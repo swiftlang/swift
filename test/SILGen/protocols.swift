@@ -249,7 +249,7 @@ class ClassWithGetter : PropertyWithGetter {
 
 // Make sure we are generating a protocol witness that calls the class method on
 // ClassWithGetter.
-// CHECK-LABEL: sil hidden [thunk] @_TTWC9protocols15ClassWithGetterS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed ClassWithGetter) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9protocols15ClassWithGetterS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed ClassWithGetter) -> Int {
 // CHECK: bb0
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_retain
@@ -272,7 +272,7 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
   }
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TTWC9protocols21ClassWithGetterSetterS_24PropertyWithGetterSetterS_FS1_g1bSi : $@cc(witness_method) @thin (@in_guaranteed ClassWithGetterSetter) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9protocols21ClassWithGetterSetterS_24PropertyWithGetterSetterS_FS1_g1bSi : $@cc(witness_method) @thin (@in_guaranteed ClassWithGetterSetter) -> Int {
 // CHECK: bb0
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_retain
@@ -315,7 +315,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
 
 // Make sure that we generate direct function calls for out struct protocl
 // witness since structs don't do virtual calls for methods.
-// CHECK-LABEL: sil hidden [thunk] @_TTWV9protocols24StructWithStoredPropertyS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed StructWithStoredProperty) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9protocols24StructWithStoredPropertyS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed StructWithStoredProperty) -> Int {
 // CHECK: bb0
 // CHECK-NEXT: load
 // CHECK-NEXT: function_ref

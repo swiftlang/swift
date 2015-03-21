@@ -99,7 +99,7 @@ struct S: Fooable {
 }
 
 // Witness thunk for nonmutating 'foo'
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@cc(witness_method) @thin (Int, @in_guaranteed S) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@cc(witness_method) @thin (Int, @in_guaranteed S) -> () {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
@@ -110,14 +110,14 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for mutating 'bar'
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3barUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout S) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3barUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout S) -> () {
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     load [[SELF_ADDR]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for 'bas', which is mutating in the protocol, but nonmutating
 // in the implementation
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3basUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout S) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3basUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout S) -> ()
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
 // CHECK:         retain_value [[SELF]]
@@ -125,7 +125,7 @@ struct S: Fooable {
 // CHECK-NOT:     release_value [[SELF]]
 
 // Witness thunk for prop1 getter
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop1Si : $@cc(witness_method) @thin (@in_guaranteed S) -> Int
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop1Si : $@cc(witness_method) @thin (@in_guaranteed S) -> Int
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
@@ -136,17 +136,17 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop1 setter
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_s5prop1Si : $@cc(witness_method) @thin (Int, @inout S) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_s5prop1Si : $@cc(witness_method) @thin (Int, @inout S) -> () {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop1 materializeForSet
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop1Si : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop1Si : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>) {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop2 getter
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop2Si : $@cc(witness_method) @thin (@in_guaranteed S) -> Int
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop2Si : $@cc(witness_method) @thin (@in_guaranteed S) -> Int
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
@@ -157,17 +157,17 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop2 setter
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_s5prop2Si : $@cc(witness_method) @thin (Int, @inout S) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_s5prop2Si : $@cc(witness_method) @thin (Int, @inout S) -> () {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop2 materializeForSet
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop2Si : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop2Si : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>) {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop3 getter
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop3Si : $@cc(witness_method) @thin (@in_guaranteed S) -> Int
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_g5prop3Si : $@cc(witness_method) @thin (@in_guaranteed S) -> Int
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
@@ -178,7 +178,7 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop3 nonmutating setter
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_s5prop3Si : $@cc(witness_method) @thin (Int, @in_guaranteed S) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_s5prop3Si : $@cc(witness_method) @thin (Int, @in_guaranteed S) -> ()
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
@@ -189,7 +189,7 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop3 nonmutating materializeForSet
-// CHECK-LABEL: sil hidden [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop3Si : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>)
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_m5prop3Si : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout S, @thick S.Type) -> ()>)
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
 // CHECK:         retain_value [[SELF]]
@@ -250,7 +250,7 @@ struct AO<T>: Fooable {
 }
 
 // Witness for nonmutating 'foo'
-// CHECK-LABEL: sil hidden [thunk] @_TTWU__GV15guaranteed_self2AOQ__S_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@cc(witness_method) @thin <T> (Int, @in_guaranteed AO<T>) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWU__GV15guaranteed_self2AOQ__S_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@cc(witness_method) @thin <T> (Int, @in_guaranteed AO<T>) -> ()
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
 // TODO: This copy isn't necessary.
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
@@ -259,7 +259,7 @@ struct AO<T>: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness for 'bar', which is mutating in protocol but nonmutating in impl
-// CHECK-LABEL: sil hidden [thunk] @_TTWU__GV15guaranteed_self2AOQ__S_7FooableS_FS1_3barUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin <T> (@inout AO<T>) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWU__GV15guaranteed_self2AOQ__S_7FooableS_FS1_3barUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin <T> (@inout AO<T>) -> ()
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
 // -- NB: This copy *is* necessary, unless we're willing to assume an inout
 //        parameter is not mutably aliased.

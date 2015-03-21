@@ -95,7 +95,7 @@ protocol ClassBounded : class {
 struct ConformingStruct : X {
   mutating
   func selfTypes(#x: ConformingStruct) -> ConformingStruct { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingStruct, @in ConformingStruct, @inout ConformingStruct) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingStruct, @in ConformingStruct, @inout ConformingStruct) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct):
   // CHECK-NEXT:    %3 = load %1 : $*ConformingStruct
   // CHECK-NEXT:    // function_ref
@@ -108,7 +108,7 @@ struct ConformingStruct : X {
   
   mutating
   func loadable(#x: Loadable) -> Loadable { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_8loadableUS1___fRQPS1_FT1xVS_8Loadable_S3_ : $@cc(witness_method) @thin (Loadable, @inout ConformingStruct) -> Loadable {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_8loadableUS1___fRQPS1_FT1xVS_8Loadable_S3_ : $@cc(witness_method) @thin (Loadable, @inout ConformingStruct) -> Loadable {
   // CHECK-NEXT:  bb0(%0 : $Loadable, %1 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %2 = function_ref @_TFV9witnesses16ConformingStruct8loadablefRS0_FT1xVS_8Loadable_S1_ : $@cc(method) @thin (Loadable, @inout ConformingStruct) -> Loadable
@@ -118,7 +118,7 @@ struct ConformingStruct : X {
   
   mutating
   func addrOnly(#x: AddrOnly) -> AddrOnly { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_8addrOnlyUS1___fRQPS1_FT1xPS_8AddrOnly__PS3__ : $@cc(witness_method) @thin (@out AddrOnly, @in AddrOnly, @inout ConformingStruct) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_8addrOnlyUS1___fRQPS1_FT1xPS_8AddrOnly__PS3__ : $@cc(witness_method) @thin (@out AddrOnly, @in AddrOnly, @inout ConformingStruct) -> () {
   // CHECK-NEXT:  bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses16ConformingStruct8addrOnlyfRS0_FT1xPS_8AddrOnly__PS1__ : $@cc(method) @thin (@out AddrOnly, @in AddrOnly, @inout ConformingStruct) -> ()
@@ -128,7 +128,7 @@ struct ConformingStruct : X {
   
   mutating
   func generic<C>(#x: C) -> C { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7genericUS1___fRQPS1_U__FT1xQ__Q_ : $@cc(witness_method) @thin <A> (@out A, @in A, @inout ConformingStruct) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7genericUS1___fRQPS1_U__FT1xQ__Q_ : $@cc(witness_method) @thin <A> (@out A, @in A, @inout ConformingStruct) -> () {
   // CHECK-NEXT:  bb0(%0 : $*A, %1 : $*A, %2 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses16ConformingStruct7genericfRS0_U__FT1xQ__Q_ : $@cc(method) @thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformingStruct) -> ()
@@ -137,7 +137,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:  }
   mutating
   func classes<C2: Classes>(#x: C2) -> C2 { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7classesUS1___fRQPS1_US_7Classes__FT1xQ__Q_ : $@cc(witness_method) @thin <A2 where A2 : Classes> (@owned A2, @inout ConformingStruct) -> @owned A2 {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7classesUS1___fRQPS1_US_7Classes__FT1xQ__Q_ : $@cc(witness_method) @thin <A2 where A2 : Classes> (@owned A2, @inout ConformingStruct) -> @owned A2 {
   // CHECK-NEXT:  bb0(%0 : $A2, %1 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %2 = function_ref @_TFV9witnesses16ConformingStruct7classesfRS0_US_7Classes__FT1xQ__Q_ : $@cc(method) @thin <τ_0_0 where τ_0_0 : Classes> (@owned τ_0_0, @inout ConformingStruct) -> @owned τ_0_0
@@ -146,7 +146,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:  }
 }
 func <~>(x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return x }
-// CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16ConformingStructS_1XS_ZFS1_oi3ltgUS1___fMQPS1_FTS2_S2__S2_ : $@cc(witness_method) @thin (@out ConformingStruct, @in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_ZFS1_oi3ltgUS1___fMQPS1_FTS2_S2__S2_ : $@cc(witness_method) @thin (@out ConformingStruct, @in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> () {
 // CHECK-NEXT:  bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct, %3 : $@thick ConformingStruct.Type):
 // CHECK-NEXT:    %4 = load %1 : $*ConformingStruct
 // CHECK-NEXT:    %5 = load %2 : $*ConformingStruct
@@ -160,7 +160,7 @@ func <~>(x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return 
 
 final class ConformingClass : X {
   func selfTypes(#x: ConformingClass) -> ConformingClass { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses15ConformingClassS_1XS_FS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingClass, @in ConformingClass, @inout ConformingClass) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_1XS_FS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingClass, @in ConformingClass, @inout ConformingClass) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformingClass, %1 : $*ConformingClass, %2 : $*ConformingClass):
   // -- load and retain 'self' from inout witness 'self' parameter
   // CHECK-NEXT:    %3 = load %2 : $*ConformingClass
@@ -180,7 +180,7 @@ final class ConformingClass : X {
 func <~>(x: ConformingClass, y: ConformingClass) -> ConformingClass { return x }
 
 extension ConformingClass : ClassBounded { }
-// CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses15ConformingClassS_12ClassBoundedS_FS1_9selfTypesUS1___fQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_12ClassBoundedS_FS1_9selfTypesUS1___fQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass {
 // CHECK-NEXT:  bb0(%0 : $ConformingClass, %1 : $ConformingClass):
 // CHECK:         %2 = function_ref @_TFC9witnesses15ConformingClass9selfTypesfS0_FT1xS0__S0_
 // CHECK-NEXT:    %3 = apply %2(%0, %1) : $@cc(method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass
@@ -192,7 +192,7 @@ struct ConformingAOStruct : X {
 
   mutating
   func selfTypes(#x: ConformingAOStruct) -> ConformingAOStruct { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses18ConformingAOStructS_1XS_FS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingAOStruct, @in ConformingAOStruct, @inout ConformingAOStruct) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses18ConformingAOStructS_1XS_FS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingAOStruct, @in ConformingAOStruct, @inout ConformingAOStruct) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformingAOStruct, %1 : $*ConformingAOStruct, %2 : $*ConformingAOStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses18ConformingAOStruct9selfTypesfRS0_FT1xS0__S0_ : $@cc(method) @thin (@out ConformingAOStruct, @in ConformingAOStruct, @inout ConformingAOStruct) -> ()
@@ -213,7 +213,7 @@ func <~>(x: ConformingAOStruct, y: ConformingAOStruct) -> ConformingAOStruct { r
 struct ConformsWithMoreGeneric : X, Y {
   mutating
   func selfTypes<E>(#x: E) -> E { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @inout ConformsWithMoreGeneric) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @inout ConformsWithMoreGeneric) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    %3 = load %1 : $*ConformsWithMoreGeneric
   // CHECK-NEXT:    %4 = alloc_stack $ConformsWithMoreGeneric
@@ -232,7 +232,7 @@ struct ConformsWithMoreGeneric : X, Y {
   func loadable<F>(#x: F) -> F { return x }
   mutating
   func addrOnly<G>(#x: G) -> G { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_8addrOnlyUS1___fRQPS1_FT1xPS_8AddrOnly__PS3__ : $@cc(witness_method) @thin (@out AddrOnly, @in AddrOnly, @inout ConformsWithMoreGeneric) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_8addrOnlyUS1___fRQPS1_FT1xPS_8AddrOnly__PS3__ : $@cc(witness_method) @thin (@out AddrOnly, @in AddrOnly, @inout ConformsWithMoreGeneric) -> () {
   // CHECK-NEXT:  bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric8addrOnlyfRS0_U__FT1xQ__Q_ : $@cc(method) @thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
@@ -242,7 +242,7 @@ struct ConformsWithMoreGeneric : X, Y {
 
   mutating
   func generic<H>(#x: H) -> H { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7genericUS1___fRQPS1_U__FT1xQ__Q_ : $@cc(witness_method) @thin <A> (@out A, @in A, @inout ConformsWithMoreGeneric) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7genericUS1___fRQPS1_U__FT1xQ__Q_ : $@cc(witness_method) @thin <A> (@out A, @in A, @inout ConformsWithMoreGeneric) -> () {
   // CHECK-NEXT:  bb0(%0 : $*A, %1 : $*A, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7genericfRS0_U__FT1xQ__Q_ : $@cc(method) @thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
@@ -252,7 +252,7 @@ struct ConformsWithMoreGeneric : X, Y {
 
   mutating
   func classes<I>(#x: I) -> I { return x }
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7classesUS1___fRQPS1_US_7Classes__FT1xQ__Q_ : $@cc(witness_method) @thin <A2 where A2 : Classes> (@owned A2, @inout ConformsWithMoreGeneric) -> @owned A2 {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7classesUS1___fRQPS1_US_7Classes__FT1xQ__Q_ : $@cc(witness_method) @thin <A2 where A2 : Classes> (@owned A2, @inout ConformsWithMoreGeneric) -> @owned A2 {
   // CHECK-NEXT:  bb0(%0 : $A2, %1 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    %2 = alloc_stack $A2
   // CHECK-NEXT:    store %0 to %2#1 : $*A2
@@ -267,7 +267,7 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:  }
 }
 func <~> <J: Y, K: Y>(x: J, y: K) -> K { return y }
-// CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_ZFS1_oi3ltgUS1___fMQPS1_FTS2_S2__S2_ : $@cc(witness_method) @thin (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @thick ConformsWithMoreGeneric.Type) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_ZFS1_oi3ltgUS1___fMQPS1_FTS2_S2__S2_ : $@cc(witness_method) @thin (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @thick ConformsWithMoreGeneric.Type) -> () {
 // CHECK-NEXT:  bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric, %3 : $@thick ConformsWithMoreGeneric.Type):
 // CHECK-NEXT:    %4 = load %1 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    %5 = load %2 : $*ConformsWithMoreGeneric
@@ -293,7 +293,7 @@ protocol LabeledRequirement {
 }
 
 struct UnlabeledWitness : LabeledRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16UnlabeledWitnessS_18LabeledRequirementS_FS1_6methodUS1___fQPS1_FT1xVS_8Loadable_T_ : $@cc(witness_method) @thin (Loadable, @in_guaranteed UnlabeledWitness) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16UnlabeledWitnessS_18LabeledRequirementS_FS1_6methodUS1___fQPS1_FT1xVS_8Loadable_T_ : $@cc(witness_method) @thin (Loadable, @in_guaranteed UnlabeledWitness) -> ()
   func method(x _: Loadable) {}
 }
 
@@ -302,7 +302,7 @@ protocol LabeledSelfRequirement {
 }
 
 struct UnlabeledSelfWitness : LabeledSelfRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses20UnlabeledSelfWitnessS_22LabeledSelfRequirementS_FS1_6methodUS1___fQPS1_FT1xS2__T_ : $@cc(witness_method) @thin (@in UnlabeledSelfWitness, @in_guaranteed UnlabeledSelfWitness) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses20UnlabeledSelfWitnessS_22LabeledSelfRequirementS_FS1_6methodUS1___fQPS1_FT1xS2__T_ : $@cc(witness_method) @thin (@in UnlabeledSelfWitness, @in_guaranteed UnlabeledSelfWitness) -> ()
   func method(x _: UnlabeledSelfWitness) {}
 }
 
@@ -311,7 +311,7 @@ protocol UnlabeledRequirement {
 }
 
 struct LabeledWitness : UnlabeledRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses14LabeledWitnessS_20UnlabeledRequirementS_FS1_6methodUS1___fQPS1_FT1xVS_8Loadable_T_ : $@cc(witness_method) @thin (Loadable, @in_guaranteed LabeledWitness) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses14LabeledWitnessS_20UnlabeledRequirementS_FS1_6methodUS1___fQPS1_FT1xVS_8Loadable_T_ : $@cc(witness_method) @thin (Loadable, @in_guaranteed LabeledWitness) -> ()
   func method(#x: Loadable) {}
 }
 
@@ -320,7 +320,7 @@ protocol UnlabeledSelfRequirement {
 }
 
 struct LabeledSelfWitness : UnlabeledSelfRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses18LabeledSelfWitnessS_24UnlabeledSelfRequirementS_FS1_6methodUS1___fQPS1_FS2_T_ : $@cc(witness_method) @thin (@in LabeledSelfWitness, @in_guaranteed LabeledSelfWitness) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses18LabeledSelfWitnessS_24UnlabeledSelfRequirementS_FS1_6methodUS1___fQPS1_FS2_T_ : $@cc(witness_method) @thin (@in LabeledSelfWitness, @in_guaranteed LabeledSelfWitness) -> ()
   func method(x: LabeledSelfWitness) {}
 }
 
@@ -329,7 +329,7 @@ protocol ReadOnlyRequirement {
 }
 
 struct ImmutableModel: ReadOnlyRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses14ImmutableModelS_19ReadOnlyRequirementS_FS1_g4propSS : $@cc(witness_method) @thin (@thick ImmutableModel.Type) -> @owned String
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses14ImmutableModelS_19ReadOnlyRequirementS_FS1_g4propSS : $@cc(witness_method) @thin (@thick ImmutableModel.Type) -> @owned String
   static let prop: String = ""
 }
 
@@ -346,16 +346,16 @@ protocol IUOFailableRequirement {
 }
 
 struct NonFailableModel: FailableRequirement, NonFailableRefinement, IUOFailableRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16NonFailableModelS_19FailableRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__ : $@cc(witness_method) @thin (@out Optional<NonFailableModel>, Int, @thick NonFailableModel.Type) -> ()
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16NonFailableModelS_21NonFailableRefinementS_FS1_CUS1___fMQPS1_FT3fooSi_S2_ : $@cc(witness_method) @thin (@out NonFailableModel, Int, @thick NonFailableModel.Type) -> ()
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16NonFailableModelS_22IUOFailableRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__ : $@cc(witness_method) @thin (@out ImplicitlyUnwrappedOptional<NonFailableModel>, Int, @thick NonFailableModel.Type) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16NonFailableModelS_19FailableRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__ : $@cc(witness_method) @thin (@out Optional<NonFailableModel>, Int, @thick NonFailableModel.Type) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16NonFailableModelS_21NonFailableRefinementS_FS1_CUS1___fMQPS1_FT3fooSi_S2_ : $@cc(witness_method) @thin (@out NonFailableModel, Int, @thick NonFailableModel.Type) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16NonFailableModelS_22IUOFailableRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__ : $@cc(witness_method) @thin (@out ImplicitlyUnwrappedOptional<NonFailableModel>, Int, @thick NonFailableModel.Type) -> ()
   init(foo: Int) {}
 }
 
 struct FailableModel: FailableRequirement, IUOFailableRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses13FailableModelS_19FailableRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses13FailableModelS_19FailableRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
 
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses13FailableModelS_22IUOFailableRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses13FailableModelS_22IUOFailableRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   // CHECK: bb0([[SELF:%[0-9]+]] : $*ImplicitlyUnwrappedOptional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
   // CHECK: select_enum_addr [[RESULT_ADDR:%[0-9]+]]#1
   // CHECK: [[RESULT:%[0-9]+]] = init_enum_data_addr [[IUO_TEMP:%[0-9]+]]#1
@@ -365,7 +365,7 @@ struct FailableModel: FailableRequirement, IUOFailableRequirement {
 }
 
 struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWV9witnesses16IUOFailableModelS_21NonFailableRefinementS_FS1_CUS1___fMQPS1_FT3fooSi_S2_
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16IUOFailableModelS_21NonFailableRefinementS_FS1_CUS1___fMQPS1_FT3fooSi_S2_
   // CHECK: bb0([[SELF:%[0-9]+]] : $*IUOFailableModel, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick IUOFailableModel.Type):
   // CHECK:   [[META:%[0-9]+]] = metatype $@thin IUOFailableModel.Type
   // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelCfMS0_FT3fooSi_GSQS0__ : $@thin (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
@@ -397,16 +397,16 @@ protocol IUOFailableClassRequirement: class {
 }
 
 final class NonFailableClassModel: FailableClassRequirement, NonFailableClassRefinement, IUOFailableClassRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses21NonFailableClassModelS_24FailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned Optional<NonFailableClassModel>
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses21NonFailableClassModelS_26NonFailableClassRefinementS_FS1_CUS1___fMQPS1_FT3fooSi_S2_ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned NonFailableClassModel
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses21NonFailableClassModelS_27IUOFailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned ImplicitlyUnwrappedOptional<NonFailableClassModel>
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21NonFailableClassModelS_24FailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned Optional<NonFailableClassModel>
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21NonFailableClassModelS_26NonFailableClassRefinementS_FS1_CUS1___fMQPS1_FT3fooSi_S2_ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned NonFailableClassModel
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21NonFailableClassModelS_27IUOFailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__ : $@cc(witness_method) @thin (Int, @thick NonFailableClassModel.Type) -> @owned ImplicitlyUnwrappedOptional<NonFailableClassModel>
   init(foo: Int) {}
 }
 
 final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses18FailableClassModelS_24FailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses18FailableClassModelS_24FailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
 
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   // CHECK: select_enum_addr
   // CHECK: unchecked_take_enum_data_addr
   // CHECK: inject_enum_addr {{.*}}Some
@@ -416,18 +416,18 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 }
 
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
   // CHECK: select_enum_addr
   // CHECK: unchecked_take_enum_data_addr
   // CHECK: inject_enum_addr {{.*}}Some
   // CHECK: inject_enum_addr {{.*}}None
   // CHECK: return [[RESULT:%[0-9]+]] : $Optional<IUOFailableClassModel>
 
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses21IUOFailableClassModelS_26NonFailableClassRefinementS_FS1_CUS1___fMQPS1_FT3fooSi_S2_
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_26NonFailableClassRefinementS_FS1_CUS1___fMQPS1_FT3fooSi_S2_
   // CHECK: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
   // CHECK: return [[RESULT:%[0-9]+]] : $IUOFailableClassModel
 
-  // CHECK-LABEL: sil hidden [thunk] @_TTWC9witnesses21IUOFailableClassModelS_27IUOFailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_27IUOFailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   init!(foo: Int) {}
 }
 

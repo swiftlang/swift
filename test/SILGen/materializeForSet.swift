@@ -137,7 +137,7 @@ struct Bill : Totalled {
 // SILGEN:   return [[T4]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>)
 // SILGEN: }
 
-// SILGEN:  sil hidden [thunk] @_TTWV17materializeForSet4BillS_8TotalledS_FS1_m5totalSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>) {
+// SILGEN:  sil hidden [transparent] [thunk] @_TTWV17materializeForSet4BillS_8TotalledS_FS1_m5totalSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>) {
 // SILGEN:  bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Bill):
 // SILGEN:    [[T0:%.*]] = function_ref @_TFV17materializeForSet4Billm5totalSi
 // SILGEN:    [[T1:%.*]] = apply [transparent] [[T0]]([[BUFFER]], [[STORAGE]], [[SELF]])

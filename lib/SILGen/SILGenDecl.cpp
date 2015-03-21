@@ -2548,7 +2548,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                 witnessContextParams,
                 SILLocation(witness.getDecl()),
                 IsNotBare,
-                IsNotTransparent,
+                IsTransparent,
                 makeModuleFragile ? IsFragile : IsNotFragile,
                 IsThunk);
 
