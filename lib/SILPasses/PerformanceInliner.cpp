@@ -633,11 +633,6 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
                                               DominanceAnalysis *DA,
                                               SILLoopAnalysis *LA,
                                               ConstantTracker &callerTracker) {
-  /// Always inline transparent calls. This should have been done during
-  /// MandatoryInlining, but generics are not currenly handled.
-  if (AI->isTransparent())
-    return true;
-  
   SILFunction *Callee = getReferencedFunction(AI);
   
   if (Callee->getInlineStrategy() == AlwaysInline)
@@ -723,10 +718,6 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
 
 /// Return true if inlining this call site into a cold block is profitable.
 static bool isProfitableInColdBlock(ApplyInst *AI) {
-  /// Always inline transparent calls.
-  if (AI->isTransparent())
-    return true;
-  
   SILFunction *Callee = getReferencedFunction(AI);
   
   if (Callee->getInlineStrategy() == AlwaysInline)
