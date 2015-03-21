@@ -22,7 +22,7 @@ extension Mirror: Printable {
   public var description: String {
     let nil_ = "nil"
     return "[" + ", ".join(
-      lazy(structure).map { "\($0.0 ?? nil_): \(toDebugString($0.1))" }
+      lazy(children).map { "\($0.0 ?? nil_): \(toDebugString($0.1))" }
     ) + "]"
   }
 }
@@ -30,7 +30,7 @@ extension Mirror: Printable {
 mirrors.test("RandomAccessStructure") {
   struct Eggs : CustomReflectable {
     func reflect() -> Mirror {
-      return Mirror(["aay", "bee", "cee"])
+      return Mirror(unlabeledChildren: ["aay", "bee", "cee"])
     }
   }
 
@@ -62,13 +62,13 @@ func find(substring: String, within domain: String) -> String.Index? {
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
     func reflect() -> Mirror {
-      return Mirror(Set(letters), schema: .Set)
+      return Mirror(unlabeledChildren: Set(letters), schema: .Set)
     }
   }
 
   let w = DoubleYou().reflect()
   expectEqual(.Set, w.schema)
-  expectEqual(count(letters), numericCast(count(w.structure)))
+  expectEqual(count(letters), numericCast(count(w.children)))
   
   // Because we don't control the order of a Set, we need to do a
   // fancy dance in order to validate the result.
@@ -82,7 +82,7 @@ mirrors.test("ForwardStructure") {
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
     func reflect() -> Mirror {
-      return Mirror(letters, schema: .Collection)
+      return Mirror(unlabeledChildren: letters, schema: .Collection)
     }
   }
 
@@ -99,7 +99,7 @@ mirrors.test("BidirectionalStructure") {
 mirrors.test("LabeledStructure") {
   struct Zee : CustomReflectable {
     func reflect() -> Mirror {
-      return ["bark": 1, "bite": 0]
+      return Mirror(children: ["bark": 1, "bite": 0])
     }
   }
 
@@ -110,7 +110,7 @@ mirrors.test("LabeledStructure") {
   struct Zee2 : CustomReflectable {
     func reflect() -> Mirror {
       return Mirror(
-        LabeledStructure(["bark": 1, "bite": 0]), schema: .Dictionary)
+        children: ["bark": 1, "bite": 0], schema: .Dictionary)
     }
   }
   let z2 = Zee2().reflect()
@@ -126,7 +126,7 @@ mirrors.test("Legacy") {
     (label: "[2]", value: 3)
   ]
   expectFalse(
-    contains(zip(x0, m.structure)) {
+    contains(zip(x0, m.children)) {
       $0.0.label != $0.1.label || $0.0.value as! Int != $0.1.value as! Int
     })
 }
@@ -159,7 +159,7 @@ mirrors.test("Addressing") {
 
   struct Zee : CustomReflectable {
     func reflect() -> Mirror {
-      return ["bark": 1, "bite": 0]
+      return Mirror(children: ["bark": 1, "bite": 0])
     }
   }
   

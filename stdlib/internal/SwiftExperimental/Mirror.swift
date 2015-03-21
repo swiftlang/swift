@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 public struct Mirror {
   public typealias Child = (label: String?, value: Any)
-  public typealias Structure = AnyForwardCollection<Child>
+  public typealias Children = AnyForwardCollection<Child>
   
   public enum Schema {
   case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set,
     ObjectiveCObject
 
-    init?(legacy: MirrorDisposition) {
+    internal init?(legacy: MirrorDisposition) {
       switch legacy {
       case .Struct: self = .Struct
       case .Class: self = .Class
@@ -36,21 +36,21 @@ public struct Mirror {
 
   public init<
     C: CollectionType where C.Generator.Element == Child
-  >(structure: C, schema: Schema? = nil) {
-    self.structure = Structure(structure)
+  >(children: C, schema: Schema? = nil) {
+    self.children = Children(children)
     self.schema = schema
   }
 
   public init<
     C: CollectionType
-  >(_ unlabeledChildren: C, schema: Schema? = nil) {
-    self.structure = Structure(
+  >(unlabeledChildren: C, schema: Schema? = nil) {
+    self.children = Children(
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
     )
     self.schema = schema
   }
 
-  public let structure: Structure
+  public let children: Children
   public let schema: Schema?
 }
 
@@ -74,7 +74,7 @@ extension Mirror {
   
   public init(_ oldMirror: MirrorType) {
     self.init(
-      structure: LegacyChildren(oldMirror),
+      children: LegacyChildren(oldMirror),
       schema: Schema(legacy: oldMirror.disposition))
   }
 }
@@ -125,20 +125,20 @@ extension Mirror {
   ) -> Any? {
     var result: Any = _Dummy(mirror: self)
     for e in [first] + rest {
-      let structure = reflect(result).structure
-      let position: Structure.Index
+      let children = reflect(result).children
+      let position: Children.Index
       if let label? = e as? String {
-        position = find(structure) { $0.label == label } ?? structure.endIndex
+        position = find(children) { $0.label == label } ?? children.endIndex
       }
       else if let offset? = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
-        position = advance(structure.startIndex, offset, structure.endIndex)
+        position = advance(children.startIndex, offset, children.endIndex)
       }
       else {
         _preconditionFailure(
           "Someone added a conformance to MirrorPathType; that privilege is reserved to the standard library")
       }
-      if position == structure.endIndex { return nil }
-      result = structure[position].value
+      if position == children.endIndex { return nil }
+      result = children[position].value
     }
     return result
   }
@@ -147,49 +147,50 @@ extension Mirror {
 //===--- Adapters ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public struct LabeledStructure<Element>
+public struct DictionaryLiteral<Key, Value>
   : CollectionType, DictionaryLiteralConvertible {
   
-  public init(dictionaryLiteral elements: (String, Element)...) {
+  public init(dictionaryLiteral elements: (Key, Value)...) {
     self.elements = elements
   }
 
   /// Construct a copy of `other`
   ///
   /// exists primarily so a Dictionary literal can be passed as an argument
-  public init(_ other: LabeledStructure) {
+  public init(_ other: DictionaryLiteral) {
     self.elements = other.elements
   }
   
-  public init(_ elements: [(String, Element)]) {
+  public init(elements: [(Key, Value)]) {
     self.elements = elements
   }
   
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return elements.endIndex }
-  
-  public subscript(position: Int) -> Mirror.Child {
-    return (label: elements[position].0, value: elements[position].1)
+
+  typealias Element = (Key,Value)
+  public subscript(position: Int) -> Element {
+    return elements[position]
   }
 
-  public func generate() -> IndexingGenerator<LabeledStructure> {
+  public func generate() -> IndexingGenerator<DictionaryLiteral> {
     return IndexingGenerator(self)
   }
   
-  internal let elements: [(String, Element)]
+  internal let elements: [(Key, Value)]
 }
 
-extension Mirror : DictionaryLiteralConvertible {
+extension Mirror {
   typealias Key = String
   typealias Value = Any
-  public init(dictionaryLiteral elements: (String, Any)...) {
-    self.init(LabeledStructure(elements))
-  }
   
   public init<Element>(
-    _ structure: LabeledStructure<Element>, schema: Schema? = nil
+    children: DictionaryLiteral<String, Element>,
+    schema: Schema? = nil
   ) {
-    self.structure = Structure(structure)
+    self.children = Children(
+      lazy(children).map { Child(label: $0.0, value: $0.1) }
+    )
     self.schema = schema
   }
 }
