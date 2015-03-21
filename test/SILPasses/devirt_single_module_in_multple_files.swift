@@ -6,12 +6,12 @@ public func test() {
   e.evaluate(1)
 }
 
-// CHECK-LABEL: sil shared [transparent] @_TTSf3cpfr74_TFFC38devirt_single_module_in_multiple_files9EvaluatorcFMS0_FT_S0_U_FT_Si_n_n___TTRXFo__dSi_XFo_iT__iSi_ 
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSf3cpfr74_TFFC38devirt_single_module_in_multiple_files9EvaluatorcFMS0_FT_S0_U_FT_Si_n_n___TTRXFo__dSi_XFo_iT__iSi_ 
 // CHECK: %{{.*}} = class_method %{{.*}} : $Problem1, #Problem1.run!1 : Problem1 -> () -> Int , $@cc(method) @thin (@owned Problem1) -> Int
 // CHECK-NEXT: apply
 // CHECK: return
 
-// CHECK-LABEL: sil shared [transparent] @_TTSf3cpfr75_TFFC38devirt_single_module_in_multiple_files9EvaluatorcFMS0_FT_S0_U0_FT_Si_n_n___TTRXFo__dSi_XFo_iT__iSi_
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTSf3cpfr75_TFFC38devirt_single_module_in_multiple_files9EvaluatorcFMS0_FT_S0_U0_FT_Si_n_n___TTRXFo__dSi_XFo_iT__iSi_
 // CHECK: %{{.*}} = class_method %{{.*}} : $Problem2, #Problem2.run!1 : Problem2 -> () -> Int , $@cc(method) @thin (@owned Problem2) -> Int
 // CHECK-NEXT: apply
 // CHECK: return

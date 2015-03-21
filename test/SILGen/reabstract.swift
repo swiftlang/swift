@@ -20,7 +20,7 @@ func test0() {
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
-// CHECK:    sil shared [transparent] [[THUNK]] : $@thin (@out Optional<Int>, @in Int, @owned @callee_owned (Int) -> Optional<Int>) -> () {
+// CHECK:    sil shared [transparent] [thunk] [[THUNK]] : $@thin (@out Optional<Int>, @in Int, @owned @callee_owned (Int) -> Optional<Int>) -> () {
 // CHECK:      [[T0:%.*]] = load %1 : $*Int
 // CHECK-NEXT: [[T1:%.*]] = apply %2([[T0]])
 // CHECK-NEXT: store [[T1]] to %0
