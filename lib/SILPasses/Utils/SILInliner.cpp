@@ -373,37 +373,3 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
       llvm_unreachable("not valid in canonical sil");
   }
 }
-
-/// \brief Returns the inlining cost of the function.
-///
-/// \param Caller is nonnull if the function is being evaluated for inlining.
-unsigned swift::getFunctionCost(SILFunction *F, SILFunction *Caller,
-                                unsigned Cutoff) {
-  DEBUG(llvm::dbgs() << "            Calculating cost for " << F->getName()
-        << ".\n");
-
-  if (F->isTransparent() == IsTransparent_t::IsTransparent)
-    return 0;
-
-  unsigned Cost = 0;
-  for (auto &BB : *F) {
-    for (auto &I : BB) {
-      auto ICost = instructionInlineCost(I);
-
-      Cost += unsigned(ICost);
-
-      // If we're debugging, continue calculating the total cost even if we
-      // passed the threshold.
-      DEBUG(continue);
-
-      // If i is greater than the Cutoff, we already know we are
-      // not going to inline this given function, so there is no point in
-      // continuing to visit instructions.
-      if (Cost > Cutoff)
-        return Cost;
-    }
-  }
-
-  DEBUG(llvm::dbgs() << "            Found cost: " << Cost << "\n");
-  return Cost;
-}

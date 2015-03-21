@@ -23,10 +23,6 @@
 
 namespace swift {
 
-/// Helper that computes an integral cost metric for use with inlining/cloning
-/// passes that want to compare against a threshold.
-unsigned getFunctionCost(SILFunction *F, SILFunction *Callee, unsigned Cutoff);
-
 // For now Free is 0 and Expensive is 1. This can be changed in the future by
 // adding more categories.
 enum class InlineCost : unsigned {
