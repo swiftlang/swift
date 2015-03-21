@@ -51,7 +51,8 @@ public func withOverriddenNSLocaleCurrentLocale<Result>(
   body: () -> Result
 ) -> Result {
   precondition(contains(
-    NSLocale.availableLocaleIdentifiers(), temporaryLocaleIdentifier),
+    NSLocale.availableLocaleIdentifiers() as! [String],
+    temporaryLocaleIdentifier),
     "requested locale \(temporaryLocaleIdentifier) is not available")
 
   return withOverriddenNSLocaleCurrentLocale(
