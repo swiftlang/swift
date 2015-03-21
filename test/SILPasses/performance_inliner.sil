@@ -891,7 +891,7 @@ bb2:                                              // Preds: bb0 bb1
   return %16 : $()                                // id: %17
 }
 
-sil @slowHelper : $@thin () -> () {
+sil [transparent] @slowHelper : $@thin () -> () {
 bb0:
   %t = tuple ()
   return %t : $()
@@ -902,7 +902,7 @@ sil [transparent] [semantics "fastpath"] @fastPathHelper : $@thin <τ_0_0 where 
 // fastpath.closedTest0 () -> ()
 // From <rdar://problem/17611447> _fastPath kills optimizer
 // First test that the inliner is not inlining the slow call.
-// Then teset that same calls is not inlined when transparent.
+// Then test that same calls is not inlined when transparent.
 // CHECK-LABEL:  @testNoInlineSlow
 // CHECK-LABEL: bb0:
 // CHECK: function_ref @fastPathHelper
@@ -923,7 +923,7 @@ bb0:
 
 bb1:
   %f2 = function_ref @slowHelper : $@thin () -> ()
-  %r2 = apply %f2() : $@thin () -> ()
+  %r2 = apply [transparent] %f2() : $@thin () -> ()
   br bb2
 
 bb2:
@@ -935,7 +935,7 @@ bb2:
 // CHECK-LABEL: bb0:
 // CHECK: function_ref @fastPathHelper
 // CHECK-LABEL: bb1:
-// CHECK-NOT: function_ref @slowHelper
+// CHECK: function_ref @slowHelper
 // CHECK-LABEL: bb2:
 sil @testInlineSlowTransparent : $@thin () -> () {
 bb0:
