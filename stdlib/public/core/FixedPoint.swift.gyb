@@ -604,10 +604,8 @@ public func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
 
 // Prefix and postfix increment and decrement.
 
-// We already have generic versions of these, but when compiling
-// -Onone we are unable to devirtualize the generic call, which
-// results in worse performance than we would like for these simple
-// operations (tracked by <rdar://problem/17692569>).
+// FIXME: After <rdar://problem/20226526> is fixed, we should be able
+//        to remove these.
 @transparent
 public prefix func ++ (inout x: ${Self}) -> ${Self} {
   x = x + 1

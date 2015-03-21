@@ -372,3 +372,17 @@ func testAssumeNonNegative() {
   var input = -3
   _assumeNonNegative(input); // expected-error {{assumed non-negative value '-3' is negative}}
 }
+
+protocol Num { func Double() -> Self }
+
+extension Int8 : Num {
+  @transparent
+  func Double() -> Int8 { return self * 2 }
+}
+
+@transparent
+func Double<T : Num>(x: T) -> T { return x.Double() }
+
+func tryDouble() -> Int8 {
+  return Double(Int8.max) // expected-error {{arithmetic operation '127 * 2' (on signed 8-bit integer type) results in an overflow}}
+}

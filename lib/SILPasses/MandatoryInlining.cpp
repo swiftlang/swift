@@ -14,6 +14,7 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SILPasses/Utils/Devirtualize.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "swift/SILPasses/Transforms.h"
@@ -286,7 +287,8 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
   SILFunction *CalleeFunction = FRI->getReferencedFunction();
 
   if (CalleeFunction->getAbstractCC() != AbstractCC::Freestanding &&
-      CalleeFunction->getAbstractCC() != AbstractCC::Method)
+      CalleeFunction->getAbstractCC() != AbstractCC::Method &&
+      CalleeFunction->getAbstractCC() != AbstractCC::WitnessMethod)
     return nullptr;
 
   // If CalleeFunction is a declaration, see if we can load it. If we fail to
@@ -341,7 +343,18 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     for (auto I = FI->begin(), E = FI->end(); I != E; ++I) {
       ApplyInst *InnerAI = dyn_cast<ApplyInst>(I);
-      if (!InnerAI || !InnerAI->isTransparent())
+
+      if (!InnerAI)
+        continue;
+
+      auto *ApplyBlock = InnerAI->getParent();
+
+      if (auto *DirectAI = devirtualizeApply(InnerAI)) {
+        InnerAI = DirectAI;
+        I = SILBasicBlock::iterator(InnerAI);
+      }
+
+      if (!InnerAI->isTransparent())
         continue;
 
       SILLocation Loc = InnerAI->getLoc();
@@ -372,8 +385,6 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         }
         return false;
       }
-
-      auto *ApplyBlock = InnerAI->getParent();
 
       // Inline function at I, which also changes I to refer to the first
       // instruction inlined in the case that it succeeds. We purposely
