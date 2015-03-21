@@ -85,16 +85,14 @@ NSStringAPIs.test("NSStringEncoding") {
 NSStringAPIs.test("localizedStringWithFormat(_:...)") {
   var world: NSString = "world"
   expectEqual("Hello, world!%42", String.localizedStringWithFormat(
-      "Hello, %@!%%%ld", world, 42))
+    "Hello, %@!%%%ld", world, 42))
 
   withOverriddenNSLocaleCurrentLocale("en_US") {
-    expectEqual("0.5", String.localizedStringWithFormat(
-        "%g", 0.5))
+    expectEqual("0.5", String.localizedStringWithFormat("%g", 0.5))
   }
 
   withOverriddenNSLocaleCurrentLocale("uk") {
-    expectEqual("0,5", String.localizedStringWithFormat(
-        "%g", 0.5))
+    expectEqual("0,5", String.localizedStringWithFormat("%g", 0.5))
   }
 }
 
