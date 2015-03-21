@@ -24,8 +24,10 @@ class SILValue;
 class SILInstruction;
 
   class DominanceAnalysis : public SILAnalysis {
-    llvm::DenseMap<SILFunction *, DominanceInfo*> DomInfo;
-    llvm::DenseMap<SILFunction *, PostDominanceInfo*> PostDomInfo;
+    typedef llvm::DenseMap<SILFunction *, DominanceInfo*> DomMap;
+    typedef llvm::DenseMap<SILFunction *, PostDominanceInfo*> PDomMap;
+    DomMap DomInfo;
+    PDomMap PostDomInfo;
 
   public:
     virtual ~DominanceAnalysis() {
@@ -41,15 +43,17 @@ class SILInstruction;
     DominanceAnalysis(SILModule *) : SILAnalysis(AnalysisKind::Dominance) {}
 
     DominanceInfo* getDomInfo(SILFunction *F) {
-      if (!DomInfo.count(F))
-        DomInfo[F] = new DominanceInfo(F);
-      return DomInfo[F];
+      auto &it = DomInfo.FindAndConstruct(F);
+      if (!it.second)
+        it.second = new DominanceInfo(F);
+      return it.second;
     }
 
     PostDominanceInfo* getPostDomInfo(SILFunction *F) {
-      if (!PostDomInfo.count(F))
-        PostDomInfo[F] = new PostDominanceInfo(F);
-      return PostDomInfo[F];
+      auto &it = PostDomInfo.FindAndConstruct(F);
+      if (!it.second)
+        it.second = new PostDominanceInfo(F);
+      return it.second;
     }
 
     static bool classof(const SILAnalysis *S) {
@@ -77,14 +81,16 @@ class SILInstruction;
 
     virtual void invalidate(SILFunction* F, InvalidationKind K) {
       if (K >= InvalidationKind::CFG) {
-        if (DomInfo.count(F)) {
-          delete DomInfo[F];
-          DomInfo.erase(F);
+        auto &it= DomInfo.FindAndConstruct(F);
+        if (it.second) {
+          delete it.second;
+          it.second = nullptr;
         }
 
-        if (PostDomInfo.count(F)) {
-          delete PostDomInfo[F];
-          PostDomInfo.erase(F);
+        auto &pit= PostDomInfo.FindAndConstruct(F);
+        if (pit.second) {
+          delete pit.second;
+          pit.second = nullptr;
         }
       }
     }
