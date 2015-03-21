@@ -339,8 +339,6 @@ class StringConcatenationOptimizer {
   ApplyInst *AIRight = nullptr;
   /// String literal conversion function to be used.
   FunctionRefInst *FRIConvertFromBuiltin = nullptr;
-  /// Set if a String literal conversion function to be used is transparent.
-  bool IsTransparent = false;
   /// Result type of a function producing the concatenated string literal.
   SILValue FuncResultType;
 
@@ -442,7 +440,6 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
 void StringConcatenationOptimizer::adjustEncodings() {
   if (SLILeft->getEncoding() == SLIRight->getEncoding()) {
     FRIConvertFromBuiltin = FRILeft;
-    IsTransparent = AILeft->isTransparent();
     if (SLILeft->getEncoding() == StringLiteralInst::Encoding::UTF8) {
       FuncResultType = AILeft->getOperand(4);
     } else {
@@ -457,7 +454,6 @@ void StringConcatenationOptimizer::adjustEncodings() {
       SLIRight->getEncoding() == StringLiteralInst::Encoding::UTF16) {
     FuncResultType = AIRight->getOperand(3);
     FRIConvertFromBuiltin = FRIRight;
-    IsTransparent = AIRight->isTransparent();
     // Convert UTF8 representation into UTF16.
     SLILeft = Builder.createStringLiteral(AI->getLoc(), SLILeft->getValue(),
                                           StringLiteralInst::Encoding::UTF16);
@@ -468,7 +464,6 @@ void StringConcatenationOptimizer::adjustEncodings() {
       SLILeft->getEncoding() == StringLiteralInst::Encoding::UTF16) {
     FuncResultType = AILeft->getOperand(3);
     FRIConvertFromBuiltin = FRILeft;
-    IsTransparent = AILeft->isTransparent();
     // Convert UTF8 representation into UTF16.
     SLIRight = Builder.createStringLiteral(AI->getLoc(), SLIRight->getValue(),
                                            StringLiteralInst::Encoding::UTF16);
@@ -561,13 +556,14 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
 
   auto FnTy = FRIConvertFromBuiltin->getType();
   auto STResultType = FnTy.castTo<SILFunctionType>()->getResult().getSILType();
+  auto *Callee = FRIConvertFromBuiltin->getReferencedFunction();
   return ApplyInst::create(AI->getLoc(),
                            FRIConvertFromBuiltin,
                            FnTy,
                            STResultType,
                            ArrayRef<Substitution>(),
                            Arguments,
-                           IsTransparent,
+                           Callee->isTransparent(),
                            *FRIConvertFromBuiltin->getReferencedFunction());
 }
 
