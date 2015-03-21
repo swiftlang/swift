@@ -343,7 +343,8 @@ protected:
   bool hoistDestroy(SILInstruction *DestroyPoint, SILLocation DestroyLoc);
 
   bool isSourceDeadAtCopy(CopyAddrInst *);
-  bool areCopyDestUsersDominatedBy(CopyAddrInst *, SmallVectorImpl<Operand *> &);
+  bool areCopyDestUsersDominatedBy(CopyAddrInst *,
+                                   SmallVectorImpl<Operand *> &);
 };
 } // namespace
 
