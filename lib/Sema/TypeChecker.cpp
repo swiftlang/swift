@@ -1717,36 +1717,19 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
         << ")\n" << OriginalIndent;
   }
 
-  // This must stay in sync with diag::availability_add_attribute.
-  enum {
-    DK_Declaration = 0,
-    DK_Type,
-    DK_Function,
-    DK_Property,
-    DK_Extension,
-    DK_EnumCase,
-  } FixedDeclKind = DK_Declaration;
+  DescriptiveDeclKind KindForDiagnostic = D->getDescriptiveKind();
 
-  // The above kinds are not acceptable from a QoI perspective, but they
-  // are good enough for testing that the Fix-It adds the attribute
-  // attribute to the right declaration. In future, we will update these
-  // to distinguish, between enums and classes, and between functions,
-  // methods, and initializers, etc.
-
-  if (isa<NominalTypeDecl>(D)) {
-    FixedDeclKind = DK_Type;
-  } else if (isa<FuncDecl>(D)) {
-    FixedDeclKind = DK_Function;
-  } else if (isa<PatternBindingDecl>(D)) {
-    FixedDeclKind = DK_Property;
-  } else if (isa<ExtensionDecl>(D)) {
-    FixedDeclKind = DK_Extension;
-  } else if (isa<EnumCaseDecl>(D)) {
-    FixedDeclKind = DK_EnumCase;
+  // To avoid exposing the pattern binding declaration to the user, get the
+  // descriptive kind from one of the VarDecls while still using the Fix-It
+  // location from the PatternBindingDecl.
+  if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
+    KindForDiagnostic =
+        abstractSyntaxDeclForAvailabilityAttribute(D)->getDescriptiveKind();
   }
 
   TC.diagnose(ReferenceRange.Start, diag::availability_add_attribute,
-              FixedDeclKind).fixItInsert(InsertLoc, AttrText);
+              KindForDiagnostic)
+      .fixItInsert(InsertLoc, AttrText);
 }
 
 /// Emit a diagnostic note and Fix-It to add an if #os(...) { } guard

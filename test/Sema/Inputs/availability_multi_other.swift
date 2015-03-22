@@ -21,7 +21,7 @@ class OtherIntroduced10_10 {
   // This method uses a 10_11 only type in its signature, so validating
   // the declaration should produce an availability error
   func returns10_11() -> OtherIntroduced10_11 { // expected-error {{'OtherIntroduced10_11' is only available on OS X 10.11 or newer}}
-      // expected-note@-1 {{add @availability attribute to enclosing function}}
+      // expected-note@-1 {{add @availability attribute to enclosing instance method}}
 
     // Body is not type checked (by design) so no error is expected for unavailable type used in return.
     return OtherIntroduced10_11()
@@ -33,7 +33,7 @@ class OtherIntroduced10_10 {
   }
 
   func takes10_11(o: OtherIntroduced10_11) { // expected-error {{'OtherIntroduced10_11' is only available on OS X 10.11 or newer}}
-      // expected-note@-1 {{add @availability attribute to enclosing function}}
+      // expected-note@-1 {{add @availability attribute to enclosing instance method}}
   }
 
   @availability(OSX, introduced=10.11)
@@ -41,7 +41,7 @@ class OtherIntroduced10_10 {
   }
 
   var propOf10_11: OtherIntroduced10_11 = // expected-error {{'OtherIntroduced10_11' is only available on OS X 10.11 or newer}}
-      // expected-note@-1 {{add @availability attribute to enclosing property}}
+      // expected-note@-1 {{add @availability attribute to enclosing var}}
 
       OtherIntroduced10_11() // We don't expect an error here because the initializer is not type checked (by design).
 
@@ -89,4 +89,4 @@ class OtherIntroduced10_12 {
 }
 
 var globalFromOtherOn10_11 : OtherIntroduced10_11? = nil // expected-error {{'OtherIntroduced10_11' is only available on OS X 10.11 or newer}}
-    // expected-note@-1 {{add @availability attribute to enclosing property}}
+    // expected-note@-1 {{add @availability attribute to enclosing var}}

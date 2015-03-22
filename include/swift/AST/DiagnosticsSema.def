@@ -1974,9 +1974,7 @@ NOTE(availability_guard_with_version_check, sema_avail, none,
      "guard with version check", ())
 
 NOTE(availability_add_attribute, sema_avail, none,
-     "add @availability attribute to enclosing "
-     "%select{declaration|type|function|property|extension|enum case}0",
-     (unsigned))
+     "add @availability attribute to enclosing %0", (DescriptiveDeclKind))
 
 ERROR(availability_accessor_only_version_newer, sema_avail, none,
       "%select{getter|setter}0 for %1 is only available on %2 %3"
