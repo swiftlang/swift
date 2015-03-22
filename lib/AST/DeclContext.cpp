@@ -479,6 +479,9 @@ void DeclContext::dumpContext() const {
 template <typename DCType>
 static unsigned getLineNumber(DCType *DC) {
   SourceLoc loc = DC->getLoc();
+  if (loc.isInvalid())
+    return 0;
+
   const ASTContext &ctx = static_cast<const DeclContext *>(DC)->getASTContext();
   return ctx.SourceMgr.getLineAndColumn(loc).first;
 }
