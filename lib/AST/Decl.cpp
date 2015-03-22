@@ -36,6 +36,8 @@
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/DeclObjC.h"
 
+#include <algorithm>
+
 using namespace swift;
 
 clang::SourceLocation ClangNode::getLocation() const {
@@ -3570,6 +3572,18 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
   auto funcTy = interfaceType->castTo<AnyFunctionType>();
   funcTy = funcTy->getResult()->castTo<AnyFunctionType>();
   return funcTy->getInput();
+}
+
+EnumCaseDecl *EnumElementDecl::getParentCase() const {
+  for (EnumCaseDecl *EC : getParentEnum()->getAllCases()) {
+    ArrayRef<EnumElementDecl *> CaseElements = EC->getElements();
+    if (std::find(CaseElements.begin(), CaseElements.end(), this) !=
+        CaseElements.end()) {
+      return EC;
+    }
+  }
+
+  llvm_unreachable("enum element not in case of parent enum");
 }
 
 SourceRange ConstructorDecl::getSourceRange() const {

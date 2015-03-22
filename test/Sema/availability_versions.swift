@@ -1014,6 +1014,11 @@ class ClassForFixit {
       // expected-note@-2 {{add @availability attribute to enclosing property}} {{3-3=@availability(OSX, introduced=10.10)\n  }}
       // expected-note@-3 {{add @availability attribute to enclosing type}} {{1-1=@availability(OSX, introduced=10.10)\n}}
 
+  var fixitForReferenceInPropertyAccessorTypeMultiple: ClassAvailableOn10_10? = nil, other: Int = 7
+      // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-2 {{add @availability attribute to enclosing property}} {{3-3=@availability(OSX, introduced=10.10)\n  }}
+      // expected-note@-3 {{add @availability attribute to enclosing type}} {{1-1=@availability(OSX, introduced=10.10)\n}}
+
   func fixitForRefInGuardOfIf() {
     if (globalAvailableOn10_10 > 1066) {
       let _ = 5
@@ -1034,4 +1039,16 @@ extension ClassToExtend {
         // expected-note@-3 {{add @availability attribute to enclosing function}} {{3-3=@availability(OSX, introduced=10.10)\n  }}
         // expected-note@-4 {{add @availability attribute to enclosing extension}} {{1-1=@availability(OSX, introduced=10.10)\n}}
   }
+}
+
+enum EnumForFixit {
+  case CaseWithUnavailablePayload(p: ClassAvailableOn10_10)
+      // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-2 {{add @availability attribute to enclosing enum case}} {{3-3=@availability(OSX, introduced=10.10)\n  }}
+      // expected-note@-3 {{add @availability attribute to enclosing type}} {{1-1=@availability(OSX, introduced=10.10)\n}}
+
+  case CaseWithUnavailablePayload2(p: ClassAvailableOn10_10), WithoutPayload
+      // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-2 {{add @availability attribute to enclosing enum case}} {{3-3=@availability(OSX, introduced=10.10)\n  }}
+      // expected-note@-3 {{add @availability attribute to enclosing type}} {{1-1=@availability(OSX, introduced=10.10)\n}}
 }

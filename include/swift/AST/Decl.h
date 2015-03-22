@@ -72,6 +72,7 @@ namespace swift {
   class GenericTypeParamType;
   class Module;
   class NameAliasType;
+  class EnumCaseDecl;
   class EnumElementDecl;
   class Pattern;
   struct PrintOptions;
@@ -3103,11 +3104,19 @@ public:
   /// A range for iterating the elements of an enum.
   using ElementRange = DowncastFilterRange<EnumElementDecl, DeclRange>;
 
+  /// A range for iterating the cases of an enum.
+  using CaseRange = DowncastFilterRange<EnumCaseDecl, DeclRange>;
+
   /// Return a range that iterates over all the elements of an enum.
   ElementRange getAllElements() const {
     return ElementRange(getMembers());
   }
   
+  /// Return a range that iterates over all the cases of an enum.
+  CaseRange getAllCases() const {
+    return CaseRange(getMembers());
+  }
+
   /// Insert all of the 'case' element declarations into a DenseSet.
   void getAllElements(llvm::DenseSet<EnumElementDecl*> &elements) const {
     for (auto elt : getAllElements())
@@ -4944,6 +4953,9 @@ public:
     return cast<EnumDecl>(getDeclContext());
   }
   
+  /// Return the containing EnumCaseDecl.
+  EnumCaseDecl *getParentCase() const;
+
   SourceLoc getStartLoc() const {
     return getNameLoc();
   }

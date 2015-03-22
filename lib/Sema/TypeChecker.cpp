@@ -1445,6 +1445,70 @@ const Decl *rootForAvailabilityFixitFinder(SourceRange ReferenceRange,
   return nullptr;
 }
 
+/// Given a declaration that allows availability attributes in the abstract
+/// syntax tree, return the declaration upon which the declaration would
+/// appear in concrete syntax. This function is necessary because for semantic
+/// analysis, the parser attaches attributes to declarations other
+/// than those on which they, concretely, appear. For these declarations (enum
+/// cases and variable declarations) a Fix-It for an added availability
+/// attribute should be suggested for the appropriate concrete location.
+static const Decl *
+concreteSyntaxDeclForAvailabilityAttribute(const Decl *AbstractSyntaxDecl) {
+  // This function needs to be kept in sync with its counterpart,
+  // abstractSyntaxDeclForAvailabilityAttribute().
+
+  // The source range for VarDecls does not include 'var ' (and, in any
+  // event, multiple variables can be introduced with a single 'var'),
+  // so suggest adding an attribute to the PatterningBindingDecl instead.
+  if (auto *VD = dyn_cast<VarDecl>(AbstractSyntaxDecl)) {
+    return VD->getParentPatternBinding();
+  }
+
+  // Similarly suggest applying the Fix-It to the parent enum case rather than
+  // the enum element.
+  if (auto *EE = dyn_cast<EnumElementDecl>(AbstractSyntaxDecl)) {
+    return EE->getParentCase();
+  }
+
+  return AbstractSyntaxDecl;
+}
+
+/// Given a declaration upon which an availability attribute would appear in
+/// concrete syntax, return a declaration to which the parser
+/// actually attaches the attribute in the abstract syntax tree. We use this
+/// function to determine whether the concrete syntax already has an
+/// availability attribute.
+static const Decl *
+abstractSyntaxDeclForAvailabilityAttribute(const Decl *ConcreteSyntaxDecl) {
+  // This function needs to be kept in sync with its counterpart,
+  // concreteSyntaxDeclForAvailabilityAttribute().
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(ConcreteSyntaxDecl)) {
+    // Existing @availability attributes in the AST are attached to VarDecls
+    // rather than PatternBindingDecls, so we return the first VarDecl for
+    // the pattern binding declaration.
+    // This is safe, even though there may be multiple VarDecls, because
+    // all parsed attribute that appear in the concrete syntax upon on the
+    // PatternBindingDecl are added to all of the VarDecls for the pattern
+    // binding.
+    ArrayRef<PatternBindingEntry> Entries = PBD->getPatternList();
+    if (Entries.size() > 0) {
+      VarDecl *VD = Entries.front().ThePattern->getSingleVar();
+      if (VD)
+        return VD;
+    }
+  } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
+    // Similar to the PatternBindingDecl case above, we return the
+    // first EnumElementDecl.
+    ArrayRef<EnumElementDecl *> Elems = ECD->getElements();
+    if (Elems.size() > 0) {
+      return Elems.front();
+    }
+  }
+
+  return ConcreteSyntaxDecl;
+}
+
 /// Given a declaration, return a better related declaration for which
 /// to suggest an @availability fixit, or the original declaration
 /// if no such related declaration exists.
@@ -1455,23 +1519,9 @@ static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
     if (FD->isAccessor()) {
       D = FD->getAccessorStorageDecl();
     }
-  } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    // Existing @availability attributes in the AST are attached to VarDecls
-    // rather than PatternBindingDecls, so we use the VarDecl as the
-    // suggested declaration rather than the VarDecl to detect when
-    // we want to update vs. add an attribute.
-    if (VarDecl *VD = PBD->getSingleVar()) {
-      D = VD;
-    }
-  } else if (auto *ECD = dyn_cast<EnumCaseDecl>(D)) {
-    // Suggest Fix-It on element rather than EnumCaseDecl.
-    ArrayRef<EnumElementDecl *> Elems = ECD->getElements();
-    if (Elems.size() > 0) {
-      D = Elems.front();
-    }
   }
 
-  return D;
+  return abstractSyntaxDeclForAvailabilityAttribute(D);
 }
 
 /// Walk the DeclContext hierarchy starting from D to find a declaration
@@ -1620,14 +1670,11 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
     return;
   }
 
-  // Attaching attributes to VarDecls is a problem for Fix-Its because
-  // the source range for VarDecls does not include 'var ' (and, in any
-  // event, multiple variables can be introduced with a single 'var'),
-  // so suggest adding an attribute to the PatterningBindingDecl instead.
-  if (auto *VD = dyn_cast<VarDecl>(D)) {
-    assert(VD->getParentPatternBinding());
-    D = VD->getParentPatternBinding();
-  }
+  // For some declarations (variables, enum elements), the location in concrete
+  // syntax to suggest the Fix-It may differ from the declaration to which
+  // we attach availability attributes in the abstract syntax tree during
+  // parsing.
+  D = concreteSyntaxDeclForAvailabilityAttribute(D);
 
   SourceLoc InsertLoc = D->getAttrs().getStartLoc(/*forModifiers=*/false);
   if (InsertLoc.isInvalid()) {
@@ -1674,7 +1721,7 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
     FixedDeclKind = DK_Property;
   } else if (isa<ExtensionDecl>(D)) {
     FixedDeclKind = DK_Extension;
-  } else if (isa<EnumElementDecl>(D)) {
+  } else if (isa<EnumCaseDecl>(D)) {
     FixedDeclKind = DK_EnumCase;
   }
 
