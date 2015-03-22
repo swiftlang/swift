@@ -452,7 +452,7 @@ func exprPostfix1(x : Int) {
 }
 
 func exprPostfix2() {
-  var x = .42 // expected-error {{'.42' is not a valid floating point literal; it must be written '0.42'}}
+  var x = .42 // expected-error {{'.42' is not a valid floating point literal; it must be written '0.42'}} {{11-11=0}}
 }
 
 //===--- Recovery for expr-super.
