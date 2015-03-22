@@ -424,8 +424,10 @@ found_inherited:
   
   // Specialize the inherited conformance, if necessary.
   if (!subs.empty()) {
-    return getType()->getASTContext()
-      .getSpecializedConformance(getType(), foundInherited, subs);
+    TypeSubstitutionMap subMap;
+    ArchetypeConformanceMap conformanceMap;
+    return foundInherited->subst(getDeclContext()->getParentModule(),
+                                 getType(), subs, subMap, conformanceMap);
   }
   assert((getType()->isEqual(foundInherited->getType()) ||
           foundInherited->getType()->isSuperclassOf(getType(), nullptr))
