@@ -888,6 +888,10 @@ WARNING(trailing_closure_excess_newlines,expr_parsing,none,
 NOTE(trailing_closure_call_here,expr_parsing,none,
      "parsing trailing closure for this call", ())
 
+ERROR(invalid_float_literal_missing_leading_zero,expr_parsing,none,
+      "'.%0' is not a valid floating point literal; it must be written '0.%0'",
+      (StringRef))
+
 ERROR(expected_identifier_after_dot_expr,expr_parsing,none,
       "expected identifier after '.' expression", ())
 ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,

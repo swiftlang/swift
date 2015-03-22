@@ -825,6 +825,28 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
   case tok::period_prefix: {     // .foo
     SourceLoc DotLoc = consumeToken(tok::period_prefix);
+    
+    // Special case ".<integer_literal>" like ".4".  This isn't valid, but the
+    // developer almost certainly meant to use "0.4".  Diagnose this, and
+    // recover as if they wrote that.
+    if (Tok.is(tok::integer_literal) && !Tok.isAtStartOfLine()) {
+      diagnose(DotLoc, diag::invalid_float_literal_missing_leading_zero,
+               Tok.getText())
+        .fixItInsert(DotLoc, "0")
+        .highlight({DotLoc, Tok.getLoc()});
+      char *Ptr = (char*)Context.Allocate(Tok.getLength()+2, 1);
+      memcpy(Ptr, "0.", 2);
+      memcpy(Ptr+2, Tok.getText().data(), Tok.getLength());
+      auto FltText = StringRef(Ptr, Tok.getLength()+2);
+      FltText = copyAndStripUnderscores(Context, FltText);
+      
+      consumeToken(tok::integer_literal);
+      Result = makeParserResult(new (Context)
+                                FloatLiteralExpr(FltText, DotLoc,
+                                                 /*Implicit=*/false));
+      break;
+    }
+    
     Identifier Name;
     SourceLoc NameLoc;
     if (parseIdentifier(Name, NameLoc,diag::expected_identifier_after_dot_expr))
