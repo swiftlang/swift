@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -33,32 +34,6 @@ using namespace swift;
 namespace {
   struct RequirementMatch;
 
-  /// Helper class whose objects invoke a function when destroyed.
-  ///
-  /// Use this via the SCOPE_GUARD macro.
-  template <typename F>
-  class ScopeGuard {
-    F &TheFunc;
-
-  public:
-    ScopeGuard(F &func) : TheFunc(func) { }
-    ~ScopeGuard() { TheFunc(); }
-
-    ScopeGuard(const ScopeGuard &) = delete;
-    ScopeGuard &operator=(const ScopeGuard &) = delete;
-  };
-
-#define JOIN(X, Y) JOIN2(X, Y)
-#define JOIN2(X, Y) X ## Y
-
-/// Provides a block of code that will be executed when exiting the
-/// current scope, e.g., to clean up resources not held by some other
-/// RAII object.
-#define SCOPE_GUARD(Code)                                 \
-  auto JOIN(scope_guard_func_, __LINE__) = [&] {Code;};   \
-  ScopeGuard<decltype(JOIN(scope_guard_func_, __LINE__))> \
-    JOIN(scope_guard_, __LINE__)(JOIN(scope_guard_func_, __LINE__));
-  
   /// The result of attempting to resolve a witness.
   enum class ResolveWitnessResult {
     /// The resolution succeeded.
@@ -2424,7 +2399,7 @@ ConformanceChecker::resolveSingleTypeWitness(AssociatedTypeDecl *assocType) {
   // Note that we're resolving this witness.
   assert(ResolvingTypeWitnesses.count(assocType) == 0 && "Currently resolving");
   ResolvingTypeWitnesses.insert(assocType);
-  SCOPE_GUARD(ResolvingTypeWitnesses.erase(assocType));
+  defer([&]{ ResolvingTypeWitnesses.erase(assocType); });
 
   // Try to resolve this type witness via name lookup, which is the
   // most direct mechanism.
@@ -2530,7 +2505,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   // Note that we're resolving this witness.
   assert(ResolvingWitnesses.count(requirement) == 0 && "Currently resolving");
   ResolvingWitnesses.insert(requirement);
-  SCOPE_GUARD(ResolvingWitnesses.erase(requirement));
+  defer([&]{ ResolvingWitnesses.erase(requirement); });
 
   // Make sure we've validated the requirement.
   if (!requirement->hasType())

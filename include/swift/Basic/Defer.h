@@ -19,11 +19,13 @@
 #define __SWIFT_DEFER_H
 
 namespace swift {
+  template <typename F>
   class DoAtScopeExit {
-    std::function<void()> Fn;
+    F &Fn;
     DoAtScopeExit(DoAtScopeExit&) = delete;
+    void operator=(DoAtScopeExit&) = delete;
   public:
-    DoAtScopeExit(std::function<void()> Fn) : Fn(Fn){}
+    DoAtScopeExit(F &Fn) : Fn(Fn){}
     ~DoAtScopeExit() {
       Fn();
     }
@@ -42,7 +44,10 @@ namespace swift {
 ///   })
 ///
 #define defer(x) \
-  swift::DoAtScopeExit DEFER_MACRO_CONCAT(defer_local, __COUNTER__)(x);
+  auto DEFER_MACRO_CONCAT(defer_func, __LINE__) = (x); \
+  swift::DoAtScopeExit<decltype(DEFER_MACRO_CONCAT(defer_func, __LINE__))> \
+       DEFER_MACRO_CONCAT(defer_local, __LINE__)\
+       (DEFER_MACRO_CONCAT(defer_func, __LINE__));
 
 #endif
 
