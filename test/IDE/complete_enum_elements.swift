@@ -66,7 +66,6 @@
 // RUN: FileCheck %s -check-prefix=QUX_ENUM_DOT < %t.enum.txt
 
 // ERROR_COMMON: found code completion token
-// ERROR_COMMON-NOT: Begin completions
 
 //===---
 //===--- Test that we can complete enum elements.

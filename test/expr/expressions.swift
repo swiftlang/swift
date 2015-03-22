@@ -359,7 +359,7 @@ var fl_e: Float = 1.0e42
 var fl_f: Float = 1.0e+  // expected-error {{expected a digit in floating point exponent}} 
 var fl_g: Float = 1.0E+42
 var fl_h: Float = 2e-42
-var vl_i: Float = -.45   // expected-error {{expected initial value after '='}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{expected expression}}
+var vl_i: Float = -.45   // expected-error {{'.45' is not a valid floating point literal; it must be written '0.45'}}
 var fl_j: Float = 0x1p0
 var fl_k: Float = 0x1.0p0
 var fl_l: Float = 0x1.0 // expected-error {{hexadecimal floating point literal must end with an exponent}}

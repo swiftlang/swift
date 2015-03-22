@@ -289,3 +289,16 @@ class OuterGenericClass<T> {
     case Zab
   } 
 }
+
+enum SimpleEnum {
+  case X, Y
+}
+
+func testSimpleEnum() {
+  let a : SimpleEnum = .X
+  let b : SimpleEnum = (.X)
+  let c : SimpleEnum=.X    // expected-error {{prefix/postfix '=' is reserved}}
+}
+
+
+

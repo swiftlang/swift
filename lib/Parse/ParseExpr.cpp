@@ -823,8 +823,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = parseExprClosure();
     break;
 
+  case tok::period:              //=.foo
   case tok::period_prefix: {     // .foo
-    SourceLoc DotLoc = consumeToken(tok::period_prefix);
+    SourceLoc DotLoc = consumeToken();
     
     // Special case ".<integer_literal>" like ".4".  This isn't valid, but the
     // developer almost certainly meant to use "0.4".  Diagnose this, and
