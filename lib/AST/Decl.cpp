@@ -818,6 +818,12 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 
   std::copy(refComponents.begin(), refComponents.end(),
             getRefComponents().data());
+
+  for (auto &ref : getRefComponents()) {
+    if (ref.GenericParams)
+      for (auto param : *ref.GenericParams)
+        param->setDeclContext(this);
+  }
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
