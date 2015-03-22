@@ -577,6 +577,15 @@ namespace {
       OS << ')';
     }
 
+    void visitEnumCaseDecl(EnumCaseDecl *ECD) {
+      printCommon(ECD, "enum_case_decl");
+      for (EnumElementDecl *D : ECD->getElements()) {
+        OS << '\n';
+        printRec(D);
+      }
+      OS << ')';
+    }
+
     void visitEnumDecl(EnumDecl *UD) {
       printCommon(UD, "enum_decl");
       printInherited(UD->getInherited());

@@ -143,6 +143,9 @@ private:
       ide::getDocumentationCommentAsDoxygen(TheCommentContext, FC, os);
   }
 
+  // Ignore other declarations.
+  void visitDecl(Decl *D) {}
+
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
     llvm::SmallString<32> scratch;

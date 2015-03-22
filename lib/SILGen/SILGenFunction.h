@@ -202,9 +202,14 @@ public:
   /// value representing the address to initialize with the return value. Null
   /// for a function that returns by value.
   SILValue IndirectReturnAddress;
+
+  struct BreakContinueDest {
+    LabeledStmt *Target;
+    JumpDest BreakDest;
+    JumpDest ContinueDest;
+  };
   
-  std::vector<std::tuple<LabeledStmt*, JumpDest, JumpDest>>
-    BreakContinueDestStack;
+  std::vector<BreakContinueDest> BreakContinueDestStack;
   std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;
@@ -654,36 +659,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Statements
   //===--------------------------------------------------------------------===//
-  
-  void visitBraceStmt(BraceStmt *S);
-  
-  void visitReturnStmt(ReturnStmt *S);
-  
-  void visitIfStmt(IfStmt *S);
-  
-  void visitIfConfigStmt(IfConfigStmt *S);
 
-  void visitDoStmt(DoStmt *S);
-  
-  void visitWhileStmt(WhileStmt *S);
-  
-  void visitDoWhileStmt(DoWhileStmt *S);
-  
-  void visitForStmt(ForStmt *S);
-  
-  void visitForEachStmt(ForEachStmt *S);
-  
-  void visitBreakStmt(BreakStmt *S);
-  
-  void visitContinueStmt(ContinueStmt *S);
-  
-  void visitFallthroughStmt(FallthroughStmt *S);
-  
-  void visitSwitchStmt(SwitchStmt *S);
+  void visit(Stmt *S) = delete;
 
-  void visitCaseStmt(CaseStmt *S);
-
-  void visitFailStmt(FailStmt *S);
+  void emitStmt(Stmt *S);
 
   void emitBreakOutOf(SILLocation loc, Stmt *S);
   

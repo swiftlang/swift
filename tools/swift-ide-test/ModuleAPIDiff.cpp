@@ -781,6 +781,10 @@ public:
     return Result;
   }
 
+  void visitDecl(Decl *D) {
+    // FIXME: maybe don't have a default case
+  }
+
   void visitStructDecl(StructDecl *SD) {
     auto ResultSD = std::make_shared<sma::StructDecl>();
     ResultSD->Name = convertToIdentifier(SD->getName());

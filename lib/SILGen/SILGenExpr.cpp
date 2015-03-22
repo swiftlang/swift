@@ -3425,7 +3425,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   prepareEpilog(resultTy, CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
-  visit(fd->getBody());
+  emitStmt(fd->getBody());
 
   emitEpilog(fd);
 }
@@ -3437,7 +3437,7 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   prepareEpilog(ace->getResultType(), CleanupLocation(ace));
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitProfilerIncrement(ce);
-    visit(ce->getBody());
+    emitStmt(ce->getBody());
   } else {
     auto *autoclosure = cast<AutoClosureExpr>(ace);
     // Closure expressions implicitly return the result of their body
@@ -3742,7 +3742,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
 
   emitProfilerIncrement(dd->getBody());
   // Emit the destructor body.
-  visit(dd->getBody());
+  emitStmt(dd->getBody());
 
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(Loc);
@@ -4070,7 +4070,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   emitProfilerIncrement(ctor->getBody());
   // Emit the constructor body.
-  visit(ctor->getBody());
+  emitStmt(ctor->getBody());
 
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(ctor);
@@ -4551,7 +4551,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   emitProfilerIncrement(ctor->getBody());
   // Emit the constructor body.
-  visit(ctor->getBody());
+  emitStmt(ctor->getBody());
 
   // Return 'self' in the epilog.
   Optional<SILValue> maybeReturnValue;

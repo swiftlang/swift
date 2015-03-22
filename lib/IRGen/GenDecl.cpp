@@ -138,6 +138,10 @@ public:
     for (Decl *member : ext->getMembers())
       visit(member);
   }
+
+  void visitTypeDecl(TypeDecl *type) {
+    // We'll visit nested types separately if necessary.
+  }
   
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
@@ -162,6 +166,9 @@ public:
     Builder.CreateCall(class_replaceMethod, args);
   }
 
+  // Can't be added in an extension.
+  void visitDestructorDecl(DestructorDecl *dtor) {}
+
   void visitConstructorDecl(ConstructorDecl *constructor) {
     if (!requiresObjCMethodDescriptor(constructor)) return;
     llvm::Constant *name, *imp, *types;
@@ -184,6 +191,10 @@ public:
     Builder.CreateCall(class_replaceMethod, args);
   }
 
+  void visitPatternBindingDecl(PatternBindingDecl *binding) {
+    // Ignore the PBD and just handle the individual vars.
+  }
+  
   void visitVarDecl(VarDecl *prop) {
     if (!requiresObjCPropertyDescriptor(IGM, prop)) return;
 
@@ -241,7 +252,7 @@ public:
 
 /// Create a descriptor for JITed @objc protocol using the ObjC runtime.
 class ObjCProtocolInitializerVisitor
-  : public TypeMemberVisitor<ObjCProtocolInitializerVisitor>
+  : public ClassMemberVisitor<ObjCProtocolInitializerVisitor>
 {
   IRGenFunction &IGF;
   IRGenModule &IGM = IGF.IGM;
@@ -329,7 +340,11 @@ public:
 
     Builder.CreateStore(result, ref, IGM.getPointerAlignment());
   }
-  
+
+  void visitTypeDecl(TypeDecl *type) {
+    // We'll visit nested types separately if necessary.
+  }
+
   void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
     llvm::Constant *name, *imp, *types;
     emitObjCMethodDescriptorParts(IGM, method, /*extended*/true,
@@ -351,6 +366,10 @@ public:
     };
     
     Builder.CreateCall(protocol_addMethodDescription, args);
+  }
+  
+  void visitPatternBindingDecl(PatternBindingDecl *binding) {
+    // Ignore the PBD and just handle the individual vars.
   }
   
   void visitAbstractStorageDecl(AbstractStorageDecl *prop) {

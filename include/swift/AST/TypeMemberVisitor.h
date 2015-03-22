@@ -39,6 +39,13 @@ public:
   BAD_MEMBER(Import)
   BAD_MEMBER(Protocol)
   BAD_MEMBER(TopLevelCode)
+  BAD_MEMBER(Operator)
+
+  // The children of these are automatically inserted into the
+  // surrounding context.
+  RetTy visitIfConfigDecl(IfConfigDecl *D) {
+    return RetTy();
+  }
 
   /// A convenience method to visit all the members.
   void visitMembers(NominalTypeDecl *D) {
@@ -52,6 +59,7 @@ template<typename ImplClass, typename RetTy = void>
 class ClassMemberVisitor : public TypeMemberVisitor<ImplClass, RetTy> {
 public:
   BAD_MEMBER(EnumElement)
+  BAD_MEMBER(EnumCase)
 
   void visitMembers(ClassDecl *D) {
     TypeMemberVisitor<ImplClass, RetTy>::visitMembers(D);

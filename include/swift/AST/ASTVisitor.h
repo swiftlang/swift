@@ -93,8 +93,6 @@ public:
     llvm_unreachable("Not reachable, all cases handled");
   }
 
-  DeclRetTy visitDecl(Decl *D, Args... AA) { return DeclRetTy(); }
-
 #define DECL(CLASS, PARENT) \
   DeclRetTy visit##CLASS##Decl(CLASS##Decl *D, Args... AA) {\
     return static_cast<ImplClass*>(this)->visit##PARENT(D, \
@@ -151,10 +149,6 @@ public:
     case DAK_Count:
       llvm_unreachable("Not an attribute kind");
     }
-  }
-
-  AttributeRetTy visitDeclAttribute(DeclAttribute *A, Args... AA) {
-    return AttributeRetTy();
   }
 
 #define DECL_ATTR(NAME,CLASS,...) \

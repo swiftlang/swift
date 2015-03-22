@@ -135,7 +135,19 @@ public:
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms
   //===--------------------------------------------------------------------===//
-  // FIXME: visit other decls
+
+  // These are either not allowed at global scope or don't require
+  // code emission.
+  void visitImportDecl(ImportDecl *d) {}
+  void visitEnumCaseDecl(EnumCaseDecl *d) {}
+  void visitEnumElementDecl(EnumElementDecl *d) {}
+  void visitOperatorDecl(OperatorDecl *d) {}
+  void visitTypeAliasDecl(TypeAliasDecl *d) {}
+  void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
+  void visitSubscriptDecl(SubscriptDecl *d) {}
+  void visitConstructorDecl(ConstructorDecl *d) {}
+  void visitDestructorDecl(DestructorDecl *d) {}
+
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);

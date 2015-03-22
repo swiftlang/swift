@@ -23,6 +23,7 @@
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/TypeMemberVisitor.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -1342,7 +1343,7 @@ static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
 
 /// An ASTVisitor for generating SIL from method declarations
 /// inside nominal types.
-class SILGenType : public Lowering::ASTVisitor<SILGenType> {
+class SILGenType : public TypeMemberVisitor<SILGenType> {
 public:
   SILGenModule &SGM;
   NominalTypeDecl *theType;
@@ -1384,6 +1385,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
+  void visitTypeAliasDecl(TypeAliasDecl *tad) {}
+  void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -1409,6 +1412,7 @@ public:
     SGM.emitDestructor(cast<ClassDecl>(theType), dd);
   }
 
+  void visitEnumCaseDecl(EnumCaseDecl *ecd) {}
   void visitEnumElementDecl(EnumElementDecl *ued) {
     assert(isa<EnumDecl>(theType));
     SGM.emitEnumConstructor(ued);
@@ -1531,7 +1535,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
 
 /// SILGenExtension - an ASTVisitor for generating SIL from method declarations
 /// and protocol conformances inside type extensions.
-class SILGenExtension : public Lowering::ASTVisitor<SILGenExtension> {
+class SILGenExtension : public TypeMemberVisitor<SILGenExtension> {
 public:
   SILGenModule &SGM;
 
@@ -1557,6 +1561,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
+  void visitTypeAliasDecl(TypeAliasDecl *tad) {}
+  void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -1593,6 +1599,11 @@ public:
                                           theType, vd);
     }
     visitAbstractStorageDecl(vd);
+  }
+
+  void visitEnumCaseDecl(EnumCaseDecl *ecd) {}
+  void visitEnumElementDecl(EnumElementDecl *ed) {
+    llvm_unreachable("enum elements aren't allowed in extensions");
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *vd) {
@@ -1911,7 +1922,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   prepareEpilog(Type(), CleanupLocation::getCleanupLocation(loc));
 
   // Emit the destructor body.
-  visit(dd->getBody());
+  emitStmt(dd->getBody());
 
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(loc);

@@ -2704,6 +2704,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
+
+  void visitGenericTypeParamDecl(GenericTypeParamDecl *D) {
+    llvm_unreachable("cannot reach here");
+  }
   
   void visitImportDecl(ImportDecl *ID) {
     TC.checkDeclAttributesEarly(ID);
@@ -4960,6 +4964,10 @@ public:
 
     // Record the interface type.
     elt->setInterfaceType(interfaceTy);
+  }
+
+  void visitEnumCaseDecl(EnumCaseDecl *ECD) {
+    // The type-checker doesn't care about how these are grouped.
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {

@@ -31,8 +31,31 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 }
 
 //===----------------------------------------------------------------------===//
-// SILGenFunction visit*Stmt implementation
+// SILGenFunction emitStmt implementation
 //===----------------------------------------------------------------------===//
+
+namespace {
+  class StmtEmitter : public Lowering::ASTVisitor<StmtEmitter> {
+    SILGenFunction &SGF;
+  public:
+    StmtEmitter(SILGenFunction &sgf) : SGF(sgf) {}
+#define STMT(ID, BASE) void visit##ID##Stmt(ID##Stmt *S);
+#include "swift/AST/StmtNodes.def"
+
+    ASTContext &getASTContext() { return SGF.getASTContext(); }
+
+    SILBasicBlock *createBasicBlock() { return SGF.createBasicBlock(); }
+    JumpDest createJumpDest(Stmt *cleanupLoc) {
+      return JumpDest(createBasicBlock(),
+                      SGF.getCleanupsDepth(),
+                      CleanupLocation(cleanupLoc));
+    }
+  };
+}
+
+void SILGenFunction::emitStmt(Stmt *S) {
+  StmtEmitter(*this).visit(S);
+}
 
 /// emitOrDeleteBlock - If there are branches to the specified basic block,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
@@ -95,9 +118,9 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   return Condition(TrueBB, FalseBB, ContBB, Loc);
 }
 
-void SILGenFunction::visitBraceStmt(BraceStmt *S) {
+void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
-  LexicalScope BraceScope(Cleanups, *this, CleanupLocation(S));
+  LexicalScope BraceScope(SGF.Cleanups, SGF, CleanupLocation(S));
   const unsigned ReturnStmtType   = 0;
   const unsigned ContinueStmtType = 1;
   const unsigned UnknownStmtType  = 2;
@@ -114,12 +137,13 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
     // If we ever reach an unreachable point, stop emitting statements and issue
     // an unreachable code diagnostic. This will need revision if we ever add
     // goto.
-    if (!B.hasValidInsertionPoint()) {
+    if (!SGF.B.hasValidInsertionPoint()) {
       if (StmtType != UnknownStmtType) {
         diagnose(getASTContext(), ESD.getStartLoc(),
                  diag::unreachable_code_after_stmt, StmtType);
       } else {
-        diagnose(getASTContext(), ESD.getStartLoc(), diag::unreachable_code);
+        diagnose(getASTContext(), ESD.getStartLoc(),
+                 diag::unreachable_code);
       }
       return;
     }
@@ -133,9 +157,9 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
         StmtType = ReturnStmtType;
       
     } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
-      emitIgnoredExpr(E);
+      SGF.emitIgnoredExpr(E);
     } else {
-      visit(ESD.get<Decl*>());
+      SGF.visit(ESD.get<Decl*>());
     }
   }
 }
@@ -176,8 +200,8 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                  result ? result : ArrayRef<SILValue>{});
 }
 
-void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
-  CurrentSILLoc = S;
+void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
+  SGF.CurrentSILLoc = S;
   SILLocation Loc = S->isImplicit() ?
                       (SILLocation)ImplicitReturnLocation(S) :
                       (SILLocation)ReturnLocation(S);
@@ -185,232 +209,218 @@ void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
   SILValue ArgV;
   if (!S->hasResult())
     // Void return.
-    Cleanups.emitBranchAndCleanups(ReturnDest, Loc);
+    SGF.Cleanups.emitBranchAndCleanups(SGF.ReturnDest, Loc);
   else
-    emitReturnExpr(Loc, S->getResult());
+    SGF.emitReturnExpr(Loc, S->getResult());
 }
 
-void SILGenFunction::visitIfStmt(IfStmt *S) {
-  Scope condBufferScope(Cleanups, S);
+void StmtEmitter::visitIfStmt(IfStmt *S) {
+  Scope condBufferScope(SGF.Cleanups, S);
   
   // Create a continuation block.  We need it if there is a labeled break out
   // of the if statement or if there is an if/then/else.
-  auto *ContBB = createBasicBlock();
+  JumpDest contDest = createJumpDest(S->getThenStmt());
+  auto contBB = contDest.getBlock();
 
   // Set the destinations for any 'break' and 'continue' statements inside the
   // body.  Note that "continue" is not valid out of a labeled 'if'.
-  BreakContinueDestStack.push_back(std::make_tuple(
-    S,
-    JumpDest(ContBB, getCleanupsDepth(), CleanupLocation(S->getThenStmt())),
-    JumpDest(CleanupLocation(S))
-  ));
+  SGF.BreakContinueDestStack.push_back(
+                               { S, contDest, JumpDest(CleanupLocation(S)) });
 
   // Set up the block for the false case.  If there is an 'else' block, we make
   // a new one, otherwise it is our continue block.
-  SILBasicBlock *CondFalseBB;
+  SILBasicBlock *condFalseBB;
   if (!S->getElseStmt())
-    CondFalseBB = ContBB;
+    condFalseBB = contBB;
   else
-    CondFalseBB = createBasicBlock();
+    condFalseBB = createBasicBlock();
 
   // Emit the condition, along with the "then" part of the if properly guarded
   // by the condition and a jump to ContBB.  If the condition fails, jump to
   // the CondFalseBB.
-  emitStmtConditionWithBody(S, ContBB, CondFalseBB);
+  SGF.emitStmtConditionWithBody(S, contBB, condFalseBB);
 
   // If there is 'else' logic, then emit it.
   if (S->getElseStmt()) {
-    B.emitBlock(CondFalseBB);
+    SGF.B.emitBlock(condFalseBB);
     visit(S->getElseStmt());
-    if (B.hasValidInsertionPoint()) {
+    if (SGF.B.hasValidInsertionPoint()) {
       RegularLocation L(S->getElseStmt());
       L.pointToEnd();
-      B.createBranch(L, ContBB);
+      SGF.B.createBranch(L, contBB);
     }
   }
 
   // If the continuation block was used, emit it now, otherwise remove it.
-  if (ContBB->pred_empty())
-    ContBB->eraseFromParent();
-  else {
+  if (contBB->pred_empty()) {
+    contBB->eraseFromParent();
+  } else {
     RegularLocation L(S->getThenStmt());
     L.pointToEnd();
-    B.emitBlock(ContBB, L);
+    SGF.B.emitBlock(contBB, L);
   }
-  BreakContinueDestStack.pop_back();
+  SGF.BreakContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitIfConfigStmt(IfConfigStmt *S) {
+void StmtEmitter::visitIfConfigStmt(IfConfigStmt *S) {
   // Active members are attached to the enclosing declaration, so there's no
   // need to walk anything within.
 }
 
-void SILGenFunction::visitWhileStmt(WhileStmt *S) {
-  Scope condBufferScope(Cleanups, S);
+void StmtEmitter::visitWhileStmt(WhileStmt *S) {
+  Scope condBufferScope(SGF.Cleanups, S);
   
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = createBasicBlock();
-  B.emitBlock(LoopBB, S);
+  JumpDest loopDest = createJumpDest(S->getBody());
+  SILBasicBlock *loopBB = loopDest.getBlock();
+  SGF.B.emitBlock(loopBB, S);
   
   // Create a break target (at this level in the cleanup stack) in case it is
   // needed.
-  auto *BreakBB = createBasicBlock();
+  JumpDest breakDest = createJumpDest(S->getBody());
+  SILBasicBlock *breakBB = breakDest.getBlock();
 
   // Set the destinations for any 'break' and 'continue' statements inside the
   // body.
-  BreakContinueDestStack.push_back(std::make_tuple(
-    S,
-    JumpDest(BreakBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
-    JumpDest(LoopBB , getCleanupsDepth(), CleanupLocation(S->getBody()))
-  ));
+  SGF.BreakContinueDestStack.push_back({S, breakDest, loopDest});
   
   // Evaluate the condition, the body, and a branch back to LoopBB when the
   // condition is true.  On failure, jump to BreakBB.
-  emitStmtConditionWithBody(S, LoopBB, BreakBB);
+  SGF.emitStmtConditionWithBody(S, loopBB, breakBB);
 
-  BreakContinueDestStack.pop_back();
+  SGF.BreakContinueDestStack.pop_back();
 
   // Handle break block.  If it was used, we link it up with the cleanup chain,
   // otherwise we just remove it.
-  if (BreakBB->pred_empty()) {
-    BreakBB->eraseFromParent();
+  if (breakBB->pred_empty()) {
+    breakBB->eraseFromParent();
   } else {
-    B.emitBlock(BreakBB);
+    SGF.B.emitBlock(breakBB);
   }
 }
 
-void SILGenFunction::visitDoStmt(DoStmt *S) {
+void StmtEmitter::visitDoStmt(DoStmt *S) {
   // We don't need to do anything fancy if we don't have a label.
   // Otherwise, assume we might break or continue.
   bool hasLabel = (bool) S->getLabelInfo();
 
-  SILBasicBlock *endBB = nullptr;
+  JumpDest endDest = JumpDest::invalid();
   if (hasLabel) {
     // Create a new basic block and jump into it.
-    SILBasicBlock *loopBB = createBasicBlock();
-    B.emitBlock(loopBB, S);
+    JumpDest loopDest = createJumpDest(S->getBody());
+    SGF.B.emitBlock(loopDest.getBlock(), S);
 
     // Set the destinations for 'break' and 'continue'.
-    endBB = createBasicBlock();
-    BreakContinueDestStack.push_back(std::make_tuple(
-      S,
-      JumpDest(endBB , getCleanupsDepth(), CleanupLocation(S->getBody())),
-      JumpDest(loopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
-    ));
+    endDest = createJumpDest(S->getBody());
+    SGF.BreakContinueDestStack.push_back({S, endDest, loopDest});
   }
 
   // Emit the body.
   visit(S->getBody());
 
   if (hasLabel) {
-    BreakContinueDestStack.pop_back();
-    emitOrDeleteBlock(B, endBB, S);
+    SGF.BreakContinueDestStack.pop_back();
+    emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
   }
 }
 
-void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
+void StmtEmitter::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = createBasicBlock();
-  B.emitBlock(LoopBB, S);
+  SILBasicBlock *loopBB = createBasicBlock();
+  SGF.B.emitBlock(loopBB, S);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *EndBB = createBasicBlock();
-  SILBasicBlock *CondBB = createBasicBlock();
-  BreakContinueDestStack.push_back(std::make_tuple(
-    S,
-    JumpDest(EndBB , getCleanupsDepth(), CleanupLocation(S->getBody())),
-    JumpDest(CondBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
-  ));
+  JumpDest endDest = createJumpDest(S->getBody());
+  JumpDest condDest = createJumpDest(S->getBody());
+  SGF.BreakContinueDestStack.push_back({ S, endDest, condDest });
 
   // Emit the body, which is always evaluated the first time around.
   visit(S->getBody());
 
   // Let's not differ from C99 6.8.5.2: "The evaluation of the controlling
   // expression takes place after each execution of the loop body."
-  emitOrDeleteBlock(B, CondBB, S);
+  emitOrDeleteBlock(SGF.B, condDest.getBlock(), S);
 
-  if (B.hasValidInsertionPoint()) {
+  if (SGF.B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
     // to the continuation block.
-    Condition Cond = emitCondition(S->getCond(), /*hasFalseCode*/ false);
+    Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false);
     
-    Cond.enterTrue(B);
-    emitProfilerIncrement(S->getBody());
-    if (B.hasValidInsertionPoint()) {
-      B.createBranch(S->getCond(), LoopBB);
+    Cond.enterTrue(SGF.B);
+    SGF.emitProfilerIncrement(S->getBody());
+    if (SGF.B.hasValidInsertionPoint()) {
+      SGF.B.createBranch(S->getCond(), loopBB);
     }
     
-    Cond.exitTrue(B);
+    Cond.exitTrue(SGF.B);
     // Complete the conditional execution.
-    Cond.complete(B);
+    Cond.complete(SGF.B);
   }
   
-  emitOrDeleteBlock(B, EndBB, S);
-  BreakContinueDestStack.pop_back();
+  emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
+  SGF.BreakContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitForStmt(ForStmt *S) {
+void StmtEmitter::visitForStmt(ForStmt *S) {
   // Enter a new scope.
-  Scope ForScope(Cleanups, CleanupLocation(S));
+  Scope ForScope(SGF.Cleanups, CleanupLocation(S));
   
   // Emit any local 'var' variables declared in the initializer.
-  for (auto D : S->getInitializerVarDecls())
-    visit(D);
+  for (auto D : S->getInitializerVarDecls()) {
+    SGF.visit(D);
+  }
   
   if (auto *Initializer = S->getInitializer().getPtrOrNull()) {
-    emitIgnoredExpr(Initializer);
+    SGF.emitIgnoredExpr(Initializer);
   }
   
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
-  if (!B.hasValidInsertionPoint()) return;
+  if (!SGF.B.hasValidInsertionPoint()) return;
   
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = createBasicBlock();
-  B.emitBlock(LoopBB, S);
+  SILBasicBlock *loopBB = createBasicBlock();
+  SGF.B.emitBlock(loopBB, S);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *IncBB = createBasicBlock();
-  SILBasicBlock *EndBB = createBasicBlock();
-  BreakContinueDestStack.push_back(std::make_tuple(
-      S,
-      JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
-      JumpDest(IncBB, getCleanupsDepth(), CleanupLocation(S->getBody()))));
+  JumpDest incDest = createJumpDest(S->getBody());
+  JumpDest endDest = createJumpDest(S->getBody());
+  SGF.BreakContinueDestStack.push_back({S, endDest, incDest});
 
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
   Condition Cond = S->getCond().isNonNull() ?
-    emitCondition(S->getCond().get(), /*hasFalseCode*/ false) :
-    Condition(LoopBB, 0, 0, S); // Infinite loop.
+    SGF.emitCondition(S->getCond().get(), /*hasFalseCode*/ false) :
+    Condition(loopBB, 0, 0, S); // Infinite loop.
   
   // If there's a true edge, emit the body in it.
   if (Cond.hasTrue()) {
-    Cond.enterTrue(B);
-    emitProfilerIncrement(S->getBody());
+    Cond.enterTrue(SGF.B);
+    SGF.emitProfilerIncrement(S->getBody());
     visit(S->getBody());
     
-    emitOrDeleteBlock(B, IncBB, S);
+    emitOrDeleteBlock(SGF.B, incDest.getBlock(), S);
     
-    if (B.hasValidInsertionPoint() && S->getIncrement().isNonNull()) {
-      FullExpr Scope(Cleanups, CleanupLocation(S->getIncrement().get()));
+    if (SGF.B.hasValidInsertionPoint() && S->getIncrement().isNonNull()) {
+      FullExpr Scope(SGF.Cleanups, CleanupLocation(S->getIncrement().get()));
       // Ignore the result of the increment expression.
-      emitIgnoredExpr(S->getIncrement().get());
+      SGF.emitIgnoredExpr(S->getIncrement().get());
     }
     
-    if (B.hasValidInsertionPoint()) {
+    if (SGF.B.hasValidInsertionPoint()) {
       // Associate the loop body's closing brace with this branch.
       RegularLocation L(S->getBody());
       L.pointToEnd();
-      B.createBranch(L, LoopBB);
+      SGF.B.createBranch(L, loopBB);
     }
-    Cond.exitTrue(B);
+    Cond.exitTrue(SGF.B);
   }
   
   // Complete the conditional execution.
-  Cond.complete(B);
+  Cond.complete(SGF.B);
   
-  emitOrDeleteBlock(B, EndBB, S);
-  BreakContinueDestStack.pop_back();
+  emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
+  SGF.BreakContinueDestStack.pop_back();
 }
 
 namespace {
@@ -430,14 +440,14 @@ public:
 } // end anonymous namespace
 
 
-void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
+void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'generator' variable that we'll be using for iteration.
-  Scope OuterForScope(Cleanups, CleanupLocation(S));
-  visitPatternBindingDecl(S->getGenerator());
+  Scope OuterForScope(SGF.Cleanups, CleanupLocation(S));
+  SGF.visitPatternBindingDecl(S->getGenerator());
   
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
-  if (!B.hasValidInsertionPoint()) return;
+  if (!SGF.B.hasValidInsertionPoint()) return;
   
   // Create a stack allocation to hold values out of the generator.
   // This will be initialized on every entry into the loop header and consumed
@@ -445,79 +455,76 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   // buffer.
   auto optTy = S->getGeneratorNext()->getType()->getCanonicalType();
   auto valTy = optTy.getAnyOptionalObjectType();
-  auto &optTL = getTypeLowering(optTy);
-  SILValue nextBuf = emitTemporaryAllocation(S, optTL.getLoweredType());
+  auto &optTL = SGF.getTypeLowering(optTy);
+  SILValue nextBuf = SGF.emitTemporaryAllocation(S, optTL.getLoweredType());
   
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = createBasicBlock();
-  B.emitBlock(LoopBB, S);
+  JumpDest loopDest = createJumpDest(S->getBody());
+  SGF.B.emitBlock(loopDest.getBlock(), S);
   
   // Set the destinations for 'break' and 'continue'.
-  SILBasicBlock *EndBB = createBasicBlock();
-  BreakContinueDestStack.push_back(std::make_tuple(
-      S,
-      JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
-      JumpDest(LoopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))));
+  JumpDest endDest = createJumpDest(S->getBody());
+  SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
 
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
   {
-    Scope InnerForScope(Cleanups, CleanupLocation(S->getGeneratorNext()));
+    Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getGeneratorNext()));
     InitializationPtr nextInit(new NextForEachValueInitialization(nextBuf));
-    emitExprInto(S->getGeneratorNext(), nextInit.get());
-    nextInit->finishInitialization(*this);
+    SGF.emitExprInto(S->getGeneratorNext(), nextInit.get());
+    nextInit->finishInitialization(SGF);
   }
   
   // Continue if the value is present.
-  Condition Cond = emitCondition(
-         emitDoesOptionalHaveValue(S, nextBuf), S,
+  Condition Cond = SGF.emitCondition(
+         SGF.emitDoesOptionalHaveValue(S, nextBuf), S,
          /*hasFalseCode=*/false, /*invertValue=*/false);
 
   if (Cond.hasTrue()) {
-    Cond.enterTrue(B);
-    emitProfilerIncrement(S->getBody());
+    Cond.enterTrue(SGF.B);
+    SGF.emitProfilerIncrement(S->getBody());
     
     // Emit the loop body.
     // The declared variable(s) for the current element are destroyed
     // at the end of each loop iteration.
     {
-      Scope InnerForScope(Cleanups, CleanupLocation(S->getBody()));
+      Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
       InitializationPtr initLoopVars
-        = emitPatternBindingInitialization(S->getPattern());
-      auto managedNext = emitManagedBufferWithCleanup(nextBuf);
-      ManagedValue val = emitUncheckedGetOptionalValueFrom(S,
+        = SGF.emitPatternBindingInitialization(S->getPattern());
+      auto managedNext = SGF.emitManagedBufferWithCleanup(nextBuf);
+      ManagedValue val = SGF.emitUncheckedGetOptionalValueFrom(S,
                                managedNext,
                                optTL,
                                SGFContext(initLoopVars.get()));
       if (!val.isInContext())
-        RValue(*this, S, valTy, val).forwardInto(*this, initLoopVars.get(), S);
+        RValue(SGF, S, valTy, val).forwardInto(SGF, initLoopVars.get(), S);
       visit(S->getBody());
     }
     
     // Loop back to the header.
-    if (B.hasValidInsertionPoint()) {
+    if (SGF.B.hasValidInsertionPoint()) {
       // Associate the loop body's closing brace with this branch.
       RegularLocation L(S->getBody());
       L.pointToEnd();
-      B.createBranch(L, LoopBB);
+      SGF.B.createBranch(L, loopDest.getBlock());
     }
-    Cond.exitTrue(B);
+    Cond.exitTrue(SGF.B);
   }
   
   // Complete the conditional execution.
-  Cond.complete(B);
+  Cond.complete(SGF.B);
   
-  emitOrDeleteBlock(B, EndBB, S);
-  BreakContinueDestStack.pop_back();
+  emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
+  SGF.BreakContinueDestStack.pop_back();
   
   // We do not need to destroy the value in the 'nextBuf' slot here, because
   // either the 'for' loop finished naturally and the buffer contains '.None',
   // or we exited by 'break' and the value in the buffer was consumed.
 }
 
-void SILGenFunction::visitBreakStmt(BreakStmt *S) {
+void StmtEmitter::visitBreakStmt(BreakStmt *S) {
   assert(S->getTarget() && "Sema didn't fill in break target?");
-  emitBreakOutOf(S, S->getTarget());
+  SGF.emitBreakOutOf(S, S->getTarget());
 }
 
 void SILGenFunction::emitBreakOutOf(SILLocation loc, Stmt *target) {
@@ -525,62 +532,62 @@ void SILGenFunction::emitBreakOutOf(SILLocation loc, Stmt *target) {
   
   // Find the target JumpDest based on the target that sema filled into the
   // stmt.
-  for (auto elt : BreakContinueDestStack) {
-    if (target == std::get<0>(elt)) {
-      Cleanups.emitBranchAndCleanups(std::get<1>(elt), loc);
+  for (auto &elt : BreakContinueDestStack) {
+    if (target == elt.Target) {
+      Cleanups.emitBranchAndCleanups(elt.BreakDest, loc);
       return;
     }
   }
   llvm_unreachable("Break has available target block.");
 }
 
-void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
+void StmtEmitter::visitContinueStmt(ContinueStmt *S) {
   assert(S->getTarget() && "Sema didn't fill in continue target?");
 
-  CurrentSILLoc = S;
+  SGF.CurrentSILLoc = S;
   
   // Find the target JumpDest based on the target that sema filled into the
   // stmt.
-  for (auto elt : BreakContinueDestStack) {
-    if (S->getTarget() == std::get<0>(elt)) {
-      Cleanups.emitBranchAndCleanups(std::get<2>(elt), S);
+  for (auto &elt : SGF.BreakContinueDestStack) {
+    if (S->getTarget() == elt.Target) {
+      SGF.Cleanups.emitBranchAndCleanups(elt.ContinueDest, S);
       return;
     }
   }
   llvm_unreachable("Break has available target block.");
 }
 
-void SILGenFunction::visitSwitchStmt(SwitchStmt *S) {
+void StmtEmitter::visitSwitchStmt(SwitchStmt *S) {
   // Implemented in SILGenPattern.cpp.
-  emitSwitchStmt(S);
+  SGF.emitSwitchStmt(S);
 }
 
-void SILGenFunction::visitCaseStmt(CaseStmt *S) {
+void StmtEmitter::visitCaseStmt(CaseStmt *S) {
   llvm_unreachable("cases should be lowered as part of switch stmt");
 }
 
-void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
+void StmtEmitter::visitFallthroughStmt(FallthroughStmt *S) {
   // Implemented in SILGenPattern.cpp.
-  emitSwitchFallthrough(S);
+  SGF.emitSwitchFallthrough(S);
 }
 
-void SILGenFunction::visitFailStmt(FailStmt *S) {
-  assert(FailDest.isValid() && FailSelfDecl && "too big to fail");
+void StmtEmitter::visitFailStmt(FailStmt *S) {
+  assert(SGF.FailDest.isValid() && SGF.FailSelfDecl && "too big to fail");
   // Clean up 'self', which may be constant or variable depending on whether
   // the initializer delegates.
-  auto &selfLoc = VarLocs[FailSelfDecl];
+  auto &selfLoc = SGF.VarLocs[SGF.FailSelfDecl];
   if (selfLoc.box.isValid()) {
     // Release the box containing 'self'.
-    B.createStrongRelease(S, selfLoc.box);
+    SGF.B.createStrongRelease(S, selfLoc.box);
   } else {
     assert(!selfLoc.value.getType().isAddress() &&
            "Pointer shouldn't be an address");
     // Release the 'self' value.
-    B.createStrongRelease(S, selfLoc.value);
+    SGF.B.createStrongRelease(S, selfLoc.value);
   }
   
   // Jump to the failure block.
-  Cleanups.emitBranchAndCleanups(FailDest, S);
+  SGF.Cleanups.emitBranchAndCleanups(SGF.FailDest, S);
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
@@ -600,5 +607,5 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   if (!TopLevelSGF->B.hasValidInsertionPoint())
     return;
   
-  TopLevelSGF->visit(td->getBody());
+  TopLevelSGF->emitStmt(td->getBody());
 }

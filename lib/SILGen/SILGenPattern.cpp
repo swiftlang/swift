@@ -1836,7 +1836,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
 /// Emit the body of a case statement at the current insertion point.
 void PatternMatchEmission::emitCaseBody(CaseStmt *caseBlock) {
-  SGF.visit(caseBlock->getBody());
+  SGF.emitStmt(caseBlock->getBody());
 
   // Implicitly break out of the pattern match statement.
   if (SGF.B.hasValidInsertionPoint()) {
@@ -1910,7 +1910,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Enter a break/continue scope.  If we wanted a continue
   // destination, it would probably be out here.
-  BreakContinueDestStack.push_back(std::make_tuple(S, contDest, JumpDest(S)));
+  BreakContinueDestStack.push_back({S, contDest, JumpDest(S)});
 
   PatternMatchContext switchContext = { emission };
   SwitchStack.push_back(&switchContext);
@@ -1996,7 +1996,7 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   // will be in the scope of any emitted patterns.
   if (CondElement == Condition.size()) {
     gen.emitProfilerIncrement(Body);
-    gen.visit(Body);
+    gen.emitStmt(Body);
     
     // Finish the "true part" by cleaning up any temporaries and jumping to the
     // continuation block.
