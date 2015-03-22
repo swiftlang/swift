@@ -1173,17 +1173,6 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
   }
 }
 
-/// Expand all of the inherited conformances.
-static void expandConformance(ProtocolConformance *conformance,
-                              llvm::SetVector<ProtocolConformance *> &expanded){
-  if (!expanded.insert(conformance))
-    return;
-
-  for (auto &inherited : conformance->getInheritedConformances()) {
-    expandConformance(inherited.second, expanded);
-  }
-}
-
 void ConformanceLookupTable::loadAllConformances(
        NominalTypeDecl *nominal,
        DeclContext *dc,
@@ -1193,18 +1182,8 @@ void ConformanceLookupTable::loadAllConformances(
   if (dc->getParentSourceFile())
     return;
 
-  // Expand all of the inherited conformances.
-  llvm::SetVector<ProtocolConformance *> expandedConformances;
-  for (auto conformance : conformances)
-    expandConformance(conformance, expandedConformances);
-
   // Add entries for each loaded conformance.
-  for (auto conformance : expandedConformances) {
-    // Only add conformances from this context. The expanded list
-    // might contain inherited conformances from other contexts.
-    if (conformance->getDeclContext() != dc)
-      continue;
-
+  for (auto conformance : conformances) {
     registerProtocolConformance(conformance);
   }
 }
