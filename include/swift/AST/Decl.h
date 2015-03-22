@@ -1596,6 +1596,9 @@ public:
   /// Set the generic signature of this extension.
   void setGenericSignature(GenericSignature *sig);
 
+  /// Retrieve the generic requirements.
+  ArrayRef<Requirement> getGenericRequirements() const;
+
   /// Retrieve the type being extended.
   Type getExtendedType() const { return ExtendedType; }
 
@@ -5552,6 +5555,13 @@ inline bool ValueDecl::isStatic() const {
   if (auto func = dyn_cast<FuncDecl>(this))
     return func->isStatic();
   return false;
+}
+
+inline ArrayRef<Requirement> ExtensionDecl::getGenericRequirements() const {
+  if (!GenericSig)
+    return { };
+
+  return GenericSig->getRequirements();
 }
 
 } // end namespace swift

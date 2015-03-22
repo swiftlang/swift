@@ -1902,6 +1902,7 @@ void Serializer::writeDecl(const Decl *D) {
     for (const auto &ref : extension->getRefComponents())
       writeGenericParams(ref.GenericParams, DeclTypeAbbrCodes);
 
+    writeRequirements(extension->getGenericRequirements());
     writeMembers(extension->getMembers(), isClassExtension);
     writeConformances(extension->getLocalConformances(nullptr), extension,
                       DeclTypeAbbrCodes);

@@ -2912,6 +2912,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
     extension->setProtocols(protocols);
 
+    // Read the generic requirements.
+    SmallVector<Requirement, 4> requirements;
+    readGenericRequirements(requirements);
+
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
     extension->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
