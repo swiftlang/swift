@@ -79,8 +79,8 @@ case is E: // expected-warning {{always fails}}
 }
 
 // Raise an error if pattern productions are used in expressions.
-var b = var a // expected-error{{expected initial value after '='}} expected-error 2 {{type annotation missing in pattern}}
-var c = is Int // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}}
+var b = var a // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}} expected-error {{consecutive statements on a line must be separated by ';'}}
+var c = is Int // expected-error{{expected initial value after '='}} expected-error {{expected expression}}  expected-error {{consecutive statements on a line must be separated by ';'}}
 
 // TODO: Bad recovery in these cases. Although patterns are never valid
 // expr-unary productions, it would be good to parse them anyway for recovery.

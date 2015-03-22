@@ -3477,10 +3477,21 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       SourceLoc EqualLoc = consumeToken(tok::equal);
       ParserResult<Expr> init = parseExpr(diag::expected_init_value);
       
+      // If this Pattern binding was not supposed to have an initializer, but it
+      // did, diagnose this and remove it.
       if (Flags & PD_DisallowInit && init.isNonNull()) {
         diagnose(EqualLoc, diag::disallowed_init);
         init = nullptr;
       }
+      
+      // Otherwise, if this pattern binding *was* supposed (or allowed) to have
+      // an initializer, but it was a parse error, replace it with ErrorExpr so
+      // that downstream clients know that it was present (well, at least the =
+      // was present).  This silences downstream diagnostics checking to make
+      // sure that some PBD's that require initializers actually had them.
+      if (!(Flags & PD_DisallowInit) && init.isNull())
+        init = makeParserResult(init, new (Context) ErrorExpr(EqualLoc));
+      
       
       // Remember this init for the PatternBindingDecl.
       PBDEntries.back().Init = PatternInit = init.getPtrOrNull();
