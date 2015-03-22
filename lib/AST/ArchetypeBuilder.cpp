@@ -583,11 +583,11 @@ ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
     Impl(new Implementation)
 {
   Impl->getInheritedProtocols = [](ProtocolDecl *protocol) {
-    return protocol->getProtocols();
+    return protocol->getInheritedProtocols(nullptr);
   };
   Impl->getConformsTo = [](AbstractTypeParamDecl *assocType) {
     return std::make_pair(assocType->getSuperclass(), 
-                          assocType->getProtocols());
+                          assocType->getConformingProtocols(nullptr));
   };
   Impl->conformsToProtocol = [](Module &M, Type t, ProtocolDecl *protocol)
   -> ProtocolConformance* {
@@ -675,7 +675,7 @@ bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
   // Add each of the conformance requirements placed on this type parameter.
   // FIXME: Would prefer not the walk the protocols. Walk the "inherited" types
   // directly instead, so we have good location information.
-  for (auto Proto : GenericParam->getProtocols()) {
+  for (auto Proto : GenericParam->getConformingProtocols(nullptr)) {
     if (addConformanceRequirement(PA, Proto, source))
       return true;
   }

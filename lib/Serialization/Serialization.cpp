@@ -2017,7 +2017,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(genericParam->getDeclContext());
 
     SmallVector<DeclID, 4> protocols;
-    for (auto proto : genericParam->getProtocols())
+    for (auto proto : genericParam->getConformingProtocols(nullptr))
       protocols.push_back(addDeclRef(proto));
 
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamDeclLayout::Code];
@@ -2040,7 +2040,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(assocType->getDeclContext());
 
     SmallVector<DeclID, 4> protocols;
-    for (auto proto : assocType->getProtocols())
+    for (auto proto : assocType->getConformingProtocols(nullptr))
       protocols.push_back(addDeclRef(proto));
 
     unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeDeclLayout::Code];
@@ -2157,7 +2157,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(proto->getDeclContext());
 
     SmallVector<DeclID, 8> protocols;
-    for (auto proto : proto->getProtocols())
+    for (auto proto : proto->getInheritedProtocols(nullptr))
       protocols.push_back(addDeclRef(proto));
 
     uint8_t rawAccessLevel =

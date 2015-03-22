@@ -306,9 +306,6 @@ private:
                       bool explicitClass = false,
                       bool PrintAsProtocolComposition = false);
 
-  template <typename DeclWithSuperclass>
-  void printInheritedWithSuperclass(DeclWithSuperclass *decl);
-
   void printInherited(const TypeDecl *decl, bool explicitClass = false);
   void printInherited(const EnumDecl *D);
   void printInherited(const ExtensionDecl *decl);
@@ -964,12 +961,6 @@ void PrintAST::printInherited(const Decl *decl,
   }
 }
 
-template <typename DeclWithSuperclass>
-void PrintAST::printInheritedWithSuperclass(DeclWithSuperclass *decl) {
-  printInherited(decl, decl->getInherited(), decl->getProtocols(),
-                 decl->getSuperclass());
-}
-
 void PrintAST::printInherited(const TypeDecl *decl, bool explicitClass) {
   printInherited(decl, decl->getInherited(), decl->getProtocols(), nullptr,
                  explicitClass);
@@ -984,8 +975,8 @@ void PrintAST::printInherited(const ExtensionDecl *decl) {
 }
 
 void PrintAST::printInherited(const GenericTypeParamDecl *D) {
-  printInherited(D, D->getInherited(), D->getProtocols(), D->getSuperclass(),
-                 false, true);
+  printInherited(D, D->getInherited(), D->getConformingProtocols(nullptr),
+                 D->getSuperclass(), false, true);
 }
 
 static void getModuleEntities(const clang::Module *ClangMod,
@@ -1166,7 +1157,9 @@ void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  printInheritedWithSuperclass(decl);
+
+  printInherited(decl, decl->getInherited(),
+                 decl->getConformingProtocols(nullptr), decl->getSuperclass());
 }
 
 void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
@@ -1178,7 +1171,9 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  printInheritedWithSuperclass(decl);
+
+  printInherited(decl, decl->getInherited(),
+                 decl->getConformingProtocols(nullptr), decl->getSuperclass());
 
   if (!decl->getDefaultDefinitionLoc().isNull()) {
     Printer << " = ";
@@ -1228,7 +1223,10 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
     [&]{
       printNominalDeclName(decl);
     });
-  printInheritedWithSuperclass(decl);
+
+  printInherited(decl, decl->getInherited(), decl->getProtocols(),
+                 decl->getSuperclass());
+
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
   }
@@ -1249,7 +1247,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   bool explicitClass = false;
   if (decl->requiresClass() && !decl->isObjC()) {
     bool inheritsRequiresClass = false;
-    for (auto proto : decl->getProtocols()) {
+    for (auto proto : decl->getInheritedProtocols(nullptr)) {
       if (proto->requiresClass()) {
         inheritsRequiresClass = true;
         break;

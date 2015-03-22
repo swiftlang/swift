@@ -54,7 +54,7 @@ static FormalLinkage
 getGenericClauseLinkage(ArrayRef<GenericTypeParamDecl *> params) {
   FormalLinkage result = FormalLinkage::Top;
   for (auto &param : params) {
-    for (auto proto : param->getProtocols())
+    for (auto proto : param->getConformingProtocols(nullptr))
       result ^= getTypeLinkage(CanType(proto->getDeclaredType()));
     if (auto superclass = param->getSuperclass())
       result ^= getTypeLinkage(superclass->getCanonicalType());

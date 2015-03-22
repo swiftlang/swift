@@ -188,7 +188,7 @@ namespace {
       // It would be abstractly good to allow conversion to a base
       // protocol to be trivial, but it's not clear that there's
       // really a structural guarantee we can rely on here.
-      for (auto baseProto : protocol->getProtocols()) {
+      for (auto baseProto : protocol->getInheritedProtocols(nullptr)) {
         // ObjC protocols do not have witnesses.
         if (!requiresProtocolWitnessTable(baseProto))
           continue;
@@ -318,7 +318,7 @@ namespace {
       // witnesses to all its conformances.
       Entries.push_back(
                       WitnessTableEntry::forAssociatedType(ty, getNextIndex()));
-      NumWitnesses += ty->getProtocols().size();
+      NumWitnesses += ty->getConformingProtocols(nullptr).size();
     }
 
     unsigned getNumWitnesses() const { return NumWitnesses; }
@@ -412,7 +412,7 @@ namespace {
       // Keep track of whether we found a better path than the
       // previous best.
       bool foundBetter = false;
-      for (auto base : proto->getProtocols()) {
+      for (auto base : proto->getInheritedProtocols(nullptr)) {
         auto &baseEntry = protoInfo.getWitnessEntry(base);
         assert(baseEntry.isBase());
 
@@ -3178,7 +3178,7 @@ namespace {
       Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
 
       // FIXME: Add static witness tables for type conformances.
-      for (auto protocol : ty->getProtocols()) {
+      for (auto protocol : ty->getConformingProtocols(nullptr)) {
         if (!requiresProtocolWitnessTable(protocol))
           continue;
 

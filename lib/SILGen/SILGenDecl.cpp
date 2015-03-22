@@ -2134,7 +2134,7 @@ public:
 
     // Reference conformances for refined protocols.
     auto protocol = Conformance->getProtocol();
-    for (auto base : protocol->getProtocols())
+    for (auto base : protocol->getInheritedProtocols(nullptr))
       emitBaseProtocolWitness(base);
 
     // Emit witnesses in protocol declaration order.
@@ -2292,7 +2292,8 @@ public:
                                 witness.getReplacement()->getCanonicalType()});
 
     // Emit records for the protocol requirements on the type.
-    assert(td->getProtocols().size() == witness.getConformances().size()
+    assert(td->getConformingProtocols(nullptr).size()
+             == witness.getConformances().size()
            && "number of conformances in assoc type substitution do not match "
               "number of requirements on assoc type");
     // The conformances should be all null or all nonnull.
@@ -2309,8 +2310,9 @@ public:
                                  return !C;
                                })));
 
-    for (unsigned i = 0, e = td->getProtocols().size(); i < e; ++i) {
-      auto protocol = td->getProtocols()[i];
+    for (unsigned i = 0, e = td->getConformingProtocols(nullptr).size(); i < e;
+         ++i) {
+      auto protocol = td->getConformingProtocols(nullptr)[i];
 
       // Only reference the witness if the protocol requires it.
       if (!SGM.Types.protocolRequiresWitnessTable(protocol))

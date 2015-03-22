@@ -2338,6 +2338,14 @@ public:
   /// its scope.
   void setArchetype(ArchetypeType *archetype) { Archetype = archetype; }
 
+  /// Retrieve the set of protocols to which this abstract type
+  /// parameter conforms.
+  ArrayRef<ProtocolDecl *> getConformingProtocols(
+                             LazyResolver *resolver,
+                             bool forceDelayedMembers = true) const {
+    return getProtocols(forceDelayedMembers);
+  }
+
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
            D->getKind() <= DeclKind::Last_AbstractTypeParamDecl;
@@ -3378,6 +3386,13 @@ public:
                Identifier Name, MutableArrayRef<TypeLoc> Inherited);
   
   using Decl::getASTContext;
+
+  /// Retrieve the set of protocols inherited from this protocol.
+  ArrayRef<ProtocolDecl *> getInheritedProtocols(
+                             LazyResolver *resolver,
+                             bool forceDelayedMembers = true) const {
+    return getProtocols(forceDelayedMembers);
+  }
 
   /// \brief Determine whether this protocol inherits from the given ("super")
   /// protocol.

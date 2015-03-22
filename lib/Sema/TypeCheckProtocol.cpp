@@ -2220,13 +2220,13 @@ namespace {
 /// associated type.
 ///
 /// \returns an empty result on success, or a description of the error.
-static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc, 
+static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
   // FIXME: Check class requirement.
 
   // Check protocol conformances.
-  for (auto reqProto : assocType->getProtocols()) {
+  for (auto reqProto : assocType->getConformingProtocols(&tc)) {
     if (!tc.conformsToProtocol(type, reqProto, dc, false))
       return reqProto;
   }
@@ -2838,7 +2838,7 @@ checkConformsToProtocol(TypeChecker &TC,
   }
 
   // Check that T conforms to all inherited protocols.
-  for (auto InheritedProto : Proto->getProtocols()) {
+  for (auto InheritedProto : Proto->getInheritedProtocols(&TC)) {
     ProtocolConformance *InheritedConformance = nullptr;
     if (TC.conformsToProtocol(T, InheritedProto, DC, false,
                               &InheritedConformance, ComplainLoc)) {
