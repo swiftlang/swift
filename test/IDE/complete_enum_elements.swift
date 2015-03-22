@@ -32,7 +32,6 @@
 // RUN: FileCheck %s -check-prefix=ENUM_SW_IN_PATTERN_1 < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_2 > %t.enum.txt
-// RUN: FileCheck %s -check-prefix=ERROR_COMMON < %t.enum.txt
 // RUN: FileCheck %s -check-prefix=ENUM_SW_IN_PATTERN_2 < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_1 > %t.enum.txt
@@ -64,8 +63,6 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_5 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=QUX_ENUM_DOT < %t.enum.txt
-
-// ERROR_COMMON: found code completion token
 
 //===---
 //===--- Test that we can complete enum elements.
