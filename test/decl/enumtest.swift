@@ -297,7 +297,7 @@ enum SimpleEnum {
 func testSimpleEnum() {
   let a : SimpleEnum = .X
   let b : SimpleEnum = (.X)
-  let c : SimpleEnum=.X    // expected-error {{prefix/postfix '=' is reserved}}
+  let c : SimpleEnum=.X    // expected-error {{postfix '=' is reserved}}
 }
 
 

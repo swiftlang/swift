@@ -206,9 +206,9 @@ void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
   restoreState(BeginState);
 }
 
-InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
+InFlightDiagnostic Lexer::diagnose(const char *Loc, Diagnostic Diag) {
   if (Diags)
-    return Diags->diagnose(getSourceLoc(Loc), ID);
+    return Diags->diagnose(getSourceLoc(Loc), Diag);
   
   return InFlightDiagnostic();
 }
@@ -622,7 +622,7 @@ void Lexer::lexOperatorIdentifier() {
     switch (TokStart[0]) {
     case '=':
       if (leftBound != rightBound)
-        diagnose(TokStart, diag::lex_unary_equal_is_reserved);
+        diagnose(TokStart, diag::lex_unary_equal_is_reserved, leftBound);
       // always emit 'tok::equal' to avoid trickle down parse errors
       return formToken(tok::equal, TokStart);
     case '&':

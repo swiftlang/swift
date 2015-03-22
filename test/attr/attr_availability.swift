@@ -61,19 +61,19 @@ let _: Int
 @availability(OSX, message) // expected-error{{expected '=' after 'message' in 'availability' attribute}}
 let _: Int
 
-@availability(OSX, message=) // expected-error{{expected string literal in 'availability' attribute}} expected-error{{prefix/postfix '=' is reserved}}
+@availability(OSX, message=) // expected-error{{expected string literal in 'availability' attribute}} expected-error{{postfix '=' is reserved}}
 let _: Int
 
 @availability(OSX, message=x) // expected-error{{expected string literal in 'availability' attribute}}
 let _: Int
 
-@availability(OSX, unavailable=) // expected-error{{expected ')' in 'availability' attribute}} expected-error{{prefix/postfix '=' is reserved}} expected-error{{expected declaration}}
+@availability(OSX, unavailable=) // expected-error{{expected ')' in 'availability' attribute}} expected-error{{postfix '=' is reserved}} expected-error{{expected declaration}}
 let _: Int
 
 @availability(OSX, introduced) // expected-error{{expected '=' after 'introduced' in 'availability' attribute}}
 let _: Int
 
-@availability(OSX, introduced=) // expected-error{{expected version number in 'availability' attribute}} expected-error{{prefix/postfix '=' is reserved}}
+@availability(OSX, introduced=) // expected-error{{expected version number in 'availability' attribute}} expected-error{{postfix '=' is reserved}}
 let _: Int
 
 @availability(OSX, introduced=x) // expected-error{{expected version number in 'availability' attribute}}

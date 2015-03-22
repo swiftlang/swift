@@ -20,6 +20,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Token.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -381,7 +382,14 @@ private:
   }
 
   void lexImpl();
-  InFlightDiagnostic diagnose(const char *Loc, Diag<> ID);
+  InFlightDiagnostic diagnose(const char *Loc, Diagnostic Diag);
+  
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  InFlightDiagnostic diagnose(const char *Loc, Diag<DiagArgTypes...> DiagID,
+                              ArgTypes &&...Args) {
+    return diagnose(Loc, Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
+  }
+
   void formToken(tok Kind, const char *TokStart);
 
   void skipToEndOfLine();

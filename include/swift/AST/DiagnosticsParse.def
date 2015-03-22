@@ -48,10 +48,6 @@ NOTE(opening_paren,parsing,none,
      "to match this opening '('", ())
 NOTE(opening_angle,parsing,none,
      "to match this opening '<'", ())
-NOTE(previous_declaration,parsing,none,
-     "previous declaration of %0 is here", (Identifier))
-NOTE(previous_definition,parsing,none,
-     "previous definition of %0 is here", (Identifier))
 
 ERROR(extra_rbrace,parsing,none,
       "extraneous '}' at top level", ())
@@ -134,7 +130,7 @@ ERROR(lex_expected_binary_exponent_in_hex_float_literal,lexing,none,
 ERROR(lex_unexpected_block_comment_end,lexing,none,
       "unexpected end of block comment", ())
 ERROR(lex_unary_equal_is_reserved,lexing,none,
-      "prefix/postfix '=' is reserved", ())
+      "%select{prefix|postfix}0 '=' is reserved", (unsigned))
 ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
       "postfix '.' is reserved", ())
 ERROR(lex_editor_placeholder,lexing,none,
