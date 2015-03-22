@@ -183,6 +183,9 @@ def enable_source_import : Flag<["-"], "enable-source-import">,
 def enable_testing : Flag<["-"], "enable-testing">,
   HelpText<"Allows this module's internal API to be accessed for testing">;
 
+def diagnose_generic_extensions : Flag<["-"], "diagnose-generic-extensions">,
+  HelpText<"Diagnose extensions of generic types without type parameters">;
+
 def import_module : Separate<["-"], "import-module">,
   HelpText<"Implicitly import the specified module">;
 

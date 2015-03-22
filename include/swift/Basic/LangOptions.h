@@ -114,7 +114,12 @@ namespace swift {
 
     /// Should access control be respected?
     bool EnableAccessControl = true;
-    
+
+    /// Whether to diagnose extensions of generic types that are missing
+    /// generic parameters.
+    /// FIXME: This is a staging option.
+    bool DiagnoseGenericExtensions = false;
+
     /// The target we are building for.
     ///
     /// This represents the minimum deployment target.

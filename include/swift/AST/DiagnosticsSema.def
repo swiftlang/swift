@@ -698,6 +698,8 @@ ERROR(extension_generic_params_for_non_generic,sema_tcd,none,
       "%0 does not have any generic parameters", (Identifier))
 ERROR(extension_generic_params_for_non_generic_type,sema_tcd,none,
       "%0 does not have any generic parameters", (Type))
+WARNING(extension_generic_missing_params,sema_tcd,none,
+      "extension of generic type %0 requires generic parameters", (Type))
 NOTE(extended_type_here,sema_tcd,none,
       "extended type %0 declared here", (Type))
 

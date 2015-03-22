@@ -622,6 +622,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
+  Opts.DiagnoseGenericExtensions
+    |= Args.hasArg(OPT_diagnose_generic_extensions);
+
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
