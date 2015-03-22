@@ -3838,14 +3838,15 @@ namespace {
 
     /// Recursively add the given protocol and its inherited protocols to the
     /// given vector, guarded by the known set of protocols.
-    static void addProtocols(ProtocolDecl *protocol,
-                             SmallVectorImpl<ProtocolDecl *> &protocols,
-                             llvm::SmallPtrSet<ProtocolDecl *, 4> &known) {
+    void addProtocols(ProtocolDecl *protocol,
+                      SmallVectorImpl<ProtocolDecl *> &protocols,
+                      llvm::SmallPtrSet<ProtocolDecl *, 4> &known) {
       if (!known.insert(protocol).second)
         return;
 
       protocols.push_back(protocol);
-      for (auto inherited : protocol->getProtocols())
+      for (auto inherited : protocol->getInheritedProtocols(
+                              Impl.getTypeResolver()))
         addProtocols(inherited, protocols, known);
     }
 

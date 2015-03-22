@@ -4377,7 +4377,7 @@ namespace {
     
     void addInherited() {
       // If there are no inherited protocols, produce null.
-      auto inherited = Protocol->getProtocols();
+      auto inherited = Protocol->getInheritedProtocols(nullptr);
       if (inherited.empty()) {
         Fields.push_back(null());
         return;

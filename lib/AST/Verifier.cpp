@@ -1622,7 +1622,7 @@ struct ASTNodeBase {};
     
     void verifyChecked(NominalTypeDecl *nominal) {
       // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(nominal, nominal->getProtocols());
+      verifyProtocolList(nominal, nominal->getLocalProtocols(nullptr));
 
       // Make sure that the protocol conformances are complete.
       for (auto conformance : nominal->getLocalConformances(nullptr)) {
@@ -1634,7 +1634,7 @@ struct ASTNodeBase {};
 
     void verifyChecked(ExtensionDecl *ext) {
       // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(ext, ext->getProtocols());
+      verifyProtocolList(ext, ext->getLocalProtocols(nullptr));
 
       // Make sure that the protocol conformances are complete.
       for (auto conformance : ext->getLocalConformances(nullptr)) {

@@ -812,7 +812,8 @@ public:
                           DeclContext *dc,
                           LazyResolver *resolver,
                           ConformanceLookupKind lookupKind,
-                          SmallVectorImpl<ProtocolConformance *> &conformances,
+                          SmallVectorImpl<ProtocolDecl *> *protocols,
+                          SmallVectorImpl<ProtocolConformance *> *conformances,
                           SmallVectorImpl<ConformanceDiagnostic> *diagnostics);
 
   /// Retrieve the complete set of protocols to which this nominal
@@ -1366,7 +1367,8 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
     // FIXME: It's odd that the inheritance clause isn't loaded at all during
     // deserialization, so we have this weird separate path.
     if (!conformingProtocol->getParentSourceFile()) {
-      for (auto protocol : conformingProtocol->getProtocols()) {
+      for (auto protocol : conformingProtocol->getInheritedProtocols(
+                             resolver)) {
         addProtocol(nominal, protocol, SourceLoc(),
                     ConformanceSource::forImplied(conformanceEntry));
       }
@@ -1706,7 +1708,8 @@ void ConformanceLookupTable::lookupConformances(
        DeclContext *dc,
        LazyResolver *resolver,
        ConformanceLookupKind lookupKind,
-       SmallVectorImpl<ProtocolConformance *> &conformances,
+       SmallVectorImpl<ProtocolDecl *> *protocols,
+       SmallVectorImpl<ProtocolConformance *> *conformances,
        SmallVectorImpl<ConformanceDiagnostic> *diagnostics) {
   // We need to expand all implied conformances before we can find
   // those conformances that pertain to this declaration context.
@@ -1733,9 +1736,16 @@ void ConformanceLookupTable::lookupConformances(
                          entry->getKind() != ConformanceEntryKind::Explicit)
                        return true;
 
-                     if (auto conformance = getConformance(nominal, resolver,
-                                                           entry))
-                       conformances.push_back(conformance);
+                     // Record the protocol.
+                     if (protocols)
+                       protocols->push_back(entry->getProtocol());
+
+                     // Record the conformance.
+                     if (conformances) {
+                       if (auto conformance = getConformance(nominal, resolver,
+                                                             entry))
+                         conformances->push_back(conformance);
+                     }
                      return false;
                    }),
     potentialConformances.end());
@@ -1959,6 +1969,32 @@ void NominalTypeDecl::getImplicitProtocols(
   ConformanceTable->getImplicitProtocols(this, protocols);
 }
 
+SmallVector<ProtocolDecl *, 2>
+DeclContext::getLocalProtocols(
+  LazyResolver *resolver,
+  ConformanceLookupKind lookupKind,
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
+{
+  SmallVector<ProtocolDecl *, 2> result;
+
+  // Dig out the nominal type.
+  NominalTypeDecl *nominal = isNominalTypeOrNominalTypeExtensionContext();
+  if (!nominal)
+    return result;
+
+  // Update to record all potential conformances.
+  nominal->prepareConformanceTable(resolver);
+  nominal->ConformanceTable->lookupConformances(
+    nominal,
+    const_cast<DeclContext *>(this),
+    resolver,
+    lookupKind,
+    &result,
+    nullptr,
+    diagnostics);
+  return result;
+}
+
 SmallVector<ProtocolConformance *, 2>
 DeclContext::getLocalConformances(
   LazyResolver *resolver,
@@ -1975,11 +2011,12 @@ DeclContext::getLocalConformances(
   // Update to record all potential conformances.
   nominal->prepareConformanceTable(resolver);
   nominal->ConformanceTable->lookupConformances(
-    nominal, 
+    nominal,
     const_cast<DeclContext *>(this),
     resolver,
     lookupKind,
-    result,
+    nullptr,
+    &result,
     diagnostics);
   return result;
 }

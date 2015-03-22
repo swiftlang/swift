@@ -379,6 +379,28 @@ public:
   /// walking up to the enclosing module and returning its ASTContext.
   ASTContext &getASTContext() const;
 
+  /// Retrieve the set of protocols whose conformances will be
+  /// associated with this declaration context.
+  ///
+  /// This function differs from \c getLocalConformances() in that it
+  /// returns protocol declarations, not protocol conformances, and
+  /// therefore does not require the protocol conformances to be
+  /// formed.
+  ///
+  /// \param lookupKind The kind of lookup to perform.
+  ///
+  /// \param diagnostics If non-null, will be populated with the set of
+  /// diagnostics that should be emitted for this declaration context.
+  ///
+  /// FIXME: This likely makes more sense on IterableDeclContext or
+  /// something similar.
+  SmallVector<ProtocolDecl *, 2>
+  getLocalProtocols(LazyResolver *resolver,
+                    ConformanceLookupKind lookupKind
+                      = ConformanceLookupKind::All,
+                    SmallVectorImpl<ConformanceDiagnostic> *diagnostics
+                      = nullptr) const;
+
   /// Retrieve the set of protocol conformances associated with this
   /// declaration context.
   ///

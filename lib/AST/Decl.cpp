@@ -2218,7 +2218,7 @@ bool ProtocolDecl::requiresClassSlow() {
   }
 
   // Check inherited protocols for class-ness.
-  for (auto *proto : getProtocols()) {
+  for (auto *proto : getInheritedProtocols(nullptr)) {
     if (proto->requiresClass()) {
       ProtocolDeclBits.RequiresClass = true;
       return true;
@@ -2290,7 +2290,7 @@ bool ProtocolDecl::existentialConformsToSelfSlow(LazyResolver *resolver) {
 
   // Check whether any of the inherited protocols fail to conform to
   // themselves.
-  for (auto proto : getProtocols()) {
+  for (auto proto : getInheritedProtocols(resolver)) {
     if (!proto->existentialConformsToSelf(resolver)) {
       ProtocolDeclBits.ExistentialConformsToSelf = false;
       return false;
