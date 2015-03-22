@@ -2979,6 +2979,13 @@ public:
                                           LazyResolver *resolver,
                                           bool sorted = false) const;
 
+  /// Register an externally-created protocol conformance in the
+  /// conformance lookup table.
+  ///
+  /// This is used by deserialization of module files to report
+  /// conformances.
+  void registerProtocolConformance(ProtocolConformance *conformance);
+
   /// \brief True if the type can implicitly derive a conformance for the given
   /// protocol.
   ///

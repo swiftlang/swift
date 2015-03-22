@@ -795,6 +795,9 @@ public:
   void addSynthesizedConformance(NominalTypeDecl *nominal,
                                  ProtocolDecl *protocol);
 
+  /// Register an externally-supplied protocol conformance.
+  void registerProtocolConformance(ProtocolConformance *conformance);
+
   /// Look for conformances to the given protocol.
   ///
   /// \param conformances Will be populated with the set of protocol
@@ -1196,31 +1199,13 @@ void ConformanceLookupTable::loadAllConformances(
     expandConformance(conformance, expandedConformances);
 
   // Add entries for each loaded conformance.
-  ASTContext &ctx = nominal->getASTContext();
-  auto &dcConformances = AllConformances[dc];
   for (auto conformance : expandedConformances) {
     // Only add conformances from this context. The expanded list
     // might contain inherited conformances from other contexts.
     if (conformance->getDeclContext() != dc)
       continue;
 
-    auto inherited = dyn_cast<InheritedProtocolConformance>(conformance);
-    ConformanceSource source
-      = inherited ? ConformanceSource::forInherited(cast<ClassDecl>(nominal))
-                  : ConformanceSource::forExplicit(dc);
-
-    auto protocol = conformance->getProtocol();
-    ConformanceEntry *entry = new (ctx) ConformanceEntry(SourceLoc(),
-                                                         protocol,
-                                                         source);
-    entry->Conformance = conformance;
-
-    // Record that this type conforms to the given protocol.
-    Conformances[protocol].push_back(entry);
-
-    // Record this as a conformance within the given declaration
-    // context.
-    dcConformances.push_back(entry);
+    registerProtocolConformance(conformance);
   }
 }
 
@@ -1672,6 +1657,44 @@ void ConformanceLookupTable::addSynthesizedConformance(NominalTypeDecl *nominal,
               ConformanceSource::forSynthesized(nominal));
 }
 
+void ConformanceLookupTable::registerProtocolConformance(
+       ProtocolConformance *conformance) {
+  auto protocol = conformance->getProtocol();
+  auto dc = conformance->getDeclContext();
+  auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext();
+
+  // If there is an entry to update, do so.
+  auto &dcConformances = AllConformances[dc];
+  for (auto entry : dcConformances) {
+    if (entry->getProtocol() == protocol) {
+      assert(!entry->getConformance() ||
+             entry->getConformance() == conformance &&
+             "Mismatched conformances");
+      entry->Conformance = conformance;
+      return;
+    }
+  }
+
+  // Otherwise, add a new entry.
+  auto inherited = dyn_cast<InheritedProtocolConformance>(conformance);
+  ConformanceSource source
+    = inherited ? ConformanceSource::forInherited(cast<ClassDecl>(nominal))
+                : ConformanceSource::forExplicit(dc);
+
+  ASTContext &ctx = nominal->getASTContext();
+  ConformanceEntry *entry = new (ctx) ConformanceEntry(SourceLoc(),
+                                                       protocol,
+                                                       source);
+  entry->Conformance = conformance;
+
+  // Record that this type conforms to the given protocol.
+  Conformances[protocol].push_back(entry);
+
+  // Record this as a conformance within the given declaration
+  // context.
+  dcConformances.push_back(entry);
+}
+
 bool ConformanceLookupTable::lookupConformance(
        Module *module, 
        NominalTypeDecl *nominal,
@@ -1967,6 +1990,12 @@ void NominalTypeDecl::getImplicitProtocols(
        SmallVectorImpl<ProtocolDecl *> &protocols) {
   prepareConformanceTable(resolver);
   ConformanceTable->getImplicitProtocols(this, protocols);
+}
+
+void NominalTypeDecl::registerProtocolConformance(
+       ProtocolConformance *conformance) {
+  prepareConformanceTable(/*FIXME:*/nullptr);
+  ConformanceTable->registerProtocolConformance(conformance);
 }
 
 SmallVector<ProtocolDecl *, 2>

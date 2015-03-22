@@ -506,9 +506,12 @@ ModuleFile::maybeReadConformance(Type conformingType,
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
   ASTContext &ctx = getContext();
-  auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(),
-                                        getDeclContext(contextID),
+  DeclContext *dc = getDeclContext(contextID);
+  auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,
                                         ProtocolConformanceState::Incomplete);
+
+  dc->isNominalTypeOrNominalTypeExtensionContext()
+    ->registerProtocolConformance(conformance);
 
   InheritedConformanceMap inheritedConformances;
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
