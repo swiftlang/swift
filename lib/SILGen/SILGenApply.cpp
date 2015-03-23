@@ -3699,14 +3699,14 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
                                     SILType::getPrimitiveObjectType(metatype));
   }
 
-  // Create the has-member block.
-  SILBasicBlock *hasMemberBB = new (F.getModule()) SILBasicBlock(&F);
+  // Create the continuation block.
+  SILBasicBlock *contBB = createBasicBlock();
 
   // Create the no-member block.
-  SILBasicBlock *noMemberBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *noMemberBB = createBasicBlock();
 
-  // Create the continuation block.
-  SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
+  // Create the has-member block.
+  SILBasicBlock *hasMemberBB = createBasicBlock();
 
   // The continuation block
   const TypeLowering &optTL = getTypeLowering(e->getType());
@@ -3797,16 +3797,15 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   // Emit the index.
   RValue index = emitRValue(e->getIndex());
 
-  // Create the has-member block.
-  SILBasicBlock *hasMemberBB = new (F.getModule()) SILBasicBlock(&F);
+  // Create the continuation block.
+  SILBasicBlock *contBB = createBasicBlock();
 
   // Create the no-member block.
-  SILBasicBlock *noMemberBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *noMemberBB = createBasicBlock();
 
-  // Create the continuation block.
-  SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
+  // Create the has-member block.
+  SILBasicBlock *hasMemberBB = createBasicBlock();
 
-  // The continuation block
   const TypeLowering &optTL = getTypeLowering(e->getType());
   auto loweredOptTy = optTL.getLoweredType();
   SILValue optTemp = emitTemporaryAllocation(e, loweredOptTy);

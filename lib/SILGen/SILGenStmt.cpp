@@ -69,6 +69,15 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
   llvm_unreachable("bad function section");
 }
 
+void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
+  assert(block->pred_empty() && "erasing block with predecessors");
+  assert(block->empty() && "erasing block with content");
+  if (block == StartOfPostmatter) {
+    StartOfPostmatter = block->getNextNode();
+  }
+  block->eraseFromParent();
+}
+
 //===----------------------------------------------------------------------===//
 // SILGenFunction emitStmt implementation
 //===----------------------------------------------------------------------===//
@@ -101,7 +110,7 @@ void SILGenFunction::emitStmt(Stmt *S) {
 /// emitOrDeleteBlock - If there are branches to the specified basic block,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
 /// turns out to have not been needed.
-static void emitOrDeleteBlock(SILBuilder &B, SILBasicBlock *BB,
+static void emitOrDeleteBlock(SILGenFunction &SGF, SILBasicBlock *BB,
                               SILLocation BranchLoc) {
   // If we ever add a single-use optimization here (to just continue
   // the predecessor instead of branching to a separate block), we'll
@@ -112,10 +121,10 @@ static void emitOrDeleteBlock(SILBuilder &B, SILBasicBlock *BB,
 
   if (BB->pred_empty()) {
     // If the block is unused, we don't need it; just delete it.
-    BB->eraseFromParent();
+    SGF.eraseBasicBlock(BB);
   } else {
     // Otherwise, continue emitting code in BB.
-    B.emitBlock(BB, BranchLoc);
+    SGF.B.emitBlock(BB, BranchLoc);
   }
 }
 
@@ -145,7 +154,6 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
          "emitting condition at unreachable point");
 
   SILBasicBlock *ContBB = createBasicBlock();
-  SILBasicBlock *TrueBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
     new (F.getModule()) SILArgument(ContBB, argTy);
@@ -158,6 +166,9 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
     FalseBB = nullptr;
     FalseDestBB = ContBB;
   }
+
+  SILBasicBlock *TrueBB = createBasicBlock();
+
   if (invertValue)
     B.createCondBranch(Loc, V, FalseDestBB, TrueBB);
   else
@@ -301,7 +312,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
 
   // If the continuation block was used, emit it now, otherwise remove it.
   if (contBB->pred_empty()) {
-    contBB->eraseFromParent();
+    SGF.eraseBasicBlock(contBB);
   } else {
     RegularLocation L(S->getThenStmt());
     L.pointToEnd();
@@ -341,7 +352,7 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
   // Handle break block.  If it was used, we link it up with the cleanup chain,
   // otherwise we just remove it.
   if (breakBB->pred_empty()) {
-    breakBB->eraseFromParent();
+    SGF.eraseBasicBlock(breakBB);
   } else {
     SGF.B.emitBlock(breakBB);
   }
@@ -370,7 +381,7 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 
   if (hasLabel) {
     SGF.BreakContinueDestStack.pop_back();
-    emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
+    emitOrDeleteBlock(SGF, endDest.getBlock(), S);
   }
 }
 
@@ -438,7 +449,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // left in the original function section after this.  So if
   // emitOrDeleteBlock ever learns to just continue in the
   // predecessor, we'll need to suppress that here.
-  emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
+  emitOrDeleteBlock(SGF, endDest.getBlock(), S);
 }
 
 void StmtEmitter::visitCatchStmt(CatchStmt *S) {
@@ -460,25 +471,25 @@ void StmtEmitter::visitDoWhileStmt(DoWhileStmt *S) {
 
   // Let's not differ from C99 6.8.5.2: "The evaluation of the controlling
   // expression takes place after each execution of the loop body."
-  emitOrDeleteBlock(SGF.B, condDest.getBlock(), S);
+  emitOrDeleteBlock(SGF, condDest.getBlock(), S);
 
   if (SGF.B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
     // to the continuation block.
     Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false);
     
-    Cond.enterTrue(SGF.B);
+    Cond.enterTrue(SGF);
     SGF.emitProfilerIncrement(S->getBody());
     if (SGF.B.hasValidInsertionPoint()) {
       SGF.B.createBranch(S->getCond(), loopBB);
     }
     
-    Cond.exitTrue(SGF.B);
+    Cond.exitTrue(SGF);
     // Complete the conditional execution.
-    Cond.complete(SGF.B);
+    Cond.complete(SGF);
   }
   
-  emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
+  emitOrDeleteBlock(SGF, endDest.getBlock(), S);
   SGF.BreakContinueDestStack.pop_back();
 }
 
@@ -502,12 +513,9 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
   // Create a new basic block and jump into it.
   SILBasicBlock *loopBB = createBasicBlock();
   SGF.B.emitBlock(loopBB, S);
-  
-  // Set the destinations for 'break' and 'continue'
-  JumpDest incDest = createJumpDest(S->getBody());
-  JumpDest endDest = createJumpDest(S->getBody());
-  SGF.BreakContinueDestStack.push_back({S, endDest, incDest});
 
+  JumpDest endDest = createJumpDest(S->getBody());
+  
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
   Condition Cond = S->getCond().isNonNull() ?
@@ -516,11 +524,18 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
   
   // If there's a true edge, emit the body in it.
   if (Cond.hasTrue()) {
-    Cond.enterTrue(SGF.B);
+    Cond.enterTrue(SGF);
     SGF.emitProfilerIncrement(S->getBody());
+
+    // Set the destinations for 'break' and 'continue'.
+    JumpDest incDest = createJumpDest(S->getBody());
+    SGF.BreakContinueDestStack.push_back({S, endDest, incDest});
+
     visit(S->getBody());
+
+    SGF.BreakContinueDestStack.pop_back();
     
-    emitOrDeleteBlock(SGF.B, incDest.getBlock(), S);
+    emitOrDeleteBlock(SGF, incDest.getBlock(), S);
     
     if (SGF.B.hasValidInsertionPoint() && S->getIncrement().isNonNull()) {
       FullExpr Scope(SGF.Cleanups, CleanupLocation(S->getIncrement().get()));
@@ -534,14 +549,13 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
       L.pointToEnd();
       SGF.B.createBranch(L, loopBB);
     }
-    Cond.exitTrue(SGF.B);
+    Cond.exitTrue(SGF);
   }
   
   // Complete the conditional execution.
-  Cond.complete(SGF.B);
+  Cond.complete(SGF);
   
-  emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
-  SGF.BreakContinueDestStack.pop_back();
+  emitOrDeleteBlock(SGF, endDest.getBlock(), S);
 }
 
 namespace {
@@ -602,7 +616,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
          /*hasFalseCode=*/false, /*invertValue=*/false);
 
   if (Cond.hasTrue()) {
-    Cond.enterTrue(SGF.B);
+    Cond.enterTrue(SGF);
     SGF.emitProfilerIncrement(S->getBody());
     
     // Emit the loop body.
@@ -629,13 +643,13 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       L.pointToEnd();
       SGF.B.createBranch(L, loopDest.getBlock());
     }
-    Cond.exitTrue(SGF.B);
+    Cond.exitTrue(SGF);
   }
   
   // Complete the conditional execution.
-  Cond.complete(SGF.B);
+  Cond.complete(SGF);
   
-  emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
+  emitOrDeleteBlock(SGF, endDest.getBlock(), S);
   SGF.BreakContinueDestStack.pop_back();
   
   // We do not need to destroy the value in the 'nextBuf' slot here, because

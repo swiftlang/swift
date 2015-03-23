@@ -53,26 +53,8 @@ BranchInst *SILBuilder::createBranch(SILLocation Loc,
   return createBranch(Loc, TargetBlock, ArgsCopy);
 }
 
-/// \brief Move the specified block to the end of the function and reset the
-/// insertion point to point to the first instruction in the emitted block.
-///
-/// Assumes that no insertion point is currently active.
-void SILBuilder::emitBlock(SILBasicBlock *BB) {
-  assert(!hasValidInsertionPoint());
-
-  // Move the block at the end of the function to provide an ordering.
-  SILFunction::iterator IP = BB->getParent()->end();
-
-  // Start inserting into that block.
-  setInsertionPoint(BB);
-
-  // Move block to its new spot.
-  moveBlockTo(BB, IP);
-}
-
-/// \brief Move the specified block to the current insertion point (which
-/// is the end of the function if there is no insertion point) and reset the
-/// insertion point to point to the first instruction in the emitted block.
+/// \brief Branch to the given block if there's an active insertion point,
+/// then move the insertion point to the end of that block.
 void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
   if (!hasValidInsertionPoint()) {
     return emitBlock(BB);
@@ -81,18 +63,11 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
   // Fall though from the currently active block into the given block.
   assert(BB->bbarg_empty() && "cannot fall through to bb with args");
 
-  // Move the new block after the current one.
-  SILFunction::iterator IP = getInsertionBB();
-  ++IP;
-
   // This is a fall through into BB, emit the fall through branch.
   createBranch(BranchLoc, BB);
 
   // Start inserting into that block.
   setInsertionPoint(BB);
-
-  // Move block to its new spot.
-  moveBlockTo(BB, IP);
 }
 
 /// splitBlockForFallthrough - Prepare for the insertion of a terminator.  If

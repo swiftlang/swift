@@ -3624,7 +3624,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     
     // If the epilog was not branched to at all, kill the BB and
     // just emit the epilog into the current BB.
-    epilogBB->eraseFromParent();
+    eraseBasicBlock(epilogBB);
 
     // If the current bb is terminated then the epilog is just unreachable.
     if (!B.hasValidInsertionPoint())
@@ -3646,8 +3646,6 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
       needsArg = true;
     }
     
-    epilogBB->eraseFromParent();
-
     // Steal the branch argument as the return value if present.
     SILBasicBlock *pred = *epilogBB->pred_begin();
     BranchInst *predBranch = cast<BranchInst>(pred->getTerminator());
@@ -3667,9 +3665,17 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // Kill the branch to the now-dead epilog BB.
     pred->getInstList().erase(predBranch);
 
+    // Finally we can erase the epilog BB.
+    eraseBasicBlock(epilogBB);
+
     // Emit the epilog into its former predecessor.
     B.setInsertionPoint(pred);
   } else {
+    // Move the epilog block to the end of the ordinary section.
+    auto endOfOrdinarySection =
+      (StartOfPostmatter ? SILFunction::iterator(StartOfPostmatter) : F.end());
+    B.moveBlockTo(epilogBB, endOfOrdinarySection);
+
     // Emit the epilog into the epilog bb. Its argument is the return value.
     if (!epilogBB->bbarg_empty()) {
       assert(epilogBB->bbarg_size() == 1 && "epilog should take 0 or 1 args");
@@ -5357,8 +5363,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
 
     case OTK_Optional:
     case OTK_ImplicitlyUnwrappedOptional: {
-      SILBasicBlock *noneBB = SGF.createBasicBlock();
       SILBasicBlock *someBB = SGF.createBasicBlock();
+      SILBasicBlock *noneBB = SGF.createBasicBlock();
 
       auto hasValue = SGF.emitDoesOptionalHaveValue(E, mat.address);
       SGF.B.createCondBranch(E, hasValue, someBB, noneBB);
@@ -5464,11 +5470,11 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                        { });
 
     // If self is null, branch to the epilog.
-    cond.enterTrue(SGF.B);
+    cond.enterTrue(SGF);
     SGF.Cleanups.emitBranchAndCleanups(SGF.ReturnDest, E, { });
-    cond.exitTrue(SGF.B);
+    cond.exitTrue(SGF);
 
-    cond.complete(SGF.B);
+    cond.complete(SGF);
   }
 
   return SGF.emitEmptyTupleRValue(E);
@@ -5721,7 +5727,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
                                        /*invertCondition*/ false,
                                        SGF.getLoweredType(E->getType()));
     
-    cond.enterTrue(SGF.B);
+    cond.enterTrue(SGF);
     SGF.emitProfilerIncrement(E);
     SILValue trueValue;
     {
@@ -5729,18 +5735,18 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
       FullExpr trueScope(SGF.Cleanups, CleanupLocation(TE));
       trueValue = visit(TE).forwardAsSingleValue(SGF, TE);
     }
-    cond.exitTrue(SGF.B, trueValue);
+    cond.exitTrue(SGF, trueValue);
     
-    cond.enterFalse(SGF.B);
+    cond.enterFalse(SGF);
     SILValue falseValue;
     {
       auto EE = E->getElseExpr();
       FullExpr falseScope(SGF.Cleanups, CleanupLocation(EE));
       falseValue = visit(EE).forwardAsSingleValue(SGF, EE);
     }
-    cond.exitFalse(SGF.B, falseValue);
+    cond.exitFalse(SGF, falseValue);
     
-    SILBasicBlock *cont = cond.complete(SGF.B);
+    SILBasicBlock *cont = cond.complete(SGF);
     assert(cont && "no continuation block for if expr?!");
     
     SILValue result = cont->bbarg_begin()[0];
@@ -5755,7 +5761,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     Condition cond = SGF.emitCondition(E->getCondExpr(),
                                        /*hasFalse*/ true,
                                        /*invertCondition*/ false);
-    cond.enterTrue(SGF.B);
+    cond.enterTrue(SGF);
     SGF.emitProfilerIncrement(E);
     {
       auto TE = E->getThenExpr();
@@ -5763,18 +5769,18 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
       TernaryInitialization init(resultAddr);
       SGF.emitExprInto(TE, &init);
     }
-    cond.exitTrue(SGF.B);
+    cond.exitTrue(SGF);
     
-    cond.enterFalse(SGF.B);
+    cond.enterFalse(SGF);
     {
       auto EE = E->getElseExpr();
       FullExpr trueScope(SGF.Cleanups, CleanupLocation(EE));
       TernaryInitialization init(resultAddr);
       SGF.emitExprInto(EE, &init);
     }
-    cond.exitFalse(SGF.B);
+    cond.exitFalse(SGF);
     
-    cond.complete(SGF.B);
+    cond.complete(SGF);
 
     return RValue(SGF, E,
                   SGF.manageBufferForExprResult(resultAddr, lowering, C));
@@ -5981,9 +5987,9 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
                                        ManagedValue input,
                                        SILType resultTy,
                                        const ValueTransform &transformValue) {
+  auto contBB = createBasicBlock();
   auto isNotPresentBB = createBasicBlock();
   auto isPresentBB = createBasicBlock();
-  auto contBB = createBasicBlock();
 
   // Create a temporary for the output optional.
   auto &resultTL = getTypeLowering(resultTy);
@@ -6471,6 +6477,8 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // Enter a cleanups scope.
   FullExpr scope(SGF.Cleanups, E);
 
+  SILBasicBlock *contBB = SGF.createBasicBlock();
+
   // Install a new optional-failure destination just outside of the
   // cleanups scope.
   SILBasicBlock *failureBB = SGF.createBasicBlock();
@@ -6487,7 +6495,6 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   scope.pop();
 
   // Branch to the continuation block.
-  SILBasicBlock *contBB = SGF.createBasicBlock();
   SGF.B.createBranch(E, contBB);
 
   // If control branched to the failure block, inject .None into the
@@ -6563,7 +6570,7 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
       failureBB = nullptr; // remember that we did this
       failureDest = SGF.BindOptionalFailureDests.back();
     } else {
-      failureBB = SGF.createBasicBlock();
+      failureBB = SGF.createBasicBlock(FunctionSection::Postmatter);
       failureDest = JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(),
                              cleanupLoc);
     }
@@ -6574,7 +6581,7 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
     // Emit the failure destination, but only if actually used.
     if (failureBB) {
       if (failureBB->pred_empty()) {
-        failureBB->eraseFromParent();
+        SGF.eraseBasicBlock(failureBB);
       } else {
         SILBuilder failureBuilder(failureBB);
         failureBuilder.setTrackingList(SGF.getBuilder().getTrackingList());
@@ -7032,7 +7039,7 @@ RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
   }
 
   Condition cond = SGF.emitCondition(isAvailable, loc);
-  cond.enterTrue(SGF.B);
+  cond.enterTrue(SGF);
   {
     ArgumentSource source;
     if (E->getSubExpr()->getType()->getAs<LValueType>()) {
@@ -7048,16 +7055,16 @@ RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
     SGF.emitInjectOptionalValueInto(loc, std::move(source), allocatedOptional,
                                     SGF.getTypeLowering(silOptType));
   }
-  cond.exitTrue(SGF.B);
+  cond.exitTrue(SGF);
 
-  cond.enterFalse(SGF.B);
+  cond.enterFalse(SGF);
   {
     // If the declaration is not available, inject .None.
     SGF.emitInjectOptionalNothingInto(loc, allocatedOptional,
                                       SGF.getTypeLowering(silOptType));
   }
-  cond.exitFalse(SGF.B);
-  cond.complete(SGF.B);
+  cond.exitFalse(SGF);
+  cond.complete(SGF);
 
   ManagedValue managedValue = SGF.emitLoad(
       loc, allocatedOptional, SGF.getTypeLowering(silOptType), C, IsNotTake);

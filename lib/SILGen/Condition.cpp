@@ -20,14 +20,14 @@
 using namespace swift;
 using namespace Lowering;
 
-void Condition::enterTrue(SILBuilder &B) {
+void Condition::enterTrue(SILGenFunction &SGF) {
   assert(TrueBB && "Cannot call enterTrue without a True block!");
   
   // TrueBB has already been inserted somewhere unless there's a
   // continuation block.
   if (!ContBB) return;
   
-  B.emitBlock(TrueBB);
+  SGF.B.emitBlock(TrueBB);
 }
 
 /// Extract the last SILLocation used in BB.
@@ -37,7 +37,7 @@ static SILLocation getContinuationLoc(SILBasicBlock &BB, SILLocation Fallback) {
       return L;
   return Fallback;
 }
-void Condition::exitTrue(SILBuilder &B, ArrayRef<SILValue> Args) {
+void Condition::exitTrue(SILGenFunction &SGF, ArrayRef<SILValue> Args) {
   // If there's no continuation block, it's because the condition was
   // folded to true.  In that case, we just continue emitting code as
   // if we were still in the true case, and we're unreachable iff the
@@ -50,7 +50,7 @@ void Condition::exitTrue(SILBuilder &B, ArrayRef<SILValue> Args) {
   
   // If there is a continuation block, we should branch to it if the
   // current point is reachable.
-  if (!B.hasValidInsertionPoint()) {
+  if (!SGF.B.hasValidInsertionPoint()) {
     // If there is no false code, the continuation block has a use
     // because the main condition jumps directly to it.
     assert(ContBB->pred_empty() || !FalseBB);
@@ -60,7 +60,8 @@ void Condition::exitTrue(SILBuilder &B, ArrayRef<SILValue> Args) {
   // Otherwise, resume into the continuation block.  This branch might
   // be folded by exitFalse if it turns out that that point is
   // unreachable.
-  B.createBranch(getContinuationLoc(*B.getInsertionBB(), Loc), ContBB, Args);
+  SGF.B.createBranch(getContinuationLoc(*SGF.B.getInsertionBB(), Loc),
+                     ContBB, Args);
   
   // Coming out of exitTrue, we can be in one of three states:
   //   - a valid non-terminal IP, but only if there is no continuation
@@ -69,7 +70,7 @@ void Condition::exitTrue(SILBuilder &B, ArrayRef<SILValue> Args) {
   //   - a cleared IP, if the end of the true block was not reachable.
 }
 
-void Condition::enterFalse(SILBuilder &B) {
+void Condition::enterFalse(SILGenFunction &SGF) {
   assert(FalseBB && "entering the false branch when it was not valid");
   
   // FalseBB has already been inserted somewhere unless there's a
@@ -78,10 +79,10 @@ void Condition::enterFalse(SILBuilder &B) {
   
   // It's possible to have no insertion point here if the end of the
   // true case was unreachable.
-  B.emitBlock(FalseBB);
+  SGF.B.emitBlock(FalseBB);
 }
 
-void Condition::exitFalse(SILBuilder &B, ArrayRef<SILValue> Args) {
+void Condition::exitFalse(SILGenFunction &SGF, ArrayRef<SILValue> Args) {
   // If there's no continuation block, it's because the condition was
   // folded to false.  In that case, we just continue emitting code as
   // if we were still in the false case, and we're unreachable iff the
@@ -94,7 +95,7 @@ void Condition::exitFalse(SILBuilder &B, ArrayRef<SILValue> Args) {
     // we don't either, regardless of whether the current location
     // is reachable.  Just keep inserting / being unreachable
     // right where we are.
-  } else if (!B.hasValidInsertionPoint()) {
+  } else if (!SGF.B.hasValidInsertionPoint()) {
     // If the true case did need the continuation block, but the false
     // case doesn't, just merge the continuation block back into its
     // single predecessor and move the IP there.
@@ -110,36 +111,37 @@ void Condition::exitFalse(SILBuilder &B, ArrayRef<SILValue> Args) {
     
     // Insert before the uncond branch and zap it.
     auto *Br = cast<BranchInst>(ContPred->getTerminator());
-    B.setInsertionPoint(Br->getParent());
+    SGF.B.setInsertionPoint(Br->getParent());
 
     Br->eraseFromParent();
     assert(ContBB->pred_empty() &&
            "Zapping the branch should make ContBB dead");
   } else {
     // Otherwise, branch to the continuation block and start inserting there.
-    B.createBranch(getContinuationLoc(*B.getInsertionBB(), Loc), ContBB, Args);
+    SGF.B.createBranch(getContinuationLoc(*SGF.B.getInsertionBB(), Loc),
+                       ContBB, Args);
   }
 }
 
-SILBasicBlock *Condition::complete(SILBuilder &B) {
+SILBasicBlock *Condition::complete(SILGenFunction &SGF) {
   // If there is no continuation block, it's because we
   // constant-folded the branch.  The case-exit will have left us in a
   // normal insertion state (i.e. not a post-terminator IP) with
   // nothing to clean up after.
   if (!ContBB) {
-    return B.getInsertionBB();
+    return SGF.B.getInsertionBB();
   }
   
   // Kill the continuation block if it's not being used.  Case-exits
   // only leave themselves post-terminator if they use the
   // continuation block, so we're in an acceptable insertion state.
   if (ContBB->pred_empty() && ContBB->bbarg_empty()) {
-    ContBB->eraseFromParent();
-    return B.hasValidInsertionPoint() ? B.getInsertionBB() : nullptr;
+    SGF.eraseBasicBlock(ContBB);
+    return SGF.B.hasValidInsertionPoint() ? SGF.B.getInsertionBB() : nullptr;
   }
   
   // Okay, we need to insert the continuation block.
-  B.emitBlock(ContBB);
+  SGF.B.emitBlock(ContBB);
   return ContBB;
 }
 

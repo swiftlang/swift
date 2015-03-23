@@ -988,7 +988,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
     // to emit, clear the IP and destroy the continuation block.
     if (contBB->pred_empty() && firstRow == clauses.rows()) {
       SGF.B.clearInsertionPoint();
-      contBB->eraseFromParent();
+      SGF.eraseBasicBlock(contBB);
       return;
     }
   }
@@ -1830,6 +1830,8 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock) {
     block = result.first->second;
     assert(block);
   } else {
+    // Create the shared destination at the first place that might
+    // have needed it.
     block = SGF.createBasicBlock();
     result.first->second = block;
   }
@@ -1953,7 +1955,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   // If the continuation block has no predecessors, this
   // point is not reachable.
   if (contBB->pred_empty()) {
-    contBB->eraseFromParent();
+    eraseBasicBlock(contBB);
   } else {
     B.emitBlock(contBB);
   }
@@ -2096,10 +2098,11 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
             if (elt == MatchFailureBB)
               elt = BI->getDestBB();
           }
-          
-          assert(MatchFailureBB->pred_empty() &&
-                 "Didn't remove all predecessors");
-          MatchFailureBB->eraseFromParent();
+
+          // Remove the branch to placate eraseBasicBlock()'s
+          // assertion that the block being removed is empty.
+          BI->eraseFromParent();
+          gen.eraseBasicBlock(MatchFailureBB);
         }
       }
 }

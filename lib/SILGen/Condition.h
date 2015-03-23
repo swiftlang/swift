@@ -58,23 +58,23 @@ public:
   
   /// enterTrue - Begin the emission of the true block.  This should only be
   /// called if hasTrue() returns true.
-  void enterTrue(SILBuilder &B);
+  void enterTrue(SILGenFunction &SGF);
   
   /// exitTrue - End the emission of the true block.  This must be called after
   /// enterTrue but before anything else on this Condition.
-  void exitTrue(SILBuilder &B, ArrayRef<SILValue> Args = {});
+  void exitTrue(SILGenFunction &SGF, ArrayRef<SILValue> Args = {});
   
   /// enterFalse - Begin the emission of the false block.  This should only be
   /// called if hasFalse() returns true.
-  void enterFalse(SILBuilder &B);
+  void enterFalse(SILGenFunction &SGF);
   
   /// exitFalse - End the emission of the true block.  This must be called after
   /// enterFalse but before anything else on this Condition.
-  void exitFalse(SILBuilder &B, ArrayRef<SILValue> Args = {});
+  void exitFalse(SILGenFunction &SGF, ArrayRef<SILValue> Args = {});
   
   /// complete - Complete this conditional execution.  This should be called
   /// only after all other calls on this Condition have been made.
-  SILBasicBlock *complete(SILBuilder &B);
+  SILBasicBlock *complete(SILGenFunction &SGF);
 };
 
 /// A conditional value is one that depends on conditional execution.

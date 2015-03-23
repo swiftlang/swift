@@ -16,9 +16,6 @@ func foo(y : A?) {
 //   Check whether the temporary holds a value.
 // CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OPTA]]#1
 // CHECK-NEXT: cond_br [[T1]], [[IS_PRESENT:bb.*]], [[NOT_PRESENT:bb[0-9]+]]
-//   Not sure what this block is doing here.
-// CHECK:    [[CONT:bb[0-9]+]]:
-// CHECK-NEXT: br [[CONT2:bb[0-9]+]]
 //   If not, destroy the temporary.
 // CHECK:    [[NOT_PRESENT]]:
 // CHECK-NEXT: destroy_addr [[TMP_OPTA]]#1
@@ -34,13 +31,16 @@ func foo(y : A?) {
 // CHECK-NEXT: store [[T0]] to [[X_VALUE]] : $*B
 // CHECK-NEXT: inject_enum_addr [[X]]#1 : $*Optional<B>, #Optional.Some
 // CHECK-NEXT: dealloc_stack [[TMP_OPTA]]#0
-// CHECK-NEXT: br [[CONT]]
+// CHECK-NEXT: br [[CONT:bb[0-9]+]]
 //   If not, release the A and inject nothing into x.
 // CHECK:    [[NOT_B]]:
 // CHECK-NEXT: strong_release [[VAL]]
 // CHECK-NEXT: inject_enum_addr [[X]]#1 : $*Optional<B>, #Optional.None
 // CHECK-NEXT: dealloc_stack [[TMP_OPTA]]#0
 // CHECK-NEXT: br [[CONT]]
+//   Finish the prsent path.
+// CHECK:    [[CONT]]:
+// CHECK-NEXT: br [[CONT2:bb[0-9]+]]
 //   Finish the not-present path.
 // CHECK:    [[NOT_PRESENT]]:
 // CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
@@ -69,11 +69,6 @@ func bar(y : A????) {
 // CHECK-NEXT: store %0 to [[TMP_OOOOA]]#1
 // CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OOOOA]]#1
 // CHECK-NEXT: cond_br [[T1]], [[P:bb.*]], [[NP:bb[0-9]+]]
-//   Not sure why this block is right here.
-//   Switch out on the value in [[OB2]].
-// CHECK:    [[SWITCH_OB2:bb[0-9]+]]:
-// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OB2]]#1
-// CHECK-NEXT: cond_br [[T1]], [[IS_B2:bb.*]], [[NOT_B2:bb[0-9]+]]
 //   If not, finish the evaluation.
 // CHECK:    [[NP]]:
 // CHECK-NEXT: destroy_addr [[TMP_OOOOA]]#1
@@ -145,7 +140,7 @@ func bar(y : A????) {
 // CHECK-NEXT: dealloc_stack [[TMP_OOOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
-// CHECK-NEXT: br [[SWITCH_OB2]]
+// CHECK-NEXT: br [[SWITCH_OB2:bb[0-9]+]]
 //   If not, inject nothing into an optional.
 // CHECK:    [[NOT_B]]:
 // CHECK-NEXT: strong_release [[VAL]]
@@ -155,6 +150,10 @@ func bar(y : A????) {
 // CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
 // CHECK-NEXT: br [[SWITCH_OB2]]
+//   Switch out on the value in [[OB2]].
+// CHECK:    [[SWITCH_OB2]]:
+// CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OB2]]#1
+// CHECK-NEXT: cond_br [[T1]], [[IS_B2:bb.*]], [[NOT_B2:bb[0-9]+]]
 //   If it's not present, finish the evaluation.
 // CHECK:    [[NOT_B2]]:
 // CHECK-NEXT: destroy_addr [[TMP_OB2]]#1

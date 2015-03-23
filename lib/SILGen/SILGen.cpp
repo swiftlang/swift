@@ -36,11 +36,10 @@ using namespace Lowering;
 //===--------------------------------------------------------------------===//
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
-  : SGM(SGM), F(F), LastInsnWithoutScope(0),
+  : SGM(SGM), F(F),
     B(createBasicBlock(), &InsertedInstrs),
-    ReturnDest(CleanupLocation::getCleanupLocation(F.getLocation())),
-    FailDest(CleanupLocation::getCleanupLocation(F.getLocation())),
-    NeedsReturn(false), CurrentSILLoc(F.getLocation()), Cleanups(*this)
+    CurrentSILLoc(F.getLocation()),
+    Cleanups(*this)
 {
 }
 

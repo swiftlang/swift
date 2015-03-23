@@ -203,7 +203,7 @@ public:
 
   /// This is used to keep track of all SILInstructions inserted by \c B.
   SmallVector<SILInstruction*, 32> InsertedInstrs;
-  size_t LastInsnWithoutScope;
+  size_t LastInsnWithoutScope = 0;
 
   /// The first block in the postmatter section of the function, if
   /// anything has been built there.
@@ -211,6 +211,33 @@ public:
   /// (This field must precede B because B's initializer calls
   /// createBasicBlock().)
   SILBasicBlock *StartOfPostmatter = nullptr;
+
+  /// The current section of the function that we're emitting code in.
+  ///
+  /// The postmatter section is a part of the function intended for
+  /// things like error-handling that don't need to be mixed into the
+  /// normal code sequence.
+  ///
+  /// If the current function section is Ordinary, and
+  /// StartOfPostmatter is non-null, the current insertion block
+  /// should be ordered before that.
+  ///  
+  /// If the current function section is Postmatter, StartOfPostmatter
+  /// is non-null and the current insertion block is ordered after
+  /// that (inclusive).
+  ///
+  /// (This field must precede B because B's initializer calls
+  /// createBasicBlock().)
+  FunctionSection CurFunctionSection = FunctionSection::Ordinary;
+
+  /// \brief Does this function require a non-void direct return?
+  bool NeedsReturn = false;
+
+  /// \brief Is emission currently within a formal modification?
+  bool InWritebackScope = false;
+
+  /// \brief Is emission currently within an inout conversion?
+  bool InInOutConversionScope = false;
   
   /// B - The SILBuilder used to construct the SILFunction.  It is
   /// what maintains the notion of the current block being emitted
@@ -239,18 +266,15 @@ public:
   SmallVector<JumpDest, 2> BindOptionalFailureDests;
 
   /// The cleanup depth and epilog BB for "return" statements.
-  JumpDest ReturnDest;
+  JumpDest ReturnDest = JumpDest::invalid();
   /// The cleanup depth and epilog BB for "fail" statements.
-  JumpDest FailDest;
+  JumpDest FailDest = JumpDest::invalid();
   /// The 'self' variable that needs to be cleaned up on failure.
   VarDecl *FailSelfDecl = nullptr;
 
   /// The destination for throws.  The block will always be in the
   /// postmatter and takes a BB argument of the exception type.
   JumpDest ThrowDest = JumpDest::invalid();
-
-  /// \brief True if a non-void return is required in this function.
-  bool NeedsReturn : 1;
     
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;
@@ -261,24 +285,6 @@ public:
   /// The stack of pending writebacks.
   std::vector<LValueWriteback> *WritebackStack = 0;
   std::vector<LValueWriteback> &getWritebackStack();
-
-  bool InWritebackScope = false;
-  bool InInOutConversionScope = false;
-
-  /// The current section of the function that we're emitting code in.
-  ///
-  /// The postmatter section is a part of the function intended for
-  /// things like error-handling that don't need to be mixed into the
-  /// normal code sequence.
-  ///
-  /// If the current function section is Ordinary, and
-  /// StartOfPostmatter is non-null, the current insertion block
-  /// should be ordered before that.
-  ///  
-  /// If the current function section is Postmatter, StartOfPostmatter
-  /// is non-null and the current insertion block is ordered after
-  /// that (inclusive).
-  FunctionSection CurFunctionSection = FunctionSection::Ordinary;
 
   /// freeWritebackStack - Just deletes WritebackStack.  Out of line to avoid
   /// having to put the definition of LValueWriteback in this header.
@@ -615,13 +621,32 @@ public:
 
   /// Create a new basic block.
   ///
-  /// The block can be explicitly placed after a particular block;
-  /// otherwise, it will be placed at the end of the current function
-  /// section.
+  /// The block can be explicitly placed after a particular block.
+  /// Otherwise, if the current insertion point is valid, it will be
+  /// placed immediately after it.  Otherwise, it will be placed at the
+  /// end of the current function section.
+  ///
+  /// Because basic blocks are generally constructed with an insertion
+  /// point active, users should be aware that this behavior leads to
+  /// an emergent LIFO ordering: if code generation requires multiple
+  /// blocks, the second block created will be positioned before the
+  /// first block.  (This is clearly desirable behavior when blocks
+  /// are created by different emissions; it's just a little
+  /// counter-intuitive within a single emission.)
   SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr);  
 
-  /// Create a new basic block in the given function section.
+  /// Create a new basic block at the end of the given function
+  /// section.
   SILBasicBlock *createBasicBlock(FunctionSection section);
+
+  /// Erase a basic block that was speculatively created and turned
+  /// out to be unneeded.
+  ///
+  /// This should be called instead of eraseFromParent() in order to
+  /// keep SILGen's internal bookkeeping consistent. 
+  ///
+  /// The block should be empty and have no predecessors.
+  void eraseBasicBlock(SILBasicBlock *block);
   
   //===--------------------------------------------------------------------===//
   // Memory management

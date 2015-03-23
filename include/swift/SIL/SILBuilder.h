@@ -130,11 +130,13 @@ public:
   // CFG Manipulation
   //===--------------------------------------------------------------------===//
 
-  /// moveBlockToEnd - Move a block to a new position in its function.
+  /// moveBlockToEnd - Move a block to immediately before the given iterator.
   void moveBlockTo(SILBasicBlock *BB, SILFunction::iterator IP) {
+    assert(SILFunction::iterator(BB) != IP && "moving block before itself?");
     SILFunction *F = BB->getParent();
     auto &Blocks = F->getBlocks();
-    Blocks.splice(IP, Blocks, BB);
+    Blocks.remove(BB);
+    Blocks.insert(IP, BB);
   }
 
   /// moveBlockToEnd - Reorder a block to the end of its containing function.
@@ -142,15 +144,16 @@ public:
     moveBlockTo(BB, BB->getParent()->end());
   }
 
-  /// \brief Move the specified block to the end of the function and reset the
-  /// insertion point to point to the first instruction in the emitted block.
+  /// \brief Move the insertion point to the end of the given block.
   ///
   /// Assumes that no insertion point is currently active.
-  void emitBlock(SILBasicBlock *BB);
+  void emitBlock(SILBasicBlock *BB) {
+    assert(!hasValidInsertionPoint());
+    setInsertionPoint(BB);
+  }
 
-  /// \brief Move the specified block to the current insertion point (which
-  /// is the end of the function if there is no insertion point) and reset the
-  /// insertion point to point to the first instruction in the emitted block.
+  /// \brief Branch to the given block if there's an active insertion point,
+  /// then move the insertion point to the end of that block.
   void emitBlock(SILBasicBlock *BB, SILLocation BranchLoc);
 
   /// splitBlockForFallthrough - Prepare for the insertion of a terminator.  If

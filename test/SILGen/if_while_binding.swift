@@ -204,13 +204,10 @@ func if_multi_where() {
   // CHECK:   [[BBOX:%[0-9]+]] = alloc_box $String // var b
   // CHECK:   function_ref Swift.Bool._getBuiltinLogicValue (Swift.Bool)() -> Builtin.Int1
   // CHECK:   cond_br {{.*}}, [[IF_BODY:bb[0-9]+]], [[IF_EXIT3:bb[0-9]+]]
-  // CHECK: [[IF_EXIT1a]]:
-  // CHECK:   release_value [[A]]
-  // CHECK:   br [[IF_DONE:bb[0-9]+]]
   // CHECK: [[IF_EXIT3]]:
   // CHECK:   strong_release [[BBOX]]#0
   // CHECK:   release_value [[A]]
-  // CHECK:   br [[IF_DONE]]
+  // CHECK:   br [[IF_DONE:bb[0-9]+]]
   if let a? = foo(), var b? = bar() where a == b {
     // CHECK: [[IF_BODY]]:
     // CHECK:   debug_value [[CVAL:%[0-9]+]] : $String  // let c
@@ -219,6 +216,9 @@ func if_multi_where() {
     // CHECK:   br [[IF_DONE]]
     let c = a
   }
+  // CHECK: [[IF_EXIT1a]]:
+  // CHECK:   release_value [[A]]
+  // CHECK:   br [[IF_DONE]]
   // CHECK: [[IF_DONE]]:
   // CHECK-NEXT:   tuple ()
   // CHECK-NEXT:   return

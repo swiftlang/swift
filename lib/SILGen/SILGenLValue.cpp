@@ -931,8 +931,8 @@ namespace {
 
       ASTContext &ctx = gen.getASTContext();
 
-      SILBasicBlock *writebackBB = gen.createBasicBlock(gen.B.getInsertionBB());
       SILBasicBlock *contBB = gen.createBasicBlock();
+      SILBasicBlock *writebackBB = gen.createBasicBlock(gen.B.getInsertionBB());
       gen.B.createSwitchEnum(loc, optionalCallback, /*defaultDest*/ nullptr,
                              { { ctx.getOptionalSomeDecl(), writebackBB },
                                { ctx.getOptionalNoneDecl(), contBB } });
@@ -1987,7 +1987,8 @@ void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
 
   // Generate code to the optional is present, and if not abort with a message
   // (provided by the stdlib).
-  SILBasicBlock *failBB = createBasicBlock(), *contBB = createBasicBlock();
+  SILBasicBlock *contBB = createBasicBlock();
+  SILBasicBlock *failBB = createBasicBlock();
 
   auto NoneEnumElementDecl = getASTContext().getOptionalNoneDecl(OTK);
   B.createSwitchEnumAddr(loc, addr, /*defaultDest*/contBB,
