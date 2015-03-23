@@ -1705,6 +1705,20 @@ namespace {
       return tv;
     }
 
+    Type visitThrowExpr(ThrowExpr *expr) {
+      // The argument must be convertible to the exception type.
+      if (Type exnType =
+            CS.getTypeChecker().getExceptionType(CS.DC, expr->getThrowLoc())) {
+        CS.addConstraint(ConstraintKind::Conversion,
+                         expr->getSubExpr()->getType(), exnType,
+                         CS.getConstraintLocator(expr,
+                                          ConstraintLocator::ThrownException));
+      }
+
+      // TODO: 'throw' should really have bottom type.
+      return TupleType::getEmpty(CS.TC.Context);
+    }
+
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
       return expr->getType();
     }

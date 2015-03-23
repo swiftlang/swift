@@ -793,7 +793,7 @@ public:
   /// Emit the empty tuple value by emitting
   SILValue emitEmptyTuple(SILLocation loc);
   /// "Emit" an RValue representing an empty tuple.
-  RValue emitEmptyTupleRValue(SILLocation loc);
+  RValue emitEmptyTupleRValue(SILLocation loc, SGFContext C);
 
   /// Returns a reference to a constant in global context. For local func decls
   /// this returns the function constant with unapplied closure context.

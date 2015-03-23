@@ -454,6 +454,10 @@ static NominalTypeDecl *findStdlibType(const ASTContext &ctx, StringRef name) {
   return nullptr;
 }
 
+NominalTypeDecl *ASTContext::getExceptionTypeDecl() const {
+  return getProtocol(KnownProtocolKind::_ErrorType);
+}
+
 NominalTypeDecl *ASTContext::getArrayDecl() const {
   if (!Impl.ArrayDecl)
     Impl.ArrayDecl = findStdlibType(*this, "Array");

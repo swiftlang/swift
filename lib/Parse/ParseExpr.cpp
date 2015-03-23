@@ -354,10 +354,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 /// parseExprUnary
 ///
 ///   expr-unary(Mode):
-///     expr-unary(Mode)
 ///     expr-postfix(Mode)
-///     expr-new
 ///     operator-prefix expr-unary(Mode)
+///     'throw' expr-unary(Mode)
 ///     '&' expr-unary(Mode)
 ///
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
@@ -377,6 +376,17 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
       return nullptr;
     return makeParserResult(
         new (Context) InOutExpr(Loc, SubExpr.get(), Type()));
+  }
+
+  case tok::kw_throw: {
+    SourceLoc throwLoc = consumeToken(tok::kw_throw);
+    ParserResult<Expr> subExpr = parseExprUnary(Message, isExprBasic);
+    if (subExpr.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Expr>();
+    if (subExpr.isNull())
+      return nullptr;
+    return makeParserResult(
+        new (Context) ThrowExpr(throwLoc, subExpr.get(), Type()));
   }
 
   case tok::oper_postfix:

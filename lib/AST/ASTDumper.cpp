@@ -1644,6 +1644,12 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+
+  void visitThrowExpr(ThrowExpr *E) {
+    printCommon(E, "throw_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   
   void visitTryExpr(TryExpr *E) {
     printCommon(E, "try_expr");

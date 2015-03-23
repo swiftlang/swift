@@ -2584,6 +2584,22 @@ namespace {
       return simplifyExprType(expr);
     }
 
+    Expr *visitThrowExpr(ThrowExpr *expr) {
+      // Coerce the operand to the exception type.
+      if (Type exnType = cs.TC.getExceptionType(cs.DC, expr->getThrowLoc())) {
+        Expr *subExpr = coerceToType(expr->getSubExpr(), exnType,
+                                     ConstraintLocatorBuilder(
+                                       cs.getConstraintLocator(expr))
+                                     .withPathElement(
+                                       ConstraintLocator::ThrownException));
+        if (!subExpr) return nullptr;
+        expr->setSubExpr(subExpr);
+      }
+
+      // The result type was set properly by constraint generation.
+      return expr;
+    }
+
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
       return expr;
     }

@@ -2949,6 +2949,30 @@ public:
   }
 };
 
+/// ThrowExpr - Throws an error.
+class ThrowExpr : public Expr {
+  Expr *SubExpr;
+  SourceLoc ThrowLoc;
+
+public:
+  explicit ThrowExpr(SourceLoc throwLoc, Expr *subExpr, Type type)
+    : Expr(ExprKind::Throw, /*Implicit=*/false, type),
+      SubExpr(subExpr), ThrowLoc(throwLoc) {}
+
+  SourceLoc getStartLoc() const { return ThrowLoc; }
+  SourceLoc getEndLoc() const { return SubExpr->getEndLoc(); }
+  SourceLoc getLoc() const { return ThrowLoc; }
+
+  SourceLoc getThrowLoc() const { return ThrowLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Throw;
+  }
+};
+
 /// DynamicTypeExpr - "base.dynamicType" - Produces a metatype value.
 ///
 /// The metatype value can comes from a evaluating an expression and then

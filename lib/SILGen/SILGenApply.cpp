@@ -3386,7 +3386,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   }
   // Index or () if none.
   if (!subscripts)
-    subscripts = emitEmptyTupleRValue(loc);
+    subscripts = emitEmptyTupleRValue(loc, SGFContext());
 
   emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
                        accessType.getResult());
@@ -3537,7 +3537,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   }
   // Index or () if none.
   if (!subscripts)
-    subscripts = emitEmptyTupleRValue(loc);
+    subscripts = emitEmptyTupleRValue(loc, SGFContext());
 
   emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
                        accessType.getResult());

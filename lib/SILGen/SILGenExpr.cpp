@@ -42,6 +42,8 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SaveAndRestore.h"
 
+#include "swift/AST/DiagnosticsSIL.h"
+
 using namespace swift;
 using namespace Lowering;
 
@@ -160,6 +162,8 @@ namespace {
     RValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
     RValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
                                             SGFContext C);
+
+    RValue visitThrowExpr(ThrowExpr *E, SGFContext C);
 
     RValue visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C);
     RValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
@@ -1243,6 +1247,30 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
     return ManagedValue::forUnmanaged(buffer);
 
   return ManagedValue(buffer, enterDestroyCleanup(buffer));
+}
+
+RValue RValueEmitter::visitThrowExpr(ThrowExpr *E, SGFContext C) {
+  // Create a continuation block to return the result in.
+  // Expression emission isn't allowed to not have an insertion point.
+  auto contBB = SGF.createBasicBlock();
+
+  // If we have a valid throw destination, emit the exception and jump there.
+  if (SGF.ThrowDest.isValid()) {
+    ManagedValue exn = SGF.emitRValueAsSingleValue(E->getSubExpr());
+    SGF.emitThrow(E, exn);
+
+  // Otherwise, diagnose.
+  } else {
+    SGF.SGM.diagnose(E, diag::unhandled_throw);
+
+    // The diagnostic above is an error, so we don't care about leaks,
+    // but we do need to not produce invalid SIL.
+    SGF.B.createUnreachable(E);
+  }
+
+  // Emit an empty tuple in the result.
+  SGF.B.emitBlock(contBB);
+  return SGF.emitEmptyTupleRValue(E, C);
 }
 
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
@@ -5477,7 +5505,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     cond.complete(SGF);
   }
 
-  return SGF.emitEmptyTupleRValue(E);
+  return SGF.emitEmptyTupleRValue(E, C);
 }
 
 /// Determine whether the given declaration returns a non-optional object that
@@ -6232,7 +6260,8 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
   llvm_unreachable("bad CC");
 }
 
-RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc) {
+RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc,
+                                            SGFContext C) {
   return RValue(CanType(TupleType::getEmpty(F.getASTContext())));
 }
 
@@ -6392,7 +6421,7 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
 RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   FullExpr scope(SGF.Cleanups, CleanupLocation(E));
   emitSimpleAssignment(SGF, E, E->getDest(), E->getSrc());
-  return SGF.emitEmptyTupleRValue(E);
+  return SGF.emitEmptyTupleRValue(E, C);
 }
 
 void SILGenFunction::emitBindOptional(SILLocation loc,

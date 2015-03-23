@@ -726,25 +726,17 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
 }
 
 void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV) {
+  assert(ThrowDest.isValid() &&
+         "calling emitThrow with invalid throw destination!");
+
   // Claim the exception value.  If we need to handle throwing
   // cleanups, the correct thing to do here is to recreate the
   // exception's cleanup when emitting each cleanup we branch through.
   // But for now we aren't bothering.
   SILValue exn = exnMV.forward(*this);
 
-  // If we have a throw destination, branch there.
-  // FIXME: should this be an assertion?
-  if (ThrowDest.isValid()) {
-    Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn);
-    return;
-  }
-
-  // Otherwise, diagnose.
-  SGM.diagnose(loc, diag::unhandled_throw);
-
-  // The diagnostic above is an error, so we don't care about leaking
-  // the exception here, but we do need to not produce invalid SIL.
-  B.createUnreachable(loc);
+  // Branch to the cleanup destination.
+  Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn);
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {

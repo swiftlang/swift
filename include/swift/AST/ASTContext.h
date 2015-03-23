@@ -335,6 +335,9 @@ public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
+
+  /// Retrieve the declaration of Swift.ErrorType.
+  NominalTypeDecl *getExceptionTypeDecl() const;
   
   /// Retrieve the declaration of Swift.Bool.
   NominalTypeDecl *getBoolDecl() const;
