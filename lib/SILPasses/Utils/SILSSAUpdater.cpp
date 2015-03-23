@@ -12,7 +12,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/raw_stream.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/SSAUpdaterImpl.h"
 #include "swift/Basic/Malloc.h"
 #include "swift/SIL/SILArgument.h"
