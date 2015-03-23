@@ -2116,7 +2116,7 @@ public:
   std::vector<SILWitnessTable::Entry> Entries;
   SILLinkage Linkage;
 
-  SILGenConformance(SILGenModule &SGM, ProtocolConformance *C)
+  SILGenConformance(SILGenModule &SGM, NormalProtocolConformance *C)
     // We only need to emit witness tables for base NormalProtocolConformances.
     : SGM(SGM), Conformance(C->getRootNormalConformance()),
       Linkage(SGM.Types.getLinkageForProtocolConformance(Conformance,
@@ -2199,7 +2199,7 @@ public:
                                         conformance->getRootNormalConformance(),
                                         NotForDefinition)
           == SILLinkage::Shared)
-      SGM.getWitnessTable(conformance);
+      SGM.getWitnessTable(conformance->getRootNormalConformance());
   }
 
   /// Fallback for unexpected protocol requirements.
@@ -2351,15 +2351,15 @@ public:
 
 SILWitnessTable *
 SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
-  conformance = conformance->getRootNormalConformance();
+  auto normal = conformance->getRootNormalConformance();
 
   // If we've already emitted this witness table, return it.
-  auto found = emittedWitnessTables.find(conformance);
+  auto found = emittedWitnessTables.find(normal);
   if (found != emittedWitnessTables.end())
     return found->second;
 
-  SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
-  emittedWitnessTables.insert({conformance, table});
+  SILWitnessTable *table = SILGenConformance(*this, normal).emit();
+  emittedWitnessTables.insert({normal, table});
   return table;
 }
 

@@ -215,6 +215,7 @@ public:
   /// Get the underlying normal conformance.
   const NormalProtocolConformance *getRootNormalConformance() const;
 
+  /// Get the underlying normal conformance.
   NormalProtocolConformance *getRootNormalConformance() {
     return const_cast<NormalProtocolConformance *>(
              const_cast<const ProtocolConformance *>(this)
