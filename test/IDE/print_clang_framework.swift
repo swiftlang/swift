@@ -1,6 +1,5 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// XFAIL: *
 
 // RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=Foo -function-definitions=false -print-regular-comments > %t/Foo.printed.txt
 // RUN: diff -u %S/Inputs/mock-sdk/Foo.printed.txt %t/Foo.printed.txt

@@ -1,5 +1,5 @@
+// REQUIRES: disabled
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=SWIFT_COMPLETIONS | FileCheck %s -check-prefix=SWIFT_COMPLETIONS
-// XFAIL: *
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FW_UNQUAL_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
