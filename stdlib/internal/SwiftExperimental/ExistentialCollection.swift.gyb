@@ -197,7 +197,7 @@ internal class _${Kind}Box<S: ${Kind}Type>
 /// 
 /// Forwards operations to an arbitrary underlying sequence having the
 /// same `Element` type, hiding the specifics of the underlying
-/// ``SequenceType``.
+/// `SequenceType`.
 ///
 /// See also: `AnyGenerator<T>`.
 public struct AnySequence<T> : SequenceType {
@@ -477,29 +477,43 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
 ///
 /// This protocol can be considered an implementation detail of the
 /// `===` and `!==` implementations for these types.
-public protocol _AnyCollectionType : CollectionType {
+public protocol AnyCollectionType : CollectionType {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `underlyingCollectionID`.
   var underlyingCollectionID: ObjectIdentifier {get}
 }
 
+/// Return true iff `lhs` and `rhs` store the same underlying collection.
 public func === <
-  L: _AnyCollectionType, R: _AnyCollectionType
+  L: AnyCollectionType, R: AnyCollectionType
 >(lhs: L, rhs: R) -> Bool {
   return lhs.underlyingCollectionID == rhs.underlyingCollectionID
 }
 
+/// Return false iff `lhs` and `rhs` store the same underlying collection.
 public func !== <
-  L: _AnyCollectionType, R: _AnyCollectionType
+  L: AnyCollectionType, R: AnyCollectionType
 >(lhs: L, rhs: R) -> Bool {
   return lhs.underlyingCollectionID != rhs.underlyingCollectionID
 }
 
 % for (ti, Traversal) in enumerate(traversals):
-public struct Any${Traversal}Collection<Element> : _AnyCollectionType {
+/// A type-erased wrapper over any collection with at least
+/// ${Traversal.lower()} indices.
+/// 
+/// Forwards operations to an arbitrary underlying collection having the
+/// same `Element` type, hiding the specifics of the underlying
+/// `CollectionType`.
+///
+/// See also: ${', '.join('`Any%sType`' % t for t in (2 * traversals)[ti + 1 : ti + 3]) }
+public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   typealias Box = _AnyCollectionBox<Element>
 
 %   for SubTraversal in traversals[ti:]:
+  /// Create an `Any${Traversal}Collection` that stores `base` as its
+  /// underlying collection.
+  ///
+  /// Complexity: O(1)
   public init<
     C: CollectionType
       where C.Index: ${SubTraversal}IndexType, C.Generator.Element == Element
@@ -509,12 +523,25 @@ public struct Any${Traversal}Collection<Element> : _AnyCollectionType {
       startIndex: _${SubTraversal}IndexBox(base.startIndex),
       endIndex: _${SubTraversal}IndexBox(base.endIndex))
   }
+
+  /// Create an `Any${Traversal}Collection` having the same underlying
+  /// collection as `other`.
+  ///
+  /// Postcondition: the result is `===` to `other`.
+  ///
+  /// Complexity: O(1)
   public init(_ other: Any${SubTraversal}Collection<Element>) {
     self._box = other._box
   }
 %   end
 
 %   for SuperTraversal in traversals[:ti]:
+  /// If the indices of the underlying collection stored by `other`
+  /// satisfy `${Traversal}IndexType`, create an
+  /// `Any${Traversal}Collection` having the same underlying
+  /// collection as `other`.  Otherwise, the result is `nil`.
+  ///
+  /// Complexity: O(1)
   public init?(_ other: Any${SuperTraversal}Collection<Element>) {
     if !(other._box.startIndex is _${Traversal}IndexBoxType) {
       return nil
@@ -524,22 +551,38 @@ public struct Any${Traversal}Collection<Element> : _AnyCollectionType {
   }
 %   end
   
+  /// Return a *generator* over the elements of this *collection*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
   
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// Identical to `endIndex` in an empty collection.
   public var startIndex: Any${Traversal}Index {
     return Any${Traversal}Index(_box.startIndex)
   }
   
+  /// The collection's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
   public var endIndex: Any${Traversal}Index {
     return Any${Traversal}Index(_box.endIndex)
   }
   
+  /// Access the element indicated by `position`.
+  ///
+  /// Requires: `position` indicates a valid position in `self` and
+  /// `position != endIndex`.
   public subscript(position: Any${Traversal}Index) -> Element {
     return _box[position._box]
   }
 
+  /// Uniquely identifies the stored underlying collection.
   public var underlyingCollectionID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
