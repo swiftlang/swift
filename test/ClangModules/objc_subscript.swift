@@ -1,4 +1,11 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
+// RUN: rm -rf %t
+// RUN: mkdir %t
+
+// FIXME: BEGIN -enable-source-import hackaround
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
+// FIXME: END -enable-source-import hackaround
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-sil -I %S/Inputs/custom-modules -I %t %s -verify
 
 // REQUIRES: objc_interop
 
