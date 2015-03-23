@@ -357,11 +357,11 @@ public:
   }
 
   virtual void invalidate(SILAnalysis::PreserveKind K) {
-    if (!(K & PreserveKind::Calls)) {
-      BottomUpFunctionOrder.clear();
-      delete CG;
-      CG = nullptr;
-    }
+    if (K & PreserveKind::Calls) return;
+
+    BottomUpFunctionOrder.clear();
+    delete CG;
+    CG = nullptr;
   }
 
   virtual void invalidate(SILFunction*, SILAnalysis::PreserveKind K) { invalidate(K); }

@@ -61,35 +61,34 @@ class SILInstruction;
     }
 
     virtual void invalidate(SILAnalysis::PreserveKind K) {
-      assert(!isLocked() && "invalidating a locked analysis?!");
-      if (!(K & PreserveKind::Branches)) {
-        // Delete Dominance Info.
-        for (auto D : DomInfo)
-          delete D.second;
+      if (K & PreserveKind::Branches) return;
 
-        // Delete PostDominanceInfo.
-        for (auto P : PostDomInfo)
-          delete P.second;
+      // Delete Dominance Info.
+      for (auto D : DomInfo)
+        delete D.second;
 
-        // Clear the maps.
-        DomInfo.clear();
-        PostDomInfo.clear();
-      }
+      // Delete PostDominanceInfo.
+      for (auto P : PostDomInfo)
+        delete P.second;
+
+      // Clear the maps.
+      DomInfo.clear();
+      PostDomInfo.clear();
     }
 
     virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
-      if (!(K & PreserveKind::Branches)) {
-        auto &it= DomInfo.FindAndConstruct(F);
-        if (it.second) {
-          delete it.second;
-          it.second = nullptr;
-        }
+      if (K & PreserveKind::Branches) return;
 
-        auto &pit= PostDomInfo.FindAndConstruct(F);
-        if (pit.second) {
-          delete pit.second;
-          pit.second = nullptr;
-        }
+      auto &it= DomInfo.FindAndConstruct(F);
+      if (it.second) {
+        delete it.second;
+        it.second = nullptr;
+      }
+
+      auto &pit= PostDomInfo.FindAndConstruct(F);
+      if (pit.second) {
+        delete pit.second;
+        pit.second = nullptr;
       }
     }
   };

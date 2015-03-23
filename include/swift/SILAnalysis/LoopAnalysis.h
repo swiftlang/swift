@@ -47,22 +47,23 @@ public:
   }
 
   virtual void invalidate(SILAnalysis::PreserveKind K) {
-    if (!(K & PreserveKind::Branches)) {
-      for (auto LI : LoopInfos)
-        delete LI.second;
+    if (K & PreserveKind::Branches) return;
 
-      // Clear the maps.
-      LoopInfos.clear();
-    }
+    for (auto LI : LoopInfos)
+      delete LI.second;
+
+    // Clear the maps.
+    LoopInfos.clear();
   }
 
   virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
-    if (!(K & PreserveKind::Branches)) {
-      if (LoopInfos.count(F)) {
-        delete LoopInfos[F];
-        LoopInfos.erase(F);
-      }
+    if (K & PreserveKind::Branches) return;
+
+    if (LoopInfos.count(F)) {
+      delete LoopInfos[F];
+      LoopInfos.erase(F);
     }
+
   }
 
   // Computes loop information for the function using dominance information or

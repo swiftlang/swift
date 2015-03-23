@@ -99,16 +99,16 @@ public:
   }
 
   virtual void invalidate(SILAnalysis::PreserveKind K) {
-    if (!(K & PreserveKind::Branches)) {
-      FunctionToPOTMap.clear();
-    }
+    if (K & PreserveKind::Branches) return;
+
+    FunctionToPOTMap.clear();
   }
 
   virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
-    if (!(K & PreserveKind::Branches)) {
-      // Invalidate just this one function. We will lazily recompute it.
-      FunctionToPOTMap[F].IsInvalidated = true;
-    }
+    if (K & PreserveKind::Branches) return;
+
+    // Invalidate just this one function. We will lazily recompute it.
+    FunctionToPOTMap[F].IsInvalidated = true;
   }
 };
 
