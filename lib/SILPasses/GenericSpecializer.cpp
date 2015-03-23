@@ -49,8 +49,9 @@ public:
       // Schedule another iteration of the transformation pipe.
       PM->scheduleAnotherIteration();
 
-      // Invalidate the call graph.
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      // We are creating new functions and modifying calls, but we are
+      // preserving the branches in the existing functions.
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
     }
   }
 
