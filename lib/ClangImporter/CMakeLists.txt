@@ -15,7 +15,10 @@ add_swift_library(swiftClangImporter
   ImportMacro.cpp
   ImportType.cpp
   LINK_LIBRARIES
-    swiftAST)
+    swiftAST
+    # Clang dependencies.
+    LLVMDebugInfoDWARF
+)
 
 
 add_dependencies(swiftClangImporter "${generated_include_targets}")
