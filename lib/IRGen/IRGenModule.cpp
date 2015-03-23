@@ -24,6 +24,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Frontend/CodeGenOptions.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -78,8 +79,11 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.Optimize ? 3 : 0;
   CGO.DisableFPElim = Opts.DisableFPElim;
+  auto &HSI = Importer->getClangPreprocessor().getHeaderSearchInfo();
+  auto &PPO = Importer->getClangPreprocessor().getPreprocessorOpts();
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
-                                                ModuleName, CGO, LLVMContext);
+                                                ModuleName, HSI, PPO, CGO,
+                                                LLVMContext);
   ClangCodeGen->Initialize(ClangContext);
 
   return ClangCodeGen;
