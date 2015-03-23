@@ -1011,18 +1011,31 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numTypeWitnesses = 0;
     unsigned numDefaultedDefinitions = 0;
 
+    // Collect the set of protocols inherited by this conformance.
+    SmallVector<ProtocolDecl *, 8> inheritedProtosSources;
+    for (auto inheritedMapping : conf->getInheritedConformances()) {
+      inheritedProtosSources.push_back(inheritedMapping.first);
+    }
+
+    // Sort the protocols so that we get a deterministic ordering.
+    llvm::array_pod_sort(inheritedProtosSources.begin(),
+                         inheritedProtosSources.end(),
+                         ProtocolType::compareProtocols);
+
+    // Store the inherited conformances.
     SmallVector<ProtocolDecl *, 8> inheritedProtos;
     SmallVector<ProtocolConformance *, 8> inheritedConformance;
-    for (auto inheritedMapping : conf->getInheritedConformances()) {
+    for (auto proto : inheritedProtosSources) {
+      auto conformance = conf->getInheritedConformance(proto);
       DeclID typeDeclID;
       ModuleID confModuleID;
-      if (encodeReferencedConformance(inheritedMapping.second, typeDeclID,
+      if (encodeReferencedConformance(conformance, typeDeclID,
                                       confModuleID,
                                       /*allowReferencingCurrent=*/false)) {
-        inheritedProtos.push_back(inheritedMapping.first);
-        inheritedConformance.push_back(inheritedMapping.second);
+        inheritedProtos.push_back(proto);
+        inheritedConformance.push_back(conformance);
       }
-      data.push_back(addDeclRef(inheritedMapping.first));
+      data.push_back(addDeclRef(proto));
       data.push_back(typeDeclID);
       data.push_back(confModuleID);
     }
