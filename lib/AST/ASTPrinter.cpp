@@ -1975,46 +1975,6 @@ void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
   Printer.printPattern(this);
 }
 
-void ProtocolConformance::printName(llvm::raw_ostream &os,
-                                    const PrintOptions &PO) const {
-  if (auto gp = getGenericParams()) {
-    StreamPrinter SPrinter(os);
-    PrintAST Printer(SPrinter, PO);
-    Printer.printGenericParams(gp);
-    os << ' ';
-  }
- 
-  getType()->print(os, PO);
-  os << ": ";
- 
-  switch (getKind()) {
-  case ProtocolConformanceKind::Normal: {
-    auto normal = cast<NormalProtocolConformance>(this);
-    os << normal->getProtocol()->getName()
-       << " module " << normal->getDeclContext()->getParentModule()->Name;
-    break;
-  }
-  case ProtocolConformanceKind::Specialized: {
-    auto spec = cast<SpecializedProtocolConformance>(this);
-    os << "specialize <";
-    interleave(spec->getGenericSubstitutions(),
-               [&](const Substitution &s) { s.print(os, PO); },
-               [&] { os << ", "; });
-    os << "> (";
-    spec->getGenericConformance()->printName(os);
-    os << ")";
-    break;
-  }
-  case ProtocolConformanceKind::Inherited: {
-    auto inherited = cast<InheritedProtocolConformance>(this);
-    os << "inherit (";
-    inherited->getInheritedConformance()->printName(os);
-    os << ")";
-    break;
-  }
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
@@ -2465,7 +2425,7 @@ public:
     if (auto paramTy = ty->getAs<GenericTypeParamType>())
       return paramTy->getDepth();
 
-    if (auto depMemTy = dyn_cast<DependentMemberType>(CanType(ty))) {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(ty->getCanonicalType())) {
       CanType rootTy;
       do {
         rootTy = depMemTy.getBase();
@@ -2911,3 +2871,50 @@ void TypeBase::print(ASTPrinter &Printer, const PrintOptions &PO) const {
 }
 
 
+void ProtocolConformance::printName(llvm::raw_ostream &os,
+                                    const PrintOptions &PO) const {
+  if (PO.PrintForSIL) {
+    if (auto genericSig = getGenericSignature()) {
+      StreamPrinter sPrinter(os);
+      TypePrinter typePrinter(sPrinter, PO);
+      typePrinter.printGenericSignature(genericSig->getGenericParams(),
+                                        genericSig->getRequirements());
+      os << ' ';
+    }
+  } else if (auto gp = getGenericParams()) {
+    StreamPrinter SPrinter(os);
+    PrintAST Printer(SPrinter, PO);
+    Printer.printGenericParams(gp);
+    os << ' ';
+  }
+ 
+  getType()->print(os, PO);
+  os << ": ";
+ 
+  switch (getKind()) {
+  case ProtocolConformanceKind::Normal: {
+    auto normal = cast<NormalProtocolConformance>(this);
+    os << normal->getProtocol()->getName()
+       << " module " << normal->getDeclContext()->getParentModule()->Name;
+    break;
+  }
+  case ProtocolConformanceKind::Specialized: {
+    auto spec = cast<SpecializedProtocolConformance>(this);
+    os << "specialize <";
+    interleave(spec->getGenericSubstitutions(),
+               [&](const Substitution &s) { s.print(os, PO); },
+               [&] { os << ", "; });
+    os << "> (";
+    spec->getGenericConformance()->printName(os);
+    os << ")";
+    break;
+  }
+  case ProtocolConformanceKind::Inherited: {
+    auto inherited = cast<InheritedProtocolConformance>(this);
+    os << "inherit (";
+    inherited->getInheritedConformance()->printName(os);
+    os << ")";
+    break;
+  }
+  }
+}

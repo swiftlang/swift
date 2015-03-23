@@ -156,7 +156,19 @@ Type ProtocolConformance::getInterfaceType() const {
 }
 
 GenericSignature *ProtocolConformance::getGenericSignature() const {
-  return getDeclContext()->getGenericSignatureOfContext();
+  switch (getKind()) {
+  case ProtocolConformanceKind::Inherited:
+  case ProtocolConformanceKind::Normal:
+    // If we have a normal or inherited protocol conformance, look for its
+    // generic signature.
+    return getDeclContext()->getGenericSignatureOfContext();
+
+  case ProtocolConformanceKind::Specialized:
+    // If we have a specialized protocol conformance, since we do not support
+    // currently partial specialization, we know that it can not have any open
+    // type variables.
+    return nullptr;
+  }
 }
 
 bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,

@@ -283,7 +283,7 @@ struct ConformingGeneric<R: AssocReqt> : AnyProtocol {
   static func staticMethod(#x: ConformingGeneric) {}
 }
 func <~> <R: AssocReqt>(x: ConformingGeneric<R>, y: ConformingGeneric<R>) {}
-// TABLE-LABEL: sil_witness_table hidden <R : AssocReqt> ConformingGeneric<R>: AnyProtocol module witness_tables {
+// TABLE-LABEL: sil_witness_table hidden <R where R : AssocReqt> ConformingGeneric<R>: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: R
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
@@ -310,7 +310,7 @@ struct ConformingGenericWithMoreGenericWitnesses<S: AssocReqt>
   static func staticMethod<Z>(#x: Z) {}
 }
 func <~> <AA: AnotherProtocol, BB: AnotherProtocol>(x: AA, y: BB) {}
-// TABLE-LABEL: sil_witness_table hidden <S : AssocReqt> ConformingGenericWithMoreGenericWitnesses<S>: AnyProtocol module witness_tables {
+// TABLE-LABEL: sil_witness_table hidden <S where S : AssocReqt> ConformingGenericWithMoreGenericWitnesses<S>: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: S
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
@@ -470,7 +470,7 @@ protocol AssocTypeWithReqt {
 struct ConformsWithDependentAssocType1<CC: AssocReqt> : AssocTypeWithReqt {
   typealias AssocType = CC
 }
-// TABLE-LABEL: sil_witness_table hidden <CC : AssocReqt> ConformsWithDependentAssocType1<CC>: AssocTypeWithReqt module witness_tables {
+// TABLE-LABEL: sil_witness_table hidden <CC where CC : AssocReqt> ConformsWithDependentAssocType1<CC>: AssocTypeWithReqt module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: CC
 // TABLE-NEXT:    associated_type_protocol (AssocType: AssocReqt): dependent
 // TABLE-NEXT:  }
