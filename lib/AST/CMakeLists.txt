@@ -40,6 +40,7 @@ add_swift_library(swiftAST
 
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
+    LLVMDebugInfoDWARF
     clangIndex
     clangFormat
     clangToolingCore

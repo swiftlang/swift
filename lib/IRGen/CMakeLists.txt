@@ -36,6 +36,7 @@ add_swift_library(swiftIRGen
 
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
+    LLVMDebugInfoDWARF
     clangCodeGen
     clangAST
 )
