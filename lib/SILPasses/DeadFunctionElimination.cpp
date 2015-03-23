@@ -304,7 +304,7 @@ public:
       : FunctionLivenessComputation(module) {}
 
   /// The main entry point of the optimization.
-  bool eliminateFunctions() {
+  void eliminateFunctions(SILModuleTransform *DFEPass) {
 
     DEBUG(llvm::dbgs() << "running dead function elimination\n");
     findAliveFunctions();
@@ -329,10 +329,9 @@ public:
         NumDeadFunc++;
         Module->eraseFunction(F);
         CallGraphChanged = true;
+        DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
       }
     }
-
-    return CallGraphChanged;
   }
 };
 
@@ -418,23 +417,20 @@ public:
   ///
   /// Bodies of alive functions should not be removed, as LLVM may
   /// still need them for analyzing their side-effects.
-  bool eliminateFunctions() {
+  void eliminateFunctions(SILModuleTransform *DFEPass) {
 
     findAliveFunctions();
-
-    bool CallGraphChanged = false;
-
     // Get rid of definitions for all global functions that are not marked as
     // alive.
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
       SILFunction *F = FI++;
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
-        CallGraphChanged |= tryToConvertExtenralDefinitionIntoDeclaration(F);
+        if (tryToConvertExtenralDefinitionIntoDeclaration(F)) {
+          DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+        }
       }
     }
-
-    return CallGraphChanged;
   }
 };
 
@@ -453,10 +449,7 @@ class SILDeadFuncElimination : public SILModuleTransform {
     getModule()->invalidateSILLoaderCaches();
 
     DeadFunctionElimination deadFunctionElimination(getModule());
-    bool changed = deadFunctionElimination.eliminateFunctions();
-    
-    if (changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+    deadFunctionElimination.eliminateFunctions(this);
   }
   
   StringRef getName() override { return "Dead Function Elimination"; }
@@ -470,13 +463,9 @@ class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
     // Avoid that Deserializers keep references to functions in their caches.
     getModule()->invalidateSILLoaderCaches();
 
-    ExternalFunctionDefinitionsElimination
-        externalFunctionDefinitionsElimination(getModule());
-    bool changed = externalFunctionDefinitionsElimination.eliminateFunctions();
-
-    if (changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
-  }
+    ExternalFunctionDefinitionsElimination EFDFE(getModule());
+    EFDFE.eliminateFunctions(this);
+ }
 
   StringRef getName() override {
     return "External Function Definitions Elimination";
