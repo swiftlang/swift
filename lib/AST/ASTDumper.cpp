@@ -2349,6 +2349,11 @@ namespace {
         printField("assoc_type", assocType->printRef());
       if (auto selfProto = T->getSelfProtocol())
         printField("self_proto", selfProto->printRef());
+
+      // FIXME: This is ugly.
+      OS << "\n";
+      T->getASTContext().dumpArchetypeContext(T, OS, Indent + 2);
+
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);
       if (auto openedExistential = T->getOpenedExistentialType())

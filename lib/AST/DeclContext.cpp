@@ -486,10 +486,10 @@ static unsigned getLineNumber(DCType *DC) {
   return ctx.SourceMgr.getLineAndColumn(loc).first;
 }
 
-unsigned DeclContext::printContext(raw_ostream &OS) const {
+unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   unsigned Depth = 0;
   if (auto *P = getParent())
-    Depth = P->printContext(OS);
+    Depth = P->printContext(OS, indent);
 
   const char *Kind;
   switch (getContextKind()) {
@@ -515,7 +515,7 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
     Kind = "AbstractFunctionDecl";
     break;
   }
-  OS.indent(Depth*2) << "0x" << (void*)this << " " << Kind;
+  OS.indent(Depth*2 + indent) << "0x" << (void*)this << " " << Kind;
 
   switch (getContextKind()) {
   case DeclContextKind::Module:

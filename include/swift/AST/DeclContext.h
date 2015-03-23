@@ -422,7 +422,7 @@ public:
   bool walkContext(ASTWalker &Walker);
 
   void dumpContext() const;
-  unsigned printContext(llvm::raw_ostream &OS) const;
+  unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0) const;
   
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,

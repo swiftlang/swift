@@ -187,6 +187,10 @@ public:
   /// The name of the module "ObjectiveC".
   Identifier ObjCModuleName;
 
+  /// Note: in non-NDEBUG builds, tracks the context of each archetype
+  /// type, which can be very useful for debugging.
+  llvm::DenseMap<ArchetypeType *, DeclContext *> ArchetypeContexts;
+
   // Define the set of known identifiers.
 #define IDENTIFIER(Id) Identifier Id_##Id;
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
@@ -707,6 +711,15 @@ public:
   /// Diagnose any unsatisfied @objc optional requirements of
   /// protocols that conflict with methods.
   bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
+
+  /// Try to dump the context of the given archetype.
+  void dumpArchetypeContext(ArchetypeType *archetype,
+                            unsigned indent = 0) const;
+
+  /// Try to dump the context of the given archetype.
+  void dumpArchetypeContext(ArchetypeType *archetype,
+                            llvm::raw_ostream &os,
+                            unsigned indent = 0) const;
 
 private:
   friend class Decl;

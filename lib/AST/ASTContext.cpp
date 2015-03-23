@@ -1903,6 +1903,19 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   return anyDiagnosed;
 }
 
+void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
+                                      unsigned indent) const {
+  dumpArchetypeContext(archetype, llvm::errs(), indent);
+}
+
+void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
+                                      llvm::raw_ostream &os,
+                                      unsigned indent) const {
+  auto knownDC = ArchetypeContexts.find(archetype);
+  if (knownDC != ArchetypeContexts.end())
+    knownDC->second->printContext(os, indent);
+}
+
 //===----------------------------------------------------------------------===//
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//

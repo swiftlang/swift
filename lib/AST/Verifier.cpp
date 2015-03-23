@@ -439,6 +439,14 @@ struct ASTNodeBase {};
 
             Out << "AST verification error: archetype " << archetype
                 << " not allowed in this context\n";
+
+            auto knownDC = Ctx.ArchetypeContexts.find(archetype);
+            if (knownDC != Ctx.ArchetypeContexts.end()) {
+              llvm::errs() << "archetype came from:\n";
+              knownDC->second->dumpContext();
+              llvm::errs() << "\n";
+            }
+
             return true;
           }
 

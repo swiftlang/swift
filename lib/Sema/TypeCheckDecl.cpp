@@ -949,6 +949,14 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
   genericParams->setAllArchetypes(
     TC.Context.AllocateCopy(builder.getAllArchetypes()));
 
+#ifndef NDEBUG
+  // Record archetype contexts.
+  for (auto archetype : genericParams->getAllArchetypes()) {
+    if (TC.Context.ArchetypeContexts.count(archetype) == 0)
+      TC.Context.ArchetypeContexts[archetype] = dc;
+  }
+#endif
+
   // Replace the generic parameters with their archetypes throughout the
   // types in the requirements.
   // FIXME: This should not be necessary at this level; it is a transitional
