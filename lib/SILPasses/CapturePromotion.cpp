@@ -965,7 +965,7 @@ class CapturePromotionPass : public SILModuleTransform {
       processFunction(&F, Worklist);
 
     if (!Worklist.empty())
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
 
     while (!Worklist.empty())
       processFunction(Worklist.pop_back_val(), Worklist);

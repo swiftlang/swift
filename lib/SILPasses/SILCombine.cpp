@@ -327,7 +327,7 @@ class SILCombine : public SILFunctionTransform {
     SILCombiner Combiner(AA, getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     if (Changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "SIL Combine"; }

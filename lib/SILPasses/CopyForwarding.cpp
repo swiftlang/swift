@@ -312,8 +312,10 @@ public:
     // global hoisting will be done.
     DoGlobalHoisting = !F->isTransparent();
     if (HasChangedCFG) {
-      DomAnalysis->invalidate(F, SILAnalysis::InvalidationKind::CFG);
-      PostOrder->invalidate(F, SILAnalysis::InvalidationKind::CFG);
+      // We are only invalidating the analysis that we use internally.
+      // We'll invalidate the analysis that are used by other passes at the end.
+      DomAnalysis->invalidate(F, SILAnalysis::PreserveKind::Nothing);
+      PostOrder->invalidate(F, SILAnalysis::PreserveKind::Nothing);
     }
     CurrentDef = SILValue();
     IsLoadedFrom = false;
@@ -984,7 +986,7 @@ class CopyForwardingPass : public SILFunctionTransform
     // Perform NRVO
     for (auto Copy : NRVOCopies) {
       performNRVO(Copy);
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
     }
 
     // Perform Copy Forwarding.
@@ -1008,9 +1010,11 @@ class CopyForwardingPass : public SILFunctionTransform
       } while (Forwarding.hasForwardedToCopy());
     }
     if (Forwarding.hasChangedCFG())
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+      // We've split critical edges so we can't preserve CFG, but we did not
+      // change calls so we can preserve them.
+      invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
     else
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "Copy Forwarding"; }

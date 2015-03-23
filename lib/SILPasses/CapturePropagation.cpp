@@ -330,7 +330,7 @@ void CapturePropagation::run() {
   // this conservative in case someone implements interprocedural/dynamic call
   // graph analysis later.
   if (HasChanged)
-    invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+    invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
 }
 
 SILTransform *swift::createCapturePropagation() {

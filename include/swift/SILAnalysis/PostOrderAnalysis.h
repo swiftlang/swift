@@ -98,16 +98,14 @@ public:
     return S->getKind() == AnalysisKind::PostOrder;
   }
 
-  virtual void invalidate(InvalidationKind K) {
-    // FIXME: Invalidating the call graph should not invalidate the domtrees
-    // of all functions.
-    if (K >= InvalidationKind::CFG) {
+  virtual void invalidate(SILAnalysis::PreserveKind K) {
+    if (!(K & PreserveKind::Branches)) {
       FunctionToPOTMap.clear();
     }
   }
 
-  virtual void invalidate(SILFunction* F, InvalidationKind K) {
-    if (K >= InvalidationKind::CFG) {
+  virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
+    if (!(K & PreserveKind::Branches)) {
       // Invalidate just this one function. We will lazily recompute it.
       FunctionToPOTMap[F].IsInvalidated = true;
     }

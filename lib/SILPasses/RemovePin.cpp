@@ -109,7 +109,7 @@ public:
 
     if (Changed)
       PM->invalidateAnalysis(getFunction(),
-                             SILAnalysis::InvalidationKind::Instructions);
+                             SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   /// Pin uses are safe if they either mark a dependence or if it is the unpin we

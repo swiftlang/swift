@@ -356,15 +356,15 @@ public:
     return *CG;
   }
 
-  virtual void invalidate(InvalidationKind K) {
-    if (K >= InvalidationKind::CallGraph) {
+  virtual void invalidate(SILAnalysis::PreserveKind K) {
+    if (!(K & PreserveKind::Calls)) {
       BottomUpFunctionOrder.clear();
       delete CG;
       CG = nullptr;
     }
   }
 
-  virtual void invalidate(SILFunction*, InvalidationKind K) { invalidate(K); }
+  virtual void invalidate(SILFunction*, SILAnalysis::PreserveKind K) { invalidate(K); }
 
   virtual void verify() const;
 };

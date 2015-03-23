@@ -845,7 +845,7 @@ class SILMem2Reg : public SILFunctionTransform {
     bool Changed = MemoryToRegisters(*F, DA->getDomInfo(F)).run();
 
     if (Changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "SIL Mem2Reg"; }

@@ -42,12 +42,8 @@ public:
     return S->getKind() == AnalysisKind::ClassHierarchyAnalysis;
   }
 
-  virtual void invalidate(InvalidationKind K) {
-    if (K >= InvalidationKind::All) {
-      DirectSubclassesCache.clear();
-      IndirectSubclassesCache.clear();
-      init(); 
-    }
+  virtual void invalidate(SILAnalysis::PreserveKind K) {
+    // Nothing can invalidate the ClassHierarchyAnalysis!
   }
 
 
@@ -80,7 +76,7 @@ public:
            IndirectSubclassesCache[C].size() > 0;
   }
 
-  virtual void invalidate(SILFunction *F, InvalidationKind K) {
+  virtual void invalidate(SILFunction *F, SILAnalysis::PreserveKind K) {
     invalidate(K);
   }
 

@@ -1398,7 +1398,7 @@ public:
           " *****\n");
 
     if (processFunction(F, AA, POTA, RCIA, HoistReleases))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "SIL Code Motion"; }

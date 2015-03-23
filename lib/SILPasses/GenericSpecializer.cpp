@@ -50,7 +50,7 @@ public:
       PM->scheduleAnotherIteration();
 
       // Invalidate the call graph.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
     }
   }
 

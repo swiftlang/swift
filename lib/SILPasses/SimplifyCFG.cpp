@@ -2326,7 +2326,7 @@ bool SimplifyCFG::run() {
     RU.run();
 
     // Force dominator recomputation below.
-    PM->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::CFG);
+    PM->invalidateAnalysis(&Fn, SILAnalysis::PreserveKind::Nothing);
     Changed = true;
   }
 
@@ -3074,7 +3074,7 @@ class SimplifyCFGPass : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     if (SimplifyCFG(*getFunction(), PM).run())
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
 
   StringRef getName() override { return "Simplify CFG"; }
@@ -3108,7 +3108,7 @@ public:
         splitAllCriticalEdges(Fn, OnlyNonCondBrEdges, nullptr, nullptr);
 
     if (Changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
   }
 
   StringRef getName() override { return "Split Critical Edges"; }
@@ -3122,7 +3122,7 @@ public:
   /// The entry point to the transformation.
   void run() override {
     if (SimplifyCFG(*getFunction(), PM).simplifyBlockArgs())
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
   
   StringRef getName() override { return "Simplify Block Args"; }

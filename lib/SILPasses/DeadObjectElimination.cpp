@@ -293,7 +293,7 @@ class DeadObjectElimination : public SILFunctionTransform {
 
   void run() override {
     if (processFunction(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "Dead Object Elimination"; }

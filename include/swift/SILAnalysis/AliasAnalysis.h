@@ -127,9 +127,11 @@ public:
     return getMemoryBehavior(Inst, V) == MemoryBehavior::MayHaveSideEffects;
   }
 
-  virtual void invalidate(InvalidationKind K) { AliasCache.clear(); }
+  virtual void invalidate(SILAnalysis::PreserveKind K) { AliasCache.clear(); }
 
-  virtual void invalidate(SILFunction *, InvalidationKind K) { invalidate(K); }
+  virtual void invalidate(SILFunction *, SILAnalysis::PreserveKind K) {
+    invalidate(K);
+  }
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

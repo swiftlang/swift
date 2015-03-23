@@ -608,7 +608,7 @@ class SILCSE : public SILFunctionTransform {
 
     CSE C;
     if (C.processFunction(*getFunction(), DA->getDomInfo(getFunction())))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "CSE"; }

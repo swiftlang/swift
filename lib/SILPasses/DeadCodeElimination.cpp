@@ -105,7 +105,7 @@ class DCE : public SILFunctionTransform {
 
     markLive(*F);
     if (removeDead(*F))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
 
   bool precomputeControlInfo(SILFunction &F);

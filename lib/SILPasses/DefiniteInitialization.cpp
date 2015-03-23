@@ -2003,13 +2003,13 @@ class DefiniteInitialization : public SILFunctionTransform {
   void run() override {
     // Walk through and promote all of the alloc_box's that we can.
     if (checkDefiniteInitialization(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::All);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
 
     DEBUG(getFunction()->verify());
 
     // Lower raw-sil only instructions used by this pass, like "assign".
     if (lowerRawSILOperations(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::All);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
 
   StringRef getName() override { return "Definite Initialization"; }

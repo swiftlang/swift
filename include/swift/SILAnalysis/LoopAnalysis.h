@@ -46,8 +46,8 @@ public:
     return S->getKind() == AnalysisKind::LoopInfo;
   }
 
-  virtual void invalidate(InvalidationKind K) {
-    if (K >= InvalidationKind::CFG) {
+  virtual void invalidate(SILAnalysis::PreserveKind K) {
+    if (!(K & PreserveKind::Branches)) {
       for (auto LI : LoopInfos)
         delete LI.second;
 
@@ -56,8 +56,8 @@ public:
     }
   }
 
-  virtual void invalidate(SILFunction* F, InvalidationKind K) {
-    if (K >= InvalidationKind::CFG) {
+  virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
+    if (!(K & PreserveKind::Branches)) {
       if (LoopInfos.count(F)) {
         delete LoopInfos[F];
         LoopInfos.erase(F);

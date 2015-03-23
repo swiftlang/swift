@@ -60,11 +60,9 @@ class SILInstruction;
       return S->getKind() == AnalysisKind::Dominance;
     }
 
-    virtual void invalidate(InvalidationKind K) {
+    virtual void invalidate(SILAnalysis::PreserveKind K) {
       assert(!isLocked() && "invalidating a locked analysis?!");
-      // FIXME: Invalidating the call graph should not invalidate the domtrees
-      // of all functions.
-      if (K >= InvalidationKind::CFG) {
+      if (!(K & PreserveKind::Branches)) {
         // Delete Dominance Info.
         for (auto D : DomInfo)
           delete D.second;
@@ -79,8 +77,8 @@ class SILInstruction;
       }
     }
 
-    virtual void invalidate(SILFunction* F, InvalidationKind K) {
-      if (K >= InvalidationKind::CFG) {
+    virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
+      if (!(K & PreserveKind::Branches)) {
         auto &it= DomInfo.FindAndConstruct(F);
         if (it.second) {
           delete it.second;

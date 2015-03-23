@@ -790,7 +790,7 @@ class AllocBoxToStack : public SILFunctionTransform {
     if (!Promotable.empty()) {
       auto Count = rewritePromotedBoxes(Promotable, ElidedOperands, Returns);
       NumStackPromoted += Count;
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
     }
   }
 

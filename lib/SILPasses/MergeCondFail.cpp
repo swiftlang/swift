@@ -81,7 +81,7 @@ public:
     }
     if (Changed)
       PM->invalidateAnalysis(getFunction(),
-                             SILAnalysis::InvalidationKind::Instructions);
+                             SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   /// \brief Try to merge the cond_fail instructions. Returns true if any could

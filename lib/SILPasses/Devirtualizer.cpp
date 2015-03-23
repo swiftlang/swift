@@ -83,7 +83,7 @@ public:
     // Invalidate the analysis of caller functions.
     for (auto *AI : DevirtualizedCalls) {
       invalidateAnalysis(AI->getFunction(),
-                         SILAnalysis::InvalidationKind::CallGraph);
+                         SILAnalysis::PreserveKind::Branches);
     }
 
     if (Changed) {
@@ -102,7 +102,7 @@ public:
       if (Specialized) {
         // We've specialized some functions and created new ones, so invalidate
         // the world.
-        invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+        invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
       }
 
       PM->scheduleAnotherIteration();
@@ -494,7 +494,7 @@ namespace {
         Changed |= insertInlineCaches(AI, CHA);
 
       if (Changed) {
-        invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+        invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
       }
     }
 

@@ -93,7 +93,7 @@ class SILPassManager {
   void scheduleAnotherIteration() { anotherIteration = true; }
 
   ///  \brief Broadcast the invalidation of the module to all analysis.
-  void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
+  void invalidateAnalysis(SILAnalysis::PreserveKind K) {
     for (auto AP : Analysis)
       if (!AP->isLocked())
         AP->invalidate(K);
@@ -101,7 +101,7 @@ class SILPassManager {
 
   /// \brief Broadcast the invalidation of the function to all analysis.
   void invalidateAnalysis(SILFunction *F,
-                          SILAnalysis::InvalidationKind K) {
+                          SILAnalysis::PreserveKind K) {
     // Invalidate the analysis (unless they are locked)
     for (auto AP : Analysis)
       if (!AP->isLocked())

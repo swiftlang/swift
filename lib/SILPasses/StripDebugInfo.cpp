@@ -40,7 +40,7 @@ class StripDebugInfo : public swift::SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     stripFunction(getFunction());
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "Strip Debug Info"; }

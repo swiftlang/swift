@@ -27,15 +27,21 @@ namespace swift {
   /// The base class for all SIL-level analysis.
   class SILAnalysis {
   public:
-    /// The invalidation Lattice.
-    /// This is a hierarchy of invalidation messages that are sent to analysis
-    /// objects. Every invalidation kind invalidates the levels before it. For
-    /// example, CFG invalidates Instructions and CFG.
-    enum class InvalidationKind {
-      Instructions,  // Invalidate instruction-related analysis.
-      CFG,           // The control flow changes.
-      CallGraph,     // The call graph changed.
-      All,           // Invalidate everything.
+    /// This is a list of values that allow passes to communicate to analysis
+    /// which traits of the code were preserved. Based on this information
+    /// the analysis can decide if it needs to be invalidated. This information
+    /// may refer to a specific function or to a list of functions depending
+    /// on the context in which it is used.
+    enum PreserveKind : unsigned {
+      Nothing     = 0x0,   // The pass does not preserve any analysis trait.
+      Calls       = 0x1,   // The pass did not modify any calls.
+      Branches    = 0x2,   // The pass did not modify any branches.
+
+      // This is a list of combined traits that is defined to make the use of
+      /// the invalidation API more convenient.
+      ProgramFlow = Calls | Branches, // The pass changed some instructions but
+                                   // did not change the overall flow
+                                   // of the code.
     };
 
     /// A list of the known analysis.
@@ -82,10 +88,10 @@ namespace swift {
     bool isLocked() { return invalidationLock; }
 
     /// Invalidate all information in this analysis.
-    virtual void invalidate(InvalidationKind K) {}
+    virtual void invalidate(PreserveKind K) {}
 
     /// Invalidate all of the information for a specific function.
-    virtual void invalidate(SILFunction *F, InvalidationKind K) {}
+    virtual void invalidate(SILFunction *F, PreserveKind K) {}
 
     /// Verify the state of this analysis.
     virtual void verify() const {}
@@ -109,12 +115,12 @@ namespace swift {
       return S->getKind() == AnalysisKind::CompleteFuncs;
     }
 
-    virtual void invalidate(InvalidationKind K) {
+    virtual void invalidate(PreserveKind K) {
       IsModulePending = true;
       HasChanged = true;
     }
 
-    virtual void invalidate(SILFunction* F, InvalidationKind) {
+    virtual void invalidate(SILFunction* F, PreserveKind) {
       PendingFuncs.insert(F);
       HasChanged = true;
     }

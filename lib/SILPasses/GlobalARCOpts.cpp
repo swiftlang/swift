@@ -229,7 +229,7 @@ class GlobalARCOpts : public SILFunctionTransform {
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     if (processFunction(*getFunction(), false, AA, POTA, RCIA)) {
       processFunction(*getFunction(), true, AA, POTA, RCIA);
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
     }
   }
 

@@ -460,9 +460,11 @@ public:
     }
 
     if (Changed) {
-      // TODO: Verify: We have updated the DominanceInfo and SILLoopInfo. It
-      // should be safe not to invalidate the CFG.
-      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
+      LA->lockInvalidation();
+      DA->lockInvalidation();
+      PM->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+      LA->unlockInvalidation();
+      DA->unlockInvalidation();
     }
   }
 };

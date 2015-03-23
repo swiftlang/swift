@@ -194,7 +194,7 @@ public:
 
     if (Changed)
       PM->invalidateAnalysis(getFunction(),
-                             SILAnalysis::InvalidationKind::Instructions);
+                             SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   /// Return True if the relationship \p Rel describes a known relation

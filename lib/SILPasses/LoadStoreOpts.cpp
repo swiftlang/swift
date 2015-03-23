@@ -1417,7 +1417,7 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
       Changed = true;
 
     if (Changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "SIL Load Store Opts"; }

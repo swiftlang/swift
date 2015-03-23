@@ -741,7 +741,7 @@ public:
 
     // Invalidate the call graph.
     if (Changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
 
     // If for testing purposes we were asked to not eliminate dead closures,
     // return.

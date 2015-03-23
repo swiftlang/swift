@@ -81,7 +81,7 @@ namespace swift {
   protected:
     SILFunction *getFunction() { return F; }
 
-    void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
+    void invalidateAnalysis(SILAnalysis::PreserveKind K) {
       PM->invalidateAnalysis(F, K);
     }
   };
@@ -108,12 +108,12 @@ namespace swift {
 
     /// Invalidate all of functions in the module, using invalidation
     /// information \p K.
-    void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
+    void invalidateAnalysis(SILAnalysis::PreserveKind K) {
       PM->invalidateAnalysis(K);
     }
 
     /// Invalidate only the function \p F, using invalidation information \p K.
-    void invalidateAnalysis(SILFunction *F, SILAnalysis::InvalidationKind K) {
+    void invalidateAnalysis(SILFunction *F, SILAnalysis::PreserveKind K) {
       PM->invalidateAnalysis(F, K);
     }
 

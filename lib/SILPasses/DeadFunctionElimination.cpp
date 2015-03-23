@@ -456,7 +456,7 @@ class SILDeadFuncElimination : public SILModuleTransform {
     bool changed = deadFunctionElimination.eliminateFunctions();
     
     if (changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
   
   StringRef getName() override { return "Dead Function Elimination"; }
@@ -475,7 +475,7 @@ class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
     bool changed = externalFunctionDefinitionsElimination.eliminateFunctions();
 
     if (changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
 
   StringRef getName() override {

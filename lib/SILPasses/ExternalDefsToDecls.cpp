@@ -27,7 +27,7 @@ class ExternalDefsToDecls : public SILModuleTransform {
       if (isAvailableExternally(F.getLinkage()) && F.isDefinition())
         F.convertToDeclaration();
 
-    invalidateAnalysis(SILAnalysis::InvalidationKind::All);
+    invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
 
   StringRef getName() override { return "External Defs To Decls"; }

@@ -1135,7 +1135,7 @@ public:
     }
 
     if (Changed)
-      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
+      PM->invalidateAnalysis(F, SILAnalysis::PreserveKind::ProgramFlow);
   }
 };
 }

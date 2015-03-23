@@ -834,8 +834,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     // we expect it to have happened.
     assert(Success && "Expected inliner to inline this function!");
     AI->eraseFromParent();
-    DA->invalidate(Caller, SILAnalysis::InvalidationKind::CFG);
-    LA->invalidate(Caller, SILAnalysis::InvalidationKind::CFG);
+    DA->invalidate(Caller, SILAnalysis::PreserveKind::Nothing);
+    LA->invalidate(Caller, SILAnalysis::PreserveKind::Nothing);
     NumFunctionsInlined++;
     Changed = true;
   }
@@ -910,7 +910,7 @@ public:
 
     // Invalidate the call graph.
     if (Changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
 
   StringRef getName() override { return PassName; }

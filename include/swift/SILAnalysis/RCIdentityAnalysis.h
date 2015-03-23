@@ -52,14 +52,12 @@ public:
     return S->getKind() == AnalysisKind::RCIdentity;
   }
 
-  virtual void invalidate(InvalidationKind K) {
-    if (K >= InvalidationKind::Instructions) {
+  virtual void invalidate(SILAnalysis::PreserveKind K) {
       Cache.clear();
-    }
   }
 
   // TODO: Add function specific cache to save compile time.
-  virtual void invalidate(SILFunction* F, InvalidationKind K) {
+  virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
     invalidate(K);
   }
 

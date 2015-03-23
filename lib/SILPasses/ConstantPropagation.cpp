@@ -950,7 +950,7 @@ private:
   void run() override {
     if (CCPFunctionBody(*getFunction(), EnableDiagnostics,
                         getOptions().AssertConfig))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "Constant Propagation"; }

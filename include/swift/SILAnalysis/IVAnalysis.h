@@ -94,22 +94,18 @@ public:
     return *IVInfos[F];
   }
 
-  virtual void invalidate(InvalidationKind K) {
-    if (K >= InvalidationKind::Instructions) {
+  virtual void invalidate(SILAnalysis::PreserveKind K) {
       for (auto IVI : IVInfos)
         delete IVI.second;
 
       IVInfos.clear();
-    }
   }
 
-  virtual void invalidate(SILFunction *F, InvalidationKind K) {
-    if (K >= InvalidationKind::Instructions) {
+  virtual void invalidate(SILFunction *F, SILAnalysis::PreserveKind K) {
       if (IVInfos.count(F)) {
         delete IVInfos[F];
         IVInfos.erase(F);
       }
-    }
   }
 
 private:
