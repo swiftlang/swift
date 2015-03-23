@@ -107,45 +107,50 @@ public struct Mirror {
 ///
 /// Instances of any type can be `reflect`\ 'ed upon, but if you are
 /// not satisfied with the `Mirror` supplied for your type by default,
-/// conform to `CustomReflectable` and you can provide your own
-/// `Mirror`
+/// you can make it conform to `CustomReflectable` and return a custom
+/// `Mirror`.
 public protocol CustomReflectable {
+  /// Return the `Mirror` for `self`.
+  ///
+  /// Note: if `Self` has value semantics, the `Mirror` should be
+  /// unaffected by subsequent mutations of `self`.
   func customReflect() -> Mirror
 }
 
-public func reflect(x: Any) -> Mirror {
-  if let customized? = x as? CustomReflectable {
+/// Return the mirror that reflects upon the given instance.
+///
+/// If the dynamic type of instance conforms to `CustomReflectable`,
+/// returns the result of calling its `customReflect` method.
+/// Otherwise, returns a mirror synthesized for `instance` by the
+/// language.
+///
+/// Note: If the dynamic type of instance has value semantics,
+/// subsequent mutations of `instance` will not observable in
+/// `Mirror`.  In general, though, the observability of such mutations
+/// is unspecified.
+public func reflect(instance: Any) -> Mirror {
+  if let customized? = instance as? CustomReflectable {
     return customized.customReflect()
   }
   else {
-    return Mirror(Swift.reflect(x))
+    return Mirror(Swift.reflect(instance))
   }
 }
 
 //===--- Addressing -------------------------------------------------------===//
+
+/// A protocol for legitimate arguments to `Mirror`\ 's `descendant`
+/// method.
+///
+/// Do not declare new conformances to this protocol; they will not
+/// work as expected.
 public protocol MirrorPathType {}
 extension IntMax : MirrorPathType {}
 extension Int : MirrorPathType {}
 extension String : MirrorPathType {}
 
-/// Returns the first index `i` in `indices(domain)` such that
-/// `predicate(domain[i])` is `true``, or `nil` if
-/// `predicate(domain[i])` is `false` for all `i`.
-///
-/// Complexity: O(\ `count(domain)`\ )
-public func find<
-  C: CollectionType
->(domain: C, predicate: (C.Generator.Element)->Bool) -> C.Index? {
-  for i in indices(domain) {
-    if predicate(domain[i]) {
-      return i
-    }
-  }
-  return nil
-}
-
 extension Mirror {
-  struct _Dummy : CustomReflectable {
+  internal struct _Dummy : CustomReflectable {
     var mirror: Mirror
     func customReflect() -> Mirror { return mirror }
   }
@@ -236,6 +241,22 @@ extension Mirror {
 //===--- General Utilities ------------------------------------------------===//
 // having nothing really to do with Mirrors.  These should be
 // separately reviewed.
+
+/// Returns the first index `i` in `indices(domain)` such that
+/// `predicate(domain[i])` is `true``, or `nil` if
+/// `predicate(domain[i])` is `false` for all `i`.
+///
+/// Complexity: O(\ `count(domain)`\ )
+public func find<
+  C: CollectionType
+>(domain: C, predicate: (C.Generator.Element)->Bool) -> C.Index? {
+  for i in indices(domain) {
+    if predicate(domain[i]) {
+      return i
+    }
+  }
+  return nil
+}
 
 public struct DictionaryLiteral<Key, Value>
   : CollectionType, DictionaryLiteralConvertible {
