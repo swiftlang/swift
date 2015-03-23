@@ -18,6 +18,8 @@ var tests = TestSuite("ExistentialCollection")
 tests.test("Sequence") {
   let fib = [1, 2, 3, 5, 8, 13, 21]
   expectEqual(fib, Array(AnySequence(fib)))
+  // AnyGenerator is a Sequence
+  expectEqual(fib, Array(AnySequence(fib).generate()))
 }
 
 tests.test("ForwardCollection") {

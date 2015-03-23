@@ -36,8 +36,9 @@ internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
 
 public class _AnyGeneratorBase {}
 
-public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
+public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType, SequenceType {
   public func next() -> T? {_abstract()}
+  public func generate() -> AnyGenerator { return self }
 }
 
 internal final class _GeneratorBox<
