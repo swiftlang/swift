@@ -14,8 +14,8 @@
 /// arbitrary instance.
 ///
 /// Describes the parts---such as stored properties, collection
-/// elements, tuple elements, active enumeration cases---that make up
-/// any given instance.  May also supply a "schema" property that
+/// elements, tuple elements, or the active enumeration case---that make
+/// up any given instance.  May also supply a "schema" property that
 /// suggests how this structure might be interpreted.
 ///
 /// Mirrors are used by playgrounds and the debugger.
@@ -155,6 +155,42 @@ extension Mirror {
     func customReflect() -> Mirror { return mirror }
   }
   
+  /// Return a specific descendant of the reflected instance, or `nil`
+  /// if no such descendant exists.
+  ///
+  /// A `String` argument selects the first `Child` with a matching label.
+  /// An integer argument *n* select the *n*\ th `Child`.  For example::
+  ///
+  ///   var d = reflect(x).descendant(1, "two", 3)
+  ///
+  /// is equivalent to:
+  ///
+  /// .. parsed-literal::
+  ///
+  ///   var d = nil
+  ///   let children = reflect(x).children
+  ///   let p0 = advance(children.startIndex, **1**, children.endIndex)
+  ///   if p0 != children.endIndex {
+  ///     let grandChildren = reflect(children[p0].value).children
+  ///     SeekTwo: for g in grandChildren {
+  ///       if g.label == **"two"** {
+  ///         let greatGrandChildren = reflect(g.value).children
+  ///         let p1 = advance(
+  ///           greatGrandChildren.startIndex, **3**, 
+  ///           greatGrandChildren.endIndex)
+  ///         if p1 != endIndex { **d = greatGrandChildren[p1].value** }
+  ///         break SeekTwo
+  ///       }
+  ///     }
+  ///   }
+  ///
+  /// As you can see, complexity for each element of the argument list
+  /// depends on the argument type and capabilities of the collection
+  /// used to initialize the corresponding instance's parent's mirror.
+  /// Each `String` argument results in a linear search.  In short,
+  /// this function is suitable for exploring the structure of a
+  /// `Mirror` in a REPL or playground, but don't expect it to be
+  /// efficient.
   public func descendant(
     first: MirrorPathType, _ rest: MirrorPathType...
   ) -> Any? {
@@ -183,7 +219,12 @@ extension Mirror {
 //===----------------------------------------------------------------------===//
 
 extension Mirror {
-  //
+  /// Create a `Mirror` with labeled `children` and optional `schema`.
+  ///
+  /// Pass a dictionary literal with `String` keys as the first
+  /// argument.  Be aware that although an *actual* `Dictionary` is
+  /// arbitrarily-ordered, the ordering of the `Mirror`\ 's `children`
+  /// will exactly match that of the literal you pass.
   public init<Element>(
     children: DictionaryLiteral<String, Element>,
     schema: Schema? = nil
@@ -197,6 +238,7 @@ extension Mirror {
 
 //===--- Legacy MirrorType Support ----------------------------------------===//
 extension Mirror.Schema {
+  /// Construct from a legacy `MirrorDisposition`
   internal init?(legacy: MirrorDisposition) {
     switch legacy {
     case .Struct: self = .Struct
@@ -215,6 +257,12 @@ extension Mirror.Schema {
 }
 
 extension Mirror {
+  /// An adapter that represents a legacy `MirrorType`\ 's children as
+  /// a `Collection` with integer `Index`.  Note that the performance
+  /// characterstics of the underlying `MirrorType` may not be
+  /// appropriate for random access!  To avoid this pitfall, convert
+  /// mirrors to use the new style, which only present forward
+  /// traversal in general.
   internal struct LegacyChildren : CollectionType {
     init(_ oldMirror: MirrorType) {
       self._oldMirror = oldMirror
@@ -230,8 +278,14 @@ extension Mirror {
     }
     internal let _oldMirror: MirrorType
   }
-  
-  public init(_ oldMirror: MirrorType) {
+
+  /// Construct from a legacy `MirrorType`.  Note that the resulting
+  /// `Mirror`\ 's `children` collection will always be upgradable to
+  /// `AnyRandomAccessCollection` even if it doesn't exhibit
+  /// appropriate performance. To avoid this pitfall, convert mirrors
+  /// to use the new style, which only present forward traversal in
+  /// general.
+  internal init(_ oldMirror: MirrorType) {
     self.init(
       children: LegacyChildren(oldMirror),
       schema: Schema(legacy: oldMirror.disposition))
@@ -258,35 +312,59 @@ public func find<
   return nil
 }
 
-public struct DictionaryLiteral<Key, Value>
-  : CollectionType, DictionaryLiteralConvertible {
-  
+/// Represent the ability to pass a dictionary literal in function
+/// signatures.
+///
+/// A function with a `DictionaryLiteral` parameter can be passed a
+/// Swift dictionary literal without causing a `Dictionary` to be
+/// created.  This capability can be especially important when the
+/// order of elements in the literal is significant.
+public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
+  /// Store `elements`
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.elements = elements
   }
+  internal let elements: [(Key, Value)]
+}
 
-  /// Construct a copy of `other`
+/// `CollectionType` conformance that allows `DictionaryLiteral` to
+/// interoperate with the rest of the standard library.
+extension DictionaryLiteral : CollectionType {
+  /// The position of the first element in a non-empty `DictionaryLiteral`.
   ///
-  /// exists primarily so a Dictionary literal can be passed as an argument
-  public init(_ other: DictionaryLiteral) {
-    self.elements = other.elements
-  }
-  
-  public init(elements: [(Key, Value)]) {
-    self.elements = elements
-  }
-  
+  /// Identical to `endIndex` in an empty `DictionaryLiteral`.
+  ///
+  /// Complexity: O(1)
   public var startIndex: Int { return 0 }
+  
+  /// The `DictionaryLiteral`\ 's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
+  ///
+  /// Complexity: O(1)
   public var endIndex: Int { return elements.endIndex }
 
-  typealias Element = (Key,Value)
+  // FIXME: a typealias is needed to prevent <rdar://20248032>
+  // why doesn't this need to be public?
+  typealias Element = (Key, Value)
+
+  /// Access the element indicated by `position`.
+  ///
+  /// Requires: `position >= 0 && position < endIndex`.
+  ///
+  /// Complexity: O(1)
   public subscript(position: Int) -> Element {
     return elements[position]
   }
 
+  /// Return a *generator* over the elements of this *sequence*.  The
+  /// *generator*\ 's next element is the first element of the
+  /// sequence.
+  ///
+  /// Complexity: O(1)
   public func generate() -> IndexingGenerator<DictionaryLiteral> {
     return IndexingGenerator(self)
   }
-  
-  internal let elements: [(Key, Value)]
 }
