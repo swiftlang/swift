@@ -652,7 +652,8 @@ public:
 
   /// \brief Create trivial substitutions for the given bound generic type.
   Optional<ArrayRef<Substitution>>
-  createTrivialSubstitutions(BoundGenericType *BGT) const;
+  createTrivialSubstitutions(BoundGenericType *BGT,
+                             DeclContext *gpContext) const;
 
   /// Record compiler-known protocol information in the AST.
   void recordKnownProtocols(Module *Stdlib);
@@ -665,7 +666,7 @@ public:
   
   /// \brief Retrieve the substitutions for a bound generic type, if known.
   Optional<ArrayRef<Substitution>>
-        getSubstitutions(BoundGenericType *Bound) const;
+  getSubstitutions(BoundGenericType *Bound, DeclContext *gpContext) const;
 
   /// Record a conformance loader and its context data for the given
   /// declaration.
@@ -733,6 +734,7 @@ private:
 
   /// \brief Set the substitutions for the given bound generic type.
   void setSubstitutions(BoundGenericType *Bound,
+                        DeclContext *gpContext,
                         ArrayRef<Substitution> Subs) const;
 };
 

@@ -1621,6 +1621,7 @@ bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
           auto key = GenericTypeParamKey::forDecl(gpDecl);
           assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
           auto *pa = Impl->PotentialArchetypes[key];
+          assert(pa == pa->getRepresentative() && "Not the representative");
           pa->ArchetypeOrConcreteType = NestedType::forConcreteType(archetype);
           pa->SameTypeSource = RequirementSource(RequirementSource::OuterScope,
                                                  SourceLoc());

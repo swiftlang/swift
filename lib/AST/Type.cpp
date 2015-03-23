@@ -244,7 +244,8 @@ bool TypeBase::isSpecialized() {
 ArrayRef<Substitution> 
 TypeBase::gatherAllSubstitutions(Module *module,
                                  SmallVectorImpl<Substitution> &scratchSpace,
-                                 LazyResolver *resolver) {
+                                 LazyResolver *resolver,
+                                 DeclContext *gpContext) {
   Type type(this);
   SmallVector<ArrayRef<Substitution>, 2> allSubstitutions;
   scratchSpace.clear();
@@ -253,7 +254,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
     // Record the substitutions in a bound generic type.
     if (auto boundGeneric = type->getAs<BoundGenericType>()) {
       allSubstitutions.push_back(boundGeneric->getSubstitutions(module,
-                                                                resolver));
+                                                                resolver,
+                                                                gpContext));
       type = boundGeneric->getParent();
       continue;
     }
@@ -282,9 +284,11 @@ TypeBase::gatherAllSubstitutions(Module *module,
 }
 
 ArrayRef<Substitution> TypeBase::gatherAllSubstitutions(Module *module,
-                                                        LazyResolver *resolver) {
+                                                        LazyResolver *resolver,
+                                                        DeclContext *gpContext){
   SmallVector<Substitution, 4> scratchSpace;
-  auto subs = gatherAllSubstitutions(module, scratchSpace, resolver);
+  auto subs = gatherAllSubstitutions(module, scratchSpace, resolver,
+                                     gpContext);
   if (scratchSpace.empty())
     return subs;
 

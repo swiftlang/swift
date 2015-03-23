@@ -621,9 +621,21 @@ void Module::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getDisplayDecls, (Results));
 }
 
+DeclContext *BoundGenericType::getGenericParamContext(
+               DeclContext *gpContext) const {
+  // If no context was provided, use the declaration itself.
+  if (!gpContext)
+    return getDecl();
+
+  assert(gpContext->getDeclaredTypeOfContext()->getAnyNominal() == getDecl() &&
+         "not a valid context");
+  return gpContext;
+}
+
 ArrayRef<Substitution> BoundGenericType::getSubstitutions(
                                            Module *module,
-                                           LazyResolver *resolver) {
+                                           LazyResolver *resolver,
+                                           DeclContext *gpContext) {
   // FIXME: If there is no module, infer one. This is a hack for callers that
   // don't have access to the module. It will have to go away once we're
   // properly differentiating bound generic types based on the protocol
@@ -632,17 +644,20 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     module = getDecl()->getParentModule();
   }
 
+  // Check the context, introducing the default if needed.
+  gpContext = getGenericParamContext(gpContext);
+
   // If we already have a cached copy of the substitutions, return them.
   auto *canon = getCanonicalType()->castTo<BoundGenericType>();
   const ASTContext &ctx = canon->getASTContext();
-  if (auto known = ctx.getSubstitutions(canon))
+  if (auto known = ctx.getSubstitutions(canon, gpContext))
     return *known;
 
   // Compute the set of substitutions.
   llvm::SmallPtrSet<ArchetypeType *, 8> knownArchetypes;
   SmallVector<ArchetypeType *, 8> archetypeStack;
   TypeSubstitutionMap substitutions;
-  auto genericParams = canon->getDecl()->getGenericParams();
+  auto genericParams = gpContext->getGenericParamsOfContext();
   unsigned index = 0;
   for (Type arg : canon->getGenericArgs()) {
     auto gp = genericParams->getParams()[index++];
@@ -715,7 +730,7 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
                                         hasTypeVariables
                                           ? AllocationArena::ConstraintSolver
                                           : AllocationArena::Permanent);
-  ctx.setSubstitutions(canon, permanentSubs);
+  ctx.setSubstitutions(canon, gpContext, permanentSubs);
   return permanentSubs;
 }
 
@@ -847,6 +862,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
   if (type->isSpecialized()) {
     // Figure out the type that's explicitly conforming to this protocol.
     Type explicitConformanceType = conformance->getType();
+    DeclContext *explicitConformanceDC = conformance->getDeclContext();
 
     // If the explicit conformance is associated with a type that is different
     // from the type we're checking, retrieve generic conformance.
@@ -855,7 +871,8 @@ LookupConformanceResult Module::lookupConformance(Type type,
       // the specialized conformance.
       SmallVector<Substitution, 4> substitutionsVec;
       auto substitutions = type->gatherAllSubstitutions(this, substitutionsVec,
-                                                        resolver);
+                                                        resolver,
+                                                        explicitConformanceDC);
 
       // Create the specialized conformance entry.
       auto result = ctx.getSpecializedConformance(type, conformance,

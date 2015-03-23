@@ -452,7 +452,8 @@ public:
   ArrayRef<Substitution> gatherAllSubstitutions(
                            Module *module,
                            SmallVectorImpl<Substitution> &scratchSpace,
-                           LazyResolver *resolver);
+                           LazyResolver *resolver,
+                           DeclContext *gpContext = nullptr);
 
   /// Gather all of the substitutions used to produce the given specialized type
   /// from its unspecialized type.
@@ -460,7 +461,8 @@ public:
   /// \returns ASTContext-allocated substitutions.
   ArrayRef<Substitution> gatherAllSubstitutions(
                            Module *module,
-                           LazyResolver *resolver);
+                           LazyResolver *resolver,
+                           DeclContext *gpContext = nullptr);
 
   /// \brief Determine whether the given type is "generic", meaning that
   /// it involves generic types for which generic arguments have not been
@@ -1306,8 +1308,17 @@ public:
   ///
   /// \param resolver The resolver that handles lazy type checking, where
   /// required. This can be null for a fully-type-checked AST.
+  ///
+  /// \param gpContext The context from which the generic parameters will be
+  /// extracted, which will be either the nominal type declaration or an
+  /// extension thereof. If null, will be set to the nominal type declaration.
   ArrayRef<Substitution> getSubstitutions(Module *module,
-                                          LazyResolver *resolver);
+                                          LazyResolver *resolver,
+                                          DeclContext *gpContext = nullptr);
+
+  /// Retrieves the generic parameter context to use with substitutions for
+  /// this bound generic type, using the given context if possible.
+  DeclContext *getGenericParamContext(DeclContext *gpContext) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     RecursiveTypeProperties properties;

@@ -92,9 +92,14 @@ namespace {
     ///
     /// \param type The witness type.
     ///
+    /// \param fromDC The DeclContext from which this associated type was
+    /// computed, which may be different from the context associated with the
+    /// protocol conformance.
+    ///
     /// \param wasDeducedOrDefaulted Whether this witness was deduced or
     /// defaulted (rather than being explicitly provided).
     void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
+                           DeclContext *fromDC,
                            bool wasDeducedOrDefaulted);
 
     /// Resolve a (non-type) witness via name lookup.
@@ -1551,7 +1556,8 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
 
   // Record the associated type deductions.
   for (auto deduction : match.AssociatedTypeDeductions) {
-    recordTypeWitness(deduction.first, deduction.second, true);
+    recordTypeWitness(deduction.first, deduction.second,
+                      witness.getDecl()->getDeclContext(), true);
   }
 }
 
@@ -1583,6 +1589,7 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
 
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
+                                           DeclContext *fromDC,
                                            bool wasDeducedOrDefaulted) {
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
@@ -2264,7 +2271,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
-    recordTypeWitness(assocType, viable.front().second, false);
+    recordTypeWitness(assocType, viable.front().second,
+                      viable.front().first->getDeclContext(), false);
     return ResolveWitnessResult::Success;
   }
 
@@ -2354,7 +2362,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDefault(
   } 
   
   // Fill in the type witness and declare success.
-  recordTypeWitness(assocType, defaultType, true);
+  recordTypeWitness(assocType, defaultType, DC, true);
   return ResolveWitnessResult::Success;
 }
 
@@ -2388,7 +2396,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDerivation(
   } 
   
   // Fill in the type witness and declare success.
-  recordTypeWitness(assocType, derivedType, true);
+  recordTypeWitness(assocType, derivedType, DC, true);
   return ResolveWitnessResult::Success;
 }
 
