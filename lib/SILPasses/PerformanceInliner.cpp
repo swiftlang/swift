@@ -897,7 +897,8 @@ public:
     SILPerformanceInliner inliner(getOptions().InlineThreshold,
                                   WhatToInline);
 
-    bool Changed = false;
+    SmallPtrSet<SILFunction*, 16> Modified;
+
     // Inline functions bottom up from the leafs.
     for (auto *F : CGA->getCallGraph().getBottomUpFunctionOrder()) {
       // If F is empty, attempt to link it. Skip it if we fail to do so.
@@ -905,12 +906,14 @@ public:
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
         continue;
 
-      Changed |= inliner.inlineCallsIntoFunction(F, DA, LA);
+      if (inliner.inlineCallsIntoFunction(F, DA, LA))
+        Modified.insert(F);
     }
 
-    // Invalidate the call graph.
-    if (Changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+    // Invalidate the functions that were inlined into.
+    for (auto *F : Modified) {
+      invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+    }
   }
 
   StringRef getName() override { return PassName; }
