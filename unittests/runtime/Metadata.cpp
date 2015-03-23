@@ -317,6 +317,16 @@ ProtocolDescriptor ProtocolB{
     .withNeedsWitnessTable(true)
 };
 
+ProtocolDescriptor ProtocolErrorType{
+  "_TMp8Metadata17ProtocolErrorType",
+  nullptr,
+  ProtocolDescriptorFlags()
+    .withSwift(true)
+    .withClassConstraint(ProtocolClassConstraint::Any)
+    .withNeedsWitnessTable(true)
+    .withSpecialProtocol(SpecialProtocol::ErrorType)
+};
+
 ProtocolDescriptor ProtocolClassConstrained{
   "_TMp8Metadata24ProtocolClassConstrained",
   nullptr,
@@ -352,6 +362,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(0U, any->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Any, any->Flags.getClassConstraint());
       EXPECT_EQ(0U, any->Protocols.NumProtocols);
+      EXPECT_EQ(SpecialProtocol::None,
+                any->Flags.getSpecialProtocol());
       return any;
     });
 
@@ -363,6 +375,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(ProtocolClassConstraint::Any, a->Flags.getClassConstraint());
       EXPECT_EQ(1U, a->Protocols.NumProtocols);
       EXPECT_EQ(&ProtocolA, a->Protocols[0]);
+      EXPECT_EQ(SpecialProtocol::None,
+                a->Flags.getSpecialProtocol());
       return a;
     });
 
@@ -375,6 +389,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(ProtocolClassConstraint::Any, b->Flags.getClassConstraint());
       EXPECT_EQ(1U, b->Protocols.NumProtocols);
       EXPECT_EQ(&ProtocolB, b->Protocols[0]);
+      EXPECT_EQ(SpecialProtocol::None,
+                b->Flags.getSpecialProtocol());
       return b;
     });
 
@@ -391,6 +407,10 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_TRUE(
            (ab->Protocols[0]==&ProtocolA && ab->Protocols[1]==&ProtocolB)
         || (ab->Protocols[0]==&ProtocolB && ab->Protocols[1]==&ProtocolA));
+      EXPECT_EQ(SpecialProtocol::None,
+                ab->Flags.getSpecialProtocol());
+      EXPECT_EQ(SpecialProtocol::None,
+                ba->Flags.getSpecialProtocol());
       return ab;
     });
 
@@ -403,6 +423,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 classConstrained->Flags.getClassConstraint());
       EXPECT_EQ(1U, classConstrained->Protocols.NumProtocols);
+      EXPECT_EQ(SpecialProtocol::None,
+                classConstrained->Flags.getSpecialProtocol());
       EXPECT_EQ(&ProtocolClassConstrained, classConstrained->Protocols[0]);
       return classConstrained;
     });
@@ -416,6 +438,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 noWitnessTable->Flags.getClassConstraint());
       EXPECT_EQ(1U, noWitnessTable->Protocols.NumProtocols);
+      EXPECT_EQ(SpecialProtocol::None,
+                noWitnessTable->Flags.getSpecialProtocol());
       EXPECT_EQ(&ProtocolNoWitnessTable, noWitnessTable->Protocols[0]);
       return noWitnessTable;
     });
@@ -430,7 +454,32 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 mixedWitnessTable->Flags.getClassConstraint());
       EXPECT_EQ(3U, mixedWitnessTable->Protocols.NumProtocols);
+      EXPECT_EQ(SpecialProtocol::None,
+                mixedWitnessTable->Flags.getSpecialProtocol());
       return mixedWitnessTable;
+    });
+
+  RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
+    [&]() -> const ExistentialTypeMetadata * {
+      auto special
+        = test_getExistentialMetadata({&ProtocolErrorType});
+      EXPECT_EQ(MetadataKind::Existential, special->getKind());
+      EXPECT_EQ(1U, special->Flags.getNumWitnessTables());
+      EXPECT_EQ(SpecialProtocol::ErrorType,
+                special->Flags.getSpecialProtocol());
+      return special;
+    });
+
+  RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
+    [&]() -> const ExistentialTypeMetadata * {
+      auto special
+        = test_getExistentialMetadata({&ProtocolErrorType, &ProtocolA});
+      EXPECT_EQ(MetadataKind::Existential, special->getKind());
+      EXPECT_EQ(2U, special->Flags.getNumWitnessTables());
+      // Compositions of special protocols aren't special.
+      EXPECT_EQ(SpecialProtocol::None,
+                special->Flags.getSpecialProtocol());
+      return special;
     });
 }
 

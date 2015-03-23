@@ -1862,7 +1862,10 @@ getClassExistentialValueWitnesses(unsigned numWitnessTables) {
 /// shared specialized table for common cases.
 static const ValueWitnessTable *
 getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
-                             unsigned numWitnessTables) {
+                             unsigned numWitnessTables,
+                             SpecialProtocol special) {
+  // TODO: Use special representation for special protocols.
+  
   switch (classConstraint) {
   case ProtocolClassConstraint::Class:
     return getClassExistentialValueWitnesses(numWitnessTables);
@@ -1954,12 +1957,21 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
       auto entry = ExistentialCacheEntry::allocate(protocolArgs, numProtocols,
                              sizeof(const ProtocolDescriptor *) * numProtocols);
       auto metadata = entry->getData();
+      
+      // Get the special protocol kind for an uncomposed protocol existential.
+      // Protocol compositions are currently never special.
+      auto special = SpecialProtocol::None;
+      if (numProtocols == 1)
+        special = protocols[0]->Flags.getSpecialProtocol();
+      
       metadata->setKind(MetadataKind::Existential);
       metadata->ValueWitnesses = getExistentialValueWitnesses(classConstraint,
-                                                              numWitnessTables);
+                                                              numWitnessTables,
+                                                              special);
       metadata->Flags = ExistentialTypeFlags()
         .withNumWitnessTables(numWitnessTables)
-        .withClassConstraint(classConstraint);
+        .withClassConstraint(classConstraint)
+        .withSpecialProtocol(special);
       metadata->Protocols.NumProtocols = numProtocols;
       for (size_t i = 0; i < numProtocols; ++i)
         metadata->Protocols[i] = protocols[i];
