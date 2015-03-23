@@ -103,7 +103,6 @@ namespace swift {
 
     void injectModule(SILModule *Mod) { M = Mod; }
 
-  protected:
     SILModule *getModule() { return M; }
 
     /// Invalidate all of functions in the module, using invalidation
