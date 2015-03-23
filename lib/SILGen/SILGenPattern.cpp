@@ -421,24 +421,24 @@ class PatternMatchEmission {
   CleanupsDepth PatternMatchStmtDepth;
   llvm::MapVector<CaseStmt*, SILBasicBlock*> SharedCases;
 
-  std::function<void()> CompletionHandler;
- 
-public:
-  PatternMatchEmission(SILGenFunction &SGF, Stmt *S)
-    : SGF(SGF), PatternMatchStmt(S),
-      PatternMatchStmtDepth(SGF.getCleanupsDepth()) {}
+  using CompletionHandlerTy =
+    llvm::function_ref<void(PatternMatchEmission &, ClauseRow &)>;
+  CompletionHandlerTy CompletionHandler;
 
-  /// Set a handler to call when a pattern match succeeds, if not using
-  /// CaseStmt's.
-  void setCompletionHandler(std::function<void()> handler) {
-    CompletionHandler = handler;
-  }
-  
+public:
+  PatternMatchEmission(SILGenFunction &SGF, Stmt *S,
+                       CompletionHandlerTy completionHandler)
+    : SGF(SGF), PatternMatchStmt(S),
+      PatternMatchStmtDepth(SGF.getCleanupsDepth()),
+      CompletionHandler(completionHandler) {}
+
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
                     const FailureHandler &failure);
 
   JumpDest getSharedCaseBlockDest(CaseStmt *caseStmt);
   void emitSharedCaseBlocks();
+
+  void emitCaseBody(CaseStmt *caseBlock);
 
 private:
   void emitWildcardDispatch(ClauseMatrix &matrix, ArgArray args, unsigned row,
@@ -483,8 +483,6 @@ private:
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
                                const FailureHandler &failure);
-
-  void emitCaseBody(CaseStmt *caseBlock);
 };
 
 /// A handle to a row in a clause matrix. Does not own memory; use of the
@@ -492,7 +490,7 @@ private:
 class ClauseRow {
   friend class ClauseMatrix;
   
-  CaseStmt *CaseBlock;
+  void *ClientData;
   Pattern *CasePattern;
   Expr *CaseGuardExpr;
 
@@ -504,8 +502,9 @@ class ClauseRow {
   SmallVector<Pattern*, 4> Columns;
 
 public:
-  ClauseRow(CaseStmt *theCase, Pattern *CasePattern, Expr *CaseGuardExpr)
-    : CaseBlock(theCase), CasePattern(CasePattern),
+  ClauseRow(void *clientData, Pattern *CasePattern, Expr *CaseGuardExpr)
+    : ClientData(clientData),
+      CasePattern(CasePattern),
       CaseGuardExpr(CaseGuardExpr) {
     Columns.push_back(CasePattern);
     if (CaseGuardExpr)
@@ -514,8 +513,8 @@ public:
       NumRemainingSpecializations = getNumSpecializations(Columns[0]);
   }
 
-  CaseStmt *getCaseBlock() const {
-    return CaseBlock;
+  void *getClientData() const {
+    return ClientData;
   }
 
   Pattern *getCasePattern() const { return CasePattern; }
@@ -1028,33 +1027,7 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   }
 
   // Enter the row.
-  CaseStmt *caseBlock = clauses[row].getCaseBlock();
-
-  // If the CaseStmt is null, then we're doing custom emission for the condition
-  // of an if/let while/let statement.  Run the handler and we're done.
-  if (caseBlock == nullptr) {
-    CompletionHandler();
-    return;
-  }
-  
-  
-  SGF.emitProfilerIncrement(caseBlock);
-
-  // Certain case statements can be entered along multiple paths,
-  // either because they have multiple labels or because of
-  // fallthrough.  However, in both situations, the case cannot have
-  // any bound variables.  If the case binds no variables, just branch
-  // out to the scope of the pattern match statement.
-  if (!caseBlock->hasBoundDecls()) {
-    JumpDest sharedDest = getSharedCaseBlockDest(caseBlock);
-    SGF.Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
-
-    // Don't emit anything yet.
-    return;
-  }
-
-  // Otherwise, emit the statement here.
-  emitCaseBody(caseBlock);
+  CompletionHandler(*this, clauses[row]);
   assert(!SGF.B.hasValidInsertionPoint());
 }
 
@@ -1905,7 +1878,30 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
-  PatternMatchEmission emission(*this, S);
+  auto completionHandler = [&](PatternMatchEmission &emission,
+                               ClauseRow &row) {
+    auto caseBlock = static_cast<CaseStmt*>(row.getClientData());
+
+    emitProfilerIncrement(caseBlock);
+
+    // Certain case statements can be entered along multiple paths,
+    // either because they have multiple labels or because of
+    // fallthrough.  However, in both situations, the case cannot have
+    // any bound variables.  If the case binds no variables, just branch
+    // out to the scope of the pattern match statement.
+    if (!caseBlock->hasBoundDecls()) {
+      JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
+      Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
+
+      // Don't emit anything yet.
+      return;
+    }
+
+    // Otherwise, emit the statement here.
+    emission.emitCaseBody(caseBlock);
+  };
+
+  PatternMatchEmission emission(*this, S, completionHandler);
   Scope switchScope(Cleanups, CleanupLocation(S));
 
   // Enter a break/continue scope.  If we wanted a continue
@@ -2050,8 +2046,15 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   // Otherwise, we have a pattern initialized by an optional.  Emit the optional
   // expression and test its presence.
   auto *PBD = Condition[CondElement].getBinding();
+
+  // The handler that generates code when the match succeeds.  This
+  // simply continues emission of the rest of the condition.
+  auto completionHandler = [&](PatternMatchEmission &emission, ClauseRow &row) {
+    emitStmtConditionWithBodyRec(CondStmt, CondElement+1,
+                                 SuccessDest, CondFailDest, gen);
+  };
   
-  PatternMatchEmission emission(gen, CondStmt);
+  PatternMatchEmission emission(gen, CondStmt, completionHandler);
   
   assert(PBD->getNumPatternEntries() == 1 &&
          "statement conditionals only have a single entry right now");
@@ -2067,13 +2070,6 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   // Add a row for the pattern we want to match against.
   ClauseRow row(/*caseBlock*/nullptr, ThePattern, /*where expr*/nullptr);
   
-  // Set the handler that generates code when the match succeeds.  This simply
-  // continues emission of the rest of the condition.
-  emission.setCompletionHandler([&]{
-    emitStmtConditionWithBodyRec(CondStmt, CondElement+1,
-                                 SuccessDest, CondFailDest, gen);
-  });
-
   SILBasicBlock *MatchFailureBB = 0;
   
   // In the match failure case, we wind back out of the cleanup blocks.
@@ -2137,5 +2133,51 @@ void SILGenFunction::emitStmtConditionWithBody(Stmt *S,SILBasicBlock *SuccessBB,
   emitStmtConditionWithBodyRec(S, 0, SuccessDest, FailDest, *this);
 }
 
+/// Emit a sequence of catch clauses.
+void SILGenFunction::emitCatchDispatch(Stmt *S, ManagedValue exn,
+                                       ArrayRef<CatchStmt*> clauses,
+                                       JumpDest catchFallthroughDest) {
+  auto completionHandler = [&](PatternMatchEmission &emission,
+                               ClauseRow &row) {
+    auto clause = static_cast<CatchStmt*>(row.getClientData());
+    emitProfilerIncrement(clause->getBody());
+    emitStmt(clause->getBody());
+
+    // If we fell out of the catch clause, branch to the fallthrough dest.
+    if (B.hasValidInsertionPoint()) {
+      Cleanups.emitBranchAndCleanups(catchFallthroughDest, clause->getBody());
+    }
+  };
+
+  PatternMatchEmission emission(*this, S, completionHandler);
+
+  // Add a row for each clause.
+  std::vector<ClauseRow> clauseRows;
+  clauseRows.reserve(clauses.size());
+  for (CatchStmt *clause : clauses) {
+    clauseRows.emplace_back(clause,
+                            clause->getErrorPattern(),
+                            clause->getGuardExpr());
+  }
+
+  // Set up an initial clause matrix.
+  ClauseMatrix clauseMatrix(clauseRows);
+
+  ConsumableManagedValue subject = { exn, CastConsumptionKind::TakeOnSuccess };
+  auto failure = [&](SILLocation location) {
+    // If we fail to match anything, just rethrow the exception.
+    if (ThrowDest.isValid()) {
+      emitThrow(S, exn);
+      return;
+    }
+
+    SGM.diagnose(S, diag::nonexhaustive_catch);
+    B.createUnreachable(location);
+  };
+
+  // Recursively specialize and emit the clause matrix.
+  emission.emitDispatch(clauseMatrix, subject, failure);
+  assert(!B.hasValidInsertionPoint());
+}
 
 

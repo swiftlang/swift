@@ -330,6 +330,24 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     visit(S->getBody());
   }
 
+  void visitDoCatchStmt(DoCatchStmt *S) {
+    visit(S->getBody());
+    visitCatchClauses(S->getCatches());
+  }
+  void visitCatchClauses(ArrayRef<CatchStmt*> clauses) {
+    for (auto clause : clauses) {
+      visitCatchStmt(clause);
+    }
+  }
+  void visitCatchStmt(CatchStmt *S) {
+    if (!IntersectsRange(S->getSourceRange()))
+      return;
+    // Names in the pattern aren't visible until after the pattern.
+    if (!IntersectsRange(S->getErrorPattern()->getSourceRange()))
+      checkPattern(S->getErrorPattern());
+    visit(S->getBody());
+  }
+
   void visitForStmt(ForStmt *S) {
     if (!IntersectsRange(S->getSourceRange()))
       return;

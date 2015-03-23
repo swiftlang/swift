@@ -724,7 +724,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       visit(C);
     }
   }
-  
+
   void visitCaseStmt(CaseStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
@@ -733,6 +733,26 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     }
     visit(S->getBody());
   }
+
+  void visitDoCatchStmt(DoCatchStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+    visit(S->getBody());
+    visitCatchClauses(S->getCatches());
+  }
+  void visitCatchClauses(ArrayRef<CatchStmt*> clauses) {
+    // TODO: some sort of binary search?
+    for (auto clause : clauses) {
+      visitCatchStmt(clause);
+    }
+  }
+  void visitCatchStmt(CatchStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+    checkPattern(S->getErrorPattern(), DeclVisibilityKind::LocalVariable);
+    visit(S->getBody());
+  }
+  
 };
   
 } // end anonymous namespace

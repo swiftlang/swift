@@ -79,6 +79,14 @@ NOTE(previous_inout_alias,sil_gen,none,
 ERROR(unsupported_recursive_type,sil_gen,none,
       "recursive value type %0 is not allowed", (Type))
 
+// Error handling diagnostics from SILGen.
+ERROR(unhandled_throw,sil_gen,none,
+      "error is not handled and enclosing function is not marked "
+      "with 'throws'", ())
+ERROR(nonexhaustive_catch,sil_gen,none,
+      "'catch' patterns must be exhaustive in function not marked "
+      "with 'throws'", ())
+
 // Definite initialization diagnostics.
 NOTE(variable_defined_here,sil_analysis,none,
      "variable defined here", ())

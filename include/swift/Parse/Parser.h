@@ -1148,6 +1148,7 @@ public:
                                         = BraceItemListKind::Brace);
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo);
+  ParserResult<CatchStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtFor(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtForCStyle(SourceLoc ForLoc,
                                         LabeledStmtInfo LabelInfo);

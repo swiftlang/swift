@@ -819,6 +819,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     TypeIdentifierWithoutDot,
     CaseStmtBeginning,
     CaseStmtDotPrefix,
+    CatchStmtBeginning,
     NominalMemberBeginning,
     AttributeBegin,
     AttributeDeclParen,
@@ -940,6 +941,7 @@ public:
 
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
+  void completeCatchStmtBeginning() override;
   void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning(
@@ -2418,6 +2420,13 @@ void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeCatchStmtBeginning() {
+  assert(!InEnumElementRawValue);
+
+  Kind = CompletionKind::CatchStmtBeginning;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -2517,6 +2526,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::TypeIdentifierWithoutDot:
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::CaseStmtDotPrefix:
+  case CompletionKind::CatchStmtBeginning:
     break;
 
   case CompletionKind::NominalMemberBeginning:
@@ -2676,6 +2686,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::TypeIdentifierWithoutDot: {
     Lookup.getTypeCompletions(ParsedTypeLoc.getType());
+    break;
+  }
+
+  case CompletionKind::CatchStmtBeginning: {
+    // TODO: code complete from known error types.
     break;
   }
 

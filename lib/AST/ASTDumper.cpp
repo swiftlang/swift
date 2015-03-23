@@ -1132,6 +1132,31 @@ public:
   void visitFailStmt(FailStmt *S) {
     OS.indent(Indent) << "(fail_stmt)";
   }
+  void visitDoCatchStmt(DoCatchStmt *S) {
+    OS.indent(Indent) << "(do_catch_stmt\n";
+    printRec(S->getBody());
+    OS << '\n';
+    Indent += 2;
+    visitCatches(S->getCatches());
+    Indent -= 2;
+    OS << ')';
+  }
+  void visitCatches(ArrayRef<CatchStmt*> clauses) {
+    for (auto clause : clauses) {
+      visitCatchStmt(clause);
+    }
+  }
+  void visitCatchStmt(CatchStmt *clause) {
+    OS.indent(Indent) << "(catch\n";
+    printRec(clause->getErrorPattern());
+    if (auto guard = clause->getGuardExpr()) {
+      OS << '\n';
+      printRec(guard);
+    }
+    OS << '\n';
+    printRec(clause->getBody());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

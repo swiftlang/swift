@@ -130,6 +130,9 @@ public:
   /// \brief Complete a case stmt pattern that starts with a dot.
   virtual void completeCaseStmtDotPrefix() = 0;
 
+    /// \brief Complete at the beginning of a catch stmt pattern.
+  virtual void completeCatchStmtBeginning() = 0;
+
   /// Complete at the beginning of member of a nominal decl member -- no tokens
   /// provided by user.
   virtual void completeNominalMemberBeginning(

@@ -92,6 +92,19 @@ Type TypeChecker::getUInt8Type(DeclContext *dc) {
   return ::getStdlibType(*this, UInt8Type, dc, "UInt8");
 }
 
+/// Find the standard type of exceptions.
+///
+/// We call this the "exception type" to try to avoid confusion with
+/// the AST's ErrorType node.
+Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
+  if (Type type = ::getStdlibType(*this, ExceptionType, dc, "_ErrorType"))
+    return type;
+
+  // Not really sugar, but the actual diagnostic text is fine.
+  diagnose(loc, diag::sugar_type_not_found, 4);
+  return Type();
+}
+
 Type TypeChecker::getNSObjectType(DeclContext *dc) {
   if (NSObjectType)
     return NSObjectType;

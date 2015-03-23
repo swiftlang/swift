@@ -1810,6 +1810,26 @@ void PrintAST::visitDoStmt(DoStmt *stmt) {
   visit(stmt->getBody());
 }
 
+void PrintAST::visitDoCatchStmt(DoCatchStmt *stmt) {
+  Printer << "do ";
+  visit(stmt->getBody());
+  for (auto clause : stmt->getCatches()) {
+    visitCatchStmt(clause);
+  }
+}
+
+void PrintAST::visitCatchStmt(CatchStmt *stmt) {
+  Printer << "catch ";
+  printPattern(stmt->getErrorPattern());
+  if (auto guard = stmt->getGuardExpr()) {
+    Printer << " where ";
+    // FIXME: print guard expression
+    (void) guard;
+  }
+  Printer << ' ';
+  visit(stmt->getBody());
+}
+
 void PrintAST::visitForStmt(ForStmt *stmt) {
   Printer << "for (";
   // FIXME: print initializer

@@ -278,6 +278,8 @@ public:
                   labelInfo),
       DoLoc(doLoc), Body(body) {}
 
+  SourceLoc getDoLoc() const { return DoLoc; }
+  
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
   
@@ -285,6 +287,107 @@ public:
   void setBody(Stmt *s) { Body = s; }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Do; }
+};
+
+/// An individual 'catch' clause.
+/// 
+/// This isn't really an independent statement any more than CaseStmt
+/// is; it's just a structural part of a DoCatchStmt.
+class CatchStmt : public Stmt {
+  SourceLoc CatchLoc;
+  SourceLoc WhereLoc;
+  Pattern *ErrorPattern;
+  Expr *GuardExpr;
+  Stmt *CatchBody;
+
+public:
+  CatchStmt(SourceLoc catchLoc, Pattern *errorPattern,
+            SourceLoc whereLoc, Expr *guardExpr, Stmt *body,
+            Optional<bool> implicit = None)
+    : Stmt(StmtKind::Catch, getDefaultImplicitFlag(implicit, catchLoc)),
+      CatchLoc(catchLoc), WhereLoc(whereLoc),
+      ErrorPattern(errorPattern), GuardExpr(guardExpr), CatchBody(body) {}
+
+  SourceLoc getCatchLoc() const { return CatchLoc; }
+
+  /// The location of the 'where' keyword if there's a guard expression.
+  SourceLoc getWhereLoc() const { return WhereLoc; }
+
+  SourceLoc getStartLoc() const { return CatchLoc; }
+  SourceLoc getEndLoc() const { return CatchBody->getEndLoc(); }
+
+  Stmt *getBody() const { return CatchBody; }
+  void setBody(Stmt *body) { CatchBody = body; }
+
+  Pattern *getErrorPattern() { return ErrorPattern; }
+  const Pattern *getErrorPattern() const { return ErrorPattern; }
+  void setErrorPattern(Pattern *pattern) { ErrorPattern = pattern; }
+
+  /// Is this catch clause "syntactically exhaustive"?
+  bool isSyntacticallyExhaustive() const;
+
+  /// Return the guard expression if present, or null if the catch has
+  /// no guard.
+  Expr *getGuardExpr() const { return GuardExpr; }
+  void setGuardExpr(Expr *guard) { GuardExpr = guard; }
+
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Catch; }
+};
+
+/// DoCatchStmt - do statement with trailing 'catch' clauses.
+class DoCatchStmt : public LabeledStmt {
+  SourceLoc DoLoc;
+  Stmt *Body;
+  unsigned NumCatches;
+
+  CatchStmt **getCatchesBuffer() {
+    return reinterpret_cast<CatchStmt **>(this+1);
+  }
+  CatchStmt * const *getCatchesBuffer() const {
+    return reinterpret_cast<CatchStmt * const *>(this+1);
+  }
+  
+  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
+              Stmt *body, ArrayRef<CatchStmt*> catches,
+              Optional<bool> implicit)
+    : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
+                  labelInfo),
+      DoLoc(doLoc), Body(body), NumCatches(catches.size()) {
+    memcpy(getCatchesBuffer(), catches.data(),
+           catches.size() * sizeof(catches[0]));
+  }
+
+public:
+  static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
+                             SourceLoc doLoc, Stmt *body,
+                             ArrayRef<CatchStmt*> catches,
+                             Optional<bool> implicit = None);
+
+  SourceLoc getDoLoc() const { return DoLoc; }
+
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
+  SourceLoc getEndLoc() const { return getCatches().back()->getEndLoc(); }
+
+  Stmt *getBody() const { return Body; }
+  void setBody(Stmt *s) { Body = s; }
+
+  ArrayRef<CatchStmt*> getCatches() const {
+    return ArrayRef<CatchStmt*>(getCatchesBuffer(), NumCatches);
+  }
+  MutableArrayRef<CatchStmt*> getMutableCatches() {
+    return MutableArrayRef<CatchStmt*>(getCatchesBuffer(), NumCatches);
+  }
+
+  /// Does this statement contain a syntactically exhaustive catch
+  /// clause?
+  ///
+  /// Note that an exhaustive do/catch statement can still throw
+  /// errors out of its catch block(s).
+  bool isSyntacticallyExhaustive() const;
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::DoCatch;
+  }
 };
 
 

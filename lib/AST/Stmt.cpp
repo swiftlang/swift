@@ -173,6 +173,7 @@ bool LabeledStmt::isPossibleContinueTarget() const {
     return false;
 
   case StmtKind::Do:
+  case StmtKind::DoCatch:
   case StmtKind::DoWhile:
   case StmtKind::For:
   case StmtKind::ForEach:
@@ -191,6 +192,7 @@ bool LabeledStmt::requiresLabelOnJump() const {
 
   case StmtKind::If:
   case StmtKind::Do:
+  case StmtKind::DoCatch:
     return true;
 
   case StmtKind::DoWhile:
@@ -201,6 +203,39 @@ bool LabeledStmt::requiresLabelOnJump() const {
     return false;
   }
   llvm_unreachable("statement kind unhandled!");
+}
+
+DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
+                                 SourceLoc doLoc, Stmt *body,
+                                 ArrayRef<CatchStmt*> catches,
+                                 Optional<bool> implicit) {
+  void *mem = ctx.Allocate(sizeof(DoCatchStmt) +
+                           catches.size() * sizeof(catches[0]),
+                           alignof(DoCatchStmt));
+  return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
+}
+
+bool DoCatchStmt::isSyntacticallyExhaustive() const {
+  for (auto clause : getCatches()) {
+    if (clause->isSyntacticallyExhaustive())
+      return true;
+  }
+  return false;
+}
+
+bool CatchStmt::isSyntacticallyExhaustive() const {
+  // It cannot have a guard expression.
+  if (getGuardExpr()) return false;
+
+  // Ignore 'var', 'let', and parens.
+  auto pattern = getErrorPattern()->getSemanticsProvidingPattern();
+
+  // Must be '_' or a variable binding.  We do not want to allow tuple
+  // patterns: in an existential context, those are potentially
+  // refutable patterns (assuming tuples can someday conform to
+  // protocols).
+  return (isa<AnyPattern>(pattern) ||
+          isa<NamedPattern>(pattern));
 }
 
 SourceRange StmtConditionElement::getSourceRange() const {

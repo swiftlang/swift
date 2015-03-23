@@ -171,6 +171,18 @@ enum class VTableParamThunk {
   ForceIUO, ///< Force-unwrap the IUO param.
 };
 
+/// A formal section of the function.  This is a SILGen-only concept,
+/// meant to improve locality.  It's only reflected in the generated
+/// SIL implicitly.
+enum class FunctionSection : bool {
+  /// The section of the function dedicated to ordinary control flow.
+  Ordinary,
+
+  /// The section of the function dedicated to error-handling and
+  /// similar things.
+  Postmatter,
+};
+
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction>
@@ -192,12 +204,19 @@ public:
   /// This is used to keep track of all SILInstructions inserted by \c B.
   SmallVector<SILInstruction*, 32> InsertedInstrs;
   size_t LastInsnWithoutScope;
+
+  /// The first block in the postmatter section of the function, if
+  /// anything has been built there.
+  ///
+  /// (This field must precede B because B's initializer calls
+  /// createBasicBlock().)
+  SILBasicBlock *StartOfPostmatter = nullptr;
   
   /// B - The SILBuilder used to construct the SILFunction.  It is
   /// what maintains the notion of the current block being emitted
   /// into.
   SILBuilder B;
-    
+
   /// IndirectReturnAddress - For a function with an indirect return, holds a
   /// value representing the address to initialize with the return value. Null
   /// for a function that returns by value.
@@ -226,6 +245,10 @@ public:
   /// The 'self' variable that needs to be cleaned up on failure.
   VarDecl *FailSelfDecl = nullptr;
 
+  /// The destination for throws.  The block will always be in the
+  /// postmatter and takes a BB argument of the exception type.
+  JumpDest ThrowDest = JumpDest::invalid();
+
   /// \brief True if a non-void return is required in this function.
   bool NeedsReturn : 1;
     
@@ -241,6 +264,21 @@ public:
 
   bool InWritebackScope = false;
   bool InInOutConversionScope = false;
+
+  /// The current section of the function that we're emitting code in.
+  ///
+  /// The postmatter section is a part of the function intended for
+  /// things like error-handling that don't need to be mixed into the
+  /// normal code sequence.
+  ///
+  /// If the current function section is Ordinary, and
+  /// StartOfPostmatter is non-null, the current insertion block
+  /// should be ordered before that.
+  ///  
+  /// If the current function section is Postmatter, StartOfPostmatter
+  /// is non-null and the current insertion block is ordered after
+  /// that (inclusive).
+  FunctionSection CurFunctionSection = FunctionSection::Ordinary;
 
   /// freeWritebackStack - Just deletes WritebackStack.  Out of line to avoid
   /// having to put the definition of LValueWriteback in this header.
@@ -575,10 +613,15 @@ public:
                           bool hasFalseCode = true, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {});
 
-  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr) {
-    return new (F.getModule()) SILBasicBlock(&F, afterBB);
-  }
-  
+  /// Create a new basic block.
+  ///
+  /// The block can be explicitly placed after a particular block;
+  /// otherwise, it will be placed at the end of the current function
+  /// section.
+  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr);  
+
+  /// Create a new basic block in the given function section.
+  SILBasicBlock *createBasicBlock(FunctionSection section);
   
   //===--------------------------------------------------------------------===//
   // Memory management
@@ -665,6 +708,12 @@ public:
   void emitStmt(Stmt *S);
 
   void emitBreakOutOf(SILLocation loc, Stmt *S);
+
+  void emitCatchDispatch(Stmt *S, ManagedValue exn,
+                         ArrayRef<CatchStmt*> clauses,
+                         JumpDest catchFallthroughDest);
+
+  void emitThrow(SILLocation loc, ManagedValue exn);
   
   //===--------------------------------------------------------------------===//
   // Patterns
@@ -675,7 +724,7 @@ public:
 
   void emitSwitchStmt(SwitchStmt *S);
   void emitSwitchFallthrough(FallthroughStmt *S);
-  
+
   //===--------------------------------------------------------------------===//
   // Expressions
   //===--------------------------------------------------------------------===//
@@ -1187,6 +1236,35 @@ public:
   
   /// Get the method dispatch mechanism for a method.
   MethodDispatch getMethodDispatch(AbstractFunctionDecl *method);
+};
+
+
+/// A utility class for saving and restoring the insertion point.
+class SavedInsertionPoint {
+  SILGenFunction &SGF;
+  SILBasicBlock *SavedIP;
+  FunctionSection SavedSection;
+public:
+  SavedInsertionPoint(SILGenFunction &SGF, SILBasicBlock *newIP,
+                      Optional<FunctionSection> optSection = None)
+    : SGF(SGF), SavedIP(SGF.B.getInsertionBB()),
+      SavedSection(SGF.CurFunctionSection) {
+    FunctionSection section = (optSection ? *optSection : SavedSection);
+    assert((section != FunctionSection::Postmatter || SGF.StartOfPostmatter) &&
+           "trying to move to postmatter without a registered start "
+           "of postmatter?");
+
+    SGF.B.setInsertionPoint(newIP);
+    SGF.CurFunctionSection = section;
+  }
+
+  SavedInsertionPoint(const SavedInsertionPoint &) = delete;
+  SavedInsertionPoint &operator=(const SavedInsertionPoint &) = delete;
+
+  ~SavedInsertionPoint() {
+    SGF.B.setInsertionPoint(SavedIP);
+    SGF.CurFunctionSection = SavedSection;
+  }
 };
 
 } // end namespace Lowering

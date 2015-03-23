@@ -762,6 +762,12 @@ ERROR(expected_lbrace_after_do,stmt_parsing,PointsToFirstBadToken,
 ERROR(expected_expr_do_while,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'do-while' condition", ())
 
+// Do/Catch Statement
+ERROR(expected_lbrace_after_catch,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'catch' pattern", ())
+ERROR(expected_catch_where_expr,stmt_parsing,PointsToFirstBadToken,
+      "expected expression for 'where' guard of 'catch'", ())
+
 // C-Style For Stmt
 ERROR(expected_init_for_stmt,stmt_parsing,PointsToFirstBadToken,
       "expected initialization in a 'for' statement", ())

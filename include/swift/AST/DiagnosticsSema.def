@@ -1669,8 +1669,8 @@ ERROR(isa_pattern_value,sema_tcp,none,
 
 ERROR(sugar_type_not_found,sema_tct,none,
       "broken standard library: cannot find "
-      "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary}0 type",
-      (/*SugarImplTypeKind*/ unsigned))
+      "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
+      "ErrorType}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,sema_tct,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())

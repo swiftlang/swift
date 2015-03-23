@@ -638,7 +638,117 @@ namespace {
       return P;
     }
   };
+
+  struct GuardedPattern {
+    Pattern *ThePattern = nullptr;
+    SourceLoc WhereLoc;
+    Expr *Guard = nullptr;
+  };
+  
+  /// Contexts in which a guarded pattern can appears.
+  enum class GuardedPatternContext {
+    Case,
+    Catch,
+  };
 } // unnamed namespace
+
+/// Parse a pattern-matching clause for a case or catch statement,
+/// including the guard expression:
+///
+///    pattern 'where' expr
+static void parseGuardedPattern(Parser &P, GuardedPattern &result,
+                                ParserStatus &status,
+                                SmallVectorImpl<VarDecl *> &boundDecls,
+                                GuardedPatternContext parsingContext) {
+  ParserResult<Pattern> patternResult;
+
+  // Do some special-case code completion for the start of the pattern.
+  if (P.CodeCompletion) {
+    if (P.Tok.is(tok::code_complete)) {
+      patternResult =
+        makeParserErrorResult(new (P.Context) AnyPattern(SourceLoc()));
+      switch (parsingContext) {
+      case GuardedPatternContext::Case:
+        P.CodeCompletion->completeCaseStmtBeginning();
+        break;
+      case GuardedPatternContext::Catch:
+        P.CodeCompletion->completeCatchStmtBeginning();
+        break;
+      }
+      P.consumeToken();
+    }
+    if (parsingContext == GuardedPatternContext::Case &&
+        P.Tok.is(tok::period) && P.peekToken().is(tok::code_complete)) {
+      patternResult =
+        makeParserErrorResult(new (P.Context) AnyPattern(SourceLoc()));
+      P.consumeToken();
+      P.CodeCompletion->completeCaseStmtDotPrefix();
+      P.consumeToken();
+    }
+  }
+
+  // Okay, if the special code-completion didn't kick in, parse a
+  // matching pattern.
+  if (patternResult.isNull()) {
+    llvm::SaveAndRestore<decltype(P.InVarOrLetPattern)>
+      T(P.InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+    patternResult = P.parseMatchingPattern();
+  }
+
+  // If that didn't work, use a bogus pattern so that we can fill out
+  // the AST.
+  if (patternResult.isNull())
+    patternResult =
+      makeParserErrorResult(new (P.Context) AnyPattern(P.PreviousLoc));
+
+  // Fill in the pattern.
+  status |= patternResult;
+  result.ThePattern = patternResult.get();
+
+  // Add variable bindings from the pattern to the case scope.  We have
+  // to do this with a full AST walk, because the freshly parsed pattern
+  // represents tuples and var patterns as tupleexprs and
+  // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
+  patternResult.get()->walk(CollectVarsAndAddToScope(P, boundDecls));
+      
+  // Now that we have them, mark them as being initialized without a PBD.
+  for (auto VD : boundDecls)
+    VD->setHasNonPatternBindingInit();
+
+  // Parse the optional 'where' guard.
+  if (P.consumeIf(tok::kw_where, result.WhereLoc)) {
+    SourceLoc startOfGuard = P.Tok.getLoc();
+
+    auto diagKind = [=]() -> Diag<> {
+      switch (parsingContext) {
+      case GuardedPatternContext::Case:
+        return diag::expected_case_where_expr;
+      case GuardedPatternContext::Catch:
+        return diag::expected_catch_where_expr;
+      }
+      llvm_unreachable("bad context");
+    }();
+    ParserResult<Expr> guardResult = P.parseExpr(diagKind);
+    status |= guardResult;
+
+    // Use the parsed guard expression if possible.
+    if (guardResult.isNonNull()) {
+      result.Guard = guardResult.get();
+
+    // Otherwise, fake up an ErrorExpr.
+    } else {
+      // If we didn't consume any tokens failing to parse the
+      // expression, don't put in the source range of the ErrorExpr.
+      SourceRange errorRange;
+      if (startOfGuard == P.Tok.getLoc()) {
+        errorRange = result.WhereLoc;
+      } else {
+        errorRange = SourceRange(startOfGuard, P.PreviousLoc);
+      }
+      result.Guard = new (P.Context) ErrorExpr(errorRange);
+    }
+  }
+}
 
 /// Parse the condition of an 'if' or 'while'.
 ///
@@ -1076,6 +1186,7 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
 /// 
 ///   stmt-do:
 ///     (identifier ':')? 'do' stmt-brace
+///     (identifier ':')? 'do' stmt-brace stmt-catch+
 ///     (identifier ':')? 'do' stmt-brace 'while' expr
 ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
   SourceLoc doLoc = consumeToken(tok::kw_do);
@@ -1085,9 +1196,38 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
   ParserResult<BraceStmt> body =
       parseBraceItemList(diag::expected_lbrace_after_do);
   status |= body;
+  if (status.hasCodeCompletion())
+    return makeParserResult<Stmt>(status, nullptr);
   if (body.isNull())
     body = makeParserResult(
         body, BraceStmt::create(Context, doLoc, {}, PreviousLoc, true));
+
+  // If the next token is 'catch', this is a 'do'/'catch' statement.
+  if (Tok.is(tok::kw_catch)) {
+    // Parse 'catch' clauses 
+    SmallVector<CatchStmt*, 4> allClauses;
+    do {
+      ParserResult<CatchStmt> clause = parseStmtCatch();
+      status |= clause;
+      if (status.hasCodeCompletion())
+        return makeParserResult<Stmt>(status, nullptr);
+
+      // parseStmtCatch promises to return non-null.
+      assert(!clause.isNull());
+      allClauses.push_back(clause.get());
+    } while (Tok.is(tok::kw_catch));
+
+    // Recover from all of the clauses failing to parse by returning a
+    // normal do-statement.
+    if (allClauses.empty()) {
+      assert(status.isError());
+      return makeParserResult(status,
+                        new (Context) DoStmt(labelInfo, doLoc, body.get()));
+    }
+
+    return makeParserResult(status,
+      DoCatchStmt::create(Context, labelInfo, doLoc, body.get(), allClauses));
+  }
 
   SourceLoc whileLoc;
 
@@ -1114,6 +1254,47 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
       status,
       new (Context) DoWhileStmt(labelInfo, doLoc, condition.get(), whileLoc,
                                 body.get()));
+}
+
+///  stmt-catch:
+///    'catch' pattern ('where' expr)? stmt-brace
+///
+/// Note that this is not a "first class" statement; it can only
+/// appear following a 'do' statement.
+///
+/// This routine promises to return a non-null result unless there was
+/// a code-completion token.
+ParserResult<CatchStmt> Parser::parseStmtCatch() {
+  // A catch block has its own scope for variables bound out of the pattern.
+  Scope S(this, ScopeKind::CatchVars);
+
+  SourceLoc catchLoc = consumeToken(tok::kw_catch);
+
+  SmallVector<VarDecl*, 4> boundDecls;
+
+  ParserStatus status;
+  GuardedPattern pattern;
+  parseGuardedPattern(*this, pattern, status, boundDecls,
+                      GuardedPatternContext::Catch);
+  if (status.hasCodeCompletion()) {
+    return makeParserCodeCompletionResult<CatchStmt>();
+  }
+
+  SourceLoc startOfBody = Tok.getLoc();
+  auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
+  status |= bodyResult;
+  if (status.hasCodeCompletion()) {
+    return makeParserCodeCompletionResult<CatchStmt>();
+  } else if (bodyResult.isNull()) {
+    bodyResult = makeParserErrorResult(BraceStmt::create(Context, startOfBody,
+                                                         {}, PreviousLoc,
+                                                         /*implicit=*/ true));
+  }
+
+  auto result =
+    new (Context) CatchStmt(catchLoc, pattern.ThePattern, pattern.WhereLoc,
+                            pattern.Guard, bodyResult.get());
+  return makeParserResult(status, result);
 }
 
 ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
@@ -1536,58 +1717,13 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
   CaseLoc = P.consumeToken(tok::kw_case);
 
   do {
-    ParserResult<Pattern> CasePattern;
-    if (P.CodeCompletion) {
-      if (P.Tok.is(tok::code_complete)) {
-        CasePattern =
-            makeParserErrorResult(new (P.Context) AnyPattern(SourceLoc()));
-        P.CodeCompletion->completeCaseStmtBeginning();
-        P.consumeToken();
-      }
-      if (P.Tok.is(tok::period) && P.peekToken().is(tok::code_complete)) {
-        CasePattern =
-            makeParserErrorResult(new (P.Context) AnyPattern(SourceLoc()));
-        P.consumeToken();
-        P.CodeCompletion->completeCaseStmtDotPrefix();
-        P.consumeToken();
-      }
-    }
-
-    if (CasePattern.isNull()) {
-      llvm::SaveAndRestore<decltype(P.InVarOrLetPattern)>
-      T(P.InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
-      CasePattern = P.parseMatchingPattern();
-    }
-
-    if (CasePattern.isNull())
-      CasePattern =
-          makeParserErrorResult(new (P.Context) AnyPattern(P.PreviousLoc));
-
-    Status |= CasePattern;
-    if (CasePattern.isNonNull()) {
-      // Add variable bindings from the pattern to the case scope.  We have
-      // to do this with a full AST walk, because the freshly parsed pattern
-      // represents tuples and var patterns as tupleexprs and
-      // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
-      CasePattern.get()->walk(CollectVarsAndAddToScope(P, BoundDecls));
-      
-      // Now that we have them, mark them as being initialized without a PBD.
-      for (auto VD : BoundDecls)
-        VD->setHasNonPatternBindingInit();
-    }
-
-    // Parse an optional 'where' guard.
-    SourceLoc WhereLoc;
-    ParserResult<Expr> Guard;
-    if (P.Tok.is(tok::kw_where)) {
-      WhereLoc = P.consumeToken(tok::kw_where);
-      Guard = P.parseExpr(diag::expected_case_where_expr);
-      Status |= Guard;
-    }
-
+    GuardedPattern PatternResult;
+    parseGuardedPattern(P, PatternResult, Status, BoundDecls,
+                        GuardedPatternContext::Case);
     LabelItems.push_back(CaseLabelItem(/*IsDefault=*/false,
-                                       CasePattern.get(), WhereLoc,
-                                       Guard.getPtrOrNull()));
+                                       PatternResult.ThePattern,
+                                       PatternResult.WhereLoc,
+                                       PatternResult.Guard));
   } while (P.consumeIf(tok::comma));
 
   ColonLoc = P.Tok.getLoc();

@@ -746,6 +746,79 @@ public:
     llvm_unreachable("case stmt outside of switch?!");
   }
 
+  Stmt *visitCatchStmt(CatchStmt *S) {
+    // Catches are handled in visitSwitchStmt.
+    llvm_unreachable("catch stmt outside of do-catch?!");
+  }
+
+  bool checkCatchStmt(CatchStmt *S) {
+    bool hadTypeError = false;
+
+    // Grab the standard exception type.
+    Type exnType = TC.getExceptionType(DC, S->getCatchLoc());
+
+    // Type-check the catch pattern.
+    Pattern *pattern = S->getErrorPattern();
+    if (Pattern *newPattern = TC.resolvePattern(pattern, DC)) {
+      pattern = newPattern;
+
+      // Coerce the pattern to the exception type.
+      if (!exnType ||
+          TC.coercePatternToType(pattern, DC, exnType, TR_InExpression)) {
+        // If that failed, be sure to give the variables error types
+        // before we type-check the guard.  (This will probably kill
+        // most of the type-checking, but maybe not.)
+        pattern->forEachVariable([&](VarDecl *var) {
+            var->overwriteType(ErrorType::get(TC.Context));
+            var->setInvalid();
+          });
+        hadTypeError = true;
+      }
+
+      S->setErrorPattern(pattern);
+    } else {
+      hadTypeError = true;
+    }
+
+    // Check the guard expression, if present.
+    if (Expr *guard = S->getGuardExpr()) {
+      hadTypeError |= TC.typeCheckCondition(guard, DC);
+      S->setGuardExpr(guard);
+    }
+      
+    // Type-check the clause body.
+    Stmt *body = S->getBody();
+    hadTypeError |= typeCheckStmt(body);
+    S->setBody(body);
+
+    return hadTypeError;
+  }
+
+  Stmt *visitDoCatchStmt(DoCatchStmt *S) {
+    // The labels are in scope for both the 'do' and all of the catch
+    // clauses.  This allows the user to break out of (or restart) the
+    // entire construct.
+    AddLabeledStmt loopNest(*this, S);
+
+    bool hadTypeError = false;
+
+    // Type-check the 'do' body.  Type failures in here will generally
+    // not cause type failures in the 'catch' clauses.
+    Stmt *newBody = S->getBody();
+    if (typeCheckStmt(newBody)) {
+      hadTypeError = true;
+    } else {
+      S->setBody(newBody);
+    }
+
+    // Check all the catch clauses independently.
+    for (auto clause : S->getCatches()) {
+      hadTypeError |= checkCatchStmt(clause);
+    }
+    
+    return hadTypeError ? nullptr : S;
+  }
+
   Stmt *visitFailStmt(FailStmt *S) {
     // These are created as part of type-checking "return" in an initializer.
     // There is nothing more to do.

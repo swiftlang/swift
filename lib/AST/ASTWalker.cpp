@@ -843,6 +843,53 @@ Stmt *Traversal::visitDoStmt(DoStmt *DS) {
   return DS;
 }
 
+Stmt *Traversal::visitDoCatchStmt(DoCatchStmt *stmt) {
+  // Transform the body of the 'do'.
+  if (Stmt *newBody = doIt(stmt->getBody())) {
+    stmt->setBody(newBody);
+  } else {
+    return nullptr;
+  }
+
+  // Transform each of the catch clauses:
+  for (CatchStmt *&clause : stmt->getMutableCatches()) {
+    if (auto newClause = doIt(clause)) {
+      clause = cast<CatchStmt>(newClause);
+    } else {
+      return nullptr;
+    }
+  }
+
+  return stmt;
+}
+
+Stmt *Traversal::visitCatchStmt(CatchStmt *stmt) {
+  // Transform the error pattern.
+  if (Pattern *newPattern = doIt(stmt->getErrorPattern())) {
+    stmt->setErrorPattern(newPattern);
+  } else {
+    return nullptr;
+  }
+
+  // Transform the guard expression if present.
+  if (Expr *oldGuardExpr = stmt->getGuardExpr()) {
+    if (Expr *newGuardExpr = doIt(oldGuardExpr)) {
+      stmt->setGuardExpr(newGuardExpr);
+    } else {
+      return nullptr;
+    }
+  }
+
+  // Transform the body of the catch clause.
+  if (Stmt *newCatchBody = doIt(stmt->getBody())) {
+    stmt->setBody(newCatchBody);
+  } else {
+    return nullptr;
+  }
+
+  return stmt;
+}
+
 Stmt *Traversal::visitWhileStmt(WhileStmt *WS) {
   if (doIt(WS->getCond()))
     return nullptr;

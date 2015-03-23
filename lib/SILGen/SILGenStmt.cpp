@@ -19,6 +19,7 @@
 #include "swift/AST/AST.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -28,6 +29,44 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
   Context.Diags.diagnose(loc,
                          diag, std::forward<U>(args)...);
+}
+
+SILBasicBlock *SILGenFunction::createBasicBlock(SILBasicBlock *afterBB) {
+  // Honor an explicit placement if given.
+  if (afterBB) {
+    return new (F.getModule()) SILBasicBlock(&F, afterBB);
+
+  // If we don't have a requested placement, but we do have a current
+  // insertion point, insert there.
+  } else if (B.hasValidInsertionPoint()) {
+    return new (F.getModule()) SILBasicBlock(&F, B.getInsertionBB());
+
+  // Otherwise, insert at the end of the current section.
+  } else {
+    return createBasicBlock(CurFunctionSection);
+  }
+}
+
+SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
+  switch (section) {
+  case FunctionSection::Ordinary: {
+    // The end of the ordinary section is just the end of the function
+    // unless postmatter blocks exist.
+    SILBasicBlock *afterBB =
+      (StartOfPostmatter ? StartOfPostmatter->getPrevNode() : nullptr);
+    return new (F.getModule()) SILBasicBlock(&F, afterBB);
+  }
+
+  case FunctionSection::Postmatter: {
+    // The end of the postmatter section is always the end of the function.
+    // Register the new block as the start of the postmatter if needed.
+    SILBasicBlock *newBB = new (F.getModule()) SILBasicBlock(&F, nullptr);
+    if (!StartOfPostmatter) StartOfPostmatter = newBB;
+    return newBB;
+  }
+
+  }
+  llvm_unreachable("bad function section");
 }
 
 //===----------------------------------------------------------------------===//
@@ -45,8 +84,10 @@ namespace {
     ASTContext &getASTContext() { return SGF.getASTContext(); }
 
     SILBasicBlock *createBasicBlock() { return SGF.createBasicBlock(); }
-    JumpDest createJumpDest(Stmt *cleanupLoc) {
-      return JumpDest(createBasicBlock(),
+
+    template <class... Args>
+    JumpDest createJumpDest(Stmt *cleanupLoc, Args... args) {
+      return JumpDest(SGF.createBasicBlock(args...),
                       SGF.getCleanupsDepth(),
                       CleanupLocation(cleanupLoc));
     }
@@ -62,6 +103,13 @@ void SILGenFunction::emitStmt(Stmt *S) {
 /// turns out to have not been needed.
 static void emitOrDeleteBlock(SILBuilder &B, SILBasicBlock *BB,
                               SILLocation BranchLoc) {
+  // If we ever add a single-use optimization here (to just continue
+  // the predecessor instead of branching to a separate block), we'll
+  // need to update visitDoCatchStmt so that code like:
+  //   try { throw x } catch _ { }
+  // doesn't leave us emitting the rest of the function in the
+  // postmatter section.
+
   if (BB->pred_empty()) {
     // If the block is unused, we don't need it; just delete it.
     BB->eraseFromParent();
@@ -306,12 +354,14 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 
   JumpDest endDest = JumpDest::invalid();
   if (hasLabel) {
+    // Create the end dest first so that the loop dest comes in-between.
+    endDest = createJumpDest(S->getBody());
+
     // Create a new basic block and jump into it.
     JumpDest loopDest = createJumpDest(S->getBody());
     SGF.B.emitBlock(loopDest.getBlock(), S);
 
     // Set the destinations for 'break' and 'continue'.
-    endDest = createJumpDest(S->getBody());
     SGF.BreakContinueDestStack.push_back({S, endDest, loopDest});
   }
 
@@ -322,6 +372,77 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
     SGF.BreakContinueDestStack.pop_back();
     emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
   }
+}
+
+void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
+  Type formalExnType =
+    S->getCatches().front()->getErrorPattern()->getType();
+  auto &exnTL = SGF.getTypeLowering(formalExnType);
+
+  // Create the throw destination at the end of the function.
+  JumpDest throwDest = createJumpDest(S->getBody(),
+                                      FunctionSection::Postmatter);
+  SILArgument *exnArg =
+    throwDest.getBlock()->createBBArg(exnTL.getLoweredType());
+
+  // We always need an continuation block because we might fall out of
+  // a catch block.  But we don't need a loop block unless the 'do'
+  // statement is labeled.
+  JumpDest endDest = createJumpDest(S->getBody());
+
+  // We don't need to do anything too fancy about emission if we don't
+  // have a label.  Otherwise, assume we might break or continue.
+  bool hasLabel = (bool) S->getLabelInfo();
+  if (hasLabel) {
+    // Create a new basic block and jump into it.
+    JumpDest loopDest = createJumpDest(S->getBody());
+    SGF.B.emitBlock(loopDest.getBlock(), S);
+
+    // Set the destinations for 'break' and 'continue'.
+    SGF.BreakContinueDestStack.push_back({S, endDest, loopDest});
+  }
+
+  // Emit the body.
+  {
+    // Push the new throw destination.
+    llvm::SaveAndRestore<JumpDest> savedThrowDest(SGF.ThrowDest, throwDest);
+
+    visit(S->getBody());
+  }
+
+  // Emit the catch clauses.
+  {
+    // Move the insertion point to the throw destination.
+    SavedInsertionPoint savedIP(SGF, throwDest.getBlock(),
+                                FunctionSection::Postmatter);
+
+    // The exception cleanup should be getting forwarded around
+    // correctly anyway, but push a scope to ensure it gets popped.
+    Scope exnScope(SGF.Cleanups, CleanupLocation(S));
+
+    // Take ownership of the exception.
+    ManagedValue exn = SGF.emitManagedRValueWithCleanup(exnArg, exnTL);
+
+    // Emit all the catch clauses, branching to the end destination if
+    // we fall out of one.
+    SGF.emitCatchDispatch(S, exn, S->getCatches(), endDest);
+  }
+
+  if (hasLabel) {
+    SGF.BreakContinueDestStack.pop_back();
+  }
+
+  // Handle falling out of the do-block.
+  //
+  // It's important for good code layout that the insertion point be
+  // left in the original function section after this.  So if
+  // emitOrDeleteBlock ever learns to just continue in the
+  // predecessor, we'll need to suppress that here.
+  emitOrDeleteBlock(SGF.B, endDest.getBlock(), S);
+}
+
+void StmtEmitter::visitCatchStmt(CatchStmt *S) {
+  llvm_unreachable("catch statement outside of context?");
 }
 
 void StmtEmitter::visitDoWhileStmt(DoWhileStmt *S) {
@@ -588,6 +709,28 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
   
   // Jump to the failure block.
   SGF.Cleanups.emitBranchAndCleanups(SGF.FailDest, S);
+}
+
+void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV) {
+  // Claim the exception value.  If we need to handle throwing
+  // cleanups, the correct thing to do here is to recreate the
+  // exception's cleanup when emitting each cleanup we branch through.
+  // But for now we aren't bothering.
+  SILValue exn = exnMV.forward(*this);
+
+  // If we have a throw destination, branch there.
+  // FIXME: should this be an assertion?
+  if (ThrowDest.isValid()) {
+    Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn);
+    return;
+  }
+
+  // Otherwise, diagnose.
+  SGM.diagnose(loc, diag::unhandled_throw);
+
+  // The diagnostic above is an error, so we don't care about leaking
+  // the exception here, but we do need to not produce invalid SIL.
+  B.createUnreachable(loc);
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
