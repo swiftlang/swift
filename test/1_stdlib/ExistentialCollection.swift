@@ -15,11 +15,30 @@ import StdlibUnittest
 
 var tests = TestSuite("ExistentialCollection")
 
+tests.test("AnyGenerator") {
+  func countStrings() -> AnyGenerator<String> {
+    let lazyStrings = lazy(0..<5).map { toString($0) }
+    
+    // This is a really complicated type of no interest to our
+    // clients.
+    let g: MapSequenceGenerator<RangeGenerator<Int>, String>
+      = lazyStrings.generate()
+    return anyGenerator(g)
+  }
+  expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))
+
+  var x = 7
+  let g = anyGenerator { x < 15 ? x++ : nil }
+  expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(g))
+}
+
 tests.test("Sequence") {
   let fib = [1, 2, 3, 5, 8, 13, 21]
   expectEqual(fib, Array(AnySequence(fib)))
   // AnyGenerator is a Sequence
   expectEqual(fib, Array(AnySequence(fib).generate()))
+  expectCrashLater()
+  let x = AnyGenerator<Int>()
 }
 
 tests.test("ForwardCollection") {

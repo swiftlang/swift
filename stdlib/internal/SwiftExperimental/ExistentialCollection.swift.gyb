@@ -36,9 +36,80 @@ internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
 
 public class _AnyGeneratorBase {}
 
-public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType, SequenceType {
+/// An abstract `GeneratorType` base class over `T` elements.
+///
+/// Use this as a `Sequence`\ 's associated `Generator` type when you
+/// don't want to expose details of the concrete generator, a subclass.
+///
+/// It is an error to create instances of `AnyGenerator` that are not
+/// also instances of an `AnyGenerator` subclass.
+///
+/// See also::
+///
+///   struct AnySequence<S: SequenceType>
+///   func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
+///   func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
+public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
+  /// Initialize the instance.  May only be called from a subclass
+  /// initializer.
+  override public init() {
+    super.init()
+    _debugPrecondition(
+      _typeID(self) != unsafeBitCast(AnyGenerator.self, ObjectIdentifier.self),
+      "AnyGenerator<T> instances can not be created; create a subclass instance instead."
+    )
+  }
+  
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// Note: subclasses must override this method.
   public func next() -> T? {_abstract()}
+}
+
+/// Every `GeneratorType` can also be a `SequenceType`.  Note that
+/// traversing the sequence consumes the generator.
+extension AnyGenerator : SequenceType {
+  /// Returns `self`.
   public func generate() -> AnyGenerator { return self }
+}
+
+/// Return a `GeneratorType` instance that wraps `base` but whose type
+/// depends only on the type of `G.Element`.
+///
+/// Example::
+///
+///   func countStrings() -> AnyGenerator<String> {
+///     let lazyStrings = lazy(0..<10).map { toString($0) }
+///
+///     // This is a really complicated type of no interest to our
+///     // clients.
+///     let g: MapSequenceGenerator<RangeGenerator<Int>, String>
+///       = lazyStrings.generate()
+///     return anyGenerator(g)
+///   }
+public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
+  return _GeneratorBox(base)
+}
+
+internal class _FunctionGenerator<T> : AnyGenerator<T> {
+  init(_ nextImplementation: ()->T?) {
+    self.nextImplementation = nextImplementation
+  }
+  override func next() -> T? { return nextImplementation() }
+  let nextImplementation: ()->T?
+}
+
+/// Return a `GeneratorType` instance whose `next` method invokes
+/// `nextImplementation` and returns the result.
+///
+/// Example::
+///
+///   var x = 7
+///   let g = anyGenerator { x < 15 ? x++ : nil }
+///   let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
+public func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T> {
+  return _FunctionGenerator(nextImplementation)
 }
 
 internal final class _GeneratorBox<
@@ -122,14 +193,28 @@ internal class _${Kind}Box<S: ${Kind}Type>
 }
 % end
 
+/// A type-erased sequence.
+/// 
+/// Forwards operations to an arbitrary underlying sequence having the
+/// same `Element` type, hiding the specifics of the underlying
+/// ``SequenceType``.
+///
+/// See also: `AnyGenerator<T>`.
 public struct AnySequence<T> : SequenceType {
   typealias Element = T
+
+  /// Wrap and forward operations to to `base`
   public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
     _box = _SequenceBox(base)
   }
+  
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// Complexity: O(1)
   public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
+  
   internal let _box: _AnySequenceBox
 }
 
@@ -271,27 +356,50 @@ internal final class _RandomAccessIndexBox<
 % for Traversal in traversals:
 
 %   Self = 'Any%sIndex' % Traversal
+/// A wrapper over an underlying `${Traversal}IndexType` that hides
+/// the specific underlying type.
+///
+/// See also: `Any${Traversal}Collection`
 public struct ${Self} : ${Traversal}IndexType {
   public typealias Distance = IntMax
-  
+
+  /// Wrap and forward operations to `base`.
   public init<BaseIndex: ${Traversal}IndexType>(_ base: BaseIndex) {
     _box = _${Traversal}IndexBox(base)
   }
   
+  /// Return the next consecutive value in a discrete sequence of
+  /// `${Self}` values.
+  ///
+  /// Requires: `self` has a well-defined successor.
   public func successor() -> ${Self} {
     return ${Self}(_box.successor())
   }
   
   % if Traversal != 'Forward':
+  /// Return the previous consecutive value in a discrete sequence of
+  /// `${Self}` values.
+  ///
+  /// Requires: `self` has a well-defined predecessor.
   public func predecessor() -> ${Self} {
     return ${Self}(_box.predecessor())
   }
   % end
   
   % if Traversal == 'RandomAccess':
+  /// Return the minimum number of applications of `successor` or
+  /// `predecessor` required to reach `other` from `self`.
+  ///
+  /// Requires: `self` and `other` wrap instances of the same type.
   public func distanceTo(other: ${Self}) -> Distance {
     return _box._distanceTo(other._box)
   }
+  
+  /// Return `self` offset by `n` steps.
+  ///
+  /// :returns: If `n > 0`, the result of applying `successor` to
+  /// `self` `n` times.  If `n < 0`, the result of applying
+  /// `predecessor` to `self` `n` times. Otherwise, `self`.
   public func advancedBy(amount: Distance) -> ${Self} {
     return ${Self}(_box._advancedBy(amount))
   }
@@ -335,6 +443,11 @@ public func ~> (
   return ${Self}(start._box._advancedBy(args.1.0, args.1.1._box))
 }
 
+/// Return true iff `lhs` and `rhs` wrap equal underlying
+/// `${Self}`\ s.
+///
+/// Requires: the types of indices wrapped by `lhs` and `rhs` are
+/// identical.
 public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
@@ -344,7 +457,7 @@ public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
 //===--- Collections ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
+internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
   subscript(_ForwardIndexBoxType) -> Element {_abstract()}
   func _count() -> IntMax {_abstract()}
 
@@ -358,16 +471,28 @@ class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
   }
 }
 
+/// A protocol for `AnyForwardCollection<T>`,
+/// `AnyBidirectionalCollection<T>`, and
+/// `AnyRandomAccessCollection<T>`.
+///
+/// This protocol can be considered an implementation detail of the
+/// `===` and `!==` implementations for these types.
 public protocol _AnyCollectionType : CollectionType {
-  var _boxID: ObjectIdentifier {get}
+  /// Identifies the underlying collection stored by `self`. Instances
+  /// copied from one another have the same `underlyingCollectionID`.
+  var underlyingCollectionID: ObjectIdentifier {get}
 }
 
-public func === <L: _AnyCollectionType, R: _AnyCollectionType>(lhs: L, rhs: R) -> Bool {
-  return lhs._boxID == rhs._boxID
+public func === <
+  L: _AnyCollectionType, R: _AnyCollectionType
+>(lhs: L, rhs: R) -> Bool {
+  return lhs.underlyingCollectionID == rhs.underlyingCollectionID
 }
 
-public func !== <L: _AnyCollectionType, R: _AnyCollectionType>(lhs: L, rhs: R) -> Bool {
-  return lhs._boxID != rhs._boxID
+public func !== <
+  L: _AnyCollectionType, R: _AnyCollectionType
+>(lhs: L, rhs: R) -> Bool {
+  return lhs.underlyingCollectionID != rhs.underlyingCollectionID
 }
 
 % for (ti, Traversal) in enumerate(traversals):
@@ -415,7 +540,7 @@ public struct Any${Traversal}Collection<Element> : _AnyCollectionType {
     return _box[position._box]
   }
 
-  public var _boxID: ObjectIdentifier {
+  public var underlyingCollectionID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
   
