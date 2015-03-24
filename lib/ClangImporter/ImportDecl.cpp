@@ -3369,16 +3369,7 @@ namespace {
       return { type, interfaceType };
     }
 
-    /// \brief Build a thunk for an Objective-C getter.
-    ///
-    /// \param getter The Objective-C getter method.
-    ///
-    /// \param dc The declaration context into which the thunk will be added.
-    ///
-    /// \param indices If non-null, the indices for a subscript getter. Null
-    /// indicates that we're generating a getter thunk for a property getter.
-    ///
-    /// \returns The getter thunk.
+    /// Build a thunk for an Objective-C subscript getter.
     FuncDecl *buildGetterThunk(const FuncDecl *getter, Type elementTy,
                                DeclContext *dc, Pattern *indices) {
       auto &context = Impl.SwiftContext;
@@ -3391,19 +3382,13 @@ namespace {
       getterArgs.push_back(createTypedNamedPattern(createSelfDecl(dc, false)));
 
       // index, for subscript operations.
-      if (indices) {
-        // Clone the indices for the thunk.
-        indices = indices->clone(context);
-        auto pat = TuplePattern::create(context, loc, TuplePatternElt(indices),
-                                        loc);
-        pat->setType(TupleType::get(TupleTypeElt(indices->getType()),
-                                    context));
-        getterArgs.push_back(pat);
-      } else {
-        // Otherwise, an empty tuple
-        getterArgs.push_back(TuplePattern::create(context, loc, { }, loc));
-        getterArgs.back()->setType(TupleType::getEmpty(context));
-      }
+      assert(indices);
+      indices = indices->clone(context);
+      auto pat = TuplePattern::create(context, loc, TuplePatternElt(indices),
+                                      loc);
+      pat->setType(TupleType::get(TupleTypeElt(indices->getType()),
+                                  context));
+      getterArgs.push_back(pat);
 
       // Form the type of the getter.
       auto getterType = elementTy;
@@ -3430,25 +3415,15 @@ namespace {
       thunk->setInterfaceType(interfaceType);
       thunk->setAccessibility(Accessibility::Public);
 
-      if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
-        thunk->getAttrs().add(objcAttr->clone(context));
-      else
-        thunk->setIsObjC(true);
+      auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>();
+      assert(objcAttr);
+      thunk->getAttrs().add(objcAttr->clone(context));
       // FIXME: Should we record thunks?
 
       return thunk;
     }
 
-    /// \brief Build a thunk for an Objective-C setter.
-    ///
-    /// \param setter The Objective-C setter method.
-    ///
-    /// \param dc The declaration context into which the thunk will be added.
-    ///
-    /// \param indices If non-null, the indices for a subscript setter. Null
-    /// indicates that we're generating a setter thunk for a property setter.
-    ///
-    /// \returns The getter thunk.
+      /// Build a thunk for an Objective-C subscript setter.
     FuncDecl *buildSetterThunk(const FuncDecl *setter, Type elementTy,
                                DeclContext *dc, Pattern *indices) {
       auto &context = Impl.SwiftContext;
@@ -3462,8 +3437,6 @@ namespace {
       //
       // Build a setter thunk with the latter signature that maps to the
       // former.
-      //
-      // Property setters are similar, but don't have indices.
 
       // Form the argument patterns.
       SmallVector<Pattern *, 2> setterArgs;
@@ -3483,14 +3456,12 @@ namespace {
       ValueElts.push_back(TuplePatternElt(valuePattern));
       ValueEltTys.push_back(TupleTypeElt(valuePattern->getType()));
       
-      // index, for subscript operations.
-      if (indices) {
-        // Clone the indices for the thunk.
-        indices = indices->clone(context);
-        ValueElts.push_back(TuplePatternElt(indices));
-        ValueEltTys.push_back(TupleTypeElt(indices->getType()));
-      }
-      
+      // Clone the indices for the thunk.
+      assert(indices);
+      indices = indices->clone(context);
+      ValueElts.push_back(TuplePatternElt(indices));
+      ValueEltTys.push_back(TupleTypeElt(indices->getType()));
+
       // value
       setterArgs.push_back(TuplePattern::create(context, loc, ValueElts, loc));
       setterArgs.back()->setType(TupleType::get(ValueEltTys, context));
@@ -3521,10 +3492,9 @@ namespace {
       thunk->setInterfaceType(interfaceType);
       thunk->setAccessibility(Accessibility::Public);
 
-      if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
-        thunk->getAttrs().add(objcAttr->clone(context));
-      else
-        thunk->setIsObjC(true);
+      auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>();
+      assert(objcAttr);
+      thunk->getAttrs().add(objcAttr->clone(context));
 
       return thunk;
     }
