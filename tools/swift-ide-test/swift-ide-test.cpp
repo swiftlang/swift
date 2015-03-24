@@ -735,35 +735,45 @@ public:
   DumpAPIWalker() {}
 
   bool walkToDeclPre(Decl *D) override {
+    const bool exploreChildren = true;
+    const bool doneWithNode = false;
+
+    // Ignore implicit Decls and don't descend into them; they often
+    // have a bogus source range that collides with something we'll
+    // want to keep.
     if (D->isImplicit())
-      return false;
+      return doneWithNode;
 
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->getFormalAccess() != Accessibility::Public) {
-        for (const auto &Single : VD->getRawComment().Comments) {
-          CharSourceRangesToDelete.push_back(Single.Range);
-        }
+    const auto *VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      return exploreChildren; // Look for a nested ValueDecl.
 
-        VD->getAttrs().getAttrRanges(SourceRangesToDelete);
-
-        if (auto *Var = dyn_cast<VarDecl>(VD)) {
-          SourceRangesToDelete.push_back(
-              Var->getParentPatternBinding()->getSourceRange());
-          return false;
-        }
-        SourceRangesToDelete.push_back(VD->getSourceRange());
-        return false;
+    if (VD->getFormalAccess() == Accessibility::Public) {
+      // Delete the bodies of public function and subscript decls
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        SourceRangesToDelete.push_back(AFD->getBodySourceRange());
+        return doneWithNode;
+      } else if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+        SourceRangesToDelete.push_back(SD->getBracesRange());
+        return doneWithNode;
       }
+      return exploreChildren; // Handle nested decls.
     }
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      SourceRangesToDelete.push_back(AFD->getBodySourceRange());
-      return false;
+
+    // Delete entire non-public decls, including...
+    for (const auto &Single : VD->getRawComment().Comments)
+      CharSourceRangesToDelete.push_back(Single.Range); // attached comments
+
+    VD->getAttrs().getAttrRanges(SourceRangesToDelete); // and attributes
+
+    if (const auto *Var = dyn_cast<VarDecl>(VD)) {
+      // VarDecls extend through their entire parent PatternBinding.
+      SourceRangesToDelete.push_back(
+          Var->getParentPatternBinding()->getSourceRange());
+    } else {
+      SourceRangesToDelete.push_back(VD->getSourceRange());
     }
-    if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-      SourceRangesToDelete.push_back(SD->getBracesRange());
-      return false;
-    }
-    return true;
+    return doneWithNode;
   }
 };
 }
@@ -800,41 +810,37 @@ static int doDumpAPI(const CompilerInvocation &InitInvok,
   clang::RewriteBuffer RewriteBuf;
   RewriteBuf.Initialize(Input);
 
+  // Convert all the accumulated SourceRanges into CharSourceRanges
   auto &CharSourceRanges = Walker.CharSourceRangesToDelete;
   for (const auto &SR : Walker.SourceRangesToDelete) {
     auto End = Lexer::getLocForEndOfToken(SM, SR.End);
     CharSourceRanges.push_back(CharSourceRange(SM, SR.Start, End));
   }
 
+  // Drop any invalid ranges
   CharSourceRanges.erase(
       std::remove_if(CharSourceRanges.begin(), CharSourceRanges.end(),
                      [](const CharSourceRange CSR) { return !CSR.isValid(); }),
       CharSourceRanges.end());
 
+  // Sort them so we can easily handle overlaps; the SourceManager
+  // doesn't cope well with overlapping deletions.
   std::sort(CharSourceRanges.begin(), CharSourceRanges.end(),
             [&](CharSourceRange LHS, CharSourceRange RHS) {
               return SM.isBeforeInBuffer(LHS.getStart(), RHS.getStart());
             });
 
-  /*
-  for (const auto CR: CharSourceRanges) {
-    CR.dump(SM);
-    llvm::errs() << "\n";
-  }
-  */
-
+  // A little function that we can re-use to delete a CharSourceRange
   const auto Del = [&](CharSourceRange CR) {
-    // CR.dump(SM);
-    // llvm::errs() << "\n";
     const auto Start = SM.getLocOffsetInBuffer(CR.getStart(), BufID);
     const auto End = SM.getLocOffsetInBuffer(CR.getEnd(), BufID);
     RewriteBuf.RemoveText(Start, End - Start, true);
   };
 
+  // Accumulate all overlapping ranges, deleting the previous one when
+  // no overlap is detected.
   CharSourceRange Accumulator;
   for (const auto CR : CharSourceRanges) {
-    if (!CR.isValid())
-      continue;
     if (!Accumulator.isValid()) {
       Accumulator = CR;
     } else if (Accumulator.overlaps(CR)) {
@@ -844,9 +850,12 @@ static int doDumpAPI(const CompilerInvocation &InitInvok,
       Accumulator = CR;
     }
   }
+
+  // The last valid range still needs to be deleted.
   if (Accumulator.isValid())
     Del(Accumulator);
 
+  // Write the edited buffer to stdout
   RewriteBuf.write(llvm::outs());
 
   return 0;
