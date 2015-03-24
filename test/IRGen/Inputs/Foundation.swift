@@ -15,6 +15,6 @@ func _convertSetToNSSet<T: Hashable>(s: Set<T>) -> NSSet {
   return NSSet()
 }
 
-func _convertNSSetToSet<T: NSObject>(s: NSSet) -> Set<T> {
+func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
   return Set<T>()
 }

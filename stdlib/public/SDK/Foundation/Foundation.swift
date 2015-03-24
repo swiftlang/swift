@@ -442,9 +442,10 @@ extension NSArray : ArrayLiteralConvertible {
 /// to Objective-C code as a method that accepts an `NSArray`.  This operation
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
 @semantics("convertFromObjectiveC")
-public func _convertNSArrayToArray<T>(source: NSArray) -> [T] {
+public func _convertNSArrayToArray<T>(source: NSArray?) -> [T] {
+  if _slowPath(source == nil) { return [] }
   var result: [T]?
-  Array._forceBridgeFromObjectiveC(source, result: &result)
+  Array._forceBridgeFromObjectiveC(source!, result: &result)
   return result!
 }
 
@@ -563,12 +564,13 @@ extension Dictionary {
 /// deferred.
 @semantics("convertFromObjectiveC")
 public func _convertNSDictionaryToDictionary<
-    Key : Hashable, Value>(d: NSDictionary)
+    Key : Hashable, Value>(d: NSDictionary?)
     -> [Key : Value] {
   // Note: there should be *a good justification* for doing something else
   // than just dispatching to `_forceBridgeFromObjectiveC`.
+  if _slowPath(d == nil) { return [:] }
   var result: [Key : Value]?
-  Dictionary._forceBridgeFromObjectiveC(d, result: &result)
+  Dictionary._forceBridgeFromObjectiveC(d!, result: &result)
   return result!
 }
 
@@ -855,9 +857,10 @@ public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
 @semantics("convertFromObjectiveC")
-public func _convertNSSetToSet<T: Hashable>(s: NSSet) -> Set<T> {
+public func _convertNSSetToSet<T: Hashable>(s: NSSet?) -> Set<T> {
+  if _slowPath(s == nil) { return [] }
   var result: Set<T>?
-  Set._forceBridgeFromObjectiveC(s, result: &result)
+  Set._forceBridgeFromObjectiveC(s!, result: &result)
   return result!
 }
 

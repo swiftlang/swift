@@ -678,11 +678,20 @@ public:
                                               CanAnyFunctionType funcType,
                                               ArrayRef<CapturedValue> captures,
                                               AnyFunctionRef closure);
-  
+
+  /// Describes what we're trying to compute a bridged type for.
+  ///
+  /// \see getLoweredBridgedType
+  enum BridgedTypePurpose {
+    ForArgument,
+    ForResult
+  };
+
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.
   Type getLoweredBridgedType(Type t, AbstractCC cc,
-                             const clang::Type *clangTy);
+                             const clang::Type *clangTy,
+                             BridgedTypePurpose forResult);
 
   /// Convert a nested function type into an uncurried AST representation.
   CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
@@ -750,7 +759,8 @@ public:
                                              ForDefinition_t definition);
   
 private:
-  Type getLoweredCBridgedType(Type t, const clang::Type *clangTy);
+  Type getLoweredCBridgedType(Type t, const clang::Type *clangTy,
+                              bool bridgedCollectionsAreOptional);
 };
 
 inline const TypeLowering &

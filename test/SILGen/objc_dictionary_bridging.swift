@@ -10,8 +10,9 @@ import gizmo
   // CHECK-LABEL: sil hidden @_TToFC24objc_dictionary_bridging3Foo23bridge_Dictionary_param{{.*}} : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
   func bridge_Dictionary_param(dict: Dictionary<Foo, Foo>) {
     // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
-    // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
-    // CHECK-NEXT:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[NSDICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
+    // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned Optional<NSDictionary>) -> @owned Dictionary<τ_0_0, τ_0_1>
+    // CHECK-NEXT: [[OPT_NSDICT:%[0-9]+]] = enum $Optional<NSDictionary>, #Optional.Some!enumelt.1, [[NSDICT]] : $NSDictionary
+    // CHECK-NEXT:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[OPT_NSDICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned Optional<NSDictionary>) -> @owned Dictionary<τ_0_0, τ_0_1>
 
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foo23bridge_Dictionary_paramfS0_FGVSs10DictionaryS0_S0__T_ : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
     // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[DICT]], [[SELF]]) : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
@@ -45,8 +46,9 @@ import gizmo
   // Property setter
   // CHECK-LABEL: sil hidden [transparent] @_TToFC24objc_dictionary_bridging3Foos8propertyGVSs10DictionaryS0_S0__ : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
   // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
-// CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
-// CHECK:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[NSDICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
+// CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned Optional<NSDictionary>) -> @owned Dictionary<τ_0_0, τ_0_1>
+// CHECK: [[OPT_NSDICT:%[0-9]+]] = enum $Optional<NSDictionary>, #Optional.Some!enumelt.1, [[NSDICT]] : $NSDictionary
+// CHECK:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[OPT_NSDICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned Optional<NSDictionary>) -> @owned Dictionary<τ_0_0, τ_0_1>
 
 // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foos8propertyGVSs10DictionaryS0_S0__ : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
 // CHECK:   [[RESULT:%[0-9]+]] = apply [transparent] [[SETTER]]([[DICT]], [[SELF]]) : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()

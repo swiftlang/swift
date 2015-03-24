@@ -343,8 +343,9 @@ class Bas : NSObject {
   // CHECK: bb0([[NSARRAY:%[0-9]+]] : $NSArray, [[SELF:%[0-9]+]] : $Bas):
   // CHECK:   strong_retain [[NSARRAY]] : $NSArray
   // CHECK:   strong_retain [[SELF]] : $Bas
-  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray{{.*}} : $@thin <τ_0_0> (@owned NSArray) -> @owned Array<τ_0_0>
-  // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[NSARRAY]]) : $@thin <τ_0_0> (@owned NSArray) -> @owned Array<τ_0_0>
+  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray{{.*}} : $@thin <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
+  // CHECK-NEXT: [[OPT_NSARRAY:%[0-9]+]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[NSARRAY]] : $NSArray
+  // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]]) : $@thin <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@cc(method) @thin (@owned Array<AnyObject>, @owned Bas) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@cc(method) @thin (@owned Array<AnyObject>, @owned Bas) -> ()
   // CHECK:   return [[RESULT]] : $()

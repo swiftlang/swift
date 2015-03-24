@@ -1,5 +1,5 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-build-swift %s -import-objc-header %S/Inputs/Foundation_bridge.h -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
 // REQUIRES: objc_interop
@@ -169,6 +169,12 @@ class Foo: NSObject {
 
 // CHECK: Foo.foo()
 Foo().invoke()
+
+// <rdar://problem/19734621> Dealing with APIs that have been updated not to return nil in newer SDKs
+// CHECK: getNullable: nil
+println("getNullable: \(getNullable())")
+// CHECK: getNonnull: []
+println("getNonnull: \(getNonnull())")
 
 // CHECK: final
 println("final")

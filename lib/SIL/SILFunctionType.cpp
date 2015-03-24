@@ -1372,12 +1372,19 @@ static CanType getBridgedInputType(TypeConverter &tc,
 
       auto clangInputTy = getClangParamType(i);
 
-      CanType bridged =
-        tc.getLoweredBridgedType(elt.getType(), cc, clangInputTy)
-          ->getCanonicalType();
-      if (bridged != CanType(elt.getType())) {
+      Type bridged = tc.getLoweredBridgedType(elt.getType(), cc, clangInputTy,
+                                              TypeConverter::ForArgument);
+      if (!bridged) {
+        tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
+                                  elt.getType());
+
+        llvm::report_fatal_error("unable to set up the ObjC bridge!");
+      }
+
+      CanType canBridged = bridged->getCanonicalType();
+      if (canBridged != CanType(elt.getType())) {
         changed = true;
-        bridgedFields.push_back(elt.getWithType(bridged));
+        bridgedFields.push_back(elt.getWithType(canBridged));
       } else {
         bridgedFields.push_back(elt);
       }
@@ -1389,11 +1396,12 @@ static CanType getBridgedInputType(TypeConverter &tc,
   }
 
   auto clangInputTy = getClangParamType(0);
-  auto loweredBridgedType = tc.getLoweredBridgedType(input, cc, clangInputTy);
+  auto loweredBridgedType = tc.getLoweredBridgedType(input, cc, clangInputTy,
+                                                    TypeConverter::ForArgument);
 
   if (!loweredBridgedType) {
     tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
-                              input.getPointer()->getString());
+                              input);
 
     llvm::report_fatal_error("unable to set up the ObjC bridge!");
   }
@@ -1415,11 +1423,12 @@ static CanType getBridgedResultType(TypeConverter &tc,
     }
   }
 
-  auto loweredType = tc.getLoweredBridgedType(result, cc, clangResultTy);
+  auto loweredType = tc.getLoweredBridgedType(result, cc, clangResultTy,
+                                              TypeConverter::ForResult);
 
   if (!loweredType) {
     tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
-                              result.getPointer()->getString());
+                              result);
 
     llvm::report_fatal_error("unable to set up the ObjC bridge!");
   }

@@ -2230,7 +2230,8 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
 }
 
 Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc,
-                                          const clang::Type *clangTy) {
+                                          const clang::Type *clangTy,
+                                          BridgedTypePurpose purpose) {
   switch (cc) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
@@ -2243,19 +2244,20 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc,
 
     // Look through optional types.
     if (auto valueTy = t->getOptionalObjectType()) {
-      auto Ty = getLoweredCBridgedType(valueTy, clangTy);
+      auto Ty = getLoweredCBridgedType(valueTy, clangTy, false);
       return Ty ? OptionalType::get(Ty) : Ty;
     }
     if (auto valueTy = t->getImplicitlyUnwrappedOptionalObjectType()) {
-      auto Ty = getLoweredCBridgedType(valueTy, clangTy);
+      auto Ty = getLoweredCBridgedType(valueTy, clangTy, false);
       return Ty ? ImplicitlyUnwrappedOptionalType::get(Ty) : Ty;
     }
-    return getLoweredCBridgedType(t, clangTy);
+    return getLoweredCBridgedType(t, clangTy, purpose == ForResult);
   }
 };
 
 Type TypeConverter::getLoweredCBridgedType(Type t,
-                                           const clang::Type *clangTy) {
+                                           const clang::Type *clangTy,
+                                           bool bridgedCollectionsAreOptional) {
   // Bridge String back to NSString.
   auto nativeStringTy = getStringType();
   if (nativeStringTy && t->isEqual(nativeStringTy))
@@ -2308,21 +2310,30 @@ Type TypeConverter::getLoweredCBridgedType(Type t,
   // Array bridging.
   if (auto arrayDecl = Context.getArrayDecl()) {
     if (t->getAnyNominal() == arrayDecl) {
-      return getNSArrayType();
+      Type bridgedTy = getNSArrayType();
+      if (bridgedCollectionsAreOptional && clangTy)
+        bridgedTy = OptionalType::get(bridgedTy);
+      return bridgedTy;
     }
   }
 
   // Dictionary bridging.
   if (auto dictDecl = Context.getDictionaryDecl()) {
     if (t->getAnyNominal() == dictDecl) {
-      return getNSDictionaryType();
+      Type bridgedTy = getNSDictionaryType();
+      if (bridgedCollectionsAreOptional && clangTy)
+        bridgedTy = OptionalType::get(bridgedTy);
+      return bridgedTy;
     }
   }
 
   // Set bridging.
   if (auto setDecl = Context.getSetDecl()) {
     if (t->getAnyNominal() == setDecl) {
-      return getNSSetType();
+      Type bridgedTy = getNSSetType();
+      if (bridgedCollectionsAreOptional && clangTy)
+        bridgedTy = OptionalType::get(bridgedTy);
+      return bridgedTy;
     }
   }
 

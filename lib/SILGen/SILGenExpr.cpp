@@ -5852,131 +5852,55 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(str);
 }
 
-static ManagedValue emitBridgeArrayToNSArray(SILGenFunction &gen,
-                                             SILLocation loc,
-                                             ManagedValue arr) {
-  SILValue arrToNSArrFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getArrayToNSArrayFn());
+static ManagedValue emitBridgeCollectionFromNative(SILGenFunction &gen,
+                                                   SILLocation loc,
+                                                   SILDeclRef bridgeFnRef,
+                                                   ManagedValue collection,
+                                                   SILType bridgedTy) {
+  SILValue bridgeFn = gen.emitGlobalFunctionRef(loc, bridgeFnRef);
 
-  // Figure out the key and value types.
-  auto arrTy
-    = arr.getType().getSwiftRValueType()->castTo<BoundGenericType>();
-  auto subs = arrTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
-  auto substFnType
-    = arrToNSArrFn.getType().substGenericArgs(gen.SGM.M, subs);
-  SILValue nsarr = gen.B.createApply(loc, arrToNSArrFn,
-                                     substFnType,
-                                     gen.SGM.getLoweredType(
-                                       gen.SGM.Types.getNSArrayType()),
-                                     subs,
-                                     { arr.forward(gen) });
+  // Figure out the type parameters.
+  auto inputTy
+    = collection.getType().getSwiftRValueType()->castTo<BoundGenericType>();
+  auto subs = inputTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
+  auto substFnType = bridgeFn.getType().substGenericArgs(gen.SGM.M, subs);
+  SILValue bridged = gen.B.createApply(loc, bridgeFn,
+                                       substFnType,
+                                       bridgedTy,
+                                       subs,
+                                       { collection.forward(gen) });
 
-  return gen.emitManagedRValueWithCleanup(nsarr);
+  return gen.emitManagedRValueWithCleanup(bridged);
 }
 
-static ManagedValue emitBridgeNSArrayToArray(SILGenFunction &gen,
-                                             SILLocation loc,
-                                             ManagedValue nsarr,
-                                             SILType nativeTy) {
-  SILValue nsarrToArrFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSArrayToArrayFn());
+static ManagedValue emitBridgeCollectionToNative(SILGenFunction &gen,
+                                                 SILLocation loc,
+                                                 SILDeclRef bridgeFnRef,
+                                                 ManagedValue collection,
+                                                 SILType nativeTy) {
+  SILValue bridgeFn = gen.emitGlobalFunctionRef(loc, bridgeFnRef);
 
-  auto arrTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
-  auto subs = arrTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
-  auto substFnType
-    = nsarrToArrFn.getType().substGenericArgs(gen.SGM.M, subs);
+  auto collectionTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
+  auto subs = collectionTy->getSubstitutions(gen.SGM.M.getSwiftModule(),
+                                             nullptr);
+  auto substFnType = bridgeFn.getType().substGenericArgs(gen.SGM.M, subs);
 
-  SILValue arr = gen.B.createApply(loc, nsarrToArrFn,
+  Type inputType = collection.getType().getSwiftRValueType();
+  if (!inputType->getOptionalObjectType()) {
+    SILType loweredOptTy = gen.SGM.getLoweredType(OptionalType::get(inputType));
+    auto *someDecl = gen.getASTContext().getOptionalSomeDecl();
+    auto *enumInst = gen.B.createEnum(loc, collection.getValue(), someDecl,
+                                      loweredOptTy);
+    collection = ManagedValue(enumInst, collection.getCleanup());
+  }
+
+  SILValue arr = gen.B.createApply(loc, bridgeFn,
                                    substFnType,
                                    nativeTy,
                                    subs,
-                                   { nsarr.forward(gen) });
+                                   { collection.forward(gen) });
 
   return gen.emitManagedRValueWithCleanup(arr);
-}
-
-static ManagedValue emitBridgeDictionaryToNSDictionary(SILGenFunction &gen,
-                                                       SILLocation loc,
-                                                       ManagedValue dict) {
-  SILValue dictToNSDictFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getDictionaryToNSDictionaryFn());
-
-  // Figure out the key and value types.
-  auto dictTy
-    = dict.getType().getSwiftRValueType()->castTo<BoundGenericType>();
-  auto subs = dictTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
-  auto substFnType
-    = dictToNSDictFn.getType().substGenericArgs(gen.SGM.M, subs);
-  SILValue nsdict = gen.B.createApply(loc, dictToNSDictFn,
-                                      substFnType,
-                                      gen.SGM.getLoweredType(
-                                        gen.SGM.Types.getNSDictionaryType()),
-                                      subs,
-                                      { dict.forward(gen) });
-
-  return gen.emitManagedRValueWithCleanup(nsdict);
-}
-
-static ManagedValue emitBridgeNSDictionaryToDictionary(SILGenFunction &gen,
-                                                       SILLocation loc,
-                                                       ManagedValue nsdict,
-                                                       SILType nativeTy) {
-  SILValue nsdictToDictFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSDictionaryToDictionaryFn());
-
-  auto dictTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
-  auto subs = dictTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
-  auto substFnType
-    = nsdictToDictFn.getType().substGenericArgs(gen.SGM.M, subs);
-
-  SILValue dict = gen.B.createApply(loc, nsdictToDictFn,
-                                    substFnType,
-                                    nativeTy,
-                                    subs,
-                                    { nsdict.forward(gen) });
-
-  return gen.emitManagedRValueWithCleanup(dict);
-}
-
-static ManagedValue emitBridgeSetToNSSet(SILGenFunction &gen, SILLocation loc,
-                                         ManagedValue set) {
-  SILValue setToNSSetFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getSetToNSSetFn());
-
-  // Figure out the key and value types.
-  auto setTy = set.getType().getSwiftRValueType()->castTo<BoundGenericType>();
-  auto subs = setTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
-  auto substFnType
-    = setToNSSetFn.getType().substGenericArgs(gen.SGM.M, subs);
-  SILValue nsset = gen.B.createApply(loc, setToNSSetFn,
-                                     substFnType,
-                                     gen.SGM.getLoweredType(
-                                       gen.SGM.Types.getNSSetType()),
-                                     subs,
-                                     { set.forward(gen) });
-
-  return gen.emitManagedRValueWithCleanup(nsset);
-}
-
-static ManagedValue emitBridgeNSSetToSet(SILGenFunction &gen,
-                                         SILLocation loc,
-                                         ManagedValue nsset,
-                                         SILType nativeTy) {
-  SILValue nssetToSetFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSSetToSetFn());
-
-  auto setTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
-  auto subs = setTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
-  auto substFnType
-    = nssetToSetFn.getType().substGenericArgs(gen.SGM.M, subs);
-
-  SILValue set = gen.B.createApply(loc, nssetToSetFn,
-                                   substFnType,
-                                   nativeTy,
-                                   subs,
-                                   { nsset.forward(gen) });
-
-  return gen.emitManagedRValueWithCleanup(set);
 }
 
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
@@ -6136,21 +6060,24 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
   // Bridge Array to NSArray.
   if (auto arrayDecl = gen.getASTContext().getArrayDecl()) {
     if (v.getType().getSwiftRValueType().getAnyNominal() == arrayDecl) {
-      return emitBridgeArrayToNSArray(gen, loc, v);
+      SILDeclRef bridgeFn = gen.SGM.getArrayToNSArrayFn();
+      return emitBridgeCollectionFromNative(gen, loc, bridgeFn, v, bridgedTy);
     }
   }
 
   // Bridge Dictionary to NSDictionary.
   if (auto dictDecl = gen.getASTContext().getDictionaryDecl()) {
     if (v.getType().getSwiftRValueType().getAnyNominal() == dictDecl) {
-      return emitBridgeDictionaryToNSDictionary(gen, loc, v);
+      SILDeclRef bridgeFn = gen.SGM.getDictionaryToNSDictionaryFn();
+      return emitBridgeCollectionFromNative(gen, loc, bridgeFn, v, bridgedTy);
     }
   }
 
   // Bridge Set to NSSet.
   if (auto setDecl = gen.getASTContext().getSetDecl()) {
     if (v.getType().getSwiftRValueType().getAnyNominal() == setDecl) {
-      return emitBridgeSetToNSSet(gen, loc, v);
+      SILDeclRef bridgeFn = gen.SGM.getSetToNSSetFn();
+      return emitBridgeCollectionFromNative(gen, loc, bridgeFn, v, bridgedTy);
     }
   }
 
@@ -6221,21 +6148,24 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
   // Bridge NSArray to Array.
   if (auto arrayDecl = gen.getASTContext().getArrayDecl()) {
     if (nativeTy.getSwiftRValueType()->getAnyNominal() == arrayDecl) {
-      return emitBridgeNSArrayToArray(gen, loc, v, nativeTy);
+      SILDeclRef bridgeFn = gen.SGM.getNSArrayToArrayFn();
+      return emitBridgeCollectionToNative(gen, loc, bridgeFn, v, nativeTy);
     }
   }
 
   // Bridge NSDictionary to Dictionary.
   if (auto dictDecl = gen.getASTContext().getDictionaryDecl()) {
     if (nativeTy.getSwiftRValueType()->getAnyNominal() == dictDecl) {
-      return emitBridgeNSDictionaryToDictionary(gen, loc, v, nativeTy);
+      SILDeclRef bridgeFn = gen.SGM.getNSDictionaryToDictionaryFn();
+      return emitBridgeCollectionToNative(gen, loc, bridgeFn, v, nativeTy);
     }
   }
 
   // Bridge NSSet to Set.
   if (auto setDecl = gen.getASTContext().getSetDecl()) {
     if (nativeTy.getSwiftRValueType()->getAnyNominal() == setDecl) {
-      return emitBridgeNSSetToSet(gen, loc, v, nativeTy);
+      SILDeclRef bridgeFn = gen.SGM.getNSSetToSetFn();
+      return emitBridgeCollectionToNative(gen, loc, bridgeFn, v, nativeTy);
     }
   }
   

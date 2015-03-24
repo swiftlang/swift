@@ -66,13 +66,13 @@ SILGenModule::~SILGenModule() {
   M.verify();
 }
 
-static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
-                                 SILGenModule &SGM,
-                                 StringRef moduleName,
-                                 StringRef functionName,
-                                 std::initializer_list<SILType> inputTypes,
-                                 Optional<SILType> outputType,
-                                 bool trustInputTypes = false) {
+static SILDeclRef
+getBridgingFn(Optional<SILDeclRef> &cacheSlot,
+              SILGenModule &SGM,
+              StringRef moduleName,
+              StringRef functionName,
+              Optional<std::initializer_list<Type>> inputTypes,
+              Optional<Type> outputType) {
   // FIXME: the optionality of outputType and the presence of trustInputTypes
   // are hacks for cases where coming up with those types is complicated, i.e.,
   // when dealing with generic bridging functions.
@@ -114,11 +114,13 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     SILDeclRef c(fd);
     auto funcInfo = SGM.getConstantType(c).castTo<SILFunctionType>();
 
-    if (!trustInputTypes) {
-      if (funcInfo->getParameters().size() != inputTypes.size()
+    if (inputTypes) {
+      auto toSILType = [&SGM](Type ty) { return SGM.getLoweredType(ty); };
+      if (funcInfo->getParameters().size() != inputTypes->size()
           || !std::equal(funcInfo->getParameterSILTypes().begin(),
                          funcInfo->getParameterSILTypes().end(),
-                         inputTypes.begin())) {
+                         makeTransformIterator(inputTypes->begin(),
+                                               toSILType))) {
         SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                      moduleName, functionName);
         llvm::report_fatal_error("unable to set up the ObjC bridge!");
@@ -126,7 +128,7 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     }
 
     if (outputType &&
-        funcInfo->getResult().getSILType() != *outputType) {
+        funcInfo->getResult().getSILType() != SGM.getLoweredType(*outputType)){
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName, functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
@@ -143,102 +145,37 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
   return *cacheSlot;
 }
 
-static SILType getStringTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(SGM.Types.getStringType());
-}
+#define REQUIRED(X) { Types.get##X##Type() }
+#define OPTIONAL(X) { OptionalType::get(Types.get##X##Type()) }
+#define GENERIC(X) None
 
-static SILType getNSStringTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(SGM.Types.getNSStringType());
-}
-
-SILDeclRef SILGenModule::getNSStringToStringFn() {
-  return getBridgingFn(NSStringToStringFn, *this,
-                       FOUNDATION_MODULE_NAME, "_convertNSStringToString",
-                       {getNSStringTy(*this)},
-                       getStringTy(*this));
-}
-
-SILDeclRef SILGenModule::getStringToNSStringFn() {
-  return getBridgingFn(StringToNSStringFn, *this,
-                       FOUNDATION_MODULE_NAME, "_convertStringToNSString",
-                       {getStringTy(*this)},
-                       getNSStringTy(*this));
-}
-
-static SILType getNSArrayTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(SGM.Types.getNSArrayType());
-}
-
-SILDeclRef SILGenModule::getArrayToNSArrayFn() {
-  return getBridgingFn(ArrayToNSArrayFn, *this,
-                       FOUNDATION_MODULE_NAME,
-                       "_convertArrayToNSArray",
-                       { /* FIXME: Array<T> */},
-                       getNSArrayTy(*this),
-                       /*FIXME: trustInputTypes=*/true);
-}
-
-SILDeclRef SILGenModule::getNSArrayToArrayFn() {
-  return getBridgingFn(NSArrayToArrayFn, *this,
-                       FOUNDATION_MODULE_NAME,
-                       "_convertNSArrayToArray",
-                       { getNSArrayTy(*this) },
-                       None /*FIXME: Array<T>*/);
-}
-
-static SILType getNSDictionaryTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(SGM.Types.getNSDictionaryType());
-}
-
-SILDeclRef SILGenModule::getDictionaryToNSDictionaryFn() {
-  return getBridgingFn(DictionaryToNSDictionaryFn, *this,
-                       FOUNDATION_MODULE_NAME,
-                       "_convertDictionaryToNSDictionary",
-                       { /* FIXME: Dictionary<K, V> */},
-                       getNSDictionaryTy(*this),
-                       /*FIXME: trustInputTypes=*/true);
-}
-
-SILDeclRef SILGenModule::getNSDictionaryToDictionaryFn() {
-  return getBridgingFn(NSDictionaryToDictionaryFn, *this,
-                       FOUNDATION_MODULE_NAME,
-                       "_convertNSDictionaryToDictionary",
-                       { getNSDictionaryTy(*this) },
-                       None /*FIXME: Dictionary<K, V>*/);
-}
-
-static SILType getNSSetTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(SGM.Types.getNSSetType());
-}
-
-SILDeclRef SILGenModule::getSetToNSSetFn() {
-  return getBridgingFn(SetToNSSetFn, *this,
-                       FOUNDATION_MODULE_NAME,
-                       "_convertSetToNSSet",
-                       { /* FIXME: Set<T> */},
-                       getNSSetTy(*this),
-                       /*FIXME: trustInputTypes=*/true);
-}
-
-SILDeclRef SILGenModule::getNSSetToSetFn() {
-  return getBridgingFn(NSSetToSetFn, *this,
-                       FOUNDATION_MODULE_NAME,
-                       "_convertNSSetToSet",
-                       { getNSSetTy(*this) },
-                       None /*FIXME: Set<T>*/);
-}
-
-#define STANDARD_GET_BRIDGING_FN(Module, FromTy, ToTy) \
+#define GET_BRIDGING_FN(Module, FromKind, FromTy, ToKind, ToTy) \
   SILDeclRef SILGenModule::get##FromTy##To##ToTy##Fn() { \
     return getBridgingFn(FromTy##To##ToTy##Fn, *this, \
                          Module, "_convert" #FromTy "To" #ToTy, \
-                         {getLoweredType(Types.get##FromTy##Type())}, \
-                         getLoweredType(Types.get##ToTy##Type())); \
+                         FromKind(FromTy), \
+                         ToKind(ToTy)); \
   }
 
-STANDARD_GET_BRIDGING_FN(OBJC_MODULE_NAME, Bool, ObjCBool)
-STANDARD_GET_BRIDGING_FN(OBJC_MODULE_NAME, ObjCBool, Bool)
-#undef STANDARD_GET_BRIDGING_FN
+GET_BRIDGING_FN(OBJC_MODULE_NAME, REQUIRED, Bool, REQUIRED, ObjCBool)
+GET_BRIDGING_FN(OBJC_MODULE_NAME, REQUIRED, ObjCBool, REQUIRED, Bool)
+GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, REQUIRED, String, REQUIRED, NSString)
+GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, REQUIRED, NSString, REQUIRED, String)
+GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, GENERIC, Array, REQUIRED, NSArray)
+GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, OPTIONAL, NSArray, GENERIC, Array)
+GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, GENERIC, Set, REQUIRED, NSSet)
+GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, OPTIONAL, NSSet, GENERIC, Set)
+GET_BRIDGING_FN(FOUNDATION_MODULE_NAME,
+                GENERIC, Dictionary,
+                REQUIRED, NSDictionary)
+GET_BRIDGING_FN(FOUNDATION_MODULE_NAME,
+                OPTIONAL, NSDictionary,
+                GENERIC, Dictionary)
+
+#undef GET_BRIDGING_FN
+#undef REQURIED
+#undef OPTIONAL
+#undef GENERIC
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();

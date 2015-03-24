@@ -58,8 +58,8 @@ ERROR(invalid_sil_builtin,sil_gen,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
       (StringRef))
 ERROR(could_not_find_bridge_type,sil_gen,none,
-      "could not find Objective-C bridge type for type '%0'; "
-      "did you forget to import Foundation?", (StringRef))
+      "could not find Objective-C bridge type for type %0; "
+      "did you forget to import Foundation?", (Type))
 
 ERROR(writeback_overlap_property,sil_gen,none,
       "inout writeback to computed property %0 occurs in multiple arguments to"

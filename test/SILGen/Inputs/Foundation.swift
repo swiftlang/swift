@@ -10,7 +10,7 @@ func _convertStringToNSString(string: String) -> NSString
 func _convertNSStringToString(nsstring: NSString) -> String
 
 // NSArray bridging entry points
-func _convertNSArrayToArray<T>(nsarr: NSArray) -> [T] {
+func _convertNSArrayToArray<T>(nsarr: NSArray?) -> [T] {
   return [T]()
 }
 
@@ -26,7 +26,7 @@ func _convertDictionaryToNSDictionary<Key, Value>(
 }
 
 func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
-       d: NSDictionary
+       d: NSDictionary?
      ) -> Dictionary<K, V> {
   return Dictionary<K, V>()
 }
@@ -36,7 +36,7 @@ func _convertSetToNSSet<T: Hashable>(s: Set<T>) -> NSSet {
   return NSSet()
 }
 
-func _convertNSSetToSet<T: NSObject>(s: NSSet) -> Set<T> {
+func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
