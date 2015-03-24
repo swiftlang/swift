@@ -15,6 +15,8 @@
 // collection without the objc runtime.
 
 //===--- Definitions needed only while experimental -----------------------===//
+import Swift
+
 internal typealias _ContiguousArrayStorageBase = AnyObject
 extension _InitializeTo { init() {} }
 extension _CopyToNativeArrayBuffer { init() {} }
@@ -56,11 +58,12 @@ public class _AnyGeneratorBase {}
 public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
-  override public init() {
+  public init(file: StaticString = __FILE__, line: UWord = __LINE__) {
     super.init()
     _debugPrecondition(
       _typeID(self) != unsafeBitCast(AnyGenerator.self, ObjectIdentifier.self),
-      "AnyGenerator<T> instances can not be created; create a subclass instance instead."
+      "AnyGenerator<T> instances can not be created; create a subclass instance instead.",
+      file: file, line: line
     )
   }
   

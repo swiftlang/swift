@@ -11,9 +11,6 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
-// XFAIL: *
-// rdar://20260634
-
 import SwiftExperimental
 import StdlibUnittest
 

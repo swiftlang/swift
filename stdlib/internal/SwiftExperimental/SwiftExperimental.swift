@@ -15,6 +15,7 @@
 // removal.  We don't guarantee API or ABI stability for this library.
 //
 //===----------------------------------------------------------------------===//
+import Swift
 
 /// The function composition operator is the only user-defined operator that
 /// operates on functions.  That's why the numeric value of precedence does

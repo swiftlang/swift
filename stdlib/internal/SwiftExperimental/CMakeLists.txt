@@ -8,6 +8,6 @@ add_swift_library(swiftSwiftExperimental SHARED IS_STDLIB
   IntegerParsing.swift.gyb
   Mirror.swift
 
-  SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
+  SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all -parse-stdlib
   INSTALL_IN_COMPONENT stdlib-experimental)
 
