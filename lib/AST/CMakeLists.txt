@@ -40,13 +40,13 @@ add_swift_library(swiftAST
 
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
+    clangCodeGen
     clangIndex
     clangFormat
     clangToolingCore
     clangFrontendTool
     clangFrontend
     clangDriver
-    clangCodeGen
     clangSerialization
     clangParse
     clangSema
