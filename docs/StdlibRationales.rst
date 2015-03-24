@@ -43,9 +43,9 @@ Type Conversions
 ----------------
 
 The canonical way to convert from an instance `x` of type ``T`` to
-type ``U`` is ``U(x)``, a precedent set by ``Int(someUInt32)``.
+type ``U`` is ``U(x)``, a precedent set by ``Int(value: UInt32)``.
 Conversions that can fail should use failable initializers,
-e.g. ``String(32)``, yielding a ``String?``. When other forms provide
+e.g. ``Int(text: String)``, yielding a ``Int?``. When other forms provide
 added convenience, they may be provided as well. For example::
 
   String.Index(s.utf16.startIndex.successor(), within: s) // canonical
