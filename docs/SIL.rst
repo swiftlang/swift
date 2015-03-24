@@ -2364,7 +2364,7 @@ It is undefined behavior if the class value is null and the method is
 not an Objective-C method.
 
 witness_method
-````````````````
+``````````````
 ::
 
   sil-instruction ::= 'witness_method' sil-method-attributes?
