@@ -1864,7 +1864,18 @@ static const ValueWitnessTable *
 getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
                              unsigned numWitnessTables,
                              SpecialProtocol special) {
-  // TODO: Use special representation for special protocols.
+  // Use special representation for special protocols.
+  switch (special) {
+  case SpecialProtocol::ErrorType:
+    // ErrorType always has a single-ObjC-refcounted representation.
+    // TODO: Without ObjC interop, could be native-refcounted.
+    return &_TWVBO;
+    
+  // Other existentials use standard representation.
+  case SpecialProtocol::AnyObject:
+  case SpecialProtocol::None:
+    break;
+  }
   
   switch (classConstraint) {
   case ProtocolClassConstraint::Class:

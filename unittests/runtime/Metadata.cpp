@@ -467,6 +467,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(1U, special->Flags.getNumWitnessTables());
       EXPECT_EQ(SpecialProtocol::ErrorType,
                 special->Flags.getSpecialProtocol());
+      EXPECT_EQ(&_TWVBO,
+                special->getValueWitnesses());
       return special;
     });
 
@@ -479,6 +481,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       // Compositions of special protocols aren't special.
       EXPECT_EQ(SpecialProtocol::None,
                 special->Flags.getSpecialProtocol());
+      EXPECT_NE(&_TWVBO,
+                special->getValueWitnesses());
       return special;
     });
 }
