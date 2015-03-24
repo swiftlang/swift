@@ -108,6 +108,7 @@ struct SimpleValue {
     case ValueKind::SelectValueInst:
     case ValueKind::RefToBridgeObjectInst:
     case ValueKind::BridgeObjectToRefInst:
+    case ValueKind::BridgeObjectToWordInst:
     case ValueKind::ThinFunctionToPointerInst:
     case ValueKind::PointerToThinFunctionInst:
         return true;
@@ -144,6 +145,10 @@ public:
     return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
 
+  hash_code visitBridgeObjectToWordInst(BridgeObjectToWordInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
+  }
+  
   hash_code visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(

@@ -934,6 +934,19 @@ bb0(%0 : $Builtin.BridgeObject):
   return %3 : $()
 }
 
+// CHECK-LABEL:   sil @cse_bridge_object_to_word
+// CHECK:           [[REF:%[0-9]+]] = bridge_object_to_word
+// CHECK-NOT:       bridge_object_to_word
+// CHECK:           tuple ([[REF]] : $Builtin.Word, [[REF]] : $Builtin.Word)
+// CHECK-NEXT:      return
+sil @cse_bridge_object_to_word : $@thin (Builtin.BridgeObject) -> (Builtin.Word, Builtin.Word) {
+bb0(%0 : $Builtin.BridgeObject):
+  %1 = bridge_object_to_word %0 : $Builtin.BridgeObject to $Builtin.Word
+  %2 = bridge_object_to_word %0 : $Builtin.BridgeObject to $Builtin.Word
+  %3 = tuple (%1 : $Builtin.Word, %2 : $Builtin.Word)
+  return %3 : $(Builtin.Word, Builtin.Word)
+}
+
 // CHECK-LABEL: sil @cse_ref_to_bridge_object
 // CHECK: ref_to_bridge_object
 // CHECK-NOT: ref_to_bridge_object
