@@ -898,7 +898,8 @@ StringTests.test("lowercaseString") {
 
   // Check the ASCII domain.
   let asciiDomain: [Int32] = Array(0..<128)
-  expectEqualFunctionsForDomain(asciiDomain,
+  expectEqualFunctionsForDomain(
+    asciiDomain,
     { String(UnicodeScalar(Int(tolower($0)))) },
     { String(UnicodeScalar(Int($0))).lowercaseString })
 
@@ -931,7 +932,8 @@ StringTests.test("uppercaseString") {
 
   // Check the ASCII domain.
   let asciiDomain: [Int32] = Array(0..<128)
-  expectEqualFunctionsForDomain(asciiDomain,
+  expectEqualFunctionsForDomain(
+    asciiDomain,
     { String(UnicodeScalar(Int(toupper($0)))) },
     { String(UnicodeScalar(Int($0))).uppercaseString })
 
@@ -976,25 +978,48 @@ StringTests.test("unicodeViews") {
 
   // slices
   // It is 4 bytes long, so it should return a replacement character.
-  expectEqual("\u{FFFD}", toString(winter.utf8[winter.utf8.startIndex ..<
-    winter.utf8.startIndex.successor().successor()]))
-  expectEqual("\u{1F3C2}", toString(winter.utf8[winter.utf8.startIndex ..<
-    advance(winter.utf8.startIndex, 4)]))
+  expectEqual(
+    "\u{FFFD}", toString(
+      winter.utf8[
+        winter.utf8.startIndex..< winter.utf8.startIndex.successor().successor()
+      ]))
+  
+  expectEqual(
+    "\u{1F3C2}", toString(
+      winter.utf8[winter.utf8.startIndex..<advance(winter.utf8.startIndex, 4)]))
 
-  expectEqual("\u{1F3C2}", toString(winter.utf16[winter.utf16.startIndex ..<
-    advance(winter.utf16.startIndex, 2)]))
-  expectEqual("\u{1F3C2}", toString(winter.unicodeScalars[
-    winter.unicodeScalars.startIndex ..<
-    winter.unicodeScalars.startIndex.successor()]))
+  expectEqual(
+    "\u{1F3C2}", toString(
+      winter.utf16[
+        winter.utf16.startIndex..<advance(winter.utf16.startIndex, 2)
+      ]))
+  
+  expectEqual(
+    "\u{1F3C2}", toString(
+      winter.unicodeScalars[
+        winter.unicodeScalars.startIndex
+        ..< winter.unicodeScalars.startIndex.successor()
+      ]))
 
   // views
-  expectEqual(winter, toString(winter.utf8[winter.utf8.startIndex ..<
-    advance(winter.utf8.startIndex, 7)]))
-  expectEqual(winter, toString(winter.utf16[winter.utf16.startIndex ..<
-    advance(winter.utf16.startIndex, 3)]))
-  expectEqual(winter, toString(
-    winter.unicodeScalars[winter.unicodeScalars.startIndex ..<
-    advance(winter.unicodeScalars.startIndex, 2)]))
+  expectEqual(
+    winter, toString(
+      winter.utf8[
+        winter.utf8.startIndex..<advance(winter.utf8.startIndex, 7)
+      ]))
+  
+  expectEqual(
+    winter, toString(
+      winter.utf16[
+        winter.utf16.startIndex..<advance(winter.utf16.startIndex, 3)
+      ]))
+  
+  expectEqual(
+    winter, toString(
+      winter.unicodeScalars[
+        winter.unicodeScalars.startIndex
+        ..< advance(winter.unicodeScalars.startIndex, 2)
+      ]))
 
   let ga = "\u{304b}\u{3099}"
   expectEqual(ga, toString(ga.utf8[ga.utf8.startIndex ..<
