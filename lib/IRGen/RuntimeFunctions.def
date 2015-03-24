@@ -795,11 +795,24 @@ FUNCTION(BlockRelease, _Block_release, C_CC,
          ARGS(ObjCBlockPtrTy),
          ATTRS(NoUnwind))
 
-void swift_reportMissingMethod();
+// void swift_reportMissingMethod();
 FUNCTION(DeadMethodError, swift_reportMissingMethod, C_CC,
         RETURNS(VoidTy),
         ARGS(),
         ATTRS(NoUnwind))
+
+FUNCTION(AllocError, swift_allocError, C_CC,
+         RETURNS(ErrorPtrTy, OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(DeallocError, swift_deallocError, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy, Int8PtrPtrTy, OpenedErrorTriplePtrTy),
+         ATTRS(NoUnwind))
 
 #undef RETURNS
 #undef ARGS

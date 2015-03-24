@@ -626,15 +626,9 @@ public:
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
   
-  void visitAllocExistentialBoxInst(AllocExistentialBoxInst *i) {
-    llvm_unreachable("tbw");
-  }
-  void visitOpenExistentialBoxInst(OpenExistentialBoxInst *i) {
-    llvm_unreachable("tbw");
-  }
-  void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *i) {
-    llvm_unreachable("tbw");
-  }
+  void visitAllocExistentialBoxInst(AllocExistentialBoxInst *i);
+  void visitOpenExistentialBoxInst(OpenExistentialBoxInst *i);
+  void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *i);
   
   void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
@@ -3807,6 +3801,35 @@ void IRGenSILFunction::visitInitBlockStorageHeaderInst(
   Explosion e;
   e.add(asBlock);
   setLoweredExplosion(SILValue(i, 0), e);
+}
+
+void IRGenSILFunction::visitAllocExistentialBoxInst(AllocExistentialBoxInst *i){
+  Explosion box;
+  auto projectionAddr =
+    emitBoxedExistentialContainerAllocation(*this, box, i->getExistentialType(),
+                                            i->getFormalConcreteType(),
+                                            i->getLoweredConcreteType(),
+                                            i->getConformances());
+  setLoweredExplosion(i->getExistentialResult(), box);
+  setLoweredAddress(i->getValueAddressResult(), projectionAddr);
+}
+
+void IRGenSILFunction::visitDeallocExistentialBoxInst(
+                                                DeallocExistentialBoxInst *i) {
+  Explosion box = getLoweredExplosion(i->getOperand());
+  emitBoxedExistentialContainerDeallocation(*this, box,
+                                            i->getOperand().getType(),
+                                            i->getConcreteType());
+}
+
+void IRGenSILFunction::visitOpenExistentialBoxInst(OpenExistentialBoxInst *i) {
+  Explosion box = getLoweredExplosion(i->getOperand());
+  auto openedArchetype = cast<ArchetypeType>(i->getType().getSwiftRValueType());
+
+  auto addr = emitBoxedExistentialProjection(*this, box,
+                                             i->getOperand().getType(),
+                                             openedArchetype);
+  setLoweredAddress(SILValue(i,0), addr);
 }
 
 void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {

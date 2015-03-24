@@ -56,6 +56,7 @@ namespace irgen {
                                         SILType metatypeType,
                                  ArrayRef<ProtocolConformance*> conformances);
   
+  
   /// Emit a class existential container from a class instance value
   /// as an explosion.
   void emitClassExistentialContainer(IRGenFunction &IGF,
@@ -66,11 +67,27 @@ namespace irgen {
                                  SILType instanceLoweredType,
                                  ArrayRef<ProtocolConformance*> conformances);
 
+  /// Allocate a boxed existential container with uninitialized space to hold a
+  /// value of a given type.
+  Address emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
+                                  Explosion &dest,
+                                  SILType destType,
+                                  CanType formalSrcType,
+                                  SILType loweredSrcType,
+                                  ArrayRef<ProtocolConformance *> conformances);
+  
   /// "Deinitialize" an existential container whose contained value is allocated
   /// but uninitialized, by deallocating the buffer owned by the container if any.
   void emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
                                             Address container,
                                             SILType type);
+  
+  /// Deallocate a boxed existential container with uninitialized space to hold
+  /// a value of a given type.
+  void emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
+                                                 Explosion &container,
+                                                 SILType containerType,
+                                                 CanType valueType);
   
   /// Emit a projection from an existential container address to the address
   /// of its concrete value buffer.
@@ -100,6 +117,13 @@ namespace irgen {
                                                  SILType baseTy,
                                                  CanType openedTy);
 
+  /// Project the address of the value inside a boxed existential container,
+  /// and open an archetype to its contained type.
+  Address emitBoxedExistentialProjection(IRGenFunction &IGF,
+                                         Explosion &base,
+                                         SILType baseTy,
+                                         CanArchetypeType openedArchetype);
+  
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
   void emitWitnessMethodValue(IRGenFunction &IGF,

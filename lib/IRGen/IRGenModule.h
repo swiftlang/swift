@@ -307,9 +307,6 @@ public:
   llvm::PointerType *WeakReferencePtrTy;/// %swift.weak_reference*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
-  // TODO: For default implementations this needs to be a triple:
-  // { i8*, %swift.type*, %witness.table* }
-  llvm::StructType *WitnessFunctionPairTy;    /// { i8*, %swift.type* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
@@ -336,6 +333,10 @@ public:
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
   llvm::StructType *ProtocolConformanceRecordTy;
   llvm::PointerType *ProtocolConformanceRecordPtrTy;
+  llvm::PointerType *ErrorPtrTy;       /// %swift.error*
+  llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
+  llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
+  
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 
   /// Get the bit width of an integer type for the target platform.

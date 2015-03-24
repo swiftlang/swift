@@ -3474,13 +3474,78 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // direct, lazily initialized, or runtime instantiated template.
 }
 
-static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
-                                                 llvm::StructType *type,
-                                        ArrayRef<ProtocolDecl*> protocols) {
-  assert(type->isOpaque() && "creating existential type in concrete struct");
+namespace {
 
+/// Type info for error existentials, currently the only kind of boxed
+/// existential.
+class ErrorExistentialTypeInfo : public HeapTypeInfo<ErrorExistentialTypeInfo>
+{
+  ProtocolEntry ErrorProtocolEntry;
+public:
+  ErrorExistentialTypeInfo(llvm::PointerType *storage,
+                           Size size, SpareBitVector spareBits,
+                           Alignment align,
+                           const ProtocolEntry &errorProtocolEntry)
+    : HeapTypeInfo(storage, size, spareBits, align),
+      ErrorProtocolEntry(errorProtocolEntry) {}
+
+  ReferenceCounting getReferenceCounting() const {
+    // TODO: If there's no ObjC interop, the error box can be Swift-refcounted.
+    return ReferenceCounting::ObjC;
+  }
+  
+  ArrayRef<ProtocolEntry> getStoredProtocols() const {
+    return ErrorProtocolEntry;
+  }
+};
+  
+} // end anonymous namespace
+
+static const TypeInfo *createErrorExistentialTypeInfo(IRGenModule &IGM,
+                                            ArrayRef<ProtocolDecl*> protocols) {
+  // The ErrorType existential has a special boxed representation. It has space
+  // only for witnesses to the ErrorType protocol.
+  assert(protocols.size() == 1
+     && *protocols[0]->getKnownProtocolKind() == KnownProtocolKind::_ErrorType);
+  
+  const ProtocolInfo &impl = IGM.getProtocolInfo(protocols[0]);
+  
+  return new ErrorExistentialTypeInfo(IGM.ErrorPtrTy,
+                                      IGM.getPointerSize(),
+                                      IGM.getHeapObjectSpareBits(),
+                                      IGM.getPointerAlignment(),
+                                      ProtocolEntry(protocols[0], impl));
+}
+
+static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
+                                            TypeBase *T,
+                                            ArrayRef<ProtocolDecl*> protocols) {
   SmallVector<llvm::Type*, 5> fields;
   SmallVector<ProtocolEntry, 4> entries;
+
+  // Check for special existentials.
+  if (protocols.size() == 1) {
+    switch (getSpecialProtocolID(protocols[0])) {
+    case SpecialProtocol::ErrorType:
+      // ErrorType has a special runtime representation.
+      return createErrorExistentialTypeInfo(IGM, protocols);
+    // Other existentials have standard representations.
+    case SpecialProtocol::AnyObject:
+    case SpecialProtocol::None:
+      break;
+    }
+  }
+
+  llvm::StructType *type;
+  if (auto *protoT = T->getAs<ProtocolType>())
+    type = IGM.createNominalType(protoT->getDecl());
+  else if (auto *compT = T->getAs<ProtocolCompositionType>())
+    // Protocol composition types are not nominal, but we name them anyway.
+    type = IGM.createNominalType(compT);
+  else
+    llvm_unreachable("unknown existential type kind");
+    
+  assert(type->isOpaque() && "creating existential type in concrete struct");
 
   // In an opaque metadata, the first two fields are the fixed buffer
   // followed by the metadata reference.  In a class metadata, the
@@ -3557,20 +3622,16 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
 
 const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
   // Protocol types are nominal.
-  llvm::StructType *type = IGM.createNominalType(T->getDecl());
-  return createExistentialTypeInfo(IGM, type, T->getDecl());
+  return createExistentialTypeInfo(IGM, T, T->getDecl());
 }
 
 const TypeInfo *
 TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
-  // Protocol composition types are not nominal, but we name them anyway.
-  llvm::StructType *type = IGM.createNominalType(T);
-
   // Find the canonical protocols.  There might not be any.
   SmallVector<ProtocolDecl*, 4> protocols;
   T->getAnyExistentialTypeProtocols(protocols);
 
-  return createExistentialTypeInfo(IGM, type, protocols);
+  return createExistentialTypeInfo(IGM, T, protocols);
 }
 
 const TypeInfo *
@@ -4959,6 +5020,104 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
                                          protocols[i], witnessConformances[i]);
     body(i, table);
   }
+}
+
+#ifndef NDEBUG
+static bool _isErrorType(SILType baseTy) {
+  llvm::SmallVector<ProtocolDecl*, 1> protos;
+  return baseTy.getSwiftRValueType()->isExistentialType(protos)
+    && protos.size() == 1
+    && protos[0]->getKnownProtocolKind()
+    && *protos[0]->getKnownProtocolKind() == KnownProtocolKind::_ErrorType;
+}
+#endif
+
+/// Project the address of the value inside a boxed existential container,
+/// and open an archetype to its contained type.
+Address irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
+                                              Explosion &base,
+                                              SILType baseTy,
+                                              CanArchetypeType openedArchetype){
+  // TODO: Non-ErrorType boxed existentials.
+  assert(_isErrorType(baseTy));
+  
+  // Get the reference to the existential box.
+  llvm::Value *box = base.claimNext();
+  // Allocate scratch space to invoke the runtime.
+  Address scratch = IGF.createAlloca(IGF.IGM.Int8PtrTy,
+                                     IGF.IGM.getPointerAlignment(),
+                                     "project_error_scratch");
+  Address out = IGF.createAlloca(IGF.IGM.OpenedErrorTripleTy,
+                                 IGF.IGM.getPointerAlignment(),
+                                 "project_error_out");
+  
+  IGF.Builder.CreateCall3(IGF.IGM.getGetErrorValueFn(), box,
+                          scratch.getAddress(),
+                          out.getAddress());
+  // Load the 'out' values.
+  auto &openedTI = IGF.getTypeInfoForLowered(openedArchetype);
+  auto projectedPtrAddr = IGF.Builder.CreateStructGEP(out, 0, Size(0));
+  auto projectedPtr = IGF.Builder.CreateLoad(projectedPtrAddr);
+  auto projected = openedTI.getAddressForPointer(projectedPtr);
+  
+  auto metadataAddr = IGF.Builder.CreateStructGEP(out, 1,
+                                                  IGF.IGM.getPointerSize());
+  auto metadata = IGF.Builder.CreateLoad(metadataAddr);
+  auto witnessAddr = IGF.Builder.CreateStructGEP(out, 2,
+                                                 2 * IGF.IGM.getPointerSize());
+  auto witness = IGF.Builder.CreateLoad(witnessAddr);
+  
+  IGF.bindArchetype(openedArchetype, metadata, witness);
+  
+  return projected;
+}
+
+/// Allocate a boxed existential container with uninitialized space to hold a
+/// value of a given type.
+Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
+                                  Explosion &dest,
+                                  SILType destType,
+                                  CanType formalSrcType,
+                                  SILType loweredSrcType,
+                                  ArrayRef<ProtocolConformance *> conformances){
+  // TODO: Non-ErrorType boxed existentials.
+  assert(_isErrorType(destType));
+
+  auto &destTI = IGF.getTypeInfo(destType).as<ErrorExistentialTypeInfo>();
+  auto &srcTI = IGF.getTypeInfo(loweredSrcType);
+  
+  auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
+  // Should only be one conformance, for the _ErrorType protocol.
+  assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
+  const ProtocolEntry &entry = destTI.getStoredProtocols()[0];
+  auto witness = getProtocolWitnessTable(IGF, formalSrcType, srcTI,
+                                         entry, conformances[0]);
+  
+  // Call the runtime to allocate the box.
+  auto result = IGF.Builder.CreateCall2(IGF.IGM.getAllocErrorFn(),
+                                        srcMetadata, witness);
+  
+  // Extract the box and value address from the result.
+  auto box = IGF.Builder.CreateExtractValue(result, 0);
+  auto addr = IGF.Builder.CreateExtractValue(result, 1);
+  dest.add(box);
+  
+  return srcTI.getAddressForPointer(addr);
+}
+
+/// Deallocate a boxed existential container with uninitialized space to hold a
+/// value of a given type.
+void irgen::emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
+                                                      Explosion &container,
+                                                      SILType containerType,
+                                                      CanType valueType) {
+  // TODO: Non-ErrorType boxed existentials.
+  assert(_isErrorType(containerType));
+
+  auto box = container.claimNext();
+  auto srcMetadata = IGF.emitTypeMetadataRef(valueType);
+  
+  IGF.Builder.CreateCall2(IGF.IGM.getDeallocErrorFn(), box, srcMetadata);
 }
 
 /// "Deinitialize" an existential container whose contained value is allocated

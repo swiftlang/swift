@@ -211,11 +211,6 @@ IRGenModule::IRGenModule(ASTContext &Context,
     RefCountedPtrTy,
   });
   
-  WitnessFunctionPairTy = createStructType(*this, "swift.witness_function",  {
-    FunctionPtrTy,
-    TypeMetadataPtrTy,
-  });
-  
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
 
@@ -269,6 +264,20 @@ IRGenModule::IRGenModule(ASTContext &Context,
                     // point too.
   };
   ObjCBlockStructTy->setBody(objcBlockElts);
+  
+  auto ErrorStructTy = llvm::StructType::create(LLVMContext, "swift.error");
+  // ErrorStruct is currently opaque to the compiler.
+  ErrorPtrTy = ErrorStructTy->getPointerTo(DefaultAS);
+  
+  llvm::Type *openedErrorTriple[] = {
+    OpaquePtrTy,
+    TypeMetadataPtrTy,
+    WitnessTablePtrTy,
+  };
+  OpenedErrorTripleTy = llvm::StructType::get(getLLVMContext(),
+                                              openedErrorTriple,
+                                              /*packed*/ false);
+  OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
   
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
