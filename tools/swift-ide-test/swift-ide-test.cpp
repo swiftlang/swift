@@ -754,51 +754,7 @@ public:
         SourceRangesToDelete.push_back(VD->getSourceRange());
         return false;
       }
-    }mate commit 3ff16dc84ff9b48d7673dbbc6c224c9c92640346
-  Author: Jordan Rose <jordan_rose@apple.com>
-  Date:   Mon Mar 23 17:18:51 2015
-
-    [CMake] Reference LLVM components using COMPONENT_DEPENDS, not LINK_LIBRARIES.
-
-    Fixes the Xcode build with LLVM RelWithDebInfo / Swift Debug.
-
-    diff --git a/lib/AST/CMakeLists.txt b/lib/AST/CMakeLists.txt
-    index 295f7d2..71fd59d 100644
-    --- a/lib/AST/CMakeLists.txt
-    +++ b/lib/AST/CMakeLists.txt
-    @@ -40,7 +40,6 @@ add_swift_library(swiftAST
-
-# Clang dependencies.
-# FIXME: Clang should really export these in some reasonable manner.
-                                        -    LLVMDebugInfoDWARF
-                                        clangIndex
-                                        clangFormat
-                                        clangToolingCore
-                                        @@ -61,7 +60,7 @@ add_swift_library(swiftAST
-                                                                            clangBasic
-
-                                                                            COMPONENT_DEPENDS
-                                                                            -    bitreader bitwriter irreader
-                                                                            +    bitreader bitwriter irreader debuginfoDWARF
-                                                                            profiledata instrumentation object objcarcopts mc mcparser
-                                                                            bitreader bitwriter ipo option core support ${LLVM_TARGETS_TO_BUILD}
-                                                                            )
-                                        diff --git a/lib/ClangImporter/CMakeLists.txt b/lib/ClangImporter/CMakeLists.txt
-                                        index 228e3ee..524b2ea 100644
-                                        --- a/lib/ClangImporter/CMakeLists.txt
-                                        +++ b/lib/ClangImporter/CMakeLists.txt
-                                        @@ -16,8 +16,8 @@ add_swift_library(swiftClangImporter
-                                                                            ImportType.cpp
-                                                                            LINK_LIBRARIES
-                                                                            swiftAST
-                                                                            -    # Clang dependencies.
-                                                                            -    LLVMDebugInfoDWARF
-                                                                            +  COMPONENT_DEPENDS
-                                                                            +    debuginfoDWARF
-                                                                            )
-                                        
-                                        
-
+    }
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       SourceRangesToDelete.push_back(AFD->getBodySourceRange());
       return false;
