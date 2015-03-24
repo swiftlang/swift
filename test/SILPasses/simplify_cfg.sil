@@ -592,6 +592,7 @@ bb5:
 // CHECK: return
 sil @dominator_based_simplify_condbr : $@thin (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
+  %l1 = integer_literal $Builtin.Int1, -1
   cond_br %0, bb1, bb4
 
 bb1:
@@ -606,7 +607,9 @@ bb3:
   br bb7(%2 : $Builtin.Int64)
 
 bb4:
-  cond_br %0, bb5, bb6
+  // expect-intrinsics should be transparent for checking the condition.
+  %x1 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %l1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %x1, bb5, bb6
 
 bb5:
   %3 = integer_literal $Builtin.Int64, 3

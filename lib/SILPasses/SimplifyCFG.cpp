@@ -459,6 +459,14 @@ static void simplifyCondBranchInst(CondBranchInst *BI, bool BranchTaken) {
   BI->eraseFromParent();
 }
 
+static SILValue skipExpect(SILValue V) {
+  if (auto *BI = dyn_cast<BuiltinInst>(V)) {
+    if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
+      return BI->getArguments()[0];
+  }
+  return V;
+}
+
 /// Returns true if C1, C2 represent equivalent conditions in the
 /// sense that each is eventually based on the same value.
 static bool areEquivalentConditions(SILValue C1, SILValue C2) {
@@ -468,7 +476,8 @@ static bool areEquivalentConditions(SILValue C1, SILValue C2) {
   if (auto *SEI = dyn_cast<SelectEnumInst>(C2))
     C2 = SEI->getEnumOperand().stripCasts();
 
-  return C1 == C2;
+  // Expect-intrinsics have no effect, so we can see through them.
+  return skipExpect(C1) == skipExpect(C2);
 }
 
 static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
