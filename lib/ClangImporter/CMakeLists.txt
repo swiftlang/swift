@@ -16,8 +16,8 @@ add_swift_library(swiftClangImporter
   ImportType.cpp
   LINK_LIBRARIES
     swiftAST
-    # Clang dependencies.
-    LLVMDebugInfoDWARF
+  COMPONENT_DEPENDS
+    debuginfoDWARF
 )
 
 

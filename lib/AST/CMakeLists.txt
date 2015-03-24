@@ -40,7 +40,6 @@ add_swift_library(swiftAST
 
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
-    LLVMDebugInfoDWARF
     clangIndex
     clangFormat
     clangToolingCore
@@ -61,7 +60,7 @@ add_swift_library(swiftAST
     clangBasic
 
   COMPONENT_DEPENDS
-    bitreader bitwriter irreader
+    bitreader bitwriter irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter ipo option core support ${LLVM_TARGETS_TO_BUILD}
   )
