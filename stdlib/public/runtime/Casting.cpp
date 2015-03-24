@@ -463,7 +463,7 @@ static bool _conformsToProtocol(const OpaqueValue *value,
                                 const WitnessTable **conformance) {
   // Handle AnyObject directly.
   // FIXME: strcmp here is horribly slow.
-  if (strcmp(protocol->Name, "_TtPSs9AnyObject_") == 0) {
+  if (protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject) {
     switch (type->getKind()) {
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
