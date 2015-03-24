@@ -438,9 +438,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                Tok.getText(), AttrName);
       return false;
     }
-    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
     consumeToken(tok::identifier);
-
+    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
