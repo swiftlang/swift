@@ -1788,29 +1788,6 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
   }
 }
 
-/// Check temporary limitations on generic extension deserialization.
-static bool checkGenericExtensionLimitations(TypeChecker &TC, const Decl *D) {
-  // Don't allow public declarations within an extension of a generic type
-  // that occurs in a different module from the generic type definition itself.
-  // FIXME: Artificial limitation because we cannot deserialize such extensions
-  // safely. The "Foundation" module carefully avoids the bugs here in a way
-  // that is not easily checked or communicated to users, so give it a pass.
-  auto DC = D->getDeclContext();
-  if (isa<ExtensionDecl>(DC) && isa<ValueDecl>(D) &&
-      cast<ValueDecl>(D)->getFormalAccess() == Accessibility::Public &&
-      DC->getDeclaredInterfaceType()->is<BoundGenericType>() &&
-      DC->getParentModule()
-        != DC->getDeclaredInterfaceType()->getAnyNominal()->getModuleContext()&&
-      !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isAccessor()) &&
-      DC->getParentModule()->Name.str() != FOUNDATION_MODULE_NAME) {
-    TC.diagnose(D, diag::unsupported_generic_extension,
-                DC->getDeclaredInterfaceType());
-    return true;
-  }
-
-  return false;
-}
-
 /// Checks the given declaration's accessibility to make sure it is valid given
 /// the way it is defined.
 ///
@@ -1818,8 +1795,6 @@ static bool checkGenericExtensionLimitations(TypeChecker &TC, const Decl *D) {
 static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   if (D->isInvalid() || D->isImplicit())
     return;
-
-  checkGenericExtensionLimitations(TC, D);
 
   switch (D->getKind()) {
   case DeclKind::Import:
@@ -1890,8 +1865,6 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       });
       if (!anyVar)
         return;
-
-      checkGenericExtensionLimitations(TC, anyVar);
 
       checkTypeAccessibility(TC, TP->getTypeLoc(), anyVar,
                              [&](Accessibility typeAccess,
