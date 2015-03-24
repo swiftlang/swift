@@ -237,21 +237,7 @@ void SourceLoc::dump(const SourceManager &SM) const {
 
 void SourceRange::print(raw_ostream &OS, const SourceManager &SM,
                         unsigned &LastBufferID, bool PrintText) const {
-  OS << '[';
-  Start.print(OS, SM, LastBufferID);
-  OS << " - ";
-  End.print(OS, SM, LastBufferID);
-  OS << ']';
-  
-  if (Start.isInvalid() || End.isInvalid())
-    return;
-  
-  if (PrintText) {
-    OS << " RangeText=\""
-       << StringRef(Start.Value.getPointer(),
-                    End.Value.getPointer() - Start.Value.getPointer()+1)
-       << '"';
-  }
+  CharSourceRange(SM, *this).print(OS, SM, LastBufferID, PrintText);
 }
 
 void SourceRange::dump(const SourceManager &SM) const {
@@ -267,3 +253,25 @@ CharSourceRange::CharSourceRange(const SourceManager &SM, SourceLoc Start,
     ByteLength = SM.getByteDistance(Start, End);
 }
 
+void CharSourceRange::print(raw_ostream &OS, const SourceManager &SM,
+                            unsigned &LastBufferID, bool PrintText) const {
+  OS << '[';
+  Start.print(OS, SM, LastBufferID);
+  OS << " - ";
+  getEnd().print(OS, SM, LastBufferID);
+  OS << ']';
+
+  if (Start.isInvalid() || getEnd().isInvalid())
+    return;
+
+  if (PrintText) {
+    OS << " RangeText=\""
+       << StringRef(Start.Value.getPointer(),
+                    getEnd().Value.getPointer() - Start.Value.getPointer() + 1)
+       << '"';
+  }
+}
+
+void CharSourceRange::dump(const SourceManager &SM) const {
+  print(llvm::errs(), SM);
+}

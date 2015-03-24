@@ -125,6 +125,11 @@ public:
   /// specified character locations.
   CharSourceRange(const SourceManager &SM, SourceLoc Start, SourceLoc End);
 
+  /// \brief Constructs a character range corresponding to a given
+  /// token range.
+  CharSourceRange(const SourceManager &SM, SourceRange Range)
+      : CharSourceRange(SM, Range.Start, Range.End) {}
+
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return Start.isInvalid(); }
 
@@ -150,11 +155,44 @@ public:
      less_equal(Other.getEnd().Value.getPointer(), getEnd().Value.getPointer());
   }
 
+  /// \brief expands *this to cover Other
+  void widen(CharSourceRange Other) {
+    auto Diff = Other.getEnd().Value.getPointer() - getEnd().Value.getPointer();
+    if (Diff > 0) {
+      ByteLength += Diff;
+    }
+    const auto MyStartPtr = getStart().Value.getPointer();
+    Diff = MyStartPtr - Other.getStart().Value.getPointer();
+    if (Diff > 0) {
+      ByteLength += Diff;
+      Start = SourceLoc(llvm::SMLoc::getFromPointer(MyStartPtr - Diff));
+    }
+  }
+
+  bool overlaps(CharSourceRange Other) const {
+    return contains(Other.getStart()) || contains(Other.getEnd());
+  }
+
   /// \brief Return the length of this valid range in bytes.  Can be zero.
   unsigned getByteLength() const {
     assert(isValid() && "length does not make sense for an invalid range");
     return ByteLength;
   }
+  
+  /// Print out the CharSourceRange.  If the locations are in the same buffer
+  /// as specified by LastBufferID, then we don't print the filename.  If not,
+  /// we do print the filename, and then update LastBufferID with the BufferID
+  /// printed.
+  void print(raw_ostream &OS, const SourceManager &SM,
+             unsigned &LastBufferID, bool PrintText = true) const;
+
+  void print(raw_ostream &OS, const SourceManager &SM,
+             bool PrintText = true) const {
+    unsigned Tmp = ~0U;
+    print(OS, SM, Tmp, PrintText);
+  }
+  
+  void dump(const SourceManager &SM) const;
 };
 
 } // end namespace swift
