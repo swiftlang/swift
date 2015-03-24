@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if _runtime(_ObjC)
+// FIXME: Various casting issues will have to be fixed to support this
+// collection without the objc runtime.
+
 //===--- Definitions needed only while experimental -----------------------===//
 internal typealias _ContiguousArrayStorageBase = AnyObject
 extension _InitializeTo { init() {} }
@@ -119,11 +123,9 @@ internal final class _GeneratorBox<
   override func next() -> Base.Element? { return base.next() }
   var base: Base
 }
-
 internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
   return ObjectIdentifier(instance.dynamicType)
 }
-
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
@@ -591,3 +593,4 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
 }
 % end
 
+#endif

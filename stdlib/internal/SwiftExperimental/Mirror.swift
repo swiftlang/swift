@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if _runtime(_ObjC)
+// FIXME: ExistentialCollection needs to be supported before this will work
+// without the ObjC Runtime.
+
 /// Representation of the sub-structure and optional "schema" of any
 /// arbitrary instance.
 ///
@@ -368,3 +372,4 @@ extension DictionaryLiteral : CollectionType {
     return IndexingGenerator(self)
   }
 }
+#endif
