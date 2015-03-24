@@ -10,6 +10,8 @@
 
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
+#pragma clang assume_nonnull begin
+
 typedef struct objc_object { void *isa; } *id;
 
 typedef struct _NSZone NSZone;
@@ -45,11 +47,11 @@ typedef double NSTimeInterval;
 #define NS_DICTIONARY(...) NSDictionary<__VA_ARGS__> *
 @interface NSDictionary<KeyType : id<NSCopying>, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
 @property (readonly) NSUInteger count;
-- (ObjectType)objectForKey:(KeyType)aKey;
+- (nullable ObjectType)objectForKey:(KeyType)aKey;
 - (NSEnumerator *)keyEnumerator;
 @end
 @interface NSDictionary<KeyType, ObjectType> (NSExtendedDictionary)
-- (ObjectType)objectForKeyedSubscript:(KeyType)key;
+- (nullable ObjectType)objectForKeyedSubscript:(KeyType)key;
 @end
 
 @interface NSDictionary (Inits)
@@ -135,3 +137,6 @@ typedef NS_ENUM(NSUInteger, NSRuncingMode) {
   NSRuncingMince,
   NSRuncingQuince
 };
+
+#pragma clang assume_nonnull end
+

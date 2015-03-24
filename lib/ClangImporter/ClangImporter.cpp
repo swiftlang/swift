@@ -249,6 +249,9 @@ ClangImporter::create(ASTContext &ctx,
       // Avoid including the iso646.h header because some headers from OS X
       // frameworks are broken by it.
       "-D_ISO646_H_", "-D__ISO646_H",
+
+      // Request new APIs from Foundation.
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=2",
     };
     invocationArgStrs.insert(invocationArgStrs.end(), extraArgs.begin(),
                              extraArgs.end());

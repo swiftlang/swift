@@ -26,7 +26,7 @@ class Target : NSString {
     super.init()
   }
 
-  required init(coder aDecoder: NSCoder) {
+  required init?(coder aDecoder: NSCoder) {
     self.swiftValue = Guts()
     self.objcValue = ""
     super.init(coder: aDecoder)

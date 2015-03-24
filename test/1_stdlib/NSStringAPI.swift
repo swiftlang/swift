@@ -473,17 +473,34 @@ NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
   let s = "え\u{304b}\u{3099}お\u{263a}\u{fe0f}😀😊"
   let startIndex = advance(s.startIndex, 1)
   let endIndex = advance(s.startIndex, 5)
-  var substrings: [String] = []
-  s.enumerateSubstringsInRange(startIndex..<endIndex,
+  if true {
+    var substrings: [String] = []
+    s.enumerateSubstringsInRange(startIndex..<endIndex,
       options: NSStringEnumerationOptions.ByComposedCharacterSequences) {
-    (substring: String, substringRange: Range<String.Index>,
-     enclosingRange: Range<String.Index>, inout stop: Bool)
-  in
-    substrings.append(substring)
-    expectEqual(substring, s[substringRange])
-    expectEqual(substring, s[enclosingRange])
+      (substring: String?, substringRange: Range<String.Index>,
+       enclosingRange: Range<String.Index>, inout stop: Bool)
+    in
+      substrings.append(substring!)
+      expectEqual(substring, s[substringRange])
+      expectEqual(substring, s[enclosingRange])
+    }
+    expectEqual([ "\u{304b}\u{3099}", "お", "☺️", "😀" ], substrings)
   }
-  expectEqual([ "\u{304b}\u{3099}", "お", "☺️", "😀" ], substrings)
+  if true {
+    var substrings: [String] = []
+    s.enumerateSubstringsInRange(startIndex..<endIndex,
+      options: NSStringEnumerationOptions.ByComposedCharacterSequences
+        | NSStringEnumerationOptions.SubstringNotRequired) {
+      (substring_: String?, substringRange: Range<String.Index>,
+       enclosingRange: Range<String.Index>, inout stop: Bool)
+    in
+      expectEmpty(substring_)
+      let substring = s[substringRange]
+      substrings.append(substring)
+      expectEqual(substring, s[enclosingRange])
+    }
+    expectEqual([ "\u{304b}\u{3099}", "お", "☺️", "😀" ], substrings)
+  }
 }
 
 NSStringAPIs.test("fastestEncoding") {

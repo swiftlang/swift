@@ -717,9 +717,11 @@ final public class NSFastGenerator : GeneratorType {
 
   public init(_ enumerable: NSFastEnumeration) {
     self.enumerable = enumerable
-    self.state = [NSFastEnumerationState](count: 1, repeatedValue: NSFastEnumerationState())
-    self.state[0].state = 0
-    self.objects = [ObjectsBuffer](count: 1, repeatedValue: ObjectsBuffer())
+    self.state = [ NSFastEnumerationState(
+      state: 0, itemsPtr: nil,
+      mutationsPtr: _fastEnumerationStorageMutationsPtr,
+      extra: (0, 0, 0, 0, 0)) ]
+    self.objects = [ ObjectsBuffer() ]
     self.n = -1
     self.count = -1
   }

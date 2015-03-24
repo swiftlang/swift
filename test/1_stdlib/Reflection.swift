@@ -267,7 +267,7 @@ println("ObjC quick look objects:")
 // CHECK-LABEL: NSURL:
 // CHECK-NEXT:    file:///Volumes/
 println("NSURL:")
-dump(NSURL(fileURLWithPath: "/Volumes", isDirectory: true)!)
+dump(NSURL(fileURLWithPath: "/Volumes", isDirectory: true))
 
 // -- Check that quick look Cocoa objects get binned correctly to their
 //    associated enum tag.

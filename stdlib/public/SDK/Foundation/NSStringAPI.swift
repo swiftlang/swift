@@ -525,10 +525,10 @@ extension String {
   /// Enumerates all the lines in a string.
   public func enumerateLines(body: (line: String, inout stop: Bool)->()) {
     _ns.enumerateLinesUsingBlock {
-      (line: String?, stop: UnsafeMutablePointer<ObjCBool>)
+      (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
       var stop_ = false
-      body(line: line!, stop: &stop_)
+      body(line: line, stop: &stop_)
       if stop_ {
         UnsafeMutablePointer<ObjCBool>(stop).memory = true
       }
@@ -588,7 +588,7 @@ extension String {
     range: Range<Index>,
     options opts:NSStringEnumerationOptions,
     _ body: (
-      substring: String, substringRange: Range<Index>,
+      substring: String?, substringRange: Range<Index>,
       enclosingRange: Range<Index>, inout Bool
     )->()
   ) {
@@ -1046,7 +1046,7 @@ extension String {
   /// Returns an array of NSString objects containing, in
   /// order, each path component of the `String`.
   public var pathComponents: [String] {
-    return _ns.pathComponents as! [String]
+    return _ns.pathComponents
   }
 
   // @property NSString* pathExtension;

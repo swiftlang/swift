@@ -1,8 +1,10 @@
 #import "ObjectiveC.h"
 
+#pragma clang assume_nonnull begin
+
 @interface NSString : NSObject<NSCopying>
 
-- (NSString*)uppercaseString;
+- (__null_unspecified NSString*)uppercaseString;
 - (id) copyWithZone: (void*)zone;
 
 @end
@@ -24,8 +26,8 @@
 
 @interface Foo : NSObject
 
-- (NSString*) foo;
-- (void) setFoo: (NSString*)s;
+- (__null_unspecified NSString*) foo;
+- (void) setFoo: (__null_unspecified NSString*)s;
 
 - (BOOL) zim;
 - (void) setZim: (BOOL)b;
@@ -37,10 +39,10 @@
 
 @end
 
-NSString *bar(void);
-void setBar(NSString *s);
+__null_unspecified NSString *bar(void);
+void setBar(__null_unspecified NSString *s);
 
-NSString *NSStringFromString(NSString *s);
+__null_unspecified NSString *NSStringFromString(__null_unspecified NSString *s);
 NSString *NSStringFromClass(Class c);
 
 #define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
@@ -52,3 +54,6 @@ _Bool getBool(void);
 
 void useBOOL(BOOL x);
 void useBool(_Bool x);
+
+#pragma clang assume_nonnull end
+

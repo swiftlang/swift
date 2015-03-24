@@ -30,7 +30,7 @@ var _fastEnumerationStorageMutationsTarget: CUnsignedLong = 0
 
 /// A dummy pointer to be used as `mutationsPtr` in fast enumeration
 /// implementations.
-public // @testable
+public // SPI(Foundation)
 var _fastEnumerationStorageMutationsPtr: UnsafeMutablePointer<CUnsignedLong> {
   return UnsafeMutablePointer(
       Builtin.addressof(&_fastEnumerationStorageMutationsTarget))

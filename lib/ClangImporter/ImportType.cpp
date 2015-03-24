@@ -1146,16 +1146,20 @@ Type ClangImporter::Implementation::importFunctionType(
     }
 
     // Check nullability of the parameter.
-    OptionalTypeKind OptionalityOfParam;
-    if (!nonNullArgs.empty() && nonNullArgs[index]) {
+    OptionalTypeKind OptionalityOfParam = OTK_ImplicitlyUnwrappedOptional;
+
+    // If the parameter type has explicit nullability, it takes precedence.
+    if (param->getType()->getNullability(param->getASTContext())) {
+      OptionalityOfParam = OTK_None;
+    } else if (!nonNullArgs.empty() && nonNullArgs[index]) {
+      // Fall back to API notes.
       OptionalityOfParam = OTK_None;
     } else if (param->hasAttr<clang::NonNullAttr>()) {
       OptionalityOfParam = OTK_None;
     } else if (knownFn) {
+      // Fall back to API notes.
       OptionalityOfParam = translateNullability(
                              knownFn->getParamTypeInfo(index));
-    } else {
-      OptionalityOfParam = OTK_ImplicitlyUnwrappedOptional;
     }
 
     // Import the parameter type into Swift.
@@ -1318,16 +1322,29 @@ Type ClangImporter::Implementation::importMethodType(
       continue;
     }
 
+    if (kind == SpecialMethodKind::NSDictionarySubscriptGetter)
+      nonNullArgs.empty();
+
     // Import the parameter type into Swift.
+
+    // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam = OTK_ImplicitlyUnwrappedOptional;
-    if (!nonNullArgs.empty() && nonNullArgs[index]) {
+
+    // If the parameter type has explicit nullability, it takes precedence.
+    if (param->getType()->getNullability(param->getASTContext())) {
+      optionalityOfParam = OTK_None;
+    } else if (!nonNullArgs.empty() && nonNullArgs[index]) {
+      // Fall back to API notes.
       optionalityOfParam = OTK_None;
     } else if (param->hasAttr<clang::NonNullAttr>()) {
       optionalityOfParam = OTK_None;
     } else if (knownMethod) {
+      // Fall back to API notes.
       optionalityOfParam =
         translateNullability(knownMethod->getParamTypeInfo(index));
-    } else if (index == 0 && clangDecl->isPropertyAccessor()) {
+    }
+
+    if (index == 0 && clangDecl->isPropertyAccessor()) {
       // If we have the parameter for a setter for a property that has
       // nullability, strip the outer nullability off the parameter
       // type: we want the property's nullability here.

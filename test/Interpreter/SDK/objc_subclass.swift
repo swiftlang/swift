@@ -14,7 +14,7 @@ class SuperString : NSString {
     self.len = len
   }
 
-  required init(coder aDecoder: NSCoder) {
+  required init?(coder aDecoder: NSCoder) {
     super.init(coder: aDecoder)
   }
 
@@ -110,13 +110,13 @@ class MyNSData : NSData {
     println("MyNSData code should not be executed")
   }
 
-  required init(coder: NSCoder) {
+  required init?(coder: NSCoder) {
     super.init(coder: coder)
   }
 }
 
 // CHECK-NOT: should not be executed
-if let myNSData = MyNSData(base64EncodedString:"\n\n\n") {
+if let myNSData? = MyNSData(base64EncodedString:"\n\n\n") {
   println("NSData came back non-nil?")
 } else {
   // CHECK: nil MyNSData as expected

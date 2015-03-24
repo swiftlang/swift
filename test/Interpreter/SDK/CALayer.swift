@@ -35,7 +35,7 @@ class FooLayer: CALayer {
     hangCanary(self)
   }
 
-  required init(coder: NSCoder) {
+  required init?(coder: NSCoder) {
     black = coder.decodeObjectForKey("black") as! CGColor
     super.init(coder: coder)
   }

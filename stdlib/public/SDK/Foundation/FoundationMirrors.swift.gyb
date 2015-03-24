@@ -41,7 +41,7 @@ ${getMirrorDecl("NSURL")} {
     _preconditionFailure("MirrorType access out of bounds")
   }
   
-  var summary: String { get { return _value.absoluteString! } }
+  var summary: String { get { return _value.absoluteString } }
   
   var quickLookObject: QuickLookObject? { return .Some(.URL(summary)) }
 }

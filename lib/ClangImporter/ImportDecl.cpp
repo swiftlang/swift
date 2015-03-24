@@ -3379,16 +3379,10 @@ namespace {
     /// indicates that we're generating a getter thunk for a property getter.
     ///
     /// \returns The getter thunk.
-    FuncDecl *buildGetterThunk(const FuncDecl *getter, DeclContext *dc,
-                               Pattern *indices) {
+    FuncDecl *buildGetterThunk(const FuncDecl *getter, Type elementTy,
+                               DeclContext *dc, Pattern *indices) {
       auto &context = Impl.SwiftContext;
       auto loc = getter->getLoc();
-
-      // Figure out the element type, by looking through 'self' and the normal
-      // parameters.
-      auto elementTy
-        = getter->getType()->castTo<AnyFunctionType>()->getResult()
-            ->castTo<AnyFunctionType>()->getResult();
 
       // Form the argument patterns.
       SmallVector<Pattern *, 3> getterArgs;
@@ -3429,7 +3423,7 @@ namespace {
 
       // Create the getter thunk.
       auto thunk = FuncDecl::create(
-          context, SourceLoc(), StaticSpellingKind::None, getter->getLoc(),
+          context, SourceLoc(), StaticSpellingKind::None, loc,
           Identifier(), SourceLoc(), nullptr, getterType, getterArgs,
           TypeLoc::withoutLoc(elementTy), dc);
       thunk->setBodyResultType(elementTy);
@@ -3455,8 +3449,8 @@ namespace {
     /// indicates that we're generating a setter thunk for a property setter.
     ///
     /// \returns The getter thunk.
-    FuncDecl *buildSetterThunk(const FuncDecl *setter, DeclContext *dc,
-                               Pattern *indices) {
+    FuncDecl *buildSetterThunk(const FuncDecl *setter, Type elementTy,
+                               DeclContext *dc, Pattern *indices) {
       auto &context = Impl.SwiftContext;
       auto loc = setter->getLoc();
       auto tuple = cast<TuplePattern>(setter->getBodyParamPatterns()[1]);
@@ -3480,8 +3474,12 @@ namespace {
       
       SmallVector<TuplePatternElt, 2> ValueElts;
       SmallVector<TupleTypeElt, 2> ValueEltTys;
-      
-      auto valuePattern = tuple->getFields()[0].getPattern()->clone(context);
+
+      auto paramVarDecl = new (context) ParamDecl(
+          /*isLet=*/false, SourceLoc(), Identifier(), loc,
+          tuple->getFields()[0].getPattern()->getSingleVar()->getName(),
+          elementTy, dc);
+      auto valuePattern = createTypedNamedPattern(paramVarDecl);
       ValueElts.push_back(TuplePatternElt(valuePattern));
       ValueEltTys.push_back(TupleTypeElt(valuePattern->getType()));
       
@@ -3707,8 +3705,22 @@ namespace {
         // returns.
         // FIXME: Adjust C++ references?
         auto setterElementTy = tuple->getFields()[0].getPattern()->getType();
-        if (!elementTy->isEqual(setterElementTy))
-          return nullptr;
+        if (!elementTy->isEqual(setterElementTy)) {
+          auto nonOptionalElementTy = elementTy->getAnyOptionalObjectType();
+          if (nonOptionalElementTy.isNull())
+            nonOptionalElementTy = elementTy;
+
+          auto nonOptionalSetterElementTy =
+              setterElementTy->getAnyOptionalObjectType();
+          if (nonOptionalSetterElementTy.isNull())
+            nonOptionalSetterElementTy = setterElementTy;
+
+          if (!nonOptionalElementTy->isEqual(nonOptionalSetterElementTy))
+            return nullptr;
+
+          elementTy =
+              ImplicitlyUnwrappedOptionalType::get(nonOptionalElementTy);
+        }
 
         setterIndices = tuple->getFields()[1].getPattern();
 
@@ -3725,9 +3737,9 @@ namespace {
         }
       }
 
-      getterThunk = buildGetterThunk(getter, dc, getterIndices);
+      getterThunk = buildGetterThunk(getter, elementTy, dc, getterIndices);
       if (setter)
-        setterThunk = buildSetterThunk(setter, dc, setterIndices);
+        setterThunk = buildSetterThunk(setter, elementTy, dc, setterIndices);
 
       // Build the subscript declaration.
       auto bodyPatterns =

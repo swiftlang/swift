@@ -19,3 +19,13 @@ func testNSDictionaryBridging(hive: Hive) {
 func testNSSetBridging(hive: Hive) {
   let relatedHives: Set<Bee>= hive.allBees
 }
+
+public func expectType<T>(_: T.Type, inout x: T) {}
+
+func testNSMutableDictionarySubscript(
+  dict: NSMutableDictionary, key: NSCopying, value: AnyObject) {
+  var oldValue = dict[key]
+  expectType(ImplicitlyUnwrappedOptional<AnyObject>.self, &oldValue)
+
+  dict[key] = value
+}
