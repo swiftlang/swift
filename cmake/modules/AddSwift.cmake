@@ -1149,8 +1149,8 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_OSX
 #   Swift modules this library depends on when built for OS X.
 #
-# SWIFT_MODULE_DEPENDS_IOS
-#   Swift modules this library depends on when built for iOS-like platforms.
+# SWIFT_MODULE_DEPENDS_IOS_TVOS
+#   Swift modules this library depends on when built for iOS or tvOS.
 #
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
@@ -1201,7 +1201,7 @@ function(add_swift_library name)
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY
       API_NOTES_NON_OVERLAY)
   parse_arguments(SWIFTLIB
-    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INSTALL_IN_COMPONENT"
+    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS_TVOS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INSTALL_IN_COMPONENT"
       "${SWIFTLIB_options}"
       ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
@@ -1277,9 +1277,9 @@ function(add_swift_library name)
         if("${sdk}" STREQUAL "OSX")
           list(APPEND swiftlib_module_depends_flattened
               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OSX})
-        elseif("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR")
+        elseif("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR" OR "${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
-              ${SWIFTLIB_SWIFT_MODULE_DEPENDS_IOS})
+              ${SWIFTLIB_SWIFT_MODULE_DEPENDS_IOS_TVOS})
         endif()
 
         set(swiftlib_module_dependency_targets)
