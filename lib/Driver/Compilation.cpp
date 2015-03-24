@@ -107,6 +107,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   SmallPtrSet<const Job *, 16> DeferredCommands;
   SmallVector<const Job *, 16> InitialOutOfDateCommands;
   auto MinPreviousBuildTime = llvm::sys::TimeValue::MaxTime();
+  unsigned InitialBlockingCount = State.BlockingCommands.size();
 
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
@@ -357,7 +358,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   };
 
   if (Result == 0) {
-    assert(State.BlockingCommands.empty() &&
+    assert(State.BlockingCommands.size() == InitialBlockingCount &&
            "some blocking commands never finished properly");
   } else {
     // Make sure we record any files that still need to be rebuilt.
