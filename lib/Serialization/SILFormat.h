@@ -172,14 +172,12 @@ namespace sil_block {
 
   using WitnessTableLayout = BCRecordLayout<
     SIL_WITNESSTABLE,
-    DeclIDField,         // Conforming Type, for reference purposes.
     SILLinkageField,     // Linkage
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
-    BCFixed<1>,          // IsFragile.
-    DeclIDField,         // ID of protocol decl
-    ModuleIDField        // module containing conformance
+    BCFixed<1>           // IsFragile.
+    // Conformance follows
     // Witness table entries will be serialized after.
   >;
 
@@ -191,18 +189,14 @@ namespace sil_block {
 
   using WitnessBaseEntryLayout = BCRecordLayout<
     SIL_WITNESS_BASE_ENTRY,
-    DeclIDField,  // ID of protocol decl
-    TypeIDField,  // ID of conforming type
-    ModuleIDField // ID of the module where the conformance lives
-    // Trailed by the conformance itself if appropriate.
+    DeclIDField  // ID of protocol decl
+    // Trailed by the conformance itself.
   >;
 
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
-    DeclIDField,  // ID of AssociatedTypeDecl
-    DeclIDField,  // ID of ProtocolDecl
-    DeclIDField,  // ID of conformance's type
-    ModuleIDField // ID of the module where the conformance lives
+    DeclIDField, // ID of AssociatedTypeDecl
+    DeclIDField  // ID of ProtocolDecl
     // Trailed by the conformance itself if appropriate.
   >;
 
@@ -279,9 +273,8 @@ namespace sil_block {
     ValueIDField,         // operand id
     SILValueResultField,  // operand result id
     TypeIDField,          // formal concrete type
-    BCArray<DeclIDField>  // triplets of protocol-type-module, used to identify
-                          // a referenced protocol conformance
-    // Trailed by inline protocol conformance info (if any)
+    BCVBR<5>              // # of protocol conformances
+    // Trailed by protocol conformance info (if any)
   >;
 
   // SIL Cast instructions with a cast kind, one type and one typed valueref.
@@ -364,9 +357,6 @@ namespace sil_block {
     BCFixed<1>,            // volatile?
     TypeIDField,           // lookup type
     SILTypeCategoryField,
-    DeclIDField,           // conformance proto
-    TypeIDField,           // conformance type
-    ModuleIDField,         // conformance module
     TypeIDField,           // Optional
     SILTypeCategoryField,  // opened
     ValueIDField,          // existential

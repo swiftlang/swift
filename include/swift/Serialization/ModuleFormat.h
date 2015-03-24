@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 183; // Last change: extension generic reqs
+const uint16_t VERSION_MINOR = 184; // Last change: normal conformance table
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -67,6 +67,11 @@ using IdentifierIDField = DeclIDField;
 // DeclContextID must be the same as DeclID because it is stored in the same way.
 using DeclContextID = DeclID;
 using DeclContextIDField = DeclIDField;
+
+// NormalConformanceID must be the same as DeclID because it is stored
+// in the same way.
+using NormalConformanceID = DeclID;
+using NormalConformanceIDField = DeclIDField;
 
 // ModuleID must be the same as IdentifierID because it is stored the same way.
 using ModuleID = IdentifierID;
@@ -627,11 +632,9 @@ namespace decls_block {
   using BoundGenericSubstitutionLayout = BCRecordLayout<
     BOUND_GENERIC_SUBSTITUTION,
     TypeIDField, // archetype
-    TypeIDField, // replacement
-    BCArray<DeclIDField> // alternating conforming type and conformance module
-                         // using the same format as the decl/module fields in
-                         // SpecializedProtocolConformanceLayout.
-    // Trailed by inline protocol conformance info (if any)
+    TypeIDField,  // replacement
+    BCVBR<5>
+    // Trailed by protocol conformance info (if any)
   >;
 
   using PolymorphicFunctionTypeLayout = BCRecordLayout<
@@ -1068,8 +1071,7 @@ namespace decls_block {
   /// A placeholder for lack of conformance information. Conformances are
   /// indexed, so simply omitting one would be incorrect.
   using NoConformanceLayout = BCRecordLayout<
-    NO_CONFORMANCE,
-    DeclIDField  // the protocol
+    NO_CONFORMANCE
   >;
 
   using NormalProtocolConformanceLayout = BCRecordLayout<
@@ -1080,39 +1082,36 @@ namespace decls_block {
     BCVBR<5>, // type mapping count
     BCVBR<5>, // inherited conformances count
     BCVBR<5>, // defaulted definitions count
-    BCFixed<1>, // incomplete?
-                // If set, the data array is empty and only inherited
-                // conformances trail the record.
     BCArray<DeclIDField>
-    // The array contains protocol-conformer-module triplets for inherited
-    // conformances, then value-value-substitutionCount triplets,
+    // The array contains value-value-substitutionCount triplets,
     // then type declarations, then defaulted definitions.
-    // The inherited conformances that can't be cross-referenced trail the
-    // record, followed by substitution records for the values and then types.
+    // Inherited conformances follow, then the substitution records for the
+    // values and then types.
   >;
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
     SPECIALIZED_PROTOCOL_CONFORMANCE,
-    DeclIDField,         // the protocol
-    DeclIDField,         // the nominal type decl for the generic conformance,
-                         // or the conforming type for the generic conformance
-                         // record that follows
-    ModuleIDField,       // the module in which the generic conformance occurs,
-                         // or BUILTIN_MODULE_ID to indicate that the generic
-                         // conformance is in the following record
+  TypeIDField,         // conforming type
     BCVBR<5>             // # of substitutions for the conformance
     // followed by substitution records for the conformance
   >;
 
   using InheritedProtocolConformanceLayout = BCRecordLayout<
     INHERITED_PROTOCOL_CONFORMANCE,
-    DeclIDField,  // the protocol
-    DeclIDField,  // the nominal type decl for the inherited conformance,
-                  // or the conforming type for the inherited conformance
-                  // record that follows
-    ModuleIDField // the module in which the inherited conformance occurs,
-                  // or BUILTIN_MODULE_ID to indicate that the inherited
-                  // conformance is in the following record
+    TypeIDField // the conforming type
+  >;
+
+  // Refers to a normal protocol conformance in the given module via its id.
+  using NormalProtocolConformanceIdLayout = BCRecordLayout<
+    NORMAL_PROTOCOL_CONFORMANCE_ID,
+    NormalConformanceIDField // the normal conformance ID
+  >;
+
+  using ProtocolConformanceXrefLayout = BCRecordLayout<
+    PROTOCOL_CONFORMANCE_XREF,
+    DeclIDField, // the protocol being conformed to
+    DeclIDField, // the nominal type of the conformance
+    ModuleIDField // the module in which the conformance can be found
   >;
 
   using MembersLayout = BCRecordLayout<
@@ -1353,6 +1352,7 @@ namespace index_block {
     LOCAL_DECL_CONTEXT_OFFSETS,
     DECL_CONTEXT_OFFSETS,
     LOCAL_TYPE_DECLS,
+    NORMAL_CONFORMANCE_OFFSETS,
   };
 
   using OffsetsLayout = BCGenericRecordLayout<

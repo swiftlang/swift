@@ -239,6 +239,9 @@ private:
   /// Local DeclContexts referenced by this module.
   std::vector<Serialized<DeclContext*>> LocalDeclContexts;
 
+  /// Normal protocol conformances referenced by this module.
+  std::vector<Serialized<NormalProtocolConformance *>> NormalConformances;
+
   /// Types referenced by this module.
   std::vector<Serialized<Type>> Types;
 
@@ -636,23 +639,14 @@ public:
   /// If the record at the cursor is not a substitution, returns None.
   Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
 
-  /// Recursively reads a protocol conformance from \c DeclTypeCursor.
+  /// Recursively reads a protocol conformance from the given cursor.
   ///
-  /// The conformance will be newly-created; it's likely that it already exists
-  /// in the AST, and will need to be canonicalized.
-  ///
-  /// If the record at the cursor is not a protocol conformance, returns
-  /// None. Note that a null pointer is a valid conformance value.
-  Optional<ProtocolConformance *>
-  maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
+  /// Note that a null conformance is valid for archetypes.
+  ProtocolConformance *readConformance(llvm::BitstreamCursor &Cursor);
 
-  /// Read a referenced conformance, such as the underlying conformance for a
-  /// specialized or inherited protocol conformance.
-  ProtocolConformance *
-  readReferencedConformance(ProtocolDecl *proto,
-                            serialization::DeclID typeID,
-                            serialization::ModuleID moduleID,
-                            llvm::BitstreamCursor &Cursor);
+  /// Read the given normal conformance from the current module file.
+  NormalProtocolConformance *readNormalConformance(
+                               serialization::NormalConformanceID id);
 
   /// Reads a generic param list from \c DeclTypeCursor.
   ///

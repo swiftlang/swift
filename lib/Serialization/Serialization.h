@@ -102,6 +102,10 @@ private:
   /// A map from generic parameter lists to the decls they come from.
   llvm::DenseMap<const GenericParamList *, const Decl *> GenericContexts;
 
+  // A map from NormalProtocolConformances to their serialized IDs.
+  llvm::DenseMap<const NormalProtocolConformance *, NormalConformanceID>
+    NormalConformances;
+
 public:
   using DeclTableData = SmallVector<std::pair<uint8_t, DeclID>, 4>;
   /// The in-memory representation of what will eventually be an on-disk hash
@@ -136,6 +140,9 @@ private:
   /// Local DeclContexts that need to be serialized.
   std::queue<const DeclContext*> LocalDeclContextsToWrite;
 
+  /// NormalProtocolConformances that need to be serialized.
+  std::queue<const NormalProtocolConformance *> NormalConformancesToWrite;
+
   /// All identifiers that need to be serialized.
   std::vector<Identifier> IdentifiersToWrite;
 
@@ -162,6 +169,10 @@ private:
   /// IdentifierID.
   std::vector<CharOffset> IdentifierOffsets;
 
+  /// The offset of each NormalProtocolConformance in the bitstream, indexed by
+  /// NormalConformanceID.
+  std::vector<BitOffset> NormalConformanceOffsets;
+
   /// The decls that adopt compiler-known protocols.
   SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
 
@@ -173,6 +184,9 @@ private:
 
   /// The last assigned DeclContextID for local decl contexts from this module.
   DeclContextID LastLocalDeclContextID = 0;
+
+  /// The last assigned NormalConformanceID for decl contexts from this module.
+  NormalConformanceID LastNormalConformanceID = 0;
 
   /// The last assigned DeclID for types from this module.
   TypeID LastTypeID = 0;
@@ -198,6 +212,8 @@ private:
       return index_block::DECL_CONTEXT_OFFSETS;
     if (&values == &LocalDeclContextOffsets)
       return index_block::LOCAL_DECL_CONTEXT_OFFSETS;
+    if (&values == &NormalConformanceOffsets)
+      return index_block::NORMAL_CONFORMANCE_OFFSETS;
     llvm_unreachable("unknown offset kind");
   }
 
@@ -226,9 +242,7 @@ private:
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformance *> conformances,
-                         const Decl *associatedDecl,
-                         const std::array<unsigned, 256> &abbrCodes,
-                         bool writeIncomplete = false);
+                         const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes an array of members for a decl context.
   ///
@@ -346,6 +360,15 @@ public:
   /// The DeclContext will be scheduled for serialization if necessary.
   DeclContextID addLocalDeclContextRef(const DeclContext *DC);
 
+  /// Records the use of the given normal protocol conformance.
+  ///
+  /// The normal protocol conformance will be scheduled for
+  /// serialization if necessary.
+  ///
+  /// \returns The ID for the given conformance in this module.
+  NormalConformanceID addConformanceRef(
+                        const NormalProtocolConformance *conformance);
+
   /// Records the use of the given module.
   ///
   /// The module's name will be scheduled for serialization if necessary.
@@ -359,34 +382,12 @@ public:
   void writeSubstitutions(ArrayRef<Substitution> substitutions,
                           const std::array<unsigned, 256> &abbrCodes);
 
-  /// Writes a protocol conformance.
-  void writeConformance(const ProtocolDecl *protocol,
-                        const ProtocolConformance *conformance,
-                        const Decl *associatedDecl,
-                        const std::array<unsigned, 256> &abbrCodes,
-                        bool writeIncomplete = false);
+  /// Write a normal protocol conformance.
+  void writeNormalConformance(const NormalProtocolConformance *conformance);
 
-  /// Encode a reference to another conformance.
-  ///
-  /// This is used for the conformances of substitutions and for the
-  /// underlying conformances of specialized and inherited conformances.
-  ///
-  /// \param conformance The conformance we're encoding.
-  ///
-  /// \param typeID Will be set to the "type ID" value to be stored
-  /// in the parent record.
-  ///
-  /// \param moduleID Will be set to the "module ID" value to
-  /// be stored in the parent record.
-  ///
-  /// \param allowReferencingCurrentModule If false, conformances in the current
-  /// module will always be appended rather than referenced.
-  ///
-  /// \returns true if the underlying conformance will need to be written
-  /// out as its own record following the parent record.
-  bool encodeReferencedConformance(const ProtocolConformance *conformance,
-                                   DeclID &typeID, ModuleID &moduleID,
-                                   bool allowReferencingCurrentModule);
+  /// Writes a protocol conformance.
+  void writeConformance(const ProtocolConformance *conformance,
+                        const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams,
