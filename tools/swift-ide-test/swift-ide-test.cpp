@@ -65,6 +65,7 @@ enum class ActionType {
   CodeCompletion,
   REPLCodeCompletion,
   SyntaxColoring,
+  DumpAPI,
   Structure,
   Annotation,
   TestInputCompleteness,
@@ -135,6 +136,8 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "repl-code-completion", "Perform REPL-style code completion"),
            clEnumValN(ActionType::SyntaxColoring,
                       "syntax-coloring", "Perform syntax coloring"),
+           clEnumValN(ActionType::DumpAPI,
+                      "dump-api", "Dump the public API"),
            clEnumValN(ActionType::Structure,
                       "structure", "Perform document structure annotation"),
            clEnumValN(ActionType::Annotation,
@@ -715,6 +718,137 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
                                      TerminalOutput);
   ColorContext.walk(ColorWalker);
   ColorWalker.finished();
+  return 0;
+}
+
+//============================================================================//
+// Dump API
+//============================================================================//
+
+namespace {
+
+class DumpAPIWalker : public ASTWalker {
+public:
+  SmallVector<SourceRange, 1> SourceRangesToDelete;
+  SmallVector<CharSourceRange, 1> CharSourceRangesToDelete;
+
+  DumpAPIWalker() {}
+
+  bool walkToDeclPre(Decl *D) override {
+    if (D->isImplicit())
+      return false;
+
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->getAccessibility() != Accessibility::Public) {
+        for (const auto &Single : VD->getRawComment().Comments) {
+          CharSourceRangesToDelete.push_back(Single.Range);
+        }
+
+        VD->getAttrs().getAttrRanges(SourceRangesToDelete);
+
+        if (auto *Var = dyn_cast<VarDecl>(VD)) {
+          SourceRangesToDelete.push_back(
+              Var->getParentPatternBinding()->getSourceRange());
+          return false;
+        }
+        SourceRangesToDelete.push_back(VD->getSourceRange());
+        return false;
+      }
+    }
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      SourceRangesToDelete.push_back(AFD->getBodySourceRange());
+      return false;
+    }
+    if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+      SourceRangesToDelete.push_back(SD->getBracesRange());
+      return false;
+    }
+    return true;
+  }
+};
+}
+
+static int doDumpAPI(const CompilerInvocation &InitInvok,
+                     StringRef SourceFilename) {
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(SourceFilename);
+  Invocation.getLangOptions().EnableExperimentalAvailabilityChecking = true;
+
+  CompilerInstance CI;
+
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+
+  unsigned BufID = CI.getInputBufferIDs().back();
+  SourceFile *SF = nullptr;
+  for (auto Unit : CI.getMainModule()->getFiles()) {
+    SF = dyn_cast<SourceFile>(Unit);
+    if (SF)
+      break;
+  }
+  assert(SF && "no source file?");
+  const auto &SM = CI.getSourceMgr();
+  DumpAPIWalker Walker;
+  CI.getMainModule()->walk(Walker);
+
+  //===--- rewriting ------------------------------------------------------===//
+  StringRef Input = SM.getLLVMSourceMgr().getMemoryBuffer(BufID)->getBuffer();
+  clang::RewriteBuffer RewriteBuf;
+  RewriteBuf.Initialize(Input);
+
+  auto &CharSourceRanges = Walker.CharSourceRangesToDelete;
+  for (const auto &SR : Walker.SourceRangesToDelete) {
+    auto End = Lexer::getLocForEndOfToken(SM, SR.End);
+    CharSourceRanges.push_back(CharSourceRange(SM, SR.Start, End));
+  }
+
+  CharSourceRanges.erase(
+      std::remove_if(CharSourceRanges.begin(), CharSourceRanges.end(),
+                     [](const CharSourceRange CSR) { return !CSR.isValid(); }),
+      CharSourceRanges.end());
+
+  std::sort(CharSourceRanges.begin(), CharSourceRanges.end(),
+            [&](CharSourceRange LHS, CharSourceRange RHS) {
+              return SM.isBeforeInBuffer(LHS.getStart(), RHS.getStart());
+            });
+
+  /*
+  for (const auto CR: CharSourceRanges) {
+    CR.dump(SM);
+    llvm::errs() << "\n";
+  }
+  */
+
+  const auto Del = [&](CharSourceRange CR) {
+    // CR.dump(SM);
+    // llvm::errs() << "\n";
+    const auto Start = SM.getLocOffsetInBuffer(CR.getStart(), BufID);
+    const auto End = SM.getLocOffsetInBuffer(CR.getEnd(), BufID);
+    RewriteBuf.RemoveText(Start, End - Start, true);
+  };
+
+  CharSourceRange Accumulator;
+  for (const auto CR : CharSourceRanges) {
+    if (!CR.isValid())
+      continue;
+    if (!Accumulator.isValid()) {
+      Accumulator = CR;
+    } else if (Accumulator.overlaps(CR)) {
+      Accumulator.widen(CR);
+    } else {
+      Del(Accumulator);
+      Accumulator = CR;
+    }
+  }
+  if (Accumulator.isValid())
+    Del(Accumulator);
+
+  RewriteBuf.write(llvm::outs());
+
   return 0;
 }
 
@@ -2185,6 +2319,10 @@ int main(int argc, char *argv[]) {
                                 options::SourceFilename,
                                 options::TerminalOutput,
                                 options::Typecheck);
+    break;
+
+  case ActionType::DumpAPI:
+    ExitCode = doDumpAPI(InitInvok, options::SourceFilename);
     break;
 
   case ActionType::Structure:
