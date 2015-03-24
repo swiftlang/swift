@@ -27,8 +27,7 @@ CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
   if true {
     let audioBuffer = AudioBuffer(
       mNumberChannels: 0, mDataByteSize: 0, mData: nil)
-    let result: UnsafeBufferPointer<Float> =
-      _convertAudioBufferToUnsafeBufferPointer(audioBuffer)
+    let result: UnsafeBufferPointer<Float> = UnsafeBufferPointer(audioBuffer)
     expectEqual(nil, result.baseAddress)
     expectEqual(0, result.count)
   }
@@ -37,8 +36,7 @@ CoreAudioTestSuite.test("UnsafeBufferPointer.init(_: AudioBuffer)") {
     let audioBuffer = AudioBuffer(
       mNumberChannels: 2, mDataByteSize: 1024,
       mData: UnsafeMutablePointer<Void>(bitPattern: 0x1234_5678))
-    let result: UnsafeBufferPointer<Float> =
-      _convertAudioBufferToUnsafeBufferPointer(audioBuffer)
+    let result: UnsafeBufferPointer<Float> = UnsafeBufferPointer(audioBuffer)
     expectEqual(
       UnsafePointer<Float>(audioBuffer.mData),
       result.baseAddress)
@@ -51,7 +49,7 @@ CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
     let audioBuffer = AudioBuffer(
       mNumberChannels: 0, mDataByteSize: 0, mData: nil)
     let result: UnsafeMutableBufferPointer<Float> =
-      _convertAudioBufferToUnsafeMutableBufferPointer(audioBuffer)
+      UnsafeMutableBufferPointer(audioBuffer)
     expectEqual(nil, result.baseAddress)
     expectEqual(0, result.count)
   }
@@ -61,7 +59,7 @@ CoreAudioTestSuite.test("UnsafeMutableBufferPointer.init(_: AudioBuffer)") {
       mNumberChannels: 2, mDataByteSize: 1024,
       mData: UnsafeMutablePointer<Void>(bitPattern: 0x1234_5678))
     let result: UnsafeMutableBufferPointer<Float> =
-      _convertAudioBufferToUnsafeMutableBufferPointer(audioBuffer)
+      UnsafeMutableBufferPointer(audioBuffer)
     expectEqual(
       UnsafeMutablePointer<Float>(audioBuffer.mData),
       result.baseAddress)

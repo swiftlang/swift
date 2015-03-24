@@ -12,44 +12,22 @@
 
 @exported import CoreAudio // Clang module
 
-extension UnsafeBufferPointer {
+extension UnsafeBufferPointer<T> {
   /// Initialize an `UnsafeBufferPointer<T>` from an `AudioBuffer`.
-  init(_ audioBuffer: AudioBuffer) {
-    // FIXME: this API should be public, but it can't be because of a compiler
-    // limitation: can't declare a public extension on a generic type from
-    // another module.  rdar://16974298
+  public init(_ audioBuffer: AudioBuffer) {
     self.init(
       start: UnsafePointer<T>(audioBuffer.mData),
       count: Int(audioBuffer.mDataByteSize) / strideof(T))
   }
 }
 
-// The API above can't be public yet.  We expose it through this function for
-// the sake of testing so that the code does not bitrot.
-public // @testable
-func _convertAudioBufferToUnsafeBufferPointer<T>(
-  audioBuffer: AudioBuffer) -> UnsafeBufferPointer<T> {
-  return UnsafeBufferPointer(audioBuffer)
-}
-
-extension UnsafeMutableBufferPointer {
+extension UnsafeMutableBufferPointer<T> {
   /// Initialize an `UnsafeMutableBufferPointer<T>` from an `AudioBuffer`.
-  init(_ audioBuffer: AudioBuffer) {
-    // FIXME: this API should be public, but it can't be because of a compiler
-    // limitation: can't declare a public extension on a generic type from
-    // another module.  rdar://16974298
+  public init(_ audioBuffer: AudioBuffer) {
     self.init(
       start: UnsafeMutablePointer<T>(audioBuffer.mData),
       count: Int(audioBuffer.mDataByteSize) / strideof(T))
   }
-}
-
-// The API above can't be public yet.  We expose it through this function for
-// the sake of testing so that the code does not bitrot.
-public // @testable
-func _convertAudioBufferToUnsafeMutableBufferPointer<T>(
-  audioBuffer: AudioBuffer) -> UnsafeMutableBufferPointer<T> {
-  return UnsafeMutableBufferPointer(audioBuffer)
 }
 
 extension AudioBuffer {
@@ -123,10 +101,11 @@ public struct UnsafeMutableAudioBufferListPointer {
     return UnsafeMutablePointer<AudioBuffer>(unsafeMutablePointer + 1) - 1
   }
 
-  // FIXME: the properties 'unsafePointer' and 'unsafeMutablePointer' should
-  // be initializers on UnsafePointer and UnsafeMutablePointer, but they can't
-  // because of a compiler limitation: can't declare a public extension on a
-  // generic type from another module.  rdar://16974298
+  // FIXME: the properties 'unsafePointer' and 'unsafeMutablePointer' should be
+  // initializers on UnsafePointer and UnsafeMutablePointer, but we don't want
+  // to allow any UnsafePointer<T> to be initializable from an
+  // UnsafeMutableAudioBufferListPointer, only UnsafePointer<AudioBufferList>.
+  // We need constrained extensions for that.  rdar://17821143
 
   /// The pointer to the wrapped `AudioBufferList`.
   public var unsafePointer: UnsafePointer<AudioBufferList> {
