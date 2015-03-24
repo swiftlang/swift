@@ -2170,6 +2170,12 @@ void SILGenFunction::emitCatchDispatch(Stmt *S, ManagedValue exn,
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, just rethrow the exception.
     if (ThrowDest.isValid()) {
+      // Don't actually kill the exception's cleanup.
+      CleanupStateRestorationScope scope(Cleanups);
+      if (exn.hasCleanup()) {
+        scope.pushCleanupState(exn.getCleanup(),
+                               CleanupState::PersistentlyActive);
+      }
       emitThrow(S, exn);
       return;
     }

@@ -747,7 +747,7 @@ public:
   }
 
   Stmt *visitCatchStmt(CatchStmt *S) {
-    // Catches are handled in visitSwitchStmt.
+    // Catches are handled in visitDoCatchStmt.
     llvm_unreachable("catch stmt outside of do-catch?!");
   }
 

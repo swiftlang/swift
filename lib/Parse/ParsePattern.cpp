@@ -982,7 +982,7 @@ ParserResult<Pattern> Parser::parseTypedMatchingPattern() {
 /// matching-pattern ::= matching-pattern-var
 /// matching-pattern ::= expr
 ///
-ParserResult<Pattern> Parser::parseMatchingPattern() {
+ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // TODO: Since we expect a pattern in this position, we should optimistically
   // parse pattern nodes for productions shared by pattern and expression
   // grammar. For short-term ease of initial implementation, we always go
@@ -994,7 +994,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
     bool isLet = Tok.is(tok::kw_let);
     SourceLoc varLoc = consumeToken();
     
-    return parseMatchingPatternAsLetOrVar(isLet, varLoc);
+    return parseMatchingPatternAsLetOrVar(isLet, varLoc, isExprBasic);
   }
   
   // matching-pattern ::= 'is' type
@@ -1010,7 +1010,8 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.
-  ParserResult<Expr> subExpr = parseExpr(diag::expected_pattern);
+  ParserResult<Expr> subExpr =
+    parseExprImpl(diag::expected_pattern, isExprBasic);
   if (subExpr.hasCodeCompletion())
     return makeParserCodeCompletionStatus();
   if (subExpr.isNull())
@@ -1020,7 +1021,8 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 }
 
 ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
-                                                             SourceLoc varLoc) {
+                                                             SourceLoc varLoc,
+                                                             bool isExprBasic) {
   // 'var' and 'let' patterns shouldn't nest.
   if (InVarOrLetPattern == IVOLP_InLet ||
       InVarOrLetPattern == IVOLP_InVar)
@@ -1034,7 +1036,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
-  ParserResult<Pattern> subPattern = parseMatchingPattern();
+  ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
   if (subPattern.isNull())
     return nullptr;
   return makeParserResult(new (Context) VarPattern(varLoc, isLet,

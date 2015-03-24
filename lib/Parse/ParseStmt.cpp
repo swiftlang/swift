@@ -662,6 +662,18 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                 GuardedPatternContext parsingContext) {
   ParserResult<Pattern> patternResult;
 
+  bool isExprBasic = [&]() -> bool {
+    switch (parsingContext) {
+    // 'case' is terminated with a colon and so allows a trailing closure.
+    case GuardedPatternContext::Case:
+      return false;
+    // 'catch' is terminated with a brace and so cannot.
+    case GuardedPatternContext::Catch:
+      return true;
+    }
+    llvm_unreachable("bad pattern context");
+  }();
+
   // Do some special-case code completion for the start of the pattern.
   if (P.CodeCompletion) {
     if (P.Tok.is(tok::code_complete)) {
@@ -692,7 +704,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   if (patternResult.isNull()) {
     llvm::SaveAndRestore<decltype(P.InVarOrLetPattern)>
       T(P.InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
-    patternResult = P.parseMatchingPattern();
+    patternResult = P.parseMatchingPattern(isExprBasic);
   }
 
   // If that didn't work, use a bogus pattern so that we can fill out
@@ -728,7 +740,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       }
       llvm_unreachable("bad context");
     }();
-    ParserResult<Expr> guardResult = P.parseExpr(diagKind);
+    ParserResult<Expr> guardResult = P.parseExprImpl(diagKind, isExprBasic);
     status |= guardResult;
 
     // Use the parsed guard expression if possible.
@@ -842,7 +854,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       if (Tok.is(tok::identifier) && peekToken().isAny(tok::equal, tok::colon))
         Pattern = parseSwift1IfLetPattern(IsLet, VarLoc);
       else
-        Pattern = parseMatchingPatternAsLetOrVar(IsLet, VarLoc);
+        Pattern = parseMatchingPatternAsLetOrVar(IsLet, VarLoc,
+                                                 /*isExprBasic*/ true);
       Status |= Pattern;
       
       if (Pattern.isNull() || Pattern.hasCodeCompletion())

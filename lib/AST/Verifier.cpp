@@ -670,6 +670,20 @@ struct ASTNodeBase {};
       verifyCheckedAlwaysBase(D);
     }
 
+    void verifyChecked(ThrowExpr *E) {
+      checkSameType(E->getSubExpr()->getType(),
+                    checkExceptionTypeExists("throw expression"),
+                    "throw operand");
+      verifyCheckedBase(E);
+    }
+
+    void verifyChecked(CatchStmt *S) {
+      checkSameType(S->getErrorPattern()->getType(),
+                    checkExceptionTypeExists("catch statement"),
+                    "catch pattern");
+      verifyCheckedBase(S);
+    }
+
     void verifyChecked(ReturnStmt *S) {
       auto func = Functions.back();
       Type resultType;
@@ -2307,6 +2321,14 @@ struct ASTNodeBase {};
       Out << " vs. ";
       T1.print(Out);
       Out << "\n";
+      abort();
+    }
+
+    Type checkExceptionTypeExists(const char *where) {
+      auto exn = Ctx.getExceptionTypeDecl();
+      if (exn) return exn->getDeclaredType();
+
+      Out << "exception type does not exist in " << where << "\n";
       abort();
     }
 
