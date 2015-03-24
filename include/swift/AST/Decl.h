@@ -2047,9 +2047,25 @@ public:
     return TypeAndAccess.getInt().hasValue();
   }
 
-  Accessibility getAccessibility() const {
+  /// Returns the access level specified explicitly by the user, or provided by
+  /// default according to language rules.
+  ///
+  /// This is the access used when calculating if access control is being used
+  /// consistently.
+  Accessibility getFormalAccess() const {
     assert(hasAccessibility() && "accessibility not computed yet");
     return TypeAndAccess.getInt().getValue();
+  }
+
+  /// Returns the access level that actually controls how a declaration may be
+  /// used.
+  ///
+  /// This is the access used when deciding whether a particular declaration
+  /// is only accessible from the current module. For declarations from other
+  /// modules, it behaves identically to getFormalAccess(). Rather than check
+  /// for this yourself, just use isAccessibleFrom() instead.
+  Accessibility getEffectiveAccess() const {
+    return getFormalAccess();
   }
 
   void setAccessibility(Accessibility access) {

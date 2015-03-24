@@ -401,7 +401,7 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
     // Fall through to mangle the <identifier>.
 
   } else if (decl->hasAccessibility() &&
-             decl->getAccessibility() == Accessibility::Private) {
+             decl->getFormalAccess() == Accessibility::Private) {
     // Mangle non-local private declarations with a textual discriminator
     // based on their enclosing file.
     // decl-name ::= 'P' identifier identifier
@@ -419,7 +419,7 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
       auto nominal = dyn_cast<NominalTypeDecl>(DC);
       if (!nominal)
         nominal = cast<ExtensionDecl>(DC)->getExtendedType()->getAnyNominal();
-      return nominal->getAccessibility() == Accessibility::Private;
+      return nominal->getFormalAccess() == Accessibility::Private;
     };
 
     if (!isWithinPrivateNominal(decl)) {

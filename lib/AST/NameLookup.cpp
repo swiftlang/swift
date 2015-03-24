@@ -405,7 +405,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
 
 static bool matchesDiscriminator(Identifier discriminator,
                                  const ValueDecl *value) {
-  if (value->getAccessibility() != Accessibility::Private)
+  if (value->getFormalAccess() != Accessibility::Private)
     return false;
 
   auto containingFile =
@@ -1138,7 +1138,7 @@ static bool checkAccessibility(const DeclContext *useDC,
 }
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
-  return checkAccessibility(DC, getDeclContext(), getAccessibility());
+  return checkAccessibility(DC, getDeclContext(), getFormalAccess());
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {

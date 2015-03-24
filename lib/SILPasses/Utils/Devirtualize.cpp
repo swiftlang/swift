@@ -470,24 +470,15 @@ static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
   if (FD->isDynamic() || FD->isOverridden())
     return false;
 
-  auto Access = FD->getAccessibility();
-
-  // Publicly accessible functions can be overridden by other modules
-  // unless declared final, in which case we wouldn't have generated
-  // virtual call.
-  if (Access == Accessibility::Public)
+  // Only consider 'private' members, unless we are in whole-module compilation.
+  switch (FD->getEffectiveAccess()) {
+  case Accessibility::Public:
     return false;
-
-  // Private with no known overrides?
-  if (Access == Accessibility::Private)
+  case Accessibility::Internal:
+    return M.isWholeModule();
+  case Accessibility::Private:
     return true;
-
-  assert(Access == Accessibility::Internal &&
-         "Expected all access kinds covered!");
-
-  // Internal with no known overrides? If we have visibility into the
-  // whole module, then we know it is final.
-  return M.isWholeModule();
+  }
 }
 
 /// Attempt to devirtualize the given apply if possible, and return a

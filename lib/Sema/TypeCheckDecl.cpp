@@ -1504,7 +1504,7 @@ static void computeDefaultAccessibility(TypeChecker &TC, ExtensionDecl *ED) {
   TC.checkInheritanceClause(ED);
   if (auto nominal = ED->getExtendedType()->getAnyNominal()) {
     TC.validateDecl(nominal);
-    ED->setDefaultAccessibility(std::min(nominal->getAccessibility(),
+    ED->setDefaultAccessibility(std::min(nominal->getFormalAccess(),
                                          Accessibility::Internal));
   } else {
     // Recover by assuming "internal", which is the most common thing anyway.
@@ -1529,7 +1529,7 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
             fn->getAccessorKind() == AccessorKind::IsMaterializeForSet)
           fn->setAccessibility(storage->getSetterAccessibility());
         else
-          fn->setAccessibility(storage->getAccessibility());
+          fn->setAccessibility(storage->getFormalAccess());
       } else {
         computeAccessibility(storage);
       }
@@ -1553,7 +1553,7 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::NominalTypeDecl: {
       auto nominal = cast<NominalTypeDecl>(DC);
       validateAccessibility(nominal);
-      Accessibility access = nominal->getAccessibility();
+      Accessibility access = nominal->getFormalAccess();
       if (!isa<ProtocolDecl>(nominal))
         access = std::min(access, Accessibility::Internal);
       D->setAccessibility(access);
@@ -1571,7 +1571,7 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     if (auto *AA = D->getAttrs().getAttribute<SetterAccessibilityAttr>())
       ASD->setSetterAccessibility(AA->getAccess());
     else
-      ASD->setSetterAccessibility(ASD->getAccessibility());
+      ASD->setSetterAccessibility(ASD->getFormalAccess());
 
     if (auto getter = ASD->getGetter())
       computeAccessibility(getter);
@@ -1606,9 +1606,9 @@ class TypeAccessibilityChecker : private TypeWalker {
 
     Accessibility current;
     if (auto alias = dyn_cast<NameAliasType>(ty.getPointer()))
-      current = alias->getDecl()->getAccessibility();
+      current = alias->getDecl()->getFormalAccess();
     else if (auto nominal = ty->getAnyNominal())
-      current = nominal->getAccessibility();
+      current = nominal->getFormalAccess();
     else
       current = Accessibility::Public;
     AccessStack.push_back(current);
@@ -1645,7 +1645,7 @@ class TypeAccessibilityDiagnoser : private ASTWalker {
 
     if (minAccessibilityType) {
       const ValueDecl *minDecl = getValueDecl(minAccessibilityType);
-      if (minDecl->getAccessibility() <= VD->getAccessibility())
+      if (minDecl->getFormalAccess() <= VD->getFormalAccess())
         return true;
     }
 
@@ -1681,17 +1681,18 @@ public:
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
 /// part of the type that caused the problem could not be found.
 static void checkTypeAccessibility(
-    TypeChecker &TC, TypeLoc TL, Accessibility access,
+    TypeChecker &TC, TypeLoc TL, const ValueDecl *contextDecl,
     std::function<void(Accessibility, const TypeRepr *)> diagnose) {
   // Don't spend time checking private access; this is always valid.
   // This includes local declarations.
-  if (access == Accessibility::Private || !TL.getType())
+  Accessibility contextAccess = contextDecl->getFormalAccess();
+  if (contextAccess == Accessibility::Private || !TL.getType())
     return;
 
   Accessibility typeAccess =
     TypeAccessibilityChecker::getAccessibility(TL.getType(),
                                                TC.TypeAccessibilityCache);
-  if (typeAccess >= access)
+  if (typeAccess >= contextAccess)
     return;
 
   const TypeRepr *complainRepr = nullptr;
@@ -1738,8 +1739,7 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     if (param->getInherited().empty())
       continue;
     assert(param->getInherited().size() == 1);
-    checkTypeAccessibility(TC, param->getInherited().front(),
-                           owner->getAccessibility(),
+    checkTypeAccessibility(TC, param->getInherited().front(), owner,
                            [&](Accessibility typeAccess,
                                const TypeRepr *thisComplainRepr) {
       if (!minAccess || *minAccess > typeAccess) {
@@ -1761,16 +1761,16 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     };
     switch (requirement.getKind()) {
     case RequirementKind::Conformance:
-      checkTypeAccessibility(TC, requirement.getSubjectLoc(),
-                             owner->getAccessibility(), callback);
-      checkTypeAccessibility(TC, requirement.getConstraintLoc(),
-                             owner->getAccessibility(), callback);
+      checkTypeAccessibility(TC, requirement.getSubjectLoc(), owner,
+                             callback);
+      checkTypeAccessibility(TC, requirement.getConstraintLoc(), owner,
+                             callback);
       break;
     case RequirementKind::SameType:
-      checkTypeAccessibility(TC, requirement.getFirstTypeLoc(),
-                             owner->getAccessibility(), callback);
-      checkTypeAccessibility(TC, requirement.getSecondTypeLoc(),
-                             owner->getAccessibility(), callback);
+      checkTypeAccessibility(TC, requirement.getFirstTypeLoc(), owner,
+                             callback);
+      checkTypeAccessibility(TC, requirement.getSecondTypeLoc(), owner,
+                             callback);
       break;
     case RequirementKind::WitnessMarker:
       break;
@@ -1782,7 +1782,7 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
                       isa<ProtocolDecl>(owner->getDeclContext());
     auto diag = TC.diagnose(owner, diag::generic_param_access,
                             owner->getDescriptiveKind(), isExplicit,
-                            owner->getAccessibility(), minAccess.getValue(),
+                            owner->getFormalAccess(), minAccess.getValue(),
                             accessibilityErrorKind);
     highlightOffendingType(TC, diag, complainRepr);
   }
@@ -1797,7 +1797,7 @@ static bool checkGenericExtensionLimitations(TypeChecker &TC, const Decl *D) {
   // that is not easily checked or communicated to users, so give it a pass.
   auto DC = D->getDeclContext();
   if (isa<ExtensionDecl>(DC) && isa<ValueDecl>(D) &&
-      cast<ValueDecl>(D)->getAccessibility() == Accessibility::Public &&
+      cast<ValueDecl>(D)->getFormalAccess() == Accessibility::Public &&
       DC->getDeclaredInterfaceType()->is<BoundGenericType>() &&
       DC->getParentModule()
         != DC->getDeclaredInterfaceType()->getAnyNominal()->getModuleContext()&&
@@ -1859,7 +1859,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
           return;
 
         checkTypeAccessibility(TC, TypeLoc::withoutLoc(theVar->getType()),
-                               theVar->getAccessibility(),
+                               theVar,
                                [&](Accessibility typeAccess,
                                    const TypeRepr *complainRepr) {
           bool isExplicit =
@@ -1869,7 +1869,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                   theVar->isLet(),
                                   isTypeContext,
                                   isExplicit,
-                                  theVar->getAccessibility(),
+                                  theVar->getFormalAccess(),
                                   typeAccess,
                                   theVar->getType());
         });
@@ -1893,7 +1893,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
       checkGenericExtensionLimitations(TC, anyVar);
 
-      checkTypeAccessibility(TC, TP->getTypeLoc(), anyVar->getAccessibility(),
+      checkTypeAccessibility(TC, TP->getTypeLoc(), anyVar,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *complainRepr) {
         bool isExplicit =
@@ -1903,7 +1903,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                 anyVar->isLet(),
                                 isTypeContext,
                                 isExplicit,
-                                anyVar->getAccessibility(),
+                                anyVar->getFormalAccess(),
                                 typeAccess);
         highlightOffendingType(TC, diag, complainRepr);
       });
@@ -1914,13 +1914,12 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::TypeAlias: {
     auto TAD = cast<TypeAliasDecl>(D);
 
-    checkTypeAccessibility(TC, TAD->getUnderlyingTypeLoc(),
-                           TAD->getAccessibility(),
+    checkTypeAccessibility(TC, TAD->getUnderlyingTypeLoc(), TAD,
                            [&](Accessibility typeAccess,
                                const TypeRepr *complainRepr) {
       bool isExplicit = TAD->getAttrs().hasAttribute<AccessibilityAttr>();
       auto diag = TC.diagnose(TAD, diag::type_alias_underlying_type_access,
-                              isExplicit, TAD->getAccessibility(),
+                              isExplicit, TAD->getFormalAccess(),
                               typeAccess);
       highlightOffendingType(TC, diag, complainRepr);
     });
@@ -1942,8 +1941,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     std::for_each(assocType->getInherited().begin(),
                   assocType->getInherited().end(),
                   [&](TypeLoc requirement) {
-      checkTypeAccessibility(TC, requirement,
-                             assocType->getAccessibility(),
+      checkTypeAccessibility(TC, requirement, assocType,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *thisComplainRepr) {
         if (!minAccess || *minAccess > typeAccess) {
@@ -1953,8 +1951,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
         }
       });
     });
-    checkTypeAccessibility(TC, assocType->getDefaultDefinitionLoc(),
-                           assocType->getAccessibility(),
+    checkTypeAccessibility(TC, assocType->getDefaultDefinitionLoc(), assocType,
                            [&](Accessibility typeAccess,
                                const TypeRepr *thisComplainRepr) {
       if (!minAccess || *minAccess > typeAccess) {
@@ -1966,7 +1963,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
     if (minAccess) {
       auto diag = TC.diagnose(assocType, diag::associated_type_access,
-                              assocType->getAccessibility(),
+                              assocType->getFormalAccess(),
                               *minAccess, accessibilityErrorKind);
       highlightOffendingType(TC, diag, complainRepr);
     }
@@ -1989,12 +1986,12 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       });
       if (rawTypeLocIter == ED->getInherited().end())
         return;
-      checkTypeAccessibility(TC, *rawTypeLocIter, ED->getAccessibility(),
+      checkTypeAccessibility(TC, *rawTypeLocIter, ED,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *complainRepr) {
         bool isExplicit = ED->getAttrs().hasAttribute<AccessibilityAttr>();
         auto diag = TC.diagnose(ED, diag::enum_raw_type_access,
-                                isExplicit, ED->getAccessibility(),
+                                isExplicit, ED->getFormalAccess(),
                                 typeAccess);
         highlightOffendingType(TC, diag, complainRepr);
       });
@@ -2025,12 +2022,12 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       });
       if (superclassLocIter == CD->getInherited().end())
         return;
-      checkTypeAccessibility(TC, *superclassLocIter, CD->getAccessibility(),
+      checkTypeAccessibility(TC, *superclassLocIter, CD,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *complainRepr) {
         bool isExplicit = CD->getAttrs().hasAttribute<AccessibilityAttr>();
         auto diag = TC.diagnose(CD, diag::class_super_access,
-                                isExplicit, CD->getAccessibility(),
+                                isExplicit, CD->getFormalAccess(),
                                 typeAccess);
         highlightOffendingType(TC, diag, complainRepr);
       });
@@ -2048,7 +2045,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     std::for_each(proto->getInherited().begin(),
                   proto->getInherited().end(),
                   [&](TypeLoc requirement) {
-      checkTypeAccessibility(TC, requirement, proto->getAccessibility(),
+      checkTypeAccessibility(TC, requirement, proto,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *thisComplainRepr) {
         if (!minAccess || *minAccess > typeAccess) {
@@ -2062,7 +2059,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       bool isExplicit = proto->getAttrs().hasAttribute<AccessibilityAttr>();
       auto diag = TC.diagnose(proto, diag::protocol_refine_access,
                               isExplicit,
-                              proto->getAccessibility(),
+                              proto->getFormalAccess(),
                               *minAccess);
       highlightOffendingType(TC, diag, complainRepr);
     }
@@ -2080,7 +2077,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       if (!TP)
         return;
 
-      checkTypeAccessibility(TC, TP->getTypeLoc(), SD->getAccessibility(),
+      checkTypeAccessibility(TC, TP->getTypeLoc(), SD,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *thisComplainRepr) {
         if (!minAccess || *minAccess > typeAccess) {
@@ -2090,8 +2087,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       });
     });
 
-    checkTypeAccessibility(TC, SD->getElementTypeLoc(),
-                           SD->getAccessibility(),
+    checkTypeAccessibility(TC, SD->getElementTypeLoc(), SD,
                            [&](Accessibility typeAccess,
                                const TypeRepr *thisComplainRepr) {
       if (!minAccess || *minAccess > typeAccess) {
@@ -2106,7 +2102,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                         isa<ProtocolDecl>(SD->getDeclContext());
       auto diag = TC.diagnose(SD, diag::subscript_type_access,
                               isExplicit,
-                              SD->getAccessibility(),
+                              SD->getFormalAccess(),
                               *minAccess,
                               problemIsElement);
       highlightOffendingType(TC, diag, complainRepr);
@@ -2142,7 +2138,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
         if (!TP)
           return;
 
-        checkTypeAccessibility(TC, TP->getTypeLoc(), fn->getAccessibility(),
+        checkTypeAccessibility(TC, TP->getTypeLoc(), fn,
                                [&](Accessibility typeAccess,
                                    const TypeRepr *thisComplainRepr) {
           if (!minAccess || *minAccess > typeAccess) {
@@ -2154,8 +2150,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     });
 
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
-      checkTypeAccessibility(TC, FD->getBodyResultTypeLoc(),
-                             fn->getAccessibility(),
+      checkTypeAccessibility(TC, FD->getBodyResultTypeLoc(), FD,
                              [&](Accessibility typeAccess,
                                  const TypeRepr *thisComplainRepr) {
         if (!minAccess || *minAccess > typeAccess) {
@@ -2171,7 +2166,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                         isa<ProtocolDecl>(D->getDeclContext());
       auto diag = TC.diagnose(fn, diag::function_type_access,
                               isExplicit,
-                              fn->getAccessibility(),
+                              fn->getFormalAccess(),
                               *minAccess,
                               isa<ConstructorDecl>(fn) ? FK_Initializer :
                                 isTypeContext ? FK_Method : FK_Function,
@@ -2186,12 +2181,11 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
     if (!EED->hasArgumentType())
       return;
-    checkTypeAccessibility(TC, EED->getArgumentTypeLoc(),
-                           EED->getAccessibility(),
+    checkTypeAccessibility(TC, EED->getArgumentTypeLoc(), EED,
                            [&](Accessibility typeAccess,
                                const TypeRepr *complainRepr) {
       auto diag = TC.diagnose(EED, diag::enum_case_access,
-                              EED->getAccessibility(), typeAccess);
+                              EED->getFormalAccess(), typeAccess);
       highlightOffendingType(TC, diag, complainRepr);
     });
 
@@ -2215,7 +2209,7 @@ static bool isImplicitlyObjC(const ValueDecl *VD, bool allowImplicit = false) {
       return true;
   }
 
-  if (VD->getAccessibility() == Accessibility::Private)
+  if (VD->getFormalAccess() == Accessibility::Private)
     return false;
 
   Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
@@ -2648,7 +2642,7 @@ public:
   }
 
   static bool isPrivateConformer(const NominalTypeDecl *NTD) {
-    return NTD->getAccessibility() == Accessibility::Private;
+    return NTD->getFormalAccess() == Accessibility::Private;
   }
 
   template<typename NominalOrExtensionDecl>
@@ -3073,7 +3067,7 @@ public:
       TypeResolutionOptions options;
       if (!TAD->getDeclContext()->isTypeContext())
         options |= TR_GlobalTypeAlias;
-      if (TAD->getAccessibility() == Accessibility::Private)
+      if (TAD->getFormalAccess() == Accessibility::Private)
         options |= TR_KnownNonCascadingDependency;
       
       if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD->getDeclContext(),
@@ -3108,7 +3102,7 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     TC.checkDeclAttributesEarly(assocType);
     if (!assocType->hasAccessibility())
-      assocType->setAccessibility(assocType->getProtocol()->getAccessibility());
+      assocType->setAccessibility(assocType->getProtocol()->getFormalAccess());
 
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
@@ -3465,8 +3459,7 @@ public:
 
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
-          bool isNonPrivate =
-            (PD->getAccessibility() != Accessibility::Private);
+          bool isNonPrivate = (PD->getFormalAccess() != Accessibility::Private);
           for (auto *parentProto : PD->getProtocols())
             tracker->addUsedNominal(parentProto, isNonPrivate);
         }
@@ -4562,12 +4555,12 @@ public:
       // Check accessibility.
       // FIXME: Copied from TypeCheckProtocol.cpp.
       Accessibility requiredAccess =
-        std::min(classDecl->getAccessibility(), matchDecl->getAccessibility());
+        std::min(classDecl->getFormalAccess(), matchDecl->getFormalAccess());
       bool shouldDiagnose = false;
       bool shouldDiagnoseSetter = false;
       if (requiredAccess > Accessibility::Private &&
           !isa<ConstructorDecl>(decl)) {
-        shouldDiagnose = (decl->getAccessibility() < requiredAccess);
+        shouldDiagnose = (decl->getFormalAccess() < requiredAccess);
 
         if (!shouldDiagnose && matchDecl->isSettable(classDecl)) {
           auto matchASD = cast<AbstractStorageDecl>(matchDecl);
@@ -4582,7 +4575,7 @@ public:
       }
       if (shouldDiagnose || shouldDiagnoseSetter) {
         bool overriddenForcesAccess =
-          (requiredAccess == matchDecl->getAccessibility());
+          (requiredAccess == matchDecl->getFormalAccess());
         {
           auto diag = TC.diagnose(decl, diag::override_not_accessible,
                                   shouldDiagnoseSetter,
@@ -4992,7 +4985,7 @@ public:
     Type ElemTy = ED->getDeclaredTypeInContext();
 
     if (!EED->hasAccessibility())
-      EED->setAccessibility(ED->getAccessibility());
+      EED->setAccessibility(ED->getFormalAccess());
     
     // Only attempt to validate the argument type or raw value if the element
     // is not currenly being validated.
@@ -5339,10 +5332,10 @@ public:
 
     if (CD->isRequired() && ContextTy) {
       if (auto nominal = ContextTy->getAnyNominal()) {
-        if (CD->getAccessibility() < nominal->getAccessibility()) {
+        if (CD->getFormalAccess() < nominal->getFormalAccess()) {
           auto diag = TC.diagnose(CD,
                                   diag::required_initializer_not_accessible);
-          fixItAccessibility(diag, CD, nominal->getAccessibility());
+          fixItAccessibility(diag, CD, nominal->getFormalAccess());
         }
       }
     }
@@ -5373,7 +5366,7 @@ public:
     TC.checkDeclAttributesEarly(DD);
     if (!DD->hasAccessibility()) {
       auto enclosingClass = cast<ClassDecl>(DD->getParent());
-      DD->setAccessibility(enclosingClass->getAccessibility());
+      DD->setAccessibility(enclosingClass->getFormalAccess());
     }
 
     GenericParamList *outerGenericParams;
@@ -5483,7 +5476,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       auto nominal = cast<NominalTypeDecl>(DC);
       typeCheckDecl(nominal, true);
       if (!typeParam->hasAccessibility())
-        typeParam->setAccessibility(nominal->getAccessibility());
+        typeParam->setAccessibility(nominal->getFormalAccess());
       break;
     }
 
@@ -5501,7 +5494,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       auto fn = cast<AbstractFunctionDecl>(DC);
       typeCheckDecl(fn, true);
       if (!typeParam->hasAccessibility())
-        typeParam->setAccessibility(fn->getAccessibility());
+        typeParam->setAccessibility(fn->getFormalAccess());
       break;
     }
     }
@@ -5839,7 +5832,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
       auto assocType = cast<AssociatedTypeDecl>(D);
       auto prot = assocType->getProtocol();
       validateAccessibility(prot);
-      assocType->setAccessibility(prot->getAccessibility());
+      assocType->setAccessibility(prot->getFormalAccess());
       break;
     }
 
@@ -5862,7 +5855,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
     } else {
       auto container = cast<NominalTypeDecl>(D->getDeclContext());
       validateAccessibility(container);
-      D->setAccessibility(container->getAccessibility());
+      D->setAccessibility(container->getFormalAccess());
     }
     break;
   }

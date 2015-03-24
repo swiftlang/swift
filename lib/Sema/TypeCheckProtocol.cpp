@@ -1929,12 +1929,12 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       // If the match isn't accessible enough, complain.
       // FIXME: Handle "private(set)" requirements.
       Accessibility requiredAccess =
-        std::min(Proto->getAccessibility(),
-                 Adoptee->getAnyNominal()->getAccessibility());
+        std::min(Proto->getFormalAccess(),
+                 Adoptee->getAnyNominal()->getFormalAccess());
       bool shouldDiagnose = false;
       bool shouldDiagnoseSetter = false;
       if (requiredAccess > Accessibility::Private) {
-        shouldDiagnose = (best.Witness->getAccessibility() < requiredAccess);
+        shouldDiagnose = (best.Witness->getFormalAccess() < requiredAccess);
 
         if (!shouldDiagnose && requirement->isSettable(DC)) {
           auto ASD = cast<AbstractStorageDecl>(best.Witness);
@@ -1945,7 +1945,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         }
       }
       if (shouldDiagnose || shouldDiagnoseSetter) {
-        bool protoForcesAccess = (requiredAccess == Proto->getAccessibility());
+        bool protoForcesAccess = (requiredAccess == Proto->getFormalAccess());
         auto diagKind = protoForcesAccess ? diag::witness_not_accessible_proto
                                           : diag::witness_not_accessible_type;
         auto diag = TC.diagnose(best.Witness, diagKind,

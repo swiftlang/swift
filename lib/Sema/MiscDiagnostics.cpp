@@ -765,7 +765,7 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
     VD->overwriteAccessibility(desiredAccess);
   }
 
-  if (isForSetter && VD->getAccessibility() == desiredAccess) {
+  if (isForSetter && VD->getFormalAccess() == desiredAccess) {
     assert(attr);
     attr->setInvalid();
     if (!attr->Range.isValid())

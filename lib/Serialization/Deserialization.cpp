@@ -2019,7 +2019,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                     defaultDefinitionID);
     declOrOffset = assocType;
 
-    assocType->setAccessibility(cast<ProtocolDecl>(DC)->getAccessibility());
+    assocType->setAccessibility(cast<ProtocolDecl>(DC)->getFormalAccess());
     assocType->setSuperclass(getType(superclassID));
     assocType->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
     if (isImplicit)
@@ -2788,7 +2788,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       elem->setInterfaceType(interfaceType);
     if (isImplicit)
       elem->setImplicit();
-    elem->setAccessibility(cast<EnumDecl>(DC)->getAccessibility());
+    elem->setAccessibility(cast<EnumDecl>(DC)->getFormalAccess());
 
     break;
   }
@@ -2949,7 +2949,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                            /*selfpat*/nullptr, DC);
     declOrOffset = dtor;
 
-    dtor->setAccessibility(cast<ClassDecl>(DC)->getAccessibility());
+    dtor->setAccessibility(cast<ClassDecl>(DC)->getFormalAccess());
     Pattern *selfParams = maybeReadPattern();
     assert(selfParams && "Didn't get self pattern?");
     dtor->setSelfPattern(selfParams);

@@ -739,7 +739,7 @@ public:
       return false;
 
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->getAccessibility() != Accessibility::Public) {
+      if (VD->getFormalAccess() != Accessibility::Public) {
         for (const auto &Single : VD->getRawComment().Comments) {
           CharSourceRangesToDelete.push_back(Single.Range);
         }

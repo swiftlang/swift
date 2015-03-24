@@ -204,7 +204,7 @@ void swift::ide::printSubmoduleInterface(
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (Options.AccessibilityFilter > Accessibility::Private &&
           VD->hasAccessibility() &&
-          VD->getAccessibility() < Options.AccessibilityFilter)
+          VD->getFormalAccess() < Options.AccessibilityFilter)
         continue;
     }
 

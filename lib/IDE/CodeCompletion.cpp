@@ -2179,18 +2179,18 @@ public:
 
     Accessibility AccessibilityOfContext;
     if (auto *NTD = dyn_cast<NominalTypeDecl>(CurrDeclContext))
-      AccessibilityOfContext = NTD->getAccessibility();
+      AccessibilityOfContext = NTD->getFormalAccess();
     else
       AccessibilityOfContext = cast<ExtensionDecl>(CurrDeclContext)
                                    ->getExtendedType()
                                    ->getAnyNominal()
-                                   ->getAccessibility();
+                                   ->getFormalAccess();
     // If the developer has not input "func", we need to add necessary keywords
     if (!isKeywordSpecified("func")) {
       if (!isKeywordSpecified("private") &&
           !isKeywordSpecified("public") &&
           !isKeywordSpecified("internal"))
-        Builder.addAccessControlKeyword(std::min(FD->getAccessibility(),
+        Builder.addAccessControlKeyword(std::min(FD->getFormalAccess(),
                                                  AccessibilityOfContext));
 
       if (Reason == DeclVisibilityKind::MemberOfSuper &&

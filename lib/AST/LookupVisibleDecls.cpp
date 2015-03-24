@@ -545,7 +545,7 @@ public:
         continue;
       }
       if (conflicting(FoundSignature, OtherVD->getOverloadSignature())) {
-        if (VD->getAccessibility() > OtherVD->getAccessibility()) {
+        if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {
           PossiblyConflicting.erase(I);
           PossiblyConflicting.insert(VD);
 

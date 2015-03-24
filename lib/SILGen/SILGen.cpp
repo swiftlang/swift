@@ -328,10 +328,10 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
   if (FD->isFinal() && !FD->getOverriddenDecl())
     return SILFunction::NotRelevant;
 
-  assert(FD->getAccessibility() <= classType->getAccessibility() &&
+  assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
     
-  switch (classType->getAccessibility()) {
+  switch (classType->getEffectiveAccess()) {
     case Accessibility::Private:
       return SILFunction::NotRelevant;
     case Accessibility::Internal:

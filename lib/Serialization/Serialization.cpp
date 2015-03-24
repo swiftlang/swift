@@ -1848,7 +1848,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   if (auto *value = dyn_cast<ValueDecl>(D)) {
     if (value->hasAccessibility() &&
-        value->getAccessibility() == Accessibility::Private &&
+        value->getFormalAccess() == Accessibility::Private &&
         !value->getDeclContext()->isLocalContext()) {
       // FIXME: We shouldn't need to encode this for /all/ private decls.
       // In theory we can follow the same rules as mangling and only include
@@ -2011,7 +2011,7 @@ void Serializer::writeDecl(const Decl *D) {
       underlying = typeAlias->getUnderlyingType();
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(typeAlias->getAccessibility());
+      getRawStableAccessibility(typeAlias->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasLayout::Code];
     TypeAliasLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2081,7 +2081,7 @@ void Serializer::writeDecl(const Decl *D) {
       protocols.push_back(addDeclRef(proto));
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(theStruct->getAccessibility());
+      getRawStableAccessibility(theStruct->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[StructLayout::Code];
     StructLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2111,7 +2111,7 @@ void Serializer::writeDecl(const Decl *D) {
       protocols.push_back(addDeclRef(proto));
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(theEnum->getAccessibility());
+      getRawStableAccessibility(theEnum->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[EnumLayout::Code];
     EnumLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2141,7 +2141,7 @@ void Serializer::writeDecl(const Decl *D) {
       protocols.push_back(addDeclRef(proto));
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(theClass->getAccessibility());
+      getRawStableAccessibility(theClass->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2175,7 +2175,7 @@ void Serializer::writeDecl(const Decl *D) {
       protocols.push_back(addDeclRef(proto));
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(proto->getAccessibility());
+      getRawStableAccessibility(proto->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolLayout::Code];
     ProtocolLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2203,7 +2203,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     Accessors accessors = getAccessors(var);
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(var->getAccessibility());
+      getRawStableAccessibility(var->getFormalAccess());
     uint8_t rawSetterAccessLevel = rawAccessLevel;
     if (var->isSettable(nullptr))
       rawSetterAccessLevel =
@@ -2264,7 +2264,7 @@ void Serializer::writeDecl(const Decl *D) {
       nameComponents.push_back(addIdentifierRef(argName));
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(fn->getAccessibility());
+      getRawStableAccessibility(fn->getFormalAccess());
     uint8_t rawAddressorKind =
       getRawStableAddressorKind(fn->getAddressorKind());
 
@@ -2339,7 +2339,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     Accessors accessors = getAccessors(subscript);
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(subscript->getAccessibility());
+      getRawStableAccessibility(subscript->getFormalAccess());
     uint8_t rawSetterAccessLevel = rawAccessLevel;
     if (subscript->isSettable())
       rawSetterAccessLevel =
@@ -2382,7 +2382,7 @@ void Serializer::writeDecl(const Decl *D) {
       nameComponents.push_back(addIdentifierRef(argName));
 
     uint8_t rawAccessLevel =
-      getRawStableAccessibility(ctor->getAccessibility());
+      getRawStableAccessibility(ctor->getFormalAccess());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,

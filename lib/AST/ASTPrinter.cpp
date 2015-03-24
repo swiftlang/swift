@@ -263,12 +263,12 @@ class PrintAST : public ASTVisitor<PrintAST> {
         D->getAttrs().hasAttribute<AccessibilityAttr>())
       return;
 
-    printAccessibility(D->getAccessibility());
+    printAccessibility(D->getFormalAccess());
 
     if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (auto setter = storageDecl->getSetter()) {
-        Accessibility setterAccess = setter->getAccessibility();
-        if (setterAccess != D->getAccessibility())
+        Accessibility setterAccess = setter->getFormalAccess();
+        if (setterAccess != D->getFormalAccess())
           printAccessibility(setterAccess, "(set)");
       }
     }
@@ -572,7 +572,7 @@ bool PrintAST::shouldPrint(const Decl *D) {
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessibilityFilter > Accessibility::Private &&
         VD->hasAccessibility() &&
-        VD->getAccessibility() < Options.AccessibilityFilter)
+        VD->getFormalAccess() < Options.AccessibilityFilter)
       return false;
   }
 

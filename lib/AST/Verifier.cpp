@@ -1486,7 +1486,7 @@ struct ASTNodeBase {};
       if (ASD->hasAccessibility() && ASD->isSettable(nullptr)) {
         auto setterAccess = ASD->getSetterAccessibility();
         if (ASD->getSetter() &&
-            ASD->getSetter()->getAccessibility() != setterAccess) {
+            ASD->getSetter()->getFormalAccess() != setterAccess) {
           Out << "AbstractStorageDecl's setter accessibility is out of sync"
                  " with the accessibility actually on the setter";
           abort();

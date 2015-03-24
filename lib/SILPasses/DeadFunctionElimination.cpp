@@ -141,7 +141,7 @@ protected:
 
   /// Retrieve the visiblity information from the AST.
   bool isVisibleExternally(ValueDecl *decl) {
-    Accessibility accessibility = decl->getAccessibility();
+    Accessibility accessibility = decl->getEffectiveAccess();
     SILLinkage linkage;
     switch (accessibility) {
     case Accessibility::Private:

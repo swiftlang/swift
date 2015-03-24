@@ -254,7 +254,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
     return false;
 
   // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (CD->getAccessibility()) {
+  switch (CD->getEffectiveAccess()) {
   case Accessibility::Public:
     return false;
   case Accessibility::Internal:

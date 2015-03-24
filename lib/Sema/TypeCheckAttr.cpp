@@ -1100,7 +1100,7 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
 bool AttributeChecker::visitAbstractAccessibilityAttr(
     AbstractAccessibilityAttr *attr) {
   if (Type ty = D->getDeclContext()->getDeclaredTypeInContext()) {
-    Accessibility typeAccess = ty->getAnyNominal()->getAccessibility();
+    Accessibility typeAccess = ty->getAnyNominal()->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
       auto diag = TC.diagnose(attr->getLocation(),
                               diag::access_control_member_more,
@@ -1118,7 +1118,7 @@ bool AttributeChecker::visitAbstractAccessibilityAttr(
 void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
   if (auto extension = dyn_cast<ExtensionDecl>(D)) {
     Type extendedTy = extension->getExtendedType();
-    Accessibility typeAccess = extendedTy->getAnyNominal()->getAccessibility();
+    Accessibility typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
       TC.diagnose(attr->getLocation(), diag::access_control_extension_more,
                   typeAccess,
@@ -1145,7 +1145,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
 
 void
 AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
-  auto getterAccess = cast<ValueDecl>(D)->getAccessibility();
+  auto getterAccess = cast<ValueDecl>(D)->getFormalAccess();
   if (attr->getAccess() > getterAccess) {
     // This must stay in sync with diag::access_control_setter_more.
     enum {

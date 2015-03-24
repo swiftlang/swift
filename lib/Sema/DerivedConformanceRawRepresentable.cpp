@@ -91,7 +91,7 @@ static TypeDecl *deriveRawRepresentable_Raw(TypeChecker &tc,
   rawTypeDecl->setImplicit();
   rawTypeDecl->setType(rawType);
   rawTypeDecl->setInterfaceType(rawInterfaceType);
-  rawTypeDecl->setAccessibility(enumDecl->getAccessibility());
+  rawTypeDecl->setAccessibility(enumDecl->getFormalAccess());
   enumDecl->addMember(rawTypeDecl);
   return rawTypeDecl;
 }
@@ -212,7 +212,7 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   else
     interfaceType = type;
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccessibility(enumDecl->getAccessibility());
+  getterDecl->setAccessibility(enumDecl->getFormalAccess());
 
   if (enumDecl->hasClangNode())
     tc.implicitlyDefinedFunctions.push_back(getterDecl);
@@ -225,7 +225,7 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                          SourceLoc());
-  propDecl->setAccessibility(enumDecl->getAccessibility());
+  propDecl->setAccessibility(enumDecl->getFormalAccess());
   propDecl->setInterfaceType(rawInterfaceType);
   
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
@@ -448,7 +448,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
-  initDecl->setAccessibility(enumDecl->getAccessibility());
+  initDecl->setAccessibility(enumDecl->getFormalAccess());
 
   if (enumDecl->hasClangNode())
     tc.implicitlyDefinedFunctions.push_back(initDecl);

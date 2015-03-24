@@ -75,7 +75,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
     return FormalLinkage::Private;
   }
 
-  switch (D->getAccessibility()) {
+  switch (D->getEffectiveAccess()) {
   case Accessibility::Public:
     return FormalLinkage::PublicUnique;
   case Accessibility::Internal:

@@ -1023,7 +1023,8 @@ TypeConverter::getLinkageForProtocolConformance(const NormalProtocolConformance 
       && C->getDeclContext()->getParentModule() == typeUnit->getParentModule())
     return SILLinkage::Shared;
 
-  switch (C->getProtocol()->getAccessibility()) {
+  // FIXME: This should be using std::min(protocol's access, type's access).
+  switch (C->getProtocol()->getEffectiveAccess()) {
     case Accessibility::Private:
       return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 

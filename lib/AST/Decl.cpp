@@ -2356,7 +2356,7 @@ void AbstractStorageDecl::configureSetRecord(GetSetRecord *getSetInfo,
   auto setSetterAccess = [&](FuncDecl *fn) {
     if (auto setterAccess = GetSetInfo.getInt()) {
       assert(!fn->hasAccessibility() ||
-             fn->getAccessibility() == setterAccess.getValue());
+             fn->getFormalAccess() == setterAccess.getValue());
       fn->overwriteAccessibility(setterAccess.getValue());
     }    
   };
@@ -2428,7 +2428,7 @@ void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
   Set->makeAccessor(this, AccessorKind::IsSetter);
   if (auto setterAccess = GetSetInfo.getInt()) {
     assert(!Set->hasAccessibility() ||
-           Set->getAccessibility() == setterAccess.getValue());
+           Set->getFormalAccess() == setterAccess.getValue());
     Set->overwriteAccessibility(setterAccess.getValue());
   }
 }
@@ -2462,7 +2462,7 @@ void AbstractStorageDecl::setMaterializeForSetFunc(FuncDecl *accessor) {
   accessor->makeAccessor(this, AccessorKind::IsMaterializeForSet);
   if (auto setterAccess = GetSetInfo.getInt()) {
     assert(!accessor->hasAccessibility() ||
-           accessor->getAccessibility() == setterAccess.getValue());
+           accessor->getFormalAccess() == setterAccess.getValue());
     accessor->overwriteAccessibility(setterAccess.getValue());
   }
 }

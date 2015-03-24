@@ -479,7 +479,7 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
     });
 
     alreadyInPrivateContext =
-      (nominal->getAccessibility() == Accessibility::Private);
+      (nominal->getFormalAccess() == Accessibility::Private);
 
     break;
   }
@@ -495,14 +495,14 @@ void Module::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   } else if (privateDiscriminator.empty()) {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [](const ValueDecl *VD) -> bool {
-      return VD->getAccessibility() <= Accessibility::Private;
+      return VD->getFormalAccess() <= Accessibility::Private;
     });
     results.erase(newEnd, results.end());
 
   } else {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [=](const ValueDecl *VD) -> bool {
-      if (VD->getAccessibility() > Accessibility::Private)
+      if (VD->getFormalAccess() > Accessibility::Private)
         return true;
       auto enclosingFile =
         cast<FileUnit>(VD->getDeclContext()->getModuleScopeContext());

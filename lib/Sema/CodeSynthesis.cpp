@@ -1817,7 +1817,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     auto *getter = createGetterPrototype(var, TC);
     // lazy getters are mutating on an enclosing struct.
     getter->setMutating();
-    getter->setAccessibility(var->getAccessibility());
+    getter->setAccessibility(var->getFormalAccess());
 
     VarDecl *newValueParam = nullptr;
     auto *setter = createSetterPrototype(var, newValueParam, TC);
@@ -1868,7 +1868,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                                   ImplicitConstructorKind ICK) {
   ASTContext &context = tc.Context;
   SourceLoc Loc = decl->getLoc();
-  Accessibility accessLevel = decl->getAccessibility();
+  Accessibility accessLevel = decl->getFormalAccess();
   if (!decl->hasClangNode())
     accessLevel = std::min(accessLevel, Accessibility::Internal);
 
@@ -1891,7 +1891,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       if (var->isLet() && var->getParentInitializer())
         continue;
       
-      accessLevel = std::min(accessLevel, var->getAccessibility());
+      accessLevel = std::min(accessLevel, var->getFormalAccess());
 
       auto varType = tc.getTypeOfRValue(var);
 
@@ -2182,8 +2182,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                         selfBodyPattern, bodyParamPatterns,
                                         nullptr, classDecl);
   ctor->setImplicit();
-  ctor->setAccessibility(std::min(classDecl->getAccessibility(),
-                                  superclassCtor->getAccessibility()));
+  ctor->setAccessibility(std::min(classDecl->getFormalAccess(),
+                                  superclassCtor->getFormalAccess()));
 
   // Configure 'self'.
   GenericParamList *outerGenericParams = nullptr;

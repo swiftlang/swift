@@ -620,7 +620,7 @@ static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
   PropertyDecl->setImplicit();
   PropertyDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                              SourceLoc());
-  PropertyDecl->setAccessibility(optionSetDecl->getAccessibility());
+  PropertyDecl->setAccessibility(optionSetDecl->getFormalAccess());
   NewDecls.push_back(PropertyDecl);
 
   Pattern *PropertyPattern =

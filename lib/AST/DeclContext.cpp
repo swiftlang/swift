@@ -416,7 +416,7 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
       return false;
     auto *AFD = cast<AbstractFunctionDecl>(this);
     if (AFD->hasAccessibility())
-      return AFD->getAccessibility() > Accessibility::Private;
+      return AFD->getFormalAccess() > Accessibility::Private;
     break;
   }
 
@@ -427,7 +427,7 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   case DeclContextKind::NominalTypeDecl: {
     auto *nominal = cast<NominalTypeDecl>(this);
     if (nominal->hasAccessibility())
-      return nominal->getAccessibility() > Accessibility::Private;
+      return nominal->getFormalAccess() > Accessibility::Private;
     break;
   }
 

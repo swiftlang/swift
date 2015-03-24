@@ -160,7 +160,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       auto *ED = cast<ExtensionDecl>(D);
       auto *NTD = ED->getExtendedType()->getAnyNominal();
       if (NTD->hasAccessibility() &&
-          NTD->getAccessibility() == Accessibility::Private) {
+          NTD->getFormalAccess() == Accessibility::Private) {
         break;
       }
       extendedNominals.push_back(NTD);
@@ -182,7 +182,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       if (!NTD->hasName())
         break;
       if (NTD->hasAccessibility() &&
-          NTD->getAccessibility() == Accessibility::Private) {
+          NTD->getFormalAccess() == Accessibility::Private) {
         break;
       }
       out << "- \"" << escape(NTD->getName()) << "\"\n";
@@ -198,7 +198,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       if (!VD->hasName())
         break;
       if (VD->hasAccessibility() &&
-          VD->getAccessibility() == Accessibility::Private) {
+          VD->getFormalAccess() == Accessibility::Private) {
         break;
       }
       out << "- \"" << escape(VD->getName()) << "\"\n";
@@ -269,7 +269,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   for (auto &entry : tracker->getUsedNominals()) {
     assert(entry.first != nullptr);
     if (entry.first->hasAccessibility() &&
-        entry.first->getAccessibility() == Accessibility::Private)
+        entry.first->getFormalAccess() == Accessibility::Private)
       continue;
 
     Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);

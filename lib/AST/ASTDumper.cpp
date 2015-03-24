@@ -479,7 +479,7 @@ namespace {
 
       if (VD->hasAccessibility()) {
         OS << " access=";
-        switch (VD->getAccessibility()) {
+        switch (VD->getFormalAccess()) {
         case Accessibility::Private:
           OS << "private";
           break;

@@ -207,7 +207,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   }
   
   // Otherwise, we have external linkage.
-  switch (d->getAccessibility()) {
+  switch (d->getEffectiveAccess()) {
     case Accessibility::Private:
       return (forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
