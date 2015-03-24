@@ -649,6 +649,8 @@ ModuleFile::maybeGetOrReadGenericParams(serialization::DeclID genericContextID,
       return fn->getGenericParams();
     if (auto nominal = dyn_cast<NominalTypeDecl>(genericContext))
       return nominal->getGenericParams();
+    if (auto ext = dyn_cast<ExtensionDecl>(genericContext))
+      return ext->getGenericParams();
     llvm_unreachable("only functions and nominals can provide generic params");
   } else {
     return maybeReadGenericParams(DC, Cursor);
@@ -2893,9 +2895,25 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
     extension->setProtocols(protocols);
 
+    // Conjure up a generic signature from the ref-components and requirements.
+    SmallVector<GenericTypeParamType *, 4> paramTypes;
+    for (const auto &ref : extension->getRefComponents()) {
+      if (ref.GenericParams) {
+        for (auto &genericParam : *ref.GenericParams) {
+          paramTypes.push_back(genericParam->getDeclaredType()
+                               ->castTo<GenericTypeParamType>());
+        }
+      }
+    }
+
     // Read the generic requirements.
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements);
+
+    if (!paramTypes.empty()) {
+      GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
+      extension->setGenericSignature(sig);
+    }
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
@@ -2905,11 +2923,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     extension->setValidated(true);
     extension->setCheckedInheritanceClause();
 
-    // FIXME: Hack because extensions always get the generic parameters of their
-    // nominal types.
-    extension->setGenericSignature(nominal->getGenericSignature());
-    extension->getRefComponents().back().GenericParams
-      = nominal->getGenericParams();
     break;
   }
 

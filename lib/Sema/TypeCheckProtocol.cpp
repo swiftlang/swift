@@ -1591,6 +1591,29 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
                                            DeclContext *fromDC,
                                            bool wasDeducedOrDefaulted) {
+  // If the declaration context from which the type witness was determined
+  // differs from that of the conformance, adjust the type so that it is
+  // based on the declaration context of the conformance.
+  if (fromDC != DC && DC->getGenericSignatureOfContext() &&
+      fromDC->getGenericSignatureOfContext() && !isa<ProtocolDecl>(fromDC)) {
+    TypeSubstitutionMap substitutions;
+    auto fromGenericParams = fromDC->getGenericParamsOfContext();
+    auto toGenericParams = DC->getGenericParamsOfContext();
+    while (fromGenericParams) {
+      auto fromArchetypes = fromGenericParams->getAllArchetypes();
+      auto toArchetypes = toGenericParams->getAllArchetypes();
+      for (unsigned i = 0, n = fromArchetypes.size(); i != n; ++i) {
+        substitutions[fromArchetypes[i]] = toArchetypes[i];
+      }
+
+      fromGenericParams = fromGenericParams->getOuterParameters();
+      toGenericParams = toGenericParams->getOuterParameters();
+    }
+
+    type = type.subst(fromDC->getParentModule(), substitutions,
+                      /*ignoreMissing=*/false, &TC);
+  }
+
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
     assert(Conformance->getTypeWitness(assocType, nullptr).getReplacement()

@@ -683,8 +683,6 @@ ERROR(non_nominal_extension,sema_tcd,none,
 ERROR(extension_access_with_conformances,sema_tcd,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))
-ERROR(extension_generic_args,sema_tcd,none,
-      "generic arguments are not allowed on an extension", ())
 ERROR(extension_metatype,sema_tcd,none,
       "cannot extend a metatype of a type", ())
 ERROR(extension_stored_property,sema_tcd,none,

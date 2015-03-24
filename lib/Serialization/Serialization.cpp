@@ -302,6 +302,8 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
     paramList = fn->getGenericParams();
   else if (auto nominal = dyn_cast<NominalTypeDecl>(D))
     paramList = nominal->getGenericParams();
+  else if (auto ext = dyn_cast<ExtensionDecl>(D))
+    paramList = ext->getGenericParams();
   if (paramList)
     GenericContexts[paramList] = D;
 

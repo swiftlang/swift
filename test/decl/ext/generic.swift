@@ -19,15 +19,15 @@ struct Y {
 struct Z<T : P1 where T.AssocType : P3> { }
 
 // Okay: exact match.
-extension X<T : P1, U : P2, V> { } // expected-error{{generic arguments are not allowed on an extension}}
-extension Z<T : P1 where T.AssocType : P3> { } // expected-error{{generic arguments are not allowed on an extension}}
+extension X<T : P1, U : P2, V> { }
+extension Z<T : P1 where T.AssocType : P3> { }
 
 // Okay: infer missing requirements
-extension X<T, U, V> { } // expected-error{{generic arguments are not allowed on an extension}}
-extension X<T : P1, U, V> { } // expected-error{{generic arguments are not allowed on an extension}}
-extension X<T, U : P2, V> { } // expected-error{{generic arguments are not allowed on an extension}}
-extension Z<T : P1> { } // expected-error{{generic arguments are not allowed on an extension}}
-extension Z<T> { } // expected-error{{generic arguments are not allowed on an extension}}
+extension X<T, U, V> { }
+extension X<T : P1, U, V> { }
+extension X<T, U : P2, V> { }
+extension Z<T : P1> { }
+extension Z<T> { }
 
 // Bad: extra requirements.
 extension X<T : P2, U, V> { } // expected-error{{extension of generic type 'X' cannot add requirements}}
@@ -38,7 +38,7 @@ extension X<T> { } // expected-error{{extension of generic type 'X' has too few 
 extension X<A, B, C, D> { } // expected-error{{extension of generic type 'X' has too many generic parameters (have 4, expected 3)}}
 
 // Name lookup of generic parameters.
-extension X<A, B, C> { // expected-error{{generic arguments are not allowed on an extension}}
+extension X<A, B, C> {
   // Okay: generic parameters from the extension.
   func foo(x: A) -> (B, C) { }
 
@@ -60,7 +60,7 @@ struct LValueCheck<T> {
   let x = 0
 }
 
-extension LValueCheck<A> { // expected-error{{generic arguments are not allowed on an extension}}
+extension LValueCheck<A> {
   init(newY: Int) {
     x = 42   // expected-error {{cannot assign to 'x' in 'self'}}
   }
@@ -83,14 +83,14 @@ struct MemberTypeCheckB<T> : MemberTypeProto {
   var t1: T
 }
 
-extension MemberTypeCheckB<T> { // expected-error{{generic arguments are not allowed on an extension}}
+extension MemberTypeCheckB<T> {
   typealias Underlying = MemberTypeCheckA<T>
 }
 
-extension MemberTypeCheckB<T> { // expected-error{{generic arguments are not allowed on an extension}}
+extension MemberTypeCheckB<T> {
   init(_ x: Underlying) { }
 }
 
-extension MemberTypeCheckB<T> { // expected-error{{generic arguments are not allowed on an extension}}
+extension MemberTypeCheckB<T> {
   var t2: Element { return t1 }  
 }

@@ -5864,6 +5864,8 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
   assert(D->hasAccessibility());
 }
 
+/// Check the generic parameters of an extension, recursively handling all of
+/// the parameter lists within the extension.
 static Type checkExtensionGenericParams(
               TypeChecker &tc, ExtensionDecl *ext,
               ArrayRef<ExtensionDecl::RefComponent> refComponents,
@@ -5984,17 +5986,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     // term. It should become an error with Fix-It that suggests the appropriate
     // generic parameters.
     auto genericParams = ext->getRefComponents().back().GenericParams;
-    if (!genericParams) {
-      // FIXME: Create new generic parameters with the same signature.
-      genericParams = nominal->getGenericParams();
-      ext->getRefComponents().back().GenericParams = genericParams;
-      ext->setGenericSignature(nominal->getGenericSignature());
-
-      // FIXME: We want to use the new generic parameters, not the old ones,
-      // for this reference.
-      ext->setExtendedType(nominal->getDeclaredTypeInContext());
-      return;
-    }
+    assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
     GenericSignature *sig = nullptr;
@@ -6009,10 +6001,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     ext->setGenericSignature(sig);
     ext->setExtendedType(extendedType);
-
-    // ... now complain about this, because it probably doesn't work yet.
-    diagnose(ext, diag::extension_generic_args)
-      .highlight(genericParams->getSourceRange());
     return;
   }
 }

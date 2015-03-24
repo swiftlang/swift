@@ -193,6 +193,32 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
   return *boolType;
 }
 
+/// Clone the given generic parameters in the given list. We don't need any
+/// of the requirements, because they will be inferred.
+static GenericParamList *cloneGenericParams(ASTContext &ctx,
+                                            DeclContext *dc,
+                                            GenericParamList *fromParams,
+                                            GenericParamList *outerParams) {
+  // Clone generic parameters.
+  SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
+  for (auto fromGP : *fromParams) {
+    // Create the new generic parameter.
+    auto toGP = new (ctx) GenericTypeParamDecl(dc, fromGP->getName(),
+                                               SourceLoc(),
+                                               fromGP->getDepth(),
+                                               fromGP->getIndex());
+    toGP->setImplicit(true);
+
+    // Record new generic parameter.
+    toGenericParams.push_back(toGP);
+  }
+
+  auto toParams = GenericParamList::create(ctx, SourceLoc(), toGenericParams,
+                                           SourceLoc());
+  toParams->setOuterParameters(outerParams);
+  return toParams;
+}
+
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedType())
     return;
@@ -250,7 +276,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     // we can't look through a typealias to a bound generic type of any form.
 
     // We aren't referring to a type declaration, so make sure we don't have
-    // generic arguments.
+    // generic arguments.
     auto &ref = ED->getRefComponents()[i];
     auto *tyR = cast<SimpleIdentTypeRepr>(ref.IdentType.getTypeRepr());
     ref.IdentType.setType(ident->getBoundType());
@@ -291,6 +317,12 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
                     typeDecl->getDeclaredType())
           .fixItInsertAfter(tyR->getIdLoc(), genericParamsTextBuf);
       }
+
+      // Clone the existing generic parameter list.
+      ref.GenericParams = cloneGenericParams(TC.Context, ED,
+                                             typeDecl->getGenericParams(),
+                                             outerGenericParams);
+      outerGenericParams = ref.GenericParams;
       continue;
     }
 
