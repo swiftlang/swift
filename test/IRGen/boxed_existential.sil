@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
-// ErrorType implementation currently relies on ObjC interop
-// XFAIL: linux
-
 import Swift
 
 // CHECK-LABEL: define void @retain_release_boxed_existential(%swift.error*)

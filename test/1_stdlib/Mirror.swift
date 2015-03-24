@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
+// XFAIL: linux
+
 import SwiftExperimental
 import StdlibUnittest
 
