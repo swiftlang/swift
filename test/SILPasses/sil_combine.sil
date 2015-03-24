@@ -1946,19 +1946,19 @@ bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
 }
 
 // CHECK-LABEL: sil @remove_trunc_utos_zext_of_or
-// CHECK:       bb0:
-// CHECK:         integer_literal $Builtin.Word, 0
-// CHECK:         integer_literal $Builtin.Word, 0
+// CHECK:       bb0([[Ref:%.*]]: $Builtin.Word):
+// CHECK:         integer_literal $Builtin.Word, 1
+// CHECK:         builtin "lshr_Word"
 // CHECK:         builtin "or_Word"
 // CHECK-NOT:     builtin "zextOrBitCast_Word_Int64"
 // CHECK-NOT:     builtin "u_to_s_checked_conversion_Int64"
 // CHECK-NOT:     builtin "truncOrBitCast_Int64_Word"
 // CHECK:         return
-sil @remove_trunc_utos_zext_of_or : $@thin () -> (Builtin.Word) {
-bb0:
-  %0 = integer_literal $Builtin.Word, 0
-  %1 = integer_literal $Builtin.Word, 0
-  %2 = builtin "or_Word"(%0 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+sil @remove_trunc_utos_zext_of_or : $@thin (Builtin.Word) -> (Builtin.Word) {
+bb0(%0 : $Builtin.Word):
+  %1 = integer_literal $Builtin.Word, 1
+  %l1 = builtin "lshr_Word"(%0 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
+  %2 = builtin "or_Word"(%l1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
   %3 = builtin "zextOrBitCast_Word_Int64"(%2 : $Builtin.Word) : $Builtin.Int64
   %4 = builtin "u_to_s_checked_conversion_Int64"(%3 : $Builtin.Int64): $(Builtin.Int64, Builtin.Int1)
   %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 0
@@ -1970,7 +1970,7 @@ bb0:
 
 // CHECK-LABEL: sil @dont_remove_trunc_utos_zext_of_or
 // CHECK:       bb0([[Ref:%.*]]: $Builtin.Word):
-// CHECK:         integer_literal $Builtin.Word, -1
+// CHECK:         integer_literal $Builtin.Word, -2
 // CHECK:         builtin "or_Word"
 // CHECK:         builtin "zextOrBitCast_Word_Int64"
 // CHECK:         builtin "u_to_s_checked_conversion_Int64"
@@ -1978,7 +1978,7 @@ bb0:
 // CHECK:         return
 sil @dont_remove_trunc_utos_zext_of_or : $@thin (Builtin.Word) -> (Builtin.Word) {
 bb0(%0 : $Builtin.Word):
-  %1 = integer_literal $Builtin.Word, -1
+  %1 = integer_literal $Builtin.Word, -2
   %2 = builtin "or_Word"(%0 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
   %3 = builtin "zextOrBitCast_Word_Int64"(%2 : $Builtin.Word) : $Builtin.Int64
   %4 = builtin "u_to_s_checked_conversion_Int64"(%3 : $Builtin.Int64): $(Builtin.Int64, Builtin.Int1)
@@ -2014,7 +2014,7 @@ bb0:
 
 // CHECK-LABEL: sil @dont_remove_trunc_utos_zext_of_xor
 // CHECK:       bb0([[Ref:%.*]]: $Builtin.Word):
-// CHECK:         integer_literal $Builtin.Word, 0
+// CHECK:         integer_literal $Builtin.Word, 1
 // CHECK:         builtin "xor_Word"
 // CHECK:         builtin "zextOrBitCast_Word_Int64"
 // CHECK:         builtin "u_to_s_checked_conversion_Int64"
@@ -2022,7 +2022,7 @@ bb0:
 // CHECK:         return
 sil @dont_remove_trunc_utos_zext_of_xor : $@thin (Builtin.Word) -> (Builtin.Word) {
 bb0(%0 : $Builtin.Word):
-  %1 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
   %2 = builtin "xor_Word"(%0 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
   %3 = builtin "zextOrBitCast_Word_Int64"(%2 : $Builtin.Word) : $Builtin.Int64
   %4 = builtin "u_to_s_checked_conversion_Int64"(%3 : $Builtin.Int64): $(Builtin.Int64, Builtin.Int1)

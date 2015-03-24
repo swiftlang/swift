@@ -1004,6 +1004,71 @@ SILInstruction *optimizeBuiltinArrayOperation(BuiltinInst *I,
   return nullptr;
 }
 
+/// Get operands of a binary bitop builtin where one operand is an integer
+/// literal.
+static bool getBitOpArgs(BuiltinInst *BI, SILValue &op, APInt &bits) {
+  OperandValueArrayRef Args = BI->getArguments();
+  if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[0])) {
+    op = Args[1];
+    bits = IL->getValue();
+    return true;
+  }
+  if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
+    op = Args[0];
+    bits = IL->getValue();
+    return true;
+  }
+  return false;
+}
+
+/// Optimizes binary bit operations. Optimizations for "and":
+///   x & 0 -> 0
+///   x & ~0 -> x
+///   (x & c1) & c2 -> x & (c1 & c2)
+/// The same optimizations are done for "or" and "xor".
+template <typename CombineFunc, typename NeutralFunc, typename ZeroFunc>
+SILInstruction *optimizeBitOp(BuiltinInst *BI,
+                              CombineFunc combine,
+                              NeutralFunc isNeutral,
+                              ZeroFunc isZero,
+                              SILBuilder *Builder,
+                              SILCombiner *C) {
+  SILValue firstOp;
+  APInt bits;
+  if (!getBitOpArgs(BI, firstOp, bits))
+    return nullptr;
+
+  // Combine all bits of consecutive bit operations, e.g. ((op & c1) & c2) & c3
+  SILValue op = firstOp;
+  BuiltinInst *Prev;
+  APInt prevBits;
+  while ((Prev = dyn_cast<BuiltinInst>(op)) &&
+         Prev->getBuiltinInfo().ID == BI->getBuiltinInfo().ID &&
+         getBitOpArgs(Prev, op, prevBits)) {
+    combine(bits, prevBits);
+  }
+  if (isNeutral(bits))
+    // The bit operation has no effect, e.g. x | 0 -> x
+    return C->replaceInstUsesWith(*BI, op.getDef());
+
+  if (isZero(bits))
+    // The bit operation yields to a constant, e.g. x & 0 -> 0
+    return IntegerLiteralInst::create(BI->getLoc(), BI->getType(), bits,
+                                      *BI->getFunction());
+  
+  if (op != firstOp) {
+    // We combined multiple bit operations to a single one,
+    // e.g. (x & c1) & c2 -> x & (c1 & c2)
+    auto *newLI = Builder->createIntegerLiteral(BI->getLoc(), BI->getType(),
+                                                bits);
+    return BuiltinInst::create(BI->getLoc(), BI->getName(), BI->getType(),
+                               BI->getSubstitutions(),
+                               { op, newLI },
+                               *BI->getFunction());
+  }
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
     return optimizeBuiltinCanBeObjCClass(I);
@@ -1048,6 +1113,24 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     }
     break;
   }
+  case BuiltinValueKind::And:
+    return optimizeBitOp(I,
+      [](APInt &left, const APInt &right) { left &= right; }    /* combine */,
+      [](const APInt &i) -> bool { return i.isAllOnesValue(); } /* isNeutral */,
+      [](const APInt &i) -> bool { return i.isMinValue(); }     /* isZero */,
+      Builder, this);
+  case BuiltinValueKind::Or:
+    return optimizeBitOp(I,
+      [](APInt &left, const APInt &right) { left |= right; }    /* combine */,
+      [](const APInt &i) -> bool { return i.isMinValue(); }     /* isNeutral */,
+      [](const APInt &i) -> bool { return i.isAllOnesValue(); } /* isZero */,
+      Builder, this);
+  case BuiltinValueKind::Xor:
+    return optimizeBitOp(I,
+      [](APInt &left, const APInt &right) { left ^= right; } /* combine */,
+      [](const APInt &i) -> bool { return i.isMinValue(); }  /* isNeutral */,
+      [](const APInt &i) -> bool { return false; }           /* isZero */,
+      Builder, this);
   default:
     break;
   }
