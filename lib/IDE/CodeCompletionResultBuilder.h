@@ -191,6 +191,18 @@ public:
       addTypeAnnotation(Annotation);
   }
 
+  bool escapeKeyword(StringRef Word, llvm::SmallString<16> &EscapedKeyword) {
+#define KEYWORD(kw)                                                           \
+    if (Word.equals(#kw)) {                                                   \
+      EscapedKeyword.append("`");                                             \
+      EscapedKeyword.append(Word);                                            \
+      EscapedKeyword.append("`");                                             \
+      return true;                                                            \
+    }
+#include "swift/Parse/Tokens.def"
+    return false;
+  }
+
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
                         bool IsVarArg) {
     CurrentNestingLevel++;
@@ -204,8 +216,12 @@ public:
       // buffer.
       bool IsAnnotation = (NameStr == "self");
 
+      llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterName, NameStr);
+          CodeCompletionString::Chunk::ChunkKind::CallParameterName,
+          // if the name is not annotation, we need to escape keyword
+          !IsAnnotation && escapeKeyword(NameStr, EscapedKeyword) ?
+            EscapedKeyword.str() : NameStr);
       if (IsAnnotation)
         getLastChunk().setIsAnnotation();
 
@@ -223,10 +239,12 @@ public:
     }
 
     if (Name.empty() && !LocalName.empty()) {
+      llvm::SmallString<16> EscapedKeyword;
       // Use local (non-API) parameter name if we have nothing else.
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-          LocalName.str());
+          escapeKeyword(LocalName.str(), EscapedKeyword) ? EscapedKeyword.str()
+                                                         : LocalName.str());
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }

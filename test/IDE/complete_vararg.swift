@@ -20,6 +20,9 @@ class C {
   func method1(#x: Int...) { }
   func method2(#x: Int, y: Int...) { }
   func method3(#w: Int...)(#x: Int...) { }
+  func method4(#`do` : Int...) {}
+  func method5(`class` : Int...) {}
+  func method6(`class` `protocol`: Int...) {}
   subscript(i: Int...) -> Int { return 0 }
 }
 
@@ -45,6 +48,9 @@ func testObjDot1() {
 // OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method1({#x: Int...#})[#Void#]{{; name=.+$}}
 // OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method2({#x: Int#}, {#y: Int...#})[#Void#]{{; name=.+$}}
 // OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method3({#w: Int...#})[#(x: Int...) -> Void#]{{; name=.+$}}
+// OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method4({#`do`: Int...#})[#Void#]{{; name=.+$}}
+// OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method5({#(`class`): Int...#})[#Void#]{{; name=.+$}}
+// OBJ_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   method6({#`class`: Int...#})[#Void#]{{; name=.+$}}
 // OBJ_DOT_1: End completions
 
 func testFreeFunc() {
