@@ -2325,13 +2325,17 @@ bool SimplifyCFG::run() {
     // loops.
     RU.run();
 
-    // Force dominator recomputation below.
-    PM->invalidateAnalysis(&Fn, SILAnalysis::PreserveKind::Nothing);
     Changed = true;
   }
 
   // Do simplifications that require the dominator tree to be accurate.
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+
+  if (Changed) {
+    // Force dominator recomputation since we modifed the cfg.
+    DA->invalidate(&Fn, SILAnalysis::PreserveKind::Nothing);
+  }
+
   DT = DA->getDomInfo(&Fn);
   PDT = DA->getPostDomInfo(&Fn);
   Changed |= dominatorBasedSimplify(DT);
@@ -3122,7 +3126,7 @@ public:
   /// The entry point to the transformation.
   void run() override {
     if (SimplifyCFG(*getFunction(), PM).simplifyBlockArgs())
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
   }
   
   StringRef getName() override { return "Simplify Block Args"; }
