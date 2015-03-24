@@ -273,17 +273,8 @@ static bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
     }
   } while (HadProgress);
 
-  bool Success = true;
-  for (unsigned i = 0; i != LinkLibraries.size(); ++i) {
-    if (!LoadedLibraries[i]) {
-      Success = false;
-      auto Lib = LinkLibraries[i];
-      Diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_library,
-                     (unsigned)Lib.getKind(),
-                     llvm::sys::path::stem(Lib.getName()));
-    }
-  }
-  return Success;
+  return std::all_of(LoadedLibraries.begin(), LoadedLibraries.end(),
+                     [](bool Value) { return Value; });
 }
 
 static void linkerDiagnosticHandler(const llvm::DiagnosticInfo &DI,
@@ -354,18 +345,19 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     prev = next;
   }
 
-  bool hadError = !tryLoadLibraries(
-      AllLinkLibraries, CI.getASTContext().SearchPathOpts, CI.getDiags());
+  tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,
+                   CI.getDiags());
 
   ImportedModules.insert(M);
   if (!CI.hasSourceImport())
-    return hadError;
+    return false;
 
   // IRGen the modules this module depends on. This is only really necessary
   // for imported source, but that's a very convenient thing to do in -i mode.
   // FIXME: Crawling all loaded modules is a hack.
   // FIXME: And re-doing SILGen, SIL-linking, SIL diagnostics, and IRGen is
   // expensive, because it's not properly being limited to new things right now.
+  bool hadError = false;
   for (auto &entry : CI.getASTContext().LoadedModules) {
     swift::Module *import = entry.second;
     if (!ImportedModules.insert(import).second)
