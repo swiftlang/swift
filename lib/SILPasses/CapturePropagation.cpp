@@ -325,12 +325,9 @@ void CapturePropagation::run() {
       }
     }
   }
-  // FIXME: This conservatively invalidates everything. But the transform
-  // actually changes neither the CFG nor the static call graph. I only made
-  // this conservative in case someone implements interprocedural/dynamic call
-  // graph analysis later.
+
   if (HasChanged)
-    invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+    invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
 }
 
 SILTransform *swift::createCapturePropagation() {
