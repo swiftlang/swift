@@ -69,7 +69,7 @@ class Base3 {
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TFC19devirt_default_case5Base35outerfS0_FT_T_
 // CHECK: function_ref @_TFC19devirt_default_caseP{{.*}}8Derived36middlefS0_FT_T_
 // CHECK: function_ref @_TFC19devirt_default_case5Base36middlefS0_FT_T_
-// CHECK-NOMRAL-NOT: class_method
+// CHECK-NORMAL-NOT: class_method
 // CHECK-TESTABLE: class_method %0 : $Base3, #Base3.middle!1
 // CHECK: }
   @inline(never) func outer() {
