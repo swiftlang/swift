@@ -42,13 +42,10 @@ class SILLinker : public SILModuleTransform {
   void run() override {
     // Copies code from the standard library into the user program to enable
     // optimizations.
-    bool Changed = false;
     SILModule &M = *getModule();
     for (auto &Fn : M)
-      Changed |= M.linkFunction(&Fn, SILModule::LinkingMode::LinkAll);
-
-    if (Changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      if (M.linkFunction(&Fn, SILModule::LinkingMode::LinkAll))
+          invalidateAnalysis(&Fn, SILAnalysis::PreserveKind::Nothing);
   }
 
   StringRef getName() override { return "SIL Linker"; }
