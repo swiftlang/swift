@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -O -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-sil -enable-testing | FileCheck -check-prefix=CHECK-TESTING %s
 
 // Check if cycles are removed.
 
@@ -86,14 +87,29 @@ public func callTest() {
 // CHECK-NOT: sil {{.*}}deadWitness
 // CHECK-NOT: sil {{.*}}publicClassMethod
 
+// CHECK-TESTING: sil {{.*}}inCycleA
+// CHECK-TESTING: sil {{.*}}inCycleB
+// CHECK-TESTING: sil {{.*}}deadMethod
+// CHECK-TESTING: sil {{.*}}publicClassMethod
+// CHECK-TESTING: sil {{.*}}deadWitness
+
 // CHECK-LABEL: sil_vtable Base
 // CHECK-NOT: deadMethod
+
+// CHECK-TESTING-LABEL: sil_vtable Base
+// CHECK-TESTING: deadMethod
 
 // CHECK-LABEL: sil_vtable Derived
 // CHECK-NOT: deadMethod
 
+// CHECK-TESTING-LABEL: sil_vtable Derived
+// CHECK-TESTING: deadMethod
+
 // CHECK-LABEL: sil_witness_table hidden Adopt: Prot
 // CHECK: deadWitness{{.*}} nil
+
+// CHECK-TESTING-LABEL: sil_witness_table Adopt: Prot
+// CHECK-TESTING: deadWitness{{.*}}: @{{.*}}deadWitness
 
 
 

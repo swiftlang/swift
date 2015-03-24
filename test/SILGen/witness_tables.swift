@@ -1,6 +1,10 @@
 // RUN: %target-swift-frontend -emit-silgen -parse-stdlib -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
-// RUN: FileCheck -check-prefix=TABLE %s < %t.sil
+// RUN: FileCheck -check-prefix=TABLE -check-prefix=TABLE-ALL %s < %t.sil
 // RUN: FileCheck -check-prefix=SYMBOL %s < %t.sil
+
+// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-testing > %t.testable.sil
+// RUN: FileCheck -check-prefix=TABLE-TESTABLE -check-prefix=TABLE-ALL %s < %t.testable.sil
+// RUN: FileCheck -check-prefix=SYMBOL-TESTABLE %s < %t.testable.sil
 
 import witness_tables_b
 
@@ -57,9 +61,11 @@ struct ConformingAssoc : AssocReqt {
   func requiredMethod() {}
 }
 // TABLE-LABEL: sil_witness_table hidden ConformingAssoc: AssocReqt module witness_tables {
-// TABLE-NEXT:    method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodUS1___fQPS1_FT_T_
-// TABLE-NEXT:  }
+// TABLE-TESTABLE-LABEL: sil_witness_table ConformingAssoc: AssocReqt module witness_tables {
+// TABLE-ALL-NEXT:    method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodUS1___fQPS1_FT_T_
+// TABLE-ALL-NEXT:  }
 // SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodUS1___fQPS1_FT_T_ : $@cc(witness_method) @thin (@in_guaranteed ConformingAssoc) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodUS1___fQPS1_FT_T_ : $@cc(witness_method) @thin (@in_guaranteed ConformingAssoc) -> ()
 
 struct ConformingStruct : AnyProtocol {
   typealias AssocType = SomeAssoc
@@ -88,6 +94,11 @@ func <~>(x: ConformingStruct, y: ConformingStruct) {}
 // SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_16assocTypesMethodUS1__U_S_9AssocReqt__fQPS1_FT1xQS3_9AssocType1yQS3_13AssocWithReqt_T_ : $@cc(witness_method) @thin (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingStruct) -> ()
 // SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_12staticMethodUS1__U_S_9AssocReqt__fMQPS1_FT1xS3__T_ : $@cc(witness_method) @thin (@in ConformingStruct, @thick ConformingStruct.Type) -> ()
 // SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_oi3ltgUS1__U_S_9AssocReqt__{{.*}} : $@cc(witness_method) @thin (@in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_6methodUS1__U_S_9AssocReqt__fQPS1_FT1xVS_3Arg1yS3__T_ : $@cc(witness_method) @thin (Arg, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_7genericUS1__U_S_9AssocReqt__fQPS1_US_13ArchetypeReqt__FT1xQ_1yS3__T_ : $@cc(witness_method) @thin <A where A : ArchetypeReqt> (@in A, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_16assocTypesMethodUS1__U_S_9AssocReqt__fQPS1_FT1xQS3_9AssocType1yQS3_13AssocWithReqt_T_ : $@cc(witness_method) @thin (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingStruct) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_12staticMethodUS1__U_S_9AssocReqt__fMQPS1_FT1xS3__T_ : $@cc(witness_method) @thin (@in ConformingStruct, @thick ConformingStruct.Type) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_oi3ltgUS1__U_S_9AssocReqt__{{.*}} : $@cc(witness_method) @thin (@in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> ()
 
 protocol AddressOnly {}
 

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -O -module-name devirt_default_case -disable-func-sig-opts -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -O -module-name devirt_default_case -disable-func-sig-opts -emit-sil %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
+// RUN: %target-swift-frontend -O -module-name devirt_default_case -disable-func-sig-opts -emit-sil -enable-testing %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
 @asmname("action")
 func action(n:Int)->()
@@ -62,12 +63,14 @@ public func callOuter(x: Int) -> Int {
 class Base3 {
   @inline(never) func inner() { action(5)}
   @inline(never) func middle() { inner() }
-// Check that call to Base3.middle can be devirtualized
+// Check that call to Base3.middle can be devirtualized when not compiling
+// for testing.
 // 
-// CHECK-LABEL: sil hidden [noinline] @_TFC19devirt_default_case5Base35outerfS0_FT_T_
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TFC19devirt_default_case5Base35outerfS0_FT_T_
 // CHECK: function_ref @_TFC19devirt_default_caseP{{.*}}8Derived36middlefS0_FT_T_
 // CHECK: function_ref @_TFC19devirt_default_case5Base36middlefS0_FT_T_
-// CHECK-NOT: class_method
+// CHECK-NOMRAL-NOT: class_method
+// CHECK-TESTABLE: class_method %0 : $Base3, #Base3.middle!1
 // CHECK: }
   @inline(never) func outer() {
     middle()
@@ -92,9 +95,10 @@ class E2 :C2 {}
 func foo(a: A2) -> Int {
 // Check that call to A2.f() can be devirualized.
 //
-// CHECK-LABEL: sil hidden [noinline] @_TF19devirt_default_case3fooFCS_2A2Si
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A2Si
 // CHECK: function_ref @_TFC19devirt_default_case2A21ffS0_FT_Si
-// CHECK-NOT: class_method
+// CHECK-NORMAL-NOT: class_method
+// CHECK-TESTABLE: class_method %0 : $A2, #A2.f!1
 // CHECK: }
   return a.f()
 }
@@ -115,10 +119,11 @@ class E3 :C3 {}
 func foo(a: A3) -> Int {
 // Check that call to A3.f() can be devirualized.
 //
-// CHECK-LABEL: sil hidden [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
 // CHECK: function_ref @_TFC19devirt_default_case2B31ffS0_FT_Si
 // CHECK: function_ref @_TFC19devirt_default_case2A31ffS0_FT_Si
-// CHECK-NOT: class_method
+// CHECK-NORMAL-NOT: class_method
+// CHECK-TESTABLE: class_method %0 : $A3, #A3.f!1
 // CHECK: }
   return a.f()
 }
@@ -132,10 +137,11 @@ class Base4 {
   func test() { 
 // Check that call to foo() can be devirtualized
 //
-// CHECK-LABEL: sil hidden [noinline] @_TFC19devirt_default_case5Base44testfS0_FT_T_ 
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TFC19devirt_default_case5Base44testfS0_FT_T_
 // CHECK: function_ref @_TFC19devirt_default_case8Derived43foofS0_FT_T_ 
 // CHECK: function_ref @_TFC19devirt_default_case5Base43foofS0_FT_T_
-// CHECK-NOT: class_method
+// CHECK-NORMAL-NOT: class_method
+// CHECK-TESTABLE: class_method %0 : $Base4, #Base4.foo!1
 // CHECK: }
     foo() 
   }
@@ -178,7 +184,7 @@ class D6 : C6 {
 func check_static_class_devirt(c: C6) -> Int { 
 // Check that C.bar() and D.bar() are devirtualized.
 //
-// CHECK-LABEL: sil hidden [noinline] @_TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case25check_static_class_devirtFCS_2C6Si
 // CHECK: checked_cast_br [exact] %0 : $C6 to $D6
 // CHECK: checked_cast_br [exact] %0 : $C6 to $C6
 // CHECK: class_method
@@ -197,14 +203,16 @@ class B7 : A7 { @inline(never) override func foo() -> Bool { return true } }
 // Check that it compiles without crashes and devirtualizes
 // calls to A7.foo and B7.foo
 //
-// CHECK-LABEL: sil hidden [noinline] @_TF19devirt_default_case33check_call_on_downcasted_instanceFCS_2A7Sb
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case33check_call_on_downcasted_instanceFCS_2A7Sb
 // CHECK: checked_cast_br
 // CHECK-NOT: class_method
 // CHECK: unconditional_checked_cast
 // CHECK: function_ref @_TFC19devirt_default_case2B73foofS0_FT_Sb
-// CHECK-NOT: class_method
+// CHECK-NORMAL-NOT: class_method
+// CHECK-TESTABLE: class_method %{{[0-9]+}} : $B7, #B7.foo!1
 // CHECK: function_ref @_TFC19devirt_default_case2A73foofS0_FT_Sb
-// CHECK-NOT: class_method
+// CHECK-NORMAL-NOT: class_method
+// CHECK-TESTABLE: class_method %{{[0-9]+}} : $A7, #A7.foo!1
 // CHECK: return
 @inline(never)
 func check_call_on_downcasted_instance(a: A7) -> Bool {

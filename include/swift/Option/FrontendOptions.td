@@ -180,9 +180,6 @@ def enable_objc_implicit_properties :
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
-def enable_testing : Flag<["-"], "enable-testing">,
-  HelpText<"Allows this module's internal API to be accessed for testing">;
-
 def diagnose_generic_extensions : Flag<["-"], "diagnose-generic-extensions">,
   HelpText<"Diagnose extensions of generic types without type parameters">;
 

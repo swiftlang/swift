@@ -5,6 +5,10 @@
 // RUN: %target-swift-frontend -emit-sil -O -primary-file %s %S/Inputs/whole_module_optimization_helper.swift -o %t.unopt.sil -module-name main
 // RUN: FileCheck %s -check-prefix=CHECK-SINGLE-FILE < %t.unopt.sil
 
+// RUN: %target-swift-frontend -emit-sil -O -enable-testing %s %S/Inputs/whole_module_optimization_helper.swift -o %t.testing.sil -module-name main
+// RUN: FileCheck %s < %t.testing.sil
+// RUN: FileCheck %s -check-prefix=NEGATIVE-TESTABLE < %t.testing.sil
+
 private func privateFn() -> Int32 {
   return 2
 }
@@ -28,4 +32,6 @@ public func getAnswer() -> Int32 {
 // CHECK-SINGLE-FILE: }
 
 // NEGATIVE-NOT: sil {{.+}}privateFn
+// NEGATIVE-TESTABLE-NOT: sil {{.+}}privateFn
 // NEGATIVE-NOT: sil {{.+}}compute
+// CHECK-TESTABLE: sil {{.+}}compute

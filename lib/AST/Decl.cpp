@@ -40,6 +40,10 @@
 
 using namespace swift;
 
+bool impl::isTestingEnabled(const ValueDecl *VD) {
+  return VD->getModuleContext()->isTestingEnabled();
+}
+
 clang::SourceLocation ClangNode::getLocation() const {
   if (auto D = getAsDecl())
     return D->getLocation();

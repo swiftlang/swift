@@ -2057,16 +2057,12 @@ public:
     return TypeAndAccess.getInt().getValue();
   }
 
-  /// Returns the access level that actually controls how a declaration may be
-  /// used.
+  /// Returns the access level that actually controls how a declaration should
+  /// be emitted and may be used.
   ///
-  /// This is the access used when deciding whether a particular declaration
-  /// is only accessible from the current module. For declarations from other
-  /// modules, it behaves identically to getFormalAccess(). Rather than check
-  /// for this yourself, just use isAccessibleFrom() instead.
-  Accessibility getEffectiveAccess() const {
-    return getFormalAccess();
-  }
+  /// This is the access used when making optimization and code generation
+  /// decisions. It should not be used at the AST or semantic level.
+  Accessibility getEffectiveAccess() const;
 
   void setAccessibility(Accessibility access) {
     assert(!hasAccessibility() && "accessibility already set");
@@ -5502,6 +5498,23 @@ inline bool ValueDecl::isSettable(DeclContext *UseDC) const {
     return sd->isSettable();
   } else
     return false;
+}
+
+namespace impl {
+  bool isTestingEnabled(const ValueDecl *VD);
+}
+
+inline Accessibility ValueDecl::getEffectiveAccess() const {
+  switch (getFormalAccess()) {
+  case Accessibility::Public:
+    return Accessibility::Public;
+  case Accessibility::Internal:
+    if (impl::isTestingEnabled(this))
+      return Accessibility::Public;
+    return Accessibility::Internal;
+  case Accessibility::Private:
+    return Accessibility::Private;
+  }
 }
 
 inline Optional<VarDecl *>
