@@ -3104,9 +3104,9 @@ container may use one of several representations:
   and ``release``-d. The following instructions manipulate boxed existential
   containers:
 
-  * alloc_existential_box (TBW)
-  * open_existential_box (TBW)
-  * dealloc_existential_box (TBW)
+  * `alloc_existential_box`_
+  * `open_existential_box`_
+  * `dealloc_existential_box`_
 
 Some existential types may additionally support specialized representations
 when they contain certain known concrete types. For example, when Objective-C
