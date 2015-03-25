@@ -31,7 +31,7 @@ endif()
 set(swift_runtime_objc_sources)
 set(swift_runtime_unicode_normalization_sources)
 set(swift_runtime_link_libraries)
-if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OSX")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(swift_runtime_objc_sources
       Availability.mm
       ErrorObject.mm
