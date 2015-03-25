@@ -25,6 +25,27 @@ import Swift
 ///
 /// Mirrors are used by playgrounds and the debugger.
 public struct Mirror {
+
+  /// Initialize a mirror that reflects upon the given `instance`.
+  ///
+  /// If the dynamic type of `instance` conforms to
+  /// `CustomReflectable`, returns the result of calling its
+  /// `customReflect` method.  Otherwise, returns a mirror synthesized
+  /// for `instance` by the language.
+  ///
+  /// Note: If the dynamic type of `instance` has value semantics,
+  /// subsequent mutations of `instance` will not observable in
+  /// `Mirror`.  In general, though, the observability of such
+  /// mutations is unspecified.
+  public init(reflect instance: Any) {
+    if let customized? = instance as? CustomReflectable {
+      self = customized.customReflect()
+    }
+    else {
+      self = Mirror(Swift.reflect(instance))
+    }
+  }
+  
   /// An element of the reflected instance's structure.  The optional
   /// `label` may be used when appropriate, e.g. to represent the name
   /// of a stored property or of an active `enum` case, and will be
@@ -138,26 +159,6 @@ public protocol CustomReflectable {
   func customReflect() -> Mirror
 }
 
-/// Return the mirror that reflects upon the given instance.
-///
-/// If the dynamic type of instance conforms to `CustomReflectable`,
-/// returns the result of calling its `customReflect` method.
-/// Otherwise, returns a mirror synthesized for `instance` by the
-/// language.
-///
-/// Note: If the dynamic type of instance has value semantics,
-/// subsequent mutations of `instance` will not observable in
-/// `Mirror`.  In general, though, the observability of such mutations
-/// is unspecified.
-public func reflect(instance: Any) -> Mirror {
-  if let customized? = instance as? CustomReflectable {
-    return customized.customReflect()
-  }
-  else {
-    return Mirror(Swift.reflect(instance))
-  }
-}
-
 //===--- Addressing -------------------------------------------------------===//
 
 /// A protocol for legitimate arguments to `Mirror`\ 's `descendant`
@@ -217,7 +218,7 @@ extension Mirror {
   ) -> Any? {
     var result: Any = _Dummy(mirror: self)
     for e in [first] + rest {
-      let children = reflect(result).children
+      let children = Mirror(reflect: result).children
       let position: Children.Index
       if let label? = e as? String {
         position = _find(children) { $0.label == label } ?? children.endIndex

@@ -16,8 +16,6 @@
 import SwiftExperimental
 import StdlibUnittest
 
-let reflect = SwiftExperimental.reflect
-
 var mirrors = TestSuite("Mirrors")
 
 extension Mirror: Printable {
@@ -121,7 +119,7 @@ mirrors.test("LabeledStructure") {
 }
 
 mirrors.test("Legacy") {
-  let m = reflect([1, 2, 3])
+  let m = Mirror(reflect: [1, 2, 3])
   let x0: [Mirror.Child] = [
     (label: "[0]", value: 1),
     (label: "[1]", value: 2),
@@ -134,7 +132,7 @@ mirrors.test("Legacy") {
 }
 
 mirrors.test("Addressing") {
-  let m0 = reflect([1, 2, 3])
+  let m0 = Mirror(reflect: [1, 2, 3])
   expectEqual(1, m0.descendant(0) as? Int)
   expectEqual(1, m0.descendant("[0]") as? Int)
   expectEqual(2, m0.descendant(1) as? Int)
@@ -142,7 +140,7 @@ mirrors.test("Addressing") {
   expectEqual(3, m0.descendant(2) as? Int)
   expectEqual(3, m0.descendant("[2]") as? Int)
   
-  let m1 = reflect((a: ["one", "two", "three"], b: 4))
+  let m1 = Mirror(reflect: (a: ["one", "two", "three"], b: 4))
   let ott0 = m1.descendant(0) as? [String]
   expectNotEmpty(ott0)
   let ott1 = m1.descendant(".0") as? [String]
@@ -170,7 +168,7 @@ mirrors.test("Addressing") {
     (a: ["five"], b: Zee()),
     (a: [], b: Zee())]
 
-  let m = reflect(x)
+  let m = Mirror(reflect: x)
   let two = m.descendant(0, ".0", 1)
   expectEqual("two", two as? String)
   expectEqual(1, m.descendant(1, 1, "bark") as? Int)
@@ -180,7 +178,7 @@ mirrors.test("Addressing") {
 
 mirrors.test("Invalid Path Type") {
   struct X : MirrorPathType {}
-  let m = reflect([1, 2, 3])
+  let m = Mirror(reflect: [1, 2, 3])
   expectEqual(1, m.descendant(0) as? Int)
   expectCrashLater()
   m.descendant(X())
