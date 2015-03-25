@@ -22,22 +22,36 @@
 //===----------------------------------------------------------------------===//
 
 #include "ErrorObject.h"
+#include <objc/runtime.h>
 #include <Foundation/Foundation.h>
 
 using namespace swift;
 
-// A dummy object we can use as a sentinel value to recognize SwiftErrors
-// whose NSError bits haven't been initialized, in a way debuggers can easily
-// recognize.
-static const id UnbridgedSwiftError = @"<uninitialized Swift ErrorType>";
+/// A subclass of NSError used to represent bridged native Swift errors.
+@interface _SwiftNativeNSError : NSError
+@end
+
+@implementation _SwiftNativeNSError
+
+- (void)dealloc {
+  // We must destroy the contained Swift value.
+  auto error = (SwiftError*)self;
+  error->getType()->vw_destroy(error->getValue());
+
+  [super dealloc];
+}
+
+@end
 
 /// Allocate a catchable error object.
 static BoxPair::Return
 _swift_allocError_(const Metadata *type,
                    const WitnessTable *errorConformance) {
-  static CFTypeID CFErrorID = CFErrorGetTypeID();
+  static auto TheSwiftNativeNSError = [_SwiftNativeNSError class];
+  assert(class_getInstanceSize(TheSwiftNativeNSError) == sizeof(NSErrorLayout)
+         && "NSError layout changed!");
   
-  // Determine the allocated space necessary to carry the value.
+  // Determine the extra allocated space necessary to carry the value.
   // TODO: If the error type is a simple enum with no associated values, we
   // could emplace it in the "code" slot of the NSError and save ourselves
   // some work.
@@ -45,17 +59,20 @@ _swift_allocError_(const Metadata *type,
   unsigned size = type->getValueWitnesses()->getSize();
   unsigned alignMask = type->getValueWitnesses()->getAlignmentMask();
 
-  size_t valueOffset = (sizeof(SwiftError) + alignMask) & ~alignMask;
-  size_t totalSize = valueOffset + size;
+  size_t alignmentPadding = -sizeof(SwiftError) & alignMask;
+  size_t totalExtraSize = sizeof(SwiftError) - sizeof(NSErrorLayout)
+    + alignmentPadding + size;
+  size_t valueOffset = alignmentPadding + sizeof(SwiftError);
   
   // Allocate the instance as if it were a CFError. We won't really initialize
   // the CFError parts until forced to though.
-  auto instance = (SwiftError*)_CFRuntimeCreateInstance(kCFAllocatorDefault,
-                                 CFErrorID, totalSize - sizeof(CFRuntimeBase),
-                                 nullptr);
+  auto instance
+    = (SwiftError *)class_createInstance(TheSwiftNativeNSError, totalExtraSize);
+
+  // Leave the NSError bits zero-initialized. We'll lazily instantiate them when
+  // needed.
 
   // Initialize the Swift type metadata.
-  instance->domain = (CFStringRef)UnbridgedSwiftError;
   instance->type = type;
   instance->errorConformance = errorConformance;
   
@@ -79,7 +96,7 @@ swift::swift_allocError(const Metadata *type,
 static void
 _swift_deallocError_(SwiftError *error,
                      const Metadata *type) {
-  CFAllocatorDeallocate(kCFAllocatorDefault, error);
+  object_dispose((id)error);
 }
 
 extern "C" auto *_swift_deallocError = _swift_deallocError_;

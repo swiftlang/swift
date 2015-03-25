@@ -32,36 +32,42 @@
 namespace swift {
 
 /// A mockery of the physical layout of NSError and CFError.
-struct OpaqueNSError {
+struct NSErrorLayout {
+  // CFError has a CF refcounting header. NSError reserves a word after the
+  // 'isa' in order to be layout-compatible.
   CFRuntimeBase base;
   CFIndex code;
   CFStringRef domain;
   CFDictionaryRef userInfo;
 };
 
+static_assert(sizeof(CFRuntimeBase) == sizeof(void*) * 2,
+              "size of CFRuntimeBase changed");
+
 /// The layout of the Swift ErrorType box.
-struct SwiftError : OpaqueNSError {
+struct SwiftError : NSErrorLayout {
   // By inheriting OpaqueNSError, the SwiftError structure reserves enough
   // space within itself to lazily emplace an NSError instance, and gets
   // Core Foundation's refcounting scheme.
 
   /// The type of Swift error value contained in the box.
+  /// This is only available for native Swift errors.
   const Metadata *type;
   /// The ErrorType witness table.
+  /// This is only available for native Swift errors.
   const WitnessTable *errorConformance;
   
   /// Get a pointer to the value, which is tail-allocated after
   /// the fixed header.
   const OpaqueValue *getValue() const {
     // If the box is a bridged NSError, then the box's address is itself the
-    // value.
-    if (isPureNSError())
-      return reinterpret_cast<const OpaqueValue *>(this);
+    // value. We can't provide an address for that..
+    assert(!isPureNSError());
   
     auto baseAddr = reinterpret_cast<uintptr_t>(this + 1);
     // Round up to the value's alignment.
     unsigned alignMask = type->getValueWitnesses()->getAlignmentMask();
-    baseAddr = (baseAddr + alignMask) & ~alignMask;
+    baseAddr = (baseAddr + alignMask) & ~(uintptr_t)alignMask;
     return reinterpret_cast<const OpaqueValue *>(baseAddr);
   }
   OpaqueValue *getValue() {
