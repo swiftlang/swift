@@ -94,7 +94,7 @@ public func flatMap<S : SequenceType, T>(
 public struct MapCollectionView<Base: CollectionType, T> : CollectionType {
   /// The position of the first element in a non-empty collection.
   ///
-  /// Identical to `endIndex` in an empty collection.
+  /// In an empty collection, `startIndex == endIndex`.
   public var startIndex: Base.Index {
     return _base.startIndex
   }

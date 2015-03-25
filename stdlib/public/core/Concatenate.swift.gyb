@@ -215,7 +215,7 @@ struct ${View}<
 
   /// The position of the first element in a non-empty collection.
   ///
-  /// Identical to `endIndex` in an empty collection.
+  /// In an empty collection, `startIndex == endIndex`.
   public // @testable
   var startIndex: Index {
     return ${Index}.adjustForward(_base, _base.startIndex, nil)

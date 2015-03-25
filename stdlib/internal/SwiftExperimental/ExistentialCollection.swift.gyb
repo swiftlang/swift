@@ -569,7 +569,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   
   /// The position of the first element in a non-empty collection.
   ///
-  /// Identical to `endIndex` in an empty collection.
+  /// In an empty collection, `startIndex == endIndex`.
   public var startIndex: Any${Traversal}Index {
     return Any${Traversal}Index(_box.startIndex)
   }

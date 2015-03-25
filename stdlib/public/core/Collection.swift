@@ -49,7 +49,7 @@ public protocol _CollectionType : _SequenceType {
 
   /// The position of the first element in a non-empty collection.
   ///
-  /// Identical to `endIndex` in an empty collection.
+  /// In an empty collection, `startIndex == endIndex`.
   var startIndex: Index {get}
 
   /// The collection's "past the end" position.

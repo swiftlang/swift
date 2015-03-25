@@ -119,7 +119,7 @@ public struct FilterCollectionView<Base: CollectionType> : CollectionType {
 
   /// The position of the first element in a non-empty collection.
   ///
-  /// Identical to `endIndex` in an empty collection.
+  /// In an empty collection, `startIndex == endIndex`.
   ///
   /// Complexity: O(N), where N is the ratio between unfiltered and
   /// filtered collection counts.

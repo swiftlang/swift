@@ -501,7 +501,7 @@ public func += <
 extension _ContiguousArrayBuffer : CollectionType {
   /// The position of the first element in a non-empty collection.
   ///
-  /// Identical to `endIndex` in an empty collection.
+  /// In an empty collection, `startIndex == endIndex`.
   public var startIndex: Int {
     return 0
   }

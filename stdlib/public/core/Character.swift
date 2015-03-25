@@ -157,7 +157,7 @@ public struct Character :
 
     /// The position of the first element in a non-empty collection.
     ///
-    /// Identical to `endIndex` in an empty collection.
+    /// In an empty collection, `startIndex == endIndex`.
     var startIndex: Int {
       return 0
     }
@@ -219,7 +219,7 @@ public struct Character :
 
     /// The position of the first element in a non-empty collection.
     ///
-    /// Identical to `endIndex` in an empty collection.
+    /// In an empty collection, `startIndex == endIndex`.
     var startIndex : Int {
       return 0
     }
