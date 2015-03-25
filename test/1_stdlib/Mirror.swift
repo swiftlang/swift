@@ -64,12 +64,12 @@ func find(substring: String, within domain: String) -> String.Index? {
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
     func customReflect() -> Mirror {
-      return Mirror(unlabeledChildren: Set(letters), schema: .Set)
+      return Mirror(unlabeledChildren: Set(letters), displayStyle: .Set)
     }
   }
 
   let w = DoubleYou().customReflect()
-  expectEqual(.Set, w.schema)
+  expectEqual(.Set, w.displayStyle)
   expectEqual(count(letters), numericCast(count(w.children)))
   
   // Because we don't control the order of a Set, we need to do a
@@ -84,13 +84,13 @@ mirrors.test("ForwardStructure") {
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
     func customReflect() -> Mirror {
-      return Mirror(unlabeledChildren: letters, schema: .Collection)
+      return Mirror(unlabeledChildren: letters, displayStyle: .Collection)
     }
   }
 
   // Test that the basics seem to work
   let y = Why().customReflect()
-  expectEqual(.Collection, y.schema)
+  expectEqual(.Collection, y.displayStyle)
 
   let description = y.description
   expectEqual(
@@ -107,16 +107,16 @@ mirrors.test("LabeledStructure") {
 
   let z = Zee().customReflect()
   expectEqual("[bark: 1, bite: 0]", z.description)
-  expectEmpty(z.schema)
+  expectEmpty(z.displayStyle)
 
   struct Zee2 : CustomReflectable {
     func customReflect() -> Mirror {
       return Mirror(
-        children: ["bark": 1, "bite": 0], schema: .Dictionary)
+        children: ["bark": 1, "bite": 0], displayStyle: .Dictionary)
     }
   }
   let z2 = Zee2().customReflect()
-  expectEqual(.Dictionary, z2.schema)
+  expectEqual(.Dictionary, z2.displayStyle)
   expectEqual("[bark: 1, bite: 0]", z2.description)
 }
 
