@@ -235,18 +235,15 @@ public:
     return  false;
   }
 
-  /// Return true if the absolute value of \p A is smaller or equal to the
+  /// Return true if the absolute value of \p A is smaller than the
   /// absolute value of \p B. In other words, check if \p A known to be closer
-  /// (or equal distance) to zero.
-  static bool isKnownAbsSLE(SILValue A, SILValue B) {
-    if (knownRelation(A, B,  ValueRelation::EQ))
-      return true;
-
+  /// to zero.
+  static bool isKnownAbsLess(SILValue A, SILValue B) {
     IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
     IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
 
     if (AI && BI)
-      return AI->getValue().abs().sle(BI->getValue().abs());
+      return AI->getValue().abs().slt(BI->getValue().abs());
 
     return false;
   }
@@ -318,17 +315,32 @@ public:
       case BuiltinValueKind::SMulOver:
         //  A * B traps unless:
         if (F.Relationship == ValueRelation::SMul) {
-          // L * R already known to not trap at this point in the program.
-          // And the following applies:
-          // A is closer or equal distance to zero than L.
-          // B is closer or equal distance to zero than R.
-          // Or commutatively: abs(R) >= abs(A) and abs(L) >= abs(B).
+          // L * R already known to not trap at this point in the program and
+          // the following rules apply:
+          //
+          // A is closer zero than L and B == R,
+          // or A == L, and B is closer to zero than R.
+          //
+          // We do not allow removing the overflow checks when one of the
+          // multipliers just switches the sign (abs(L) == abs(A)) because
+          // there are more negative numbers and (-MIN_INT * -1 overflows).
+          // In other words X * -1 does not does not guard X * 1.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          if (isKnownAbsSLE(A, F.Left) && isKnownAbsSLE(B, F.Right))
+
+          if (isKnownAbsLess(A, F.Left) &&
+              knownRelation(B, F.Right, ValueRelation::EQ))
+            return true;
+          if (knownRelation(A, F.Left, ValueRelation::EQ) &&
+              isKnownAbsLess(B, F.Right))
             return true;
 
-          if (isKnownAbsSLE(B, F.Left) && isKnownAbsSLE(A, F.Right))
+          // And commutitively, swapping A and B.
+          if (isKnownAbsLess(B, F.Left) &&
+              knownRelation(A, F.Right, ValueRelation::EQ))
+            return true;
+          if (knownRelation(B, F.Left, ValueRelation::EQ) &&
+              isKnownAbsLess(A, F.Right))
             return true;
         }
         return false;
