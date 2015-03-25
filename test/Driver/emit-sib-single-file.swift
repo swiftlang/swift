@@ -14,6 +14,8 @@
 // RUN: %target-swiftc_driver %t.o -o %t
 // RUN: %target-run %t | FileCheck %s
 
+// XFAIL: *
+// radar://20295441
 
 // CHECK: Hello World
 // CHECK: Hello Bob, today is Tuesday.
