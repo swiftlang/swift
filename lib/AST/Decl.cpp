@@ -3005,9 +3005,10 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
     }
   }
   
-  // If the self type is the result of an upstream error, return it
-  if (selfTy->is<ErrorType>())
-    return selfTy;
+  // If the self type couldn't be computed, or is the result of an
+  // upstream error, return an error type.
+  if (!selfTy || selfTy->is<ErrorType>())
+    return ErrorType::get(dc->getASTContext());
   
   // Capture the generic parameters, if requested.
   if (outerGenericParams)
