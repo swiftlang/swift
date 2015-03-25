@@ -22,6 +22,9 @@ using namespace swift;
 //                       Check SILValue Type Properties
 //===----------------------------------------------------------------------===//
 
+/// These are just for performance and verification. If one needs to make
+/// changes that cause the asserts the fire, please update them. The purpose is
+/// to prevent these predicates from changing values by mistake.
 static_assert(std::is_standard_layout<SILValue>::value,
               "Expected SILValue to be standard layout");
 static_assert(sizeof(SILValue) == sizeof(uintptr_t),

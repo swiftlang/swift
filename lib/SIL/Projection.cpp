@@ -22,6 +22,9 @@ using namespace swift;
 //                         Projection Static Asserts
 //===----------------------------------------------------------------------===//
 
+/// These are just for performance and verification. If one needs to make
+/// changes that cause the asserts the fire, please update them. The purpose is
+/// to prevent these predicates from changing values by mistake.
 static_assert(std::is_standard_layout<Projection>::value,
               "Expected projection to be a standard layout type");
 static_assert(sizeof(Projection) == (sizeof(uintptr_t) * 2 + 8),
