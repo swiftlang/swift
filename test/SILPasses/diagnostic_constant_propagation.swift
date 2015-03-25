@@ -389,7 +389,7 @@ func tryDouble() -> Int8 {
 
 @transparent
 func add<T : SignedIntegerType>(left: T, right: T) -> T {
-  return left + left
+  return left + right
 }
 
 @transparent
