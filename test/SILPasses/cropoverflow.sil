@@ -545,7 +545,9 @@ bb0(%0 : $Int64):
 
 // CHECK-LABEL: @unsigned_mul_previous_traps
 // Keep the first condfail but remove the second one.
+// CHECK: umul_with_overflow_Int64
 // CHECK: cond_fail
+// CHECK: umul_with_overflow_Int64
 // CHECK-NOT: cond_fail
 // CHECK: return
 sil hidden @unsigned_mul_previous_traps : $@thin (Int64) -> () {
@@ -566,3 +568,61 @@ bb0(%0 : $Int64):
   %10 = tuple ()
   return %10 : $()
 }
+
+// CHECK-LABEL: @signed_mul_previous_traps_neg
+// CHECK: smul_with_overflow_Int64
+// CHECK: smul_with_overflow_Int64
+// Make sure we keep the last overflow check.
+// CHECK: cond_fail
+// CHECK: return
+sil hidden @signed_mul_previous_traps_neg : $@thin (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+
+  // This is X * 9
+  // We can remove this check because the following check will guard us: abs(-100) > abs(9).
+  %4 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+
+  %7 = integer_literal $Builtin.Int64, -100
+  %8 = builtin "smul_with_overflow_Int64"(%7 : $Builtin.Int64, %2 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+
+  // This is -100 * X. We can't remove this check because abs(-100) > abs(9).
+  cond_fail %9 : $Builtin.Int1
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: @signed_mul_previous_traps_abs_neg
+// CHECK: smul_with_overflow_Int64
+// CHECK: cond_fail
+// CHECK: smul_with_overflow_Int64
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @signed_mul_previous_traps_abs_neg : $@thin (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 1000          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+
+  // This is X * 9
+  %4 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+
+  %7 = integer_literal $Builtin.Int64, -100
+  %8 = builtin "smul_with_overflow_Int64"(%7 : $Builtin.Int64, %2 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+
+  // This is -100 * X. We can remove this check because abs(-100) < abs(1000).
+  cond_fail %9 : $Builtin.Int1
+  %10 = tuple ()
+  return %10 : $()
+}
+
+
+

@@ -235,6 +235,22 @@ public:
     return  false;
   }
 
+  /// Return true if the absolute value of \p A is smaller or equal to the
+  /// absolute value of \p B. In other words, check if \p A known to be closer
+  /// (or equal distance) to zero.
+  static bool isKnownAbsSLE(SILValue A, SILValue B) {
+    if (knownRelation(A, B,  ValueRelation::EQ))
+      return true;
+
+    IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
+    IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+
+    if (AI && BI)
+      return AI->getValue().abs().sle(BI->getValue().abs());
+
+    return false;
+  }
+
   /// Return true if the constraint \p F can prove that the overflow check
   /// for \p BI is not needd.
   static bool isOverflowCheckRemovedByConstraint(Constraint &F,
@@ -304,14 +320,15 @@ public:
         if (F.Relationship == ValueRelation::SMul) {
           // L * R already known to not trap at this point in the program.
           // And the following applies:
-          // L >= A and R >= B  or (commutatively) R >= A and L >= B.
+          // A is closer or equal distance to zero than L.
+          // B is closer or equal distance to zero than R.
+          // Or commutatively: abs(R) >= abs(A) and abs(L) >= abs(B).
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          if (knownRelation(A, F.Left,  ValueRelation::SLE) &&
-              knownRelation(B, F.Right, ValueRelation::SLE))
+          if (isKnownAbsSLE(A, F.Left) && isKnownAbsSLE(B, F.Right))
             return true;
-          if (knownRelation(B, F.Left,  ValueRelation::SLE) &&
-              knownRelation(A, F.Right, ValueRelation::SLE))
+
+          if (isKnownAbsSLE(B, F.Left) && isKnownAbsSLE(A, F.Right))
             return true;
         }
         return false;
