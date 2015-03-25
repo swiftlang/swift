@@ -1713,6 +1713,13 @@ struct ExistentialTypeMetadata : public Metadata {
   /// Get the representation form this existential type uses.
   ExistentialTypeRepresentation getRepresentation() const;
   
+  /// True if it's valid to take ownership of the value in the existential
+  /// container if we own the container.
+  bool mayTakeValue(const OpaqueValue *container) const;
+  
+  /// Clean up an existential container whose value is uninitialized.
+  void deinitExistentialContainer(OpaqueValue *container) const;
+  
   /// Project the value pointer from an existential container of the type
   /// described by this metadata.
   const OpaqueValue *projectValue(const OpaqueValue *container) const;

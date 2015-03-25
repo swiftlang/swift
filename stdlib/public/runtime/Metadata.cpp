@@ -1903,6 +1903,53 @@ ExistentialTypeMetadata::getRepresentation() const {
   return ExistentialTypeRepresentation::Opaque;
 }
 
+bool
+ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
+  switch (getRepresentation()) {
+  // Owning a reference to a class existential is equivalent to owning a
+  // reference to the contained class instance.
+  case ExistentialTypeRepresentation::Class:
+    return true;
+  // Opaque existential containers uniquely own their contained value.
+  case ExistentialTypeRepresentation::Opaque:
+    return true;
+    
+  // References to boxed existential containers may be shared.
+  case ExistentialTypeRepresentation::ErrorType: {
+    // We can only take the value if the box is a bridged NSError, in which case
+    // owning a reference to the box is owning a reference to the NSError.
+    // TODO: Or if the box is uniquely referenced. We don't have intimate
+    // enough knowledge of CF refcounting to check for that dynamically yet.
+    const SwiftError *errorBox
+      = *reinterpret_cast<const SwiftError * const *>(container);
+    return errorBox->isPureNSError();
+  }
+  }
+}
+
+void
+ExistentialTypeMetadata::deinitExistentialContainer(OpaqueValue *container)
+const {
+  switch (getRepresentation()) {
+  case ExistentialTypeRepresentation::Class:
+    // Nothing to clean up after taking the class reference.
+    break;
+  
+  case ExistentialTypeRepresentation::Opaque: {
+    // Containing the value may require a side allocation, which we need
+    // to clean up.
+    auto opaque = reinterpret_cast<OpaqueExistentialContainer *>(container);
+    opaque->Type->vw_deallocateBuffer(&opaque->Buffer);
+    break;
+  }
+  
+  case ExistentialTypeRepresentation::ErrorType:
+    // TODO: If we were able to claim the value from a uniquely-owned
+    // existential box, we would want to deallocError here.
+    break;
+  }
+}
+
 const OpaqueValue *
 ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   switch (getRepresentation()) {
@@ -1918,7 +1965,12 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
                          const_cast<ValueBuffer*>(&opaqueContainer->Buffer));
   }
   case ExistentialTypeRepresentation::ErrorType: {
-    auto errorBox = reinterpret_cast<const SwiftError *>(container);
+    const SwiftError *errorBox
+      = *reinterpret_cast<const SwiftError * const *>(container);
+    // If the error is a bridged NSError, then the "box" is in fact itself
+    // the value.
+    if (errorBox->isPureNSError())
+      return container;
     return errorBox->getValue();
   }
   }
@@ -1939,7 +1991,8 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
     return opaqueContainer->Type;
   }
   case ExistentialTypeRepresentation::ErrorType: {
-    auto errorBox = reinterpret_cast<const SwiftError *>(container);
+    const SwiftError *errorBox
+      = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getType();
   }
   }
@@ -1970,7 +2023,9 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
   case ExistentialTypeRepresentation::ErrorType: {
     // Only one witness table we should be able to return, which is the
     // ErrorType.
-    auto errorBox = reinterpret_cast<const SwiftError *>(container);
+    assert(i == 0 && "only one witness table in an ErrorType box");
+    const SwiftError *errorBox
+      = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getErrorConformance();
   }
   }
