@@ -77,8 +77,16 @@ class DCE : public SILFunctionTransform {
   PostDominanceInfo *PDT;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
 
+  /// Tracks if the pass changed branches.
+  bool BranchesChanged;
+  /// Trackes if the pass changed ApplyInsts.
+  bool CallsChanged;
+
   /// The entry point to the transformation.
   void run() override {
+    BranchesChanged = false;
+    CallsChanged = false;
+
     SILFunction *F = getFunction();
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
@@ -104,8 +112,16 @@ class DCE : public SILFunctionTransform {
       return;
 
     markLive(*F);
-    if (removeDead(*F))
-      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+    if (removeDead(*F)) {
+      unsigned P = SILAnalysis::PreserveKind::Nothing;
+
+      if (!BranchesChanged)
+        P |= SILAnalysis::PreserveKind::Branches;
+      if (!CallsChanged)
+        P |= SILAnalysis::PreserveKind::Calls;
+
+      invalidateAnalysis((SILAnalysis::PreserveKind)P);
+    }
   }
 
   bool precomputeControlInfo(SILFunction &F);
@@ -340,7 +356,7 @@ bool DCE::removeDead(SILFunction &F) {
       if (LiveValues.count(Inst))
         continue;
 
-      DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
+      DEBUG(llvm::dbgs() << "Removing dead argument:\n");
       DEBUG(Inst->dump());
 
       for (unsigned i = 0, e = Inst->getNumTypes(); i != e; ++i) {
@@ -362,6 +378,7 @@ bool DCE::removeDead(SILFunction &F) {
         replaceBranchWithJump(Inst,
                               nearestUsefulPostDominator(Inst->getParent()));
         Inst->eraseFromParent();
+        BranchesChanged = true;
         Changed = true;
         continue;
       }
@@ -375,6 +392,10 @@ bool DCE::removeDead(SILFunction &F) {
         auto *Undef = SILUndef::get(Inst->getType(i), Inst->getModule());
         SILValue(Inst, i).replaceAllUsesWith(Undef);
       }
+
+
+      if (isa<ApplyInst>(Inst))
+        CallsChanged = true;
 
       Inst->eraseFromParent();
       Changed = true;
