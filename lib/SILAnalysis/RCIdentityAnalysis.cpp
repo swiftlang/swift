@@ -52,7 +52,7 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
 }
 
 //===----------------------------------------------------------------------===//
-//                                  Analysis
+//                          RCIdentityRoot Analysis
 //===----------------------------------------------------------------------===//
 
 /// Returns true if FirstIV is a SILArgument or SILInstruction in a BB that
@@ -386,6 +386,56 @@ stripRCIdentityPreservingOps(SILValue V, unsigned RecursionDepth) {
   }
 
   return V;
+}
+
+//===----------------------------------------------------------------------===//
+//                              RCUser Analysis
+//===----------------------------------------------------------------------===//
+
+/// Return all recursive users of V, looking through users which propagate
+/// RCIdentity.
+///
+/// We only use the instruction analysis here.
+void RCIdentityAnalysis::getRCUsers(
+    SILValue InputValue, llvm::SmallVectorImpl<SILInstruction *> &Users) {
+  // Add V to the worklist.
+  llvm::SmallVector<SILValue, 8> Worklist;
+  Worklist.push_back(InputValue);
+
+  // A set used to ensure we only visit users once.
+  llvm::SmallPtrSet<SILInstruction *, 8> VisitedInsts;
+
+  // Then until we finish the worklist...
+  while (!Worklist.empty()) {
+    // Pop off the top value.
+    SILValue V = Worklist.pop_back_val();
+
+    // For each user of V...
+    for (auto *Op : V.getUses()) {
+      SILInstruction *User = Op->getUser();
+
+      // If we have already visited this user, continue.
+      if (!VisitedInsts.insert(User).second)
+        continue;
+
+      // Otherwise attempt to strip off one layer of RC identical instructions
+      // from User.
+      SILValue StrippedRCID = stripRCIdentityPreservingInsts(User);
+
+      // If StrippedRCID is not V, then we know that User's result is
+      // conservatively not RCIdentical
+      // to V and we should add it to our RCUserList and continue.
+      if (StrippedRCID != V) {
+        Users.push_back(User);
+        continue;
+      }
+
+      // Otherwise, add all of User's uses to our list to continue searching.
+      for (unsigned i = 0, e = User->getNumTypes(); i != e; ++i) {
+        Worklist.push_back(SILValue(User, i));
+      }
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//

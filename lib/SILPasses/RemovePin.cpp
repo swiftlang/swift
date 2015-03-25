@@ -18,6 +18,7 @@
 #include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
@@ -30,8 +31,11 @@
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/ADT/Statistic.h"
 
 #include "llvm/Support/CommandLine.h"
+
+STATISTIC(NumPinPairsRemoved, "Num pin pairs removed");
 
 using namespace swift;
 
@@ -58,6 +62,8 @@ class RemovePinInsts : public SILFunctionTransform {
 
   AliasAnalysis *AA;
 
+  RCIdentityAnalysis *RCIA;
+
 public:
   RemovePinInsts() {}
 
@@ -65,6 +71,10 @@ public:
 
   void run() override {
     AA = PM->getAnalysis<AliasAnalysis>();
+    RCIA = PM->getAnalysis<RCIdentityAnalysis>();
+
+    DEBUG(llvm::dbgs() << "*** Running Pin Removal on "
+                       << getFunction()->getName() << "\n");
 
     bool Changed = false;
     for (auto &BB : *getFunction()) {
@@ -72,30 +82,49 @@ public:
       // This is only a BB local analysis for now.
       AvailablePins.clear();
 
+      DEBUG(llvm::dbgs() << "Visiting new BB!\n");
+
       for (auto InstIt = BB.begin(), End = BB.end(); InstIt != End; ) {
         auto *CurInst = &*InstIt;
         ++InstIt;
 
+        DEBUG(llvm::dbgs() << "    Visiting: " << *CurInst);
+
         // Add StrongPinInst to available pins.
         if (isa<StrongPinInst>(CurInst)) {
+          DEBUG(llvm::dbgs() << "        Found pin!\n");
           AvailablePins.insert(CurInst);
           continue;
         }
 
         // Try to remove StrongUnpinInst if its input is available.
         if (auto *Unpin = dyn_cast<StrongUnpinInst>(CurInst)) {
-          auto *PinDef = dyn_cast<StrongPinInst>(Unpin->getOperand().getDef());
+          DEBUG(llvm::dbgs() << "        Found unpin!\n");
+          SILValue RCId = RCIA->getRCIdentityRoot(Unpin->getOperand());
+          DEBUG(llvm::dbgs() << "        RCID Source: " << *RCId.getDef());
+          auto *PinDef = dyn_cast<StrongPinInst>(RCId.getDef());
           if (PinDef && AvailablePins.count(PinDef)){
+            DEBUG(llvm::dbgs() << "        Found matching pin: " << *PinDef);
             SmallVector<MarkDependenceInst *, 8> MarkDependentInsts;
             if (areSafePinUsers(PinDef, Unpin, MarkDependentInsts)) {
+              DEBUG(llvm::dbgs() << "        Pin users are safe! Removing!\n");
               Changed = true;
-              auto NewDep = PinDef->getOperand();
-              for (auto &MD : MarkDependentInsts)
-                MD->setOperand(1, NewDep);
+              auto *Enum = SILBuilder(PinDef).createOptionalSome(
+                  PinDef->getLoc(), PinDef->getOperand(), PinDef->getType(0));
+              SILValue(PinDef).replaceAllUsesWith(Enum);
               Unpin->eraseFromParent();
               PinDef->eraseFromParent();
+              // Remove this pindef from AvailablePins.
+              AvailablePins.erase(PinDef);
+              ++NumPinPairsRemoved;
+            } else {
+              DEBUG(llvm::dbgs()
+                    << "        Pin users are not safe! Can not remove!\n");
             }
+
             continue;
+          } else {
+            DEBUG(llvm::dbgs() << "        Failed to find matching pin!\n");
           }
           // Otherwise, fall through. An unpin, through destruction of an object
           // can have arbitrary sideeffects.
@@ -103,6 +132,8 @@ public:
 
         // In all other cases check whether this could be a potentially
         // releasing instruction.
+        DEBUG(llvm::dbgs()
+              << "        Checking if this inst invalidates pins.\n");
         invalidateAvailablePins(CurInst);
       }
     }
@@ -112,17 +143,30 @@ public:
                              SILAnalysis::PreserveKind::ProgramFlow);
   }
 
-  /// Pin uses are safe if they either mark a dependence or if it is the unpin we
-  /// are trying to remove.
+  /// Pin uses are safe if:
+  ///
+  /// 1. The user marks a dependence.
+  /// 2. The user is the unpin we are trying to remove.
+  /// 3. The user is an RCIdentical user of our Pin result and only has
+  ///    RCIdentity preserving insts, mark dependence, or the unpin we are
+  ///    trying
+  ///    to remove as users.
   bool areSafePinUsers(StrongPinInst *Pin, StrongUnpinInst *Unpin,
                        SmallVectorImpl<MarkDependenceInst *> &MarkDeps) {
-    for (auto *U : Pin->getUses()) {
-      if (auto *MD = dyn_cast<MarkDependenceInst>(U->getUser()))
+    // Grab all uses looking past RCIdentical uses from RCIdentityAnalysis.
+    llvm::SmallVector<SILInstruction *, 8> Users;
+    RCIA->getRCUsers(SILValue(Pin), Users);
+
+    for (auto *U : Users) {
+      if (auto *MD = dyn_cast<MarkDependenceInst>(U)) {
         MarkDeps.push_back(MD);
-      else if (dyn_cast<StrongUnpinInst>(U->getUser()) == Unpin)
         continue;
-      else
-        return false;
+      }
+
+      if (dyn_cast<StrongUnpinInst>(U) == Unpin)
+        continue;
+
+      return false;
     }
     return true;
   }
@@ -160,8 +204,15 @@ public:
           RemovePin.push_back(P);
     }
 
-    for (auto P: RemovePin)
+    if (RemovePin.empty()) {
+      DEBUG(llvm::dbgs() << "        No pins to invalidate!\n");
+      return;
+    }
+
+    for (auto *P : RemovePin) {
+      DEBUG(llvm::dbgs() << "        Invalidating Pin: " << *P);
       AvailablePins.erase(P);
+    }
   }
 };
 }

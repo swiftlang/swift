@@ -93,3 +93,42 @@ bb0(%0 : $*ArrayInt):
   strong_unpin %6 : $Optional<Builtin.NativeObject>
   return %7 : $Bool
 }
+
+// CHECK-LABEL: sil @remove_pins_with_inert_rcidentity_uses : $@thin (@inout ArrayInt) -> () {
+// CHECK-NOT: strong_pin
+// CHECK-NOT: strong_unpin
+sil @remove_pins_with_inert_rcidentity_uses : $@thin (@inout ArrayInt) -> () {
+bb0(%0 : $*ArrayInt):
+  %1 = load %0: $*ArrayInt
+  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
+  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
+  %6 = strong_pin %3 : $Builtin.NativeObject
+  %7 = integer_literal $Builtin.Int1, 0
+  %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
+  %9 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 0
+  strong_unpin %9 : $Optional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @remove_pins_with_noninert_rcidentity_uses : $@thin (@inout ArrayInt) -> Bool {
+// CHECK: strong_pin
+// CHECK: strong_unpin
+sil @remove_pins_with_noninert_rcidentity_uses : $@thin (@inout ArrayInt) -> Bool {
+bb0(%0 : $*ArrayInt):
+  %1 = load %0: $*ArrayInt
+  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
+  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
+  %6 = strong_pin %3 : $Builtin.NativeObject
+  %7 = integer_literal $Builtin.Int1, 0
+  %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
+  %9 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 0
+  strong_unpin %9 : $Optional<Builtin.NativeObject>
+  %10 = unchecked_trivial_bit_cast %9 : $Optional<Builtin.NativeObject> to $UnsafePointer<HeapObject>
+  %11 = apply %5(%10) : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
+  return %11 : $Bool
+}

@@ -48,6 +48,10 @@ public:
 
   SILValue getRCIdentityRoot(SILValue V);
 
+  /// Return all recursive users of V, looking through users which
+  /// propagate RCIdentity.
+  void getRCUsers(SILValue V, llvm::SmallVectorImpl<SILInstruction *> &Users);
+
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::RCIdentity;
   }

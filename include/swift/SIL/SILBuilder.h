@@ -559,7 +559,13 @@ public:
                        EnumElementDecl *Element, SILType Ty) {
     return insert(new (F.getModule()) EnumInst(Loc, Operand, Element, Ty));
   }
-  
+
+  /// Create an enum Optional<T>.Some.
+  EnumInst *createOptionalSome(SILLocation Loc, SILValue Operand, SILType Ty) {
+    auto *Decl = F.getModule().getASTContext().getOptionalSomeDecl();
+    return createEnum(Loc, Operand, Decl, Ty);
+  }
+
   InitEnumDataAddrInst *createInitEnumDataAddr(SILLocation Loc, SILValue Operand,
                                        EnumElementDecl *Element, SILType Ty) {
     return insert(
