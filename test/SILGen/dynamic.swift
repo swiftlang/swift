@@ -426,7 +426,7 @@ public class Sub : Base {
   // CHECK: return {{%.*}} : $Bool
   // CHECK: }
 
-  // CHECK-LABEL: sil shared @_TFFC7dynamic3Subg1xSbu_KT_Sb : $@thin (@owned Sub) -> Bool {
+  // CHECK-LABEL: sil shared [transparent] @_TFFC7dynamic3Subg1xSbu_KT_Sb : $@thin (@owned Sub) -> Bool {
   // CHECK: [[SUPER:%.*]] = super_method [volatile] %0 : $Sub, #Base.x!getter.1.foreign : Base -> () -> Bool , $@cc(objc_method) @thin (Base) -> ObjCBool
   // CHECK: = apply [[SUPER]]({{%.*}})
   // CHECK: return {{%.*}} : $Bool

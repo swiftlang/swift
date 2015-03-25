@@ -465,7 +465,7 @@ class SuperSub : SuperBase {
     // CHECK: = partial_apply [[INNER]](%0)
     // CHECK: return
     let f1 = {
-      // CHECK-LABEL: sil shared @_TFFFC8closures8SuperSub1fFS0_FT_T_U_FT_T_u_KT_T_
+      // CHECK-LABEL: sil shared [transparent] @_TFFFC8closures8SuperSub1fFS0_FT_T_U_FT_T_u_KT_T_
       // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
       // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfS0_FT_T_
       // CHECK: = apply [[METHOD]]([[SUPER]])
@@ -484,7 +484,7 @@ class SuperSub : SuperBase {
     // CHECK: = partial_apply [[INNER]](%0)
     // CHECK: return
     func g1() {
-      // CHECK-LABEL: sil shared @_TFFFC8closures8SuperSub1gFS0_FT_T_L_2g1FT_T_u_KT_T_
+      // CHECK-LABEL: sil shared [transparent] @_TFFFC8closures8SuperSub1gFS0_FT_T_L_2g1FT_T_u_KT_T_
       // CHECK: [[SUPER:%.*]] = upcast %0 : $SuperSub to $SuperBase
       // CHECK: [[METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfS0_FT_T_
       // CHECK: = apply [[METHOD]]([[SUPER]])

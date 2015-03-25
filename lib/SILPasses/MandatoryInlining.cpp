@@ -358,10 +358,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
                                                       CaptureArgs, FullArgs,
                                                       PAI,
                                                       Mode);
-      if (!CalleeFunction)
-        continue;
-
-      if (!InnerAI->isTransparent() &&
+      if (!CalleeFunction ||
           CalleeFunction->isTransparent() == IsNotTransparent)
         continue;
 

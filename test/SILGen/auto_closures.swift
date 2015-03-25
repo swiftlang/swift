@@ -41,7 +41,7 @@ public class Sub : Base {
   // CHECK: return {{%.*}} : $Bool
   // CHECK: }
 
-  // CHECK-LABEL: sil shared @_TFFC13auto_closures3Subg1xVS_4Boolu_KT_S1_ : $@thin (@owned Sub) -> Bool {
+  // CHECK-LABEL: sil shared [transparent] @_TFFC13auto_closures3Subg1xVS_4Boolu_KT_S1_ : $@thin (@owned Sub) -> Bool {
   // CHECK: [[SUPER:%.*]] = function_ref @_TFC13auto_closures4Baseg1xVS_4Bool
   // CHECK: [[RET:%.*]] = apply [[SUPER]]({{%.*}})
   // CHECK: return [[RET]]
@@ -50,7 +50,7 @@ public class Sub : Base {
 
 // CHECK-LABEL: sil hidden @_TF13auto_closures20closureInAutoclosureFTVS_4BoolS0__S0_ : $@thin (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil shared @_TFF13auto_closures20closureInAutoclosureFTVS_4BoolS0__S0_u_KT_S0_ : $@thin (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil shared [transparent] @_TFF13auto_closures20closureInAutoclosureFTVS_4BoolS0__S0_u_KT_S0_ : $@thin (Bool, Bool) -> Bool {
 // CHECK: }
 // CHECK-LABEL: sil shared @_TFFF13auto_closures20closureInAutoclosureFTVS_4BoolS0__S0_u_KT_S0_U_FS0_S0_ : $@thin (Bool, Bool) -> Bool {
 // CHECK: }

@@ -233,6 +233,9 @@ bool SILDeclRef::isTransparent() const {
   if (isEnumElement())
     return true;
 
+  if (hasAutoClosureExpr())
+    return true;
+
   return hasDecl() ? getDecl()->isTransparent() : false;
 }
 

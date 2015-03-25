@@ -10,8 +10,8 @@ protocol CP : class {
 sil @plus : $@thin (Int64, Int64) -> Int64
 sil @fromLiteral : $@thin (Builtin.Int128, @thin Int64.Type) -> Int64
 
-// CHECK-LABEL: sil @test_add : $@thin (Int64) -> Int64 {
-sil @test_add : $@thin (Int64) -> Int64 {
+// CHECK-LABEL: sil [transparent] @test_add : $@thin (Int64) -> Int64 {
+sil [transparent] @test_add : $@thin (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
   store %0 to %1#1 : $*Int64
@@ -147,8 +147,8 @@ bb0(%0 : $Int64):
 protocol SomeProtocol {
 }
 
-// CHECK-LABEL: sil @test_existential_metatype : $@thin (@in SomeProtocol) -> @thick SomeProtocol.Type
-sil @test_existential_metatype : $@thin (@in SomeProtocol) -> @thick SomeProtocol.Type {
+// CHECK-LABEL: sil [transparent] @test_existential_metatype : $@thin (@in SomeProtocol) -> @thick SomeProtocol.Type
+sil [transparent] @test_existential_metatype : $@thin (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
   %1 = alloc_box $SomeProtocol
   copy_addr [take] %0 to [initialization] %1#1 : $*SomeProtocol
@@ -194,8 +194,8 @@ sil @sub_floats : $@thin (Float32, Float32) -> Float32
 sil @foo : $@thin (Float32, Float32) -> Bool
 sil @bar : $@thin (Float32) -> Bool
 
-// CHECK-LABEL: sil @test_control_flow : $@thin (Float, Float) -> Float
-sil @test_control_flow : $@thin (Float, Float) -> Float {
+// CHECK-LABEL: sil [transparent] @test_control_flow : $@thin (Float, Float) -> Float
+sil [transparent] @test_control_flow : $@thin (Float, Float) -> Float {
 bb0(%0 : $Float, %1 : $Float):
   %2 = alloc_box $Float
   %3 = alloc_box $Float
@@ -357,8 +357,8 @@ bb0(%0 : $Float):
   return %21 : $Float
 }
 
-// CHECK-LABEL: @test_recursive_foo : $@thin (Float) -> Float
-sil @test_recursive_foo : $@thin (Float) -> Float {
+// CHECK-LABEL: [transparent] @test_recursive_foo : $@thin (Float) -> Float
+sil [transparent] @test_recursive_foo : $@thin (Float) -> Float {
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
   // CHECK: return
@@ -369,8 +369,8 @@ bb0(%0 : $Float):
   return %5 : $Float
 }
 
-// CHECK-LABEL: sil @test_recursive_bar : $@thin (Float) -> Float
-sil @test_recursive_bar : $@thin (Float) -> Float {
+// CHECK-LABEL: sil [transparent] @test_recursive_bar : $@thin (Float) -> Float
+sil [transparent] @test_recursive_bar : $@thin (Float) -> Float {
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
   // CHECK: return
@@ -381,8 +381,8 @@ bb0(%0 : $Float):
   return %5 : $Float
 }
 
-// CHECK-LABEL: sil @test_recursive_baz : $@thin (Float) -> Float
-sil @test_recursive_baz : $@thin (Float) -> Float {
+// CHECK-LABEL: sil [transparent] @test_recursive_baz : $@thin (Float) -> Float
+sil [transparent] @test_recursive_baz : $@thin (Float) -> Float {
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
   // CHECK: return
@@ -391,8 +391,8 @@ bb0(%0 : $Float):
   return %0 : $Float
 }
 
-// CHECK-LABEL: sil @test_partial_foo : $@thin (Int64) -> Int64 {
-sil @test_partial_foo : $@thin (Int64) -> Int64 {
+// CHECK-LABEL: sil [transparent] @test_partial_foo : $@thin (Int64) -> Int64 {
+sil [transparent] @test_partial_foo : $@thin (Int64) -> Int64 {
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
   // CHECK: [[VAL1:%.*]] = function_ref @plus
   // CHECK: [[VAL2:%.*]] = apply [[VAL1]]([[VAL0]], [[VAL0]])
@@ -406,14 +406,14 @@ bb0(%0 : $Int64):
   return %13 : $Int64
 }
 
-sil @test_partial_baz : $@thin (Int64, Int64) -> Int64 {
+sil [transparent] @test_partial_baz : $@thin (Int64, Int64) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64):
   %6 = function_ref @plus : $@thin (Int64, Int64) -> Int64
   %7 = apply %6(%0, %1) : $@thin (Int64, Int64) -> Int64
   return %7 : $Int64
 }
 
-sil @test_partial_bar : $@thin (@callee_owned (Int64) -> Int64, Int64) -> Int64 {
+sil [transparent] @test_partial_bar : $@thin (@callee_owned (Int64) -> Int64, Int64) -> Int64 {
 bb0(%0 : $@callee_owned (Int64) -> Int64, %1 : $Int64):
   %7 = apply [transparent] %0(%1) : $@callee_owned (Int64) -> Int64
   return %7 : $Int64
@@ -421,7 +421,7 @@ bb0(%0 : $@callee_owned (Int64) -> Int64, %1 : $Int64):
 
 sil @true_getter : $@thin () -> Bool
 
-sil @short_circuit_or : $@thin (Bool, @callee_owned () -> Bool) -> Bool {
+sil [transparent] @short_circuit_or : $@thin (Bool, @callee_owned () -> Bool) -> Bool {
 bb0(%0 : $Bool, %1 : $@callee_owned () -> Bool):
   %2 = alloc_box $Bool
   %3 = alloc_box $@callee_owned () -> Bool
@@ -449,7 +449,7 @@ bb3(%16 : $Bool):
   return %16 : $Bool
 }
 
-sil private @closure0 : $@thin (@owned Builtin.NativeObject, @inout Bool) -> Bool {
+sil private [transparent] @closure0 : $@thin (@owned Builtin.NativeObject, @inout Bool) -> Bool {
 bb0(%0 : $Builtin.NativeObject, %1 : $*Bool):
   %2 = tuple ()
   %3 = load %1 : $*Bool
@@ -774,4 +774,48 @@ bb0(%0 : $*U, %1 : $*Builtin.Int32, %2 : $@callee_owned (@out U, Builtin.Int32) 
   %4 = apply %2(%0, %3) : $@callee_owned (@out U, Builtin.Int32) -> ()
   // CHECK: return
   return %4 : $()
+}
+
+// CHECK-LABEL: sil [transparent] @inner_transparent
+sil [transparent] @inner_transparent : $@thin (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8 {
+// CHECK: bb0
+bb0(%0 : $@callee_owned () -> Builtin.Int8):
+  strong_retain %0 : $@callee_owned () -> Builtin.Int8
+  %3 = apply %0() : $@callee_owned () -> Builtin.Int8
+  strong_release %0 : $@callee_owned () -> Builtin.Int8
+  // CHECK: return
+  return %3 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil [transparent] @outer_transparent
+sil [transparent] @outer_transparent : $@thin (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8 {
+// CHECK: bb0
+bb0(%0 : $@callee_owned () -> Builtin.Int8):
+  %2 = function_ref @inner_transparent : $@thin (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  strong_retain %0 : $@callee_owned () -> Builtin.Int8
+  %4 = apply %2(%0) : $@thin (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  strong_release %0 : $@callee_owned () -> Builtin.Int8
+  // CHECK: return
+  return %4 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil @testouter_transparent
+sil @testouter_transparent : $@thin (Builtin.Int8) -> Builtin.Int8 {
+// CHECK: bb0
+bb0(%0 : $Builtin.Int8):
+  // CHECK-NOT: = apply
+  %2 = function_ref @outer_transparent : $@thin (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  %3 = function_ref @identity_closure : $@thin (Builtin.Int8) -> Builtin.Int8
+  %4 = partial_apply %3(%0) : $@thin (Builtin.Int8) -> Builtin.Int8
+  %5 = apply %2(%4) : $@thin (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
+  // CHECK: return %0
+  return %5 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil shared [transparent] @identity_closure
+sil shared [transparent] @identity_closure : $@thin (Builtin.Int8) -> Builtin.Int8 {
+// CHECK: bb0
+bb0(%0 : $Builtin.Int8):
+  // CHECK: return
+  return %0 : $Builtin.Int8
 }
