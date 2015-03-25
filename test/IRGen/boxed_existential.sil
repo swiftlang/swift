@@ -16,11 +16,29 @@ entry(%e : $_ErrorType):
 sil @alloc_boxed_existential : $@thin <T: _ErrorType> (@in T) -> @owned _ErrorType {
 entry(%x : $*T):
   // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* %T, i8** %T._ErrorType)
-  // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } %1, 0
-  // CHECK: [[ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } %1, 1
+  // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
+  // CHECK: [[ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   %b = alloc_existential_box $_ErrorType, $T
   // CHECK: call %swift.opaque* %initializeWithTake(%swift.opaque* [[ADDR]], %swift.opaque* %0, %swift.type* %T)
   copy_addr [take] %x to [initialization] %b#1 : $*T
+  // CHECK: ret %swift.error* [[BOX]]
+  return %b#0 : $_ErrorType
+}
+
+struct SomeError: _ErrorType {
+  let domain: String
+  let code: Int
+}
+
+// CHECK-LABEL: define %swift.error* @alloc_boxed_existential_concrete
+sil @alloc_boxed_existential_concrete : $@thin (@owned SomeError) -> @owned _ErrorType {
+entry(%x : $SomeError):
+  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @_TMdV17boxed_existential9SomeError {{.*}}, i8** @_TWPV17boxed_existential9SomeErrorSs10_ErrorTypeS_)
+  // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
+  // CHECK: [[OPAQUE_ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
+  // CHECK: [[ADDR:%.*]] = bitcast %swift.opaque* [[OPAQUE_ADDR]] to %V17boxed_existential9SomeError*
+  %b = alloc_existential_box $_ErrorType, $SomeError
+  store %x to %b#1 : $*SomeError
   // CHECK: ret %swift.error* [[BOX]]
   return %b#0 : $_ErrorType
 }

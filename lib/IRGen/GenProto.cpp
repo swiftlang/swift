@@ -5102,6 +5102,8 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto addr = IGF.Builder.CreateExtractValue(result, 1);
   dest.add(box);
   
+  addr = IGF.Builder.CreateBitCast(addr,
+                                   srcTI.getStorageType()->getPointerTo());
   return srcTI.getAddressForPointer(addr);
 }
 
