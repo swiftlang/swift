@@ -309,6 +309,55 @@ internal func _find<
   return nil
 }
 
+//===--- QuickLooks -------------------------------------------------------===//
+
+// this typealias implies renaming the existing QuickLookObject to
+// QuickLook.  Since it is an enum, the use of the word Object is
+// misleading.
+public typealias QuickLook = QuickLookObject
+
+extension QuickLook {
+  /// Initialize for the given `instance`.
+  ///
+  /// If the dynamic type of `instance` conforms to
+  /// `CustomQuickLookable`, returns the result of calling its
+  /// `customQuickLook` method.  Otherwise, returns a `QuickLook`
+  /// synthesized for `instance` by the language.
+  ///
+  /// Note: If the dynamic type of `instance` has value semantics,
+  /// subsequent mutations of `instance` will not observable in
+  /// `Mirror`.  In general, though, the observability of such
+  /// mutations is unspecified.
+  public init(reflect instance: Any) {
+    if let customized? = instance as? CustomQuickLookable {
+      self = customized.customQuickLook()
+    }
+    else {
+      if let q? = Swift.reflect(instance).quickLookObject {
+        self = q
+      }
+      else {
+        self = .Text(toDebugString(instance))
+      }
+    }
+  }
+}
+
+/// A type that explicitly supplies its own QuickLookObject.
+///
+/// Instances of any type can be `reflect`\ 'ed upon, but if you are
+/// not satisfied with the `Mirror` supplied for your type by default,
+/// you can make it conform to `CustomReflectable` and return a custom
+/// `Mirror`.
+public protocol CustomQuickLookable {
+  /// Return the `Mirror` for `self`.
+  ///
+  /// Note: if `Self` has value semantics, the `Mirror` should be
+  /// unaffected by subsequent mutations of `self`.
+  func customQuickLook() -> QuickLook
+}
+
+
 //===--- General Utilities ------------------------------------------------===//
 // This component could stand alone, but is used in Mirror's public interface.
 

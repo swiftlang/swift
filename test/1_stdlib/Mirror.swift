@@ -9,7 +9,10 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t &&  mkdir %t
+// RUN: %target-build-swift %s -module-name Mirror -o %t/a.out
+// RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg
+// FIXME: timeout wrapper is necessary because the ASan test runs for hours
 
 // XFAIL: linux
 
@@ -182,6 +185,37 @@ mirrors.test("Invalid Path Type") {
   expectEqual(1, m.descendant(0) as? Int)
   expectCrashLater()
   m.descendant(X())
+}
+
+mirrors.test("QuickLook") {
+  // Customization works.
+  struct CustomQuickie : CustomQuickLookable {
+    func customQuickLook() -> QuickLook {
+      return .Point(1.25, 42)
+    }
+  }
+  switch QuickLook(reflect: CustomQuickie()) {
+  case .Point(1.25, 42): break; default: expectTrue(false)
+  }
+  
+  // QuickLook support from Legacy Mirrors works.
+  switch QuickLook(reflect: true) {
+  case .Logical(true): break; default: expectTrue(false)
+  }
+
+  // With no Legacy Mirror QuickLook support, we fall back to
+  // toDebugString().
+  struct X {}
+  switch QuickLook(reflect: X()) {
+  case .Text(let text) where text.hasSuffix(".(X #1)"): break;
+  default: expectTrue(false)
+  }
+  struct Y : DebugPrintable {
+    var debugDescription: String { return "Why?" }
+  }
+  switch QuickLook(reflect: Y()) {
+  case .Text("Why?"): break; default: expectTrue(false)
+  }
 }
 
 runAllTests()
