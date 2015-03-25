@@ -266,7 +266,7 @@ class FooClassPropertyOwnership : FooClassBase {
   var retainable: AnyObject!
   var strongRef: AnyObject!
   @NSCopying var copyable: AnyObject!
-  weak var weakRef: @sil_weak AnyObject!
+  weak var weakRef: @sil_weak AnyObject?
   var scalar: Int32
   init!()
   convenience init!(float f: Float)

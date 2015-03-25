@@ -218,7 +218,7 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
   <decl:Var>var <loc>retainable</loc>: <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Var>var <loc>strongRef</loc>: <ref:Protocol>AnyObject</ref>!</decl>
   <decl:Var>@NSCopying var <loc>copyable</loc>: <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Var>weak var <loc>weakRef</loc>: @sil_weak <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>weak var <loc>weakRef</loc>: @sil_weak <ref:Protocol>AnyObject</ref>?</decl>
   <decl:Var>var <loc>scalar</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Constructor><loc>init!()</loc></decl>
   <decl:Constructor>convenience <loc>init!(float f: <ref:Struct>Float</ref>)</loc></decl>
