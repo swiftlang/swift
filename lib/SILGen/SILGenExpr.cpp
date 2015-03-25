@@ -5840,15 +5840,22 @@ static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
 static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
                                                SILLocation loc,
                                                ManagedValue nsstr) {
-  // func _convertNSStringToString(NSString) -> String
-  SILValue nsstringToStringFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSStringToStringFn());
-  
-  SILValue str = gen.B.createApply(loc, nsstringToStringFn,
-                    nsstringToStringFn.getType(),
-                    gen.getLoweredType(gen.SGM.Types.getStringType()),
-                    {}, nsstr.forward(gen));
-  
+  SILValue bridgeFn =
+      gen.emitGlobalFunctionRef(loc, gen.SGM.getNSStringToStringFn());
+
+  Type inputType = nsstr.getType().getSwiftRValueType();
+  if (!inputType->getOptionalObjectType()) {
+    SILType loweredOptTy = gen.SGM.getLoweredType(OptionalType::get(inputType));
+    auto *someDecl = gen.getASTContext().getOptionalSomeDecl();
+    auto *enumInst = gen.B.createEnum(loc, nsstr.getValue(), someDecl,
+                                      loweredOptTy);
+    nsstr = ManagedValue(enumInst, nsstr.getCleanup());
+  }
+
+  SILType nativeTy = gen.getLoweredType(gen.SGM.Types.getStringType());
+  SILValue str = gen.B.createApply(loc, bridgeFn, bridgeFn.getType(), nativeTy,
+                                   {}, { nsstr.forward(gen) });
+
   return gen.emitManagedRValueWithCleanup(str);
 }
 
@@ -5894,13 +5901,13 @@ static ManagedValue emitBridgeCollectionToNative(SILGenFunction &gen,
     collection = ManagedValue(enumInst, collection.getCleanup());
   }
 
-  SILValue arr = gen.B.createApply(loc, bridgeFn,
-                                   substFnType,
-                                   nativeTy,
-                                   subs,
-                                   { collection.forward(gen) });
+  SILValue result = gen.B.createApply(loc, bridgeFn,
+                                      substFnType,
+                                      nativeTy,
+                                      subs,
+                                      { collection.forward(gen) });
 
-  return gen.emitManagedRValueWithCleanup(arr);
+  return gen.emitManagedRValueWithCleanup(result);
 }
 
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
@@ -6118,13 +6125,11 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
                                       emitCBridgedToNativeValue);
   }
 
-  // If the output is a bridged type, convert it back to a native type.
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
-  if (loweredNativeTy == gen.SGM.Types.get##NativeType##Type() &&           \
-      loweredBridgedTy == gen.SGM.Types.get##BridgedType##Type()) {         \
-    return emitBridge##BridgedType##To##NativeType(gen, loc, v);            \
+  // Bridge Bool to ObjCBool when requested.
+  if (loweredNativeTy == gen.SGM.Types.getBoolType() &&
+      loweredBridgedTy == gen.SGM.Types.getObjCBoolType()) {
+    return emitBridgeObjCBoolToBool(gen, loc, v);
   }
-#include "swift/SIL/BridgedTypes.def"
 
   // Bridge Objective-C to thick metatypes.
   if (auto bridgedMetaTy = dyn_cast<AnyMetatypeType>(loweredBridgedTy)){
@@ -6143,6 +6148,13 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
     
     if (nativeFTy->getRepresentation() != FunctionType::Representation::Block)
       return gen.emitBlockToFunc(loc, v, nativeFTy);
+  }
+
+  // Bridge NSString to String.
+  if (auto stringDecl = gen.getASTContext().getStringDecl()) {
+    if (nativeTy.getSwiftRValueType()->getAnyNominal() == stringDecl) {
+      return emitBridgeNSStringToString(gen, loc, v);
+    }
   }
 
   // Bridge NSArray to Array.

@@ -2260,8 +2260,12 @@ Type TypeConverter::getLoweredCBridgedType(Type t,
                                            bool bridgedCollectionsAreOptional) {
   // Bridge String back to NSString.
   auto nativeStringTy = getStringType();
-  if (nativeStringTy && t->isEqual(nativeStringTy))
-    return getNSStringType();
+  if (nativeStringTy && t->isEqual(nativeStringTy)) {
+    Type bridgedTy = getNSStringType();
+    if (bridgedCollectionsAreOptional && clangTy)
+      bridgedTy = OptionalType::get(bridgedTy);
+    return bridgedTy;
+  }
 
   // Bridge Bool back to ObjC bool, unless the original Clang type was _Bool.
   auto nativeBoolTy = getBoolType();

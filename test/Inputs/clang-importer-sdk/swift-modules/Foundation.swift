@@ -6,7 +6,7 @@
 func _convertStringToNSString(string: String) -> NSString
 
 @asmname("swift_NSStringToString") internal
-func _convertNSStringToString(nsstring: NSString) -> String
+func _convertNSStringToString(nsstring: NSString?) -> String
 
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)

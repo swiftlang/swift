@@ -111,6 +111,18 @@ func testNonnullSet(obj: Test) -> Set<NSObject> {
   return obj.nonnullSet
 } // CHECK: {{^}$}}
 
+// CHECK-LABEL: sil hidden @_TF20objc_bridged_results17testNonnullStringFCSo4TestSS
+func testNonnullString(obj: Test) -> String {
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullString!getter.1.foreign : Test -> () -> String , $@cc(objc_method) @thin (Test) -> @autoreleased Optional<NSString>
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@cc(objc_method) @thin (Test) -> @autoreleased Optional<NSString>
+  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @swift_NSStringToString : $@thin (@owned Optional<NSString>) -> @owned String
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]]) : $@thin (@owned Optional<NSString>) -> @owned String
+  // CHECK: strong_release %0 : $Test
+  // CHECK: return [[RESULT]] : $String
+  return obj.nonnullString
+} // CHECK: {{^}$}}
+
 
 // Note: This doesn't really "work" in that it doesn't accept a nil value the
 // way the others do, because subscripts are thunked. But the main thing is

@@ -95,9 +95,10 @@ func _convertStringToNSString(string: String) -> NSString {
 
 @semantics("convertFromObjectiveC")
 public // COMPILER_INTRINSIC
-func _convertNSStringToString(nsstring: NSString) -> String {
+func _convertNSStringToString(nsstring: NSString?) -> String {
+  if nsstring == nil { return "" }
   var result: String?
-  String._forceBridgeFromObjectiveC(nsstring, result: &result)
+  String._forceBridgeFromObjectiveC(nsstring!, result: &result)
   return result!
 }
 

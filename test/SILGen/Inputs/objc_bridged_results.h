@@ -7,6 +7,7 @@
 
 @property (nonnull, readonly) NSDictionary *nonnullDictionary;
 @property (nonnull, readonly) NSSet *nonnullSet;
+@property (nonnull, readonly) NSString *nonnullString;
 
 // Subscripts still have thunks wrapped around them.
 - (nonnull NSArray *)objectAtIndexedSubscript:(long)index;

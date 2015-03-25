@@ -17,7 +17,8 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
 // CHECK:  [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:  [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
-// CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED]])
+// CHECK:  [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
+// CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:  [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
 // CHECK:  store [[NATIVE]] to [[NATIVE_BUF]]
 // CHECK:  inject_enum_addr [[OPT_NATIVE_BUF]]{{.*}}Some
@@ -44,7 +45,8 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
 // CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
-// CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED]])
+// CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
+// CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
 // CHECK:   store [[NATIVE]] to [[NATIVE_BUF]]
 // CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
@@ -163,7 +165,8 @@ func callBar() -> String {
 // CHECK:   [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
 // CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
-// CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED]])
+// CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
+// CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
 // CHECK:   store [[NATIVE]] to [[NATIVE_BUF]]
 // CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
@@ -254,7 +257,8 @@ class Bas : NSObject {
   // CHECK-LABEL: sil hidden [transparent]  @_TToFC13objc_bridging3Bass11strRealPropSS : $@cc(objc_method) @thin (NSString, Bas) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
-  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[VALUE]])
+  // CHECK:   [[VALUE_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[VALUE]]
+  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[VALUE_BOX]])
   
   // CHECK:   [[SETIMPL:%.*]] = function_ref @_TFC13objc_bridging3Bass11strRealPropSS
   // CHECK:   apply [transparent] [[SETIMPL]]([[STR]], %1)
@@ -282,7 +286,8 @@ class Bas : NSObject {
   // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bass11strFakePropSS : $@cc(objc_method) @thin (NSString, Bas) -> () {
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
-  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR]])
+  // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[NSSTR]]
+  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]])
   // CHECK:   [[SETTER:%.*]] = function_ref @_TFC13objc_bridging3Bass11strFakePropSS
   // CHECK:   apply [[SETTER]]([[STR]], [[THIS]])
   // CHECK: }
@@ -317,7 +322,8 @@ class Bas : NSObject {
   // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas6strArg
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
-  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR]])
+  // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[NSSTR]]
+  // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]])
   // CHECK:   [[METHOD:%.*]] = function_ref @_TFC13objc_bridging3Bas6strArg
   // CHECK:   apply [[METHOD]]([[STR]], [[THIS]])
   // CHECK: }

@@ -7,7 +7,7 @@
 func _convertStringToNSString(string: String) -> NSString
 
 @asmname("swift_NSStringToString")
-func _convertNSStringToString(nsstring: NSString) -> String
+func _convertNSStringToString(nsstring: NSString?) -> String
 
 // NSArray bridging entry points
 func _convertNSArrayToArray<T>(nsarr: NSArray?) -> [T] {

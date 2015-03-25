@@ -49,7 +49,8 @@ class A {
 // CHECK-NEXT: [[NSSTR:%.*]] = load [[TMP_NSSTR]]
 // CHECK:      [[T0:%.*]] = function_ref @swift_NSStringToString
 //   Make a temporary initialized string that we're going to clobber as part of the conversion process (?).
-// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR]])
+// CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[NSSTR]] : $NSString
+// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR_BOX]])
 // CHECK-NEXT: [[TMP_STR2:%.*]] = init_enum_data_addr [[TMP_OPTSTR]]
 // CHECK-NEXT: store [[T1]] to [[TMP_STR2]]
 // CHECK-NEXT: inject_enum_addr [[TMP_OPTSTR]]{{.*}}Some
