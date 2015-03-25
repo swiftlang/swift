@@ -300,7 +300,36 @@ public:
         return false;
 
       case BuiltinValueKind::SMulOver:
+        //  A * B traps unless:
+        if (F.Relationship == ValueRelation::SMul) {
+          // L * R already known to not trap at this point in the program.
+          // And the following applies:
+          // L >= A and R >= B  or (commutatively) R >= A and L >= B.
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          if (knownRelation(A, F.Left,  ValueRelation::SLE) &&
+              knownRelation(B, F.Right, ValueRelation::SLE))
+            return true;
+          if (knownRelation(B, F.Left,  ValueRelation::SLE) &&
+              knownRelation(A, F.Right, ValueRelation::SLE))
+            return true;
+        }
+        return false;
       case BuiltinValueKind::UMulOver:
+        //  A * B traps unless:
+        if (F.Relationship == ValueRelation::UMul) {
+          // L * R already known to not trap at this point in the program.
+          // And the following applies:
+          // L >= A and R >= B  or (commutatively) R >= A and L >= B.
+          SILValue A = BI->getOperand(0);
+          SILValue B = BI->getOperand(1);
+          if (knownRelation(A, F.Left,  ValueRelation::ULE) &&
+              knownRelation(B, F.Right, ValueRelation::ULE))
+            return true;
+          if (knownRelation(B, F.Left,  ValueRelation::ULE) &&
+              knownRelation(A, F.Right, ValueRelation::ULE))
+            return true;
+        }
         return false;
 
       case BuiltinValueKind::USubOver:
