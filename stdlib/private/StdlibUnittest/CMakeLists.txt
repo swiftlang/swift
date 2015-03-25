@@ -4,7 +4,7 @@ set(swift_stdlib_unittest_module_depends
 set(swift_stdlib_unittest_framework_depends)
 set(swift_stdlib_unittest_private_link_libraries)
 
-if(SWIFT_HOST_VARIANT STREQUAL "macosx")
+if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   list(APPEND swift_stdlib_unittest_platform_sources
     GetOSVersion.mm)
   list(APPEND swift_stdlib_unittest_module_depends
