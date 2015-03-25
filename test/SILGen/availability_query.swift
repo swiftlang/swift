@@ -8,7 +8,7 @@
 // CHECK: [[FUNC:%.*]] = function_ref @_TFSs26_stdlib_isOSVersionAtLeastFTBwBwBw_Bi1_ : $@thin (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[QUERY_RESULT:%.*]] = apply [[FUNC]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@thin (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[BOOL_FUNC:%.*]] = function_ref @_TFSs8_getBoolFBi1_Sb : $@thin (Builtin.Int1) -> Bool
-// CHECK: [[BOOL_RESULT:%.*]] = apply [transparent] [[BOOL_FUNC]]([[QUERY_RESULT]]) : $@thin (Builtin.Int1) -> Bool
+// CHECK: [[BOOL_RESULT:%.*]] = apply [[BOOL_FUNC]]([[QUERY_RESULT]]) : $@thin (Builtin.Int1) -> Bool
 if #os(OSX >= 10.9.8, iOS >= 7.1) {
 }
 
@@ -18,7 +18,7 @@ if #os(OSX >= 10.9.8, iOS >= 7.1) {
 // CHECK: [[QUERY_FUNC:%.*]] = function_ref @_TFSs26_stdlib_isOSVersionAtLeastFTBwBwBw_Bi1_ : $@thin (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@thin (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[BOOL_FUNC:%.*]] = function_ref @_TFSs8_getBoolFBi1_Sb : $@thin (Builtin.Int1) -> Bool
-// CHECK: [[BOOL_RESULT:%.*]] = apply [transparent] [[BOOL_FUNC]]([[QUERY_RESULT]]) : $@thin (Builtin.Int1) -> Bool
+// CHECK: [[BOOL_RESULT:%.*]] = apply [[BOOL_FUNC]]([[QUERY_RESULT]]) : $@thin (Builtin.Int1) -> Bool
 if #os(OSX >= 10.10) {
 }
 
@@ -28,6 +28,6 @@ if #os(OSX >= 10.10) {
 // CHECK: [[QUERY_FUNC:%.*]] = function_ref @_TFSs26_stdlib_isOSVersionAtLeastFTBwBwBw_Bi1_ : $@thin (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@thin (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[BOOL_FUNC:%.*]] = function_ref @_TFSs8_getBoolFBi1_Sb : $@thin (Builtin.Int1) -> Bool
-// CHECK: [[BOOL_RESULT:%.*]] = apply [transparent] [[BOOL_FUNC]]([[QUERY_RESULT]]) : $@thin (Builtin.Int1) -> Bool
+// CHECK: [[BOOL_RESULT:%.*]] = apply [[BOOL_FUNC]]([[QUERY_RESULT]]) : $@thin (Builtin.Int1) -> Bool
 if #os(OSX >= 10) {
 }

@@ -560,8 +560,7 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
                              getOpType(Inst->getSubstCalleeSILType()),
                              getOpType(Inst->getType()),
                              getOpSubstitutions(Inst->getSubstitutions()),
-                             Args,
-                             Inst->isTransparent()));
+                             Args));
 }
 
 template<typename ImplClass>

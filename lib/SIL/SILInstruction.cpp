@@ -379,8 +379,6 @@ namespace {
 
     bool visitApplyInst(ApplyInst *RHS) {
       auto *X = cast<ApplyInst>(LHS);
-      if (X->isTransparent() != RHS->isTransparent())
-        return false;
       return X->getSubstitutions() == RHS->getSubstitutions();
     }
 

@@ -184,7 +184,7 @@ void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
 
   ApplyInst *NAI =
-      Builder.createApply(Loc, FRI, Arguments, AI->isTransparent());
+      Builder.createApply(Loc, FRI, Arguments);
   AI->replaceAllUsesWith(NAI);
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
 }
@@ -556,14 +556,12 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
 
   auto FnTy = FRIConvertFromBuiltin->getType();
   auto STResultType = FnTy.castTo<SILFunctionType>()->getResult().getSILType();
-  auto *Callee = FRIConvertFromBuiltin->getReferencedFunction();
   return ApplyInst::create(AI->getLoc(),
                            FRIConvertFromBuiltin,
                            FnTy,
                            STResultType,
                            ArrayRef<Substitution>(),
                            Arguments,
-                           Callee->isTransparent(),
                            *FRIConvertFromBuiltin->getReferencedFunction());
 }
 

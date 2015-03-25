@@ -218,7 +218,7 @@ bb0(%0 : $*A<T>, %1 : $*T, %2 : $@thin A<T>.Type):
   %6 = alloc_stack $T                             // users: %7, %9, %12
   copy_addr %1 to [initialization] %6#1 : $*T     // id: %7
   %8 = alloc_stack $A<T>                          // users: %9, %10, %11
-  %9 = apply [transparent] %4<T>(%8#1, %6#1, %5) : $@thin <τ_0_0> (@out A<τ_0_0>, @in τ_0_0, @thin A<τ_0_0>.Type) -> ()
+  %9 = apply %4<T>(%8#1, %6#1, %5) : $@thin <τ_0_0> (@out A<τ_0_0>, @in τ_0_0, @thin A<τ_0_0>.Type) -> ()
   copy_addr [take] %8#1 to [initialization] %3#1 : $*A<T> // id: %10
   dealloc_stack %8#0 : $*@local_storage A<T>      // id: %11
   dealloc_stack %6#0 : $*@local_storage T         // id: %12
@@ -274,7 +274,7 @@ bb0(%0 : $*AnyObject):
   // function_ref Swift.Optional.Some <A>(Swift.Optional<A>.Type)(A) -> Swift.Optional<A>
   %f0 = function_ref @_TFSq4SomeU__fMGSqQ__FQ_GSqQ__ : $@thin <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0, @thin Optional<τ_0_0>.Type) -> ()
   %t0 = metatype $@thin Optional<AnyObject>.Type
-  %i0 = apply [transparent] %f0<AnyObject>(%l0#1, %0, %t0) : $@thin <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0, @thin Optional<τ_0_0>.Type) -> ()
+  %i0 = apply %f0<AnyObject>(%l0#1, %0, %t0) : $@thin <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0, @thin Optional<τ_0_0>.Type) -> ()
 
   %g1 = alloc_stack $GeneratorOfOne<AnyObject> // 850
   %s1 = struct_element_addr %g1#1 : $*GeneratorOfOne<AnyObject>, #GeneratorOfOne.elements

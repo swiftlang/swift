@@ -931,8 +931,8 @@ bb0(%0 : $Int, %1 : $*Int):
 sil @test_transparent : $@thin () -> () {
 bb0:
   %0 = function_ref @classes : $@thin () -> ()
-  // CHECK: apply [transparent] %{{.*}}() : $@thin () -> ()
-  %1 = apply [transparent] %0() : $@thin () -> ()
+  // CHECK: apply %{{.*}}() : $@thin () -> ()
+  %1 = apply %0() : $@thin () -> ()
   %2 = tuple ()
   %3 = return %2 : $()
 }

@@ -31,7 +31,7 @@ func opaque_archetype_is_opaque_archetype
   // -- apply the _getBool library fn
   // CHECK-NEXT:  function_ref Swift._getBool
   // CHECK-NEXT:  [[GETBOOL:%.*]] = function_ref @_TFSs8_getBoolFBi1_Sb :
-  // CHECK-NEXT:  [[RES:%.*]] = apply [transparent] [[GETBOOL]]([[I1]])
+  // CHECK-NEXT:  [[RES:%.*]] = apply [[GETBOOL]]([[I1]])
   // -- we don't consume the checked value
   // CHECK:   return [[RES]] : $Bool
 }

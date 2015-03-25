@@ -10,8 +10,8 @@ func useTransparentFuncWithDefaultArgument() ->Int {
   return transparentFuncWithDefaultArgument();
 
   // CHECK-LABEL: sil hidden @_TF21transparent_attribute37useTransparentFuncWithDefaultArgumentFT_Si
-  // CHECK: apply [transparent] {{.*}} line:10:44
-  // CHECK: apply [transparent] {{.*}} line:10:10
+  // CHECK: apply {{.*}} line:10:44
+  // CHECK: apply {{.*}} line:10:10
   // CHECK: return
   
 }
@@ -42,7 +42,7 @@ func testStructWithTranspConstructor() -> StructWithTranspConstructor {
   
   // testStructWithTranspConstructor
   // CHECK-APPLY: _T21transparent_attribute31testStructWithTranspConstructorFT_VS_27StructWithTranspConstructor
-  // CHECK: apply [transparent] {{.*}} line:38:10
+  // CHECK: apply {{.*}} line:38:10
   
 }
 
@@ -75,13 +75,13 @@ func testProperty(z: MySt) {
   var m2 : MySt = x2;
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute12testPropertyFT1zVS_4MySt_T_
   // CHECK: function_ref @_TF21transparent_attributes2x1VS_4MySt
-  // CHECK-NEXT: apply [transparent]
+  // CHECK-NEXT: apply
   // CHECK: function_ref @_TF21transparent_attributes2x2VS_4MySt
-  // CHECK-NEXT: apply [transparent]
+  // CHECK-NEXT: apply
   // CHECK: function_ref @_TF21transparent_attributeg2x1VS_4MySt
-  // CHECK-NEXT: apply [transparent]
+  // CHECK-NEXT: apply
   // CHECK: function_ref @_TF21transparent_attributeg2x2VS_4MySt
-  // CHECK-NEXT: apply [transparent]
+  // CHECK-NEXT: apply
 }
 
 var _tr2 = MySt()
@@ -120,13 +120,13 @@ func testStructExtension() {
   var t : MySt = c.tr3
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute13testStructExtensionFT_T_
   // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructCfMS0_FT5inputVS_4MySt_S0_
-  // CHECK: apply [transparent] [[INIT]]
+  // CHECK: apply [[INIT]]
   // CHECK: [[TR1:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStruct3tr1fRS0_FT_T_
-  // CHECK: apply [transparent] [[TR1]]
+  // CHECK: apply [[TR1]]
   // CHECK: [[TR2:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructg3tr2VS_4MySt
-  // CHECK: apply [transparent] [[TR2]]
+  // CHECK: apply [[TR2]]
   // CHECK: [[TR3:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructg3tr3VS_4MySt
-  // CHECK: apply [transparent] [[TR3]]
+  // CHECK: apply [[TR3]]
 }
 
 enum MyEnum {
@@ -143,8 +143,8 @@ func testEnumExtension() {
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute17testEnumExtensionFT_T_
   // CHECK: [[TR3:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum3tr3fS0_FT_T_
   // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum9onetranspFMS0_S0_
-  // CHECK: apply [transparent] [[INIT]]
-  // CHECK: apply [transparent] [[TR3]]
+  // CHECK: apply [[INIT]]
+  // CHECK: apply [[TR3]]
 }
 
 struct testVarDecl {
@@ -161,7 +161,7 @@ struct testVarDecl {
     var z: Int = max
     // CHECK-APPLY: sil hidden @_TFV21transparent_attribute11testVarDecl14testVarDeclFoofRS0_FT_T_
     // CHECK: [[TR4:%[0-9]+]] = function_ref @_TFV21transparent_attribute11testVarDeclg3maxSi
-    // CHECK: apply [transparent] [[TR4]]
+    // CHECK: apply [[TR4]]
   }
 }
 
@@ -171,7 +171,7 @@ struct testVarDeclShortenedSyntax {
     var z: Int = testVarDeclShortenedSyntax.max
     // CHECK-APPLY: sil hidden @_TFV21transparent_attribute26testVarDeclShortenedSyntax29testVarDeclShortenedSyntaxfoofRS0_FT_T_
     // CHECK: [[TR5:%[0-9]+]] = function_ref @_TZFV21transparent_attribute26testVarDeclShortenedSyntaxg3maxSi
-    // CHECK: apply [transparent] [[TR5]]
+    // CHECK: apply [[TR5]]
   }
 };
 

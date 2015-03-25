@@ -829,7 +829,7 @@ bb0(%0 : $Builtin.Int32):
   %6 = alloc_stack $Builtin.Int32
   // CHECK-NOT: strong_retain
   strong_retain %5 : $@callee_owned (@out Builtin.Int32, Builtin.Int32) -> ()
-  // CHECK: apply [transparent] [[REABSTRACT]]([[TMP]]#1, %0, [[THICK]])
+  // CHECK: apply [[REABSTRACT]]([[TMP]]#1, %0, [[THICK]])
   %8 = apply %5(%6#1, %0) : $@callee_owned (@out Builtin.Int32, Builtin.Int32) -> ()
   // CHECK-NOT: strong_release
   strong_release %5 : $@callee_owned (@out Builtin.Int32, Builtin.Int32) -> ()

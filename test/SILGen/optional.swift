@@ -78,7 +78,7 @@ func wrap<T>(x: T) -> T? { return x }
 // CHECK: sil hidden @_TF8optional16wrap_then_unwrap
 func wrap_then_unwrap<T>(x: T) -> T {
   // CHECK: [[FORCE:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
-  // CHECK: apply [transparent] [[FORCE]]<{{.*}}>(%0, {{%.*}})
+  // CHECK: apply [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x)!
 }
 

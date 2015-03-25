@@ -4433,8 +4433,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILType resultTy = getLoweredLoadableType(ctor->getResultType());
 
   SILValue initedSelfValue
-    = B.createApply(Loc, initVal.forward(*this), initTy, resultTy, subs, args,
-                    initConstant.isTransparent());
+    = B.createApply(Loc, initVal.forward(*this), initTy, resultTy, subs, args);
 
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),

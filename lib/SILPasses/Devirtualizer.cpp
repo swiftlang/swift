@@ -130,7 +130,7 @@ static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
                                  AI->getSubstCalleeSILType(),
                                  AI->getType(),
                                  AI->getSubstitutions(),
-                                 Ret, AI->isTransparent());
+                                 Ret);
   NAI->setDebugScope(AI->getDebugScope());
   return NAI;
 }

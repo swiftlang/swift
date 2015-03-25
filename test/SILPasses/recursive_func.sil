@@ -23,7 +23,7 @@ bb0(%c : $Builtin.Int32, %v : $Builtin.RawPointer):
   %1 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %4
   %2 = metatype $@thin Int.Type                   // user: %4
   %3 = integer_literal $Builtin.Int2048, 1000     // user: %4
-  %4 = apply [transparent] %1(%3, %2) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %5
+  %4 = apply %1(%3, %2) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %5
   %5 = apply %0(%4) : $@thin (Int) -> ()
   %6 = integer_literal $Builtin.Int32, 0
   return %6 : $Builtin.Int32
@@ -41,9 +41,9 @@ bb0(%0 : $Int, %1 : $REC):
   %6 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %9
   %7 = metatype $@thin Int.Type                   // user: %9
   %8 = integer_literal $Builtin.Int2048, 2        // user: %9
-  %9 = apply [transparent] %6(%8, %7) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %10
-  %10 = apply [transparent] %5(%0, %9) : $@thin (Int, Int) -> Bool // user: %11
-  %11 = apply [transparent] %4(%10) : $@cc(method) @thin (Bool) -> Builtin.Int1 // user: %12
+  %9 = apply %6(%8, %7) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %10
+  %10 = apply %5(%0, %9) : $@thin (Int, Int) -> Bool // user: %11
+  %11 = apply %4(%10) : $@cc(method) @thin (Bool) -> Builtin.Int1 // user: %12
   cond_br %11, bb1, bb2                           // id: %12
 
 bb1:                                              // Preds: bb0
@@ -55,8 +55,8 @@ bb1:                                              // Preds: bb0
   %16 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %19
   %17 = metatype $@thin Int.Type                  // user: %19
   %18 = integer_literal $Builtin.Int2048, 2       // user: %19
-  %19 = apply [transparent] %16(%18, %17) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %20
-  %20 = apply [transparent] %15(%0, %19) : $@thin (Int, Int) -> Int // user: %21
+  %19 = apply %16(%18, %17) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %20
+  %20 = apply %15(%0, %19) : $@thin (Int, Int) -> Int // user: %21
   %21 = apply %14(%20, %1) : $@cc(method) @thin (Int, @owned REC) -> ()
   strong_retain %1 : $REC                         // id: %22
   %23 = class_method %1 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@cc(method) @thin (Int, @owned REC) -> () // user: %30
@@ -66,8 +66,8 @@ bb1:                                              // Preds: bb0
   %25 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %28
   %26 = metatype $@thin Int.Type                  // user: %28
   %27 = integer_literal $Builtin.Int2048, 1       // user: %28
-  %28 = apply [transparent] %25(%27, %26) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %29
-  %29 = apply [transparent] %24(%0, %28) : $@thin (Int, Int) -> Int // user: %30
+  %28 = apply %25(%27, %26) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %29
+  %29 = apply %24(%0, %28) : $@thin (Int, Int) -> Int // user: %30
   %30 = apply %23(%29, %1) : $@cc(method) @thin (Int, @owned REC) -> ()
   br bb2                                          // id: %31
 

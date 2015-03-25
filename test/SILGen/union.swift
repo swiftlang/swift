@@ -38,7 +38,7 @@ enum Optionable {
 var truthy : Boolish {
   // CHECK: [[TRUTHY:%[0-9]+]] = function_ref @_TFO5union7Boolish6truthyFMS0_S0_
   // CHECK: [[BOOLISH:%[0-9]+]] = metatype $@thin Boolish.Type
-  // CHECK: [[RESULT:%[0-9]+]] = apply [transparent] [[TRUTHY]]([[BOOLISH]])
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[TRUTHY]]([[BOOLISH]])
   // CHECK: return [[RESULT]]
   return .truthy
 }
@@ -47,7 +47,7 @@ var truthy : Boolish {
 var falsy : Boolish {
   // CHECK: [[FALSY:%[0-9]+]] = function_ref @_TFO5union7Boolish5falsyFMS0_S0_
   // CHECK: [[BOOLISH:%[0-9]+]] = metatype $@thin Boolish.Type
-  // CHECK: [[RESULT:%[0-9]+]] = apply [transparent] [[FALSY]]([[BOOLISH]])
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[FALSY]]([[BOOLISH]])
   // CHECK: return [[RESULT]]
   return .falsy
 }

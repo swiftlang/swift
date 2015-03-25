@@ -174,7 +174,7 @@ func small_closure_capture_with_argument(var x: Int) -> (y: Int) -> Int {
 // CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[PLUS:%[0-9]+]] = function_ref @_TZFSsoi1pFTSiSi_Si{{.*}}
 // CHECK: [[LHS:%[0-9]+]] = load [[XADDR]]
-// CHECK: [[RET:%[0-9]+]] = apply [transparent] [[PLUS]]([[LHS]], [[DOLLAR0]])
+// CHECK: [[RET:%[0-9]+]] = apply [[PLUS]]([[LHS]], [[DOLLAR0]])
 // CHECK: release [[XBOX]]
 // CHECK: return [[RET]]
 

@@ -832,7 +832,7 @@ bb0:
   %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
   %2 = integer_literal $Builtin.Int2048, 0
-  %3 = apply [transparent] %0(%2, %1) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+  %3 = apply %0(%2, %1) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   return %3 : $Int
 }
 sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
@@ -857,7 +857,7 @@ bb0(%0 : $*Bool):
   %3 = integer_literal $Builtin.Int1, 0
   %4 = struct $Bool (%3 : $Builtin.Int1)
   %5 = function_ref @_TFSs11_branchHintUSs11BooleanType__FTQ_Sb_Sb : $@thin <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0, Bool) -> Bool
-  %6 = apply [transparent] %5<Bool>(%0, %4) : $@thin <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0, Bool) -> Bool
+  %6 = apply %5<Bool>(%0, %4) : $@thin <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0, Bool) -> Bool
   return %6 : $Bool
 }
 
@@ -876,7 +876,7 @@ bb0(%0 : $Int32):
   %6 = struct $Bool (%5 : $Builtin.Int1)          // user: %7
   store %6 to %1#1 : $*Bool                       // id: %7
   %8 = function_ref @_TTSgSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@thin (@in Bool) -> Bool // user: %9
-  %9 = apply [transparent] %8(%1#1) : $@thin (@in Bool) -> Bool // user: %10
+  %9 = apply %8(%1#1) : $@thin (@in Bool) -> Bool // user: %10
   %10 = struct_extract %9 : $Bool, #Bool.value    // user: %12
   dealloc_stack %1#0 : $*@local_storage Bool      // id: %11
   cond_br %10, bb1, bb2                           // id: %12
@@ -916,14 +916,14 @@ bb0:
   %v12 = integer_literal $Builtin.Int1, 0
   %v16 = struct $Bool (%v12 : $Builtin.Int1)
   store %v16 to %v9#1 : $*Bool                      // id: %17
-  %v18 = apply [transparent] %f1<Bool>(%v9#1) : $@thin <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0) -> Bool
+  %v18 = apply %f1<Bool>(%v9#1) : $@thin <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0) -> Bool
   %v19 = struct_extract %v18 : $Bool, #Bool.value
   dealloc_stack %v9#0 : $*@local_storage Bool      // id: %20
   cond_br %v19, bb2, bb1                           // id: %21
 
 bb1:
   %f2 = function_ref @slowHelper : $@thin () -> ()
-  %r2 = apply [transparent] %f2() : $@thin () -> ()
+  %r2 = apply %f2() : $@thin () -> ()
   br bb2
 
 bb2:
@@ -944,14 +944,14 @@ bb0:
   %v12 = integer_literal $Builtin.Int1, 0
   %v16 = struct $Bool (%v12 : $Builtin.Int1)
   store %v16 to %v9#1 : $*Bool                      // id: %17
-  %v18 = apply [transparent] %f1<Bool>(%v9#1) : $@thin <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0) -> Bool
+  %v18 = apply %f1<Bool>(%v9#1) : $@thin <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0) -> Bool
   %v19 = struct_extract %v18 : $Bool, #Bool.value
   dealloc_stack %v9#0 : $*@local_storage Bool      // id: %20
   cond_br %v19, bb2, bb1                           // id: %21
 
 bb1:
   %f2 = function_ref @slowHelper : $@thin () -> ()
-  %r2 = apply [transparent] %f2() : $@thin () -> ()
+  %r2 = apply %f2() : $@thin () -> ()
   br bb2
 
 bb2:

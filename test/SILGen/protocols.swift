@@ -320,7 +320,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
 // CHECK-NEXT: load
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @_TFV9protocols24StructWithStoredPropertyg1aSi : $@cc(method) @thin (StructWithStoredProperty) -> Int
-// CHECK-NEXT: apply [transparent] %2(%1) : $@cc(method) @thin (StructWithStoredProperty) -> Int
+// CHECK-NEXT: apply %2(%1) : $@cc(method) @thin (StructWithStoredProperty) -> Int
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {

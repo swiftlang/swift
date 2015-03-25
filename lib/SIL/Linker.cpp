@@ -159,7 +159,7 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
 
   // If the linking mode is not link all, AI is not transparent, and the
   // callee is not shared, we don't want to perform any linking.
-  if (!isLinkAll() && !AI->isTransparent() &&
+  if (!isLinkAll() && !Callee->isTransparent() &&
       !hasSharedVisibility(Callee->getLinkage()))
     return false;
 

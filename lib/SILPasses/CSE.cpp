@@ -292,7 +292,7 @@ public:
     return llvm::hash_combine(X->getKind(), X->getCallee(),
                               llvm::hash_combine_range(Operands.begin(),
                                                        Operands.end()),
-                              X->hasSubstitutions(), X->isTransparent());
+                              X->hasSubstitutions());
   }
 
   hash_code visitBuiltinInst(BuiltinInst *X) {

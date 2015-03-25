@@ -3232,10 +3232,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
-  bool Transparent = false;
-  if ((Opcode == ValueKind::ApplyInst &&
-       parseSILOptional(Transparent, *this, "transparent")) ||
-      parseValueName(FnName))
+  if (parseValueName(FnName))
     return true;
   SmallVector<ParsedSubstitution, 4> parsedSubs;
   if (parseApplySubstitutions(parsedSubs))
@@ -3306,8 +3303,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
                               substFTI->getResult().getSILType(),
-                              subs, Args,
-                              Transparent);
+                              subs, Args);
     break;
   }
   case ValueKind::PartialApplyInst: {

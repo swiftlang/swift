@@ -586,7 +586,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
                              SILAbbrCodes[SILInstApplyLayout::Code],
                              2 /*Builtin*/,
-                             0 /*Transparent*/,
                              BI->getSubstitutions().size(),
                              S.addTypeRef(BI->getType().getSwiftRValueType()),
                              (unsigned)BI->getType().getCategory(),
@@ -610,7 +609,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], 0/*Apply*/,
-        (unsigned)AI->isTransparent(),
         AI->getSubstitutions().size(),
         S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),
         S.addTypeRef(AI->getSubstCalleeType()),
@@ -628,7 +626,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], 1/*PartialApply*/,
-        0 /*IsTransparent*/,
         PAI->getSubstitutions().size(),
         S.addTypeRef(PAI->getCallee().getType().getSwiftRValueType()),
         S.addTypeRef(PAI->getSubstCalleeType()),

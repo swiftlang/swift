@@ -51,7 +51,7 @@ bb0(%0 : $Node):
   // CHECK-NOT: class_method %0
   // CHECK: [[FUNC:%.*]] = function_ref @transparent_target
   %3 = class_method %0 : $Node, #Node.index!getter.1 : Node -> () -> Int , $@cc(method) @thin (@owned Node) -> Int
-  // CHECK: [[RESULT:%.*]] = apply [transparent] [[FUNC]](%0)
+  // CHECK: [[RESULT:%.*]] = apply [[FUNC]](%0)
   %4 = apply %3(%0) : $@cc(method) @thin (@owned Node) -> Int
   // CHECK: strong_release %0
   strong_release %0 : $Node

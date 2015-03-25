@@ -11,13 +11,13 @@ import def_transparent
 // SIL-LABEL: sil @main : $@cc(cdecl) @thin (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> Int32 {
 // SIL: [[RAW:%.+]] = global_addr @_Tv11transparent3rawSb : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @_TF15def_transparent15testTransparentFT1xSb_Sb : $@thin (Bool) -> Bool
-// SIL: [[RESULT:%.+]] = apply [transparent] [[FUNC]]({{%.+}}) : $@thin (Bool) -> Bool
+// SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@thin (Bool) -> Bool
 // SIL: store [[RESULT]] to [[RAW]] : $*Bool
 var raw = testTransparent(x: false)
 
 // SIL: [[TMP:%.+]] = global_addr @_Tv11transparent3tmpVSs5Int32 : $*Int32
 // SIL: [[FUNC2:%.+]] = function_ref @_TF15def_transparent11testBuiltinFT_VSs5Int32 : $@thin () -> Int32
-// SIL: [[RESULT2:%.+]] = apply [transparent] [[FUNC2]]() : $@thin () -> Int32
+// SIL: [[RESULT2:%.+]] = apply [[FUNC2]]() : $@thin () -> Int32
 // SIL: store [[RESULT2]] to [[TMP]] : $*Int32
 var tmp = testBuiltin()
 

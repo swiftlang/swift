@@ -621,7 +621,7 @@ bb0(%0 : $DerivedClassWithIVars):
 
   // Get an int
   %5 = function_ref @makesInt : $@thin () -> Int
-  %7 = apply [transparent] %5() : $@thin () -> Int
+  %7 = apply %5() : $@thin () -> Int
 
   // Initialize the 'a' ivar with the int.
   %8 = load %3 : $*DerivedClassWithIVars

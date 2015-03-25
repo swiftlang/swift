@@ -442,10 +442,7 @@ class ApplyInst : public SILInstruction {
 
   /// The number of tail-allocated substitutions, allocated after the operand
   /// list's tail allocation.
-  unsigned NumSubstitutions : 31;
-
-  /// Whether the callee had the attribute [transparent].
-  unsigned Transparent : 1;
+  unsigned NumSubstitutions;
 
   /// The type of the callee with our substitutions applied.
   SILType SubstCalleeType;
@@ -464,7 +461,7 @@ class ApplyInst : public SILInstruction {
             SILType SubstCalleeType,
             SILType ReturnType,
             ArrayRef<Substitution> Substitutions,
-            ArrayRef<SILValue> Args, bool Transparent);
+            ArrayRef<SILValue> Args);
 
 public:
   static ApplyInst *create(SILLocation Loc, SILValue Callee,
@@ -472,7 +469,6 @@ public:
                            SILType ReturnType,
                            ArrayRef<Substitution> Substitutions,
                            ArrayRef<SILValue> Args,
-                           bool Transparent,
                            SILFunction &F);
 
   // The operand number of the first argument.
@@ -600,8 +596,6 @@ public:
            "substitutions.");
     return getSubstitutions().slice(1);
   }
-
-  bool isTransparent() const { return Transparent; }
 
   bool hasIndirectResult() const {
     return getSubstCalleeType()->hasIndirectResult();

@@ -35,7 +35,7 @@ bb0(%0 : $Int64):
   %9 = integer_literal $Builtin.Int128, 10
   %10 = apply %7(%9, %8) : $@thin (Builtin.Int128, @thin Int64.Type) -> Int64
   %11 = apply %5(%6, %10) : $@thin (Int64, Int64) -> Int64
-  %12 = apply [transparent] %4(%11) : $@thin (Int64) -> Int64
+  %12 = apply %4(%11) : $@thin (Int64) -> Int64
   %13 = function_ref @fromLiteral : $@thin (Builtin.Int128, @thin Int64.Type) -> Int64
   %14 = metatype $@thin Int64.Type
   %15 = integer_literal $Builtin.Int128, 30

@@ -663,8 +663,6 @@ public:
   
   void visitApplyInst(ApplyInst *AI) {
     OS << "apply ";
-    if (AI->isTransparent())
-      OS << "[transparent] ";
     OS << getID(AI->getCallee());
     printSubstitutions(AI->getSubstitutions());
     OS << '(';

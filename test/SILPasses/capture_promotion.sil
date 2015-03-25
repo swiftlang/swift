@@ -45,7 +45,7 @@ bb0:
   %12 = function_ref @convert_from_integer_literal : $@thin (Builtin.Word, @thin Int.Type) -> Int
   %13 = metatype $@thin Int.Type
   %14 = integer_literal $Builtin.Word, 3
-  %15 = apply [transparent] %12(%14, %13) : $@thin (Builtin.Word, @thin Int.Type) -> Int
+  %15 = apply %12(%14, %13) : $@thin (Builtin.Word, @thin Int.Type) -> Int
   store %15 to %11#1 : $*Int
 
 // CHECK-NOT: function_ref @closure0 :
@@ -194,7 +194,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Int, %2 : $Builtin.NativeObject, %3 : $*I
   %4 = function_ref @_TFSsoi1pFTSiSi_Si : $@thin (Int, Int) -> Int
   %5 = load %3 : $*Int
   %6 = load %3 : $*Int
-  %7 = apply [transparent] %4(%5, %6) : $@thin (Int, Int) -> Int
+  %7 = apply %4(%5, %6) : $@thin (Int, Int) -> Int
   assign %7 to %1 : $*Int
   strong_release %2 : $Builtin.NativeObject
   strong_release %0 : $Builtin.NativeObject

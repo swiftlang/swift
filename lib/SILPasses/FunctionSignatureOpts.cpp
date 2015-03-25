@@ -542,8 +542,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
 
     // Create the new apply.
     ApplyInst *NewAI = Builder.createApply(Loc, FRI, LoweredType, ResultType,
-                                           ArrayRef<Substitution>(), NewArgs,
-                                           NewF->isTransparent());
+                                           ArrayRef<Substitution>(), NewArgs);
 
     // Replace all uses of the old apply with the new apply.
     AI->replaceAllUsesWith(NewAI);
@@ -586,7 +585,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
   SILType ResultType = LoweredType.getFunctionInterfaceResultType();
   SILValue ReturnValue = Builder.createApply(Loc, FRI, LoweredType, ResultType,
                                              ArrayRef<Substitution>(),
-                                             ThunkArgs, NewF->isTransparent());
+                                             ThunkArgs);
 
   // If we have any arguments that were consumed but are now guaranteed,
   // insert a fix lifetime instruction and a release_value.

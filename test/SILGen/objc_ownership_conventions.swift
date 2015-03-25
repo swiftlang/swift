@@ -123,7 +123,7 @@ func test10(let g: Gizmo) -> AnyClass {
   // CHECK:      [[T0:%.*]] = load [[OPT_THICK_BUF]]#1
   // CHECK-NEXT: store [[T0]] to [[OPT_THICK_BUF:%.*]]#1
   // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-  // CHECK:      apply [transparent] [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, [[OPT_THICK_BUF]]#1)
+  // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, [[OPT_THICK_BUF]]#1)
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]#1
   // CHECK:      strong_release [[G]] : $Gizmo
   // CHECK:      strong_release [[G]] : $Gizmo
@@ -149,7 +149,7 @@ func test11(let g: Gizmo) -> AnyClass {
   // CHECK:      [[T0:%.*]] = load [[OPT_THICK_BUF]]#1
   // CHECK-NEXT: store [[T0]] to [[OPT_THICK_BUF:%.*]]#1
   // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-  // CHECK:      apply [transparent] [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, [[OPT_THICK_BUF]]#1)
+  // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, [[OPT_THICK_BUF]]#1)
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]#1
   // CHECK:      strong_release [[G]] : $Gizmo
   // CHECK:      strong_release [[G]] : $Gizmo

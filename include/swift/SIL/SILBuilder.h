@@ -213,20 +213,19 @@ public:
                          SILType SubstFnTy,
                          SILType Result,
                          ArrayRef<Substitution> Subs,
-                         ArrayRef<SILValue> Args,
-                         bool Transparent = false) {
+                         ArrayRef<SILValue> Args) {
     return insert(ApplyInst::create(Loc, Fn, SubstFnTy, Result,
-                                    Subs, Args, Transparent, F));
+                                    Subs, Args, F));
   }
   
-  ApplyInst *createApply(SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args,
-                         bool Transparent = false) {
+  ApplyInst *createApply(SILLocation Loc, SILValue Fn,
+                         ArrayRef<SILValue> Args) {
     auto FnTy = Fn.getType();
     return createApply(Loc, Fn, FnTy,
                        FnTy.castTo<SILFunctionType>()
                          ->getResult()
                          .getSILType(),
-                       ArrayRef<Substitution>(), Args, Transparent);
+                       ArrayRef<Substitution>(), Args);
   }
 
 

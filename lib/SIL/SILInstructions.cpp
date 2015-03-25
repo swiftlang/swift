@@ -179,10 +179,9 @@ ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy,
                      SILType Result,
                      ArrayRef<Substitution> Subs,
-                     ArrayRef<SILValue> Args,
-                     bool Transparent)
+                     ArrayRef<SILValue> Args)
   : SILInstruction(ValueKind::ApplyInst, Loc, Result),
-    NumSubstitutions(Subs.size()), Transparent(Transparent),
+    NumSubstitutions(Subs.size()),
     SubstCalleeType(SubstCalleeTy),
     Operands(this, Args, Callee)
 {
@@ -197,13 +196,13 @@ ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
                              SILType Result,
                              ArrayRef<Substitution> Subs,
                              ArrayRef<SILValue> Args,
-                             bool Transparent, SILFunction &F) {
+                             SILFunction &F) {
   void *Buffer = F.getModule().allocate(sizeof(ApplyInst)
                               + decltype(Operands)::getExtraSize(Args.size())
                               + sizeof(Substitution) * Subs.size(),
                             alignof(ApplyInst));
   return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeTy,
-                                 Result, Subs, Args, Transparent);
+                                 Result, Subs, Args);
 }
 
 bool ApplyInst::hasSemantics(StringRef SemanticsString) const {

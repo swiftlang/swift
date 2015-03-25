@@ -91,7 +91,7 @@ struct LoadableStruct {
   // CHECK:       [[DOES_HAVE_VALUE]]:
   // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
   // CHECK:         [[TMP:%.*]] = alloc_stack $LoadableStruct
-  // CHECK:         apply [transparent] [[GET_VALUE_FN]]<LoadableStruct>([[TMP]]#1, [[DELEGATEE_SELF_MAT]]#1)
+  // CHECK:         apply [[GET_VALUE_FN]]<LoadableStruct>([[TMP]]#1, [[DELEGATEE_SELF_MAT]]#1)
   // CHECK:         [[DELEGATEE_SELF_VAL:%.*]] = load [[TMP]]
   // CHECK:         assign [[DELEGATEE_SELF_VAL]] to [[SELF_MARKED]]
   // CHECK:         dealloc_stack [[TMP]]
@@ -111,7 +111,7 @@ struct LoadableStruct {
   // CHECK:         store [[DELEGATEE_SELF]] to [[DELEGATEE_SELF_MAT]]
   // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
   // CHECK:         [[TMP:%.*]] = alloc_stack $LoadableStruct
-  // CHECK:         apply [transparent] [[GET_VALUE_FN]]<LoadableStruct>([[TMP]]#1, [[DELEGATEE_SELF_MAT]]#1)
+  // CHECK:         apply [[GET_VALUE_FN]]<LoadableStruct>([[TMP]]#1, [[DELEGATEE_SELF_MAT]]#1)
   // CHECK:         [[DELEGATEE_SELF_VAL:%.*]] = load [[TMP]]
   // CHECK:         assign [[DELEGATEE_SELF_VAL]] to [[SELF_MARKED]]
   // CHECK:         dealloc_stack [[TMP]]
@@ -189,7 +189,7 @@ struct AddressOnlyStruct {
   // CHECK:       [[DOES_HAVE_VALUE]]:
   // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
   // CHECK:         [[TMP:%.*]] = alloc_stack $AddressOnlyStruct
-  // CHECK:         apply [transparent] [[GET_VALUE_FN]]<AddressOnlyStruct>([[TMP]]#1, [[DELEGATEE_SELF]]#1)
+  // CHECK:         apply [[GET_VALUE_FN]]<AddressOnlyStruct>([[TMP]]#1, [[DELEGATEE_SELF]]#1)
   // CHECK:         copy_addr [take] [[TMP]]#1 to [[SELF_MARKED]]
   // CHECK:         dealloc_stack [[TMP]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF]]
@@ -207,7 +207,7 @@ struct AddressOnlyStruct {
   // CHECK:         apply [[DELEGATEE_INIT]]([[DELEGATEE_SELF]]
   // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
   // CHECK:         [[TMP:%.*]] = alloc_stack $AddressOnlyStruct
-  // CHECK:         apply [transparent] [[GET_VALUE_FN]]<AddressOnlyStruct>([[TMP]]#1, [[DELEGATEE_SELF]]#1)
+  // CHECK:         apply [[GET_VALUE_FN]]<AddressOnlyStruct>([[TMP]]#1, [[DELEGATEE_SELF]]#1)
   // CHECK:         copy_addr [take] [[TMP]]#1 to [[SELF_MARKED]]
   // CHECK:         dealloc_stack [[TMP]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF]]
@@ -300,7 +300,7 @@ class RootClass {
   // CHECK:       [[HAS_VALUE]]:
   // CHECK:         [[GET_OPTIONAL_VALUE:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
   // CHECK:         [[TMP:%.*]] = alloc_stack $RootClass
-  // CHECK:         apply [transparent] [[GET_OPTIONAL_VALUE]]<RootClass>([[TMP]]#1, [[NEW_SELF_OPT_MAT]]#1)
+  // CHECK:         apply [[GET_OPTIONAL_VALUE]]<RootClass>([[TMP]]#1, [[NEW_SELF_OPT_MAT]]#1)
   // CHECK:         [[NEW_SELF:%.*]] = load [[TMP]]
   // CHECK:         store [[NEW_SELF]] to [[SELF_MARKED]]
   // CHECK:         dealloc_stack [[TMP]]

@@ -507,7 +507,7 @@ func testNoReturnAttrParam(fptr: @noreturn ()->()) -> () {}
 // CHECK-LABEL: sil hidden @_TF9functions16applyTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1 {
 func applyTransparent(x: Bool) -> Bool {
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions15testTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1
-  // CHECK: apply [transparent] [[FUNC]]({{%[0-9]+}}) : $@thin (Builtin.Int1) -> Builtin.Int1
+  // CHECK: apply [[FUNC]]({{%[0-9]+}}) : $@thin (Builtin.Int1) -> Builtin.Int1
   return testTransparent(x)
 }
 

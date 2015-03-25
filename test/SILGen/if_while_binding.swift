@@ -233,7 +233,7 @@ func if_leading_boolean(a : Int) {
   // CHECK: debug_value %0 : $Int  // let a
   // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0) : $@thin (Int, Int) -> Bool
 
-  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply [transparent] %2([[EQRESULT]]) : $@cc(method) @thin (Bool) -> Builtin.Int1
+  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply %2([[EQRESULT]]) : $@cc(method) @thin (Bool) -> Builtin.Int1
   // CHECK-NEXT: cond_br [[EQRESULTI1]], [[CHECKFOO:bb[0-9]+]], [[IFDONE:bb[0-9]+]]
 
   // Call Foo and test for the optional being present.

@@ -1508,13 +1508,6 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen,
                                  /*volatile*/ false);
 }
 
-static bool isTransparent(SILValue v) {
-  if (auto fnRef = dyn_cast<FunctionRefInst>(v))
-    return fnRef->getReferencedFunction()->isTransparent();
-  
-  return false;
-}
-
 void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                SILDeclRef requirement,
                                SILDeclRef witness,
@@ -1689,8 +1682,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                                 witnessParams, witnessSILTy, loc);
   SILValue witnessResultValue = B.createApply(
       loc, witnessFnRef, witnessSILTy,
-      witnessFTy->getResult().getSILType(), witnessSubs, args,
-      isTransparent(witnessFnRef));
+      witnessFTy->getResult().getSILType(), witnessSubs, args);
 
   auto thunkResultTy = F.mapTypeIntoContext(thunkTy->getSemanticResultSILType());
   

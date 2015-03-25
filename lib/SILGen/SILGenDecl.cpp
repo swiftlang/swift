@@ -1896,8 +1896,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     ->substGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
   SILValue result = B.createApply(loc, nativeFn,
                                   SILType::getPrimitiveObjectType(substTy),
-                                  swiftResultTy.getSILType(), subs, args,
-                                  thunk.isTransparent());
+                                  swiftResultTy.getSILType(), subs, args);
 
   scope.pop();
   

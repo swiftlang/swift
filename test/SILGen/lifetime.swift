@@ -391,7 +391,7 @@ class Foo<T> {
     // initialization for y
     // CHECK: [[INTCTOR:%[0-9]+]] = function_ref @_TFSiCfMSiFT_Si : $@thin (@thin Int.Type) -> Int
     // CHECK: [[INTMETA:%[0-9]+]] = metatype $@thin Int.Type
-    // CHECK: [[INTVAL:%[0-9]+]] = apply [transparent] [[INTCTOR]]([[INTMETA]])
+    // CHECK: [[INTVAL:%[0-9]+]] = apply [[INTCTOR]]([[INTMETA]])
 
     x = bar()
     // CHECK: function_ref @_TF8lifetime3barFT_Si : $@thin () -> Int

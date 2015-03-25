@@ -9,7 +9,7 @@
 // CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
 // CHECK: [[INT:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[LIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 17
-// CHECK: [[RESULT:%[0-9]+]] = apply [transparent] [[CVT]]([[LIT]], [[INT]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK: return [[RESULT]] : $Int
 
 // Default argument for third parameter.
@@ -28,7 +28,7 @@ func testDefaultArg1() {
   // CHECK: [[LITFN:%[0-9]+]] = function_ref @_TFSdCfMSdFT20_builtinFloatLiteralBf{{64|80}}__Sd
   // CHECK: [[FLOAT64:%[0-9]+]] = metatype $@thin Double.Type
   // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x4009000000000000|0x4000C800000000000000}}
-  // CHECK: [[FLOATVAL:%[0-9]+]] = apply [transparent] [[LITFN]]([[FLOATLIT]], [[FLOAT64]])
+  // CHECK: [[FLOATVAL:%[0-9]+]] = apply [[LITFN]]([[FLOATLIT]], [[FLOAT64]])
   // CHECK: [[DEF0FN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg1{{.*}}_A_
   // CHECK: [[DEF0:%[0-9]+]] = apply [[DEF0FN]]()
   // CHECK: [[DEF2FN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg1{{.*}}_A1_
@@ -45,7 +45,7 @@ func testDefaultArg2() {
 // CHECK:  [[LITFN:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
 // CHECK:  [[INT64:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK:  [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
-// CHECK:  [[I:%[0-9]+]] = apply [transparent] [[LITFN]]([[INTLIT]], [[INT64]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK:  [[DFN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg2{{.*}}_A0_ : $@thin () -> Double
 // CHECK:  [[D:%[0-9]+]] = apply [[DFN]]() : $@thin () -> Double
 // CHECK:  [[SFN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg2{{.*}}_A1_ : $@thin () -> @owned String

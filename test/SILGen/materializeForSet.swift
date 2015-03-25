@@ -131,7 +131,7 @@ struct Bill : Totalled {
 // SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCU__fMGSqQ__FT10nilLiteralT__GSqQ__ : $@thin <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()
 // SILGEN:   [[META:%.*]] = metatype $@thin Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>.Type
 // SILGEN:   [[T2:%.*]] = alloc_stack $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>
-// SILGEN:   [[OPT:%.*]] = apply [transparent] [[INIT]]<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>([[T2]]#1, [[META]]) : $@thin <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()
+// SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>([[T2]]#1, [[META]]) : $@thin <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()
 // SILGEN:   [[T3:%.*]] = load [[T2]]#1
 // SILGEN:   [[T4:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T3]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>)
 // SILGEN:   return [[T4]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>)
@@ -140,7 +140,7 @@ struct Bill : Totalled {
 // SILGEN:  sil hidden [transparent] [thunk] @_TTWV17materializeForSet4BillS_8TotalledS_FS1_m5totalSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>) {
 // SILGEN:  bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Bill):
 // SILGEN:    [[T0:%.*]] = function_ref @_TFV17materializeForSet4Billm5totalSi
-// SILGEN:    [[T1:%.*]] = apply [transparent] [[T0]]([[BUFFER]], [[STORAGE]], [[SELF]])
+// SILGEN:    [[T1:%.*]] = apply [[T0]]([[BUFFER]], [[STORAGE]], [[SELF]])
 // SILGEN:    return [[T1]] :
 
 // SILGEN: sil_witness_table hidden Bill: Totalled module materializeForSet {

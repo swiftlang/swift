@@ -19,11 +19,11 @@ struct D {
 // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
 // CHECK: [[INTMETA:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 2
-// CHECK: [[INTVAL:%[0-9]+]] = apply [transparent] [[INTCONV]]([[INTLIT]], [[INTMETA]])
+// CHECK: [[INTVAL:%[0-9]+]] = apply [[INTCONV]]([[INTLIT]], [[INTMETA]])
 // CHECK: [[FLOATCONV:%[0-9]+]] = function_ref @_TFSdCfMSdFT20_builtinFloatLiteralBf{{64|80}}__Sd
 // CHECK: [[FLOATMETA:%[0-9]+]] = metatype $@thin Double.Type
 // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x400C000000000000|0x4000E000000000000000}}
-// CHECK: [[FLOATVAL:%[0-9]+]] = apply [transparent] [[FLOATCONV]]([[FLOATLIT]], [[FLOATMETA]])
+// CHECK: [[FLOATVAL:%[0-9]+]] = apply [[FLOATCONV]]([[FLOATLIT]], [[FLOATMETA]])
 // CHECK: [[IADDR:%[0-9]+]] = struct_element_addr [[THIS]] : $*D, #D.i
 // CHECK: assign [[INTVAL]] to [[IADDR]]
 // CHECK: [[JADDR:%[0-9]+]] = struct_element_addr [[THIS]] : $*D, #D.j
@@ -38,7 +38,7 @@ class E {
 // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
 // CHECK: [[INT64_CTOR:%[0-9]+]] = function_ref @_TFVSs5Int64CfMS_FT_S_ : $@thin (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int64.Type
-// CHECK-NEXT: [[ZERO:%[0-9]+]] = apply [transparent] [[INT64_CTOR]]([[INT64]]) : $@thin (@thin Int64.Type) -> Int64
+// CHECK-NEXT: [[ZERO:%[0-9]+]] = apply [[INT64_CTOR]]([[INT64]]) : $@thin (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[SELF]] : $E, #E.i
 // CHECK-NEXT: assign [[ZERO]] to [[IREF]] : $*Int64
 // CHECK-NEXT: return [[SELF]] : $E

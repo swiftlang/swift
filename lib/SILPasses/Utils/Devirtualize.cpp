@@ -285,8 +285,7 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
     SILType::getPrimitiveObjectType(SubstCalleeType);
   ApplyInst *NewAI =
     B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
-                  Subs, NewArgs,
-                  FRI->getReferencedFunction()->isTransparent());
+                  Subs, NewArgs);
 
   if (ReturnType == AI->getType()) {
     AI->replaceAllUsesWith(NewAI);
@@ -407,8 +406,7 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI, SILFunction *F,
   auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
   auto ResultSILType = SubstCalleeCanType->getSILResult();
   auto *SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
-                                  ResultSILType, NewSubstList, Arguments,
-                                 FRI->getReferencedFunction()->isTransparent());
+                                  ResultSILType, NewSubstList, Arguments);
 
   auto *WMI = cast<WitnessMethodInst>(AI->getCallee());
 

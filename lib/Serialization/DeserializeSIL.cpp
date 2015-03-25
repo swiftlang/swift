@@ -630,7 +630,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   SmallVector<SILInstruction*, 1> InsertedInsn;
   SILBuilder Builder(BB, &InsertedInsn);
   unsigned OpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
-           ValResNum = 0, ValResNum2 = 0, Attr = 0, IsTransparent = 0,
+           ValResNum = 0, ValResNum2 = 0, Attr = 0,
            NumSubs = 0, NumConformances = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
@@ -687,7 +687,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_APPLY: {
     unsigned IsPartial;
-    SILInstApplyLayout::readRecord(scratch, IsPartial, IsTransparent, NumSubs,
+    SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs,
                                    TyID, TyID2, ValID, ValResNum, ListOfValues);
     switch (IsPartial) {
     case 0:
@@ -907,7 +907,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
       Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
                                    ArgTys[I>>1]));
-    bool Transparent = (bool)IsTransparent;
     unsigned NumSub = NumSubs;
 
     SmallVector<Substitution, 4> Substitutions;
@@ -920,7 +919,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createApply(Loc, getLocalValue(ValID, ValResNum, FnTy),
                                     SubstFnTy,
                                     FTI->getResult().getSILType(),
-                                    Substitutions, Args, Transparent);
+                                    Substitutions, Args);
     break;
   }
   case ValueKind::PartialApplyInst: {

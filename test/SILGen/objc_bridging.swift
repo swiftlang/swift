@@ -24,7 +24,7 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  inject_enum_addr [[OPT_NATIVE_BUF]]{{.*}}Some
 // CHECK:  [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]#1
 // CHECK:  [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-// CHECK:  apply [transparent] [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
+// CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:  [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:  return [[NATIVE]] 
 // CHECK:}
@@ -52,7 +52,7 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-// CHECK:   apply [transparent] [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
+// CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]
 // CHECK: }
@@ -172,7 +172,7 @@ func callBar() -> String {
 // CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]#1
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-// CHECK:   apply [transparent] [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
+// CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]
 // CHECK: }
@@ -241,7 +241,7 @@ class Bas : NSObject {
   // CHECK:   strong_retain [[THIS]] : $Bas
   // CHECK:   // function_ref objc_bridging.Bas.strRealProp.getter
   // CHECK:   [[PROPIMPL:%.*]] = function_ref @_TFC13objc_bridging3Basg11strRealPropSS
-  // CHECK:   [[PROP_COPY:%.*]] = apply [transparent] [[PROPIMPL]]([[THIS]]) : $@cc(method) @thin (@owned Bas) -> @owned String
+  // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[THIS]]) : $@cc(method) @thin (@owned Bas) -> @owned String
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[PROP_COPY]])
   // CHECK:   autorelease_return [[NSSTR]]
@@ -261,7 +261,7 @@ class Bas : NSObject {
   // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[VALUE_BOX]])
   
   // CHECK:   [[SETIMPL:%.*]] = function_ref @_TFC13objc_bridging3Bass11strRealPropSS
-  // CHECK:   apply [transparent] [[SETIMPL]]([[STR]], %1)
+  // CHECK:   apply [[SETIMPL]]([[STR]], %1)
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC13objc_bridging3Bass11strRealPropSS
   // CHECK: bb0(%0 : $String, %1 : $Bas):

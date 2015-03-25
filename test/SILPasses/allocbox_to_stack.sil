@@ -355,7 +355,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
   %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply [transparent] %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %4 = apply %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
   %5 = load %3#1 : $*Int                          // user: %8
   dealloc_stack %3#0 : $*@local_storage Int       // id: %6
   strong_release %0 : $Builtin.NativeObject      // id: %7
@@ -393,7 +393,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
   %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply [transparent] %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %4 = apply %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
   %5 = load %3#1 : $*Int                          // user: %8
   dealloc_stack %3#0 : $*@local_storage Int       // id: %6
   strong_release %0 : $Builtin.NativeObject      // id: %7
@@ -425,7 +425,7 @@ bb0(%0 : $@callee_owned (@out U) -> ()):
   debug_value %0 : $@callee_owned (@out U) -> ()
   strong_retain %0 : $@callee_owned (@out U) -> ()
   %3 = alloc_stack $U
-  %4 = apply [transparent] %0(%3#1) : $@callee_owned (@out U) -> ()
+  %4 = apply %0(%3#1) : $@callee_owned (@out U) -> ()
   destroy_addr %3#1 : $*U
   dealloc_stack %3#0 : $*@local_storage U
   strong_release %0 : $@callee_owned (@out U) -> ()
@@ -451,7 +451,7 @@ bb0(%0 : $*T):
   // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @_TTSf0n_d_n__closure_to_specialize
   // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]]#1)
   %6 = partial_apply %3<T>(%4#0, %4#1) : $@thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
-  %7 = apply [transparent] %2<T>(%6) : $@thin <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
+  %7 = apply %2<T>(%6) : $@thin <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
   // CHECK: destroy_addr [[STACK]]#1 : $*T
   destroy_addr %0 : $*T
   %9 = tuple ()
@@ -495,7 +495,7 @@ sil [noinline] @inner : $@thin (@owned @callee_owned () -> Bool) -> Bool {
 bb0(%0 : $@callee_owned () -> Bool):
   debug_value %0 : $@callee_owned () -> Bool
   strong_retain %0 : $@callee_owned () -> Bool
-  %3 = apply [transparent] %0() : $@callee_owned () -> Bool
+  %3 = apply %0() : $@callee_owned () -> Bool
   strong_release %0 : $@callee_owned () -> Bool
 // CHECK: return
   return %3 : $Bool
@@ -507,7 +507,7 @@ sil [noinline] @outer : $@thin (@owned @callee_owned () -> Bool) -> Bool {
 bb0(%0 : $@callee_owned () -> Bool):
   debug_value %0 : $@callee_owned () -> Bool
   strong_retain %0 : $@callee_owned () -> Bool
-  %3 = apply [transparent] %0() : $@callee_owned () -> Bool
+  %3 = apply %0() : $@callee_owned () -> Bool
   strong_release %0 : $@callee_owned () -> Bool
 // CHECK: return
   return %3 : $Bool
@@ -579,7 +579,7 @@ bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*S<T>):
   copy_addr %2 to [initialization] %4#1 : $*S<T>
   %6 = function_ref @get : $@cc(method) @thin <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
   %7 = apply %6<T>(%4#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
-  %8 = apply [transparent] %3(%0, %7) : $@thin (Int, Int) -> Bool
+  %8 = apply %3(%0, %7) : $@thin (Int, Int) -> Bool
   dealloc_stack %4#0 : $*@local_storage S<T>
   strong_release %1 : $Builtin.NativeObject
 // CHECK: return

@@ -283,7 +283,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   Builder.setInsertionPoint(AI);
   ApplyInst *NewAI = Builder.createApply(AI->getLoc(), FRI, LoweredType,
                                          ResultType, ArrayRef<Substitution>(),
-                                         NewArgs, NewF->isTransparent());
+                                         NewArgs);
 
   // If we passed in the original closure as @owned, then insert a release right
   // after NewAI. This is to balance the +1 from being an @owned argument to AI.

@@ -35,7 +35,7 @@ bb0(%0 : $Int, %1 : $X):
   %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
-  %7 = apply [transparent] %4(%6, %5) : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %9
+  %7 = apply %4(%6, %5) : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %9
   return %7 : $Int
 }
 
@@ -47,7 +47,7 @@ bb0(%0 : $X):
   %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
-  %7 = apply [transparent] %4(%6, %5) : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %9
+  %7 = apply %4(%6, %5) : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %9
   return %7 : $Int
 }
 

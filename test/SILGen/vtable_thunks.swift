@@ -87,7 +87,7 @@ class F: D {
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuofS0_FTGSqCS_1B_1yS1_1zS1__S1_
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
 // CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-// CHECK:         apply [transparent] [[FORCE_UNWRAP_FN]]<B>([[UNWRAP_Y_ADDR:%.*]]#1,
+// CHECK:         apply [[FORCE_UNWRAP_FN]]<B>([[UNWRAP_Y_ADDR:%.*]]#1,
 // CHECK:         [[UNWRAP_Y:%.*]] = load [[UNWRAP_Y_ADDR]]
 // CHECK:         [[RES:%.*]] = apply {{%.*}}([[WRAP_X]], [[UNWRAP_Y]], %2, %3)
 // CHECK:         [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]

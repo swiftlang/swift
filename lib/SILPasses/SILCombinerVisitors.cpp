@@ -626,8 +626,7 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
   }
 
   ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, FnType, ResultTy,
-                                        Subs, Args,
-                                 FRI->getReferencedFunction()->isTransparent());
+                                        Subs, Args);
   NAI->setDebugScope(AI->getDebugScope());
 
   // We also need to release the partial_apply instruction itself because it
@@ -736,7 +735,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
   // Create the new apply inst.
   auto NAI = ApplyInst::create(AI->getLoc(), FRI, CCSILTy,
                                ConvertCalleeTy->getSILResult(),
-                               ArrayRef<Substitution>(), Args, false,
+                               ArrayRef<Substitution>(), Args,
                                *FRI->getReferencedFunction());
   NAI->setDebugScope(AI->getDebugScope());
   return NAI;
@@ -1268,7 +1267,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
 
       auto NewAI = Builder->createApply(
           AI->getLoc(), AI->getCallee(), NewSubstCalleeType,
-          AI->getType(), Substitutions, Args, AI->isTransparent());
+          AI->getType(), Substitutions, Args);
 
       replaceInstUsesWith(*AI, NewAI, 0);
       eraseInstFromFunction(*AI);
@@ -1360,8 +1359,7 @@ static ApplyInst *optimizeCastThroughThinFuntionPointer(
           AI->getModule(), AI->getModule().getSwiftModule(), Subs));
 
   ApplyInst *NewApply = Builder->createApply(
-      AI->getLoc(), OrigThinFun, NewSubstCalleeType, AI->getType(), Subs, Args,
-      OrigThinFun->getReferencedFunction()->isTransparent());
+      AI->getLoc(), OrigThinFun, NewSubstCalleeType, AI->getType(), Subs, Args);
   NewApply->setDebugScope(AI->getDebugScope());
 
   return NewApply;
@@ -1599,7 +1597,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     return ApplyInst::create(AI->getLoc(), TTTFI->getOperand(),
                              substTy, AI->getType(),
                              AI->getSubstitutions(), Arguments,
-                             AI->isTransparent(),
                              *AI->getFunction());
   }
 

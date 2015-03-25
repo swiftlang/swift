@@ -802,9 +802,9 @@ bb0(%0 : $Int, %1 : $*Int):
 sil [fragile] @test_transparent : $@thin () -> () {
 bb0:
   // CHECK: function_ref
-  // CHECK: apply [transparent]
+  // CHECK: apply
   %0 = function_ref @classes : $@thin () -> ()
-  %1 = apply [transparent] %0() : $@thin () -> ()
+  %1 = apply %0() : $@thin () -> ()
   %2 = tuple ()
   %3 = return %2 : $()
 }
@@ -822,7 +822,7 @@ bb0:
   %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
   %2 = integer_literal $Builtin.Int2048, 0 
-  %3 = apply [transparent] %0(%2, %1) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+  %3 = apply %0(%2, %1) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   return %3 : $Int
 }
 // CHECK-LABEL: [always_inline] @always_inline_callee
@@ -831,7 +831,7 @@ bb0:
   %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
   %2 = integer_literal $Builtin.Int2048, 0 
-  %3 = apply [transparent] %0(%2, %1) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+  %3 = apply %0(%2, %1) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
   return %3 : $Int
 }
 sil [fragile] [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int

@@ -37,7 +37,7 @@ import gizmo
   // CHECK-LABEL: sil hidden [transparent] @_TToFC24objc_dictionary_bridging3Foog8propertyGVSs10DictionaryS0_S0__ : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
   // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foog8propertyGVSs10DictionaryS0_S0__ : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
-  // CHECK:   [[DICT:%[0-9]+]] = apply [transparent] [[GETTER]]([[SELF]]) : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
+  // CHECK:   [[DICT:%[0-9]+]] = apply [[GETTER]]([[SELF]]) : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
   
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertDictionaryToNSDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
   // CHECK:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
@@ -51,7 +51,7 @@ import gizmo
 // CHECK:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[OPT_NSDICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned Optional<NSDictionary>) -> @owned Dictionary<τ_0_0, τ_0_1>
 
 // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foos8propertyGVSs10DictionaryS0_S0__ : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
-// CHECK:   [[RESULT:%[0-9]+]] = apply [transparent] [[SETTER]]([[DICT]], [[SELF]]) : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
+// CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[DICT]], [[SELF]]) : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
 // CHECK:   return [[RESULT]] : $()
 
   // CHECK-LABEL: sil hidden [transparent] @_TToFC24objc_dictionary_bridging3Foog19nonVerbatimProperty{{.*}} : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary

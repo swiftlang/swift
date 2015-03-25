@@ -1666,8 +1666,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
   auto resultType = substFnType->getResult().getSILType();
   auto calleeType = SILType::getPrimitiveObjectType(substFnType);
   SILValue result = gen.B.createApply(loc, fnValue, calleeType,
-                                      resultType, subs, argValues,
-                                      transparent);
+                                      resultType, subs, argValues);
 
   // Given any guaranteed arguments that are not being passed at +0, insert the
   // decrement here instead of at the end of scope. Guaranteed just means that

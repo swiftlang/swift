@@ -56,7 +56,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   strong_retain %0
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.typicalProperty.getter
   // CHECK-NEXT:   [[GETIMPL:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo
-  // CHECK-NEXT:   [[RES:%.*]] = apply [transparent] [[GETIMPL]](%0)
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[GETIMPL]](%0)
   // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo
   // CHECK-NEXT: }
   
@@ -76,7 +76,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   retain [[THIS]] : $Hoozit
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.typicalProperty.setter
   // CHECK-NEXT:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo
-  // CHECK-NEXT:   [[RES:%.*]] = apply [transparent] [[FR]](%0, %1)
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[FR]](%0, %1)
   // CHECK_NEXT:   return [[RES]] line:[[@LINE-19]]:7:auto_gen
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo
@@ -92,7 +92,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   strong_retain %0
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.getter
   // CHECK-NEXT:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo
-  // CHECK-NEXT:   [[RES:%.*]] = apply [transparent] [[FR]](%0)
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[FR]](%0)
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
@@ -111,7 +111,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.setter
   // CHECK-NEXT:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo
-  // CHECK-NEXT:   [[RES:%.*]] = apply [transparent] [[FR]](%0, %1)
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[FR]](%0, %1)
   // CHECK-NEXT:   return [[RES]]
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo

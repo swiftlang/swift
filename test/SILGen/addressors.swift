@@ -194,7 +194,7 @@ struct D : Subscriptable {
 // SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCU__fMGSqQ__FT10nilLiteralT__GSqQ__
 // SILGEN:   [[META:%.*]] = metatype $@thin Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>.Type
 // SILGEN:   [[T0:%.*]] = alloc_stack $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>
-// SILGEN:   [[OPT:%.*]] = apply [transparent] [[INIT]]<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>([[T0]]#1, [[META]])
+// SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>([[T0]]#1, [[META]])
 // SILGEN:   [[T1:%.*]] = load [[T0]]#1
 // SILGEN:   [[T2:%.*]] = tuple ([[ADDR]] : $Builtin.RawPointer, [[T1]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>)
 // SILGEN:   dealloc_stack [[T0]]#0

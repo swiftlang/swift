@@ -7,7 +7,7 @@ var false_ = Bool()
 func call_auto_closure(@autoclosure var x: () -> Bool) -> Bool {
   // CHECK: [[XBOX:%.*]] = alloc_box $@callee_owned () -> Bool
   // CHECK: [[XLOAD:%.*]] = load [[XBOX]]#1
-  // CHECK: [[RET:%.*]] = apply [transparent] [[XLOAD]]()
+  // CHECK: [[RET:%.*]] = apply [[XLOAD]]()
   // CHECK: return [[RET]]
   return x()
 }
