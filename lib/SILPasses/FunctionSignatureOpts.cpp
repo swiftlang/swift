@@ -748,10 +748,10 @@ static bool canSpecializeFunction(SILFunction &F) {
   if (F.isAvailableExternally())
     return false;
 
-  // Do not specialize the signature of transparent functions or always inline
-  // functions, we will just inline them and specialize each one of the
-  // individual functions that these sorts of functions are inlined into.
-  if (F.isTransparent() || F.getInlineStrategy() == Inline_t::AlwaysInline)
+  // Do not specialize the signature of always inline functions. We
+  // will just inline them and specialize each one of the individual
+  // functions that these sorts of functions are inlined into.
+  if (F.getInlineStrategy() == Inline_t::AlwaysInline)
     return false;
 
   // For now ignore generic functions to keep things simple...
