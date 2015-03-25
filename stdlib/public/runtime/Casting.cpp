@@ -1938,7 +1938,7 @@ namespace {
 // Conformance Cache.
 static ConcurrentMap<size_t, ConformanceCacheEntry> ConformanceCache;
 // This variable is used to signal when a cache was generated and
-// it is correct to avild a new scan.
+// it is correct to avoid a new scan.
 unsigned ConformanceCacheGeneration = 0;
 
 // Conformance sections pending a scan.
@@ -2113,7 +2113,7 @@ recur_inside_cache_lock:
 
 const WitnessTable *
 swift::swift_conformsToProtocol(const Metadata *type,
-                                const ProtocolDescriptor *protocol){
+                                const ProtocolDescriptor *protocol) {
   // Install callbacks for tracking when a new dylib is loaded so we can 
   // scan it.
   installCallbacksToInspectDylib();
