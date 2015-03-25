@@ -183,9 +183,8 @@ var pr : Proto = 3.14159
 // CHECK: Double: 3.14159
 pr.foo()
 
-// FIXME: Triggers an error that breaks the conformance below it.
-// <rdar://problem/20163191>
-// pr = "foo"
+// erroneous; we'll try again after adding the conformance
+pr = "foo"
 
 extension String : Proto {
   func foo() {
