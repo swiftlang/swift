@@ -267,23 +267,54 @@ index for subscripting the collection::
   if c.startIndex != c.endIndex { } // OK
   c[c.endIndex]                     // Oops! (index out-of-range)
 
-.. sidebar:: Mutable Collections
+Mutable Collections
+-------------------
 
-   A **mutable collection** is a collection that supports in-place
-   element mutation.  The protocol is a simple refinement of
-   `CollectionType` that adds a subscript setter:
+A **mutable collection** is a collection that supports in-place element
+mutation.  The protocol is a simple refinement of `CollectionType` that adds a
+subscript setter:
 
-   .. parsed-literal::
+.. parsed-literal::
 
-     protocol MutableCollectionType 
-       : CollectionType {
-       subscript(i: Index) -> Generator.Element 
-         {get **set**}
-     }
+  protocol MutableCollectionType : CollectionType {
+    subscript(i: Index) -> Generator.Element { get **set** }
+  }
 
-   Note that this protocol implies only mutation of content, not of
-   structure.  Swift has other protocols, such as
-   `RangeReplaceableCollectionType`, to cover structural mutation.
+The `CollectionType` protocol does not require collection to support mutation,
+so it is not possible to tell from the protocol itself whether the order of
+elements in an instance of a type that conforms to `CollectionType` has a
+domain-specific meaning or not.  (Note that since elements in collections have
+stable indices, the element order within the collection itself is stable; the
+order sometimes does not have a meaning and is not chosen by the code that uses
+the collection, but by the implementation details of the collection itself.)
+
+`MutableCollectionType` protocol allows the to replace a specific element,
+identified by an index, with another one in the same position.  This capability
+essentially allows to rearrange the elements inside the collection in any
+order, thus types that conform to `MutableCollectionType` can represent
+collections with a domain-specific element order (not every instance of a
+`MutableCollectionType` has an interesting order, though).
+
+Range Replaceable Collections
+-----------------------------
+
+The `MutableCollectionType` protocol implies only mutation of content, not of
+structure (for example, changing the number of elements).  The
+`RangeReplaceableCollectionType` protocol adds the capability to perform
+structural mutation, which in its most general form is expressed as replacing a
+range of elements, denoted by two indices, by elements from a collection with a
+**different** length.
+
+::
+
+  public protocol RangeReplaceableCollectionType : MutableCollectionType {
+    mutating func replaceRange<
+      C: CollectionType where C.Generator.Element == Self.Generator.Element
+    >(
+      subRange: Range<Index>, with newElements: C
+    )
+  }
+
 
 Index Protocols
 ---------------
