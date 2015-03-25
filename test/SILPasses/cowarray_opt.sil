@@ -5,6 +5,10 @@ sil_stage canonical
 import Builtin
 import Swift
 
+/////////////
+// Utility //
+/////////////
+
 struct ArrayIntBuffer {
   var storage : Builtin.NativeObject
 }
@@ -16,7 +20,39 @@ struct MyArray<T> {
 struct MyStruct {
 }
 
-// CHECK-LABEL: sil @cow_should_pair_retain_release
+sil public_external [semantics "array.make_mutable"] @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> () {
+bb0(%0: $*MyArray<MyStruct>):
+  unreachable
+}
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil @simple_hoist
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK: [[FUN:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK: apply [[FUN]]([[ARRAY]]
+// CHECK: bb1
+// CHECK-NOT: array_make_mutable
+// CHECK-NOT: apply [[FUN]]
+sil @simple_hoist : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  %2 = load %0 : $*MyArray<MyStruct>
+  br bb1
+
+bb1:
+  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
+}
+
+
+// CHECK-LABEL: sil @hoist_ignoring_paired_retain_release_and_hoist
 // CHECK: bb0(
 // CHECK-NOT: br
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
@@ -26,8 +62,7 @@ struct MyStruct {
 // CHECK: bb1:
 // CHECK-NOT: apply
 // CHECK:  cond_br {{.*}}, bb1
-
-sil @cow_should_pair_retain_release : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+sil @hoist_ignoring_paired_retain_release_and_hoist : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1
@@ -46,7 +81,151 @@ bb2:
   return %7 : $()
 }
 
-sil public_external [semantics "array.make_mutable"] @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> () {
-bb0(%0: $*MyArray<MyStruct>):
-  unreachable
+// CHECK-LABEL: sil @hoist_blocked_by_unpaired_retain_release_1
+// CHECK: bb0(
+// CHECK-NOT: apply
+// CHECK: bb1:
+// CHECK: retain_value
+// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
+// CHECK: apply [[MM]]
+// CHECK:  cond_br {{.*}}, bb1
+sil @hoist_blocked_by_unpaired_retain_release_1 : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  %2 = load %0 : $*MyArray<MyStruct>
+  br bb1
+
+bb1:
+  retain_value %2 : $MyArray<MyStruct>
+  %3 = load %1 : $*Builtin.Int1
+  %4 = load %0 : $*MyArray<MyStruct>
+  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  cond_br %3, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
+}
+
+
+// CHECK-LABEL: sil @hoist_not_blocked_by_unpaired_release
+// CHECK: bb0(
+// CHECK-NOT: br
+// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
+// CHECK-NOT: br
+// CHECK: apply [[MM]]
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: apply
+// CHECK:  cond_br {{.*}}, bb1
+sil @hoist_not_blocked_by_unpaired_release : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  %2 = load %0 : $*MyArray<MyStruct>
+  br bb1
+
+bb1:
+  %3 = load %1 : $*Builtin.Int1
+  %4 = load %0 : $*MyArray<MyStruct>
+  release_value %2 : $MyArray<MyStruct>
+  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  cond_br %3, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @cow_should_ignore_mark_dependence_addrproj_use : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+// CHECK: bb0(
+// CHECK-NOT: br
+// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
+// CHECK-NOT: br
+// CHECK: apply [[MM]]
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: apply
+// CHECK:  cond_br {{.*}}, bb1
+sil @cow_should_ignore_mark_dependence_addrproj_use : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  %999 = struct_element_addr %0 : $*MyArray<MyStruct>, #MyArray.buffer
+  %9999 = struct_element_addr %999 : $*ArrayIntBuffer, #ArrayIntBuffer.storage
+  %99999 = load %9999 : $*Builtin.NativeObject
+  %2 = load %0 : $*MyArray<MyStruct>
+  br bb1
+
+bb1:
+  retain_value %2 : $MyArray<MyStruct>
+  %3 = load %1 : $*Builtin.Int1
+  %4 = load %0 : $*MyArray<MyStruct>
+  release_value %2 : $MyArray<MyStruct>
+  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  mark_dependence %1 : $*Builtin.Int1 on %99999 : $Builtin.NativeObject
+  cond_br %3, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @cow_should_ignore_mark_dependence_value : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+// CHECK: bb0(
+// CHECK-NOT: br
+// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
+// CHECK-NOT: br
+// CHECK: apply [[MM]]
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: apply
+// CHECK:  cond_br {{.*}}, bb1
+sil @cow_should_ignore_mark_dependence_value : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  %2 = load %0 : $*MyArray<MyStruct>
+  br bb1
+
+bb1:
+  retain_value %2 : $MyArray<MyStruct>
+  %3 = load %1 : $*Builtin.Int1
+  %4 = load %0 : $*MyArray<MyStruct>
+  release_value %2 : $MyArray<MyStruct>
+  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  mark_dependence %1 : $*Builtin.Int1 on %2 : $MyArray<MyStruct>
+  cond_br %3, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @cow_should_ignore_enum : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+// CHECK: bb0(
+// CHECK-NOT: br
+// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
+// CHECK-NOT: br
+// CHECK: apply [[MM]]
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: apply
+// CHECK:  cond_br {{.*}}, bb1
+sil @cow_should_ignore_enum : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  %2 = load %0 : $*MyArray<MyStruct>
+  br bb1
+
+bb1:
+  retain_value %2 : $MyArray<MyStruct>
+  %3 = load %1 : $*Builtin.Int1
+  %4 = load %0 : $*MyArray<MyStruct>
+  release_value %2 : $MyArray<MyStruct>
+  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %8 = enum $Optional<MyArray<MyStruct>>, #Optional.Some!enumelt.1, %2 : $MyArray<MyStruct>
+  mark_dependence %1 : $*Builtin.Int1 on %8 : $Optional<MyArray<MyStruct>>
+  cond_br %3, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
 }

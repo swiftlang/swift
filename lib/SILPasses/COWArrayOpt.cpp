@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "cowarray-opts"
+#include "swift/SILPasses/Passes.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -22,7 +23,6 @@
 #include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
-#include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -128,24 +128,30 @@ public:
 
   /// Collect all uses of the value at the given address.
   void collectUses(ValueBase *V, ArrayRef<unsigned> AccessPath) {
+    // Save our old indent and increment.
     // Collect all users of the address and loads.
     collectAddressUses(V, AccessPath, nullptr);
 
     // Collect all uses of the Struct value.
     for (auto *DefInst : StructLoads) {
-      for (auto DefUI : DefInst->getUses()) {
-        if (!Visited.insert(&*DefUI).second)
+      for (auto *DefUI : DefInst->getUses()) {
+        if (!Visited.insert(&*DefUI).second) {
           continue;
+        }
+
         StructValueUsers.push_back(DefUI->getUser());
       }
     }
+
     // Collect all users of element values.
     for (auto &Pair : ElementLoads) {
-      for (auto DefUI : Pair.first->getUses()) {
-        if (!Visited.insert(&*DefUI).second)
+      for (auto *DefUI : Pair.first->getUses()) {
+        if (!Visited.insert(&*DefUI).second) {
           continue;
+        }
+
         ElementValueUsers.push_back(
-          std::make_pair(DefUI->getUser(), Pair.second));
+            std::make_pair(DefUI->getUser(), Pair.second));
       }
     }
   }
@@ -167,12 +173,12 @@ protected:
   /// Struct.
   void collectAddressUses(ValueBase *V, ArrayRef<unsigned> AccessPathSuffix,
                           Operand *StructVal) {
-
-    for (auto UI : V->getUses()) {
+    for (auto *UI : V->getUses()) {
       // Keep the operand, not the instruction in the visited set. The same
       // instruction may theoretically have different types of uses.
-      if (!Visited.insert(&*UI).second)
+      if (!Visited.insert(&*UI).second) {
         continue;
+      }
 
       SILInstruction *UseInst = UI->getUser();
       if (StructVal) {
@@ -190,6 +196,7 @@ protected:
 
         ElementAddressUsers.push_back(std::make_pair(UseInst,StructVal));
         continue;
+      }
 
       if (AccessPathSuffix.empty()) {
         // Found a use of the struct at the given access path.
@@ -219,6 +226,7 @@ protected:
         AggregateAddressUsers.push_back(UseInst);
         continue;
       }
+
       if (APC.Index != AccessPathSuffix[0]) {
         // Ignore uses of disjoint elements.
         continue;
@@ -522,6 +530,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
           !getReachingBlocks().count(UseInst->getParent())) {
         continue;
       }
+
       DEBUG(llvm::dbgs() << "    Skipping Array: may escape through call!\n    "
             << *UseInst);
       return false;
@@ -551,12 +560,35 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       continue;
     }
 
+    if (isa<MarkDependenceInst>(UseInst)) {
+      continue;
+    }
+
     DEBUG(llvm::dbgs() << "    Skipping Array: unknown Array use!\n    "
           << *UseInst);
     // Found an unsafe or unknown user. The Array may escape here.
     return false;
   }
   return true;
+}
+
+/// Returns true if this instruction is a safe array use if all of its users are
+/// also safe array users.
+static bool isTransitiveSafeUser(SILInstruction *I) {
+  switch (I->getKind()) {
+  case ValueKind::StructExtractInst:
+  case ValueKind::TupleExtractInst:
+  case ValueKind::UncheckedEnumDataInst:
+  case ValueKind::StructInst:
+  case ValueKind::TupleInst:
+  case ValueKind::EnumInst:
+  case ValueKind::UncheckedRefBitCastInst:
+  case ValueKind::UncheckedRefCastInst:
+    assert(I->getNumTypes() == 1 && "We assume these are unary");
+    return true;
+  default:
+    return false;
+  }
 }
 
 /// Check that the use of an Array value, the value of an aggregate containing
@@ -575,12 +607,15 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
       return false;
     }
 
-    if (auto *SEI = dyn_cast<StructExtractInst>(UseInst)) {
-      for (auto UI : SEI->getUses()) {
-        if (!checkSafeArrayElementUse(UI->getUser(), SEI->getOperand()))
-          return false;
-      }
-      continue;
+    /// Is this a unary transitive safe user instruction. This means that the
+    /// instruction is safe only if all of its users are safe. Check this
+    /// recursively.
+    if (isTransitiveSafeUser(UseInst)) {
+      return std::all_of(UseInst->use_begin(), UseInst->use_end(),
+                         [this](Operand *Op) -> bool {
+                           return checkSafeArrayElementUse(Op->getUser(),
+                                                           Op->get());
+                         });
     }
 
     if (auto *RVI = dyn_cast<RetainValueInst>(UseInst)) {
@@ -597,6 +632,9 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
       // buffer that is loaded from a local array struct.
       continue;
     }
+
+    if (isa<MarkDependenceInst>(UseInst))
+      continue;
 
     // Found an unsafe or unknown user. The Array may escape here.
     DEBUG(llvm::dbgs() << "    Skipping Array: unsafe Array value use!\n    "
@@ -639,36 +677,35 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
     // buffer that is loaded from a local array struct.
     return true;
 
-  if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(UseInst)) {
-    for (auto UI : SEI->getUses()) {
-      // Recurse.
-      if (!checkSafeArrayElementUse(UI->getUser(), ArrayVal))
-        return false;
-    }
-    return true;
-  }
-
   // Look for a safe mark_dependence instruction use.
+  //
   // This use looks something like:
-  // %57 = load %56 : $*Builtin.BridgeObject from Array<Int>
-  // %58 = unchecked_ref_bit_cast %57 : $Builtin.BridgeObject to $_ContiguousArr
-  // %59 = unchecked_ref_cast %58 : $_ContiguousArrayStorageBase to $Builtin.Nat
-  // %60 = struct_extract %53 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointe
-  // %61 = pointer_to_address %60 : $Builtin.RawPointer to $*Int
-  // %62 = mark_dependence %61 : $*Int on %59 : $Builtin.NativeObject
+  //
+  //   %57 = load %56 : $*Builtin.BridgeObject from Array<Int>
+  //   %58 = unchecked_ref_bit_cast %57 : $Builtin.BridgeObject to
+  //   $_ContiguousArray
+  //   %59 = unchecked_ref_cast %58 : $_ContiguousArrayStorageBase to
+  //   $Builtin.NativeObject
+  //   %60 = struct_extract %53 : $UnsafeMutablePointer<Int>,
+  //   #UnsafeMutablePointer
+  //   %61 = pointer_to_address %60 : $Builtin.RawPointer to $*Int
+  //   %62 = mark_dependence %61 : $*Int on %59 : $Builtin.NativeObject
+  //
+  // The struct_extract, unchecked_ref_bit_cast, unchecked_ref_cast are handled
+  // below in the "Transitive SafeArrayElementUse" code.
   if (isa<MarkDependenceInst>(UseInst))
     return true;
-  if (auto *UCRBC = dyn_cast<UncheckedRefBitCastInst>(UseInst)) {
-    for (auto U : UCRBC->getUses())
-      if (!checkSafeArrayElementUse(U->getUser(), ArrayVal))
-        return false;
-    return true;
-  }
-  if (auto *UCRC = dyn_cast<UncheckedRefCastInst>(UseInst)) {
-    for (auto U : UCRC->getUses())
-      if (!checkSafeArrayElementUse(U->getUser(), ArrayVal))
-        return false;
-    return true;
+
+  // If this is an instruction which is a safe array element use if and only if
+  // all of its users are safe array element uses, recursively check its uses
+  // and return false if any of them are not transitive escape array element
+  // uses.
+  if (isTransitiveSafeUser(UseInst)) {
+    return std::all_of(UseInst->use_begin(), UseInst->use_end(),
+                       [this, &ArrayVal](Operand *UI) -> bool {
+                         return checkSafeArrayElementUse(UI->getUser(),
+                                                         ArrayVal);
+                       });
   }
 
   // Found an unsafe or unknown user. The Array may escape here.
@@ -840,8 +877,12 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable, SILValue Arra
     if (hasLoopOnlyDestructorSafeArrayOperations()) {
       hoistMakeMutableAndSelfProjection(MakeMutable,
                                         ArrayAddr != ArrayAddrBase);
+      DEBUG(llvm::dbgs()
+            << "    Can Hoist: loop only has 'safe' array operations!\n");
       return true;
     }
+
+    DEBUG(llvm::dbgs() << "    Skipping Array: is not unique!\n");
     return false;
   }
 
@@ -906,8 +947,8 @@ bool COWArrayOpt::run() {
 }
 
 namespace {
-class COWArrayOptPass : public SILFunctionTransform
-{
+
+class COWArrayOptPass : public SILFunctionTransform {
   void run() override {
     DEBUG(llvm::dbgs() << "COW Array Opts in Func " << getFunction()->getName()
           << "\n");
@@ -948,6 +989,7 @@ SILTransform *swift::createCOWArrayOpts() {
 }
 
 namespace {
+
 /// This optimization specializes loops with calls to
 /// "array.props.isNative/needsElementTypeCheck".
 ///
@@ -1111,7 +1153,13 @@ private:
   /// new array onto it.
   bool checkSafeArrayAddressUses(UserList &AddressUsers) {
     for (auto *UseInst : AddressUsers) {
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
+
+      if (isa<DeallocStackInst>(UseInst)) {
+        // Handle destruction of a local array.
+        continue;
+      }
+
+      if (auto *AI = dyn_cast<ApplyInst>(UseInst)) {
         if (ArraySemanticsCall(AI))
           continue;
 
@@ -1123,7 +1171,10 @@ private:
         DEBUG(
             llvm::dbgs() << "    Skipping Array: may escape through call!\n    "
                          << *UseInst);
-      } else if (StoreInst *StInst = dyn_cast<StoreInst>(UseInst)) {
+        return false;
+      }
+
+      if (auto *StInst = dyn_cast<StoreInst>(UseInst)) {
         // Allow a local array to be initialized outside the loop via a by-value
         // argument or return value. The array value may be returned by its
         // initializer or some other factory function.
@@ -1136,17 +1187,16 @@ private:
         if (isa<SILArgument>(InitArray) || isa<ApplyInst>(InitArray))
           continue;
 
-      } else if (isa<DeallocStackInst>(UseInst)) {
-        // Handle destruction of a local array.
-        continue;
-
-      } else {
-        DEBUG(llvm::dbgs() << "    Skipping Array: unknown Array use!\n    "
-                           << *UseInst);
+        return false;
       }
+
+      DEBUG(llvm::dbgs() << "    Skipping Array: unknown Array use!\n    "
+                         << *UseInst);
       // Found an unsafe or unknown user. The Array may escape here.
       return false;
     }
+
+    // Otherwise, all of our users are sane. The array does not scape.
     return true;
   }
 
