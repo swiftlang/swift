@@ -178,27 +178,41 @@ protected:
       if (StructVal) {
         // Found a use of an element.
         assert(AccessPathSuffix.empty() && "should have accessed struct");
-        if (LoadInst *LoadI = dyn_cast<LoadInst>(UseInst))
+        if (auto *LoadI = dyn_cast<LoadInst>(UseInst)) {
           ElementLoads.push_back(std::make_pair(LoadI, StructVal));
-        else if (isa<StructElementAddrInst>(UseInst))
+          continue;
+        }
+
+        if (isa<StructElementAddrInst>(UseInst)) {
           collectAddressUses(UseInst, AccessPathSuffix, StructVal);
-        else
-          ElementAddressUsers.push_back(std::make_pair(UseInst,StructVal));
+          continue;
+        }
+
+        ElementAddressUsers.push_back(std::make_pair(UseInst,StructVal));
         continue;
 
-      } else if (AccessPathSuffix.empty()) {
+      if (AccessPathSuffix.empty()) {
         // Found a use of the struct at the given access path.
-        if (LoadInst *LoadI = dyn_cast<LoadInst>(UseInst))
+        if (auto *LoadI = dyn_cast<LoadInst>(UseInst)) {
           StructLoads.push_back(LoadI);
-        else if (isa<StructElementAddrInst>(UseInst))
+          continue;
+        }
+
+        if (isa<StructElementAddrInst>(UseInst)) {
           collectAddressUses(UseInst, AccessPathSuffix, &*UI);
+          continue;
+        }
+
         // Value users - this happens if we start with a value object in V.
-        else if (definesSingleObjectType(V))
+        if (definesSingleObjectType(V)) {
           StructValueUsers.push_back(UseInst);
-        else
-          StructAddressUsers.push_back(UseInst);
+          continue;
+        }
+
+        StructAddressUsers.push_back(UseInst);
         continue;
       }
+
       AccessPathComponent APC(UseInst);
       if (!APC.isValid()) {
         // Found a use of an aggregate containing the given element.
@@ -499,7 +513,7 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
 bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
   for (auto *UseInst : AddressUsers) {
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
+    if (auto *AI = dyn_cast<ApplyInst>(UseInst)) {
       if (ArraySemanticsCall(AI))
         continue;
 
@@ -510,7 +524,10 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       }
       DEBUG(llvm::dbgs() << "    Skipping Array: may escape through call!\n    "
             << *UseInst);
-    } else if (StoreInst *StInst = dyn_cast<StoreInst>(UseInst)) {
+      return false;
+    }
+
+    if (auto *StInst = dyn_cast<StoreInst>(UseInst)) {
       // Allow a local array to be initialized outside the loop via a by-value
       // argument or return value. The array value may be returned by its
       // initializer or some other factory function.
@@ -519,18 +536,23 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
               << *StInst);
         return false;
       }
+
       SILValue InitArray = StInst->getSrc();
       if (isa<SILArgument>(InitArray) || isa<ApplyInst>(InitArray))
         continue;
 
-    } else if (isa<DeallocStackInst>(UseInst)) {
+      DEBUG(llvm::dbgs() << "    Skipping Array: may escape through store!\n"
+                         << "    " << *UseInst);
+      return false;
+    }
+
+    if (isa<DeallocStackInst>(UseInst)) {
       // Handle destruction of a local array.
       continue;
-
-    } else {
-      DEBUG(llvm::dbgs() << "    Skipping Array: unknown Array use!\n    "
-            << *UseInst);
     }
+
+    DEBUG(llvm::dbgs() << "    Skipping Array: unknown Array use!\n    "
+          << *UseInst);
     // Found an unsafe or unknown user. The Array may escape here.
     return false;
   }
@@ -543,27 +565,39 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 /// Loop.
 bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
   for (auto *UseInst : ArrayValueUsers) {
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(UseInst)) {
+    if (auto *AI = dyn_cast<ApplyInst>(UseInst)) {
       if (ArraySemanticsCall(AI))
         continue;
 
-    } else if (auto *SEI = dyn_cast<StructExtractInst>(UseInst)) {
+      // Found an unsafe or unknown user. The Array may escape here.
+      DEBUG(llvm::dbgs() << "    Skipping Array: unsafe call!\n    "
+            << *UseInst);
+      return false;
+    }
+
+    if (auto *SEI = dyn_cast<StructExtractInst>(UseInst)) {
       for (auto UI : SEI->getUses()) {
         if (!checkSafeArrayElementUse(UI->getUser(), SEI->getOperand()))
           return false;
       }
       continue;
+    }
 
-    } else if (auto *RVI = dyn_cast<RetainValueInst>(UseInst)) {
+    if (auto *RVI = dyn_cast<RetainValueInst>(UseInst)) {
       if (isRetainReleasedBeforeMutate(UseInst, RVI->getOperand()))
         continue;
+      // Found an unsafe or unknown user. The Array may escape here.
+      DEBUG(llvm::dbgs() << "    Skipping Array: found unmatched retain value!\n"
+                         << "    " << *UseInst);
+      return false;
+    }
 
-    } else if (isa<ReleaseValueInst>(UseInst)) {
+    if (isa<ReleaseValueInst>(UseInst)) {
       // Releases are always safe. This case handles the release of an array
       // buffer that is loaded from a local array struct.
       continue;
-
     }
+
     // Found an unsafe or unknown user. The Array may escape here.
     DEBUG(llvm::dbgs() << "    Skipping Array: unsafe Array value use!\n    "
           << *UseInst);
@@ -716,13 +750,17 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         if (SameTy.isNull()) {
           SameTy =
               Sem.getSelf().getType().getSwiftRValueType()->getCanonicalType();
-        } else if (Sem.getSelf()
+          continue;
+        }
+        
+        if (Sem.getSelf()
                        .getType()
                        .getSwiftRValueType()
                        ->getCanonicalType() != SameTy) {
           DEBUG(llvm::dbgs() << "    (NO) mismatching array types\n");
           return false;
         }
+
         // Safe array semantics operation.
         continue;
       }
@@ -840,21 +878,28 @@ bool COWArrayOpt::run() {
       // Inst may be moved by hoistMakeMutable.
       SILInstruction *Inst = II++;
       ArraySemanticsCall MakeMutableCall(Inst, "array.make_mutable");
-      if (MakeMutableCall) {
-        SILValue ArrayAddr = MakeMutableCall.getSelf();
-        auto HoistedCallEntry = ArrayMakeMutableMap.find(ArrayAddr);
-        if (HoistedCallEntry == ArrayMakeMutableMap.end()) {
-          if (hoistMakeMutable(MakeMutableCall, ArrayAddr)) {
-            ArrayMakeMutableMap[ArrayAddr] = MakeMutableCall;
-            HasChanged = true;
-          } else
-            ArrayMakeMutableMap[ArrayAddr] = nullptr;
-        } else if (HoistedCallEntry->second) {
-          DEBUG(llvm::dbgs() << "    Removing make_mutable call: " << *MakeMutableCall);
-          MakeMutableCall.removeCall();
-          HasChanged = true;
+      if (!MakeMutableCall)
+        continue;
+
+      SILValue ArrayAddr = MakeMutableCall.getSelf();
+      auto HoistedCallEntry = ArrayMakeMutableMap.find(ArrayAddr);
+      if (HoistedCallEntry == ArrayMakeMutableMap.end()) {
+        if (!hoistMakeMutable(MakeMutableCall, ArrayAddr)) {
+          ArrayMakeMutableMap[ArrayAddr] = nullptr;
+          continue;
         }
+
+        ArrayMakeMutableMap[ArrayAddr] = MakeMutableCall;
+        HasChanged = true;
+        continue;
       }
+
+      if (!HoistedCallEntry->second)
+        continue;
+
+      DEBUG(llvm::dbgs() << "    Removing make_mutable call: " << *MakeMutableCall);
+      MakeMutableCall.removeCall();
+      HasChanged = true;
     }
   }
   return HasChanged;
