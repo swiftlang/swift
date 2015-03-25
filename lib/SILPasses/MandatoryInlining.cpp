@@ -206,8 +206,6 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
                   SmallVectorImpl<SILValue>& FullArgs,
                   PartialApplyInst *&PartialApply,
                   SILModule::LinkingMode Mode) {
-  assert(AI->isTransparent() && "Expected an apply of a transparent function!");
-
   IsThick = false;
   PartialApply = nullptr;
   CaptureArgs.clear();
@@ -278,8 +276,6 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
   }
 
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
-  assert((FRI || !isa<SILInstruction>(CalleeValue)) &&
-         "Unable to find function_ref for transparent apply!");
 
   if (!FRI)
     return nullptr;
@@ -354,9 +350,6 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         I = SILBasicBlock::iterator(InnerAI);
       }
 
-      if (!InnerAI->isTransparent())
-        continue;
-
       SILLocation Loc = InnerAI->getLoc();
       SILValue CalleeValue = InnerAI->getCallee();
       bool IsThick;
@@ -366,6 +359,10 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
                                                       PAI,
                                                       Mode);
       if (!CalleeFunction)
+        continue;
+
+      if (!InnerAI->isTransparent() &&
+          CalleeFunction->isTransparent() == IsNotTransparent)
         continue;
 
       // Then recursively process it first before trying to inline it.

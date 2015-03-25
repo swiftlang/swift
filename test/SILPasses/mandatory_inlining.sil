@@ -753,11 +753,12 @@ bb0(%0 : $*U, %1 : $Builtin.Int32, %2 : $@callee_owned (@out U, Builtin.Int32) -
   %6 = alloc_stack $Builtin.Int32
   store %1 to %6#1 : $*Builtin.Int32
   strong_retain %2 : $@callee_owned (@out U, Builtin.Int32) -> ()
+  // CHECK-NOT: function_ref @reabstractionThunk
   %9 = function_ref @reabstractionThunk : $@thin <τ_0_0> (@out τ_0_0, @in Builtin.Int32, @owned @callee_owned (@out τ_0_0, Builtin.Int32) -> ()) -> ()
-  // CHECK: [[PARTIAL:%[0-9a-zA-Z]+]] = partial_apply
+  // CHECK-NOT: partial_apply
   %10 = partial_apply %9<U>(%2) : $@thin <τ_0_0> (@out τ_0_0, @in Builtin.Int32, @owned @callee_owned (@out τ_0_0, Builtin.Int32) -> ()) -> ()
   // CHECK-NOT: apply [transparent]
-  // CHECK: apply [[PARTIAL]]
+  // CHECK: apply %2
   %11 = apply [transparent] %5<Builtin.Int32, U>(%0, %6#1, %10) : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0, @owned @callee_owned (@out τ_0_1, @in τ_0_0) -> ()) -> ()
   dealloc_stack %6#0 : $*@local_storage Builtin.Int32
   strong_release %2 : $@callee_owned (@out U, Builtin.Int32) -> ()
