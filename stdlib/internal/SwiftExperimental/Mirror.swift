@@ -30,7 +30,7 @@ public struct Mirror {
   ///
   /// If the dynamic type of `instance` conforms to
   /// `CustomReflectable`, returns the result of calling its
-  /// `customReflect` method.  Otherwise, returns a mirror synthesized
+  /// `makeCustomMirror` method.  Otherwise, returns a mirror synthesized
   /// for `instance` by the language.
   ///
   /// Note: If the dynamic type of `instance` has value semantics,
@@ -39,7 +39,7 @@ public struct Mirror {
   /// mutations is unspecified.
   public init(reflect instance: Any) {
     if let customized? = instance as? CustomReflectable {
-      self = customized.customReflect()
+      self = customized.makeCustomMirror()
     }
     else {
       self = Mirror(Swift.reflect(instance))
@@ -101,7 +101,7 @@ public struct Mirror {
   /// collections, e.g.::
   ///
   ///   extension MyArray : CustomReflectable {
-  ///     func customReflect() -> Mirror 
+  ///     func makeCustomMirror() -> Mirror 
   ///       return Mirror(unlabelledChildren: self, .Collection)
   ///     }
   ///   }
@@ -156,7 +156,7 @@ public protocol CustomReflectable {
   ///
   /// Note: if `Self` has value semantics, the `Mirror` should be
   /// unaffected by subsequent mutations of `self`.
-  func customReflect() -> Mirror
+  func makeCustomMirror() -> Mirror
 }
 
 //===--- Addressing -------------------------------------------------------===//
@@ -174,7 +174,7 @@ extension String : MirrorPathType {}
 extension Mirror {
   internal struct _Dummy : CustomReflectable {
     var mirror: Mirror
-    func customReflect() -> Mirror { return mirror }
+    func makeCustomMirror() -> Mirror { return mirror }
   }
   
   /// Return a specific descendant of the reflected instance, or `nil`
@@ -312,25 +312,27 @@ internal func _find<
 //===--- QuickLooks -------------------------------------------------------===//
 
 // this typealias implies renaming the existing QuickLookObject to
-// QuickLook.  Since it is an enum, the use of the word Object is
-// misleading.
-public typealias QuickLook = QuickLookObject
+// PlaygroundQuickLook (since it is an enum, the use of the word
+// "Object" is misleading).
+public typealias PlaygroundQuickLook = QuickLookObject
 
-extension QuickLook {
+extension PlaygroundQuickLook {
   /// Initialize for the given `instance`.
   ///
   /// If the dynamic type of `instance` conforms to
-  /// `CustomQuickLookable`, returns the result of calling its
-  /// `customQuickLook` method.  Otherwise, returns a `QuickLook`
-  /// synthesized for `instance` by the language.
+  /// `CustomPlaygroundQuickLookable`, returns the result of calling
+  /// its `makeCustomPlaygroundQuickLook` method.  Otherwise, returns
+  /// a `PlaygroundQuickLook` synthesized for `instance` by the
+  /// language.  Note: in some cases the result may be
+  /// `.Text(toDebugString(instance))`.
   ///
   /// Note: If the dynamic type of `instance` has value semantics,
   /// subsequent mutations of `instance` will not observable in
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
   public init(reflect instance: Any) {
-    if let customized? = instance as? CustomQuickLookable {
-      self = customized.customQuickLook()
+    if let customized? = instance as? CustomPlaygroundQuickLookable {
+      self = customized.makeCustomPlaygroundQuickLook()
     }
     else {
       if let q? = Swift.reflect(instance).quickLookObject {
@@ -343,18 +345,18 @@ extension QuickLook {
   }
 }
 
-/// A type that explicitly supplies its own QuickLookObject.
+/// A type that explicitly supplies its own PlaygroundQuickLook.
 ///
 /// Instances of any type can be `reflect`\ 'ed upon, but if you are
 /// not satisfied with the `Mirror` supplied for your type by default,
 /// you can make it conform to `CustomReflectable` and return a custom
 /// `Mirror`.
-public protocol CustomQuickLookable {
+public protocol CustomPlaygroundQuickLookable {
   /// Return the `Mirror` for `self`.
   ///
   /// Note: if `Self` has value semantics, the `Mirror` should be
   /// unaffected by subsequent mutations of `self`.
-  func customQuickLook() -> QuickLook
+  func makeCustomPlaygroundQuickLook() -> PlaygroundQuickLook
 }
 
 

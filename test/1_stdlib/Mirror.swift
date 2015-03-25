@@ -32,12 +32,12 @@ extension Mirror: Printable {
 
 mirrors.test("RandomAccessStructure") {
   struct Eggs : CustomReflectable {
-    func customReflect() -> Mirror {
+    func makeCustomMirror() -> Mirror {
       return Mirror(unlabeledChildren: ["aay", "bee", "cee"])
     }
   }
 
-  let x = Eggs().customReflect()
+  let x = Eggs().makeCustomMirror()
   
   expectEqual("[nil: \"aay\", nil: \"bee\", nil: \"cee\"]", x.description)
 }
@@ -64,12 +64,12 @@ func find(substring: String, within domain: String) -> String.Index? {
 
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
-    func customReflect() -> Mirror {
+    func makeCustomMirror() -> Mirror {
       return Mirror(unlabeledChildren: Set(letters), displayStyle: .Set)
     }
   }
 
-  let w = DoubleYou().customReflect()
+  let w = DoubleYou().makeCustomMirror()
   expectEqual(.Set, w.displayStyle)
   expectEqual(count(letters), numericCast(count(w.children)))
   
@@ -84,13 +84,13 @@ mirrors.test("ForwardStructure") {
 
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
-    func customReflect() -> Mirror {
+    func makeCustomMirror() -> Mirror {
       return Mirror(unlabeledChildren: letters, displayStyle: .Collection)
     }
   }
 
   // Test that the basics seem to work
-  let y = Why().customReflect()
+  let y = Why().makeCustomMirror()
   expectEqual(.Collection, y.displayStyle)
 
   let description = y.description
@@ -101,22 +101,22 @@ mirrors.test("BidirectionalStructure") {
 
 mirrors.test("LabeledStructure") {
   struct Zee : CustomReflectable {
-    func customReflect() -> Mirror {
+    func makeCustomMirror() -> Mirror {
       return Mirror(children: ["bark": 1, "bite": 0])
     }
   }
 
-  let z = Zee().customReflect()
+  let z = Zee().makeCustomMirror()
   expectEqual("[bark: 1, bite: 0]", z.description)
   expectEmpty(z.displayStyle)
 
   struct Zee2 : CustomReflectable {
-    func customReflect() -> Mirror {
+    func makeCustomMirror() -> Mirror {
       return Mirror(
         children: ["bark": 1, "bite": 0], displayStyle: .Dictionary)
     }
   }
-  let z2 = Zee2().customReflect()
+  let z2 = Zee2().makeCustomMirror()
   expectEqual(.Dictionary, z2.displayStyle)
   expectEqual("[bark: 1, bite: 0]", z2.description)
 }
@@ -161,7 +161,7 @@ mirrors.test("Addressing") {
   expectEqual("three", m1.descendant(".0", "[2]") as? String)
 
   struct Zee : CustomReflectable {
-    func customReflect() -> Mirror {
+    func makeCustomMirror() -> Mirror {
       return Mirror(children: ["bark": 1, "bite": 0])
     }
   }
@@ -187,33 +187,33 @@ mirrors.test("Invalid Path Type") {
   m.descendant(X())
 }
 
-mirrors.test("QuickLook") {
+mirrors.test("PlaygroundQuickLook") {
   // Customization works.
-  struct CustomQuickie : CustomQuickLookable {
-    func customQuickLook() -> QuickLook {
+  struct CustomQuickie : CustomPlaygroundQuickLookable {
+    func makeCustomPlaygroundQuickLook() -> PlaygroundQuickLook {
       return .Point(1.25, 42)
     }
   }
-  switch QuickLook(reflect: CustomQuickie()) {
+  switch PlaygroundQuickLook(reflect: CustomQuickie()) {
   case .Point(1.25, 42): break; default: expectTrue(false)
   }
   
-  // QuickLook support from Legacy Mirrors works.
-  switch QuickLook(reflect: true) {
+  // PlaygroundQuickLook support from Legacy Mirrors works.
+  switch PlaygroundQuickLook(reflect: true) {
   case .Logical(true): break; default: expectTrue(false)
   }
 
   // With no Legacy Mirror QuickLook support, we fall back to
   // toDebugString().
   struct X {}
-  switch QuickLook(reflect: X()) {
+  switch PlaygroundQuickLook(reflect: X()) {
   case .Text(let text) where text.hasSuffix(".(X #1)"): break;
   default: expectTrue(false)
   }
   struct Y : DebugPrintable {
     var debugDescription: String { return "Why?" }
   }
-  switch QuickLook(reflect: Y()) {
+  switch PlaygroundQuickLook(reflect: Y()) {
   case .Text("Why?"): break; default: expectTrue(false)
   }
 }
