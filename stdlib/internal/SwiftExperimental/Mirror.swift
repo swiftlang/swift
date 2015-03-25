@@ -15,13 +15,13 @@ import Swift
 // FIXME: ExistentialCollection needs to be supported before this will work
 // without the ObjC Runtime.
 
-/// Representation of the sub-structure and optional "schema" of any
-/// arbitrary instance.
+/// Representation of the sub-structure and optional "display style"
+/// of any arbitrary instance.
 ///
 /// Describes the parts---such as stored properties, collection
-/// elements, tuple elements, or the active enumeration case---that make
-/// up any given instance.  May also supply a "schema" property that
-/// suggests how this structure might be interpreted.
+/// elements, tuple elements, or the active enumeration case---that
+/// make up any given instance.  May also supply a "display style"
+/// property that suggests how this structure might be rendered.
 ///
 /// Mirrors are used by playgrounds and the debugger.
 public struct Mirror {
@@ -51,14 +51,14 @@ public struct Mirror {
   ///
   /// Playgrounds and the debugger will show a representation similar
   /// to the one used for instances of the kind indicated by the
-  /// `Schema` case name when the `Mirror` is used for display.
-  public enum Schema {
+  /// `DisplayStyle` case name when the `Mirror` is used for display.
+  public enum DisplayStyle {
   case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set,
     ObjectiveCObject
   }
 
   /// Initialize with the given collection of `children` and optional
-  /// `schema`.
+  /// `displayStyle`.
   ///
   /// The traversal protocol modeled by `children`\ 's indices
   /// (`ForwardIndexType`, `BidirectionalIndexType`, or
@@ -68,13 +68,13 @@ public struct Mirror {
   /// `AnyRandomAccessCollection` for details.
   public init<
     C: CollectionType where C.Generator.Element == Child
-  >(children: C, schema: Schema? = nil) {
+  >(children: C, displayStyle: DisplayStyle? = nil) {
     self.children = Children(children)
-    self.schema = schema
+    self.displayStyle = displayStyle
   }
 
   /// Initialize with the given collection of `Child` instances, each
-  /// with a `nil` `label`, and optional `schema`.
+  /// with a `nil` `label`, and optional `displayStyle`.
   ///
   /// This initializer is especially useful for the mirrors of
   /// collections, e.g.::
@@ -93,14 +93,14 @@ public struct Mirror {
   /// `AnyRandomAccessCollection` for details.
   public init<
     C: CollectionType
-  >(unlabeledChildren: C, schema: Schema? = nil) {
+  >(unlabeledChildren: C, displayStyle: DisplayStyle? = nil) {
     self.children = Children(
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
     )
-    self.schema = schema
+    self.displayStyle = displayStyle
   }
 
-  /// Initialize with labeled `children` and optional `schema`.
+  /// Initialize with labeled `children` and optional `displayStyle`.
   ///
   /// Pass a dictionary literal with `String` keys as the first
   /// argument.  Be aware that although an *actual* `Dictionary` is
@@ -108,12 +108,12 @@ public struct Mirror {
   /// will exactly match that of the literal you pass.
   public init<Element>(
     children: DictionaryLiteral<String, Element>,
-    schema: Schema? = nil
+    displayStyle: DisplayStyle? = nil
   ) {
     self.children = Children(
       lazy(children).map { Child(label: $0.0, value: $0.1) }
     )
-    self.schema = schema
+    self.displayStyle = displayStyle
   }
   
   /// A collection of `Child` elements describing the structure of the
@@ -121,7 +121,7 @@ public struct Mirror {
   public let children: Children
 
   /// Suggests a display style for the reflected instance.
-  public let schema: Schema?
+  public let displayStyle: DisplayStyle?
 }
 
 /// A type that explicitly supplies its own Mirror.
@@ -237,7 +237,7 @@ extension Mirror {
 }
 
 //===--- Legacy MirrorType Support ----------------------------------------===//
-extension Mirror.Schema {
+extension Mirror.DisplayStyle {
   /// Construct from a legacy `MirrorDisposition`
   internal init?(legacy: MirrorDisposition) {
     switch legacy {
@@ -288,7 +288,7 @@ extension Mirror {
   internal init(_ oldMirror: MirrorType) {
     self.init(
       children: LegacyChildren(oldMirror),
-      schema: Schema(legacy: oldMirror.disposition))
+      displayStyle: DisplayStyle(legacy: oldMirror.disposition))
   }
 }
 
