@@ -78,13 +78,16 @@ public:
       return false;
     if (isEditorPlaceholder())
       return false;
+    if (isInPlaceName())
+      return false;
+
     if ((unsigned char)Pointer[0] < 0x80)
       return isOperatorStartCodePoint((unsigned char)Pointer[0]);
 
     // Handle the high unicode case out of line.
     return isOperatorSlow();
   }
-  
+
   /// isOperatorStartCodePoint - Return true if the specified code point is a
   /// valid start of an operator.
   static bool isOperatorStartCodePoint(uint32_t C) {
@@ -126,6 +129,13 @@ public:
 
   bool isEditorPlaceholder() const {
     return !empty() && Pointer[0] == '<' && Pointer[1] == '#';
+  }
+
+  // isInPlaceName - Return true if this identifier is the name of an in-place
+  // function (e.g. "=foo").
+  bool isInPlaceName() const {
+    return !empty() && Pointer[0] == '=' && Pointer[1] != '\0' &&
+           !isOperatorContinuationCodePoint(Pointer[1]);
   }
   
   void *getAsOpaquePointer() const { return (void *)Pointer; }

@@ -78,6 +78,7 @@ class Lexer {
 
   /// @}
 
+  Token CurToken;
   Token NextToken;
   
   /// \brief This is true if we're lexing a .sil file instead of a .swift

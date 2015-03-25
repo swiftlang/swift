@@ -363,25 +363,25 @@ prefix operator - {}
 
 // "Exponentiative"
 
-infix operator << { associativity none precedence 160 }
-infix operator >> { associativity none precedence 160 }
+infix operator << { associativity none precedence 160 has_assignment }
+infix operator >> { associativity none precedence 160 has_assignment }
 
 // "Multiplicative"
 
-infix operator   * { associativity left precedence 150 }
+infix operator   * { associativity left precedence 150 has_assignment }
 infix operator  &* { associativity left precedence 150 }
-infix operator   / { associativity left precedence 150 }
-infix operator   % { associativity left precedence 150 }
-infix operator   & { associativity left precedence 150 }
+infix operator   / { associativity left precedence 150 has_assignment }
+infix operator   % { associativity left precedence 150 has_assignment }
+infix operator   & { associativity left precedence 150 has_assignment }
 
 // "Additive"
 
-infix operator   + { associativity left precedence 140 }
+infix operator   + { associativity left precedence 140 has_assignment }
 infix operator  &+ { associativity left precedence 140 }
-infix operator   - { associativity left precedence 140 }
+infix operator   - { associativity left precedence 140 has_assignment }
 infix operator  &- { associativity left precedence 140 }
-infix operator   | { associativity left precedence 140 }
-infix operator   ^ { associativity left precedence 140 }
+infix operator   | { associativity left precedence 140 has_assignment }
+infix operator   ^ { associativity left precedence 140 has_assignment }
 
 // FIXME: is this the right precedence level for "..." ?
 infix operator  ... { associativity none precedence 135 }
@@ -423,19 +423,6 @@ infix operator || { associativity left precedence 110 }
 // User-defined assignment operators are not supported. The = operator is
 // hardcoded as if it had the following attributes:
 // infix operator = { associativity right precedence 90 }
-
-// Compound
-
-infix operator  *= { associativity right precedence 90 assignment }
-infix operator  /= { associativity right precedence 90 assignment }
-infix operator  %= { associativity right precedence 90 assignment }
-infix operator  += { associativity right precedence 90 assignment }
-infix operator  -= { associativity right precedence 90 assignment }
-infix operator <<= { associativity right precedence 90 assignment }
-infix operator >>= { associativity right precedence 90 assignment }
-infix operator  &= { associativity right precedence 90 assignment }
-infix operator  ^= { associativity right precedence 90 assignment }
-infix operator  |= { associativity right precedence 90 assignment }
 
 // Workaround for <rdar://problem/14011860> SubTLF: Default
 // implementations in protocols.  Library authors should ensure

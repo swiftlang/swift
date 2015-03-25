@@ -2544,18 +2544,18 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     uint8_t rawAssociativity;
     unsigned precedence;
-    bool isAssignment;
+    bool isMutating;
     bool isAssocImplicit;
     bool isPrecedenceImplicit;
-    bool isAssignmentImplicit;
+    bool isMutatingImplicit;
 
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID,
                                                  contextID,
                                                  rawAssociativity, precedence,
-                                                 isAssignment,
+                                                 isMutating,
                                                  isAssocImplicit,
                                                  isPrecedenceImplicit,
-                                                 isAssignmentImplicit);
+                                                 isMutatingImplicit);
 
     auto associativity = getActualAssociativity(rawAssociativity);
     if (!associativity.hasValue()) {
@@ -2564,7 +2564,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
 
     InfixData infixData(precedence, associativity.getValue(),
-                        isAssignment);
+                        isMutating);
 
     auto DC = getDeclContext(contextID);
 
@@ -2575,8 +2575,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                  SourceLoc(), SourceLoc(),
                                                  isPrecedenceImplicit,
                                                  SourceLoc(), SourceLoc(),
-                                                 isAssignmentImplicit,
-                                                 SourceLoc(),
+                                                 isMutatingImplicit,
+                                                 SourceLoc(), SourceLoc(),
                                                  SourceLoc(), infixData);
     break;
   }

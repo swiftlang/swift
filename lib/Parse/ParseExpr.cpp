@@ -571,11 +571,26 @@ ParserResult<Expr> Parser::parseExprSuper() {
       if (parseIdentifier(name, nameLoc,
                           diag::expected_identifier_after_super_dot_expr))
         return nullptr;
-
       return makeParserResult(new (Context) UnresolvedDotExpr(superRef, dotLoc,
                                                               name, nameLoc,
                                                            /*Implicit=*/false));
     }
+  } else if (Tok.is(tok::period_equal)) {
+    // super.=foo
+    SourceLoc dotLoc = consumeToken();
+    SourceLoc nameLoc;
+    Identifier name;
+    if (parseIdentifier(name, nameLoc,
+                        diag::expected_identifier_after_super_dot_expr))
+      return nullptr;
+    
+    llvm::SmallString<32> buf;
+    buf += "=";
+    buf += name.str();
+    name = Context.getIdentifier(buf);
+    return makeParserResult(new (Context) UnresolvedDotExpr(superRef, dotLoc,
+                                                            name, nameLoc,
+                                                         /*Implicit=*/false));
   } else if (Tok.isFollowingLSquare()) {
     // super[expr]
     ParserResult<Expr> idx = parseExprList(tok::l_square, tok::r_square);
@@ -707,6 +722,7 @@ MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
 ///   expr-dot:
 ///     expr-postfix '.' 'type'
 ///     expr-postfix '.' identifier generic-args? expr-call-suffix?
+///     expr-postfix '.=' identifier generic-args? expr-call-suffix?
 ///     expr-postfix '.' integer_literal
 ///
 ///   expr-subscript:
@@ -988,6 +1004,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     bool IsPeriod = false;
     // Look ahead to see if we have '.foo(', '.foo[', '.foo{',
     //   '.foo.1(', '.foo.1[', or '.foo.1{'.
+    // TODO: also check for .=foo( ?
     if (Tok.is(tok::period_prefix) && (peekToken().is(tok::identifier) ||
                                        peekToken().is(tok::integer_literal))) {
       BacktrackingScope BS(*this);
@@ -1099,7 +1116,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       SourceLoc NameLoc = Tok.getLoc();
       if (Tok.is(tok::identifier)) {
         consumeToken(tok::identifier);
-        
+
         // If this is a selector reference, collect the selector pieces.
         bool IsSelector = false;
         if (Tok.is(tok::colon) && peekToken().isIdentifierOrUnderscore()) {
@@ -1169,6 +1186,42 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         consumeToken(tok::integer_literal);
       }
 
+      continue;
+    }
+
+    if (consumeIf(tok::period_equal)) {
+      if (!Tok.is(tok::identifier)) {
+        diagnose(Tok, diag::expected_identifier_following_period_equal);
+        return nullptr;
+      }
+      llvm::SmallString<32> buf;
+      buf += "=";
+      buf += Tok.getText();
+      Identifier Name = Context.getIdentifier(buf);
+      SourceLoc NameLoc = consumeToken();
+      Result = makeParserResult(
+        new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name, NameLoc,
+                                        /*Implicit=*/false));
+
+      if (canParseAsGenericArgumentList()) {
+        SmallVector<TypeRepr*, 8> args;
+        SourceLoc LAngleLoc, RAngleLoc;
+        if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
+          diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
+        }
+
+        SmallVector<TypeLoc, 8> locArgs;
+        for (auto ty : args)
+          locArgs.push_back(ty);
+        Result = makeParserResult(new (Context) UnresolvedSpecializeExpr(
+            Result.get(), LAngleLoc, Context.AllocateCopy(locArgs),
+            RAngleLoc));
+      }
+
+      // If there is an expr-call-suffix, parse it and form a call.
+      if (Tok.isFollowingLParen()) {
+        Result = parseExprCallSuffix(Result);
+      }
       continue;
     }
     

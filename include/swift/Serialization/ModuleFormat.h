@@ -895,10 +895,10 @@ namespace decls_block {
     DeclContextIDField,// context decl
     AssociativityField,
     BCFixed<8>,  // precedence
-    BCFixed<1>,  // assignment
+    BCFixed<1>,  // mutating
     BCFixed<1>,  // IsAssocImplicit flag
     BCFixed<1>,  // IsPrecedenceImplicit flag
-    BCFixed<1>   // IsAssignmentImplicit flag
+    BCFixed<1>   // IsMutatingImplicit flag
   >;
 
   using EnumElementLayout = BCRecordLayout<

@@ -1711,12 +1711,12 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
       Printer << "precedence " << decl->getPrecedence();
       Printer.printNewline();
     }
-    if (!decl->isAssignmentImplicit()) {
+    if (!decl->isMutatingImplicit()) {
       indent();
-      if (decl->isAssignment())
-        Printer << "assignment";
+      if (decl->isMutating())
+        Printer << "mutating";
       else
-        Printer << "/* not assignment */";
+        Printer << "/* not mutating */";
       Printer.printNewline();
     }
   }

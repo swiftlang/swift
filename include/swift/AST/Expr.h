@@ -1690,15 +1690,16 @@ public:
   }
 };
 
-/// A member access (foo.bar) on an expression with unresolved type.
+/// A member access (foo.bar or foo.=bar) on an expression with unresolved
+/// type.
 class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
   Identifier Name;
 public:
-  UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, Identifier name,
-                    SourceLoc nameloc, bool Implicit)
+  UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc,
+                    Identifier name, SourceLoc nameloc, bool Implicit)
   : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr), DotLoc(dotloc),
     NameLoc(nameloc), Name(name) {}
   

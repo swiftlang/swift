@@ -75,10 +75,13 @@ class Foo {
 infix operator ~> { precedence 99999 }   // expected-error {{'precedence' must be in the range of 0 to 255}}
 
 infix operator ->= {
-  assignment
+  mutating
 }
 
 infix operator ->== {
-  assignment assignment // expected-error{{'assignment' for infix operator declared multiple}}
+  mutating mutating // expected-error{{'mutating' for infix operator declared multiple}}
 }
 
+infix operator ->=== {
+  assignment // expected-error{{'assignment' is no longer a valid infix operator attribute; use 'mutating'}}
+}

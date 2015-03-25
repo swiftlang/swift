@@ -153,10 +153,10 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     LHS = tryEval->getSubExpr();
   }
   
-  // If this is an assignment operator, and the left operand is an optional
+  // If this is a mutating operator, and the left operand is an optional
   // evaluation, pull the operator into the chain.
   OptionalEvaluationExpr *optEval = nullptr;
-  if (infixData.isAssignment()) {
+  if (infixData.isMutating()) {
     if ((optEval = dyn_cast<OptionalEvaluationExpr>(LHS))) {
       LHS = optEval->getSubExpr();
     }
@@ -179,7 +179,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   // assuming $#! is some crazy operator with lower precedence
   // than the conditional operator.
   if (auto tryRHS = dyn_cast<TryExpr>(RHS)) {
-    if (isa<IfExpr>(Op) || infixData.isAssignment()) {
+    if (isa<IfExpr>(Op) || infixData.isMutating()) {
       if (!isEndOfSequence) {
         if (isa<IfExpr>(Op)) {
           TC.diagnose(tryRHS->getTryLoc(), diag::try_if_rhs_noncovering);
@@ -191,7 +191,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
       TC.diagnose(tryRHS->getTryLoc(), diag::try_rhs);
     }
   }
-
+  
   // Fold the result into the optional evaluation or try.
   auto makeResultExpr = [&](Expr *result) -> Expr * {
     if (optEval) {

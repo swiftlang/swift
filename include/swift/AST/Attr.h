@@ -90,13 +90,13 @@ class InfixData {
   /// Zero if invalid, or else an Associativity+1.
   unsigned InvalidOrAssoc : 2;
   
-  unsigned Assignment : 1;
+  unsigned Mutating : 1;
   
 public:
-  InfixData() : Precedence(0), InvalidOrAssoc(0), Assignment(0) {}
-  InfixData(unsigned char prec, Associativity assoc, bool isAssignment)
+  InfixData() : Precedence(0), InvalidOrAssoc(0), Mutating(0) {}
+  InfixData(unsigned char prec, Associativity assoc, bool isMutating)
     : Precedence(prec), InvalidOrAssoc(unsigned(assoc) + 1),
-      Assignment((unsigned)isAssignment) {}
+      Mutating((unsigned)isMutating) {}
 
   bool isValid() const { return InvalidOrAssoc != 0; }
 
@@ -119,15 +119,15 @@ public:
     return Precedence;
   }
   
-  bool isAssignment() const {
+  bool isMutating() const {
     assert(isValid());
-    return (bool)Assignment;
+    return (bool)Mutating;
   }
 
   friend bool operator==(InfixData L, InfixData R) {
     return L.Precedence == R.Precedence
         && L.InvalidOrAssoc == R.InvalidOrAssoc
-        && L.Assignment == R.Assignment;
+        && L.Mutating == R.Mutating;
   }
   friend bool operator!=(InfixData L, InfixData R) {
     return !operator==(L, R);
