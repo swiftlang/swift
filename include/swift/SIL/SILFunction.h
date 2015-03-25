@@ -420,7 +420,7 @@ public:
   /// SILFunction.
   SILType mapTypeIntoContext(SILType type) const;
 
-  /// Converts the given function if it is a definition to a deaclaration.
+  /// Converts the given function definition to a declaration.
   void convertToDeclaration();
 
   /// Return the identity substitutions necessary to forward this call if it is
