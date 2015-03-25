@@ -981,7 +981,7 @@ StringTests.test("unicodeViews") {
   expectEqual(
     "\u{FFFD}", toString(
       winter.utf8[
-        winter.utf8.startIndex..< winter.utf8.startIndex.successor().successor()
+        winter.utf8.startIndex..<winter.utf8.startIndex.successor().successor()
       ]))
   
   expectEqual(
