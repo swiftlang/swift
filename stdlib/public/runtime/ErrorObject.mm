@@ -92,6 +92,7 @@ swift::swift_deallocError(SwiftError *error, const Metadata *type) {
 static const WitnessTable *getNSErrorConformanceToErrorType() {
   // TODO
   assert(false && "not implemented");
+  return nullptr;
 }
 
 const Metadata *SwiftError::getType() const {
