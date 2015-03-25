@@ -26,6 +26,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Allocator.h"
+#include <type_traits>
 
 namespace swift {
 
@@ -37,6 +38,7 @@ enum class ProjectionKind : uint8_t {
   Tuple,
   Class,
   Enum,
+  LastProjectionKind = Enum,
 };
 
 /// An abstract representation of a SIL Projection that allows one to work with
@@ -44,23 +46,31 @@ enum class ProjectionKind : uint8_t {
 class Projection {
   friend class ProjectionTree;
 
-  /// The kind of projection that we are processing.
-  ProjectionKind Kind;
-
   /// The type of this projection.
   SILType Type;
 
   /// The decl associated with this projection if the projection is
   /// representing a nominal type.
+  ///
+  /// TODO: We could use a pointer int pair here with kind. I expect to expand
+  /// projection kind in the future to include other types of projections,
+  /// i.e. indexing.
   ValueDecl *Decl;
 
   /// The index associated with the projection if the projection is representing
-  /// a tuple type or the decl's index in its parent.
-  unsigned Index;
+  /// a tuple type or the decl's index in its parent. We assume no more than 64
+  /// indices so we can merge this with Kind into two pointers. We can lose a
+  /// bit here and be ok.
+  unsigned Index : 6;
+
+  /// The kind of projection that we are processing.
+  unsigned Kind : 2;
+  static_assert(unsigned(ProjectionKind::LastProjectionKind) == 3,
+                "Need to update size of kind");
 
 public:
   Projection(const Projection &P)
-    : Kind(P.getKind()), Type(P.getType()), Index(0) {
+      : Type(P.getType()), Index(0), Kind(unsigned(P.getKind())) {
     if (P.isNominalKind()) {
       Decl = P.getDecl();
       Index = P.getDeclIndex();
@@ -146,7 +156,7 @@ public:
   }
 
   /// Returns the ProjectionKind of this instruction.
-  ProjectionKind getKind() const { return Kind; }
+  ProjectionKind getKind() const { return ProjectionKind(Kind); }
 
   /// Return the type of this projection.
   SILType getType() const { return Type; }
@@ -177,12 +187,12 @@ public:
 
   /// Returns true if this projection is a nominal kind projection.
   bool isNominalKind() const {
-    switch (Kind) {
+    switch (getKind()) {
     case ProjectionKind::Struct:
     case ProjectionKind::Class:
     case ProjectionKind::Enum:
       return true;
-    default:
+    case ProjectionKind::Tuple:
       return false;
     }
   }
@@ -192,10 +202,12 @@ public:
   /// This looks very sparse now, but in the future it will include type indexed
   /// and byte indexed kinds for index_addr and index_raw_addr instructions.
   bool isIndexedKind() const {
-    switch (Kind) {
+    switch (getKind()) {
     case ProjectionKind::Tuple:
       return true;
-    default:
+    case ProjectionKind::Struct:
+    case ProjectionKind::Class:
+    case ProjectionKind::Enum:
       return false;
     }
   }
@@ -230,9 +242,8 @@ public:
   SILValue getOperandForAggregate(SILInstruction *I) const;
 
 private:
-  Projection(ProjectionKind Kind, SILType Type, ValueDecl *Decl,
-             unsigned Index)
-    : Kind(Kind), Type(Type), Decl(Decl), Index(Index) {}
+  Projection(ProjectionKind Kind, SILType Type, ValueDecl *Decl, unsigned Index)
+      : Type(Type), Decl(Decl), Index(Index), Kind(unsigned(Kind)) {}
 
   explicit Projection(StructElementAddrInst *SEA);
   explicit Projection(TupleElementAddrInst *TEA);

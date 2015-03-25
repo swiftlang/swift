@@ -19,6 +19,15 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
+//                         Projection Static Asserts
+//===----------------------------------------------------------------------===//
+
+static_assert(std::is_standard_layout<Projection>::value,
+              "Expected projection to be a standard layout type");
+static_assert(sizeof(Projection) == (sizeof(uintptr_t) * 2 + 8),
+              "Projection size changed");
+
+//===----------------------------------------------------------------------===//
 //                                 Projection
 //===----------------------------------------------------------------------===//
 
@@ -135,36 +144,39 @@ static unsigned getIndexForValueDecl(ValueDecl *Decl) {
 }
 
 Projection::Projection(StructElementAddrInst *SEA)
-  : Kind(ProjectionKind::Struct), Type(SEA->getType()),
-    Decl(SEA->getField()), Index(getIndexForValueDecl(Decl)) {}
+    : Type(SEA->getType()), Decl(SEA->getField()),
+      Index(getIndexForValueDecl(Decl)),
+      Kind(unsigned(ProjectionKind::Struct)) {}
 
 Projection::Projection(TupleElementAddrInst *TEA)
-  : Kind(ProjectionKind::Tuple), Type(TEA->getType()),
-    Decl(nullptr), Index(TEA->getFieldNo()) {}
+    : Type(TEA->getType()), Decl(nullptr), Index(TEA->getFieldNo()),
+      Kind(unsigned(ProjectionKind::Tuple)) {}
 
 Projection::Projection(RefElementAddrInst *REA)
-  : Kind(ProjectionKind::Class), Type(REA->getType()),
-    Decl(REA->getField()), Index(getIndexForValueDecl(Decl)) {}
+    : Type(REA->getType()), Decl(REA->getField()),
+      Index(getIndexForValueDecl(Decl)), Kind(unsigned(ProjectionKind::Class)) {
+}
 
 /// UncheckedTakeEnumDataAddrInst always have an index of 0 since enums only
 /// have one payload.
 Projection::Projection(UncheckedTakeEnumDataAddrInst *UTEDAI)
-  : Kind(ProjectionKind::Enum), Type(UTEDAI->getType()),
-    Decl(UTEDAI->getElement()), Index(0) {}
+    : Type(UTEDAI->getType()), Decl(UTEDAI->getElement()), Index(0),
+      Kind(unsigned(ProjectionKind::Enum)) {}
 
 Projection::Projection(StructExtractInst *SEI)
-  : Kind(ProjectionKind::Struct), Type(SEI->getType()),
-    Decl(SEI->getField()), Index(getIndexForValueDecl(Decl)) {}
+    : Type(SEI->getType()), Decl(SEI->getField()),
+      Index(getIndexForValueDecl(Decl)),
+      Kind(unsigned(ProjectionKind::Struct)) {}
 
 Projection::Projection(TupleExtractInst *TEI)
-  : Kind(ProjectionKind::Tuple), Type(TEI->getType()),
-    Decl(nullptr), Index(TEI->getFieldNo()) {}
+    : Type(TEI->getType()), Decl(nullptr), Index(TEI->getFieldNo()),
+      Kind(unsigned(ProjectionKind::Tuple)) {}
 
 /// UncheckedEnumData always have an index of 0 since enums only have one
 /// payload.
 Projection::Projection(UncheckedEnumDataInst *UEDAI)
-  : Kind(ProjectionKind::Enum), Type(UEDAI->getType()),
-    Decl(UEDAI->getElement()), Index(0) {}
+    : Type(UEDAI->getType()), Decl(UEDAI->getElement()), Index(0),
+      Kind(unsigned(ProjectionKind::Enum)) {}
 
 NullablePtr<SILInstruction>
 Projection::

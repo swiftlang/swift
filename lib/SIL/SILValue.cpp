@@ -18,6 +18,19 @@
 
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+//                       Check SILValue Type Properties
+//===----------------------------------------------------------------------===//
+
+static_assert(std::is_standard_layout<SILValue>::value,
+              "Expected SILValue to be standard layout");
+static_assert(sizeof(SILValue) == sizeof(uintptr_t),
+              "SILValue should be pointer sized");
+
+//===----------------------------------------------------------------------===//
+//                              Utility Methods
+//===----------------------------------------------------------------------===//
+
 void SILValue::replaceAllUsesWith(SILValue V) {
   assert(*this != V && "Cannot RAUW a value with itself");
   assert(getType() == V.getType() && "Invalid type");
