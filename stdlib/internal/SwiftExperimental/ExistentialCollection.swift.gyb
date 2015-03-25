@@ -130,9 +130,11 @@ internal final class _GeneratorBox<
   override func next() -> Base.Element? { return base.next() }
   var base: Base
 }
+
 internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
   return ObjectIdentifier(instance.dynamicType)
 }
+
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
