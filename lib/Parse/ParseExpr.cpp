@@ -381,8 +381,12 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   case tok::kw_throw: {
     SourceLoc throwLoc = consumeToken(tok::kw_throw);
     ParserResult<Expr> subExpr = parseExprUnary(Message, isExprBasic);
-    if (subExpr.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Expr>();
+    if (subExpr.hasCodeCompletion()) {
+      if (CodeCompletion)
+        CodeCompletion->completeThrowStmtBeginning();
+      else
+        return makeParserCodeCompletionResult<Expr>();
+    }
     if (subExpr.isNull())
       return nullptr;
     return makeParserResult(

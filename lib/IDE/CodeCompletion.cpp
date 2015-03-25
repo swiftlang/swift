@@ -820,6 +820,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     CaseStmtBeginning,
     CaseStmtDotPrefix,
     CatchStmtBeginning,
+    ThrowStmtBeginning,
     NominalMemberBeginning,
     AttributeBegin,
     AttributeDeclParen,
@@ -942,6 +943,7 @@ public:
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
   void completeCatchStmtBeginning() override;
+  void completeThrowStmtBeginning() override;
   void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning(
@@ -2001,6 +2003,45 @@ public:
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
+  bool isErrorDecl(ValueDecl *VD) {
+    // This VD is an exception if it conforms the base error type
+    auto BaseException = CurrDeclContext->getASTContext().getExceptionTypeDecl();
+    if (auto TD = dyn_cast<TypeDecl>(VD)) {
+      auto Protocols = TD->getProtocols();
+      if (std::find(Protocols.begin(), Protocols.end(), BaseException) !=
+          Protocols.end()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool isErrorType(Type Ty) {
+    if (Ty.isNull())
+      return false;
+    if (auto NT = dyn_cast<NominalType>(Ty.getPointer())) {
+      return isErrorDecl(NT->getDecl());
+    }
+    return false;
+  }
+
+  void getThrowStmtCompletion(SourceLoc Loc) {
+    Kind = LookupKind::ValueInDeclContext;
+    NeedLeadingDot = false;
+
+    auto Consumer = FilteredDeclConsumer([&](ValueDecl *VD,
+                                             DeclVisibilityKind Kind) {
+      auto IsOfErrorType = [&](ValueDecl *VD) {
+        if (!VD->hasType())
+          TypeResolver->resolveDeclSignature(VD);
+        return isErrorType(VD->getType());
+      };
+      return isErrorDecl(VD) || IsOfErrorType(VD);
+    }, *this);
+    lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver.get(),
+                       /*IncludeTopLevel=*/true, Loc);
+  }
+
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
     llvm::SaveAndRestore<LookupKind> ChangeLookupKind(
         Kind, LookupKind::EnumElement);
@@ -2049,17 +2090,8 @@ public:
 
   void getExceptionCompletions(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
-    auto BaseException = CurrDeclContext->getASTContext().getExceptionTypeDecl();
     FilteredDeclConsumer Consumer([&](ValueDecl *VD, DeclVisibilityKind Reason) {
-      // This VD is an exception if it conforms the base error type
-      if (auto TD = dyn_cast<TypeDecl>(VD)) {
-        auto Protocols = TD->getProtocols();
-        if (std::find(Protocols.begin(), Protocols.end(),
-                      BaseException) != Protocols.end()) {
-          return true;
-        }
-      }
-      return false;
+      return isErrorDecl(VD);
     }, *this);
     lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver.get(), true, Loc);
   }
@@ -2458,6 +2490,13 @@ void CodeCompletionCallbacksImpl::completeCatchStmtBeginning() {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeThrowStmtBeginning() {
+  assert(!InEnumElementRawValue);
+
+  Kind = CompletionKind::ThrowStmtBeginning;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -2558,6 +2597,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::CaseStmtDotPrefix:
   case CompletionKind::CatchStmtBeginning:
+  case CompletionKind::ThrowStmtBeginning:
     break;
 
   case CompletionKind::NominalMemberBeginning:
@@ -2722,6 +2762,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::CatchStmtBeginning: {
     Lookup.getExceptionCompletions(P.Context.SourceMgr.getCodeCompletionLoc());
+    break;
+  }
+
+  case CompletionKind::ThrowStmtBeginning: {
+    Lookup.getThrowStmtCompletion(P.Context.SourceMgr.getCodeCompletionLoc());
     break;
   }
 
