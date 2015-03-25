@@ -9,10 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t &&  mkdir %t
-// RUN: %target-build-swift %s -module-name Mirror -o %t/a.out
-// RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg
-// FIXME: timeout wrapper is necessary because the ASan test runs for hours
+// RUN: %target-run-simple-swift
 
 // XFAIL: linux
 
