@@ -488,11 +488,8 @@ class MandatoryInlining : public SILModuleTransform {
 
       if (F.getRefCount() != 0) continue;
 
-      // We can always remove transparent functions.  We can also
-      // remove functions that came from closures.
-      if (!F.isTransparent() &&
-          (!F.hasLocation() || !F.getLocation().isASTNode<Expr>() ||
-           !F.getLocation().isASTNode<AbstractClosureExpr>()))
+      // Leave non-transparent functions alone.
+      if (!F.isTransparent())
         continue;
 
       // We discard functions that don't have external linkage,
