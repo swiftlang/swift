@@ -2033,6 +2033,37 @@ public:
     }
   }
 
+  class FilteredDeclConsumer : public VisibleDeclConsumer {
+    llvm::function_ref<bool(ValueDecl *VD, DeclVisibilityKind Reason)> Filter;
+    VisibleDeclConsumer &RealConsumer;
+  public:
+    FilteredDeclConsumer(llvm::function_ref<bool(ValueDecl *VD, DeclVisibilityKind
+      Reason)> Filter, VisibleDeclConsumer &RealConsumer) : Filter(Filter),
+        RealConsumer(RealConsumer) {}
+    virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+      if (Filter(VD, Reason)) {
+        RealConsumer.foundDecl(VD, Reason);
+      }
+    }
+  };
+
+  void getExceptionCompletions(SourceLoc Loc) {
+    Kind = LookupKind::TypeInDeclContext;
+    auto BaseException = CurrDeclContext->getASTContext().getExceptionTypeDecl();
+    FilteredDeclConsumer Consumer([&](ValueDecl *VD, DeclVisibilityKind Reason) {
+      // This VD is an exception if it conforms the base error type
+      if (auto TD = dyn_cast<TypeDecl>(VD)) {
+        auto Protocols = TD->getProtocols();
+        if (std::find(Protocols.begin(), Protocols.end(),
+                      BaseException) != Protocols.end()) {
+          return true;
+        }
+      }
+      return false;
+    }, *this);
+    lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver.get(), true, Loc);
+  }
+
   void getTypeCompletions(Type BaseType) {
     Kind = LookupKind::Type;
     this->BaseType = BaseType;
@@ -2690,7 +2721,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::CatchStmtBeginning: {
-    // TODO: code complete from known error types.
+    Lookup.getExceptionCompletions(P.Context.SourceMgr.getCodeCompletionLoc());
     break;
   }
 

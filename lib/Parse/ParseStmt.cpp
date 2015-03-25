@@ -661,7 +661,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                 SmallVectorImpl<VarDecl *> &boundDecls,
                                 GuardedPatternContext parsingContext) {
   ParserResult<Pattern> patternResult;
-
+  auto setErrorResult = [&] () {
+    patternResult = makeParserErrorResult(new (P.Context)
+      AnyPattern(SourceLoc()));
+  };
   bool isExprBasic = [&]() -> bool {
     switch (parsingContext) {
     // 'case' is terminated with a colon and so allows a trailing closure.
@@ -675,10 +678,9 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   }();
 
   // Do some special-case code completion for the start of the pattern.
-  if (P.CodeCompletion) {
-    if (P.Tok.is(tok::code_complete)) {
-      patternResult =
-        makeParserErrorResult(new (P.Context) AnyPattern(SourceLoc()));
+  if (P.Tok.is(tok::code_complete)) {
+    if (P.CodeCompletion) {
+      setErrorResult();
       switch (parsingContext) {
       case GuardedPatternContext::Case:
         P.CodeCompletion->completeCaseStmtBeginning();
@@ -688,14 +690,21 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         break;
       }
       P.consumeToken();
+    } else {
+      status.setHasCodeCompletion();
+      return;
     }
-    if (parsingContext == GuardedPatternContext::Case &&
-        P.Tok.is(tok::period) && P.peekToken().is(tok::code_complete)) {
-      patternResult =
-        makeParserErrorResult(new (P.Context) AnyPattern(SourceLoc()));
+  }
+  if (parsingContext == GuardedPatternContext::Case &&
+      P.Tok.is(tok::period) && P.peekToken().is(tok::code_complete)) {
+    if (P.CodeCompletion) {
+      setErrorResult();
       P.consumeToken();
       P.CodeCompletion->completeCaseStmtDotPrefix();
       P.consumeToken();
+    } else {
+      status.setHasCodeCompletion();
+      return;
     }
   }
 
