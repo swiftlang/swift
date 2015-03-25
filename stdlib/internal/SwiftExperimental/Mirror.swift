@@ -73,7 +73,7 @@ public struct Mirror {
     self.schema = schema
   }
 
-  /// Initialize with the given collection of child instances, each
+  /// Initialize with the given collection of `Child` instances, each
   /// with a `nil` `label`, and optional `schema`.
   ///
   /// This initializer is especially useful for the mirrors of
@@ -100,11 +100,27 @@ public struct Mirror {
     self.schema = schema
   }
 
+  /// Initialize with labeled `children` and optional `schema`.
+  ///
+  /// Pass a dictionary literal with `String` keys as the first
+  /// argument.  Be aware that although an *actual* `Dictionary` is
+  /// arbitrarily-ordered, the ordering of the `Mirror`\ 's `children`
+  /// will exactly match that of the literal you pass.
+  public init<Element>(
+    children: DictionaryLiteral<String, Element>,
+    schema: Schema? = nil
+  ) {
+    self.children = Children(
+      lazy(children).map { Child(label: $0.0, value: $0.1) }
+    )
+    self.schema = schema
+  }
+  
   /// A collection of `Child` elements describing the structure of the
   /// reflected instance.
   public let children: Children
 
-  /// Suggests a display representation for the reflected instance.
+  /// Suggests a display style for the reflected instance.
   public let schema: Schema?
 }
 
@@ -204,7 +220,7 @@ extension Mirror {
       let children = reflect(result).children
       let position: Children.Index
       if let label? = e as? String {
-        position = find(children) { $0.label == label } ?? children.endIndex
+        position = _find(children) { $0.label == label } ?? children.endIndex
       }
       else if let offset? = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
         position = advance(children.startIndex, offset, children.endIndex)
@@ -217,27 +233,6 @@ extension Mirror {
       result = children[position].value
     }
     return result
-  }
-}
-
-//===--- Adapters ---------------------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-extension Mirror {
-  /// Create a `Mirror` with labeled `children` and optional `schema`.
-  ///
-  /// Pass a dictionary literal with `String` keys as the first
-  /// argument.  Be aware that although an *actual* `Dictionary` is
-  /// arbitrarily-ordered, the ordering of the `Mirror`\ 's `children`
-  /// will exactly match that of the literal you pass.
-  public init<Element>(
-    children: DictionaryLiteral<String, Element>,
-    schema: Schema? = nil
-  ) {
-    self.children = Children(
-      lazy(children).map { Child(label: $0.0, value: $0.1) }
-    )
-    self.schema = schema
   }
 }
 
@@ -297,16 +292,12 @@ extension Mirror {
   }
 }
 
-//===--- General Utilities ------------------------------------------------===//
-// having nothing really to do with Mirrors.  These should be
-// separately reviewed.
-
 /// Returns the first index `i` in `indices(domain)` such that
 /// `predicate(domain[i])` is `true``, or `nil` if
 /// `predicate(domain[i])` is `false` for all `i`.
 ///
 /// Complexity: O(\ `count(domain)`\ )
-public func find<
+internal func _find<
   C: CollectionType
 >(domain: C, predicate: (C.Generator.Element)->Bool) -> C.Index? {
   for i in indices(domain) {
@@ -316,6 +307,9 @@ public func find<
   }
   return nil
 }
+
+//===--- General Utilities ------------------------------------------------===//
+// This component could stand alone, but is used in Mirror's public interface.
 
 /// Represent the ability to pass a dictionary literal in function
 /// signatures.

@@ -81,6 +81,10 @@ extension AnyGenerator : SequenceType {
   public func generate() -> AnyGenerator { return self }
 }
 
+//===--- Generic Factories ------------------------------------------------===//
+// The following two functions should be initializers, but we can't
+// yet express that in the language.
+
 /// Return a `GeneratorType` instance that wraps `base` but whose type
 /// depends only on the type of `G.Element`.
 ///
@@ -503,8 +507,8 @@ public func !== <
 }
 
 % for (ti, Traversal) in enumerate(traversals):
-/// A type-erased wrapper over any collection with at least
-/// ${Traversal.lower()} indices.
+/// A type-erased wrapper over any collection with indices that 
+/// support ${Traversal.lower().replace('omacc', 'om acc')} traversal.
 /// 
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
