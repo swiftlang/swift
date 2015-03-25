@@ -28,6 +28,7 @@
 #include <pthread.h>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
+#include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Lazy.h"
 #include "Debug.h"
@@ -1885,57 +1886,99 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
   }
 }
 
+ExistentialTypeRepresentation
+ExistentialTypeMetadata::getRepresentation() const {
+  // Some existentials use special containers.
+  switch (Flags.getSpecialProtocol()) {
+  case SpecialProtocol::ErrorType:
+    return ExistentialTypeRepresentation::ErrorType;
+  case SpecialProtocol::AnyObject:
+  case SpecialProtocol::None:
+    break;
+  }
+  // The layout of standard containers depends on whether the existential is
+  // class-constrained.
+  if (isClassBounded())
+    return ExistentialTypeRepresentation::Class;
+  return ExistentialTypeRepresentation::Opaque;
+}
+
 const OpaqueValue *
 ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
-  // The layout of the container depends on whether it's class-constrained.
-  if (Flags.getClassConstraint() == ProtocolClassConstraint::Class) {
+  switch (getRepresentation()) {
+  case ExistentialTypeRepresentation::Class: {
     auto classContainer =
       reinterpret_cast<const ClassExistentialContainer*>(container);
     return reinterpret_cast<const OpaqueValue *>(&classContainer->Value);
-  } else {
+  }
+  case ExistentialTypeRepresentation::Opaque: {
     auto opaqueContainer =
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
     return opaqueContainer->Type->vw_projectBuffer(
                          const_cast<ValueBuffer*>(&opaqueContainer->Buffer));
   }
+  case ExistentialTypeRepresentation::ErrorType: {
+    auto errorBox = reinterpret_cast<const SwiftError *>(container);
+    return errorBox->getValue();
+  }
+  }
 }
 
 const Metadata *
 ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
-  // The layout of the container depends on whether it's class-constrained.
-  if (isClassBounded()) {
+  switch (getRepresentation()) {
+  case ExistentialTypeRepresentation::Class: {
     auto classContainer =
       reinterpret_cast<const ClassExistentialContainer*>(container);
     void *obj = classContainer->Value;
     return swift_getObjectType(reinterpret_cast<HeapObject*>(obj));
-  } else {
+  }
+  case ExistentialTypeRepresentation::Opaque: {
     auto opaqueContainer =
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
     return opaqueContainer->Type;
   }
+  case ExistentialTypeRepresentation::ErrorType: {
+    auto errorBox = reinterpret_cast<const SwiftError *>(container);
+    return errorBox->getType();
+  }
+  }
 }
 
-const WitnessTable * const *
+const WitnessTable *
 ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
                                          unsigned i) const {
   assert(i < Flags.getNumWitnessTables());
 
-  // The layout of the container depends on whether it's class-constrained.
-  const WitnessTable * const * witnessTables;
-  if (isClassBounded()) {
+  // The layout of the container depends on whether it's class-constrained
+  // or a special protocol.
+  const WitnessTable * const *witnessTables;
+  
+  switch (getRepresentation()) {
+  case ExistentialTypeRepresentation::Class: {
     auto classContainer =
       reinterpret_cast<const ClassExistentialContainer*>(container);
     witnessTables = classContainer->getWitnessTables();
-  } else {
+    break;
+  }
+  case ExistentialTypeRepresentation::Opaque: {
     auto opaqueContainer =
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
     witnessTables = opaqueContainer->getWitnessTables();
+    break;
+  }
+  case ExistentialTypeRepresentation::ErrorType: {
+    // Only one witness table we should be able to return, which is the
+    // ErrorType.
+    auto errorBox = reinterpret_cast<const SwiftError *>(container);
+    return errorBox->getErrorConformance();
+  }
   }
 
   // The return type here describes extra structure for the protocol
   // witness table for some reason.  We should probaby have a nominal
   // type for these, just for type safety reasons.
-  return reinterpret_cast<const WitnessTable * const *>(witnessTables[i]);
+  return witnessTables[i];
 }
 
 /// \brief Fetch a uniqued metadata for an existential type. The array

@@ -1687,6 +1687,16 @@ struct ClassExistentialContainer {
   }
 };
 
+/// The possible physical representations of existential types.
+enum class ExistentialTypeRepresentation {
+  /// The type uses an opaque existential representation.
+  Opaque,
+  /// The type uses a class existential representation.
+  Class,
+  /// The type uses the ErrorType boxed existential representation.
+  ErrorType,
+};
+
 /// The structure of existential type metadata.
 struct ExistentialTypeMetadata : public Metadata {
   /// The number of witness tables and class-constrained-ness of the type.
@@ -1700,22 +1710,24 @@ struct ExistentialTypeMetadata : public Metadata {
     : Metadata{MetadataKind::Existential},
       Flags(ExistentialTypeFlags()), Protocols() {}
   
+  /// Get the representation form this existential type uses.
+  ExistentialTypeRepresentation getRepresentation() const;
+  
   /// Project the value pointer from an existential container of the type
   /// described by this metadata.
   const OpaqueValue *projectValue(const OpaqueValue *container) const;
   
   OpaqueValue *projectValue(OpaqueValue *container) const {
-    return const_cast<OpaqueValue *>(projectValue((const OpaqueValue*) container));
+    return const_cast<OpaqueValue *>(projectValue((const OpaqueValue*)container));
   }
-  
   /// Get the dynamic type from an existential container of the type described
   /// by this metadata.
   const Metadata *getDynamicType(const OpaqueValue *container) const;
   
   /// Get a witness table from an existential container of the type described
   /// by this metadata.
-  const WitnessTable * const *getWitnessTable(const OpaqueValue *container,
-                                              unsigned i) const;
+  const WitnessTable * getWitnessTable(const OpaqueValue *container,
+                                       unsigned i) const;
 
   /// Return true iff all the protocol constraints are @objc.
   bool isObjC() const {

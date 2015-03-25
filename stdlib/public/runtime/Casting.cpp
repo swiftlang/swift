@@ -462,7 +462,6 @@ static bool _conformsToProtocol(const OpaqueValue *value,
                                 const ProtocolDescriptor *protocol,
                                 const WitnessTable **conformance) {
   // Handle AnyObject directly.
-  // FIXME: strcmp here is horribly slow.
   if (protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject) {
     switch (type->getKind()) {
     case MetadataKind::Class:
