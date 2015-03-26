@@ -363,7 +363,15 @@ extension _ArrayBuffer {
       return _native._isValidSubscript(index,
                                    hoistedIsNativeBuffer: hoistedIsNativeBuffer)
     }
-    return index >= 0 && index < count
+    // ObjC arrays do their own subscript checking. We return true to avoid
+    // additional subscript checking in the stdlib.
+    // But first we have to make the check to ensure memory safety (see above).
+    if (_isClassOrObjCExistential(T.self)) {
+      // Only non value elements can have non native storage.
+      _precondition(!_isNative,
+        "inout rules were violated: the array was overwritten by a native array")
+    }
+    return true
   }
 
   /// How many elements the buffer can store without reallocation
