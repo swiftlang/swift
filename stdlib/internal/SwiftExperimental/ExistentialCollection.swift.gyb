@@ -58,13 +58,11 @@ public class _AnyGeneratorBase {}
 public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
-  public init(file: StaticString = __FILE__, line: UWord = __LINE__) {
+  override public init() {
     super.init()
     _debugPrecondition(
       _typeID(self) != unsafeBitCast(AnyGenerator.self, ObjectIdentifier.self),
-      "AnyGenerator<T> instances can not be created; create a subclass instance instead.",
-      file: file, line: line
-    )
+      "AnyGenerator<T> instances can not be created; create a subclass instance instead.")
   }
   
   /// Advance to the next element and return it, or `nil` if no next
@@ -212,7 +210,7 @@ internal class _${Kind}Box<S: ${Kind}Type>
 ///
 /// See also: `AnyGenerator<T>`.
 public struct AnySequence<T> : SequenceType {
-  typealias Element = T
+  public typealias Element = T
 
   /// Wrap and forward operations to to `base`
   public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
@@ -491,21 +489,21 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
 public protocol AnyCollectionType : CollectionType {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied from one another have the same `underlyingCollectionID`.
-  var underlyingCollectionID: ObjectIdentifier {get}
+  var _underlyingCollectionID: ObjectIdentifier {get}
 }
 
 /// Return true iff `lhs` and `rhs` store the same underlying collection.
 public func === <
   L: AnyCollectionType, R: AnyCollectionType
 >(lhs: L, rhs: R) -> Bool {
-  return lhs.underlyingCollectionID == rhs.underlyingCollectionID
+  return lhs._underlyingCollectionID == rhs._underlyingCollectionID
 }
 
 /// Return false iff `lhs` and `rhs` store the same underlying collection.
 public func !== <
   L: AnyCollectionType, R: AnyCollectionType
 >(lhs: L, rhs: R) -> Bool {
-  return lhs.underlyingCollectionID != rhs.underlyingCollectionID
+  return lhs._underlyingCollectionID != rhs._underlyingCollectionID
 }
 
 % for (ti, Traversal) in enumerate(traversals):
@@ -594,7 +592,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   }
 
   /// Uniquely identifies the stored underlying collection.
-  public var underlyingCollectionID: ObjectIdentifier {
+  public var _underlyingCollectionID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
   
