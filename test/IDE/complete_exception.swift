@@ -13,6 +13,8 @@ class NoneError1 {}
 // CATCH1-NOT:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
+// CATCH1-DAG:  Keyword/None:                       let e {|}; name=e{{$}}
+// CATCH1-DAG:  Keyword/None:                       _ {|}; name=_{{$}}
 }
 
 {

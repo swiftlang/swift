@@ -2030,7 +2030,6 @@ public:
   void getThrowStmtCompletion(SourceLoc Loc) {
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-
     auto Consumer = FilteredDeclConsumer([&](ValueDecl *VD,
                                              DeclVisibilityKind Kind) {
       auto IsOfErrorType = [&](ValueDecl *VD) {
@@ -2098,6 +2097,28 @@ public:
     lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver.get(), true, Loc);
   }
 
+  void getExceptionHandleClauses() {
+    auto AddLet = [&](bool NeedWhere) {
+      CodeCompletionResultBuilder Builder(Sink,
+                                          CodeCompletionResult::ResultKind::
+                                            Keyword,
+                                          SemanticContextKind::None);
+      Builder.addDeclIntroducer("let ");
+      Builder.addTextChunk("e");
+      if (NeedWhere) {
+        // TODO: add where clause
+      }
+      Builder.addBraceStmtWithCursor();
+    };
+    AddLet(false);
+    CodeCompletionResultBuilder Builder(Sink,
+                                        CodeCompletionResult::ResultKind::
+                                          Keyword,
+                                        SemanticContextKind::None);
+    Builder.addTextChunk("_");
+    Builder.addBraceStmtWithCursor();
+  }
+
   void getTypeCompletions(Type BaseType) {
     Kind = LookupKind::Type;
     this->BaseType = BaseType;
@@ -2105,7 +2126,6 @@ public:
     Type MetaBase = MetatypeType::get(BaseType);
     lookupVisibleMemberDecls(*this, MetaBase,
                              CurrDeclContext, TypeResolver.get());
-
     addKeyword("Type", MetaBase);
     addKeyword("self", BaseType);
   }
@@ -2764,6 +2784,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::CatchStmtBeginning: {
     Lookup.getExceptionCompletions(P.Context.SourceMgr.getCodeCompletionLoc());
+    Lookup.getExceptionHandleClauses();
     break;
   }
 
