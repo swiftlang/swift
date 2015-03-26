@@ -2006,11 +2006,13 @@ public:
   bool isErrorDecl(ValueDecl *VD) {
     // This VD is an exception if it conforms the base error type
     auto BaseException = CurrDeclContext->getASTContext().getExceptionTypeDecl();
-    if (auto TD = dyn_cast<TypeDecl>(VD)) {
-      auto Protocols = TD->getProtocols();
-      if (std::find(Protocols.begin(), Protocols.end(), BaseException) !=
-          Protocols.end()) {
-        return true;
+    if (auto TD = dyn_cast<NominalTypeDecl>(VD)) {
+      if (TD->getKind() != DeclKind::Protocol) {
+        auto Protocols = TD->getProtocols();
+        if (std::find(Protocols.begin(), Protocols.end(), BaseException) !=
+            Protocols.end()) {
+          return true;
+        }
       }
     }
     return false;

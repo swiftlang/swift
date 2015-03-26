@@ -1,6 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CATCH1 | FileCheck %s -check-prefix=CATCH1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=THROW1 | FileCheck %s -check-prefix=THROW1
 
+protocol ErrorPro1 : _ErrorType {}
 class Error1 : _ErrorType {}
 class Error2 : _ErrorType {}
 class NoneError1 {}
@@ -26,5 +27,6 @@ class NoneError1 {}
 // THROW1-DAG:  Decl[LocalVar]/Local:               e2[#Error2#]; name=e2{{$}}
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
+// THROW1-NOT:  Decl[Protocol]/CurrModule:          ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}
 // THROW1-NOT:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
 }
