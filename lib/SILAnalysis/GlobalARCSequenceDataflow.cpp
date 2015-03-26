@@ -603,9 +603,8 @@ static bool processBBTopDown(
   return NestingDetected;
 }
 
-void
-ARCSequenceDataflowEvaluator::
-mergePredecessors(ARCBBStateInfoHandle &DataHandle) {
+void ARCSequenceDataflowEvaluator::mergePredecessors(
+    ARCBBStateInfoHandle &DataHandle) {
   bool HasAtLeastOnePred = false;
   llvm::SmallVector<SILBasicBlock *, 4> BBThatNeedInsertPts;
 
@@ -622,7 +621,8 @@ mergePredecessors(ARCBBStateInfoHandle &DataHandle) {
     if (!PredDataHandle)
       continue;
 
-    DEBUG(llvm::dbgs() << "    Merging Pred: " << PredDataHandle->getID() << "\n");
+    DEBUG(llvm::dbgs() << "    Merging Pred: " << PredDataHandle->getID()
+                       << "\n");
 
     // If the predecessor is the head of a backedge in our traversal, clear any
     // state we are tracking now and clear the state of the basic block. There
@@ -630,7 +630,7 @@ mergePredecessors(ARCBBStateInfoHandle &DataHandle) {
     if (PredDataHandle->isBackedge(BB)) {
       BBState.clear();
       break;
-    }    
+    }
 
     ARCBBState &PredBBState = PredDataHandle->getState();
 
@@ -673,7 +673,8 @@ bool ARCSequenceDataflowEvaluator::processTopDown() {
     mergePredecessors(BBDataHandle);
 
     // Then perform the basic block optimization.
-    NestingDetected |= processBBTopDown(BBDataHandle.getState(), DecToIncStateMap, AA, RCIA);
+    NestingDetected |=
+        processBBTopDown(BBDataHandle.getState(), DecToIncStateMap, AA, RCIA);
   }
 
   return NestingDetected;
@@ -698,9 +699,8 @@ bool ARCSequenceDataflowEvaluator::processTopDown() {
 /// information. Instead we run an extra iteration of the ARC optimizer with
 /// this enabled in a side table so the information gets propgated everywhere in
 /// the CFG.
-bool
-ARCSequenceDataflowEvaluator::
-processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
+bool ARCSequenceDataflowEvaluator::processBBBottomUp(
+    ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
   SILBasicBlock &BB = BBState.getBB();
 
@@ -833,9 +833,8 @@ processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
   return NestingDetected;
 }
 
-void
-ARCSequenceDataflowEvaluator::
-mergeSuccessors(ARCBBStateInfoHandle &DataHandle) {
+void ARCSequenceDataflowEvaluator::mergeSuccessors(
+    ARCBBStateInfoHandle &DataHandle) {
   SILBasicBlock *BB = DataHandle.getBB();
   ARCBBState &BBState = DataHandle.getState();
 
@@ -882,9 +881,8 @@ mergeSuccessors(ARCBBStateInfoHandle &DataHandle) {
   }
 }
 
-bool
-ARCSequenceDataflowEvaluator::
-processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
+bool ARCSequenceDataflowEvaluator::processBottomUp(
+    bool FreezeOwnedArgEpilogueReleases) {
   bool NestingDetected = false;
 
   DEBUG(llvm::dbgs() << "<<<< Processing Bottom Up! >>>>\n");
@@ -894,7 +892,8 @@ processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
     // Grab the BBState associated with it and set it to be the current BB.
     auto BBDataHandle = *getBottomUpBBState(BB);
 
-    // This will always succeed since we have an entry for each BB in our post order.
+    // This will always succeed since we have an entry for each BB in our post
+    // order.
     DEBUG(llvm::dbgs() << "Processing BB#: " << BBDataHandle.getID() << "\n");
 
     DEBUG(llvm::dbgs() << "Merging Successors!\n");
@@ -913,16 +912,16 @@ processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
 //===----------------------------------------------------------------------===//
 
 ARCSequenceDataflowEvaluator::ARCSequenceDataflowEvaluator(
-      SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
-      RCIdentityAnalysis *RCIA,
-      BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-      BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
-      : F(F), AA(AA), POA(POA), RCIA(RCIA),
-        DecToIncStateMap(DecToIncStateMap), IncToDecStateMap(IncToDecStateMap),
-        // We use a malloced pointer here so we don't need to expose
-        // ARCBBStateInfo in the header.
-        BBStateInfo(new ARCBBStateInfo(&F, POA)),
-        ConsumedArgToReleaseMap(RCIA, &F) {}
+    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
+    RCIdentityAnalysis *RCIA,
+    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
+    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
+    : F(F), AA(AA), POA(POA), RCIA(RCIA), DecToIncStateMap(DecToIncStateMap),
+      IncToDecStateMap(IncToDecStateMap),
+      // We use a malloced pointer here so we don't need to expose
+      // ARCBBStateInfo in the header.
+      BBStateInfo(new ARCBBStateInfo(&F, POA)),
+      ConsumedArgToReleaseMap(RCIA, &F) {}
 
 bool ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
   bool NestingDetected = processBottomUp(FreezeOwnedReleases);
@@ -936,9 +935,7 @@ ARCSequenceDataflowEvaluator::~ARCSequenceDataflowEvaluator() {
   delete BBStateInfo;
 }
 
-void ARCSequenceDataflowEvaluator::clear() {
-  BBStateInfo->clear();
-}
+void ARCSequenceDataflowEvaluator::clear() { BBStateInfo->clear(); }
 
 llvm::Optional<ARCBBStateInfoHandle>
 ARCSequenceDataflowEvaluator::getBottomUpBBState(SILBasicBlock *BB) {

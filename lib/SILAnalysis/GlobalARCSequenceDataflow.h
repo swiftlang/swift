@@ -66,10 +66,10 @@ private:
 
 public:
   ARCSequenceDataflowEvaluator(
-    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
-    RCIdentityAnalysis *RCIA,
-    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
+      SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
+      RCIdentityAnalysis *RCIA,
+      BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
+      BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
   ~ARCSequenceDataflowEvaluator();
 
   /// Run the dataflow evaluator.
