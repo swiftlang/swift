@@ -199,6 +199,8 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
     set(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
   endif()
 
+  set(LLVM_ABI_BREAKING_CHECKS "WITH_ASSERTS")
+
   include(AddLLVM)
   include(TableGen)
   include(HandleLLVMOptions)
