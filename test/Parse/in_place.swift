@@ -24,16 +24,30 @@ protocol P {
 }
 extension C1: P {}
 
-let c = C1()
+var c = C1()
 c.=foo1(c)
 c .= foo1(c)
 c.=bogus(c) // expected-error{{'C1' does not have a member named '=bogus'}}
 c .= bogus(c) // expected-error{{'C1' does not have a member named '=bogus'}}
 c.=bogus // expected-error{{'C1' does not have a member named '=bogus'}}
-
 c.=1 // expected-error{{expected identifier following '.='}}
+
+let cc = C1()
+cc.=foo1(c) // expected-error{{immutable value of type 'C1' only has mutating members named '=foo1'}}
+cc .= foo1(c) // expected-error{{immutable value of type 'C1' only has mutating members named '=foo1'}}
 
 infix operator ++++ { precedence 130 has_assignment }
 
 func ++++(foo: C1, bar: C1) -> C1 { return foo }
 func ++++=(inout foo: C1, bar: C1) { foo = foo ++++ bar }
+
+struct Point {
+  var x: Float
+  var y: Float
+
+  // Test that in-place method bodies are allowed to mutate object
+  func =step(dx: Float, dy: Float) {
+    x += dx
+    y += dy
+  }
+}

@@ -3863,7 +3863,8 @@ public:
 
     // Validate the mutating attribute if present, and install it into the bit
     // on funcdecl (instead of just being a DeclAttribute).
-    if (FD->getAttrs().hasAttribute<MutatingAttr>())
+    if (FD->getAttrs().hasAttribute<MutatingAttr>() ||
+        FD->getName().isInPlaceName())
       FD->setMutating(true);
     else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
       FD->setMutating(false);
