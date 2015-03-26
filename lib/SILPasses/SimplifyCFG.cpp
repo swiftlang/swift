@@ -1358,9 +1358,6 @@ bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
 /// "Val" is substituted for BBArg.  If so, return true, if nothing obvious
 /// is possible, return false.
 static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
-  assert(!isa<IntegerLiteralInst>(Val) && !isa<FloatLiteralInst>(Val) &&
-         "Obvious constants shouldn't reach here");
-
   // If the value being substituted is an enum, check to see if there are any
   // switches on it.
   auto *EI = dyn_cast<EnumInst>(Val);
@@ -1369,72 +1366,24 @@ static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
 
   for (auto UI : BBArg->getUses()) {
     auto *User = UI->getUser();
+    // We only know we can simplify if the switch_enum user is in the block we
+    // are trying to jump thread.
+    // The value must not be define in the same basic block as the switch enum
+    // user. If this is the case we have a single block switch_enum loop.
     if (isa<SwitchEnumInst>(User) || isa<SelectEnumInst>(User))
-      return true;
-    
+      if (BBArg->getParent() == User->getParent() &&
+          EI->getParent() != BBArg->getParent())
+        return true;
+
     // Also allow enum of enum, which usually can be combined to a single
     // instruction. This helps to simplify the creation of an enum from an
     // integer raw value.
     if (isa<EnumInst>(User))
-      return true;
+      if (BBArg->getParent() == User->getParent() &&
+          EI->getParent() != BBArg->getParent())
+        return true;
   }
   return false;
-}
-
-/// Check whether we can 'thread' through the switch_enum instruction by
-/// duplicating the switch_enum block into SrcBB.
-static bool isThreadableSwitchEnumInst(SwitchEnumInst *SEI,
-                                       SILBasicBlock *SrcBB, EnumInst *&E0,
-                                       EnumInst *&E1) {
-  auto SEIBB = SEI->getParent();
-  auto PIt = SEIBB->pred_begin();
-  auto PEnd = SEIBB->pred_end();
-
-  // Recognize a switch_enum preceeded by two direct branch blocks that carry
-  // the switch_enum operand's value as EnumInsts.
-  if(std::distance(PIt, PEnd) != 2)
-    return false;
-
-  auto Arg = dyn_cast<SILArgument>(SEI->getOperand());
-  if (!Arg)
-    return false;
-
-  if (Arg->getParent() != SEIBB)
-    return false;
-
-  // We must not duplicate alloc_stack, dealloc_stack.
-  if (!canDuplicateBlock(SEIBB))
-      return false;
-
-  auto Idx = Arg->getIndex();
-  auto IncomingBr0 = dyn_cast<BranchInst>(((*PIt))->getTerminator());
-  ++PIt;
-  auto IncomingBr1 = dyn_cast<BranchInst>((*PIt)->getTerminator());
-
-  // Make sure that we don't have an incoming critical edge.
-  if (!IncomingBr0 || !IncomingBr1)
-    return false;
-
-  // We cannonicalize to IncomingBr0 to be from the basic block we clone
-  // into.
-  if (IncomingBr1->getParent() == SrcBB)
-    std::swap(IncomingBr0, IncomingBr1);
-
-  assert(IncomingBr0->getArgs().size() == SEIBB->getNumBBArg());
-  assert(IncomingBr1->getArgs().size() == SEIBB->getNumBBArg());
-
-  // Make sure that both predecessors arguments are an EnumInst so that we can
-  // forward the branch.
-  E0 = dyn_cast<EnumInst>(IncomingBr0->getArg(Idx));
-  E1 = dyn_cast<EnumInst>(IncomingBr1->getArg(Idx));
-  if (!E0 || !E1)
-    return false;
-
-  // We also need to check for the absence of payload uses. we are not handling
-  // them.
-  auto SwitchDestBB0 = SEI->getCaseDestination(E0->getElement());
-  auto SwitchDestBB1 = SEI->getCaseDestination(E1->getElement());
-  return SwitchDestBB0->getNumBBArg() == 0 && SwitchDestBB1->getNumBBArg() == 0;
 }
 
 void SimplifyCFG::findLoopHeaders() {
@@ -1486,27 +1435,15 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   if (isa<ReturnInst>(DestBB->getTerminator()))
     return false;
 
-  bool isThreadableCondBr = isa<CondBranchInst>(DestBB->getTerminator()) &&
-                  canDuplicateBlock(DestBB);
+  // We need to update SSA if a value duplicated is used outside of the
+  // duplicated block.
+  bool NeedToUpdateSSA = false;
 
-  // We can jump thread switch enum instructions. But we need to 'thread' it by
-  // hand - i.e. we need to replace the switch enum by branches - if we don't do
-  // so the ssaupdater will fail because we can't form 'phi's with anything
-  // other than branches and conditional branches because only they support
-  // arguments :(.
-  EnumInst *EnumInst0 = nullptr;
-  EnumInst *EnumInst1 = nullptr;
-  SwitchEnumInst *SEI = dyn_cast<SwitchEnumInst>(DestBB->getTerminator());
-  bool isThreadableEnumInst =
-      SEI && isThreadableSwitchEnumInst(SEI, SrcBB, EnumInst0, EnumInst1);
-
-  // This code is intentionally simple, and cannot thread if the BBArgs of the
-  // destination are used outside the DestBB.
-  bool HasDestBBDefsUsedOutsideBlock = false;
+  // Are the arguments to this block used outside of the block.
   for (auto Arg : DestBB->getBBArgs())
-    if ((HasDestBBDefsUsedOutsideBlock |= isUsedOutsideOfBlock(Arg, DestBB)))
-      if (!isThreadableCondBr && !isThreadableEnumInst)
-        return false;
+    if ((NeedToUpdateSSA |= isUsedOutsideOfBlock(Arg, DestBB))) {
+      break;
+    }
 
   // We don't have a great cost model at the SIL level, so we don't want to
   // blissly duplicate tons of code with a goal of improved performance (we'll
@@ -1515,12 +1452,14 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // "constant" arguments to the branch or if we know how to fold something
   // given the duplication.
   bool WantToThread = false;
-  for (auto V : BI->getArgs()) {
-    if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
-      WantToThread = true;
-      break;
+
+  if (isa<CondBranchInst>(DestBB->getTerminator()))
+    for (auto V : BI->getArgs()) {
+      if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
+        WantToThread = true;
+        break;
+      }
     }
-  }
 
   if (!WantToThread) {
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i)
@@ -1538,32 +1477,30 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   unsigned Cost = 0;
 
   for (auto &Inst : DestBB->getInstList()) {
+    if (!Inst.isTriviallyDuplicatable())
+      return false;
+
+    // Don't jumpthread function calls.
+    if (isa<ApplyInst>(Inst))
+      return false;
+
     // This is a really trivial cost model, which is only intended as a starting
     // point.
     if (instructionInlineCost(Inst) != InlineCost::Free)
       if (++Cost == 4) return false;
 
-    // If there is an instruction in the block that has used outside the block,
-    // duplicating it would require constructing SSA, which we're not prepared
-    // to do.
-    if ((HasDestBBDefsUsedOutsideBlock |=
-         isUsedOutsideOfBlock(&Inst, DestBB))) {
-      if (!isThreadableCondBr && !isThreadableEnumInst)
-        return false;
-
-      // We can't build SSA for method values that lower to objc methods.
-      if (auto *MI = dyn_cast<MethodInst>(&Inst))
-        if (MI->getMember().isForeign)
-          return false;
-    }
+    // We need to update ssa if a value is used outside the duplicated block.
+    if (!NeedToUpdateSSA)
+      NeedToUpdateSSA |= isUsedOutsideOfBlock(&Inst, DestBB);
   }
 
   // Don't jump thread through a potential header - this can produce irreducible
   // control flow.
-  if (!isThreadableEnumInst && LoopHeaders.count(DestBB))
+  if (!isa<SwitchEnumInst>(DestBB->getTerminator()) &&
+      LoopHeaders.count(DestBB))
     return false;
 
-  // Okay, it looks like we want to do this and we can.  Duplicate the
+    // Okay, it looks like we want to do this and we can.  Duplicate the
   // destination block into this one, rewriting uses of the BBArgs to use the
   // branch arguments as we go.
   ThreadingCloner Cloner(BI);
@@ -1577,31 +1514,8 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   addToWorklist(BI->getParent());
   BI->eraseFromParent();
 
-  // Thread the switch enum instruction.
-  if (isThreadableEnumInst && HasDestBBDefsUsedOutsideBlock) {
-    assert(EnumInst0 && EnumInst1 && "Need to have two enum instructions");
-    // We know that the switch enum is fed by enum instructions along all
-    // incoming edges.
-    auto SwitchDestBB0 = SEI->getCaseDestination(EnumInst0->getElement());
-    auto SwitchDestBB1 = SEI->getCaseDestination(EnumInst1->getElement());
-
-    auto ClonedSEI = SrcBB->getTerminator();
-    auto &InstList0 = SrcBB->getInstList();
-    InstList0.insert(InstList0.end(),
-                     BranchInst::create(SEI->getLoc(), SwitchDestBB0,
-                                        *SEI->getFunction()));
-
-    auto &InstList1 = SEI->getParent()->getInstList();
-    InstList1.insert(InstList1.end(),
-                     BranchInst::create(SEI->getLoc(), SwitchDestBB1,
-                                        *SEI->getFunction()));
-    ClonedSEI->eraseFromParent();
-    SEI->eraseFromParent();
-  }
-
-  if (HasDestBBDefsUsedOutsideBlock) {
+  if (NeedToUpdateSSA)
     updateSSAAfterCloning(Cloner, SrcBB, DestBB);
-  }
 
   // We may be able to simplify DestBB now that it has one fewer predecessor.
   simplifyAfterDroppingPredecessor(DestBB);
