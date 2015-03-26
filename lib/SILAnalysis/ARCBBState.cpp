@@ -65,7 +65,9 @@ void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBBState) {
     // Ok, now we know that the merged set can safely represent a set of
     // of instructions which together semantically act as one ref count
     // increment. Merge the two states together.
-    RefCountState.merge(OtherRefCountState);
+    if (!RefCountState.merge(OtherRefCountState)) {
+      PtrToBottomUpState.blot(RefCountedValue);
+    }
   }
 }
 
@@ -112,22 +114,14 @@ void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
     TopDownRefCountState &RefCountState = Pair.second;
     TopDownRefCountState &OtherRefCountState = Other->second;
 
-    // We create states for specific arguments when processing top down. If we
-    // have one ref count state that has seen a ref count and a different one
-    // that was initialized with an argument but has not seen a ref count value,
-    // we don't want to merge them. Instead we blot since this is a form of
-    // partial merging that we do not support.
-    if (RefCountState.Argument.isNull() !=
-        OtherRefCountState.Argument.isNull()) {
-      DEBUG(llvm::dbgs() << "Can not merge arg and non-arg path!\n");
+    // Attempt to merge Other into this ref count state. If we fail, blot this
+    // ref counted value and continue.
+    if (!RefCountState.merge(OtherRefCountState)) {
+      DEBUG(llvm::dbgs() << "Failed to merge!\n");
       PtrToTopDownState.blot(RefCountedValue);
       continue;
     }
 
-    // Ok, now we know that the merged set can safely represent a set of
-    // of instructions which together semantically act as one ref count
-    // increment. Merge the two states together.
-    RefCountState.merge(OtherRefCountState);
     DEBUG(llvm::dbgs() << "                Partial: "
                        << (RefCountState.isPartial() ? "yes" : "no") << "\n");
   }

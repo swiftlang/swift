@@ -17,4 +17,5 @@ add_swift_library(swiftSILAnalysis
   ArraySemantic.cpp
   RefCountState.cpp
   ARCBBState.cpp
+  RCStateTransition.cpp
   LINK_LIBRARIES swiftSILPassesUtils)

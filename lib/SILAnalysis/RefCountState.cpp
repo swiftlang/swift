@@ -109,15 +109,12 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
     return false;
   }
 
-  // We should never have an argument path merge with a non-argument path.
-  if (Argument.isNull() != Other.Argument.isNull()) {
+  if (!Transition.hasValue() || !Other.Transition.hasValue() ||
+      !Transition->merge(Other.Transition.getValue())) {
+    DEBUG(llvm::dbgs() << "            Failed merge!\n");
     clear();
-    DEBUG(llvm::dbgs() << "            Can not merge Argument with "
-                          "Non-Argument path... Bailing!\n");
     return false;
   }
-
-  Increments.insert(Other.Increments.begin(), Other.Increments.end());
 
   Partial |= Other.Partial;
   Partial |= InsertPts.size() != Other.InsertPts.size();
@@ -163,8 +160,12 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
     return false;
   }
 
-  // Merge previously seen instructions.
-  Decrements.insert(Other.Decrements.begin(), Other.Decrements.end());
+  if (!Transition.hasValue() || !Other.Transition.hasValue() ||
+      !Transition->merge(Other.Transition.getValue())) {
+    DEBUG(llvm::dbgs() << "            Failed merge!\n");
+    clear();
+    return false;
+  }
 
   Partial |= Other.Partial;
   Partial |= InsertPts.size() != Other.InsertPts.size();

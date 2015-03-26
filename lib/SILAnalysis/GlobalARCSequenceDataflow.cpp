@@ -114,9 +114,10 @@ static bool processBBTopDown(
     }
 
     SILValue Op;
+    RCStateTransitionKind TransitionKind = getRCStateTransitionKind(&I);
 
     // If I is a ref count increment instruction...
-    if (isRefCountIncrement(I)) {
+    if (TransitionKind == RCStateTransitionKind::StrongIncrement) {
       // map its operand to a newly initialized or reinitialized ref count
       // state and continue...
       Op = RCIA->getRCIdentityRoot(I.getOperand(0));
@@ -131,7 +132,7 @@ static bool processBBTopDown(
     }
 
     // If we have a reference count decrement...
-    if (isRefCountDecrement(I)) {
+    if (TransitionKind == RCStateTransitionKind::StrongDecrement) {
       // Look up the state associated with its operand...
       Op = RCIA->getRCIdentityRoot(I.getOperand(0));
       TopDownRefCountState &RefCountState = BBState.getTopDownRefCountState(Op);
@@ -336,9 +337,10 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       continue;
 
     SILValue Op;
+    RCStateTransitionKind TransitionKind = getRCStateTransitionKind(&I);
 
     // If I is a ref count decrement instruction...
-    if (isRefCountDecrement(I)) {
+    if (TransitionKind == RCStateTransitionKind::StrongDecrement) {
       // map its operand to a newly initialized or reinitialized ref count
       // state and continue...
       Op = RCIA->getRCIdentityRoot(I.getOperand(0));
@@ -358,8 +360,8 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       // any other pointers via a use or a decrement.
     }
 
-    // If we have a reference count decrement...
-    if (isRefCountIncrement(I)) {
+    // If we have a reference count increment...
+    if (TransitionKind == RCStateTransitionKind::StrongIncrement) {
       // Look up the state associated with its operand...
       Op = RCIA->getRCIdentityRoot(I.getOperand(0));
       BottomUpRefCountState &RefCountState =

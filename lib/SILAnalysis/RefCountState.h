@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILANALYSIS_REFCOUNTSTATE_H
 #define SWIFT_SILANALYSIS_REFCOUNTSTATE_H
 
+#include "RCStateTransition.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
@@ -25,53 +26,6 @@ class AliasAnalysis;
 } // end namespace swift
 
 //===----------------------------------------------------------------------===//
-//                                  Utility
-//===----------------------------------------------------------------------===//
-
-namespace swift {
-/// Is I an instruction that we recognize as a "reference count increment"
-/// instruction?
-static inline bool isRefCountIncrement(SILInstruction &I) {
-  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I);
-}
-
-/// Is I an instruction that we recognize as a "reference count decrement"
-/// instruction?
-static inline bool isRefCountDecrement(SILInstruction &I) {
-  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
-}
-
-/// Returns true if Inc and Dec are compatible reference count instructions.
-///
-/// In more specific terms this means that means a (strong_retain,
-/// strong_release) pair or a (retain_value, release_value) pair.
-static inline bool matchingRefCountPairType(SILInstruction *I1,
-                                            SILInstruction *I2) {
-// While we support layout compatible types, we just return true here. If/when
-// that support is removed in the future, this code should be re-enabled. Keep
-// in mind that there is nothing inherently wrong with matching up retain_value,
-// strong_retain, release_value, strong_release. Previously though there were no
-// cases where it could possibly come up so I put this assertion in just to be
-// careful since I had not discussed this with anyone.
-#if 0
-  // Always put the strong retain on the left.
-  if (isa<StrongRetainInst>(I2) || isa<RetainValueInst>(I2))
-    std::swap(I1, I2);
-
-  // Now we know that I1 should be an increment and I2 a decrement. Assert to
-  // check for programmer error.
-  assert(isRefCountIncrement(*I1) && isRefCountDecrement(*I2) &&
-         "Submitting two increments or decrements to this function is "
-         "invalid.");
-  return (isa<StrongRetainInst>(I1) && isa<StrongReleaseInst>(I2)) ||
-    (isa<RetainValueInst>(I1) && isa<ReleaseValueInst>(I2));
-#else
-  return true;
-#endif
-}
-}
-
-//===----------------------------------------------------------------------===//
 //                              Ref Count State
 //===----------------------------------------------------------------------===//
 
@@ -81,11 +35,15 @@ namespace swift {
 /// retain_value, strong_release,
 template <typename ImplStruct>
 struct RefCountState {
-  using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 8>;
+  using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 4>;
 
   /// Return the SILValue that represents the RCRoot that we are
   /// tracking.
   SILValue RCRoot;
+
+  /// The last state transition that this RefCountState went through. None if we
+  /// have not see any transition on this ref count yet.
+  llvm::Optional<RCStateTransition> Transition;
 
   /// Was the pointer we are tracking known incremented when we visited the
   /// current increment we are tracking? In that case we know that it is safe
@@ -118,6 +76,8 @@ struct RefCountState {
     // Are we already tracking a ref count modification?
     bool Nested = isTrackingRefCount();
 
+    Transition = RCStateTransition(I);
+
     // Initialize value.
     RCRoot = I->getOperand(0).stripCasts();
 
@@ -135,6 +95,7 @@ struct RefCountState {
   /// Uninitialize the current state.
   void clear() {
     RCRoot = SILValue();
+    Transition = None;
     KnownSafe = false;
     Partial = false;
     InsertPts.clear();
@@ -280,12 +241,17 @@ struct RefCountState {
   /// Returns true if the passed in ref count inst matches the ref count inst
   /// we are tracking. This handles generically retains/release.
   bool isRefCountInstMatchedToTrackedInstruction(SILInstruction *RefCountInst) {
-    // If our state is not initialized, return false since we are not tracking
-    // anything. If the ValueKind of our increments, decrement do not match, we
-    // can not eliminate the pair so return false.
-    if (!isTrackingRefCountInst() ||
-        !matchingRefCountPairType(*getInstructions().begin(), RefCountInst))
+    // If we are not tracking any state transitions bail.
+    if (!Transition.hasValue())
       return false;
+
+    // Otherwise, ask the transition state if this instruction causes a
+    // transition that can be matched with the transition in order to eliminate
+    // the transition.
+    if (!Transition->matchingInst(RefCountInst))
+      return false;
+
+    // If we have a match, handle it.
     return asImpl()->handleRefCountInstMatch(RefCountInst);
   }
 };
@@ -311,9 +277,6 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
                         ///  this decrement.
   };
 
-  /// The set of decrements that we are tracking.
-  llvm::SmallPtrSet<SILInstruction *, 8> Decrements;
-
   /// Current place in the sequence of the value.
   LatticeState LatState = LatticeState::None;
 
@@ -331,10 +294,6 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
     // known safe.
     KnownSafe = NestingDetected;
 
-    // Clear our decrement list and insert I into it.
-    Decrements.clear();
-    Decrements.insert(I);
-
     // Set our lattice state to be incremented.
     LatState = LatticeState::Decremented;
 
@@ -343,7 +302,6 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
 
   /// Uninitialize the current state.
   void clear() {
-    Decrements.clear();
     LatState = LatticeState::None;
     SuperTy::clear();
   }
@@ -354,31 +312,29 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
   }
 
   /// Is this ref count initialized and tracking a ref count ptr.
-  bool isTrackingRefCount() const {
-    return Decrements.size();
-  }
+  bool isTrackingRefCount() const { return Transition.hasValue(); }
 
   /// Are we tracking an instruction currently? This returns false when given an
   /// uninitialized ReferenceCountState.
   bool isTrackingRefCountInst() const {
-    return Decrements.size();
+    return Transition.hasValue() && Transition->isMutator();
   }
 
   /// Are we tracking a source of ref counts? This currently means that we are
   /// tracking an argument that is @owned. In the future this will include
   /// return values of functions that are @owned.
   bool isTrackingRefCountSource() const {
-    return false;
+    return Transition.hasValue() && Transition->isEndPoint();
   }
 
   /// Returns true if I is an instruction that we are tracking.
   bool containsInstruction(SILInstruction *I) const {
-    return Decrements.count(I);
+    return Transition.hasValue() && Transition->containsMutator(I);
   }
 
   /// Return the increment we are tracking.
-  Range<decltype(Decrements)::iterator> getInstructions() const {
-    return {Decrements.begin(), Decrements.end()};
+  RCStateTransition::mutator_range getInstructions() const {
+    return Transition->getMutators();
   }
 
   /// Returns true if given the current lattice state, do we care if the value
@@ -508,10 +464,6 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
     MightBeUsed,        ///< The pointer has been incremented,
   };
 
-  /// The increment/increment set that we are tracking.
-  NullablePtr<SILArgument> Argument;
-  llvm::SmallPtrSet<SILInstruction *, 8> Increments;
-
   /// Current place in the sequence of the value.
   LatticeState LatState = LatticeState::None;
 
@@ -523,11 +475,6 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
     bool NestingDetected = SuperTy::initWithInst(I);
 
-    // Clear our tracked set of increments and add I to the list.
-    Argument = nullptr;
-    Increments.clear();
-    Increments.insert(I);
-
     // Set our lattice state to be incremented.
     LatState = LatticeState::Incremented;
 
@@ -536,8 +483,7 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   void initWithArg(SILArgument *Arg) {
     LatState = LatticeState::Incremented;
-    Increments.clear();
-    Argument = Arg;
+    Transition = RCStateTransition(Arg);
     RCRoot = Arg;
     KnownSafe = false;
     InsertPts.clear();
@@ -545,8 +491,7 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   /// Uninitialize the current state.
   void clear() {
-    Argument = nullptr;
-    Increments.clear();
+    Transition = None;
     LatState = LatticeState::None;
     SuperTy::clear();
   }
@@ -557,33 +502,29 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
   }
 
   /// Is this ref count initialized and tracking a ref count ptr.
-  bool isTrackingRefCount() const {
-    return !Increments.empty() || !Argument.isNull();
-  }
+  bool isTrackingRefCount() const { return Transition.hasValue(); }
 
   /// Are we tracking an instruction currently? This returns false when given an
   /// uninitialized ReferenceCountState.
   bool isTrackingRefCountInst() const {
-    return Increments.size();
+    return Transition.hasValue() && Transition->isMutator();
   }
 
   /// Are we tracking a source of ref counts? This currently means that we are
   /// tracking an argument that is @owned. In the future this will include
   /// return values of functions that are @owned.
   bool isTrackingRefCountSource() const {
-    return !Argument.isNull();
+    return Transition.hasValue() && Transition->isEndPoint();
   }
 
   /// Returns true if I is an instruction that we are tracking.
   bool containsInstruction(SILInstruction *I) const {
-    return Increments.count(I);
+    return Transition.hasValue() && Transition->containsMutator(I);
   }
 
   /// Return the increment we are tracking.
-  Range<decltype(Increments)::iterator> getInstructions() const {
-    assert(Argument.isNull() &&
-           "Should never call this when processing an argument.");
-    return {Increments.begin(), Increments.end()};
+  RCStateTransition::mutator_range getInstructions() const {
+    return Transition->getMutators();
   }
 
   /// Returns true if given the current lattice state, do we care if the value
