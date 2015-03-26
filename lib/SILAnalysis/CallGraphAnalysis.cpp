@@ -100,6 +100,10 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     return true;
   }
 
+  case ValueKind::PartialApplyInst:
+    return tryGetCalleeSet(cast<PartialApplyInst>(Callee)->getCallee(),
+                           CalleeSet, Complete);
+
   case ValueKind::DynamicMethodInst:
     // TODO: Decide how to handle these in graph construction and
     //       analysis passes. We might just leave them out of the
@@ -155,7 +159,6 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     return true;
   }
 
-  case ValueKind::PartialApplyInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::SuperMethodInst:
     // TODO: Each of these requires specific handling.
