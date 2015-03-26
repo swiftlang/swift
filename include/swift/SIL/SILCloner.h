@@ -189,7 +189,7 @@ protected:
 
     // For simple protocol types, use Self.
     if (auto protocol = dyn_cast<ProtocolType>(existential))
-      return protocol->getDecl()->getSelf()->getArchetype();
+      return protocol->getDecl()->getProtocolSelf()->getArchetype();
 
     // Otherwise, open a new archetype with the right conformances.
     assert(isa<ProtocolCompositionType>(existential));
@@ -1153,8 +1153,9 @@ SILCloner<ImplClass>::visitSuperMethodInst(SuperMethodInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
+  auto memberDC = Inst->getMember().getDecl()->getDeclContext();
   auto conformance =
-    getOpConformance(Inst->getLookupProtocol()->getSelf()->getArchetype(),
+    getOpConformance(memberDC->getProtocolSelf()->getArchetype(),
                      Inst->getLookupType(), Inst->getConformance());
   doPostProcess(
       Inst,

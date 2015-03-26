@@ -78,7 +78,7 @@ protocol BarProtocol {
   deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }
 
-extension BarProtocol { // expected-error {{protocol 'BarProtocol' cannot be extended}}
+extension BarProtocol {
   init(x : Int) {}
   deinit {} // expected-error {{deinitializers may only be declared within a class}}
 }

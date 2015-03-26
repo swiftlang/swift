@@ -676,7 +676,7 @@ WARNING(non_trailing_closure_before_default_args,sema_tcd,none,
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
-      "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))
+      "non-nominal type %0 cannot be extended", (Type))
 ERROR(extension_access_with_conformances,sema_tcd,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))

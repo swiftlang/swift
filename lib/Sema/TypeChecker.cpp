@@ -219,6 +219,11 @@ static GenericParamList *cloneGenericParams(ASTContext &ctx,
   return toParams;
 }
 
+// FIXME: total hack
+GenericParamList *createProtocolGenericParams(ASTContext &ctx,
+                                              ProtocolDecl *proto,
+                                              DeclContext *dc);
+
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedType())
     return;
@@ -318,10 +323,16 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
           .fixItInsertAfter(tyR->getIdLoc(), genericParamsTextBuf);
       }
 
-      // Clone the existing generic parameter list.
-      ref.GenericParams = cloneGenericParams(TC.Context, ED,
-                                             typeDecl->getGenericParams(),
-                                             outerGenericParams);
+      if (auto proto = dyn_cast<ProtocolDecl>(typeDecl)) {
+        // For a protocol extension, build the generic parameter list.
+        ref.GenericParams = proto->createGenericParams(ED);
+      } else {
+        // Clone the existing generic parameter list.
+        ref.GenericParams = cloneGenericParams(TC.Context, ED,
+                                               typeDecl->getGenericParams(),
+                                               outerGenericParams);
+      }
+
       outerGenericParams = ref.GenericParams;
       continue;
     }
@@ -366,7 +377,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // Check whether we extended something that is not a nominal type.
   Type extendedTy = typeLoc.getType();
   if (!extendedTy->is<NominalType>() && !extendedTy->is<UnboundGenericType>()) {
-    TC.diagnose(ED, diag::non_nominal_extension, false, extendedTy);
+    TC.diagnose(ED, diag::non_nominal_extension, extendedTy);
     ED->setInvalid();
     ED->setExtendedType(ErrorType::get(TC.Context));
     invalidateAllComponents();

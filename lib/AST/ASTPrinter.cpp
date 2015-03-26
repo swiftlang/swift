@@ -293,6 +293,7 @@ public:
   void printPattern(const Pattern *pattern);
 
   void printGenericParams(GenericParamList *params);
+  void printWhereClause(ArrayRef<RequirementRepr> requirements);
 
 private:
   bool shouldPrint(const Decl *D);
@@ -522,38 +523,42 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
     printInherited(GP);
   }
 
-  auto Requirements = Params->getRequirements();
-  if (!Requirements.empty()) {
-    bool IsFirst = true;
-    for (auto &Req : Requirements) {
-      if (Req.isInvalid() ||
-          Req.getKind() == RequirementKind::WitnessMarker)
-        continue;
+  printWhereClause(Params->getRequirements());
+  Printer << ">";
+}
 
-      if (IsFirst) {
-        Printer << " where ";
-        IsFirst = false;
-      } else {
-        Printer << ", ";
-      }
+void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
+  if (requirements.empty())
+    return;
 
-      switch (Req.getKind()) {
-      case RequirementKind::Conformance:
-        printTypeLoc(Req.getSubjectLoc());
-        Printer << " : ";
-        printTypeLoc(Req.getConstraintLoc());
-        break;
-      case RequirementKind::SameType:
-        printTypeLoc(Req.getFirstTypeLoc());
-        Printer << " == ";
-        printTypeLoc(Req.getSecondTypeLoc());
-        break;
-      case RequirementKind::WitnessMarker:
-        llvm_unreachable("Handled above");
-      }
+  bool isFirst = true;
+  for (auto &req : requirements) {
+    if (req.isInvalid() ||
+        req.getKind() == RequirementKind::WitnessMarker)
+      continue;
+
+    if (isFirst) {
+      Printer << " where ";
+      isFirst = false;
+    } else {
+      Printer << ", ";
+    }
+
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+      printTypeLoc(req.getSubjectLoc());
+      Printer << " : ";
+      printTypeLoc(req.getConstraintLoc());
+      break;
+    case RequirementKind::SameType:
+      printTypeLoc(req.getFirstTypeLoc());
+      Printer << " == ";
+      printTypeLoc(req.getSecondTypeLoc());
+      break;
+    case RequirementKind::WitnessMarker:
+      llvm_unreachable("Handled above");
     }
   }
-  Printer << ">";
 }
 
 bool PrintAST::shouldPrint(const Decl *D) {
@@ -861,8 +866,15 @@ void PrintAST::printMembers(DeclRange members, bool needComma) {
 void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
   Printer.printName(decl->getName());
   if (auto gp = decl->getGenericParams()) {
-    if (!isa<ProtocolDecl>(decl))
-      printGenericParams(gp);
+    if (!isa<ProtocolDecl>(decl)) {
+      // For a protocol extension, print only the where clause; the
+      // generic parameter list is implicit. For other nominal types,
+      // print the generic parameters.
+      if (decl->isProtocolOrProtocolExtensionContext())
+        printWhereClause(gp->getRequirements());
+      else
+        printGenericParams(gp);
+    }
   }
 }
 

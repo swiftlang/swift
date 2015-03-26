@@ -101,6 +101,3 @@ protocol P {
   static final func f4() // expected-error {{only classes and class members may be marked with 'final'}}
 }
 
-extension P { // expected-error {{protocol 'P' cannot be extended}}
-}
-

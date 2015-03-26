@@ -322,8 +322,8 @@ static Type getSelfTypeForMaterializeForSetCallback(ASTContext &ctx,
   }
 
   // If we're in a protocol, we want to actually use the Self type.
-  if (auto protocolType = selfType->getAs<ProtocolType>()) {
-    selfType = protocolType->getDecl()->getSelf()->getArchetype();
+  if (selfType->is<ProtocolType>()) {
+    selfType = DC->getProtocolSelf()->getArchetype();
   }
 
   // Use the metatype if this is a static member.

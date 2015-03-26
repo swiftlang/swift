@@ -234,8 +234,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
     // If we found an associated type from within its protocol, resolve it
     // as a dependent member relative to Self if Self is still dependent.
     if (auto proto = dyn_cast<ProtocolDecl>(fromDC)) {
-      auto selfTy
-        = proto->getSelf()->getDeclaredType()->castTo<GenericTypeParamType>();
+      auto selfTy = proto->getProtocolSelf()->getDeclaredType()
+                      ->castTo<GenericTypeParamType>();
       auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
 
       if (baseTy->isDependentType()) {
@@ -247,7 +247,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
       if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
         return substMemberTypeWithBase(fromDC->getParentModule(),
                                        typeDecl,
-                                       fromProto->getSelf()->getArchetype(),
+                                       fromProto->getProtocolSelf()
+                                         ->getArchetype(),
                                        /*isTypeReference=*/true);
       }
     }
@@ -273,9 +274,10 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
       // the member type declaration. Substitute the type we're coming from as
       // the base of the member type to produce the projected type result.
       if (fromType->getAnyNominal() == ownerNominal) {
-        // If we are referring into a protocol, the base type is the 'Self'.
-        if (auto proto = dyn_cast<ProtocolDecl>(ownerNominal)) {
-          auto selfTy = proto->getSelf()->getDeclaredType()
+        // If we are referring into a protocol or extension thereof,
+        // the base type is the 'Self'.
+        if (ownerDC->isProtocolOrProtocolExtensionContext()) {
+          auto selfTy = ownerDC->getProtocolSelf()->getDeclaredType()
                           ->castTo<GenericTypeParamType>();
           fromType = resolver->resolveGenericTypeParamType(selfTy);
         }

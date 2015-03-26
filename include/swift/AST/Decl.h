@@ -3432,9 +3432,6 @@ public:
     return SourceRange(ProtocolLoc, getBraces().End);
   }
 
-  /// \brief Retrieve the generic parameter 'Self'.
-  GenericTypeParamDecl *getSelf() const;
-
   /// True if this protocol can only be conformed to by class types.
   bool requiresClass() {
     if (ProtocolDeclBits.RequiresClassValid)
@@ -3514,6 +3511,12 @@ public:
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
+
+  /// Create the implicit generic parameter list for a protocol or
+  /// extension thereof.
+  ///
+  /// FIXME: protocol extensions will introduce a where clause here as well.
+  GenericParamList *createGenericParams(DeclContext *dc);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

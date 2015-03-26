@@ -1730,21 +1730,7 @@ void NominalTypeDecl::computeType() {
   // Don't add them again.
   if (!getGenericParams()) {
     if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-      // The generic parameter 'Self'.
-      auto selfId = ctx.Id_Self;
-      auto selfDecl = new (ctx) GenericTypeParamDecl(proto, selfId,
-                                                     proto->getLoc(), 0, 0);
-      auto protoRef = new (ctx) SimpleIdentTypeRepr(proto->getLoc(),
-                                                    proto->getName());
-      protoRef->setValue(proto);
-      TypeLoc selfInherited[1] = { TypeLoc(protoRef) };
-      selfInherited[0].setType(DeclaredTy);
-      selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
-      selfDecl->setImplicit();
-      
-      // The generic parameter list itself.
-      GenericParams = GenericParamList::create(ctx, SourceLoc(), selfDecl,
-                                               SourceLoc());
+      GenericParams = proto->createGenericParams(proto);
     }
   }
 }
@@ -2249,7 +2235,7 @@ bool ProtocolDecl::existentialConformsToSelfSlow(LazyResolver *resolver) {
     resolver->resolveDeclSignature(this);
 
   // Check whether this protocol conforms to itself.
-  auto selfType = getSelf()->getArchetype();
+  auto selfType = getProtocolSelf()->getArchetype();
   for (auto member : getMembers()) {
     if (auto vd = dyn_cast<ValueDecl>(member)) {
       if (resolver && !vd->hasType())
@@ -2309,10 +2295,6 @@ bool ProtocolDecl::existentialConformsToSelfSlow(LazyResolver *resolver) {
   return true;
 }
 
-GenericTypeParamDecl *ProtocolDecl::getSelf() const {
-  return getGenericParams()->getParams().front();
-}
-
 StringRef ProtocolDecl::getObjCRuntimeName(
                           llvm::SmallVectorImpl<char> &buffer) const {
   // If there is an 'objc' attribute with a name, use that name.
@@ -2323,6 +2305,28 @@ StringRef ProtocolDecl::getObjCRuntimeName(
 
   // Produce the mangled name for this protocol.
   return mangleObjCRuntimeName(this, buffer);
+}
+
+GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
+  SourceLoc loc;
+  if (auto ext = dyn_cast<ExtensionDecl>(dc))
+    loc = ext->getLoc();
+  else
+    loc = getLoc();
+
+  // The generic parameter 'Self'.
+  auto &ctx = getASTContext();
+  auto selfId = ctx.Id_Self;
+  auto selfDecl = new (ctx) GenericTypeParamDecl(dc, selfId, loc, 0, 0);
+  auto protoRef = new (ctx) SimpleIdentTypeRepr(loc, getName());
+  protoRef->setValue(this);
+  TypeLoc selfInherited[1] = { TypeLoc(protoRef) };
+  selfInherited[0].setType(ProtocolType::get(this, ctx));
+  selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
+  selfDecl->setImplicit();
+
+  // The generic parameter list itself.
+  return GenericParamList::create(ctx, SourceLoc(), selfDecl, SourceLoc());
 }
 
 FuncDecl *AbstractStorageDecl::getAccessorFunction(AccessorKind kind) const {
@@ -2982,7 +2986,7 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
     isMutating = true;
   }
 
-  
+
   if (outerGenericParams)
     *outerGenericParams = nullptr;
   
@@ -2991,17 +2995,13 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
     // For a protocol, the type of 'self' is the parameter type 'Self', not
     // the protocol itself.
     selfTy = containerTy;
-    if (auto proto = containerTy->getAs<ProtocolType>()) {
-      auto self = proto->getDecl()->getSelf();
+    if (containerTy->is<ProtocolType>()) {
+      auto self = dc->getProtocolSelf();
       assert(self && "Missing 'Self' type in protocol");
       if (wantInterfaceType)
         selfTy = self->getDeclaredType();
       else
         selfTy = self->getArchetype();
-
-      // FIXME: Hack for attempts to extend a protocol
-      if (isa<ExtensionDecl>(dc))
-        return ErrorType::get(theMethod->getASTContext());
     }
   }
   
@@ -3355,7 +3355,8 @@ bool FuncDecl::isUnaryOperator() const {
   if (!isOperator())
     return false;
   
-  unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
+  unsigned opArgIndex
+    = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
   
   auto *argTuple = dyn_cast<TuplePattern>(getBodyParamPatterns()[opArgIndex]);
   if (!argTuple)
@@ -3368,7 +3369,8 @@ bool FuncDecl::isBinaryOperator() const {
   if (!isOperator())
     return false;
   
-  unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
+  unsigned opArgIndex
+    = getDeclContext()->isProtocolOrProtocolExtensionContext() ? 1 : 0;
   
   auto *argTuple = dyn_cast<TuplePattern>(getBodyParamPatterns()[opArgIndex]);
   if (!argTuple)
@@ -3457,8 +3459,9 @@ DynamicSelfType *FuncDecl::getDynamicSelf() const {
     return nullptr;
 
   auto extType = getExtensionType();
-  if (auto protoTy = extType->getAs<ProtocolType>())
-    return DynamicSelfType::get(protoTy->getDecl()->getSelf()->getArchetype(),
+  if (extType->is<ProtocolType>())
+    return DynamicSelfType::get(getDeclContext()->getProtocolSelf()
+                                  ->getArchetype(),
                                 getASTContext());
 
   return DynamicSelfType::get(extType, getASTContext());
@@ -3469,8 +3472,9 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
     return nullptr;
 
   auto extType = getDeclContext()->getDeclaredInterfaceType();
-  if (auto protoTy = extType->getAs<ProtocolType>())
-    return DynamicSelfType::get(protoTy->getDecl()->getSelf()->getDeclaredType(),
+  if (extType->is<ProtocolType>())
+    return DynamicSelfType::get(getDeclContext()->getProtocolSelf()
+                                  ->getDeclaredType(),
                                 getASTContext());
 
   return DynamicSelfType::get(extType, getASTContext());

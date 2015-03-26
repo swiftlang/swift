@@ -660,10 +660,15 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
 }
 
 bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
+  ProtocolDecl *RootProtocol = dyn_cast<ProtocolDecl>(GenericParam->getDeclContext());
+  if (!RootProtocol) {
+    if (auto Ext = dyn_cast<ExtensionDecl>(GenericParam->getDeclContext()))
+      RootProtocol = dyn_cast_or_null<ProtocolDecl>(Ext->getExtendedType()->getAnyNominal());
+  }
   PotentialArchetype *PA
     = addGenericParameter(
         GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
-        dyn_cast<ProtocolDecl>(GenericParam->getDeclContext()),
+        RootProtocol,
         GenericParam->getName());
   
   if (!PA)

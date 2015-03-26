@@ -292,7 +292,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       assert(!fd->isAccessor());
       
       // FIXME: Thunks for instance methods of generics.
-      assert(!(fd->isInstanceMember() && isa<ProtocolDecl>(fd->getDeclContext()))
+      assert(!(fd->isInstanceMember() &&
+               isa<ProtocolDecl>(fd->getDeclContext()))
              && "currying generic method not yet supported");
 
       // FIXME: Curry thunks for generic methods don't work right yet, so skip

@@ -1396,8 +1396,9 @@ bool DeclContext::lookupQualified(Type type,
             stack.push_back(superclassDecl);
     }
 
-    // If we're not looking at a protocol and we don't we're not supposed to
-    // visit the protocols that this type conforms to, skip the next step.
+    // If we're not looking at a protocol and we're not supposed to
+    // visit the protocols that this type conforms to, skip the next
+    // step.
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
 

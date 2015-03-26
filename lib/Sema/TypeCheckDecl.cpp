@@ -1778,8 +1778,9 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
   }
 
   if (minAccess.hasValue()) {
-    bool isExplicit = owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
-                      isa<ProtocolDecl>(owner->getDeclContext());
+    bool isExplicit =
+      owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
+      owner->getDeclContext()->isProtocolOrProtocolExtensionContext();
     auto diag = TC.diagnose(owner, diag::generic_param_access,
                             owner->getDescriptiveKind(), isExplicit,
                             owner->getFormalAccess(), minAccess.getValue(),
@@ -1871,7 +1872,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                  const TypeRepr *complainRepr) {
         bool isExplicit =
           anyVar->getAttrs().hasAttribute<AccessibilityAttr>() ||
-          isa<ProtocolDecl>(anyVar->getDeclContext());
+          anyVar->getDeclContext()->isProtocolOrProtocolExtensionContext();
         auto diag = TC.diagnose(P->getLoc(), diag::pattern_type_access,
                                 anyVar->isLet(),
                                 isTypeContext,
@@ -2071,8 +2072,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     });
 
     if (minAccess) {
-      bool isExplicit = SD->getAttrs().hasAttribute<AccessibilityAttr>() ||
-                        isa<ProtocolDecl>(SD->getDeclContext());
+      bool isExplicit =
+        SD->getAttrs().hasAttribute<AccessibilityAttr>() ||
+        SD->getDeclContext()->isProtocolOrProtocolExtensionContext();
       auto diag = TC.diagnose(SD, diag::subscript_type_access,
                               isExplicit,
                               SD->getFormalAccess(),
@@ -2135,8 +2137,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     }
 
     if (minAccess) {
-      bool isExplicit = fn->getAttrs().hasAttribute<AccessibilityAttr>() ||
-                        isa<ProtocolDecl>(D->getDeclContext());
+      bool isExplicit =
+        fn->getAttrs().hasAttribute<AccessibilityAttr>() ||
+        D->getDeclContext()->isProtocolOrProtocolExtensionContext();
       auto diag = TC.diagnose(fn, diag::function_type_access,
                               isExplicit,
                               fn->getFormalAccess(),
@@ -2601,7 +2604,7 @@ public:
     }
 
     if ((IsSecondPass && !IsFirstPass) ||
-        isa<ProtocolDecl>(decl->getDeclContext())) {
+        decl->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
       TC.checkUnsupportedProtocolType(decl);
     }
   }
@@ -5086,15 +5089,12 @@ public:
     if (!IsSecondPass) {
       CanType ExtendedTy = DeclContext::getExtendedType(ED);
 
-      if (!isa<EnumType>(ExtendedTy) &&
-          !isa<StructType>(ExtendedTy) &&
-          !isa<ClassType>(ExtendedTy) &&
-          !isa<BoundGenericEnumType>(ExtendedTy) &&
-          !isa<BoundGenericStructType>(ExtendedTy) &&
-          !isa<BoundGenericClassType>(ExtendedTy) &&
+      if (!isa<NominalType>(ExtendedTy) &&
+          !isa<BoundGenericType>(ExtendedTy) &&
           !isa<ErrorType>(ExtendedTy)) {
+        // FIXME: Redundant diagnostic test here?
         TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
-                    isa<ProtocolType>(ExtendedTy), ExtendedTy);
+                    ExtendedTy);
         // FIXME: It would be nice to point out where we found the named type
         // declaration, if any.
         ED->setInvalid();
@@ -5586,7 +5586,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     // Set the underlying type of each of the associated types to the
     // appropriate archetype.
-    auto selfDecl = proto->getSelf();
+    auto selfDecl = proto->getProtocolSelf();
     ArchetypeType *selfArchetype = builder.getArchetype(selfDecl);
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -5905,14 +5905,19 @@ static Type checkExtensionGenericParams(
   TypeLoc extendedTypeInfer;
   auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) -> bool {
     if (extendedTypeInfer.isNull()) {
-      SmallVector<Type, 2> genericArgs;
-      for (auto gp : *genericParams) {
-        genericArgs.push_back(gp->getDeclaredInterfaceType());
+      if (isa<ProtocolDecl>(nominal)) {
+        // Simple case: protocols don't form bound generic types.
+        extendedTypeInfer.setType(nominal->getDeclaredInterfaceType());
+      } else {
+        SmallVector<Type, 2> genericArgs;
+        for (auto gp : *genericParams) {
+          genericArgs.push_back(gp->getDeclaredInterfaceType());
+        }
+
+        extendedTypeInfer.setType(BoundGenericType::get(nominal,
+                                                        parentType,
+                                                        genericArgs));
       }
-      
-      extendedTypeInfer.setType(BoundGenericType::get(nominal, 
-                                                      parentType,
-                                                      genericArgs));
     }
     
     return builder.inferRequirements(extendedTypeInfer);
@@ -5945,6 +5950,9 @@ static Type checkExtensionGenericParams(
   checkGenericParamList(builder, genericParams, tc, ext->getModuleContext());
   inferExtendedTypeReqs(builder);
   finalizeGenericParamList(builder, genericParams, ext, tc);
+
+  if (isa<ProtocolDecl>(nominal))
+    return nominal->getDeclaredType();
 
   // Compute the final extended type.
   SmallVector<Type, 2> genericArgs;
@@ -5988,6 +5996,23 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     // Check generic parameters.
     GenericSignature *sig = nullptr;
     extendedType = checkExtensionGenericParams(*this, ext, 
+                                               ext->getRefComponents(),
+                                               extendedType, sig);
+    if (!extendedType) {
+      ext->setInvalid();
+      ext->setExtendedType(ErrorType::get(Context));
+      return;
+    }
+
+    ext->setGenericSignature(sig);
+    ext->setExtendedType(extendedType);
+    return;
+  }
+
+  // If we're extending a protocol, check the generic parameters.
+  if (extendedType->is<ProtocolType>()) {
+    GenericSignature *sig = nullptr;
+    extendedType = checkExtensionGenericParams(*this, ext,
                                                ext->getRefComponents(),
                                                extendedType, sig);
     if (!extendedType) {

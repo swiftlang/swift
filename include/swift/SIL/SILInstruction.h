@@ -2497,14 +2497,16 @@ public:
 
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
-    return cast<ProtocolDecl>(getMember().getDecl()->getDeclContext());
+    return getMember().getDecl()->getDeclContext()
+             ->isProtocolOrProtocolExtensionContext();
   }
   ProtocolConformance *getConformance() const { return Conformance; }
 
   /// Get a representation of the lookup type as a substitution of the
   /// protocol's Self archetype.
   Substitution getSelfSubstitution() const {
-    return Substitution{getLookupProtocol()->getSelf()->getArchetype(),
+    auto memberDC = getMember().getDecl()->getDeclContext();
+    return Substitution{memberDC->getProtocolSelf()->getArchetype(),
                         getLookupType(),
                         Conformance};
   }

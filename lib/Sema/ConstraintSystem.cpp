@@ -943,7 +943,8 @@ void ConstraintSystem::openGeneric(
       auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
       if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
         if (!skipProtocolSelfConstraint ||
-            !(isa<ProtocolDecl>(dc) || isa<ProtocolDecl>(dc->getParent())) ||
+            !(dc->isProtocolOrProtocolExtensionContext() ||
+              dc->getParent()->isProtocolOrProtocolExtensionContext()) ||
             !isProtocolSelfType(req.getFirstType())) {
           addConstraint(ConstraintKind::ConformsTo, subjectTy, proto,
                         locatorPtr);
@@ -1122,9 +1123,9 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       // Determine the object type of 'self'.
       auto nominal = value->getDeclContext()->getDeclaredTypeOfContext()
                        ->getAnyNominal();
-      if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+      if (dc->isProtocolOrProtocolExtensionContext()) {
         // Retrieve the type variable for 'Self'.
-        selfTy = replacements[protocol->getSelf()->getDeclaredType()
+        selfTy = replacements[dc->getProtocolSelf()->getDeclaredType()
                                 ->getCanonicalType()];
       } else {
         // Open the nominal type.
@@ -1182,7 +1183,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // Constrain the 'self' object type.
   auto openedFnType = openedType->castTo<FunctionType>();
   Type selfObjTy = openedFnType->getInput()->getRValueInstanceType();
-  if (isa<ProtocolDecl>(value->getDeclContext())) {
+  if (value->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.

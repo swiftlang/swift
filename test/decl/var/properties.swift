@@ -417,9 +417,9 @@ protocol ProtocolWithExtension1 {
   var foo: Int { get }
   static var fooStatic : Int { get }
 }
-extension ProtocolWithExtension1 { // expected-error {{protocol 'ProtocolWithExtension1' cannot be extended}}
-  var fooExt: Int // intentionally not diagnosed
-  static var fooExtStatic = 4
+extension ProtocolWithExtension1 {
+  var fooExt: Int // expected-error{{extensions may not contain stored properties}}
+  static var fooExtStatic = 4 // expected-error{{static stored properties not yet supported in generic types}}
 }
 
 func getS() -> S {

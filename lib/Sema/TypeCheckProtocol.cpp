@@ -2352,7 +2352,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDefault(
   // Create a set of type substitutions for all known associated type.
   // FIXME: Base this on dependent types rather than archetypes?
   TypeSubstitutionMap substitutions;
-  substitutions[Proto->getSelf()->getArchetype()] = Adoptee;
+  substitutions[Proto->getProtocolSelf()->getArchetype()] = Adoptee;
   for (auto member : Proto->getMembers()) {
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       if (Conformance->hasTypeWitness(assocType))

@@ -1753,11 +1753,12 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
           conformanceType = metatypeType->getInstanceType().getPointer();
           
           if (auto protocolType = dyn_cast<ProtocolType>(conformanceType)) {
-            conformanceType = protocolType->getDecl()->getSelf()->getArchetype();
+            conformanceType = protocolType->getDecl()->getProtocolSelf()
+                                ->getArchetype();
           }
         }
         
-        if (auto conformedArchetype = dyn_cast<ArchetypeType>(conformanceType)) {
+        if (auto conformedArchetype = dyn_cast<ArchetypeType>(conformanceType)){
           return conformedArchetype->getNestedType(Name);
         }
       }
@@ -2223,9 +2224,9 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
     baseTy = metaBase->getInstanceType()->getRValueType();
   }
 
-  // If the member is part of a protocol, we need to substitute in the
-  // type of Self.
-  if (auto memberProtocol = dyn_cast<ProtocolDecl>(memberDC)) {
+  // If the member is part of a protocol or extension thereof, we need
+  // to substitute in the type of Self.
+  if (memberDC->isProtocolOrProtocolExtensionContext()) {
     // We only substitute into archetypes for now.
     // FIXME: This seems like an odd restriction.
     if (!baseTy->is<ArchetypeType>())
@@ -2234,8 +2235,8 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     TypeSubstitutionMap substitutions;
-    substitutions[memberProtocol->getSelf()->getArchetype()] = baseTy;
-    substitutions[memberProtocol->getSelf()->getDeclaredType()
+    substitutions[memberDC->getProtocolSelf()->getArchetype()] = baseTy;
+    substitutions[memberDC->getProtocolSelf()->getDeclaredType()
                     ->getCanonicalType()->castTo<GenericTypeParamType>()]
       = baseTy;
     return memberType.subst(module, substitutions, /*ignoreMissing=*/false,

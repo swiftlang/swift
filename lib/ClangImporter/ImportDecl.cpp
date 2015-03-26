@@ -63,10 +63,11 @@ namespace inferred_attributes {
 
 /// \brief Retrieve the type of 'self' for the given context.
 static Type getSelfTypeForContext(DeclContext *dc) {
-  // For a protocol, the type is 'Self'.
-  if (auto proto = dyn_cast<ProtocolDecl>(dc))
-    return proto->getSelf()->getArchetype();
-
+  // For a protocol or extension thereof, the type is 'Self'.
+  // FIXME: Weird that we're producing an archetype for protocol Self,
+  // but the declared type of the context in non-protocol cases.
+  if (dc->isProtocolOrProtocolExtensionContext())
+    return dc->getProtocolSelf()->getArchetype();
   return dc->getDeclaredTypeOfContext();
 }
 
@@ -3330,17 +3331,18 @@ namespace {
       return cast<NamedPattern>(pattern)->getDecl();
     }
 
-    /// Retrieves the type and interface type for a protocol method given
-    /// the computed type of that method.
-    std::pair<Type, Type> getProtocolMethodType(ProtocolDecl *proto,
+    /// Retrieves the type and interface type for a protocol or
+    /// protocol extension method given the computed type of that
+    /// method.
+    std::pair<Type, Type> getProtocolMethodType(DeclContext *dc,
                                                 AnyFunctionType *fnType) {
       Type type = PolymorphicFunctionType::get(fnType->getInput(),
                                                fnType->getResult(),
-                                               proto->getGenericParams());
+                                               dc->getGenericParamsOfContext());
 
       // Figure out the curried 'self' type for the interface type. It's always
       // either the generic parameter type 'Self' or a metatype thereof.
-      auto selfDecl = proto->getSelf();
+      auto selfDecl = dc->getProtocolSelf();
       auto selfTy = selfDecl->getDeclaredType();
       auto interfaceInputTy = selfTy;
       auto inputTy = fnType->getInput();
@@ -3362,7 +3364,7 @@ namespace {
         });
 
       Type interfaceType = GenericFunctionType::get(
-                             proto->getGenericSignature(),
+                             dc->getGenericSignatureOfContext(),
                              interfaceInputTy,
                              interfaceResultTy,
                              AnyFunctionType::ExtInfo());
@@ -3401,9 +3403,9 @@ namespace {
 
       // If we're in a protocol, the getter thunk will be polymorphic.
       Type interfaceType;
-      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+      if (dc->isProtocolOrProtocolExtensionContext()) {
         std::tie(getterType, interfaceType)
-          = getProtocolMethodType(proto, getterType->castTo<AnyFunctionType>());
+          = getProtocolMethodType(dc, getterType->castTo<AnyFunctionType>());
       }
 
       // Create the getter thunk.
@@ -3475,11 +3477,12 @@ namespace {
                        setterType);
       }
 
-      // If we're in a protocol, the setter thunk will be polymorphic.
+      // If we're in a protocol or extension thereof, the setter thunk
+      // will be polymorphic.
       Type interfaceType;
-      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+      if (dc->isProtocolOrProtocolExtensionContext()) {
         std::tie(setterType, interfaceType)
-          = getProtocolMethodType(proto, setterType->castTo<AnyFunctionType>());
+          = getProtocolMethodType(dc, setterType->castTo<AnyFunctionType>());
       }
 
       // Create the setter thunk.
@@ -3513,7 +3516,7 @@ namespace {
 
       // If the original declaration was implicit, we may want to change that.
       if (original->isImplicit() && !redecl->isImplicit() &&
-          !isa<ProtocolDecl>(redecl->getDeclContext()))
+          !redecl->getDeclContext()->isProtocolOrProtocolExtensionContext())
         original->setImplicit(false);
 
       // The only other transformation we know how to do safely is add a
@@ -4596,7 +4599,7 @@ namespace {
 
       // Create the archetype for the implicit 'Self'.
       auto selfId = Impl.SwiftContext.Id_Self;
-      auto selfDecl = result->getSelf();
+      auto selfDecl = result->getProtocolSelf();
       ArchetypeType *selfArchetype =
                            ArchetypeType::getNew(Impl.SwiftContext, nullptr,
                                                  result, selfId,

@@ -65,7 +65,6 @@ extension C1 {} // no-error
 extension C1.NestedStruct {} // no-error
 
 protocol P1 {}
-extension P1 {} // expected-error {{protocol 'P1' cannot be extended}}
 
 protocol P2 {}
 

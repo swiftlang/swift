@@ -44,6 +44,7 @@ namespace swift {
   class LazyResolver;
   class LazyMemberLoader;
   class GenericSignature;
+  class GenericTypeParamDecl;
   class GenericTypeParamType;
   class ProtocolDecl;
   class Requirement;
@@ -241,6 +242,16 @@ public:
   /// If this DeclContext is a class, or an extension on a class, return the
   /// ClassDecl, otherwise return null.
   ClassDecl *isClassOrClassExtensionContext() const;
+
+  /// If this DeclContext is a protocol, or an extension on a
+  /// protocol, return the ProtocolDecl, otherwise return null.
+  ProtocolDecl *isProtocolOrProtocolExtensionContext() const;
+
+  /// \brief Retrieve the generic parameter 'Self' from a protocol or
+  /// protocol extension.
+  ///
+  /// Only valid if \c isProtocolOrProtocolExtensionContext().
+  GenericTypeParamDecl *getProtocolSelf() const;
 
   /// getDeclaredTypeOfContext - For a type context, retrieves the declared
   /// type of the context. Returns a null type for non-type contexts.

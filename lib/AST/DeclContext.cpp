@@ -57,6 +57,16 @@ ClassDecl *DeclContext::isClassOrClassExtensionContext() const {
            isNominalTypeOrNominalTypeExtensionContext());
 }
 
+ProtocolDecl *DeclContext::isProtocolOrProtocolExtensionContext() const {
+  return dyn_cast_or_null<ProtocolDecl>(
+           isNominalTypeOrNominalTypeExtensionContext());
+}
+
+GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
+  assert(isProtocolOrProtocolExtensionContext() && "not a protocol");
+  return getGenericParamsOfContext()->getParams().front();
+}
+
 Type DeclContext::getDeclaredTypeOfContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:

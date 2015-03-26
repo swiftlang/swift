@@ -120,7 +120,7 @@ static Type getExistentialArchetype(SILValue existential) {
   CanType ty = existential.getType().getSwiftRValueType();
   if (ty->is<ArchetypeType>())
     return ty;
-  return cast<ProtocolType>(ty)->getDecl()->getSelf()->getArchetype();
+  return cast<ProtocolType>(ty)->getDecl()->getProtocolSelf()->getArchetype();
 }
 
 /// Retrieve the type to use for a method found via dynamic lookup.
