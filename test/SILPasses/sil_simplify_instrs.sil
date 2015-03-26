@@ -176,3 +176,47 @@ bb2:
 bb3(%11 : $Ternary):
   return %11 : $Ternary
 }
+
+// xor(xor (a, b), b) -> a
+// CHECK-LABEL: sil @simplify_xor1
+// CHECK-NEXT: bb0
+// CHECK-NEXT: %[[ID:[0-9+]]] = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT: return %[[ID]] : $Builtin.Int32
+sil @simplify_xor1 : $@thin () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  %1 = integer_literal $Builtin.Int32, 21
+  %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  %3 = builtin "xor_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  return %3 : $Builtin.Int32
+}
+
+// xor(xor (a, b), a) -> b
+// CHECK-LABEL: sil @simplify_xor2
+// CHECK-NEXT: bb0
+// CHECK-NEXT: %[[ID:[0-9+]]] = integer_literal $Builtin.Int32, 21
+// CHECK-NEXT: return %[[ID]] : $Builtin.Int32
+sil @simplify_xor2 : $@thin () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  %1 = integer_literal $Builtin.Int32, 21
+  %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  %3 = builtin "xor_Int32"(%2 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int32
+  return %3 : $Builtin.Int32
+}
+
+
+// CHECK-LABEL: sil @simplify_xor3
+// CHECK-NEXT: bb0
+// CHECK-NEXT: %[[ID:[0-9+]]] = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT: return %[[ID]] : $Builtin.Int32
+// xor(b, xor (a, b)) -> a
+sil @simplify_xor3 : $@thin () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  %1 = integer_literal $Builtin.Int32, 21
+  %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  %3 = builtin "xor_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  return %3 : $Builtin.Int32
+}
+

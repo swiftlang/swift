@@ -488,6 +488,29 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
     }
     return SILValue();
   }
+
+  case BuiltinValueKind::Xor: {
+    SILValue val1, val2, val3;
+    // xor (xor (val1, val2), val3) == val1
+    if (BI->getNumOperands() == 2 &&
+        (match(BI,
+               m_BuiltinInst(BuiltinValueKind::Xor,
+                             m_BuiltinInst(BuiltinValueKind::Xor,
+                                           m_SILValue(val1), m_SILValue(val2)),
+                             m_SILValue(val3))) ||
+         match(BI, m_BuiltinInst(BuiltinValueKind::Xor, m_SILValue(val3),
+                                 m_BuiltinInst(BuiltinValueKind::Xor,
+                                               m_SILValue(val1),
+                                               m_SILValue(val2)))))) {
+
+      if (val2 == val3)
+        return val1.getDef();
+      if (val1 == val3)
+        return val2.getDef();
+      if (val1 == val2)
+        return val3.getDef();
+    }
+  }
   }
   return SILValue();
 }
