@@ -175,20 +175,31 @@ BuiltinInst::BuiltinInst(SILLocation Loc,
          sizeof(Substitution) * Subs.size());
 }
 
+ApplyInstBase::ApplyInstBase(ValueKind Kind, SILLocation Loc, SILValue Callee,
+    SILType SubstCalleeType,
+    ArrayRef<Substitution> Subs,
+    ArrayRef<SILValue> Args,
+    SILType Ty)
+  : SILInstruction(Kind, Loc, Ty),
+    SubstCalleeType(SubstCalleeType),
+    NumSubstitutions(Subs.size()),
+    Operands(this, Args, Callee)
+{
+  static_assert(IsTriviallyCopyable<Substitution>::value,
+                "assuming Substitution is trivial");
+  memcpy(getSubstitutionsStorage(), Subs.begin(),
+         sizeof(Substitution) * Subs.size());
+}
+
+
 ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy,
                      SILType Result,
                      ArrayRef<Substitution> Subs,
                      ArrayRef<SILValue> Args)
-  : SILInstruction(ValueKind::ApplyInst, Loc, Result),
-    NumSubstitutions(Subs.size()),
-    SubstCalleeType(SubstCalleeTy),
-    Operands(this, Args, Callee)
+  : ApplyInstBase(ValueKind::ApplyInst, Loc, Callee, SubstCalleeTy,
+                  Subs, Args, Result)
 {
-  static_assert(IsTriviallyCopyable<Substitution>::value,
-                "assuming Substitution is trivially copyable");
-  memcpy(getSubstitutionsStorage(), Subs.begin(),
-         sizeof(Substitution) * Subs.size());
 }
 
 ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
@@ -219,15 +230,9 @@ PartialApplyInst::PartialApplyInst(SILLocation Loc, SILValue Callee,
                                    ArrayRef<SILValue> Args, SILType ClosureType)
 // FIXME: the callee should have a lowered SIL function type, and PartialApplyInst
 // should derive the type of its result by partially applying the callee's type.
-  : SILInstruction(ValueKind::PartialApplyInst, Loc, ClosureType),
-    SubstCalleeType(SubstCalleeTy),
-    NumSubstitutions(Subs.size()),
-    Operands(this, Args, Callee)
+  : ApplyInstBase(ValueKind::PartialApplyInst, Loc, Callee, SubstCalleeTy,
+                  Subs, Args, ClosureType)
 {
-  static_assert(IsTriviallyCopyable<Substitution>::value,
-                "assuming Substitution is trivial");
-  memcpy(getSubstitutionsStorage(), Subs.begin(),
-         sizeof(Substitution) * Subs.size());
 }
 
 PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,

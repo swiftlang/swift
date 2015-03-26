@@ -435,17 +435,18 @@ public:
 };
 
 /// ApplyInst - Represents the full application of a function value.
-class ApplyInst : public SILInstruction {
+class ApplyInstBase : public SILInstruction {
+protected:
   enum {
     Callee
   };
 
+  /// The type of the callee with our substitutions applied.
+  SILType SubstCalleeType;
+
   /// The number of tail-allocated substitutions, allocated after the operand
   /// list's tail allocation.
   unsigned NumSubstitutions;
-
-  /// The type of the callee with our substitutions applied.
-  SILType SubstCalleeType;
 
   /// The fixed operand is the callee;  the rest are arguments.
   TailAllocatedOperandList<1> Operands;
@@ -453,24 +454,18 @@ class ApplyInst : public SILInstruction {
   Substitution *getSubstitutionsStorage() {
     return reinterpret_cast<Substitution*>(Operands.asArray().end());
   }
+
   const Substitution *getSubstitutionsStorage() const {
     return reinterpret_cast<const Substitution*>(Operands.asArray().end());
   }
 
-  ApplyInst(SILLocation Loc, SILValue Callee,
-            SILType SubstCalleeType,
-            SILType ReturnType,
-            ArrayRef<Substitution> Substitutions,
-            ArrayRef<SILValue> Args);
+  ApplyInstBase(ValueKind Kind, SILLocation Loc, SILValue Callee,
+                SILType SubstCalleeType,
+                ArrayRef<Substitution> Substitutions,
+                ArrayRef<SILValue> Args,
+                SILType Ty);
 
 public:
-  static ApplyInst *create(SILLocation Loc, SILValue Callee,
-                           SILType SubstCalleeType,
-                           SILType ReturnType,
-                           ArrayRef<Substitution> Substitutions,
-                           ArrayRef<SILValue> Args,
-                           SILFunction &F);
-
   // The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return 1; }
 
@@ -501,6 +496,7 @@ public:
   MutableArrayRef<Substitution> getSubstitutions() {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
+
   ArrayRef<Substitution> getSubstitutions() const {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
@@ -509,6 +505,7 @@ public:
   MutableArrayRef<Operand> getArgumentOperands() {
     return Operands.getDynamicAsArray();
   }
+
   ArrayRef<Operand> getArgumentOperands() const {
     return Operands.getDynamicAsArray();
   }
@@ -518,12 +515,12 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
+  /// Returns the number of arguments for this partial apply.
+  unsigned getNumArguments() const { return getArguments().size(); }
+
   Operand &getArgumentRef(unsigned i) {
     return Operands.getDynamicAsArray()[i];
   }
-
-  /// The number of arguments passed to the ApplyInst.
-  unsigned getNumArguments() const { return getArguments().size(); }
 
   /// Return the ith argument passed to this instruction.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
@@ -532,6 +529,55 @@ public:
   void setArgument(unsigned i, SILValue V) {
     return getArgumentOperands()[i].set(V);
   }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  /// Return the ast level function type of this partial apply.
+  CanSILFunctionType getFunctionType() const {
+    return getType().castTo<SILFunctionType>();
+  }
+
+  bool hasIndirectResult() const {
+    return getSubstCalleeType()->hasIndirectResult();
+  }
+
+  SILValue getIndirectResult() const {
+    assert(hasIndirectResult() && "apply inst does not have indirect result!");
+    return getArguments().front();
+  }
+
+  OperandValueArrayRef getArgumentsWithoutIndirectResult() const {
+    if (hasIndirectResult())
+      return getArguments().slice(1);
+    return getArguments();
+  }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::ApplyInst ||
+           V->getKind() == ValueKind::PartialApplyInst;
+  }
+};
+
+/// ApplyInst - Represents the full application of a function value.
+class ApplyInst : public ApplyInstBase {
+  ApplyInst(SILLocation Loc, SILValue Callee,
+            SILType SubstCalleeType,
+            SILType ReturnType,
+            ArrayRef<Substitution> Substitutions,
+            ArrayRef<SILValue> Args);
+
+public:
+  static ApplyInst *create(SILLocation Loc, SILValue Callee,
+                           SILType SubstCalleeType,
+                           SILType ReturnType,
+                           ArrayRef<Substitution> Substitutions,
+                           ArrayRef<SILValue> Args,
+                           SILFunction &F);
 
   /// Returns true if this apply has a self argument.
   bool hasSelfArgument() const {
@@ -582,6 +628,7 @@ public:
                                                          ops.size()-1);
     return OperandValueArrayRef(opsWithoutSelf);
   }
+
   Substitution getSelfSubstitution() const {
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
@@ -589,6 +636,7 @@ public:
            "substitutions.");
     return getSubstitutions()[0];
   }
+
   ArrayRef<Substitution> getSubstitutionsWithoutSelfSubstitution() const {
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
@@ -612,9 +660,6 @@ public:
     return getArguments();
   }
 
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
@@ -627,27 +672,7 @@ public:
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
 /// application of a function value.
-class PartialApplyInst : public SILInstruction {
-  enum {
-    Callee
-  };
-
-  SILType SubstCalleeType;
-
-  /// The number of tail-allocated substitutions, allocated after the operand
-  /// list's tail allocation.
-  unsigned NumSubstitutions;
-
-  /// The fixed operand is the callee;  the rest are arguments.
-  TailAllocatedOperandList<1> Operands;
-
-  Substitution *getSubstitutionsStorage() {
-    return reinterpret_cast<Substitution*>(Operands.asArray().end());
-  }
-  const Substitution *getSubstitutionsStorage() const {
-    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
-  }
-
+class PartialApplyInst : public ApplyInstBase {
   PartialApplyInst(SILLocation Loc, SILValue Callee,
                    SILType SubstCalleeType,
                    ArrayRef<Substitution> Substitutions,
@@ -660,56 +685,6 @@ public:
                                   ArrayRef<SILValue> Args,
                                   SILType ClosureType,
                                   SILFunction &F);
-
-  SILValue getCallee() const { return Operands[Callee].get(); }
-
-  // Get the type of the callee without the applied substitutions.
-  CanSILFunctionType getOrigCalleeType() const {
-    return getCallee().getType().castTo<SILFunctionType>();
-  }
-
-  // Get the type of the callee with the applied substitutions.
-  CanSILFunctionType getSubstCalleeType() const {
-    return SubstCalleeType.castTo<SILFunctionType>();
-  }
-  SILType getSubstCalleeSILType() const {
-    return SubstCalleeType;
-  }
-
-  /// True if this application has generic substitutions.
-  bool hasSubstitutions() const { return NumSubstitutions != 0; }
-
-  /// The substitutions used to bind the generic arguments of this function.
-  MutableArrayRef<Substitution> getSubstitutions() {
-    return {getSubstitutionsStorage(), NumSubstitutions};
-  }
-  ArrayRef<Substitution> getSubstitutions() const {
-    return {getSubstitutionsStorage(), NumSubstitutions};
-  }
-
-  /// The arguments passed to this instruction.
-  MutableArrayRef<Operand> getArgumentOperands() {
-    return Operands.getDynamicAsArray();
-  }
-
-  /// The arguments passed to this instruction.
-  OperandValueArrayRef getArguments() const {
-    return Operands.getDynamicValuesAsArray();
-  }
-
-  /// Returns the number of arguments for this partial apply.
-  unsigned getNumArguments() const { return getArguments().size(); }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  /// Return the ast level function type of this partial apply.
-  CanSILFunctionType getFunctionType() const {
-    return getType().castTo<SILFunctionType>();
-  }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::PartialApplyInst;
