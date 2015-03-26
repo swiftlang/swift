@@ -416,6 +416,8 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
     }
   }
 
+  /// Attempt to merge \p Other into this ref count state. Return true if we
+  /// succeed and false otherwise.
   bool merge(const BottomUpRefCountState &Other);
 };
 
@@ -578,6 +580,8 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
     }
   }
 
+  /// Attempt to merge \p Other into this ref count state. Return true if we
+  /// succeed and false otherwise.
   bool merge(const TopDownRefCountState &Other);
 };
 
