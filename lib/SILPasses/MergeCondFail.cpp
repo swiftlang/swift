@@ -70,7 +70,9 @@ public:
           }
         }
 
-        if (CFI)
+        // Do not process arithmetic overflow checks. We typically generate more
+        // efficient code with separate jump-on-overflow.
+        if (CFI && !hasOverflowConditionOperand(CFI))
           CondFailToMerge.push_back(CFI);
 
       }
@@ -89,13 +91,6 @@ public:
   bool mergeCondFails(SmallVectorImpl<CondFailInst *> &CondFailToMerge) {
     assert(CondFailToMerge.size() > 1 &&
            "Need at least two cond_fail instructions");
-
-    // Remove overflow operands from the list. We can typically generate more
-    // efficient code without merging them: jump-on-overflow.
-    CondFailToMerge.erase(std::remove_if(CondFailToMerge.begin(),
-                                         CondFailToMerge.end(),
-                                         hasOverflowConditionOperand),
-                          CondFailToMerge.end());
 
     if (CondFailToMerge.size() < 2)
       return false;
