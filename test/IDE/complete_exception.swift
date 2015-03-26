@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CATCH1 | FileCheck %s -check-prefix=CATCH1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=THROW1 | FileCheck %s -check-prefix=THROW1
 
 class Error1 : _ErrorType {}
 class Error2 : _ErrorType {}
