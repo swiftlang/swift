@@ -46,8 +46,7 @@ static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
-  if (Triple.isArch32Bit())
-    llvm::sys::path::append(LibPath, "32");
+  llvm::sys::path::append(LibPath, Triple.getArchName());
   SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
 }
 

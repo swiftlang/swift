@@ -86,12 +86,7 @@ endfunction()
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
-  set_if_arch_bitness(result
-      ARCH "${arch}"
-      CASE_32_BIT "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/32"
-      CASE_64_BIT "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-
-  set("${result_var_name}" "${result}" PARENT_SCOPE)
+  set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
 endfunction()
 
 

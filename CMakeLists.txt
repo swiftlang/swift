@@ -372,7 +372,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   is_sdk_requested(IOS swift_build_ios)
   if(swift_build_ios AND ${swift_can_crosscompile_stdlib})
-    configure_sdk_darwin(IOS "iOS" "7.0" iphoneos ios ios "armv7;arm64" TRUE)
+    configure_sdk_darwin(IOS "iOS" "7.0" iphoneos ios ios "armv7;armv7s;arm64" TRUE)
     configure_target_variant(IOS-DA "iOS Debug+Asserts"   IOS DA "Debug+Asserts")
     configure_target_variant(IOS-RA "iOS Release+Asserts" IOS RA "Release+Asserts")
     configure_target_variant(IOS-R  "iOS Release"         IOS R "Release")
