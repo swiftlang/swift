@@ -113,11 +113,13 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
 }
 
 static void mapOperands(SILInstruction *I,
-                        llvm::DenseMap<ValueBase *, SILValue> ValueMap) {
+                        const llvm::DenseMap<ValueBase *, SILValue> &ValueMap) {
   for (auto &Opd : I->getAllOperands()) {
     SILValue OrigVal = Opd.get();
     ValueBase *OrigDef = OrigVal.getDef();
-    if (SILValue MappedVal = ValueMap[OrigDef]) {
+    auto Found = ValueMap.find(OrigDef);
+    if (Found != ValueMap.end()) {
+      SILValue MappedVal = Found->second;
       unsigned ResultIdx = OrigVal.getResultNumber();
       // All mapped instructions have their result number set to zero. Except
       // for arguments that we followed along one edge to their incoming value
@@ -132,14 +134,15 @@ static void mapOperands(SILInstruction *I,
 static void
 updateSSAForUseOfInst(SILSSAUpdater &Updater,
                       SmallVectorImpl<SILArgument*> &InsertedPHIs,
-                      llvm::DenseMap<ValueBase *, SILValue> &ValueMap,
+                      const llvm::DenseMap<ValueBase *, SILValue> &ValueMap,
                       SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock,
                       ValueBase *Inst) {
   if (Inst->use_empty())
     return;
 
   // Find the mapped instruction.
-  SILValue MappedValue = ValueMap[Inst];
+  assert(ValueMap.count(Inst) && "Expected to find value in map!");
+  SILValue MappedValue = ValueMap.find(Inst)->second;
   auto *MappedInst = MappedValue.getDef();
   assert(MappedValue);
   assert(MappedInst);
@@ -198,7 +201,7 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
 static void
 rewriteNewLoopEntryCheckBlock(SILBasicBlock *Header,
                               SILBasicBlock *EntryCheckBlock,
-                              llvm::DenseMap<ValueBase *, SILValue> ValueMap) {
+                        const llvm::DenseMap<ValueBase *, SILValue> &ValueMap) {
   SmallVector<SILArgument*, 4> InsertedPHIs;
   SILSSAUpdater Updater(&InsertedPHIs);
 
