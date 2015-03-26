@@ -171,7 +171,7 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
   }
 }
 
-void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
+void swift::replaceWithSpecializedFunction(ApplyInstBase *AI, SILFunction *NewF) {
   SILLocation Loc = AI->getLoc();
   ArrayRef<Substitution> Subst;
 
@@ -183,8 +183,17 @@ void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
   SILBuilderWithScope<2> Builder(AI);
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
 
-  ApplyInst *NAI =
-      Builder.createApply(Loc, FRI, Arguments);
+  ApplyInstBase *NAI = nullptr;
+
+  if (isa<ApplyInst>(AI))
+    NAI = Builder.createApply(Loc, FRI, Arguments);
+  if (isa<PartialApplyInst>(AI))
+    NAI = Builder.createPartialApply(Loc, FRI,
+                               AI->getSubstCalleeSILType(),
+                               {},
+                               Arguments,
+                               AI->getType());
+
   AI->replaceAllUsesWith(NAI);
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
 }

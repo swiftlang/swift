@@ -252,3 +252,257 @@ bb0(%0 : $Base):
 // CHECK-LABEL: sil shared @_TTS{{.*}}generic_upcast : $@thin (@owned Base) -> @owned Base {
 // CHECK: bb0(%0 : $Base):
 // CHECK:  return %0 : $Base
+
+
+// Check generic specialization of partial_apply
+
+protocol P { func get() -> Int32 }
+
+struct C : P { func get() -> Int32 }
+
+// test4.C.get (test4.C)() -> Swift.Int32
+sil hidden @_TFV5test41C3getfS0_FT_VSs5Int32 : $@cc(method) @thin (C) -> Int32 {
+bb0(%0 : $C):
+  debug_value %0 : $C  // let self                // id: %1
+  %2 = integer_literal $Builtin.Int32, 1          // user: %3
+  %3 = struct $Int32 (%2 : $Builtin.Int32)        // user: %4
+  return %3 : $Int32                              // id: %4
+}
+
+// test4.C.init (test4.C.Type)() -> test4.C
+sil hidden @_TFV5test41CCfMS0_FT_S0_ : $@thin (@thin C.Type) -> C {
+bb0(%0 : $@thin C.Type):
+  %1 = alloc_stack $C  // var self                // user: %3
+  %2 = struct $C ()                               // user: %4
+  dealloc_stack %1#0 : $*@local_storage C         // id: %3
+  return %2 : $C                                  // id: %4
+}
+
+// protocol witness for test4.P.get <A : test4.P>(test4.P.Self)() -> Swift.Int32 in conformance test4.C : test4.P in test4
+sil hidden [transparent] [thunk] @_TTWV5test41CS_1PS_FS1_3getUS1___fQPS1_FT_VSs5Int32 : $@cc(witness_method) @thin (@in_guaranteed C) -> Int32 {
+bb0(%0 : $*C):
+  %1 = load %0 : $*C                              // user: %3
+  // function_ref test4.C.get (test4.C)() -> Swift.Int32
+  %2 = function_ref @_TFV5test41C3getfS0_FT_VSs5Int32 : $@cc(method) @thin (C) -> Int32 // user: %3
+  %3 = apply %2(%1) : $@cc(method) @thin (C) -> Int32 // user: %4
+  return %3 : $Int32                              // id: %4
+}
+
+// test4.boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32
+sil hidden [noinline] @_TF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_ : $@thin <U, T where U : P> (@in U) -> @owned @callee_owned (Int32, @in T) -> Int32 {
+bb0(%0 : $*U):
+  debug_value_addr %0 : $*U  // let y             // id: %1
+  // function_ref test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
+  %2 = function_ref @_TFF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned Builtin.NativeObject, @inout τ_0_0) -> Int32 // user: %5
+  %3 = alloc_box $U                               // users: %4, %5, %5
+  copy_addr %0 to [initialization] %3#1 : $*U     // id: %4
+  %5 = partial_apply %2<U, T>(%3#0, %3#1) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned Builtin.NativeObject, @inout τ_0_0) -> Int32 // user: %7
+  destroy_addr %0 : $*U                           // id: %6
+  return %5 : $@callee_owned (Int32, @in T) -> Int32 // id: %7
+}
+
+// test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
+sil shared @_TFF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@thin <U, T where U : P> (Int32, @in T, @owned Builtin.NativeObject, @inout U) -> Int32 {
+bb0(%0 : $Int32, %1 : $*T, %2 : $Builtin.NativeObject, %3 : $*U):
+  debug_value %0 : $Int32  // let x               // id: %4
+  debug_value_addr %1 : $*T  // let z             // id: %5
+  %6 = witness_method $U, #P.get!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %7
+  %7 = apply %6<U>(%3) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %8
+  %8 = struct_extract %7 : $Int32, #Int32.value   // user: %11
+  %9 = struct_extract %0 : $Int32, #Int32.value   // user: %11
+  %10 = integer_literal $Builtin.Int1, -1         // user: %11
+  %11 = builtin "sadd_with_overflow_Int32"(%8 : $Builtin.Int32, %9 : $Builtin.Int32, %10 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %12, %13
+  %12 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 0 // user: %15
+  %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = struct $Int32 (%12 : $Builtin.Int32)      // user: %18
+  strong_release %2 : $Builtin.NativeObject       // id: %16
+  destroy_addr %1 : $*T                           // id: %17
+  return %15 : $Int32                             // id: %18
+}
+
+// static Swift.+ infix (Swift.Int32, Swift.Int32) -> Swift.Int32
+sil public_external [transparent] [fragile] @_TZFSsoi1pFTVSs5Int32S__S_ : $@thin (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = struct_extract %0 : $Int32, #Int32.value   // user: %5
+  %3 = struct_extract %1 : $Int32, #Int32.value   // user: %5
+  %4 = integer_literal $Builtin.Int1, -1          // user: %5
+  %5 = builtin "sadd_with_overflow_Int32"(%2 : $Builtin.Int32, %3 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %6, %7
+  %6 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 0 // user: %9
+  %7 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 1 // user: %8
+  cond_fail %7 : $Builtin.Int1                    // id: %8
+  %9 = struct $Int32 (%6 : $Builtin.Int32)        // user: %10
+  return %9 : $Int32                              // id: %10
+}
+
+// test4.foo <A : test4.P, B : test4.P>(A, B) -> (Swift.Int32, Swift.Float) -> Swift.Int32
+sil hidden [noinline] @_TF5test43fooUS_1P_S0___FTQ_Q0__FTVSs5Int32Sf_S1_ : $@thin <T, U where T : P, U : P> (@in T, @in U) -> @owned @callee_owned (Int32, Float) -> Int32 {
+bb0(%0 : $*T, %1 : $*U):
+  debug_value_addr %0 : $*T  // let x             // id: %2
+  debug_value_addr %1 : $*U  // let y             // id: %3
+  // function_ref test4.boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32
+  %4 = function_ref @_TF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32, @in τ_0_1) -> Int32 // user: %7
+  %5 = alloc_stack $U                             // users: %6, %7, %10
+  copy_addr %1 to [initialization] %5#1 : $*U     // id: %6
+  %7 = apply %4<U, Float>(%5#1) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32, @in τ_0_1) -> Int32 // user: %9
+  // function_ref reabstraction thunk helper <T_0_0, T_0_1 where T_0_0: test4.P, T_0_1: test4.P> from @callee_owned (@unowned Swift.Int32, @in Swift.Float) -> (@unowned Swift.Int32) to @callee_owned (@unowned Swift.Int32, @unowned Swift.Float) -> (@unowned Swift.Int32)
+  %8 = function_ref @_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVSs5Int32iSf_dS1__XFo_dS1_dSf_dS1__ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (Int32, Float, @owned @callee_owned (Int32, @in Float) -> Int32) -> Int32 // user: %9
+  %9 = partial_apply %8<T, U>(%7) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (Int32, Float, @owned @callee_owned (Int32, @in Float) -> Int32) -> Int32 // user: %13
+  dealloc_stack %5#0 : $*@local_storage U         // id: %10
+  destroy_addr %1 : $*U                           // id: %11
+  destroy_addr %0 : $*T                           // id: %12
+  return %9 : $@callee_owned (Int32, Float) -> Int32 // id: %13
+}
+
+// reabstraction thunk helper <T_0_0, T_0_1 where T_0_0: test4.P, T_0_1: test4.P> from @callee_owned (@unowned Swift.Int32, @in Swift.Float) -> (@unowned Swift.Int32) to @callee_owned (@unowned Swift.Int32, @unowned Swift.Float) -> (@unowned Swift.Int32)
+sil shared [transparent] [thunk] @_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVSs5Int32iSf_dS1__XFo_dS1_dSf_dS1__ : $@thin <T, U where T : P, U : P> (Int32, Float, @owned @callee_owned (Int32, @in Float) -> Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Float, %2 : $@callee_owned (Int32, @in Float) -> Int32):
+  %3 = alloc_stack $Float                         // users: %4, %5, %6
+  store %1 to %3#1 : $*Float                      // id: %4
+  %5 = apply %2(%0, %3#1) : $@callee_owned (Int32, @in Float) -> Int32 // user: %7
+  dealloc_stack %3#0 : $*@local_storage Float     // id: %6
+  return %5 : $Int32                              // id: %7
+}
+
+// test4.gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32
+sil hidden [noinline] @_TF5test44gen1US_1P__FQ_FVSs5Int32S1_ : $@thin <T where T : P> (@in T) -> @owned @callee_owned (Int32) -> Int32 {
+bb0(%0 : $*T):
+  debug_value_addr %0 : $*T  // let x             // id: %1
+  // function_ref test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
+  %2 = function_ref @_TFF5test44gen1US_1P__FQ_FVSs5Int32S1_U_FS1_S1_ : $@thin <τ_0_0 where τ_0_0 : P> (Int32, @owned Builtin.NativeObject, @inout τ_0_0) -> Int32 // user: %5
+  %3 = alloc_box $T                               // users: %4, %5, %5
+  copy_addr %0 to [initialization] %3#1 : $*T     // id: %4
+  %5 = partial_apply %2<T>(%3#0, %3#1) : $@thin <τ_0_0 where τ_0_0 : P> (Int32, @owned Builtin.NativeObject, @inout τ_0_0) -> Int32 // user: %7
+  destroy_addr %0 : $*T                           // id: %6
+  return %5 : $@callee_owned (Int32) -> Int32     // id: %7
+}
+
+// test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
+sil shared @_TFF5test44gen1US_1P__FQ_FVSs5Int32S1_U_FS1_S1_ : $@thin <T where T : P> (Int32, @owned Builtin.NativeObject, @inout T) -> Int32 {
+bb0(%0 : $Int32, %1 : $Builtin.NativeObject, %2 : $*T):
+  debug_value %0 : $Int32  // let $0              // id: %3
+  %4 = witness_method $T, #P.get!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %5
+  %5 = apply %4<T>(%2) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %6
+  %6 = struct_extract %5 : $Int32, #Int32.value   // user: %9
+  %7 = struct_extract %0 : $Int32, #Int32.value   // user: %9
+  %8 = integer_literal $Builtin.Int1, -1          // user: %9
+  %9 = builtin "sadd_with_overflow_Int32"(%6 : $Builtin.Int32, %7 : $Builtin.Int32, %8 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $Int32 (%10 : $Builtin.Int32)      // user: %15
+  strong_release %1 : $Builtin.NativeObject       // id: %14
+  return %13 : $Int32                             // id: %15
+}
+
+// check that there is a generic specialization of boo
+// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS__Sf___TF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_ : $@thin (@in C) -> @owned @callee_owned (Int32, @in Float) -> Int32
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_TTSg5V4main1CS0_S_1PS__Sf___TFF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_U_FTS1_Q0__S1_
+// CHECK: partial_apply [[CLOSURE_SPECIALIZATION:%[0-9]+]]
+// CHECK: return
+
+// Check that there is a generic specialization of a closure from foo
+// CHECK-LABEL: sil shared @_TTSg5V4main1CS0_S_1PS__Sf___TFF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_U_FTS1_Q0__S1_
+// CHECK: return
+
+// Check that there is a generic specialization of foo
+// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TF5test43fooUS_1P_S0___FTQ_Q0__FTVSs5Int32Sf_S1_ : $@thin (@in C, @in C) -> @owned @callee_owned (Int32, Float) -> Int32
+// CHECK: function_ref @_TTSg5V4main1CS0_S_1PS__Sf___TF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_ 
+// check that it invokes a generic specialization of the reabstraction thunk helper which invokes a specialization boo
+// CHECK: [[THUNK_SPECIALIZATION:%[0-9]+]] = function_ref @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVSs5Int32iSf_dS1__XFo_dS1_dSf_dS1__
+// CHECK-NOT: apply
+// CHECK: partial_apply [[THUNK_SPECIALIZATION]]
+// CHECK-NOT: apply
+// CHECK: return
+
+
+// Check that there is a generic specialization of gen1
+// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS____TF5test44gen1US_1P__FQ_FVSs5Int32S1_ : $@thin (@in C) -> @owned @callee_owned (Int32) -> Int32
+// check that it invokes a generic specialization of the closure by mean of partial_apply
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_TTSg5V4main1CS0_S_1PS____TFF5test44gen1US_1P__FQ_FVSs5Int32S1_U_FS1_S1_
+// CHECK-NOT: apply
+// CHECK: partial_apply [[CLOSURE_SPECIALIZATION]]
+// CHECK-NOT: apply
+// CHECK: return
+
+// Check that there is a generic specialization of a closure from gen1
+// CHECK-LABEL: sil shared @_TTSg5V4main1CS0_S_1PS____TFF5test44gen1US_1P__FQ_FVSs5Int32S1_U_FS1_S1_ : $@thin (Int32, @owned Builtin.NativeObject, @inout C) -> Int32
+// CHECK: return
+
+
+
+// test4.bar () -> Swift.Int32
+// CHECK-LABEL: sil hidden @_TF5test43barFT_VSs5Int32
+// check that it does not invoke a generic specialization of foo
+// CHECK-NOT:  function_ref @_TF5test43fooUS_1P_S0___FTQ_Q0__FTVSs5Int32Sf_S1_
+// check that it invokes a generic specialization of foo
+// CHECK: function_ref @_TTSg5V4main1CS0_S_1PS__S0_S0_S1_S____TF5test43fooUS_1P_S0___FTQ_Q0__FTVSs5Int32Sf_S1_
+sil hidden @_TF5test43barFT_VSs5Int32 : $@thin () -> Int32 {
+bb0:
+  %0 = alloc_stack $@callee_owned (Int32, Float) -> Int32  // var f // users: %11, %22
+  // function_ref test4.C.init (test4.C.Type)() -> test4.C
+  %1 = function_ref @_TFV5test41CCfMS0_FT_S0_ : $@thin (@thin C.Type) -> C // user: %3
+  %2 = metatype $@thin C.Type                     // user: %3
+  %3 = apply %1(%2) : $@thin (@thin C.Type) -> C  // users: %4, %7, %9
+  debug_value %3 : $C  // let c                   // id: %4
+  // function_ref test4.foo <A : test4.P, B : test4.P>(A, B) -> (Swift.Int32, Swift.Float) -> Swift.Int32
+  %5 = function_ref @_TF5test43fooUS_1P_S0___FTQ_Q0__FTVSs5Int32Sf_S1_ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (@in τ_0_0, @in τ_0_1) -> @owned @callee_owned (Int32, Float) -> Int32 // user: %10
+  %6 = alloc_stack $C                             // users: %7, %10, %13
+  store %3 to %6#1 : $*C                          // id: %7
+  %8 = alloc_stack $C                             // users: %9, %10, %12
+  store %3 to %8#1 : $*C                          // id: %9
+  %10 = apply %5<C, C>(%6#1, %8#1) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (@in τ_0_0, @in τ_0_1) -> @owned @callee_owned (Int32, Float) -> Int32 // users: %11, %14, %20, %21
+  store %10 to %0#1 : $*@callee_owned (Int32, Float) -> Int32 // id: %11
+  dealloc_stack %8#0 : $*@local_storage C         // id: %12
+  dealloc_stack %6#0 : $*@local_storage C         // id: %13
+  strong_retain %10 : $@callee_owned (Int32, Float) -> Int32 // id: %14
+  %15 = integer_literal $Builtin.Int32, 3         // user: %16
+  %16 = struct $Int32 (%15 : $Builtin.Int32)      // user: %20
+  %17 = float_literal $Builtin.FPIEEE80, 0x4000C8F5C28F5C28F5C3 // 3.1400000000000000001 // user: %18
+  %18 = builtin "fptrunc_FPIEEE80_FPIEEE32"(%17 : $Builtin.FPIEEE80) : $Builtin.FPIEEE32 // user: %19
+  %19 = struct $Float (%18 : $Builtin.FPIEEE32)   // user: %20
+  %20 = apply %10(%16, %19) : $@callee_owned (Int32, Float) -> Int32 // user: %23
+  strong_release %10 : $@callee_owned (Int32, Float) -> Int32 // id: %21
+  dealloc_stack %0#0 : $*@local_storage @callee_owned (Int32, Float) -> Int32 // id: %22
+  return %20 : $Int32                             // id: %23
+}
+
+// test4.testBar () -> Swift.Int32
+sil @_TF5test47testBarFT_VSs5Int32 : $@thin () -> Int32 {
+bb0:
+  // function_ref test4.bar () -> Swift.Int32
+  %0 = function_ref @_TF5test43barFT_VSs5Int32 : $@thin () -> Int32 // user: %1
+  %1 = apply %0() : $@thin () -> Int32            // user: %2
+  return %1 : $Int32                              // id: %2
+}
+
+
+// CHECK-LABEL: sil @_TF5test48testGen1FT_VSs5Int32
+// CHECK: function_ref @_TFV5test41CCfMS0_FT_S0_
+// CHECK: apply
+// Reference to the generic specialization of gen1
+// CHECK-NOT: function_ref @_TF5test44gen1US_1P__FQ_FVSs5Int32S1_
+// CHECK: function_ref @_TTSg5V4main1CS0_S_1PS____TF5test44gen1US_1P__FQ_FVSs5Int32S1_ : $@thin (@in C) -> @owned @callee_owned (Int32) -> Int32
+sil @_TF5test48testGen1FT_VSs5Int32 : $@thin () -> Int32 {
+bb0:
+  %0 = alloc_stack $@callee_owned (Int32) -> Int32  // var f // users: %9, %16
+  // function_ref test4.C.init (test4.C.Type)() -> test4.C
+  %1 = function_ref @_TFV5test41CCfMS0_FT_S0_ : $@thin (@thin C.Type) -> C // user: %3
+  %2 = metatype $@thin C.Type                     // user: %3
+  %3 = apply %1(%2) : $@thin (@thin C.Type) -> C  // users: %4, %7
+  debug_value %3 : $C  // let c                   // id: %4
+  // function_ref test4.gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32
+  %5 = function_ref @_TF5test44gen1US_1P__FQ_FVSs5Int32S1_ : $@thin <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32) -> Int32 // user: %8
+  %6 = alloc_stack $C                             // users: %7, %8, %10
+  store %3 to %6#1 : $*C                          // id: %7
+  %8 = apply %5<C>(%6#1) : $@thin <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32) -> Int32 // users: %9, %11, %14, %15
+  store %8 to %0#1 : $*@callee_owned (Int32) -> Int32 // id: %9
+  dealloc_stack %6#0 : $*@local_storage C         // id: %10
+  strong_retain %8 : $@callee_owned (Int32) -> Int32 // id: %11
+  %12 = integer_literal $Builtin.Int32, 3         // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %14
+  %14 = apply %8(%13) : $@callee_owned (Int32) -> Int32 // user: %17
+  strong_release %8 : $@callee_owned (Int32) -> Int32 // id: %15
+  dealloc_stack %0#0 : $*@local_storage @callee_owned (Int32) -> Int32 // id: %16
+  return %14 : $Int32                             // id: %17
+}

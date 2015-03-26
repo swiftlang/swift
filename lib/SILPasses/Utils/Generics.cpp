@@ -82,7 +82,7 @@ void SpecializingCloner::populateCloned() {
 }
 
 
-void GenericSpecializer::addApplyInst(ApplyInst *AI) {
+void GenericSpecializer::addApplyInst(ApplyInstBase *AI) {
   if (!AI || !AI->hasSubstitutions())
     return;
 
@@ -105,13 +105,13 @@ void GenericSpecializer::collectApplyInst(SILFunction &F) {
   // Scan all of the instructions in this function in search of ApplyInsts.
   for (auto &BB : F)
     for (auto &I : BB) {
-      ApplyInst *AI = dyn_cast<ApplyInst>(&I);
+      ApplyInstBase *AI = dyn_cast<ApplyInstBase>(&I);
       if (AI)
         addApplyInst(AI);
     }
 }
 
-static bool hasSameSubstitutions(ApplyInst *A, ApplyInst *B) {
+static bool hasSameSubstitutions(ApplyInstBase *A, ApplyInstBase *B) {
   if (A == B)
     return true;
 
