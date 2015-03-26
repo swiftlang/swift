@@ -489,7 +489,7 @@ StringRef SerializedASTFile::getFilename() const {
 }
 
 const clang::Module *SerializedASTFile::getUnderlyingClangModule() {
-  if (auto *ShadowedModule = getFile().getShadowedModule())
+  if (auto *ShadowedModule = File.getShadowedModule())
     return ShadowedModule->findUnderlyingClangModule();
   return nullptr;
 }

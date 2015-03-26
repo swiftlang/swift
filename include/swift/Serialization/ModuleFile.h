@@ -363,6 +363,11 @@ public:
     return FileContext->getParentModule();
   }
 
+  FileUnit *getFile() const {
+    assert(FileContext && "no associated context yet");
+    return FileContext;
+  }
+
 private:
   /// Read an on-disk decl hash table stored in index_block::DeclListLayout
   /// format.

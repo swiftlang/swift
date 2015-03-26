@@ -103,8 +103,8 @@ public:
     Identifier getModuleIdentifier() const {
       return MF->getAssociatedModule()->getName();
     }
-    ModuleFile *getFile() const {
-      return MF;
+    FileUnit *getFile() const {
+      return MF->getFile();
     }
     SILFunction *lookupSILFunction(SILFunction *InFunc);
     SILFunction *lookupSILFunction(StringRef Name);

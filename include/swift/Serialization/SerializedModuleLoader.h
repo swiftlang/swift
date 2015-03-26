@@ -107,8 +107,6 @@ class SerializedASTFile final : public LoadedFile {
     : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
 
 public:
-  ModuleFile &getFile() const { return File; }
-
   bool isSIB() const { return IsSIB; }
 
   virtual bool isSystemModule() const override;

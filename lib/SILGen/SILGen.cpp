@@ -979,7 +979,7 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *sf,
       sgm.emitSourceFile(file, startElem.getValueOr(0));
     } else if (auto *file = dyn_cast<SerializedASTFile>(sf)) {
       if (file->isSIB())
-        m->getSILLoader()->getAllForModule(mod->getName(), &file->getFile());
+        m->getSILLoader()->getAllForModule(mod->getName(), file);
     }
   } else {
     for (auto file : mod->getFiles()) {
