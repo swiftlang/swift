@@ -442,7 +442,7 @@ int main(int argc, char **argv) {
         CI.getASTContext(), CI.getSILModule(), nullptr);
 
     if (extendedInfo.isSIB())
-      SL->getAllForModule(CI.getMainModule()->getName());
+      SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
     else
       SL->getAll();
   }

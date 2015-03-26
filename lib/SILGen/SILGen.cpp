@@ -956,7 +956,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 //===--------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(Module *mod, SILOptions &options, SourceFile *sf,
+SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *sf,
                         Optional<unsigned> startElem, bool makeModuleFragile,
                         bool isWholeModule) {
   const DeclContext *DC;
@@ -975,7 +975,12 @@ SILModule::constructSIL(Module *mod, SILOptions &options, SourceFile *sf,
   SILGenModule sgm(*m, mod, makeModuleFragile);
 
   if (sf) {
-    sgm.emitSourceFile(sf, startElem.getValueOr(0));
+    if (auto *file = dyn_cast<SourceFile>(sf)) {
+      sgm.emitSourceFile(file, startElem.getValueOr(0));
+    } else if (auto *file = dyn_cast<SerializedASTFile>(sf)) {
+      if (file->isSIB())
+        m->getSILLoader()->getAllForModule(mod->getName(), &file->getFile());
+    }
   } else {
     for (auto file : mod->getFiles()) {
       auto nextSF = dyn_cast<SourceFile>(file);
@@ -983,6 +988,16 @@ SILModule::constructSIL(Module *mod, SILOptions &options, SourceFile *sf,
         continue;
       sgm.emitSourceFile(nextSF, 0);
     }
+
+    // Also make sure to process any intermediate files that may contain SIL
+    bool hasSIB = std::any_of(mod->getFiles().begin(),
+                              mod->getFiles().end(),
+                              [](const FileUnit *File) -> bool {
+      auto *SASTF = dyn_cast<SerializedASTFile>(File);
+      return SASTF && SASTF->isSIB();
+    });
+    if (hasSIB)
+      m->getSILLoader()->getAllForModule(mod->getName(), nullptr);
   }
 
   // Emit external definitions used by this module.
@@ -990,16 +1005,6 @@ SILModule::constructSIL(Module *mod, SILOptions &options, SourceFile *sf,
     auto def = mod->Ctx.ExternalDefinitions[i];
     sgm.emitExternalDefinition(def);
   }
-
-  // Also make sure to process any intermediate files that may contain SIL
-  bool hasSIB = std::any_of(mod->getFiles().begin(),
-                            mod->getFiles().end(),
-                            [](const FileUnit *File) -> bool {
-    auto *SASTF = dyn_cast<SerializedASTFile>(File);
-    return SASTF && SASTF->isSIB();
-  });
-  if (hasSIB)
-    m->getSILLoader()->getAllForModule(mod->getName());
 
   return m;
 }
@@ -1014,7 +1019,7 @@ swift::performSILGeneration(Module *mod,
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(SourceFile &sf, SILOptions &options,
+swift::performSILGeneration(FileUnit &sf, SILOptions &options,
                             Optional<unsigned> startElem,
                             bool makeModuleFragile) {
   return SILModule::constructSIL(sf.getParentModule(), options, &sf, startElem,

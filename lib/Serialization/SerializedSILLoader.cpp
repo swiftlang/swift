@@ -102,10 +102,13 @@ void SerializedSILLoader::getAll() {
 
 // FIXME: Not the best interface. We know exactly which FileUnits may have SIL
 // those in the main module.
-void SerializedSILLoader::getAllForModule(Identifier Mod) {
+void SerializedSILLoader::getAllForModule(Identifier Mod,
+                                          ModuleFile *PrimaryFile) {
   for (auto &Des : LoadedSILSections) {
-    if (Des->getModuleIdentifier() == Mod)
-      Des->getAll(false);
+    if (Des->getModuleIdentifier() == Mod) {
+      Des->getAll(PrimaryFile ?
+                  Des->getFile() != PrimaryFile : false);
+    }
   }
 }
 

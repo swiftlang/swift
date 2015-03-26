@@ -219,7 +219,7 @@ public:
   /// If \p makeModuleFragile is true, all functions and global variables of
   /// the module are marked as fragile. This is used for compiling the stdlib.
   static std::unique_ptr<SILModule>
-  constructSIL(Module *M, SILOptions &Options, SourceFile *sf = nullptr,
+  constructSIL(Module *M, SILOptions &Options, FileUnit *sf = nullptr,
                Optional<unsigned> startElem = None,
                bool makeModuleFragile = false,
                bool isWholeModule = false);

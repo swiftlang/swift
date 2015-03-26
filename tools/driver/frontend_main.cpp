@@ -478,13 +478,19 @@ static bool performCompile(CompilerInstance &Instance,
 
   std::unique_ptr<SILModule> SM = Instance.takeSILModule();
   if (!SM) {
-    if (PrimarySourceFile)
-      SM = performSILGeneration(*PrimarySourceFile, Invocation.getSILOptions(),
+    if (opts.PrimaryInput.hasValue() && opts.PrimaryInput.getValue().isFilename()) {
+      FileUnit *PrimaryFile = PrimarySourceFile;
+      if (!PrimaryFile) {
+        auto Index = opts.PrimaryInput.getValue().Index;
+        PrimaryFile = Instance.getMainModule()->getFiles()[Index];
+      }
+      SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
                                 None, opts.SILSerializeAll);
-    else
+    } else {
       SM = performSILGeneration(Instance.getMainModule(), Invocation.getSILOptions(),
                                 opts.SILSerializeAll,
                                 true);
+    }
   }
 
   // We've been told to emit SIL after SILGen, so write it now.

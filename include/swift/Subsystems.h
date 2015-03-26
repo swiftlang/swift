@@ -41,6 +41,7 @@ namespace swift {
   class DelayedParsingCallbacks;
   class DiagnosticConsumer;
   class DiagnosticEngine;
+  class FileUnit;
   class GenericParamList;
   class IRGenOptions;
   class LangOptions;
@@ -205,7 +206,7 @@ namespace swift {
   /// If \p makeModuleFragile is true, all functions and global variables of
   /// the module are marked as fragile. This is used for compiling the stdlib.
   std::unique_ptr<SILModule>
-  performSILGeneration(SourceFile &SF, SILOptions &options,
+  performSILGeneration(FileUnit &SF, SILOptions &options,
                        Optional<unsigned> StartElem = None,
                        bool makeModuleFragile = false);
 

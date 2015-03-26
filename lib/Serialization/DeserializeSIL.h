@@ -103,6 +103,9 @@ public:
     Identifier getModuleIdentifier() const {
       return MF->getAssociatedModule()->getName();
     }
+    ModuleFile *getFile() const {
+      return MF;
+    }
     SILFunction *lookupSILFunction(SILFunction *InFunc);
     SILFunction *lookupSILFunction(StringRef Name);
     SILVTable *lookupVTable(Identifier Name);

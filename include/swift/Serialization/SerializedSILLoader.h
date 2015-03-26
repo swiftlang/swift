@@ -22,6 +22,7 @@
 namespace swift {
 class ASTContext;
 class Module;
+class ModuleFile;
 class SILDeserializer;
 class SILFunction;
 class SILGlobalVariable;
@@ -95,7 +96,7 @@ public:
 
   /// Deserialize all SILFunctions, VTables, and WitnessTables for
   /// a given Module.
-  void getAllForModule(Identifier Mod);
+  void getAllForModule(Identifier Mod, ModuleFile *PrimaryFile);
 
   /// Deserialize all SILFunctions in all SILModules.
   void getAllSILFunctions();
