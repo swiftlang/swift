@@ -427,6 +427,7 @@ ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
                          OrigFTI->getCalleeConvention(),
                          ClonedInterfaceArgTys,
                          OrigFTI->getResult(),
+                         OrigFTI->getOptionalErrorResult(),
                          M.getASTContext());
 
   auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs, ClonedTy,

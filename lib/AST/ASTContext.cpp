@@ -2559,7 +2559,8 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
                               ExtInfo info,
                               ParameterConvention calleeConvention,
                               ArrayRef<SILParameterInfo> params,
-                              SILResultInfo result) {
+                              SILResultInfo result,
+                              Optional<SILResultInfo> errorResult) {
   id.AddPointer(genericParams);
   id.AddInteger(info.getFuncAttrKey());
   id.AddInteger(unsigned(calleeConvention));
@@ -2567,6 +2568,10 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
   for (auto param : params)
     param.profile(id);
   result.profile(id);
+
+  // Just allow the profile length to implicitly distinguish the
+  // presence of an error result.
+  if (errorResult) errorResult->profile(id);
 }
 
 SILFunctionType::SILFunctionType(GenericSignature *genericSig,
@@ -2574,17 +2579,21 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
                                  ParameterConvention calleeConvention,
                                  ArrayRef<SILParameterInfo> interfaceParams,
                                  SILResultInfo interfaceResult,
+                                 Optional<SILResultInfo> interfaceErrorResult,
                                  const ASTContext &ctx,
                                  RecursiveTypeProperties properties)
   : TypeBase(TypeKind::SILFunction, &ctx, properties),
     GenericSig(genericSig),
     InterfaceResult(interfaceResult) {
+  SILFunctionTypeBits.HasErrorResult = interfaceErrorResult.hasValue();
   SILFunctionTypeBits.ExtInfo = ext.Bits;
   NumParameters = interfaceParams.size();
   assert(!isIndirectParameter(calleeConvention));
   SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
   memcpy(getMutableParameters().data(), interfaceParams.data(),
          interfaceParams.size() * sizeof(SILParameterInfo));
+  if (interfaceErrorResult)
+    getMutableErrorResult() = *interfaceErrorResult;
 
   // Make sure the interface types are sane.
 #ifndef NDEBUG
@@ -2604,6 +2613,11 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
     assert(!getResult().getType().findIf([](Type t) {
       return t->is<ArchetypeType>();
     }) && "interface type of generic type should not contain context archetypes");
+    if (hasErrorResult()) {
+      assert(!getErrorResult().getType().findIf([](Type t) {
+        return t->is<ArchetypeType>();
+      }) && "interface type of generic type should not contain context archetypes");
+    }
   }
 #endif
 }
@@ -2632,11 +2646,13 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
                                     ExtInfo ext, ParameterConvention callee,
                                     ArrayRef<SILParameterInfo> interfaceParams,
                                     SILResultInfo interfaceResult,
+                           Optional<SILResultInfo> interfaceErrorResult,
                                     const ASTContext &ctx) {
   assert(isValidSILExtInfo(ext) && "contains attributes not supported in SIL");
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, callee,
-                           interfaceParams, interfaceResult);
+                           interfaceParams, interfaceResult,
+                           interfaceErrorResult);
 
   // Do we already have this generic function type?
   void *insertPos;
@@ -2647,9 +2663,9 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   // All SILFunctionTypes are canonical.
 
   // Allocate storage for the object.
-  // FIXME: 2*params.size() so we can stash interface types.
   size_t bytes = sizeof(SILFunctionType)
-               + sizeof(SILParameterInfo) * interfaceParams.size();
+               + sizeof(SILParameterInfo) * interfaceParams.size()
+               + (interfaceErrorResult ? sizeof(SILResultInfo) : 0);
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   // Right now, generic SIL function types cannot be dependent or contain type
@@ -2664,6 +2680,9 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
     // or return types. They still never contain type variables and are always
     // materializable.
     properties += interfaceResult.getType()->getRecursiveProperties();
+    if (interfaceErrorResult)
+      properties +=
+        interfaceErrorResult->getType()->getRecursiveProperties();
 
     for (auto &param : interfaceParams) {
       properties += param.getType()->getRecursiveProperties();
@@ -2673,6 +2692,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   auto fnType =
     new (mem) SILFunctionType(genericSig, ext, callee,
                               interfaceParams, interfaceResult,
+                              interfaceErrorResult,
                               ctx, properties);
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);

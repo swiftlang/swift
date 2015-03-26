@@ -431,6 +431,19 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
     }
   }
 
+  // We want to call 'throws' class methods assuming that they return
+  // an error result, rather than paying the additional overhead
+  // for an indirect call.  That means thunking.
+  Optional<SILResultInfo> vtableErrorResult;
+  if (baseTy->hasErrorResult() && !origDerivedTy->hasErrorResult()) {
+    needsThunk = true;
+    vtableErrorResult = baseTy->getErrorResult();
+  } else {
+    assert(origDerivedTy->hasErrorResult() == baseTy->hasErrorResult());
+    assert(!origDerivedTy->hasErrorResult() ||
+           origDerivedTy->getErrorResult() == baseTy->getErrorResult());
+  }
+
   // The parameters may be either more optional than the base, or if the base
   // is IUO, may force off optionality.
   auto baseParams = baseTy->getParametersWithoutIndirectResult();
@@ -491,6 +504,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
                                           origDerivedTy->getExtInfo(),
                                           origDerivedTy->getCalleeConvention(),
                                           vtableParams, vtableResult,
+                                          vtableErrorResult,
                                           getASTContext());
   SILLocation loc(derived.getDecl());
   auto thunk = SILFunction::create(M, SILLinkage::Private, name, vtableDerivedTy,
@@ -1554,6 +1568,7 @@ static ManagedValue emitFuncToBlock(SILGenFunction &gen,
                      ParameterConvention::Direct_Unowned,
                      params,
                      blockTy->getResult(),
+                     blockTy->getOptionalErrorResult(),
                      gen.getASTContext());
   
   // Create the invoke function. Borrow the mangling scheme from reabstraction
@@ -3519,6 +3534,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                    ParameterConvention::Direct_Unowned),
                   SILResultInfo(IUOptNSStringTy,
                                 ResultConvention::Autoreleased),
+                  /*error result*/ None,
                   getASTContext());
     auto NSStringFromClassFn
       = SGM.M.getOrCreateFunction(mainClass, "NSStringFromClass",
@@ -3559,6 +3575,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   argTypes,
                   SILResultInfo(argc.getType().getSwiftRValueType(),
                                 ResultConvention::Unowned),
+                  /*error result*/ None,
                   getASTContext());
     
     auto UIApplicationMainFn
@@ -3607,6 +3624,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   argTypes,
                   SILResultInfo(argc.getType().getSwiftRValueType(),
                                 ResultConvention::Unowned),
+                  /*error result*/ None,
                   getASTContext());
     
     auto NSApplicationMainFn

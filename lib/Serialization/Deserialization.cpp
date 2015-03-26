@@ -3624,6 +3624,8 @@ Type ModuleFile::getType(TypeID TID) {
   case decls_block::SIL_FUNCTION_TYPE: {
     TypeID interfaceResultID;
     uint8_t rawInterfaceResultConvention;
+    TypeID interfaceErrorResultID;
+    uint8_t rawInterfaceErrorResultConvention;
     uint8_t rawCallingConvention;
     uint8_t rawCalleeConvention;
     bool thin, block;
@@ -3635,6 +3637,8 @@ Type ModuleFile::getType(TypeID TID) {
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
                                                    interfaceResultID,
                                                    rawInterfaceResultConvention,
+                                                   interfaceErrorResultID,
+                                           rawInterfaceErrorResultConvention,
                                                    rawCalleeConvention,
                                                    rawCallingConvention,
                                                    thin, block,
@@ -3661,6 +3665,20 @@ Type ModuleFile::getType(TypeID TID) {
     }
     SILResultInfo interfaceResult(getType(interfaceResultID)->getCanonicalType(),
                                   interfaceResultConvention.getValue());
+
+    // Process the error result.
+    Optional<SILResultInfo> interfaceErrorResult;
+    if (interfaceErrorResultID != 0) {
+      auto convention
+        = getActualResultConvention(rawInterfaceErrorResultConvention);
+      if (!convention.hasValue()) {
+        error();
+        return nullptr;
+      }
+      interfaceErrorResult =
+        SILResultInfo(getType(interfaceErrorResultID)->getCanonicalType(),
+                      convention.getValue());
+    }
 
     // Process the parameters.
     unsigned numParamIDs = paramIDs.size() - numGenericParams;
@@ -3702,6 +3720,7 @@ Type ModuleFile::getType(TypeID TID) {
     typeOrOffset = SILFunctionType::get(genericSig, extInfo,
                                         calleeConvention.getValue(),
                                         allParams, interfaceResult,
+                                        interfaceErrorResult,
                                         ctx);
     break;
   }

@@ -701,7 +701,7 @@ static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
 
   return SILFunctionType::get(nullptr, extInfo,
                               /*callee*/ ParameterConvention::Direct_Unowned,
-                              inputs, result, ctx);
+                              inputs, result, None, ctx);
 }
 
 /// Call [self allocWithZone: nil].

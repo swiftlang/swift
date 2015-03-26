@@ -3986,7 +3986,7 @@ namespace {
 
       return SILFunctionType::get(sig, extInfo,
                                   ParameterConvention::Direct_Unowned,
-                                  param, result, ctx);
+                                  param, result, None, ctx);
     }
 
     template <class T>

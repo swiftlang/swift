@@ -2745,8 +2745,18 @@ void Serializer::writeType(Type ty) {
 
     auto callingConvention = fnTy->getAbstractCC();
     auto interfaceResult = fnTy->getResult();
+    TypeID interfaceResultTyID = addTypeRef(interfaceResult.getType());
     auto stableInterfaceResultConvention =
       getRawStableResultConvention(interfaceResult.getConvention());
+
+    TypeID errorResultTyID = 0;
+    uint8_t stableErrorResultConvention = 0;
+    if (fnTy->hasErrorResult()) {
+      auto abResult = fnTy->getErrorResult();
+      errorResultTyID = addTypeRef(abResult.getType());
+      stableErrorResultConvention =
+        getRawStableResultConvention(abResult.getConvention());
+    }
 
     SmallVector<TypeID, 8> paramTypes;
     for (auto param : fnTy->getParameters()) {
@@ -2766,8 +2776,10 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-          addTypeRef(interfaceResult.getType()),
+          interfaceResultTyID,
           stableInterfaceResultConvention,
+          errorResultTyID,
+          stableErrorResultConvention,
           stableCalleeConvention,
           getRawStableCC(callingConvention),
           fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,

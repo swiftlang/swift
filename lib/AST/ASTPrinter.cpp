@@ -2590,7 +2590,23 @@ public:
     }
     Printer << ") -> ";
 
-    T->getResult().print(Printer, Options);
+    if (T->hasErrorResult()) {
+      // The error result is implicitly @owned; don't print that.
+      assert(T->getErrorResult().getConvention() == ResultConvention::Owned);
+
+      if (T->getResult().getType()->isVoid()) {
+        Printer << "@error ";
+        T->getErrorResult().getType().print(Printer, Options);
+      } else {
+        Printer << "(";
+        T->getResult().print(Printer, Options);
+        Printer << ", @error ";
+        T->getErrorResult().getType().print(Printer, Options);
+        Printer << ")";
+      }
+    } else {
+      T->getResult().print(Printer, Options);
+    }
   }
   
   void visitSILBlockStorageType(SILBlockStorageType *T) {

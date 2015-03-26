@@ -228,6 +228,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    params,
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
+                                   None,
                                    C);
 
   return SILFunction::create(M, SILLinkage::Public,

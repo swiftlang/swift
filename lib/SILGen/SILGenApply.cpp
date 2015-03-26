@@ -112,6 +112,7 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
                               fnType->getCalleeConvention(),
                               newParams,
                               newResult,
+                              fnType->getOptionalErrorResult(),
                               ctx);
 }
 
@@ -3636,7 +3637,8 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
                      ParameterConvention::Direct_Owned,
                      fnTy->getParameters()
                        .slice(0, fnTy->getParameters().size() - 1),
-                     resultInfo, gen.getASTContext());
+                     resultInfo, fnTy->getOptionalErrorResult(),
+                     gen.getASTContext());
   
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.

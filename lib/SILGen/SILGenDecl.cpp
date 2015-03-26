@@ -1885,9 +1885,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   auto objcFnTy = emitObjCThunkArguments(*this, loc, thunk, args);
   auto nativeInfo = getConstantInfo(native);
   auto swiftResultTy = nativeInfo.SILFnType->getResult()
-    .transform([&](Type t) { return F.mapTypeIntoContext(t); });
+    .map([&](CanType t) { return F.mapTypeIntoContext(t)->getCanonicalType(); });
   auto objcResultTy = objcFnTy->getResult()
-    .transform([&](Type t) { return F.mapTypeIntoContext(t); });
+    .map([&](CanType t) { return F.mapTypeIntoContext(t)->getCanonicalType(); });
 
   // Call the native entry point.
   SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);

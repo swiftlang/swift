@@ -496,6 +496,25 @@ should take action to reclaim that autorelease with
   corresponds to the LLVM "nocapture" attribute in terms of semantics (but is
   limited to only work with parameters of function type in Swift).
 
+- SIL function types may provide an optional error result, written by
+  placing ``@error`` on a result.  An error result is always
+  implicitly ``@owned``.  Only functions with a native calling
+  convention may have an error result.
+
+  A function with an error result cannot be called with `apply`.
+  It must be called with `try_apply`.
+
+  Type lowering lowers the ``throws`` annotation on formal function
+  types into more concrete error propagation:
+
+  - For native Swift functions, ``throws`` is turned into an error
+    result.
+
+  - For non-native Swift functions, ``throws`` is turned in an
+    explicit error-handling mechanism based on the imported API.  The
+    importer only imports non-native methods and types as ``throws``
+    when it is possible to do this automatically.
+
 Properties of Types
 ```````````````````
 
@@ -2458,6 +2477,9 @@ instruction does no retaining or releasing of its arguments by itself; the
 `calling convention`_'s retain/release policy must be handled by separate
 explicit ``retain`` and ``release`` instructions. The return value will
 likewise not be implicitly retained or released.
+
+The callee value must have function type.  That function type may not
+have an error result; for that, use ``try_apply``.
 
 NB: If the callee value is of a thick function type, ``apply`` currently
 consumes the callee value at +1 strong retain count.

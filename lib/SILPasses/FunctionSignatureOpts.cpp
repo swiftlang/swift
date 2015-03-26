@@ -435,6 +435,7 @@ FunctionAnalyzer::createOptimizedSILFunctionType() {
   }
 
   SILResultInfo InterfaceResult = FTy->getResult();
+  auto InterfaceErrorResult = FTy->getOptionalErrorResult();
   auto ExtInfo = FTy->getExtInfo();
 
   // Change the calling convention to freestanding if we have modified self.
@@ -444,7 +445,8 @@ FunctionAnalyzer::createOptimizedSILFunctionType() {
   return SILFunctionType::get(FTy->getGenericSignature(),
                               ExtInfo,
                               FTy->getCalleeConvention(),
-                              InterfaceParams, InterfaceResult, Ctx);
+                              InterfaceParams, InterfaceResult,
+                              InterfaceErrorResult, Ctx);
 }
 
 SILFunction *

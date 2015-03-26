@@ -1264,6 +1264,25 @@ entry:
   return %m : $@thick (() -> ()).Type
 }
 
+
+// CHECK-LABEL: sil @error_result : $@thin () -> @error _ErrorType
+sil @error_result : $@thin () -> @error _ErrorType {
+entry:
+  unreachable
+}
+
+// CHECK-LABEL: sil @error_result2 : $@thin () -> (Int, @error _ErrorType)
+sil @error_result2 : $@thin () -> (Int, @error _ErrorType) {
+entry:
+  unreachable
+}
+
+// CHECK-LABEL: sil @error_result3 : $@thin () -> (@owned Class1, @error _ErrorType)
+sil @error_result3 : $@thin () -> (@owned Class1, @error _ErrorType) {
+entry:
+  unreachable
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
 // CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_

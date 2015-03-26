@@ -230,8 +230,9 @@ protected:
     unsigned : NumTypeBaseBits;
     unsigned ExtInfo : 16;
     unsigned CalleeConvention : 3;
+    unsigned HasErrorResult : 1;
   };
-  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 16+3 };
+  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 16+4 };
   static_assert(NumSILFunctionTypeBits <= 32, "fits in an unsigned");
 
   struct AnyMetatypeTypeBitfields {
@@ -2394,11 +2395,19 @@ public:
 
   SILType getSILType() const; // in SILType.h
 
+  /// Return a version of this parameter info with the type replaced.
+  SILParameterInfo getWithType(CanType type) const {
+    return SILParameterInfo(type, getConvention());
+  }
+
   /// Transform this SILParameterInfo by applying the user-provided
   /// function to its type.
+  ///
+  /// Note that this does not perform a recursive transformation like
+  /// Type::transform does.
   template<typename F>
-  SILParameterInfo transform(const F &fn) const {
-    return SILParameterInfo(fn(getType())->getCanonicalType(), getConvention());
+  SILParameterInfo map(const F &fn) const {
+    return getWithType(fn(getType()));
   }
 
   /// Replace references to substitutable types with new, concrete types and
@@ -2408,7 +2417,7 @@ public:
   SILParameterInfo subst(Module *module, TypeSubstitutionMap &substitutions,
                          bool ignoreMissing, LazyResolver *resolver) const {
     Type type = getType().subst(module, substitutions, ignoreMissing, resolver);
-    return SILParameterInfo(type->getCanonicalType(), getConvention());
+    return getWithType(type->getCanonicalType());
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
@@ -2481,11 +2490,19 @@ public:
   }
   SILType getSILType() const; // in SILType.h
 
+  /// Return a version of this result info with the type replaced.
+  SILResultInfo getWithType(CanType type) const {
+    return SILResultInfo(type, getConvention());
+  }
+
   /// Transform this SILResultInfo by applying the user-provided
   /// function to its type.
+  ///
+  /// Note that this does not perform a recursive transformation like
+  /// Type::transform does.
   template <typename F>
-  SILResultInfo transform(F &&fn) const {
-    return SILResultInfo(fn(getType())->getCanonicalType(), getConvention());
+  SILResultInfo map(F &&fn) const {
+    return getWithType(fn(getType()));
   }
 
   /// Replace references to substitutable types with new, concrete types and
@@ -2495,7 +2512,7 @@ public:
   SILResultInfo subst(Module *module, TypeSubstitutionMap &substitutions,
                       bool ignoreMissing, LazyResolver *resolver) const {
     Type type = getType().subst(module, substitutions, ignoreMissing, resolver);
-    return SILResultInfo(type->getCanonicalType(), getConvention());
+    return getWithType(type->getCanonicalType());
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
@@ -2561,10 +2578,16 @@ private:
     return MutableArrayRef<SILParameterInfo>(ptr, NumParameters);
   }
 
+  SILResultInfo &getMutableErrorResult() {
+    assert(hasErrorResult());
+    return *reinterpret_cast<SILResultInfo*>(getMutableParameters().end());
+  }
+
   SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> interfaceParams,
                   SILResultInfo interfaceResult,
+                  Optional<SILResultInfo> interfaceErrorResult,
                   const ASTContext &ctx,
                   RecursiveTypeProperties properties);
 
@@ -2576,6 +2599,7 @@ public:
                                 ParameterConvention calleeConvention,
                                 ArrayRef<SILParameterInfo> interfaceParams,
                                 SILResultInfo interfaceResult,
+                                Optional<SILResultInfo> interfaceErrorResult,
                                 const ASTContext &ctx);
 
   // in SILType.h
@@ -2592,6 +2616,21 @@ public:
 
   SILResultInfo getResult() const {
     return InterfaceResult;
+  }
+
+  /// Does this function have a blessed Swift-native error result?
+  bool hasErrorResult() const {
+    return SILFunctionTypeBits.HasErrorResult;
+  }
+  SILResultInfo getErrorResult() const {
+    return const_cast<SILFunctionType*>(this)->getMutableErrorResult();
+  }
+  Optional<SILResultInfo> getOptionalErrorResult() const {
+    if (hasErrorResult()) {
+      return getErrorResult();
+    } else {
+      return None;
+    }
   }
   
   ArrayRef<SILParameterInfo> getParameters() const {
@@ -2679,14 +2718,15 @@ public:
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCalleeConvention(),
-            getParameters(), getResult());
+            getParameters(), getResult(), getOptionalErrorResult());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature *genericSig,
                       ExtInfo info,
                       ParameterConvention calleeConvention,
                       ArrayRef<SILParameterInfo> params,
-                      SILResultInfo result);
+                      SILResultInfo result,
+                      Optional<SILResultInfo> errorResult);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

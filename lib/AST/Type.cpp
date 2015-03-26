@@ -2290,6 +2290,31 @@ Identifier DependentMemberType::getName() const {
   return NameOrAssocType.get<AssociatedTypeDecl *>()->getName();
 }
 
+static bool transformSILResult(SILResultInfo &result, bool &changed,
+                               const std::function<Type(Type)> &fn) {
+  Type transType = result.getType().transform(fn);
+  if (!transType) return true;
+
+  CanType canTransType = transType->getCanonicalType();
+  if (canTransType != result.getType()) {
+    changed = true;
+    result = result.getWithType(canTransType);
+  }
+  return false;
+}
+
+static bool transformSILParameter(SILParameterInfo &param, bool &changed,
+                                  const std::function<Type(Type)> &fn) {
+  Type transType = param.getType().transform(fn);
+  if (!transType) return true;
+
+  CanType canTransType = transType->getCanonicalType();
+  if (canTransType != param.getType()) {
+    changed = true;
+    param = param.getWithType(canTransType);
+  }
+  return false;
+}
 
 Type Type::transform(const std::function<Type(Type)> &fn) const {
   // Transform this type node.
@@ -2346,22 +2371,20 @@ case TypeKind::Id:
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
 
-    SILResultInfo origInterfaceResult = fnTy->getResult();
-    Type transInterfaceResult = origInterfaceResult.getType().transform(fn);
-    if (!transInterfaceResult)
-      return Type();
-    CanType canTransInterfaceResult = transInterfaceResult->getCanonicalType();
-    changed = changed || (canTransInterfaceResult != origInterfaceResult.getType());
+    SILResultInfo transResult = fnTy->getResult();
+    if (transformSILResult(transResult, changed, fn)) return Type();
 
     SmallVector<SILParameterInfo, 8> transInterfaceParams;
-    for (auto origParam : fnTy->getParameters()) {
-      Type transParam = origParam.getType().transform(fn);
-      if (!transParam) return Type();
+    for (SILParameterInfo param : fnTy->getParameters()) {
+      if (transformSILParameter(param, changed, fn)) return Type();
+      transInterfaceParams.push_back(param);
+    }
 
-      CanType canTransParam = transParam->getCanonicalType();
-      transInterfaceParams.push_back(SILParameterInfo(canTransParam,
-                                             origParam.getConvention()));
-      changed = changed || (canTransParam != origParam.getType());
+    Optional<SILResultInfo> transErrorResult;
+    if (fnTy->hasErrorResult()) {
+      SILResultInfo result = fnTy->getErrorResult();
+      if (transformSILResult(result, changed, fn)) return Type();
+      transErrorResult = result;
     }
 
     if (!changed) return *this;
@@ -2370,8 +2393,8 @@ case TypeKind::Id:
                                 fnTy->getExtInfo(),
                                 fnTy->getCalleeConvention(),
                                 transInterfaceParams,
-                                SILResultInfo(canTransInterfaceResult,
-                                          origInterfaceResult.getConvention()),
+                                transResult,
+                                transErrorResult,
                                 Ptr->getASTContext());
   }
 

@@ -1760,6 +1760,10 @@ ERROR(sil_function_label,type_parsing,PointsToFirstBadToken,
 ERROR(sil_function_repeat_convention,type_parsing,PointsToFirstBadToken,
       "repeated %select{parameter|result|callee}0 convention attribute",
       (unsigned))
+ERROR(sil_function_multiple_results,type_parsing,PointsToFirstBadToken,
+      "SIL function types cannot have multiple results", ())
+ERROR(sil_function_multiple_error_results,type_parsing,PointsToFirstBadToken,
+      "SIL function types cannot have multiple @error results", ())
 
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,type_parsing,none,

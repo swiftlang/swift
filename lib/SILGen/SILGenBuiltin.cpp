@@ -786,6 +786,7 @@ adjustMetatypeArgumentToThick(SILGenModule &SGM, SILFunction *fn) {
                          oldLoweredType->getCalleeConvention(),
                          newParamTypes,
                          oldLoweredType->getResult(),
+                         oldLoweredType->getOptionalErrorResult(),
                          SGM.getASTContext());
   fn->rewriteLoweredTypeUnsafe(newLoweredType);
 

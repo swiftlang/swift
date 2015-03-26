@@ -53,6 +53,7 @@ CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
                               callee,
                               type->getParameters(),
                               type->getResult(),
+                              type->getOptionalErrorResult(),
                               type->getASTContext());
   SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
 }
@@ -483,6 +484,9 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     result = SILResultInfo(loweredResultType, convention);
   }
 
+  // TODO: map native 'throws' to an error result type.
+  Optional<SILResultInfo> errorResult;
+
   // Destructure the input tuple type.
   if (origFnType) {
     DestructureInputs InputDestructurer(M, conventions, inputs);
@@ -508,7 +512,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 
   return SILFunctionType::get(genericSig,
                               extInfo, calleeConvention,
-                              inputs, result,
+                              inputs, result, errorResult,
                               M.getASTContext());
 }
 
@@ -1792,6 +1796,13 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
     substituter.substResult(AbstractionPattern(origLoweredType.getResult()),
                             substLoweredInterfaceType.getResult());
 
+  // Map the error result.  Currently this is never dependent.
+  Optional<SILResultInfo> substErrorResult
+    = origFnType->getOptionalErrorResult();
+  assert(!substErrorResult ||
+         (!substErrorResult->getType()->isDependentType() &&
+          !substErrorResult->getType()->hasArchetype()));
+
   // Map the inputs.
   substituter.substInputs(origLoweredType.getInput(),
                           substLoweredInterfaceType.getInput());
@@ -1808,6 +1819,7 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
                               origFnType->getCalleeConvention(),
                               substituter.getSubstParams(),
                               substResult,
+                              substErrorResult,
                               Context);
 }
 
@@ -1838,6 +1850,11 @@ namespace {
 
       SILResultInfo substResult = subst(origType->getResult());
 
+      auto substErrorResult = origType->getOptionalErrorResult();
+      assert(!substErrorResult ||
+             (!substErrorResult->getType()->isDependentType() &&
+              !substErrorResult->getType()->hasArchetype()));
+
       SmallVector<SILParameterInfo, 8> substParams;
       substParams.reserve(origType->getParameters().size());
       for (auto &origParam : origType->getParameters()) {
@@ -1851,6 +1868,7 @@ namespace {
                                   origType->getExtInfo(),
                                   origType->getCalleeConvention(),
                                   substParams, substResult,
+                                  substErrorResult,
                                   getASTContext());
     }
 

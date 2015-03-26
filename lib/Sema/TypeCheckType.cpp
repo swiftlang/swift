@@ -1044,8 +1044,12 @@ namespace {
                                   = DefaultParameterConvention);
     SILParameterInfo resolveSILParameter(TypeRepr *repr,
                                          TypeResolutionOptions options);
-    SILResultInfo resolveSILResult(TypeRepr *repr,
-                                   TypeResolutionOptions options);
+    bool resolveSILResults(TypeRepr *repr, TypeResolutionOptions options,
+                           SmallVectorImpl<SILResultInfo> &results,
+                           Optional<SILResultInfo> &errorResult);
+    bool resolveSingleSILResult(TypeRepr *repr, TypeResolutionOptions options,
+                                SmallVectorImpl<SILResultInfo> &results,
+                                Optional<SILResultInfo> &errorResult);
     Type resolveInOutType(InOutTypeRepr *repr,
                           TypeResolutionOptions options);
     Type resolveArrayType(ArrayTypeRepr *repr,
@@ -1440,10 +1444,24 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       hasError = true;
   }
 
-  SILResultInfo result = resolveSILResult(repr->getResultTypeRepr(),
-                                          options | TR_FunctionResult);
-  if (result.getType()->is<ErrorType>())
-    hasError = true;
+  SILResultInfo result;
+  Optional<SILResultInfo> errorResult;
+  {
+    // For now, resolveSILResults only returns a single ordinary result.
+    SmallVector<SILResultInfo, 1> ordinaryResults;
+    if (resolveSILResults(repr->getResultTypeRepr(),
+                          options | TR_FunctionResult,
+                          ordinaryResults, errorResult)) {
+      hasError = true;
+    } else {
+      if (ordinaryResults.empty()) {
+        result = SILResultInfo(TupleType::getEmpty(TC.Context),
+                               ResultConvention::Unowned);
+      } else {
+        result = ordinaryResults.front();
+      }
+    }
+  }
 
   if (hasError)
     return ErrorType::get(Context);
@@ -1452,6 +1470,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   GenericSignature *genericSig = nullptr;
   SmallVector<SILParameterInfo, 4> interfaceParams;
   SILResultInfo interfaceResult;
+  Optional<SILResultInfo> interfaceErrorResult;
   if (repr->getGenericParams()) {
     llvm::DenseMap<ArchetypeType*, Type> archetypeMap;
     genericSig
@@ -1471,23 +1490,32 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     };
     
     for (auto &param : params) {
-      CanType interfaceTy = param.getType()
-        .transform(getArchetypesAsDependentTypes)
-        ->getCanonicalType();
-      interfaceParams.push_back(SILParameterInfo(interfaceTy,
-                                                 param.getConvention()));
+      auto transParamType =
+        param.getType().transform(getArchetypesAsDependentTypes)
+          ->getCanonicalType();
+      interfaceParams.push_back(param.getWithType(transParamType));
     }
-    CanType resultTy
-      = result.getType().transform(getArchetypesAsDependentTypes)
-                        ->getCanonicalType();
-    interfaceResult = SILResultInfo(resultTy, result.getConvention());
+    auto transResultType =
+      result.getType().transform(getArchetypesAsDependentTypes)
+        ->getCanonicalType();
+    interfaceResult = result.getWithType(transResultType);
+
+    if (errorResult) {
+      auto transErrorResultType =
+        errorResult->getType().transform(getArchetypesAsDependentTypes)
+          ->getCanonicalType();
+      interfaceErrorResult =
+        errorResult->getWithType(transErrorResultType);
+    }
   } else {
     interfaceParams = params;
     interfaceResult = result;
+    interfaceErrorResult = errorResult;
   }
   return SILFunctionType::get(genericSig, extInfo,
                               callee,
                               interfaceParams, interfaceResult,
+                              interfaceErrorResult,
                               Context);
 }
 
@@ -1532,15 +1560,29 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   return SILParameterInfo(type->getCanonicalType(), convention);
 }
 
-SILResultInfo TypeResolver::resolveSILResult(TypeRepr *repr,
-                                             TypeResolutionOptions options) {
-  assert(options & TR_FunctionResult && "Should be marked as a result");
-  auto convention = DefaultResultConvention;
+bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
+                                          TypeResolutionOptions options,
+                              SmallVectorImpl<SILResultInfo> &ordinaryResults,
+                                       Optional<SILResultInfo> &errorResult) {
   Type type;
-  bool hadError = false;
+  auto convention = DefaultResultConvention;
+  bool isErrorResult = false;
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
+    // Copy the attributes out; we're going to destructively modify them.
     auto attrs = attrRepr->getAttrs();
+
+    // Recognize @error.
+    if (attrs.has(TypeAttrKind::TAK_error)) {
+      attrs.clearAttribute(TypeAttrKind::TAK_error);
+      isErrorResult = true;
+
+      // Error results are always implicitly @owned.
+      convention = ResultConvention::Owned;
+    }
+
+    // Recognize result conventions.
+    bool hadError = false;
     auto checkFor = [&](TypeAttrKind tak, ResultConvention attrConv) {
       if (!attrs.has(tak)) return;
       if (convention != DefaultResultConvention) {
@@ -1555,14 +1597,83 @@ SILResultInfo TypeResolver::resolveSILResult(TypeRepr *repr,
     checkFor(TypeAttrKind::TAK_unowned_inner_pointer,
              ResultConvention::UnownedInnerPointer);
     checkFor(TypeAttrKind::TAK_autoreleased, ResultConvention::Autoreleased);
+    if (hadError) return true;
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
   } else {
     type = resolveType(repr, options);
   }
 
-  if (hadError) type = ErrorType::get(Context);
-  return SILResultInfo(type->getCanonicalType(), convention);
+  // Propagate type-resolution errors out.
+  if (type->is<ErrorType>()) return true;
+
+  assert(!isErrorResult || convention == ResultConvention::Owned);
+  SILResultInfo resolvedResult(type->getCanonicalType(), convention);
+
+  // TODO: we want to generalize this to allow multiple normal results.
+  // But for now, just allow one.
+  if (!isErrorResult) {
+    if (!ordinaryResults.empty()) {
+      TC.diagnose(repr->getStartLoc(), diag::sil_function_multiple_results);
+      return true;
+    }
+
+    ordinaryResults.push_back(resolvedResult);
+    return false;
+  }
+
+  // Error result types must have pointer-like representation.
+  // FIXME: check that here?
+
+  // We don't expect to have a reason to support multiple independent
+  // error results.  (Would this be disjunctive or conjunctive?)
+  if (errorResult.hasValue()) {
+    TC.diagnose(repr->getStartLoc(),
+                diag::sil_function_multiple_error_results);
+    return true;
+  }
+
+  errorResult = resolvedResult;
+  return false;
+}
+
+static bool hasElementWithSILResultAttribute(TupleTypeRepr *tuple) {
+  for (auto elt : tuple->getElements()) {
+    if (auto attrRepr = dyn_cast<AttributedTypeRepr>(elt)) {
+      const TypeAttributes &attrs = attrRepr->getAttrs();
+      if (attrs.has(TypeAttrKind::TAK_owned) ||
+          attrs.has(TypeAttrKind::TAK_unowned_inner_pointer) ||
+          attrs.has(TypeAttrKind::TAK_autoreleased) ||
+          attrs.has(TypeAttrKind::TAK_error)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool TypeResolver::resolveSILResults(TypeRepr *repr,
+                                     TypeResolutionOptions options,
+                                SmallVectorImpl<SILResultInfo> &ordinaryResults,
+                                Optional<SILResultInfo> &errorResult) {
+  assert(options & TR_FunctionResult && "Should be marked as a result");
+
+  // When we generalize SIL to handle multiple normal results, we
+  // should always split up a tuple (a single level deep only).  Until
+  // then, we need to recognize when the tuple elements don't use any
+  // SIL result attributes and keep it as a single result.
+  if (auto tuple = dyn_cast<TupleTypeRepr>(repr)) {
+    if (hasElementWithSILResultAttribute(tuple)) {
+      bool hadError = false;
+      for (auto elt : tuple->getElements()) {
+        if (resolveSingleSILResult(elt, options, ordinaryResults, errorResult))
+          hadError = true;
+      }
+      return hadError;
+    }
+  }
+
+  return resolveSingleSILResult(repr, options, ordinaryResults, errorResult);
 }
 
 Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,

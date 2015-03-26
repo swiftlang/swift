@@ -538,6 +538,7 @@ DeadParamCloner::initCloned(SILFunction *Orig,
                          OrigFTI->getCalleeConvention(),
                          ClonedInterfaceArgTys,
                          OrigFTI->getResult(),
+                         OrigFTI->getOptionalErrorResult(),
                          M.getASTContext());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())

@@ -295,6 +295,19 @@ public:
                                              result2.getSILType()), what,
              complain("ABI-incompatible return values"));
 
+    // Our error result conventions are designed to be ABI compatible
+    // with functions lacking error results.  Just make sure that the
+    // actual conventions match up.
+    if (type1->hasErrorResult() && type2->hasErrorResult()) {
+      auto error1 = type1->getErrorResult();
+      auto error2 = type2->getErrorResult();
+      _require(error1.getConvention() == error2.getConvention(), what,
+               complain("Different error result conventions"));
+      _require(areABICompatibleParamsOrReturns(error1.getSILType(),
+                                               error2.getSILType()), what,
+               complain("ABI-incompatible error results"));
+    }
+
     // Check the parameters.
     // TODO: Could allow known-empty types to be inserted or removed, but SIL
     // doesn't know what empty types are yet.
@@ -607,6 +620,9 @@ public:
 
     require(!AI->getSubstCalleeType()->isPolymorphic(),
             "substituted callee type should not be generic");
+
+    require(!AI->getSubstCalleeType()->hasErrorResult(),
+            "apply instruction cannot call function with error result");
 
     requireSameType(SILType::getPrimitiveObjectType(substTy),
                     SILType::getPrimitiveObjectType(AI->getSubstCalleeType()),
@@ -1419,6 +1435,7 @@ public:
                                      methodTy->getCalleeConvention(),
                                      dynParams,
                                      dynResult,
+                                     methodTy->getOptionalErrorResult(),
                                      F.getASTContext());
     return SILType::getPrimitiveObjectType(fnTy);
   }

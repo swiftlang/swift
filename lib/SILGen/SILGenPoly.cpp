@@ -1020,11 +1020,19 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto interfaceResult = SILResultInfo(
     Types.getInterfaceTypeOutOfContext(expectedType->getResult().getType(), generics),
     expectedType->getResult().getConvention());
+
+  Optional<SILResultInfo> interfaceErrorResult;
+  if (expectedType->hasErrorResult()) {
+    interfaceErrorResult = SILResultInfo(
+      Types.getInterfaceTypeOutOfContext(expectedType->getErrorResult().getType(), generics),
+      expectedType->getErrorResult().getConvention());
+  }
   
   // The type of the thunk function.
   auto thunkType = SILFunctionType::get(genericSig, extInfo,
                                         ParameterConvention::Direct_Unowned,
                                         interfaceParams, interfaceResult,
+                                        interfaceErrorResult,
                                         getASTContext());
 
   // Define the substituted function type for partial_apply's purposes.
@@ -1035,6 +1043,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                                        ParameterConvention::Direct_Unowned,
                                        params,
                                        expectedType->getResult(),
+                                       expectedType->getOptionalErrorResult(),
                                        getASTContext());
   }
 

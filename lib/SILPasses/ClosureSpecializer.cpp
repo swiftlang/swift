@@ -438,7 +438,9 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
   auto ClonedTy = SILFunctionType::get(
       ClosureUserFunTy->getGenericSignature(), ClosureUserFunTy->getExtInfo(),
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
-      ClosureUserFunTy->getResult(), M.getASTContext());
+      ClosureUserFunTy->getResult(),
+      ClosureUserFunTy->getOptionalErrorResult(),
+      M.getASTContext());
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.

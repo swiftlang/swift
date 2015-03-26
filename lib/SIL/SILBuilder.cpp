@@ -39,6 +39,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                             ParameterConvention::Direct_Owned,
                                             newParams,
                                             FTI->getResult(),
+                                            FTI->getOptionalErrorResult(),
                                             M.getASTContext());
   return SILType::getPrimitiveObjectType(appliedFnType);
 }

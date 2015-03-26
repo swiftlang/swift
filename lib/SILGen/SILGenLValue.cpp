@@ -848,66 +848,6 @@ namespace {
       return ManagedValue::forLValue(address);
     }
 
-    static CanSILFunctionType getCallbackType(SILGenModule &SGM,
-                                              FuncDecl *materializeForSet,
-                                              ManagedValue baseValue) {
-      auto extInfo = SILFunctionType::ExtInfo()
-        .withRepresentation(AnyFunctionType::Representation::Thin);
-
-      ASTContext &ctx = SGM.getASTContext();
-
-      // Use () as the base type if the storage isn't in a type context.
-      // Always pass the base indirectly, but we can use in_guaranteed if
-      // materializeForSet isn't mutating.
-      Type contextType =
-        materializeForSet->getDeclContext()->getDeclaredTypeInContext();
-
-      CanType formalBaseType;
-      CanType loweredBaseType;
-      ParameterConvention baseConvention;
-      if (contextType) {
-        assert(baseValue);
-        loweredBaseType = baseValue.getType().getSwiftRValueType();
-
-        // FIXME: this only works under the assumption that methods can
-        // only be declared on types that are invariant w.r.t. lowering.
-        formalBaseType = loweredBaseType;
-
-        if (formalBaseType->mayHaveSuperclass() ||
-            materializeForSet->isStatic() ||
-            !materializeForSet->isMutating())
-          baseConvention = ParameterConvention::Indirect_In_Guaranteed;
-        else
-          baseConvention = ParameterConvention::Indirect_Inout;
-
-      // Otherwise, just pretend that () is the base type.  This may
-      // block us from sensibly implementing materializeForSet in
-      // non-type generic contexts, but it's not clear when we would
-      // ever need to do that.
-      } else {
-        formalBaseType = TupleType::getEmpty(ctx);
-        loweredBaseType = formalBaseType;
-        baseConvention = ParameterConvention::Indirect_In_Guaranteed;
-      }
-
-      auto baseMetatypeType =
-        CanMetatypeType::get(formalBaseType, MetatypeRepresentation::Thick);
-
-      SILParameterInfo params[] = {
-        { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
-        { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
-        { loweredBaseType, baseConvention },
-        { baseMetatypeType, ParameterConvention::Direct_Unowned },
-      };
-
-      SILResultInfo result(TupleType::getEmpty(ctx),
-                           ResultConvention::Unowned);
-
-      return SILFunctionType::get(nullptr, extInfo,
-                                  ParameterConvention::Direct_Unowned,
-                                  params, result, ctx);
-    }
-
     void writeback(SILGenFunction &gen, SILLocation loc,
                    ManagedValue base, Materialize temporary,
                    ArrayRef<SILValue> extraInfo) && override {
