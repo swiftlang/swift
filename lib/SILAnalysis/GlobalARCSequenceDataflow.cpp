@@ -521,7 +521,18 @@ swift::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
 
   // For each successor of BB...
   for (SILBasicBlock *PredBB : BB->getPreds()) {
-    DEBUG(llvm::dbgs() << "    Merging Pred: " << BBToBBID[PredBB] << "\n");
+
+    // Try to look up a BBState for it. If we don't have any such state, then
+    // the predecessor must be unreachable from the entrance and thus is
+    // uninteresting to us.
+    auto PredState = getTopDownBBState(PredBB);
+    if (PredState.isNull())
+      continue;
+
+    // We know this will succeed since we already looked up BBState for our pred.
+    //
+    // TODO: Once you have data handles, use the handle instead.
+    DEBUG(llvm::dbgs() << "    Merging Pred: " << BBToBBIDMap[PredBB] << "\n");
 
     // If the precessor is the head of a backedge in our traversal, clear any
     // state we are tracking now and clear the state of the basic block. There
@@ -531,28 +542,21 @@ swift::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
       break;
     }
 
-    // Otherwise, lookup the BBState associated with the predecessor and merge
-    // the predecessor in.
-    auto I = TopDownBBStates.find(PredBB);
-
-    // If we can not lookup the BBState then the BB was not in the post order
-    // implying that it is unreachable. LLVM will ensure that the BB is removed
-    // if we do not reach it at the SIL level. Since it is unreachable, ignore
-    // it.
-    if (I == TopDownBBStates.end())
-      continue;
-
     // If we found the state but the state is for a trap BB, skip it. Trap BBs
     // leak all reference counts and do not reference reference semantic objects
     // in any manner.
-    if (I->second.isTrapBB())
+    //
+    // TODO: I think this is a copy paste error, since we a trap BB should have
+    // an unreachable at its end. See if this can be removed.
+    if (PredState.get()->isTrapBB())
       continue;
 
-    if (!HasAtLeastOnePred) {
-      BBState.initPredTopDown(I->second);
-    } else {
-      BBState.mergePredTopDown(I->second);
+    if (HasAtLeastOnePred) {
+      BBState.mergePredTopDown(*PredState.get());
+      continue;
     }
+
+    BBState.initPredTopDown(*PredState.get());
     HasAtLeastOnePred = true;
   }
 }
@@ -565,17 +569,20 @@ bool swift::ARCSequenceDataflowEvaluator::processTopDown() {
   // For each BB in our reverse post order...
   for (auto *BB : POTA->getReversePostOrder(&F)) {
 
-    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToBBID[BB] << "\n");
+    // This will always succeed since we have an entry for each BB in our RPOT.
+    //
+    // TODO: When data handles are introduced, print that instead. This code
+    // should not be touching BBIDs directly.
+    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToBBIDMap[BB] << "\n");
 
     // Grab the BBState associated with it and set it to be the current BB.
-    ARCBBState &BBState = TopDownBBStates.find(BB)->second;
-    BBState.init(BB);
+    auto BBState = getTopDownBBState(BB);
 
     DEBUG(llvm::dbgs() << "Merging Predecessors!\n");
-    mergePredecessors(BBState, BB);
+    mergePredecessors(*BBState.get(), BB);
 
     // Then perform the basic block optimization.
-    NestingDetected |= processBBTopDown(BBState, DecToIncStateMap, AA, RCIA);
+    NestingDetected |= processBBTopDown(*BBState.get(), DecToIncStateMap, AA, RCIA);
   }
 
   return NestingDetected;
@@ -766,18 +773,18 @@ swift::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
     }
 
     // Otherwise, lookup the BBState associated with the successor and merge
-    // the successor in.
-    auto I = BottomUpBBStates.find(SuccBB);
-    assert(I != BottomUpBBStates.end());
+    // the successor in. We know this will always succeed.
+    auto SuccBBState = getBottomUpBBState(SuccBB);
 
-    if (I->second.isTrapBB())
+    if (SuccBBState.get()->isTrapBB())
       continue;
 
-    if (!HasAtLeastOneSucc) {
-      BBState.initSuccBottomUp(I->second);
-    } else {
-      BBState.mergeSuccBottomUp(I->second);
+    if (HasAtLeastOneSucc) {
+      BBState.mergeSuccBottomUp(*SuccBBState.get());
+      continue;
     }
+
+    BBState.initSuccBottomUp(*SuccBBState.get());
     HasAtLeastOneSucc = true;
   }
 }
@@ -790,17 +797,17 @@ processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
 
   // For each BB in our post order...
   for (auto *BB : POTA->getPostOrder(&F)) {
-    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToBBID[BB] << "\n");
+    // This will always succeed since we have an entry for each BB in our post order.
+    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToBBIDMap[BB] << "\n");
 
     // Grab the BBState associated with it and set it to be the current BB.
-    ARCBBState &BBState = BottomUpBBStates.find(BB)->second;
-    BBState.init(BB);
+    auto BBState = getBottomUpBBState(BB);
 
     DEBUG(llvm::dbgs() << "Merging Successors!\n");
-    mergeSuccessors(BBState, BB);
+    mergeSuccessors(*BBState.get(), BB);
 
     // Then perform the basic block optimization.
-    NestingDetected |= processBBBottomUp(BBState,
+    NestingDetected |= processBBBottomUp(*BBState.get(),
                                          FreezeOwnedArgEpilogueReleases);
   }
 
@@ -812,35 +819,21 @@ processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
 //===----------------------------------------------------------------------===//
 
 void swift::ARCSequenceDataflowEvaluator::init() {
-  // Initialize the post order data structure.
-#ifndef NDEBUG
-  unsigned Count = 0;
-  for (auto &BB : F) {
-    BBToBBID[&BB] = Count++;
-  }
-#endif
-
-  // Then iterate through it in reverse to perform the post order, looking for
-  // backedges.
-  llvm::DenseSet<SILBasicBlock *> VisitedSet;
-  unsigned i = 0;
+  // Initialize state for each one of our BB's in the RPOT. *NOTE* This means
+  // that unreachable predecessors will not have any BBState associated with
+  // them.
   for (SILBasicBlock *BB : POTA->getReversePostOrder(&F)) {
-    VisitedSet.insert(BB);
+    unsigned BBID = BBToBBIDMap.size();
+    BBToBBIDMap[BB] = BBID;
 
-    BottomUpBBStates[i].first = BB;
-    BottomUpBBStates[i].second.init(BB);
-    TopDownBBStates[i].first = BB;
-    TopDownBBStates[i].second.init(BB);
-    ++i;
+    BBIDToBottomUpBBStateMap[BBID].init(BB);
+    BBIDToTopDownBBStateMap[BBID].init(BB);
 
     for (auto &Succ : BB->getSuccessors())
       if (SILBasicBlock *SuccBB = Succ.getBB())
-        if (VisitedSet.count(SuccBB))
+        if (BBToBBIDMap.count(SuccBB))
           BackedgeMap[BB].insert(SuccBB);
   }
-
-  BottomUpBBStates.sort();
-  TopDownBBStates.sort();
 }
 
 bool swift::ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {

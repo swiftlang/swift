@@ -13,8 +13,9 @@
 #include "ReferenceCountState.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
-#include "swift/Basic/PreallocatedMap.h"
+#include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/Optional.h"
 
 namespace swift {
 
@@ -175,25 +176,21 @@ class ARCSequenceDataflowEvaluator {
   /// The map from dataflow terminating increment -> decrement dataflow state.
   BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap;
 
-#ifndef NDEBUG
-  /// A map from a SIL Basic Block to its id in the BB list. This matches what
-  /// is printed out in SIL files.
-  llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBID;
-#endif
+  // A map from BB -> BBID. A BB's BBID is its RPOT number.
+  llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
+
+  /// Map from a BBID to BB's bottom up dataflow state. Meant to be used in
+  /// conjunction with BBToBBIDMap.
+  std::vector<ARCBBState> BBIDToBottomUpBBStateMap;
+
+  /// Map from a BBID to BB's top down dataflow state. Meant to be used in
+  /// conjunction with BBToBBIDMap.
+  std::vector<ARCBBState> BBIDToTopDownBBStateMap;
 
   /// A map mapping the head to a tail of a backedge. We only compute this once
   /// in the lifetime of this class.
   llvm::DenseMap<SILBasicBlock *,
                  llvm::SmallPtrSet<SILBasicBlock *, 4>> BackedgeMap;
-
-  /// A type which maps a basic block to an ARCBBState.
-  using BBToARCStateMapTy = PreallocatedMap<SILBasicBlock *, ARCBBState>;
-
-  /// Map from a basic block to its bottom up dataflow state.
-  BBToARCStateMapTy BottomUpBBStates;
-
-  /// Map from basic block to its top down dataflow state.
-  BBToARCStateMapTy TopDownBBStates;
 
   ConsumedArgToEpilogueReleaseMatcher ConsumedArgToReleaseMap;
 
@@ -205,20 +202,10 @@ public:
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
       : F(F), AA(AA), POTA(POTA), RCIA(RCIA),
         DecToIncStateMap(DecToIncStateMap), IncToDecStateMap(IncToDecStateMap),
-#ifndef NDEBUG
-        BBToBBID(),
-#endif
+        BBToBBIDMap(),
+        BBIDToBottomUpBBStateMap(POTA->size(&F)),
+        BBIDToTopDownBBStateMap(POTA->size(&F)),
         BackedgeMap(),
-        BottomUpBBStates(POTA->size(&F),
-                         [](const BBToARCStateMapTy::PairTy &P1,
-                            const BBToARCStateMapTy::PairTy &P2) {
-                           return P1.first < P2.first;
-                         }),
-        TopDownBBStates(POTA->size(&F),
-                        [](const BBToARCStateMapTy::PairTy &P1,
-                           const BBToARCStateMapTy::PairTy &P2) {
-                          return P1.first < P2.first;
-                        }),
     ConsumedArgToReleaseMap(RCIA, &F) {}
 
   /// Initialize the dataflow evaluator state.
@@ -229,12 +216,12 @@ public:
 
   /// Clear all of the states we are tracking for the various basic blocks.
   void clear() {
-    assert(BottomUpBBStates.size() == TopDownBBStates.size()
+    assert(BBIDToBottomUpBBStateMap.size() == BBIDToTopDownBBStateMap.size()
            && "These should be one to one mapped to basic blocks so should"
            " have the same size");
-    for (unsigned i = 0, e = BottomUpBBStates.size(); i != e; ++i) {
-      BottomUpBBStates[i].second.clear();
-      TopDownBBStates[i].second.clear();
+    for (unsigned i : indices(BBIDToBottomUpBBStateMap)) {
+      BBIDToBottomUpBBStateMap[i].clear();
+      BBIDToTopDownBBStateMap[i].clear();
     }
   }
 
@@ -259,6 +246,27 @@ private:
                          bool FreezeOwnedArgEpilogueReleases);
 
   void computePostDominatingConsumedArgMap();
+
+  llvm::Optional<unsigned> getBBID(SILBasicBlock *BB) const {
+    auto Iter = BBToBBIDMap.find(BB);
+    if (Iter == BBToBBIDMap.end())
+      return None;
+    return Iter->second;
+  }
+
+  NullablePtr<ARCBBState> getBottomUpBBState(SILBasicBlock *BB) {
+    auto ID = getBBID(BB);
+    if (!ID.hasValue())
+      return nullptr;
+    return &BBIDToBottomUpBBStateMap[ID.getValue()];
+  }
+
+  NullablePtr<ARCBBState> getTopDownBBState(SILBasicBlock *BB) {
+    auto ID = getBBID(BB);
+    if (!ID.hasValue())
+      return nullptr;
+    return &BBIDToTopDownBBStateMap[ID.getValue()];
+  }
 };
 
 } // end swift namespace
