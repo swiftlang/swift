@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ReferenceCountState.h"
+#ifndef SWIFT_SILANALYSIS_GLOBALARCSEQUENCEDATAFLOW_H
+#define SWIFT_SILANALYSIS_GLOBALARCSEQUENCEDATAFLOW_H
+
+#include "RefCountState.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
@@ -270,3 +273,5 @@ private:
 };
 
 } // end swift namespace
+
+#endif

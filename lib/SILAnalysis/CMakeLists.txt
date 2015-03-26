@@ -15,4 +15,5 @@ add_swift_library(swiftSILAnalysis
   DestructorAnalysis.cpp
   CFG.cpp
   ArraySemantic.cpp
+  RefCountState.cpp
   LINK_LIBRARIES swiftSILPassesUtils)

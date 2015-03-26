@@ -1,4 +1,4 @@
-//===- ReferenceCountState.h - Represents a Reference Count -----*- C++ -*-===//
+//===--- RefCountState.h - Represents a Reference Count -----*- C++ -*-----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILANALYSIS_REFERENCECOUNTSTATE_H
-#define SWIFT_SILANALYSIS_REFERENCECOUNTSTATE_H
+#ifndef SWIFT_SILANALYSIS_REFCOUNTSTATE_H
+#define SWIFT_SILANALYSIS_REFCOUNTSTATE_H
 
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
@@ -21,7 +21,7 @@
 #include <algorithm>
 
 namespace swift {
-  class AliasAnalysis;
+class AliasAnalysis;
 } // end namespace swift
 
 namespace swift {
@@ -388,13 +388,13 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
   /// advance return true. Otherwise return false.
   bool handleDecrement(SILInstruction *PotentialDecrement) {
     switch (LatState) {
-      case LatticeState::MightBeUsed:
-        LatState = LatticeState::MightBeDecremented;
-        return true;
-      case LatticeState::None:
-      case LatticeState::MightBeDecremented:
-      case LatticeState::Decremented:
-        return false;
+    case LatticeState::MightBeUsed:
+      LatState = LatticeState::MightBeDecremented;
+      return true;
+    case LatticeState::None:
+    case LatticeState::MightBeDecremented:
+    case LatticeState::Decremented:
+      return false;
     }
   }
 
@@ -411,16 +411,16 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
            "Must be able to be used at this point of the lattice.");
     // Advance the sequence...
     switch (LatState) {
-      case LatticeState::Decremented:
-        LatState = LatticeState::MightBeUsed;
-        assert(InsertPts.empty() && "If we are decremented, we should have no "
-               "insertion points.");
-        InsertPts.insert(std::next(SILBasicBlock::iterator(PotentialUser)));
-        return true;
-      case LatticeState::MightBeUsed:
-      case LatticeState::MightBeDecremented:
-      case LatticeState::None:
-        return false;
+    case LatticeState::Decremented:
+      LatState = LatticeState::MightBeUsed;
+      assert(InsertPts.empty() && "If we are decremented, we should have no "
+                                  "insertion points.");
+      InsertPts.insert(std::next(SILBasicBlock::iterator(PotentialUser)));
+      return true;
+    case LatticeState::MightBeUsed:
+    case LatticeState::MightBeDecremented:
+    case LatticeState::None:
+      return false;
     }
   }
 
@@ -444,23 +444,23 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
            "Must be able to be used at this point of the lattice.");
     // Advance the sequence...
     switch (LatState) {
-      // If were decremented, insert the insertion point.
-      case LatticeState::Decremented: {
-        assert(InsertPts.empty() && "If we are decremented, we should have no "
-               "insertion points.");
-        auto Iter = SILBasicBlock::iterator(PotentialGuaranteedUser);
-        InsertPts.insert(std::next(Iter));
-        LatState = LatticeState::MightBeDecremented;
-        return true;
-      }
-      case LatticeState::MightBeUsed:
-        // If we have a might be used, we already created an insertion point
-        // earlier. Just move to MightBeDecremented.
-        LatState = LatticeState::MightBeDecremented;
-        return true;
-      case LatticeState::MightBeDecremented:
-      case LatticeState::None:
-        return false;
+    // If were decremented, insert the insertion point.
+    case LatticeState::Decremented: {
+      assert(InsertPts.empty() && "If we are decremented, we should have no "
+                                  "insertion points.");
+      auto Iter = SILBasicBlock::iterator(PotentialGuaranteedUser);
+      InsertPts.insert(std::next(Iter));
+      LatState = LatticeState::MightBeDecremented;
+      return true;
+    }
+    case LatticeState::MightBeUsed:
+      // If we have a might be used, we already created an insertion point
+      // earlier. Just move to MightBeDecremented.
+      LatState = LatticeState::MightBeDecremented;
+      return true;
+    case LatticeState::MightBeDecremented:
+    case LatticeState::None:
+      return false;
     }
   }
 
@@ -470,16 +470,16 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
     // Otherwise modify the state appropriately in preparation for removing the
     // increment, decrement pair.
     switch (LatState) {
-      case LatticeState::None:
-        return false;
-      case LatticeState::Decremented:
-      case LatticeState::MightBeUsed:
-        // Unset InsertPt so we remove retain release pairs instead of
-        // performing code motion.
-        InsertPts.clear();
-        SWIFT_FALLTHROUGH;
-      case LatticeState::MightBeDecremented:
-        return true;
+    case LatticeState::None:
+      return false;
+    case LatticeState::Decremented:
+    case LatticeState::MightBeUsed:
+      // Unset InsertPt so we remove retain release pairs instead of
+      // performing code motion.
+      InsertPts.clear();
+      SWIFT_FALLTHROUGH;
+    case LatticeState::MightBeDecremented:
+      return true;
     }
   }
 
@@ -593,14 +593,14 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
   /// advance return true. Otherwise return false.
   bool handleDecrement(SILInstruction *PotentialDecrement) {
     switch (LatState) {
-      case LatticeState::Incremented:
-        LatState = LatticeState::MightBeDecremented;
-        InsertPts.insert(PotentialDecrement);
-        return true;
-      case LatticeState::None:
-      case LatticeState::MightBeDecremented:
-      case LatticeState::MightBeUsed:
-        return false;
+    case LatticeState::Incremented:
+      LatState = LatticeState::MightBeDecremented;
+      InsertPts.insert(PotentialDecrement);
+      return true;
+    case LatticeState::None:
+    case LatticeState::MightBeDecremented:
+    case LatticeState::MightBeUsed:
+      return false;
     }
   }
 
@@ -618,13 +618,13 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
     // Otherwise advance the sequence...
     switch (LatState) {
-      case LatticeState::MightBeDecremented:
-        LatState = LatticeState::MightBeUsed;
-        return true;
-      case LatticeState::Incremented:
-      case LatticeState::None:
-      case LatticeState::MightBeUsed:
-        return false;
+    case LatticeState::MightBeDecremented:
+      LatState = LatticeState::MightBeUsed;
+      return true;
+    case LatticeState::Incremented:
+    case LatticeState::None:
+    case LatticeState::MightBeUsed:
+      return false;
     }
   }
 
@@ -648,25 +648,24 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
            "Must be able to be used at this point of the lattice.");
     // Advance the sequence...
     switch (LatState) {
-      // If were decremented, insert the insertion point.
-      case LatticeState::Incremented: {
-        assert(InsertPts.empty() && "If we are decremented, we should have no "
-               "insertion points.");
-        LatState = LatticeState::MightBeUsed;
-        InsertPts.insert(PotentialGuaranteedUser);
-        return true;
-      }
-      case LatticeState::MightBeDecremented:
-        // If we have a might be used, we already created an insertion point
-        // earlier. Just move to MightBeDecremented.
-        LatState = LatticeState::MightBeUsed;
-        return true;
-      case LatticeState::MightBeUsed:
-      case LatticeState::None:
-        return false;
+    // If were decremented, insert the insertion point.
+    case LatticeState::Incremented: {
+      assert(InsertPts.empty() && "If we are decremented, we should have no "
+                                  "insertion points.");
+      LatState = LatticeState::MightBeUsed;
+      InsertPts.insert(PotentialGuaranteedUser);
+      return true;
+    }
+    case LatticeState::MightBeDecremented:
+      // If we have a might be used, we already created an insertion point
+      // earlier. Just move to MightBeDecremented.
+      LatState = LatticeState::MightBeUsed;
+      return true;
+    case LatticeState::MightBeUsed:
+    case LatticeState::None:
+      return false;
     }
   }
-
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
@@ -674,16 +673,16 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
     // Otherwise modify the state appropriately in preparation for removing the
     // increment, decrement pair.
     switch (LatState) {
-      case LatticeState::None:
-        return false;
-      case LatticeState::Incremented:
-      case LatticeState::MightBeDecremented:
-        // Unset InsertPt so we remove retain release pairs instead of performing
-        // code motion.
-        InsertPts.clear();
-        SWIFT_FALLTHROUGH;
-      case LatticeState::MightBeUsed:
-        return true;
+    case LatticeState::None:
+      return false;
+    case LatticeState::Incremented:
+    case LatticeState::MightBeDecremented:
+      // Unset InsertPt so we remove retain release pairs instead of performing
+      // code motion.
+      InsertPts.clear();
+      SWIFT_FALLTHROUGH;
+    case LatticeState::MightBeUsed:
+      return true;
     }
   }
 
@@ -691,5 +690,14 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 };
 
 } // end swift namespace
+
+namespace llvm {
+
+raw_ostream &operator<<(raw_ostream &OS,
+                        swift::BottomUpRefCountState::LatticeState S);
+raw_ostream &operator<<(raw_ostream &OS,
+                        swift::TopDownRefCountState::LatticeState S);
+
+} // end namespace llvm
 
 #endif
