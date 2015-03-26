@@ -108,30 +108,30 @@ struct RefCountState {
 
   /// Is this ref count initialized and tracking a ref count ptr.
   bool isTrackingRefCount() const {
-    return asImpl()->isTrackingRefCount();
+    return Transition.hasValue();
   }
 
   /// Are we tracking an instruction currently? This returns false when given an
   /// uninitialized ReferenceCountState.
   bool isTrackingRefCountInst() const {
-    return asImpl()->isTrackingRefCountInst();
+    return Transition.hasValue() && Transition->isMutator();
   }
 
   /// Are we tracking a source of ref counts? This currently means that we are
   /// tracking an argument that is @owned. In the future this will include
   /// return values of functions that are @owned.
   bool isTrackingRefCountSource() const {
-    return asImpl()->isTrackingRefCountSource();
+    return Transition.hasValue() && Transition->isEndPoint();
   }
 
   /// Return the increment we are tracking.
-  Range<InstructionSet::iterator> getInstructions() const {
-    return asImpl()->getInstructions();
+  RCStateTransition::mutator_range getInstructions() const {
+    return Transition->getMutators();
   }
 
   /// Returns true if I is in the instructions we are tracking.
   bool containsInstruction(SILInstruction *I) const {
-    return asImpl()->containsInstruction(I);
+    return Transition.hasValue() && Transition->containsMutator(I);
   }
 
   /// Return the value with reference semantics that is the operand of our
@@ -311,32 +311,6 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
     return LatState == LatticeState::Decremented;
   }
 
-  /// Is this ref count initialized and tracking a ref count ptr.
-  bool isTrackingRefCount() const { return Transition.hasValue(); }
-
-  /// Are we tracking an instruction currently? This returns false when given an
-  /// uninitialized ReferenceCountState.
-  bool isTrackingRefCountInst() const {
-    return Transition.hasValue() && Transition->isMutator();
-  }
-
-  /// Are we tracking a source of ref counts? This currently means that we are
-  /// tracking an argument that is @owned. In the future this will include
-  /// return values of functions that are @owned.
-  bool isTrackingRefCountSource() const {
-    return Transition.hasValue() && Transition->isEndPoint();
-  }
-
-  /// Returns true if I is an instruction that we are tracking.
-  bool containsInstruction(SILInstruction *I) const {
-    return Transition.hasValue() && Transition->containsMutator(I);
-  }
-
-  /// Return the increment we are tracking.
-  RCStateTransition::mutator_range getInstructions() const {
-    return Transition->getMutators();
-  }
-
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is decremented.
   bool valueCanBeDecrementedGivenLatticeState() const {
@@ -499,32 +473,6 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
   /// Can we gaurantee that the given reference counted value has been modified?
   bool isRefCountStateModified() const {
     return LatState == LatticeState::Incremented;
-  }
-
-  /// Is this ref count initialized and tracking a ref count ptr.
-  bool isTrackingRefCount() const { return Transition.hasValue(); }
-
-  /// Are we tracking an instruction currently? This returns false when given an
-  /// uninitialized ReferenceCountState.
-  bool isTrackingRefCountInst() const {
-    return Transition.hasValue() && Transition->isMutator();
-  }
-
-  /// Are we tracking a source of ref counts? This currently means that we are
-  /// tracking an argument that is @owned. In the future this will include
-  /// return values of functions that are @owned.
-  bool isTrackingRefCountSource() const {
-    return Transition.hasValue() && Transition->isEndPoint();
-  }
-
-  /// Returns true if I is an instruction that we are tracking.
-  bool containsInstruction(SILInstruction *I) const {
-    return Transition.hasValue() && Transition->containsMutator(I);
-  }
-
-  /// Return the increment we are tracking.
-  RCStateTransition::mutator_range getInstructions() const {
-    return Transition->getMutators();
   }
 
   /// Returns true if given the current lattice state, do we care if the value
