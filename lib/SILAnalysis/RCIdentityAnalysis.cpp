@@ -392,8 +392,47 @@ stripRCIdentityPreservingOps(SILValue V, unsigned RecursionDepth) {
 //                              RCUser Analysis
 //===----------------------------------------------------------------------===//
 
+/// Returns true for instructions that always represent a value being removed
+/// from ARC management. Returns false otherwise.
+///
+/// TODO: Expand this.
+static bool isAlwaysARCExitUser(SILInstruction *User) {
+  switch (User->getKind()) {
+  case ValueKind::UncheckedTrivialBitCastInst:
+  case ValueKind::RefToRawPointerInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// Is this a user that represents an escape of user from ARC control. This
+/// means that from an RC use perspective, the object can be ignored since it is
+/// up to the frontend to communicate via fix_lifetime and mark_dependence these
+/// dependencies.
+static bool isARCExitUser(SILInstruction *User) {
+  // If this instruction is always an ARC exit instruction, return true early.
+  if (isAlwaysARCExitUser(User))
+    return true;
+
+  if (auto *TEI = dyn_cast<TupleExtractInst>(User)) {
+    // If the tuple we are extracting from only has one non trivial element and
+    // we are not extracting from that element, this is an ARC escape.
+    return TEI->isTrivialEltOfOneRCIDTuple();
+  }
+
+  if (auto *SEI = dyn_cast<StructExtractInst>(User)) {
+    // If the struct we are extracting from only has one non trivial element and
+    // we are not extracting from that element, this is an ARC escape.
+    return SEI->isTrivialFieldOfOneRCIDStruct();
+  }
+
+  return false;
+}
+
 /// Return all recursive users of V, looking through users which propagate
-/// RCIdentity.
+/// RCIdentity. *NOTE* This ignores obvious ARC escapes where the a potential
+/// user of the RC is not managed by ARC.
 ///
 /// We only use the instruction analysis here.
 void RCIdentityAnalysis::getRCUsers(
@@ -423,9 +462,15 @@ void RCIdentityAnalysis::getRCUsers(
       SILValue StrippedRCID = stripRCIdentityPreservingInsts(User);
 
       // If StrippedRCID is not V, then we know that User's result is
-      // conservatively not RCIdentical
-      // to V and we should add it to our RCUserList and continue.
+      // conservatively not RCIdentical to V.
       if (StrippedRCID != V) {
+        // If the user is an ARC exit and is considered a "exit" from ARC then
+        // it is a use of the pointer, but not of the RC itself, so we can
+        // ignore it.
+        if (isARCExitUser(User))
+          continue;
+
+        // Otherwise, it is an RC user that our user wants.
         Users.push_back(User);
         continue;
       }

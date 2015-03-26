@@ -2213,40 +2213,10 @@ public:
     return getTupleType()->getNumElements();
   }
 
-  bool isEltOnlyNonTrivialElt() const {
-    SILModule &Mod = getModule();
-
-    // If the elt we are extracting is trivial, we can not be a non-trivial
-    // field... return false.
-    if (getType().isTrivial(Mod))
-      return false;
-
-    // Ok, we know that the elt we are extracting is non-trivial. Make sure that
-    // we have no other non-trivial elts.
-    SILType OpTy = getOperand().getType();
-    unsigned FieldNo = getFieldNo();
-
-    // For each element index of the tuple...
-    for (unsigned i = 0, e = getNumTupleElts(); i != e; ++i) {
-      // If the element index is the one we are extracting, skip it...
-      if (i == FieldNo)
-        continue;
-
-      // Otherwise check if we have a non-trivial type. If we don't have one,
-      // continue.
-      if (OpTy.getTupleElementType(i).isTrivial(Mod))
-        continue;
-
-      // If we do have a non-trivial type, return false. We have multiple
-      // non-trivial types violating our condition.
-      return false;
-    }
-
-    // We checked every other elt of the tuple and did not find any
-    // non-trivial elt except for ourselves. Return true.
-    return true;
-  }
-
+  /// Returns true if this is a trivial result of a tuple that is non-trivial
+  /// and represents one RCID.
+  bool isTrivialEltOfOneRCIDTuple() const;
+  bool isEltOnlyNonTrivialElt() const;
 };
 
 /// Derive the address of a numbered element from the address of a tuple.
@@ -2296,40 +2266,14 @@ public:
     return s;
   }
 
+  /// Returns true if this is a trivial result of a struct that is non-trivial
+  /// and represents one RCID.
+  bool isTrivialFieldOfOneRCIDStruct() const;
+
   /// Return true if we are extracting the only non-trivial field of out parent
   /// struct. This implies that a ref count operation on the aggregate is
   /// equivalent to a ref count operation on this field.
-  bool isFieldOnlyNonTrivialField() const {
-    SILModule &Mod = getModule();
-
-    // If the field we are extracting is trivial, we can not be a non-trivial
-    // field... return false.
-    if (getType().isTrivial(Mod))
-      return false;
-
-    SILType StructTy = getOperand().getType();
-
-    // Ok, we are visiting a non-trivial field. Then for every stored field...
-    for (VarDecl *D : getStructDecl()->getStoredProperties()) {
-      // If we are visiting our own field continue.
-      if (Field == D)
-        continue;
-
-      // Ok, we have a field that is not equal to the field we are
-      // extracting. If that field is trivial, we do not care about
-      // it... continue.
-      if (StructTy.getFieldType(D, Mod).isTrivial(Mod))
-        continue;
-
-      // We have found a non trivial member that is not the member we are
-      // extracting, fail.
-      return false;
-    }
-
-    // We checked every other field of the struct and did not find any
-    // non-trivial fields except for ourselves. Return true.
-    return true;
-  }
+  bool isFieldOnlyNonTrivialField() const;
 };
 
 /// Derive the address of a physical field from the address of a struct.

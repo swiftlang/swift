@@ -6,6 +6,31 @@ import Swift
 import SwiftShims
 import Builtin
 
+/////////////
+// Utility //
+/////////////
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct ArrayInt{
+  var buffer : ArrayIntBuffer
+}
+
+sil public_external [semantics "array.make_mutable"] @make_mutable : $@cc(method) @thin (@inout ArrayInt) -> Bool {
+  bb0(%0: $*ArrayInt):
+    unreachable
+}
+
+sil @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
+
+sil @user : $@thin (Builtin.NativeObject) -> Bool
+
+///////////
+// Tests //
+///////////
+
 // CHECK-LABEL: sil @remove_pins
 // CHECK-NOT: strong_pin
 // CHECK-NOT: strong_unpin
@@ -34,19 +59,6 @@ bb0(%0 : $Builtin.NativeObject):
   return %2 : $()
 }
 
-struct ArrayIntBuffer {
-  var storage : Builtin.NativeObject
-}
-
-struct ArrayInt{
-  var buffer : ArrayIntBuffer
-}
-
-sil public_external [semantics "array.make_mutable"] @make_mutable : $@cc(method) @thin (@inout ArrayInt) -> Bool {
-  bb0(%0: $*ArrayInt):
-    unreachable
-}
-
 /// Due to the usage pattern of the array's uniquing there will always be a
 /// guarding make_mutable across the second access of a non-structural
 /// modification sequence.
@@ -72,8 +84,6 @@ bb0(%0 : $*ArrayInt):
   %8 = tuple()
   return %8 : $()
 }
-
-sil @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
 
 // CHECK-LABEL: sil @dont_remove_pins_across_pin_read
 // CHECK: [[PINREAD:%.*]] = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native
@@ -113,10 +123,10 @@ bb0(%0 : $*ArrayInt):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @remove_pins_with_noninert_rcidentity_uses : $@thin (@inout ArrayInt) -> Bool {
-// CHECK: strong_pin
-// CHECK: strong_unpin
-sil @remove_pins_with_noninert_rcidentity_uses : $@thin (@inout ArrayInt) -> Bool {
+// CHECK-LABEL: sil @remove_pins_with_inert_rcidentity_uses_2 : $@thin (@inout ArrayInt) -> Bool {
+// CHECK-NOT: strong_pin
+// CHECK-NOT: strong_unpin
+sil @remove_pins_with_inert_rcidentity_uses_2 : $@thin (@inout ArrayInt) -> Bool {
 bb0(%0 : $*ArrayInt):
   %1 = load %0: $*ArrayInt
   %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
@@ -132,3 +142,51 @@ bb0(%0 : $*ArrayInt):
   %11 = apply %5(%10) : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
   return %11 : $Bool
 }
+
+// Make sure we ignore the uses of %10 and %12.
+//
+// This is safe to do since the value we are extracting has nothing to do really
+// with the RCIdentity of the tuple we are extracting from.
+
+// CHECK-LABEL: sil @remove_pins_with_inert_rcidentity_uses3 : $@thin (@inout ArrayInt) -> (Builtin.Int1, Builtin.Int1) {
+// CHECK-NOT: strong_pin
+// CHECK-NOT: strong_unpin
+sil @remove_pins_with_inert_rcidentity_uses3 : $@thin (@inout ArrayInt) -> (Builtin.Int1, Builtin.Int1) {
+bb0(%0 : $*ArrayInt):
+  %1 = load %0: $*ArrayInt
+  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
+  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
+  %6 = strong_pin %3 : $Builtin.NativeObject
+  %7 = integer_literal $Builtin.Int1, 0
+  %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
+  %9 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 0
+  %10 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 1
+  strong_unpin %9 : $Optional<Builtin.NativeObject>  
+  %11 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 1
+  %12 = tuple(%10 : $Builtin.Int1, %11 : $Builtin.Int1)
+  return %12 : $(Builtin.Int1, Builtin.Int1)
+}
+
+// CHECK-LABEL: sil @do_not_remove_pins_non_inert_rcidentity_uses : $@thin (@inout ArrayInt) -> Bool {
+// CHECK: strong_pin
+// CHECK: strong_unpin
+sil @do_not_remove_pins_non_inert_rcidentity_uses : $@thin (@inout ArrayInt) -> Bool {
+bb0(%0 : $*ArrayInt):
+  %1 = load %0: $*ArrayInt
+  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
+  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
+  %6 = strong_pin %3 : $Builtin.NativeObject
+  %7 = integer_literal $Builtin.Int1, 0
+  %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
+  %9 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 0
+  strong_unpin %9 : $Optional<Builtin.NativeObject>
+  %10 = unchecked_ref_bit_cast %9 : $Optional<Builtin.NativeObject> to $Builtin.NativeObject
+  %11 = function_ref @user : $@thin (Builtin.NativeObject) -> Bool
+  %12 = apply %11(%10) : $ @thin (Builtin.NativeObject) -> Bool
+  return %12 : $Bool
+}
+
