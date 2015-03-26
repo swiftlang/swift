@@ -252,6 +252,10 @@ public:
   /// for \p BI is not needd.
   static bool isOverflowCheckRemovedByConstraint(Constraint &F,
                                                  BuiltinInst *BI) {
+    // L and R are the righthand and lefthand sides of the constraint.
+    SILValue L = F.Left;
+    SILValue R = F.Right;
+
     switch (BI->getBuiltinInfo().ID) {
       default: return false;
       case BuiltinValueKind::SAddOver:
@@ -262,11 +266,11 @@ public:
           // L >= A and R >= B  or (commutatively) R >= A and L >= B.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          if (knownRelation(A, F.Left,  ValueRelation::SLE) &&
-              knownRelation(B, F.Right, ValueRelation::SLE))
+          if (knownRelation(A, L,  ValueRelation::SLE) &&
+              knownRelation(B, R, ValueRelation::SLE))
             return true;
-          if (knownRelation(B, F.Left,  ValueRelation::SLE) &&
-              knownRelation(A, F.Right, ValueRelation::SLE))
+          if (knownRelation(B, L,  ValueRelation::SLE) &&
+              knownRelation(A, R, ValueRelation::SLE))
             return true;
         }
 
@@ -276,9 +280,9 @@ public:
           SILValue B = BI->getOperand(1);
           IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
           IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
-          if (F.Left == A && BI && BI->getValue().getSExtValue() == 1)
+          if (L == A && BI && BI->getValue().getSExtValue() == 1)
             return true;
-          if (F.Left == B && AI && AI->getValue().getSExtValue() == 1)
+          if (L == B && AI && AI->getValue().getSExtValue() == 1)
             return true;
         }
 
@@ -291,11 +295,11 @@ public:
           // L >= A and R >= B  or (commutatively) R >= A and L >= B.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          if (knownRelation(A, F.Left,  ValueRelation::ULE) &&
-              knownRelation(B, F.Right, ValueRelation::ULE))
+          if (knownRelation(A, L,  ValueRelation::ULE) &&
+              knownRelation(B, R, ValueRelation::ULE))
             return true;
-          if (knownRelation(B, F.Left,  ValueRelation::ULE) &&
-              knownRelation(A, F.Right, ValueRelation::ULE))
+          if (knownRelation(B, L,  ValueRelation::ULE) &&
+              knownRelation(A, R, ValueRelation::ULE))
             return true;
         }
 
@@ -305,9 +309,9 @@ public:
           SILValue B = BI->getOperand(1);
           IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
           IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
-          if (F.Left == A && BI && BI->getValue().getZExtValue() == 1)
+          if (L == A && BI && BI->getValue().getZExtValue() == 1)
             return true;
-          if (F.Left == B && AI && AI->getValue().getZExtValue() == 1)
+          if (L == B && AI && AI->getValue().getZExtValue() == 1)
             return true;
         }
         return false;
@@ -328,19 +332,19 @@ public:
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
 
-          if (isKnownAbsLess(A, F.Left) &&
-              knownRelation(B, F.Right, ValueRelation::EQ))
+          if (isKnownAbsLess(A, L) &&
+              knownRelation(B, R, ValueRelation::EQ))
             return true;
-          if (knownRelation(A, F.Left, ValueRelation::EQ) &&
-              isKnownAbsLess(B, F.Right))
+          if (knownRelation(A, L, ValueRelation::EQ) &&
+              isKnownAbsLess(B, R))
             return true;
 
           // And commutitively, swapping A and B.
-          if (isKnownAbsLess(B, F.Left) &&
-              knownRelation(A, F.Right, ValueRelation::EQ))
+          if (isKnownAbsLess(B, L) &&
+              knownRelation(A, R, ValueRelation::EQ))
             return true;
-          if (knownRelation(B, F.Left, ValueRelation::EQ) &&
-              isKnownAbsLess(A, F.Right))
+          if (knownRelation(B, L, ValueRelation::EQ) &&
+              isKnownAbsLess(A, R))
             return true;
         }
         return false;
@@ -352,11 +356,11 @@ public:
           // L >= A and R >= B  or (commutatively) R >= A and L >= B.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          if (knownRelation(A, F.Left,  ValueRelation::ULE) &&
-              knownRelation(B, F.Right, ValueRelation::ULE))
+          if (knownRelation(A, L,  ValueRelation::ULE) &&
+              knownRelation(B, R, ValueRelation::ULE))
             return true;
-          if (knownRelation(B, F.Left,  ValueRelation::ULE) &&
-              knownRelation(A, F.Right, ValueRelation::ULE))
+          if (knownRelation(B, L,  ValueRelation::ULE) &&
+              knownRelation(A, R, ValueRelation::ULE))
             return true;
         }
         return false;
@@ -373,8 +377,8 @@ public:
           // Example: Given 2<X we know that X-2 can't trap.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          if (knownRelation(F.Right, A, ValueRelation::EQ) &&
-              knownRelation(B, F.Left, ValueRelation::ULE)) {
+          if (knownRelation(R, A, ValueRelation::EQ) &&
+              knownRelation(B, L, ValueRelation::ULE)) {
             return true;
           }
         }
@@ -383,13 +387,13 @@ public:
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
           // A - B, L == R and known that L >= A and R == B.
-          if (knownRelation(F.Right, B, ValueRelation::EQ) &&
-              knownRelation(A, F.Left, ValueRelation::ULE)) {
+          if (knownRelation(R, B, ValueRelation::EQ) &&
+              knownRelation(A, L, ValueRelation::ULE)) {
             return true;
           }
           // Swap L and R because equality is commutative.
-          if (knownRelation(F.Left, B, ValueRelation::EQ) &&
-              knownRelation(A, F.Right, ValueRelation::ULE)) {
+          if (knownRelation(L, B, ValueRelation::EQ) &&
+              knownRelation(A, R, ValueRelation::ULE)) {
             return true;
           }
         }
@@ -400,8 +404,8 @@ public:
           // L <= A and B <= R.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          if (knownRelation(F.Left, A, ValueRelation::ULE) &&
-              knownRelation(B, F.Right,  ValueRelation::ULE))
+          if (knownRelation(L, A, ValueRelation::ULE) &&
+              knownRelation(B, R,  ValueRelation::ULE))
             return true;
         }
 
@@ -410,7 +414,7 @@ public:
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
           IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
-          if (F.Right == A && BI && BI->getValue().getZExtValue() == 1)
+          if (R == A && BI && BI->getValue().getZExtValue() == 1)
             return true;
         }
 
@@ -430,9 +434,9 @@ public:
           // Example: Given 2<X we know that X-2 can't trap.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          if (isKnownPositive(F.Left) &&
-              knownRelation(F.Right, A, ValueRelation::EQ) &&
-              knownRelation(B, F.Left, ValueRelation::SLE)) {
+          if (isKnownPositive(L) &&
+              knownRelation(R, A, ValueRelation::EQ) &&
+              knownRelation(B, L, ValueRelation::SLE)) {
             return true;
           }
         }
@@ -443,8 +447,8 @@ public:
           // L <= A and B <= R.
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          if (knownRelation(F.Left, A, ValueRelation::SLE) &&
-              knownRelation(B, F.Right,  ValueRelation::SLE))
+          if (knownRelation(L, A, ValueRelation::SLE) &&
+              knownRelation(B, R,  ValueRelation::SLE))
             return true;
         }
 
@@ -452,24 +456,23 @@ public:
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
           // A - B, L == R and known that L >= A and R == B.
-          if (knownRelation(F.Right, B, ValueRelation::EQ) &&
-              knownRelation(A, F.Left, ValueRelation::SLE)) {
+          if (knownRelation(R, B, ValueRelation::EQ) &&
+              knownRelation(A, L, ValueRelation::SLE)) {
             return true;
           }
           // Swap L and R because equality is commutative.
-          if (knownRelation(F.Left, B, ValueRelation::EQ) &&
-              knownRelation(A, F.Right, ValueRelation::SLE)) {
+          if (knownRelation(L, B, ValueRelation::EQ) &&
+              knownRelation(A, R, ValueRelation::SLE)) {
             return true;
           }
         }
-
 
         // A - 1 does not trap if A is greater than some other number.
         if (F.Relationship == ValueRelation::SLT) {
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
           IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
-          if (F.Right == A && BI && BI->getValue().getSExtValue() == 1)
+          if (R == A && BI && BI->getValue().getSExtValue() == 1)
             return true;
         }
         return false;
