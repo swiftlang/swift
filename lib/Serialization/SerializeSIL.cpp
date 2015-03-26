@@ -1617,7 +1617,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // serialize everything.
   // FIXME: Resilience: could write out vtable for fragile classes.
   for (const SILVTable &vt : SILMod->getVTables()) {
-    if (ShouldSerializeAll)
+    if (ShouldSerializeAll &&
+        vt.getClass()->getModuleContext() == SILMod->getSwiftModule())
       writeSILVTable(vt);
   }
 
