@@ -243,7 +243,7 @@ public:
     IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
 
     if (AI && BI)
-      return AI->getValue().abs().slt(BI->getValue().abs());
+      return AI->getValue().abs().ult(BI->getValue().abs());
 
     return false;
   }
