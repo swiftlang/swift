@@ -45,7 +45,7 @@ class SILLinker : public SILModuleTransform {
     SILModule &M = *getModule();
     for (auto &Fn : M)
       if (M.linkFunction(&Fn, SILModule::LinkingMode::LinkAll))
-          invalidateAnalysis(&Fn, SILAnalysis::PreserveKind::Nothing);
+          invalidateAnalysis(&Fn, SILAnalysis::PreserveKind::Branches);
   }
 
   StringRef getName() override { return "SIL Linker"; }
