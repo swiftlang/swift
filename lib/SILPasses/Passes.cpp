@@ -187,6 +187,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.add(createDCE());
   PM.add(createCSE());
   PM.add(createSILCombine());
+  PM.add(createCondFailOpt());
   AddSimplifyCFGSILCombine(PM);
 
   // Perform retain/release code motion and run the first ARC optimizer.

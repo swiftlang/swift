@@ -245,6 +245,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::SwiftArrayOpts,
                                    "array-specialize",
                                    "Specialize arrays"),
+                        clEnumValN(PassKind::CondFailOpt,
+                                   "condfail-opt",
+                                   "Optimize cond_fail instructions"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
