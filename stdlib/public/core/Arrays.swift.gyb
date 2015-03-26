@@ -201,8 +201,8 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
 %if Self == 'Array':
     get {
       let isNative = _getArrayPropertyIsNative()
-      let needsTypeCheck = _getArrayPropertyNeedsElementTypeCheck()
       _checkSubscript(index, hoistedIsNativeBuffer: isNative)
+      let needsTypeCheck = _getArrayPropertyNeedsElementTypeCheck()
       return _getElement(index, hoistedIsNativeBuffer: isNative,
                          hoistedNeedsElementTypeCheck: needsTypeCheck)
     }
