@@ -233,8 +233,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
     // If we found an associated type from within its protocol, resolve it
     // as a dependent member relative to Self if Self is still dependent.
-    if (auto proto = dyn_cast<ProtocolDecl>(fromDC)) {
-      auto selfTy = proto->getProtocolSelf()->getDeclaredType()
+    if (fromDC->isProtocolOrProtocolExtensionContext()) {
+      auto selfTy = fromDC->getProtocolSelf()->getDeclaredType()
                       ->castTo<GenericTypeParamType>();
       auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
 
@@ -244,10 +244,10 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
     }
 
     if (typeDecl->getDeclContext() != fromDC) {
-      if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
+      if (fromDC->isProtocolOrProtocolExtensionContext()) {
         return substMemberTypeWithBase(fromDC->getParentModule(),
                                        typeDecl,
-                                       fromProto->getProtocolSelf()
+                                       fromDC->getProtocolSelf()
                                          ->getArchetype(),
                                        /*isTypeReference=*/true);
       }
