@@ -47,8 +47,145 @@ static bool isAutoreleasePoolCall(SILInstruction &I) {
 }
 
 //===----------------------------------------------------------------------===//
-//                         ARCBBState Implementation
+//                                 ARCBBState
 //===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// \brief Per-BasicBlock state.
+class ARCSequenceDataflowEvaluator::ARCBBState {
+public:
+  using TopDownMapTy = BlotMapVector<SILValue, TopDownRefCountState>;
+  using BottomUpMapTy = BlotMapVector<SILValue, BottomUpRefCountState>;
+
+private:
+  /// The basic block that this bbstate corresponds to.
+  SILBasicBlock *BB;
+
+  /// The top-down traversal uses this to record information known about a
+  /// pointer at the bottom of each block.
+  TopDownMapTy PtrToTopDownState;
+
+  /// The bottom-up traversal uses this to record information known about a
+  /// pointer at the top of each block.
+  BottomUpMapTy PtrToBottomUpState;
+
+  /// Is this a BB that is a trap?
+  bool IsTrapBB;
+
+public:
+  ARCBBState() : BB() {}
+  ARCBBState(SILBasicBlock *BB) : BB(BB) {}
+
+  void init(SILBasicBlock *NewBB) {
+    assert(NewBB && "Cannot set NewBB to a nullptr.");
+    BB = NewBB;
+    IsTrapBB = false;
+    initializeTrapStatus();
+  }
+
+  /// Is this BB a BB that fits the canonical form of a trap?
+  ///
+  /// The canonical form of a trap is:
+  ///
+  ///   builtin "int_trap"() : $()
+  ///   unreachable
+  ///
+  /// This can not have any uses of reference counted values since the frontend
+  /// just leaks at that point.
+  bool isTrapBB() const { return IsTrapBB; }
+
+  /// Top Down Iterators
+  using topdown_iterator = TopDownMapTy::iterator;
+  using topdown_const_iterator = TopDownMapTy::const_iterator;
+  topdown_iterator topdown_begin() { return PtrToTopDownState.begin(); }
+  topdown_iterator topdown_end() { return PtrToTopDownState.end(); }
+  topdown_const_iterator topdown_begin() const {
+    return PtrToTopDownState.begin();
+  }
+  topdown_const_iterator topdown_end() const { return PtrToTopDownState.end(); }
+  Range<topdown_iterator> getTopDownStates() {
+    return make_range(topdown_begin(), topdown_end());
+  }
+
+  /// Bottom up iteration.
+  using bottomup_iterator = BottomUpMapTy::iterator;
+  using bottomup_const_iterator = BottomUpMapTy::const_iterator;
+  bottomup_iterator bottomup_begin() { return PtrToBottomUpState.begin(); }
+  bottomup_iterator bottomup_end() { return PtrToBottomUpState.end(); }
+  bottomup_const_iterator bottomup_begin() const {
+    return PtrToBottomUpState.begin();
+  }
+  bottomup_const_iterator bottomup_end() const {
+    return PtrToBottomUpState.end();
+  }
+  Range<bottomup_iterator> getBottomupStates() {
+    return make_range(bottomup_begin(), bottomup_end());
+  }
+
+  /// Attempt to find the PtrState object describing the top down state for
+  /// pointer Arg. Return a new initialized PtrState describing the top down
+  /// state for Arg if we do not find one.
+  TopDownRefCountState &getTopDownRefCountState(SILValue Ptr) {
+    return PtrToTopDownState[Ptr];
+  }
+
+  /// Attempt to find the PtrState object describing the bottom up state for
+  /// pointer Arg. Return a new initialized PtrState describing the bottom up
+  /// state for Arg if we do not find one.
+  BottomUpRefCountState &getBottomUpRefCountState(SILValue Ptr) {
+    return PtrToBottomUpState[Ptr];
+  }
+
+  /// Blot \p Ptr.
+  void clearBottomUpRefCountState(SILValue Ptr) {
+    PtrToBottomUpState.blot(Ptr);
+  }
+
+  /// Blot \p Ptr.
+  void clearTopDownRefCountState(SILValue Ptr) {
+    PtrToTopDownState.blot(Ptr);
+  }
+
+  void clearTopDownState() { PtrToTopDownState.clear(); }
+  void clearBottomUpState() { PtrToBottomUpState.clear(); }
+
+  /// Clear both the bottom up *AND* top down state.
+  void clear() {
+    clearTopDownState();
+    clearBottomUpState();
+  }
+
+  /// Returns a reference to the basic block that we are tracking.
+  SILBasicBlock &getBB() const { return *BB; }
+
+  /// Merge in the state of the successor basic block. This is currently a stub.
+  void mergeSuccBottomUp(ARCBBState &SuccBB);
+
+  /// Initialize this BB with the state of the successor basic block. This is
+  /// called on a basic block's state and then any other successors states are
+  /// merged in. This is currently a stub.
+  void initSuccBottomUp(ARCBBState &SuccBB);
+
+  /// Merge in the state of the predecessor basic block. This is currently a stub.
+  void mergePredTopDown(ARCBBState &PredBB);
+
+  /// Initialize the state for this BB with the state of its predecessor
+  /// BB. Used to create an initial state before we merge in other
+  /// predecessors. This is currently a stub.
+  void initPredTopDown(ARCBBState &PredBB);
+
+private:
+  void initializeTrapStatus();
+};
+
+} // end namespace swift
+
+namespace {
+
+using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
+
+} // end anonymous namespace
 
 /// Merge in the state of the successor basic block. This is an intersection
 /// operation.
@@ -161,6 +298,151 @@ void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
 /// predecessors.
 void ARCBBState::initPredTopDown(ARCBBState &PredBBState) {
   PtrToTopDownState = PredBBState.PtrToTopDownState;
+}
+
+void ARCBBState::initializeTrapStatus() {
+  IsTrapBB = isARCInertTrapBB(BB);
+}
+
+//===----------------------------------------------------------------------===//
+//                               ARCBBStateInfo
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+class ARCSequenceDataflowEvaluator::ARCBBStateInfoHandle {
+  friend ARCSequenceDataflowEvaluator::ARCBBStateInfo;
+
+  SILBasicBlock *BB;
+  ARCBBState &BBState;
+  NullablePtr<llvm::SmallPtrSet<SILBasicBlock *, 4>> BackedgeMap;
+  unsigned ID;
+
+  ARCBBStateInfoHandle(SILBasicBlock *BB, unsigned ID, ARCBBState &BBState)
+    : BB(BB), BBState(BBState), BackedgeMap(), ID(ID) {}
+  ARCBBStateInfoHandle(SILBasicBlock *BB, unsigned ID, ARCBBState &BBState,
+                       llvm::SmallPtrSet<SILBasicBlock *, 4> &BackedgeMap)
+    : BB(BB), BBState(BBState), BackedgeMap(&BackedgeMap), ID(ID) {}
+
+public:
+  ARCBBStateInfoHandle(const ARCBBStateInfoHandle &) = default;
+  ARCBBStateInfoHandle(ARCBBStateInfoHandle &&) = default;;
+  ~ARCBBStateInfoHandle() = default;
+
+  SILBasicBlock *getBB() const { return BB; }
+  unsigned getID() const { return ID; }
+  ARCBBState &getState() { return BBState; }
+  bool isBackedge(SILBasicBlock *BB) const {
+    if (BackedgeMap.isNull())
+      return false;
+    return BackedgeMap.get()->count(BB);
+  }
+};
+
+class ARCSequenceDataflowEvaluator::ARCBBStateInfo {
+  /// A map from BB -> BBID. A BB's BBID is its RPOT number.
+  llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
+
+  /// Map from a BBID to BB's bottom up dataflow state. Meant to be used in
+  /// conjunction with BBToBBIDMap.
+  std::vector<ARCBBState> BBIDToBottomUpBBStateMap;
+
+  /// Map from a BBID to BB's top down dataflow state. Meant to be used in
+  /// conjunction with BBToBBIDMap.
+  std::vector<ARCBBState> BBIDToTopDownBBStateMap;
+
+  /// A map mapping the head to a tail of a backedge. We only compute this once
+  /// in the lifetime of this class.
+  llvm::DenseMap<SILBasicBlock *,
+                 llvm::SmallPtrSet<SILBasicBlock *, 4>> BackedgeMap;
+
+public:
+  ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POTA);
+
+  llvm::Optional<ARCBBStateInfoHandle> getBottomUpBBHandle(SILBasicBlock *BB);
+  llvm::Optional<ARCBBStateInfoHandle> getTopDownBBHandle(SILBasicBlock *BB);
+
+  void clear();
+
+private:
+  llvm::Optional<unsigned> getBBID(SILBasicBlock *BB) const;
+};
+
+} // end swift namespace
+
+namespace {
+
+using ARCBBStateInfo = ARCSequenceDataflowEvaluator::ARCBBStateInfo;
+using ARCBBStateInfoHandle = ARCSequenceDataflowEvaluator::ARCBBStateInfoHandle;
+
+} // end anonymous namespace
+
+ARCBBStateInfo::ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POA)
+  : BBToBBIDMap(), BBIDToBottomUpBBStateMap(POA->size(F)),
+    BBIDToTopDownBBStateMap(POA->size(F)), BackedgeMap() {
+
+  // Initialize state for each one of our BB's in the RPOT. *NOTE* This means
+  // that unreachable predecessors will not have any BBState associated with
+  // them.
+  for (SILBasicBlock *BB : POA->getReversePostOrder(F)) {
+    unsigned BBID = BBToBBIDMap.size();
+    BBToBBIDMap[BB] = BBID;
+
+    BBIDToBottomUpBBStateMap[BBID].init(BB);
+    BBIDToTopDownBBStateMap[BBID].init(BB);
+
+    for (auto &Succ : BB->getSuccessors())
+      if (SILBasicBlock *SuccBB = Succ.getBB())
+        if (BBToBBIDMap.count(SuccBB))
+          BackedgeMap[BB].insert(SuccBB);
+  }
+}
+
+llvm::Optional<ARCBBStateInfoHandle>
+ARCBBStateInfo::getBottomUpBBHandle(SILBasicBlock *BB) {
+  auto OptID = getBBID(BB);
+  if (!OptID.hasValue())
+    return None;
+
+  unsigned ID = OptID.getValue();
+
+  auto BackedgeIter = BackedgeMap.find(BB);
+  if (BackedgeIter == BackedgeMap.end())
+    return ARCBBStateInfoHandle(BB, ID, BBIDToBottomUpBBStateMap[ID]);
+  return ARCBBStateInfoHandle(BB, ID, BBIDToBottomUpBBStateMap[ID],
+                              BackedgeIter->second);
+}
+
+llvm::Optional<ARCBBStateInfoHandle>
+ARCBBStateInfo::getTopDownBBHandle(SILBasicBlock *BB) {
+  auto MaybeID = getBBID(BB);
+  if (!MaybeID.hasValue())
+    return None;
+
+  unsigned ID = MaybeID.getValue();
+
+  auto BackedgeIter = BackedgeMap.find(BB);
+  if (BackedgeIter == BackedgeMap.end())
+    return ARCBBStateInfoHandle(BB, ID, BBIDToTopDownBBStateMap[ID]);
+  return ARCBBStateInfoHandle(BB, ID, BBIDToTopDownBBStateMap[ID],
+                              BackedgeIter->second);
+}
+
+llvm::Optional<unsigned> ARCBBStateInfo::getBBID(SILBasicBlock *BB) const {
+  auto Iter = BBToBBIDMap.find(BB);
+  if (Iter == BBToBBIDMap.end())
+    return None;
+  return Iter->second;
+}
+
+void ARCBBStateInfo::clear() {
+  assert(BBIDToBottomUpBBStateMap.size() == BBIDToTopDownBBStateMap.size()
+         && "These should be one to one mapped to basic blocks so should"
+         " have the same size");
+  for (unsigned i : indices(BBIDToBottomUpBBStateMap)) {
+    BBIDToBottomUpBBStateMap[i].clear();
+    BBIDToTopDownBBStateMap[i].clear();
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -322,33 +604,35 @@ static bool processBBTopDown(
 }
 
 void
-swift::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
-                                                            SILBasicBlock *BB) {
+ARCSequenceDataflowEvaluator::
+mergePredecessors(ARCBBStateInfoHandle &DataHandle) {
   bool HasAtLeastOnePred = false;
   llvm::SmallVector<SILBasicBlock *, 4> BBThatNeedInsertPts;
+
+  SILBasicBlock *BB = DataHandle.getBB();
+  ARCBBState &BBState = DataHandle.getState();
 
   // For each successor of BB...
   for (SILBasicBlock *PredBB : BB->getPreds()) {
 
-    // Try to look up a BBState for it. If we don't have any such state, then
-    // the predecessor must be unreachable from the entrance and thus is
+    // Try to look up the data handle for it. If we don't have any such state,
+    // then the predecessor must be unreachable from the entrance and thus is
     // uninteresting to us.
-    auto PredState = getTopDownBBState(PredBB);
-    if (PredState.isNull())
+    auto PredDataHandle = getTopDownBBState(PredBB);
+    if (!PredDataHandle)
       continue;
 
-    // We know this will succeed since we already looked up BBState for our pred.
-    //
-    // TODO: Once you have data handles, use the handle instead.
-    DEBUG(llvm::dbgs() << "    Merging Pred: " << BBToBBIDMap[PredBB] << "\n");
+    DEBUG(llvm::dbgs() << "    Merging Pred: " << PredDataHandle->getID() << "\n");
 
-    // If the precessor is the head of a backedge in our traversal, clear any
+    // If the predecessor is the head of a backedge in our traversal, clear any
     // state we are tracking now and clear the state of the basic block. There
     // is some sort of control flow here that we do not understand.
-    if (BackedgeMap[PredBB].count(BB)) {
+    if (PredDataHandle->isBackedge(BB)) {
       BBState.clear();
       break;
-    }
+    }    
+
+    ARCBBState &PredBBState = PredDataHandle->getState();
 
     // If we found the state but the state is for a trap BB, skip it. Trap BBs
     // leak all reference counts and do not reference reference semantic objects
@@ -356,41 +640,40 @@ swift::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
     //
     // TODO: I think this is a copy paste error, since we a trap BB should have
     // an unreachable at its end. See if this can be removed.
-    if (PredState.get()->isTrapBB())
+    if (PredBBState.isTrapBB())
       continue;
 
     if (HasAtLeastOnePred) {
-      BBState.mergePredTopDown(*PredState.get());
+      BBState.mergePredTopDown(PredBBState);
       continue;
     }
 
-    BBState.initPredTopDown(*PredState.get());
+    BBState.initPredTopDown(PredBBState);
     HasAtLeastOnePred = true;
   }
 }
 
-bool swift::ARCSequenceDataflowEvaluator::processTopDown() {
+bool ARCSequenceDataflowEvaluator::processTopDown() {
   bool NestingDetected = false;
 
   DEBUG(llvm::dbgs() << "<<<< Processing Top Down! >>>>\n");
 
   // For each BB in our reverse post order...
-  for (auto *BB : POTA->getReversePostOrder(&F)) {
+  for (auto *BB : POA->getReversePostOrder(&F)) {
+    // We should always have a value here.
+    auto BBDataHandle = getTopDownBBState(BB).getValue();
 
     // This will always succeed since we have an entry for each BB in our RPOT.
     //
     // TODO: When data handles are introduced, print that instead. This code
     // should not be touching BBIDs directly.
-    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToBBIDMap[BB] << "\n");
-
-    // Grab the BBState associated with it and set it to be the current BB.
-    auto BBState = getTopDownBBState(BB);
+    DEBUG(llvm::dbgs() << "Processing BB#: " << BBDataHandle.getID() << "\n");
 
     DEBUG(llvm::dbgs() << "Merging Predecessors!\n");
-    mergePredecessors(*BBState.get(), BB);
+    mergePredecessors(BBDataHandle);
 
     // Then perform the basic block optimization.
-    NestingDetected |= processBBTopDown(*BBState.get(), DecToIncStateMap, AA, RCIA);
+    NestingDetected |= processBBTopDown(BBDataHandle.getState(), DecToIncStateMap, AA, RCIA);
   }
 
   return NestingDetected;
@@ -416,7 +699,7 @@ bool swift::ARCSequenceDataflowEvaluator::processTopDown() {
 /// this enabled in a side table so the information gets propgated everywhere in
 /// the CFG.
 bool
-swift::ARCSequenceDataflowEvaluator::
+ARCSequenceDataflowEvaluator::
 processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
   SILBasicBlock &BB = BBState.getBB();
@@ -551,10 +834,10 @@ processBBBottomUp(ARCBBState &BBState, bool FreezeOwnedArgEpilogueReleases) {
 }
 
 void
-swift::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
-                                                          SILBasicBlock *BB) {
-  // Grab the backedge set for our BB.
-  auto &BackEdgeSet = BackedgeMap[BB];
+ARCSequenceDataflowEvaluator::
+mergeSuccessors(ARCBBStateInfoHandle &DataHandle) {
+  SILBasicBlock *BB = DataHandle.getBB();
+  ARCBBState &BBState = DataHandle.getState();
 
   // For each successor of BB...
   ArrayRef<SILSuccessor> Succs = BB->getSuccessors();
@@ -575,47 +858,50 @@ swift::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
     // order, we know that all of a BB's successors will always be
     // visited before the BB, implying we will know if conservatively
     // we saw a release on the pointer going down all paths.
-    if (BackEdgeSet.count(SuccBB)) {
+    if (DataHandle.isBackedge(SuccBB)) {
       BBState.clear();
       break;
     }
 
     // Otherwise, lookup the BBState associated with the successor and merge
     // the successor in. We know this will always succeed.
-    auto SuccBBState = getBottomUpBBState(SuccBB);
+    auto SuccDataHandle = *getBottomUpBBState(SuccBB);
 
-    if (SuccBBState.get()->isTrapBB())
+    ARCBBState &SuccBBState = SuccDataHandle.getState();
+
+    if (SuccBBState.isTrapBB())
       continue;
 
     if (HasAtLeastOneSucc) {
-      BBState.mergeSuccBottomUp(*SuccBBState.get());
+      BBState.mergeSuccBottomUp(SuccBBState);
       continue;
     }
 
-    BBState.initSuccBottomUp(*SuccBBState.get());
+    BBState.initSuccBottomUp(SuccBBState);
     HasAtLeastOneSucc = true;
   }
 }
 
-bool swift::ARCSequenceDataflowEvaluator::
+bool
+ARCSequenceDataflowEvaluator::
 processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
   bool NestingDetected = false;
 
   DEBUG(llvm::dbgs() << "<<<< Processing Bottom Up! >>>>\n");
 
   // For each BB in our post order...
-  for (auto *BB : POTA->getPostOrder(&F)) {
-    // This will always succeed since we have an entry for each BB in our post order.
-    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToBBIDMap[BB] << "\n");
-
+  for (auto *BB : POA->getPostOrder(&F)) {
     // Grab the BBState associated with it and set it to be the current BB.
-    auto BBState = getBottomUpBBState(BB);
+    auto BBDataHandle = *getBottomUpBBState(BB);
+
+    // This will always succeed since we have an entry for each BB in our post order.
+    DEBUG(llvm::dbgs() << "Processing BB#: " << BBDataHandle.getID() << "\n");
 
     DEBUG(llvm::dbgs() << "Merging Successors!\n");
-    mergeSuccessors(*BBState.get(), BB);
+    mergeSuccessors(BBDataHandle);
 
     // Then perform the basic block optimization.
-    NestingDetected |= processBBBottomUp(*BBState.get(),
+    NestingDetected |= processBBBottomUp(BBDataHandle.getState(),
                                          FreezeOwnedArgEpilogueReleases);
   }
 
@@ -626,30 +912,40 @@ processBottomUp(bool FreezeOwnedArgEpilogueReleases) {
 //                 Top Level ARC Sequence Dataflow Evaluator
 //===----------------------------------------------------------------------===//
 
-void swift::ARCSequenceDataflowEvaluator::init() {
-  // Initialize state for each one of our BB's in the RPOT. *NOTE* This means
-  // that unreachable predecessors will not have any BBState associated with
-  // them.
-  for (SILBasicBlock *BB : POTA->getReversePostOrder(&F)) {
-    unsigned BBID = BBToBBIDMap.size();
-    BBToBBIDMap[BB] = BBID;
+ARCSequenceDataflowEvaluator::ARCSequenceDataflowEvaluator(
+      SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
+      RCIdentityAnalysis *RCIA,
+      BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
+      BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
+      : F(F), AA(AA), POA(POA), RCIA(RCIA),
+        DecToIncStateMap(DecToIncStateMap), IncToDecStateMap(IncToDecStateMap),
+        // We use a malloced pointer here so we don't need to expose
+        // ARCBBStateInfo in the header.
+        BBStateInfo(new ARCBBStateInfo(&F, POA)),
+        ConsumedArgToReleaseMap(RCIA, &F) {}
 
-    BBIDToBottomUpBBStateMap[BBID].init(BB);
-    BBIDToTopDownBBStateMap[BBID].init(BB);
-
-    for (auto &Succ : BB->getSuccessors())
-      if (SILBasicBlock *SuccBB = Succ.getBB())
-        if (BBToBBIDMap.count(SuccBB))
-          BackedgeMap[BB].insert(SuccBB);
-  }
-}
-
-bool swift::ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
+bool ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
   bool NestingDetected = processBottomUp(FreezeOwnedReleases);
   NestingDetected |= processTopDown();
   return NestingDetected;
 }
 
-void swift::ARCBBState::initializeTrapStatus() {
-  IsTrapBB = isARCInertTrapBB(BB);
+ARCSequenceDataflowEvaluator::~ARCSequenceDataflowEvaluator() {
+  // We use a malloced pointer here so we don't need to expose the type to the
+  // outside world.
+  delete BBStateInfo;
+}
+
+void ARCSequenceDataflowEvaluator::clear() {
+  BBStateInfo->clear();
+}
+
+llvm::Optional<ARCBBStateInfoHandle>
+ARCSequenceDataflowEvaluator::getBottomUpBBState(SILBasicBlock *BB) {
+  return BBStateInfo->getBottomUpBBHandle(BB);
+}
+
+llvm::Optional<ARCBBStateInfoHandle>
+ARCSequenceDataflowEvaluator::getTopDownBBState(SILBasicBlock *BB) {
+  return BBStateInfo->getTopDownBBHandle(BB);
 }

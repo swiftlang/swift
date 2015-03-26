@@ -382,9 +382,7 @@ createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
 
   // We pass in size to avoid expensively recomputing size over and over
   // again. Currently F has to do a walk to perform that computation.
-  auto *C = new ARCMatchingSetComputationContext(F, AA, POTA, RCIA);
-  C->Evaluator.init();
-  return C;
+  return new ARCMatchingSetComputationContext(F, AA, POTA, RCIA);
 }
 
 void
