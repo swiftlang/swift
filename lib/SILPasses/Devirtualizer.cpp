@@ -87,24 +87,6 @@ public:
     }
 
     if (Changed) {
-      bool Specialized = false;
-
-      // Try to specialize the devirtualized calls.
-      auto GS = GenericSpecializer(getModule());
-
-      // Try to specialize the newly devirtualized calls.
-      if (GS.specialize(DevirtualizedCalls)) {
-        Specialized = true;
-        DEBUG(llvm::dbgs() << "Specialized some generic functions\n");
-      }
-
-
-      if (Specialized) {
-        // We've specialized some functions and created new ones, so invalidate
-        // the world.
-        invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
-      }
-
       PM->scheduleAnotherIteration();
     }
   }
