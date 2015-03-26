@@ -392,29 +392,11 @@ stripRCIdentityPreservingOps(SILValue V, unsigned RecursionDepth) {
 //                              RCUser Analysis
 //===----------------------------------------------------------------------===//
 
-/// Returns true for instructions that always represent a value being removed
-/// from ARC management. Returns false otherwise.
-///
-/// TODO: Expand this.
-static bool isAlwaysARCExitUser(SILInstruction *User) {
-  switch (User->getKind()) {
-  case ValueKind::UncheckedTrivialBitCastInst:
-  case ValueKind::RefToRawPointerInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
 /// Is this a user that represents an escape of user from ARC control. This
 /// means that from an RC use perspective, the object can be ignored since it is
 /// up to the frontend to communicate via fix_lifetime and mark_dependence these
 /// dependencies.
-static bool isARCExitUser(SILInstruction *User) {
-  // If this instruction is always an ARC exit instruction, return true early.
-  if (isAlwaysARCExitUser(User))
-    return true;
-
+static bool isNonOverlappingTrivialAccess(SILInstruction *User) {
   if (auto *TEI = dyn_cast<TupleExtractInst>(User)) {
     // If the tuple we are extracting from only has one non trivial element and
     // we are not extracting from that element, this is an ARC escape.
@@ -464,10 +446,10 @@ void RCIdentityAnalysis::getRCUsers(
       // If StrippedRCID is not V, then we know that User's result is
       // conservatively not RCIdentical to V.
       if (StrippedRCID != V) {
-        // If the user is an ARC exit and is considered a "exit" from ARC then
-        // it is a use of the pointer, but not of the RC itself, so we can
-        // ignore it.
-        if (isARCExitUser(User))
+        // If the user is extracting a trivial field of an aggregate structure
+        // that does not overlap with the ref counted part of the aggregate, we
+        // can ignore it.
+        if (isNonOverlappingTrivialAccess(User))
           continue;
 
         // Otherwise, it is an RC user that our user wants.

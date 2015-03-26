@@ -123,10 +123,10 @@ bb0(%0 : $*ArrayInt):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @remove_pins_with_inert_rcidentity_uses_2 : $@thin (@inout ArrayInt) -> Bool {
-// CHECK-NOT: strong_pin
-// CHECK-NOT: strong_unpin
-sil @remove_pins_with_inert_rcidentity_uses_2 : $@thin (@inout ArrayInt) -> Bool {
+// CHECK-LABEL: sil @cant_remove_pins_with_escaping_rcidentity_use : $@thin (@inout ArrayInt) -> Bool {
+// CHECK: strong_pin
+// CHECK: strong_unpin
+sil @cant_remove_pins_with_escaping_rcidentity_use : $@thin (@inout ArrayInt) -> Bool {
 bb0(%0 : $*ArrayInt):
   %1 = load %0: $*ArrayInt
   %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
