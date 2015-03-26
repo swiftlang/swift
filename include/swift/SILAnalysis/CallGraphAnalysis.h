@@ -116,6 +116,13 @@ public:
     return CalleeSet.getInt();
   }
 
+  /// The apply has a complete callee set, and it's of size one. In
+  /// other words we can replace its callee with a function_ref
+  /// regardless of what kind of instruction the callee is now.
+  bool hasSingleCallee() const {
+    return isCalleeSetComplete() && CalleeSet.getPointer()->size() == 1;
+  }
+
   unsigned getOrdinal() const {
     return Ordinal;
   }

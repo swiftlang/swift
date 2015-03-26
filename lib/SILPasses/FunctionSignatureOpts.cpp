@@ -523,7 +523,14 @@ static void
 rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
                       const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites) {
   for (const CallGraphEdge *Edge : CallSites) {
+    if (!Edge->hasSingleCallee()) continue;
+
     auto *AI = const_cast<ApplyInst *>(Edge->getApply());
+
+    // We don't have support for the handling of argument indices that
+    // we need when we have an apply of a partial_apply.
+    if (isa<PartialApplyInst>(AI->getCallee()))
+      continue;
 
     SILBuilderWithScope<16> Builder(AI);
 
