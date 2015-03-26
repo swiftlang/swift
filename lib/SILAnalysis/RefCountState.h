@@ -24,12 +24,11 @@ namespace swift {
 class AliasAnalysis;
 } // end namespace swift
 
-namespace swift {
-
 //===----------------------------------------------------------------------===//
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+namespace swift {
 /// Is I an instruction that we recognize as a "reference count increment"
 /// instruction?
 static inline bool isRefCountIncrement(SILInstruction &I) {
@@ -70,10 +69,13 @@ static inline bool matchingRefCountPairType(SILInstruction *I1,
   return true;
 #endif
 }
+}
 
 //===----------------------------------------------------------------------===//
 //                              Ref Count State
 //===----------------------------------------------------------------------===//
+
+namespace swift {
 
 /// A struct that abstracts over reference counts manipulated by strong_retain,
 /// retain_value, strong_release,
@@ -81,8 +83,9 @@ template <typename ImplStruct>
 struct RefCountState {
   using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 8>;
 
-  /// Return the SILValue that we are tracking.
-  SILValue Value;
+  /// Return the SILValue that represents the RCRoot that we are
+  /// tracking.
+  SILValue RCRoot;
 
   /// Was the pointer we are tracking known incremented when we visited the
   /// current increment we are tracking? In that case we know that it is safe
@@ -116,7 +119,7 @@ struct RefCountState {
     bool Nested = isTrackingRefCount();
 
     // Initialize value.
-    Value = I->getOperand(0).stripCasts();
+    RCRoot = I->getOperand(0).stripCasts();
 
     // This retain is known safe if the operand we are tracking was already
     // known incremented previously. This occurs when you have nested
@@ -131,7 +134,7 @@ struct RefCountState {
 
   /// Uninitialize the current state.
   void clear() {
-    Value = SILValue();
+    RCRoot = SILValue();
     KnownSafe = false;
     Partial = false;
     InsertPts.clear();
@@ -172,14 +175,14 @@ struct RefCountState {
 
   /// Return the value with reference semantics that is the operand of our
   /// increment.
-  SILValue getValue() const {
-    assert(Value && "Value should never be null here");
-    return Value;
+  SILValue getRCRoot() const {
+    assert(RCRoot && "Value should never be null here");
+    return RCRoot;
   }
 
   /// Returns true if we have a valid value that we are tracking.
-  bool hasValue() const {
-    return Value.isValid();
+  bool hasRCRoot() const {
+    return RCRoot.isValid();
   }
 
   /// The latest point we can move the increment without bypassing instructions
@@ -217,7 +220,7 @@ struct RefCountState {
 
     // If we can prove that Other can not use the pointer we are tracking,
     // return...
-    if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getValue(), AA))
+    if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
       return false;
 
     // Otherwise, allow the CRTP substruct to update itself given we have a
@@ -244,7 +247,7 @@ struct RefCountState {
 
     // If we can prove that Other can not use the pointer we are tracking,
     // return...
-    if (!mayDecrementRefCount(PotentialDecrement, getValue(), AA))
+    if (!mayDecrementRefCount(PotentialDecrement, getRCRoot(), AA))
       return false;
 
     // Otherwise, allow the CRTP substruct to update itself given we have a
@@ -268,7 +271,7 @@ struct RefCountState {
     if (!asImpl()->valueCanBeUsedGivenLatticeState())
       return false;
 
-    if (!mayUseValue(PotentialUser, getValue(), AA))
+    if (!mayUseValue(PotentialUser, getRCRoot(), AA))
       return false;
 
     return asImpl()->handleUser(PotentialUser);
@@ -535,7 +538,7 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
     LatState = LatticeState::Incremented;
     Increments.clear();
     Argument = Arg;
-    Value = Arg;
+    RCRoot = Arg;
     KnownSafe = false;
     InsertPts.clear();
   }

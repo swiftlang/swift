@@ -146,7 +146,7 @@ static bool processBBTopDown(
         // Copy the current value of ref count state into the result map.
         DecToIncStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:\n"
-                           << RefCountState.getValue());
+                           << RefCountState.getRCRoot());
 
         // Clear the ref count state in preparation for more pairs.
         RefCountState.clear();
@@ -189,7 +189,7 @@ static bool processBBTopDown(
       // decrement.
       if (OtherState.second.handlePotentialGuaranteedUser(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
-                           << OtherState.second.getValue());
+                           << OtherState.second.getRCRoot());
         continue;
       }
 
@@ -198,7 +198,7 @@ static bool processBBTopDown(
       // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-                           << OtherState.second.getValue());
+                           << OtherState.second.getRCRoot());
         continue;
       }
 
@@ -206,7 +206,7 @@ static bool processBBTopDown(
       // could be used by the given instruction.
       if (OtherState.second.handlePotentialUser(&I, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
-                           << OtherState.second.getValue());
+                           << OtherState.second.getRCRoot());
     }
   }
 
@@ -375,7 +375,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
         // Copy the current value of ref count state into the result map.
         IncToDecStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING DECREMENT:"
-                           << RefCountState.getValue());
+                           << RefCountState.getRCRoot());
 
         // Clear the ref count state so it can be used for future pairs we may
         // see.
@@ -385,7 +385,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       else {
         if (RefCountState.isTrackingRefCountInst()) {
           DEBUG(llvm::dbgs()
-                << "    FAILED MATCH DECREMENT:" << RefCountState.getValue());
+                << "    FAILED MATCH DECREMENT:" << RefCountState.getRCRoot());
         } else {
           DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT. Not tracking a "
                                 "decrement.\n");
@@ -419,7 +419,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       // decrement.
       if (OtherState.second.handlePotentialGuaranteedUser(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
-                           << OtherState.second.getValue());
+                           << OtherState.second.getRCRoot());
         continue;
       }
 
@@ -428,7 +428,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-                           << OtherState.second.getValue());
+                           << OtherState.second.getRCRoot());
         continue;
       }
 
@@ -436,7 +436,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       // could be used by the given instruction.
       if (OtherState.second.handlePotentialUser(&I, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
-                           << OtherState.second.getValue());
+                           << OtherState.second.getRCRoot());
     }
   }
 

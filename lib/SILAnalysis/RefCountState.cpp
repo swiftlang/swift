@@ -83,13 +83,13 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   DEBUG(llvm::dbgs() << "            Left: " << LatState << "; Right: "
                      << Other.LatState << "; Result: " << NewState << "\n");
   DEBUG(llvm::dbgs() << "            V: ";
-        if (hasValue())
-          getValue()->dump();
+        if (hasRCRoot())
+          getRCRoot()->dump();
         else
           llvm::dbgs() << "\n";
         llvm::dbgs() << "            OtherV: ";
-        if (Other.hasValue())
-          Other.getValue()->dump();
+        if (Other.hasRCRoot())
+          Other.getRCRoot()->dump();
         else
           llvm::dbgs() << "\n");
 
@@ -137,13 +137,13 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
                      << Other.LatState << "; Result: " << NewState << "\n");
   DEBUG(llvm::dbgs() << "                V: ";
-        if (hasValue())
-          getValue()->dump();
+        if (hasRCRoot())
+          getRCRoot()->dump();
         else
           llvm::dbgs() << "\n";
         llvm::dbgs() << "                OtherV: ";
-        if (Other.hasValue())
-          Other.getValue()->dump();
+        if (Other.hasRCRoot())
+          Other.getRCRoot()->dump();
         else
           llvm::dbgs() << "\n");
 
