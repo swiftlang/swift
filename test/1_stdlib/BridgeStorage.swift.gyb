@@ -55,8 +55,8 @@ struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
 
   init(native: Native, bits: Int) {
     _sanityCheck(
-      bits >= 0 && bits < 3,
-      "BridgeObject can't store bits outside the range 0-2")
+      bits >= 0 && bits < 2,
+      "BridgeObject can't store bits outside the range 0-1")
     
     self.object = native
     self.bits = UInt8(truncatingBitPattern: bits)
@@ -193,7 +193,7 @@ allTests.test("${Self}") {
   let oy: NSString = "oy"
   expectTrue(B(objC: oy).objCInstance == oy)
   
-  for i in 0..<3 {
+  for i in 0..<2 {
     if true {
       var b = B(native: C(), bits: i)
       expectFalse(b.isObjC)

@@ -36,8 +36,8 @@ struct _BridgeStorage<
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     
     // More bits are available on some platforms, but it's not portable
-    _sanityCheck(0..<3 ~= bits,
-        "BridgeStorage can't store bits outside the range 0..<3")
+    _sanityCheck(0...1 ~= bits,
+        "BridgeStorage can't store bits outside the range 0...1")
 
     rawValue = _makeNativeBridgeObject(
       native, UInt(bits) << _objectPointerLowSpareBitShift)
@@ -85,14 +85,15 @@ struct _BridgeStorage<
   public // @testable
   var isNative: Bool {
     @inline(__always) get {
-      return !_isTagged && _nonPointerBits(rawValue) != _objectPointerSpareBits
+      return (_bitPattern(rawValue) &
+              (_objCTaggedPointerBits | _objectPointerIsObjCBit)) == 0
     }
   }
   
   public // @testable
   var isObjC: Bool {
     @inline(__always) get {
-      return _isTagged || _nonPointerBits(rawValue) == _objectPointerSpareBits
+      return !isNative
     }
   }
   
@@ -142,8 +143,7 @@ struct _BridgeStorage<
   //===--- private --------------------------------------------------------===//
   internal var _isTagged: Bool {
     @inline(__always) get {
-      return _isObjCTaggedPointer(
-        Builtin.castReferenceFromBridgeObject(rawValue))
+      return (_bitPattern(rawValue) & _objCTaggedPointerBits) != 0
     }
   }
   

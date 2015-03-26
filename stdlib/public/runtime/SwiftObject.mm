@@ -499,12 +499,21 @@ swift::_swift_usesNativeSwiftReferenceCounting_class(const void *theClass) {
 #endif
 }
 
-// These bits are all set in every non-tagged non-native BridgeObject
+// The non-pointer bits, excluding the ObjC tag bits.
 static auto const unTaggedNonNativeBridgeObjectBits
   = heap_object_abi::SwiftSpareBitsMask
   & ~heap_object_abi::ObjCReservedBitsMask;
 
 #if SWIFT_OBJC_INTEROP
+
+#if defined(__x86_64__)
+static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
+#elif defined(__arm64__)
+static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
+#else
+static uintptr_t const objectPointerIsObjCBit = 0x00000002U;
+#endif
+
 static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
   assert(!isObjCTaggedPointerOrNull(object));
   return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
@@ -542,8 +551,10 @@ void swift::swift_unknownRelease(void *object) {
 ///
 /// Requires: object does not encode a tagged pointer
 static bool isNonNative_unTagged_bridgeObject(void *object) {
-  return (uintptr_t(object) & unTaggedNonNativeBridgeObjectBits)
-    == unTaggedNonNativeBridgeObjectBits;
+  static_assert((heap_object_abi::SwiftSpareBitsMask & objectPointerIsObjCBit) ==
+                objectPointerIsObjCBit,
+                "isObjC bit not within spare bits");
+  return (uintptr_t(object) & objectPointerIsObjCBit) != 0;
 }
 #endif
 
