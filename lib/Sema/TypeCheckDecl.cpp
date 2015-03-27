@@ -265,13 +265,10 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
 }
 
 void TypeChecker::resolveInheritanceClause(DeclContext *dc) {
-  TypeResolutionOptions options;
-
   // FIXME: Add a cached bit so this isn't O(n) in repeated calls.
   MutableArrayRef<TypeLoc> inheritanceClause;
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
     inheritanceClause = nominal->getInherited();
-    options |= TR_NominalInheritanceClause;
   } else {
     auto ext = cast<ExtensionDecl>(dc);
     inheritanceClause = ext->getInherited();
@@ -281,7 +278,7 @@ void TypeChecker::resolveInheritanceClause(DeclContext *dc) {
   PartialGenericTypeToArchetypeResolver resolver(*this);
 
   for (auto &inherited : inheritanceClause) {
-    if (validateType(inherited, dc, options, &resolver)) {
+    if (validateType(inherited, dc, TR_GenericSignature, &resolver)) {
       inherited.setInvalidType(Context);
       continue;
     }
@@ -299,20 +296,23 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     DC = nominal;
-    options |= TR_NominalInheritanceClause;
+    options |= TR_GenericSignature;
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
-    options |= TR_NominalInheritanceClause;
+    options |= TR_GenericSignature;
   } else if (isa<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the
     // signature of the enclosing entity.
     DC = decl->getDeclContext();
     if (auto nominal = dyn_cast<NominalTypeDecl>(DC)) {
       DC = nominal;
-      options |= TR_NominalInheritanceClause;
+      options |= TR_GenericSignature;
     } else if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
       DC = ext;
-      options |= TR_NominalInheritanceClause;
+      options |= TR_GenericSignature;
+    } else if (auto func = dyn_cast<AbstractFunctionDecl>(DC)) {
+      DC = func;
+      options |= TR_GenericSignature;
     } else if (!DC->isModuleScopeContext()) {
       // Skip the generic parameter's context entirely.
       DC = DC->getParent();

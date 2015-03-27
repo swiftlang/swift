@@ -297,7 +297,7 @@ Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc,
                                         DeclContext *dc,
                                         MutableArrayRef<TypeLoc> genericArgs,
-                                        bool isNominalInheritanceClause,
+                                        bool isGenericSignature,
                                         GenericTypeResolver *resolver) {
   // Make sure we always have a resolver to use.
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
@@ -330,8 +330,8 @@ Type TypeChecker::applyGenericArguments(Type type,
   }
 
   TypeResolutionOptions options;
-  if (isNominalInheritanceClause)
-    options |= TR_NominalInheritanceClause;
+  if (isGenericSignature)
+    options |= TR_GenericSignature;
 
   // Validate the generic arguments and capture just the types.
   SmallVector<Type, 4> genericArgTypes;
@@ -370,13 +370,13 @@ Type TypeChecker::applyGenericArguments(Type type,
 static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
                                      DeclContext *dc,
                                      ArrayRef<TypeRepr *> genericArgs,
-                                     bool isNominalInheritanceClause,
+                                     bool isGenericSignature,
                                      GenericTypeResolver *resolver) {
   SmallVector<TypeLoc, 8> args;
   for (auto tyR : genericArgs)
     args.push_back(tyR);
   Type ty = TC.applyGenericArguments(type, loc, dc, args,
-                                     isNominalInheritanceClause, resolver);
+                                     isGenericSignature, resolver);
   if (!ty)
     return ErrorType::get(TC.Context);
   return ty;
@@ -396,7 +396,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *dc,
                             ArrayRef<TypeRepr *> genericArgs,
                             bool allowUnboundGenerics,
-                            bool isNominalInheritanceClause,
+                            bool isGenericSignature,
                             GenericTypeResolver *resolver) {
   TC.validateDecl(typeDecl);
 
@@ -432,7 +432,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   if (!genericArgs.empty()) {
     // Apply the generic arguments to the type.
     type = applyGenericTypeReprArgs(TC, type, loc, dc, genericArgs,
-                                    isNominalInheritanceClause, resolver);
+                                    isGenericSignature, resolver);
   }
 
   assert(type);
@@ -459,15 +459,15 @@ static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
 /// \param dc The context in which name lookup occurred.
 /// \param components The components that refer to the type, where the last
 /// component refers to the type that could not be found.
-/// \param isNominalInheritanceClause True if this type is in a nominal's
-/// inheritance clause.
+/// \param isGenericSignature True if we're only looking into the generic
+/// signature of the given context.
 ///
 /// \returns true if we could not fix the type reference, false if
 /// typo correction (or some other mechanism) was able to fix the
 /// reference.
 static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                 ArrayRef<ComponentIdentTypeRepr *> components,
-                                bool isNominalInheritanceClause,
+                                bool isGenericSignature,
                                 GenericTypeResolver *resolver) {
   auto comp = components.back();
 
@@ -483,7 +483,7 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
       auto type = resolveTypeDecl(tc, nominal, comp->getIdLoc(), dc, { },
                                   /*allowUnboundGenerics=*/false,
-                                  isNominalInheritanceClause, resolver);
+                                  isGenericSignature, resolver);
       if (type->is<ErrorType>())
         return true;
 
@@ -561,7 +561,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // Resolve the first component, which is the only one that requires
   // unqualified name lookup.
   DeclContext *lookupDC = DC;
-  if (options.contains(TR_NominalInheritanceClause))
+  if (options.contains(TR_GenericSignature))
     lookupDC = DC->getParent();
   UnqualifiedLookup Globals(comp->getIdentifier(), lookupDC, &TC,
                             options.contains(TR_KnownNonCascadingDependency),
@@ -601,7 +601,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                                 DC, genericArgs,
                                 options.contains(TR_AllowUnboundGenerics),
-                                options.contains(TR_NominalInheritanceClause),
+                                options.contains(TR_GenericSignature),
                                 resolver);
     if (type->is<ErrorType>()) {
       comp->setValue(type);
@@ -650,7 +650,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // source, bail out.
     if (!diagnoseErrors ||
         diagnoseUnknownType(TC, DC, comp,
-                            options.contains(TR_NominalInheritanceClause),
+                            options.contains(TR_GenericSignature),
                             resolver)) {
       Type ty = ErrorType::get(TC.Context);
       comp->setValue(ty);
@@ -671,15 +671,17 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (parentComps.empty()) {
       TypeResolutionOptions lookupOptions = options;
 
-      // For inheritance clause lookups, don't actually look into the type.
-      // Just look at the generic parameters, and then move up to the enclosing
-      // context.
-      if (options.contains(TR_NominalInheritanceClause)) {
+      // For lookups within the generic signature, look at the generic
+      // parameters (only), then move up to the enclosing context.
+      if (options.contains(TR_GenericSignature)) {
         GenericParamList *genericParams;
-        if (auto *nominal = dyn_cast<NominalTypeDecl>(DC))
+        if (auto *nominal = dyn_cast<NominalTypeDecl>(DC)) {
           genericParams = nominal->getGenericParams();
-        else
-          genericParams = cast<ExtensionDecl>(DC)->getGenericParams();
+        } else if (auto *ext = dyn_cast<ExtensionDecl>(DC)) {
+          genericParams = ext->getGenericParams();
+        } else {
+          genericParams = cast<AbstractFunctionDecl>(DC)->getGenericParams();
+        }
 
         if (!isa<GenericIdentTypeRepr>(comp)) {
           if (genericParams) {
@@ -773,13 +775,14 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         }
 
         // If we didn't find anything, complain.
-        bool isNominal = options.contains(TR_NominalInheritanceClause);
+        bool isGenericSignature = options.contains(TR_GenericSignature);
         bool recovered = false;
         if (!memberTypes) {
           // If we're not allowed to complain or we couldn't fix the
           // source, bail out.
           if (!diagnoseErrors || 
-              diagnoseUnknownType(TC, DC, components, isNominal, resolver)) {
+              diagnoseUnknownType(TC, DC, components, isGenericSignature,
+                                  resolver)) {
             Type ty = ErrorType::get(TC.Context);
             comp->setValue(ty);
             return ty;
@@ -804,7 +807,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           memberType = applyGenericTypeReprArgs(TC, memberType,
                                                 genComp->getIdLoc(),
                                                 DC, genComp->getGenericArgs(),
-                                                isNominal, resolver);
+                                                isGenericSignature, resolver);
 
         comp->setValue(memberType);
         return memberType;
@@ -836,11 +839,12 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       }
 
       // If we didn't find a type, complain.
-      bool isNominal = options.contains(TR_NominalInheritanceClause);
+      bool isGenericSignature = options.contains(TR_GenericSignature);
       bool recovered = false;
       if (!foundModuleTypes) {
         if (!diagnoseErrors || 
-            diagnoseUnknownType(TC, DC, components, isNominal, resolver)) {
+            diagnoseUnknownType(TC, DC, components, isGenericSignature,
+                                resolver)) {
           Type ty = ErrorType::get(TC.Context);
           comp->setValue(ty);
           return ty;
@@ -856,7 +860,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
         foundType = applyGenericTypeReprArgs(TC, foundType, genComp->getIdLoc(),
                                              DC, genComp->getGenericArgs(),
-                                             isNominal, resolver);
+                                             isGenericSignature, resolver);
       }
 
       comp->setValue(foundType);
@@ -888,7 +892,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
                               genericArgs, 
                               options.contains(TR_AllowUnboundGenerics),
-                              options.contains(TR_NominalInheritanceClause),
+                              options.contains(TR_GenericSignature),
                               resolver);
   comp->setValue(type);
   return type;
@@ -1739,7 +1743,7 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     TypeLoc args[2] = { TypeLoc(repr->getKey()), TypeLoc(repr->getValue()) };
 
     if (!TC.applyGenericArguments(unboundTy, repr->getStartLoc(), DC, args,
-                                  options.contains(TR_NominalInheritanceClause),
+                                  options.contains(TR_GenericSignature),
                                   Resolver)) {
       return ErrorType::get(TC.Context);
     }

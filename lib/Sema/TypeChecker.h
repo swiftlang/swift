@@ -209,9 +209,9 @@ enum TypeResolutionFlags {
   /// Whether we are the variable type in a for/in statement.
   TR_EnumerationVariable = 0x200,
   
-  /// Whether this type is being used in the inheritance clause of a nominal
-  /// type.
-  TR_NominalInheritanceClause = 0x800,
+  /// Whether we are looking only in the generic signature of the context
+  /// we're searching, rather than the entire context.
+  TR_GenericSignature = 0x800,
 
   /// Whether this type is the referent of a global type alias.
   TR_GlobalTypeAlias = 0x1000,
@@ -507,8 +507,8 @@ public:
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
-  /// \param isNominalInheritanceClause True if these generic arguments appear
-  /// in the inheritance clause of a nominal type.
+  /// \param isGenericSignature True if we are looking only in the generic
+  /// signature of the context.
   /// \param resolver The generic type resolver.
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
@@ -517,7 +517,7 @@ public:
                              SourceLoc loc,
                              DeclContext *dc,
                              MutableArrayRef<TypeLoc> genericArgs,
-                             bool isNominalInheritanceClause,
+                             bool isGenericSignature,
                              GenericTypeResolver *resolver);
 
   /// \brief Substitute the given base type into the type of the given member,
