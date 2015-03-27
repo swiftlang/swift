@@ -511,7 +511,7 @@ bool swift::isARCInertTrapBB(SILBasicBlock *BB) {
 //===----------------------------------------------------------------------===//
 
 ConsumedArgToEpilogueReleaseMatcher::
-ConsumedArgToEpilogueReleaseMatcher(RCIdentityAnalysis *RCIA,
+ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCIA,
                                     SILFunction *F) {
   // Find the return BB of F. If we fail, then bail.
   auto ReturnBB = F->findReturnBB();

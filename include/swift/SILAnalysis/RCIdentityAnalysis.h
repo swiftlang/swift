@@ -30,7 +30,7 @@ namespace swift {
 class DominanceAnalysis;
 
 /// This class is a simple wrapper around an identity cache.
-class RCIdentityAnalysis : public SILAnalysis {
+class RCIdentityFunctionInfo {
   llvm::DenseMap<SILValue, SILValue> Cache;
   llvm::DenseSet<SILArgument *> VisitedArgs;
   DominanceAnalysis *DA;
@@ -40,11 +40,8 @@ class RCIdentityAnalysis : public SILAnalysis {
   enum { MaxRecursionDepth = 16 };
 
 public:
-  RCIdentityAnalysis(SILModule *, SILPassManager *PM)
-    : SILAnalysis(AnalysisKind::RCIdentity), Cache(), VisitedArgs(),
-      DA(PM->getAnalysis<DominanceAnalysis>()) {}
-  RCIdentityAnalysis(const RCIdentityAnalysis &) = delete;
-  RCIdentityAnalysis &operator=(const RCIdentityAnalysis &) = delete;
+  RCIdentityFunctionInfo(DominanceAnalysis *D) : Cache(), VisitedArgs(),
+  DA(D) {}
 
   SILValue getRCIdentityRoot(SILValue V);
 
@@ -54,19 +51,6 @@ public:
   /// unchecked_trivial_bit_cast.
   void getRCUsers(SILValue V, llvm::SmallVectorImpl<SILInstruction *> &Users);
 
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::RCIdentity;
-  }
-
-  virtual void invalidate(SILAnalysis::PreserveKind K) {
-      Cache.clear();
-  }
-
-  // TODO: Add function specific cache to save compile time.
-  virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
-    invalidate(K);
-  }
-
 private:
   SILValue getRCIdentityRootInner(SILValue V, unsigned RecursionDepth);
   SILValue stripRCIdentityPreservingOps(SILValue V, unsigned RecursionDepth);
@@ -74,6 +58,47 @@ private:
   SILValue stripOneRCIdentityIncomingValue(SILArgument *Arg, SILValue V);
   bool findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
                                       SILValue RCIdentity);
+};
+
+class RCIdentityAnalysis : public SILAnalysis {
+  typedef llvm::DenseMap<SILFunction *, RCIdentityFunctionInfo*> RCMap;
+  RCMap RCInfo;
+
+  DominanceAnalysis *DA;
+
+public:
+  RCIdentityAnalysis(SILModule *, SILPassManager *PM)
+    : SILAnalysis(AnalysisKind::RCIdentity), RCInfo(),
+      DA(PM->getAnalysis<DominanceAnalysis>()) {}
+  RCIdentityAnalysis(const RCIdentityAnalysis &) = delete;
+  RCIdentityAnalysis &operator=(const RCIdentityAnalysis &) = delete;
+
+  static bool classof(const SILAnalysis *S) {
+    return S->getKind() == AnalysisKind::RCIdentity;
+  }
+
+  RCIdentityFunctionInfo* getRCInfo(SILFunction *F) {
+    auto &it = RCInfo.FindAndConstruct(F);
+    if (!it.second)
+      it.second = new RCIdentityFunctionInfo(DA);
+    return it.second;
+  }
+
+  virtual void invalidate(SILAnalysis::PreserveKind K) {
+    // Delete RC info for all functions.
+    for (auto D : RCInfo)
+      delete D.second;
+
+    RCInfo.clear();
+  }
+
+  virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
+    auto &it = RCInfo.FindAndConstruct(F);
+    if (it.second) {
+      delete it.second;
+      it.second = nullptr;
+    }
+  }
 };
 
 } // end swift namespace

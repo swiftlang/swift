@@ -51,7 +51,7 @@ private:
   /// An analysis which computes the identity root of a SILValue(), i.e. the
   /// dominating origin SILValue of the reference count that by retaining or
   /// releasing this value one is affecting.
-  RCIdentityAnalysis *RCIA;
+  RCIdentityFunctionInfo *RCIA;
 
   /// The map from dataflow terminating decrements -> increment dataflow state.
   BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap;
@@ -67,7 +67,7 @@ private:
 public:
   ARCSequenceDataflowEvaluator(
       SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
-      RCIdentityAnalysis *RCIA,
+      RCIdentityFunctionInfo *RCIA,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
   ~ARCSequenceDataflowEvaluator();

@@ -148,7 +148,7 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
 static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
                             AliasAnalysis *AA,
                             PostOrderAnalysis *POTA,
-                            RCIdentityAnalysis *RCIA) {
+                            RCIdentityFunctionInfo *RCIA) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
@@ -226,7 +226,7 @@ class GlobalARCOpts : public SILFunctionTransform {
 
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
-    auto *RCIA = getAnalysis<RCIdentityAnalysis>();
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->getRCInfo(getFunction());
     if (processFunction(*getFunction(), false, AA, POTA, RCIA)) {
       processFunction(*getFunction(), true, AA, POTA, RCIA);
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);

@@ -62,7 +62,7 @@ class RemovePinInsts : public SILFunctionTransform {
 
   AliasAnalysis *AA;
 
-  RCIdentityAnalysis *RCIA;
+  RCIdentityFunctionInfo *RCIA;
 
 public:
   RemovePinInsts() {}
@@ -71,7 +71,7 @@ public:
 
   void run() override {
     AA = PM->getAnalysis<AliasAnalysis>();
-    RCIA = PM->getAnalysis<RCIdentityAnalysis>();
+    RCIA = PM->getAnalysis<RCIdentityAnalysis>()->getRCInfo(getFunction());
 
     DEBUG(llvm::dbgs() << "*** Running Pin Removal on "
                        << getFunction()->getName() << "\n");

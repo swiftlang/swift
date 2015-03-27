@@ -116,7 +116,7 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
 /// value that is trivially RC-identical to V and dominates the argument's
 /// block. If such a value exists, it is a candidate for RC-indentity with the
 /// argument itself--the caller must verify this after evaluating all paths.
-SILValue RCIdentityAnalysis::stripOneRCIdentityIncomingValue(SILArgument *A,
+SILValue RCIdentityFunctionInfo::stripOneRCIdentityIncomingValue(SILArgument *A,
                                                              SILValue V) {
   // Strip off any non-argument instructions from IV. We know that this will
   // always result in RCIdentical values without additional analysis.
@@ -160,7 +160,7 @@ static llvm::Optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
   return !Decl.get()->hasArgumentType();
 }
 
-bool RCIdentityAnalysis::
+bool RCIdentityFunctionInfo::
 findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
                                SILValue RCIdentity) {
   // First grab the NonPayloadedEnumBB and RCIdentityBB. If we can not find
@@ -262,9 +262,8 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
 /// count identity. The key thing we have to be careful of is that %0 must have
 /// the same enum case as %1 along the edge from bb10 to bb12. Otherwise, we can
 /// potentially mismatch
-SILValue
-RCIdentityAnalysis::
-stripRCIdentityPreservingArgs(SILValue V, unsigned RecursionDepth) {
+SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
+                                                      unsigned RecursionDepth) {
   auto *A = dyn_cast<SILArgument>(V);
   if (!A) {
     return SILValue();
@@ -360,9 +359,8 @@ llvm::cl::opt<bool> StripOffArgs(
     "enable-rc-identity-arg-strip", llvm::cl::init(true),
     llvm::cl::desc("Should RC identity try to strip off arguments"));
 
-SILValue
-RCIdentityAnalysis::
-stripRCIdentityPreservingOps(SILValue V, unsigned RecursionDepth) {
+SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingOps(SILValue V,
+                                                      unsigned RecursionDepth) {
   while (true) {
     // First strip off any RC identity preserving instructions. This is cheap.
     if (SILValue NewV = stripRCIdentityPreservingInsts(V)) {
@@ -417,7 +415,7 @@ static bool isNonOverlappingTrivialAccess(SILInstruction *User) {
 /// user of the RC is not managed by ARC.
 ///
 /// We only use the instruction analysis here.
-void RCIdentityAnalysis::getRCUsers(
+void RCIdentityFunctionInfo::getRCUsers(
     SILValue InputValue, llvm::SmallVectorImpl<SILInstruction *> &Users) {
   // Add V to the worklist.
   llvm::SmallVector<SILValue, 8> Worklist;
@@ -469,7 +467,7 @@ void RCIdentityAnalysis::getRCUsers(
 //                              Main Entry Point
 //===----------------------------------------------------------------------===//
 
-SILValue RCIdentityAnalysis::getRCIdentityRootInner(SILValue V,
+SILValue RCIdentityFunctionInfo::getRCIdentityRootInner(SILValue V,
                                                     unsigned RecursionDepth) {
   // Only allow this method to be recursed on for a limited number of times to
   // make sure we don't explode compile time.
@@ -493,7 +491,7 @@ SILValue RCIdentityAnalysis::getRCIdentityRootInner(SILValue V,
   return Cache[V] = NewValue;
 }
 
-SILValue RCIdentityAnalysis::getRCIdentityRoot(SILValue V) {
+SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
   SILValue Root = getRCIdentityRootInner(V, 0);
   VisitedArgs.clear();
 

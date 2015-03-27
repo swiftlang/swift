@@ -246,7 +246,7 @@ protected:
 
 /// \return true if the given instruction releases the given value.
 static bool isRelease(SILInstruction *Inst, SILValue Value,
-                      RCIdentityAnalysis *RCIA,
+                      RCIdentityFunctionInfo *RCIA,
                       SmallPtrSetImpl<Operand *> &MatchedReleases) {
   if (auto *R = dyn_cast<ReleaseValueInst>(Inst))
     if (!MatchedReleases.count(&R->getOperandRef()))
@@ -321,7 +321,7 @@ class COWArrayOpt {
   typedef StructUseCollector::UserList UserList;
   typedef StructUseCollector::UserOperList UserOperList;
 
-  RCIdentityAnalysis *RCIA;
+  RCIdentityFunctionInfo *RCIA;
   SILFunction *Function;
   SILLoop *Loop;
   SILBasicBlock *Preheader;
@@ -356,7 +356,7 @@ class COWArrayOpt {
   // When matching retains to releases we must not count the same release twice.
   SmallPtrSet<Operand*, 8> MatchedReleases;
 public:
-  COWArrayOpt(RCIdentityAnalysis *RCIA, SILLoop *L, DominanceAnalysis *DA)
+  COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA)
     : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
       Preheader(L->getLoopPreheader()), DomTree(DA->getDomInfo(Function)),
       ColdBlocks(DA), CachedSafeLoop(false, false)
@@ -955,7 +955,8 @@ class COWArrayOptPass : public SILFunctionTransform {
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
-    RCIdentityAnalysis *RCIA = PM->getAnalysis<RCIdentityAnalysis>();
+    auto *RCIA =
+      PM->getAnalysis<RCIdentityAnalysis>()->getRCInfo(getFunction());
     SILLoopInfo *LI = LA->getLoopInfo(getFunction());
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");

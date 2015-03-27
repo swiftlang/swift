@@ -124,7 +124,7 @@ static bool isArrayEltStore(StoreInst *SI) {
 
 static bool isReleaseSafeArrayReference(SILValue Ref,
                                         ArraySet &ReleaseSafeArrayReferences,
-                                        RCIdentityAnalysis *RCIA) {
+                                        RCIdentityFunctionInfo *RCIA) {
   auto RefRoot = RCIA->getRCIdentityRoot(Ref);
   if (ReleaseSafeArrayReferences.count(RefRoot))
     return true;
@@ -136,7 +136,7 @@ static bool isReleaseSafeArrayReference(SILValue Ref,
 static ArrayBoundsEffect
 mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
                    ArraySet &ReleaseSafeArrayReferences,
-                   RCIdentityAnalysis *RCIA) {
+                   RCIdentityFunctionInfo *RCIA) {
   Array = SILValue();
   Kind = ArrayCallKind::kNone;
 
@@ -231,11 +231,12 @@ class ABCAnalysis {
   ArraySet SafeArrays;
   ArraySet UnsafeArrays;
   ArraySet &ReleaseSafeArrayReferences;
-  RCIdentityAnalysis *RCIA;
+  RCIdentityFunctionInfo *RCIA;
   bool LoopMode;
 
 public:
-  ABCAnalysis(bool loopMode, ArraySet &ReleaseSafe, RCIdentityAnalysis *rcia)
+  ABCAnalysis(bool loopMode, ArraySet &ReleaseSafe,
+              RCIdentityFunctionInfo *rcia)
       : ReleaseSafeArrayReferences(ReleaseSafe), RCIA(rcia),
         LoopMode(loopMode) {}
 
@@ -336,7 +337,7 @@ getArrayIndexPair(SILValue Array, SILValue ArrayIndex, ArrayCallKind K) {
 /// after an instruction that may modify any array allowing removal of redundant
 /// checks up to that point and after that point.
 static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
-                                         RCIdentityAnalysis *RCIA) {
+                                         RCIdentityFunctionInfo *RCIA) {
   ABCAnalysis ABC(false, Arrays, RCIA);
   IndexedArraySet RedundantChecks;
   bool Changed = false;
@@ -937,7 +938,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
                               IVInfo &IVs, ArraySet &Arrays,
-                              RCIdentityAnalysis *RCIA, bool ShouldVerify) {
+                              RCIdentityFunctionInfo *RCIA, bool ShouldVerify) {
   auto *Header = Loop->getHeader();
   if (!Header) return false;
 
@@ -1074,7 +1075,7 @@ public:
     DominanceInfo *DT = DA->getDomInfo(F);
     assert(DT);
     IVInfo &IVs = IVA->getIVInfo(F);
-    auto *RCIA = getAnalysis<RCIdentityAnalysis>();
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->getRCInfo(F);
     auto DestAnalysis = PM->getAnalysis<DestructorAnalysis>();
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };

@@ -26,6 +26,7 @@ class SILInstruction;
 class AliasAnalysis;
 class PostOrderAnalysis;
 class RCIdentityAnalysis;
+class RCIdentityFunctionInfo;
 class SILFunction;
 
 } // end namespace swift
@@ -106,7 +107,7 @@ struct ARCMatchingSetComputationContext;
 ARCMatchingSetComputationContext *
 createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
                                        PostOrderAnalysis *POTA,
-                                       RCIdentityAnalysis *RCIA);
+                                       RCIdentityFunctionInfo *RCIA);
 
 /// Destroy the context.
 void
@@ -131,7 +132,7 @@ class ConsumedArgToEpilogueReleaseMatcher {
   llvm::SmallMapVector<SILArgument *, SILInstruction *, 8> ArgInstMap;
 
 public:
-  ConsumedArgToEpilogueReleaseMatcher(RCIdentityAnalysis *RCIA,
+  ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCIA,
                                       SILFunction *F);
 
   bool argumentHasRelease(SILArgument *Arg) const {

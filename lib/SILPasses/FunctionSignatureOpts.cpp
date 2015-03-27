@@ -314,7 +314,7 @@ inline T1 getFirstPairElt(const std::pair<T1, T2> &P) { return P.first; }
 class FunctionAnalyzer {
   llvm::BumpPtrAllocator &Allocator;
 
-  RCIdentityAnalysis *RCIA;
+  RCIdentityFunctionInfo *RCIA;
 
   /// The function that we are analyzing.
   SILFunction *F;
@@ -335,7 +335,7 @@ public:
   FunctionAnalyzer(const FunctionAnalyzer &) = delete;
   FunctionAnalyzer(FunctionAnalyzer &&) = delete;
 
-  FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator, RCIdentityAnalysis *RCIA,
+  FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator, RCIdentityFunctionInfo *RCIA,
                    SILFunction *F)
       : Allocator(Allocator), RCIA(RCIA), F(F), ShouldOptimize(false),
         HaveModifiedSelfArgument(false), ArgDescList() {}
@@ -658,7 +658,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
 /// returns false otherwise.
 static bool
 optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
-                          RCIdentityAnalysis *RCIA,
+                          RCIdentityFunctionInfo *RCIA,
                           SILFunction *F,
                         const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites,
                           bool CallerSetIsComplete,
@@ -832,7 +832,8 @@ public:
       bool CallerSetIsComplete = FNode->isCallerEdgesComplete();
 
       // Otherwise, try to optimize the function signature of F.
-      Changed |= optimizeFunctionSignature(Allocator, RCIA, &F, CallSites,
+      Changed |= optimizeFunctionSignature(Allocator, RCIA->getRCInfo(&F),
+                                           &F, CallSites,
                                            CallerSetIsComplete,
                                            DeadFunctions);
     }

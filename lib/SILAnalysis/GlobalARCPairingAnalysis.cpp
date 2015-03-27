@@ -55,11 +55,11 @@ struct ARCMatchingSetBuilder {
   ARCMatchingSet MatchSet;
   bool PtrIsGuaranteedArg;
 
-  RCIdentityAnalysis *RCIA;
+  RCIdentityFunctionInfo *RCIA;
 
 public:
   ARCMatchingSetBuilder(TDMapTy &TDMap, BUMapTy &BUMap,
-                        RCIdentityAnalysis *RCIA)
+                        RCIdentityFunctionInfo *RCIA)
     : TDMap(TDMap), BUMap(BUMap), MatchedPair(false),
       PtrIsGuaranteedArg(false), RCIA(RCIA) {}
 
@@ -357,11 +357,11 @@ struct ARCMatchingSetComputationContext {
   BlotMapVector<SILInstruction *, TopDownRefCountState> DecToIncStateMap;
   BlotMapVector<SILInstruction *, BottomUpRefCountState> IncToDecStateMap;
   ARCSequenceDataflowEvaluator Evaluator;
-  RCIdentityAnalysis *RCIA;
+  RCIdentityFunctionInfo *RCIA;
 
   ARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
                                    PostOrderAnalysis *POTA,
-                                   RCIdentityAnalysis *RCIA)
+                                   RCIdentityFunctionInfo *RCIA)
     : DecToIncStateMap(), IncToDecStateMap(),
       Evaluator(F, AA, POTA, RCIA, DecToIncStateMap, IncToDecStateMap),
       RCIA(RCIA) {}
@@ -373,7 +373,7 @@ ARCMatchingSetComputationContext *
 swift::
 createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
                                        PostOrderAnalysis *POTA,
-                                       RCIdentityAnalysis *RCIA) {
+                                       RCIdentityFunctionInfo *RCIA) {
   unsigned Size = F.size();
 
   // We do not handle CFGs with more than INT_MAX BBs. Fail gracefully.

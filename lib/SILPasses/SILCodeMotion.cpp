@@ -424,7 +424,7 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
 static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
                                           SILBasicBlock::iterator RV,
                                           AliasAnalysis *AA,
-                                          RCIdentityAnalysis *RCIA) {
+                                          RCIdentityFunctionInfo *RCIA) {
   // If this instruction is not a retain_value, there is nothing left for us to
   // do... bail...
   if (!isa<RetainValueInst>(RV))
@@ -483,7 +483,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
 static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
                                               SILBasicBlock::iterator I,
                                               AliasAnalysis *AA,
-                                              RCIdentityAnalysis *RCIA) {
+                                              RCIdentityFunctionInfo *RCIA) {
   // If this instruction is not a retain_value, there is nothing left for us to
   // do... bail...
   if (!isa<RetainValueInst>(I))
@@ -566,7 +566,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
                                   SILBasicBlock::iterator I,
                                   bool CanSinkToSuccessors,
                                   AliasAnalysis *AA,
-                                  RCIdentityAnalysis *RCIA) {
+                                  RCIdentityFunctionInfo *RCIA) {
   // The following methods should only be attempted if we can sink to our
   // successor.
   if (CanSinkToSuccessors) {
@@ -635,7 +635,7 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
 /// Try sink a retain as far as possible.  This is either to sucessor BBs,
 /// or as far down the current BB as possible
 static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
-                                  RCIdentityAnalysis *RCIA) {
+                                  RCIdentityFunctionInfo *RCIA) {
 
   // Make sure that each one of our successors only has one predecessor,
   // us.
@@ -748,7 +748,7 @@ public:
   bool process();
   bool hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA);
   bool sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
-                                        RCIdentityAnalysis *RCIA);
+                                        RCIdentityFunctionInfo *RCIA);
   void handlePredSwitchEnum(SwitchEnumInst *S);
   void handlePredCondSelectEnum(CondBranchInst *CondBr);
 
@@ -1195,7 +1195,7 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
 
 static SILInstruction *
 findLastSinkableMatchingEnumValueRCIncrementInPred(AliasAnalysis *AA,
-                                                   RCIdentityAnalysis *RCIA,
+                                                   RCIdentityFunctionInfo *RCIA,
                                                    SILValue EnumValue,
                                                    SILBasicBlock *BB) {
     // Otherwise, see if we can find a retain_value or strong_retain associated
@@ -1229,7 +1229,7 @@ findLastSinkableMatchingEnumValueRCIncrementInPred(AliasAnalysis *AA,
 
 static bool
 findRetainsSinkableFromSwitchRegionForEnum(
-  AliasAnalysis *AA, RCIdentityAnalysis *RCIA, SILValue EnumValue,
+  AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA, SILValue EnumValue,
   EnumBBCaseList &Map, SmallVectorImpl<SILInstruction *> &DeleteList) {
 
   // For each predecessor with argument type...
@@ -1264,7 +1264,8 @@ findRetainsSinkableFromSwitchRegionForEnum(
 
 bool
 BBEnumTagDataflowState::
-sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA, RCIdentityAnalysis *RCIA) {
+sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
+                                 RCIdentityFunctionInfo *RCIA) {
   bool Changed = false;
   unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
   llvm::SmallVector<SILInstruction *, 4> DeleteList;
@@ -1322,7 +1323,7 @@ sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA, RCIdentityAnalysis *RCIA) {
 
 static bool processFunction(SILFunction *F, AliasAnalysis *AA,
                             PostOrderAnalysis *POTA,
-                            RCIdentityAnalysis *RCIA,
+                            RCIdentityFunctionInfo *RCIA,
                             bool HoistReleases) {
 
   bool Changed = false;
@@ -1392,7 +1393,7 @@ public:
     auto *F = getFunction();
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
-    auto *RCIA = getAnalysis<RCIdentityAnalysis>();
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->getRCInfo(getFunction());
 
     DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F->getName() <<
           " *****\n");

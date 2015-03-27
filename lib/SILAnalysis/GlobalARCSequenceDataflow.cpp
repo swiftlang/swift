@@ -68,7 +68,7 @@ using ARCBBStateInfoHandle = ARCSequenceDataflowEvaluator::ARCBBStateInfoHandle;
 static bool processBBTopDown(
     ARCBBState &BBState,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-    AliasAnalysis *AA, RCIdentityAnalysis *RCIA) {
+    AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA) {
   DEBUG(llvm::dbgs() << ">>>> Top Down!\n");
 
   SILBasicBlock &BB = BBState.getBB();
@@ -525,7 +525,7 @@ bool ARCSequenceDataflowEvaluator::processBottomUp(
 
 ARCSequenceDataflowEvaluator::ARCSequenceDataflowEvaluator(
     SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
-    RCIdentityAnalysis *RCIA,
+    RCIdentityFunctionInfo *RCIA,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
     : F(F), AA(AA), POA(POA), RCIA(RCIA), DecToIncStateMap(DecToIncStateMap),
