@@ -40,60 +40,33 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
   if (allowDynamicLookup)
     options |= NL_DynamicLookup;
 
-  // Dig out the type that we'll actually be looking into, and determine
-  // whether it is a nominal type.
-  Type lookupType = type;
-  bool isMetatype = false;
-  if (auto lvalueType = lookupType->getAs<LValueType>()) {
-    lookupType = lvalueType->getObjectType();
-  }
-  if (auto metaType = lookupType->getAs<MetatypeType>()) {
-    isMetatype = true;
-    lookupType = metaType->getInstanceType();
-  }
-  NominalTypeDecl *nominalLookupType = lookupType->getAnyNominal();
-
-  /// Whether to consider protocol members or not.
-  bool considerProtocolMembers
-    = nominalLookupType && !isa<ProtocolDecl>(nominalLookupType);
-  if (considerProtocolMembers)
-    options |= NL_ProtocolMembers;
-
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
 
-  // Local function that handles protocol members found via name lookup.
-  auto handleProtocolMembers = [&]() {
-    if (!considerProtocolMembers)
-      return;
-
-    // If we considered protocol members, drop them.
-    // FIXME: This will eventually be the correct place to apply derived
-    // conformances.
-    result.filter([&](ValueDecl *value) -> bool {
-      return !isa<ProtocolDecl>(value->getDeclContext());
-    });
-  };
-
   // Look for the member.
-  dc->lookupQualified(type, name, options, this, result.Results);
-  handleProtocolMembers();
-
-  if (result.empty()) {
+  if (!dc->lookupQualified(type, name, options, this, result.Results)) {
     // If we didn't find anything, /and/ this is a nominal type, check to see
     // if any of the nominal's protocols are derivable and contain the
     // name we're looking for. (Note that we are not including extensions
     // here -- default derivation doesn't apply in extensions.)
-    if (!nominalLookupType)
+    bool isMetatype = false;
+    NominalTypeDecl *nominalDecl;
+    if (auto metatypeType = type->getAs<AnyMetatypeType>()) {
+      isMetatype = true;
+      nominalDecl = metatypeType->getInstanceType()->getAnyNominal();
+    } else {
+      nominalDecl = type->getAnyNominal();
+    }
+    if (!nominalDecl)
       return result;
     
     // Force the creation of any delayed members, to ensure proper member
     // lookup.
-    this->forceExternalDeclMembers(nominalLookupType);
+    this->forceExternalDeclMembers(nominalDecl);
 
     bool anyChange = false;
-    for (auto proto : nominalLookupType->getProtocols()) {
-      if (!nominalLookupType->derivesProtocolConformance(proto))
+    for (auto proto : nominalDecl->getProtocols()) {
+      if (!nominalDecl->derivesProtocolConformance(proto))
         continue;
 
       Type protoType = proto->getDeclaredType();
@@ -105,8 +78,8 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
         // If the protocol contains the member we're looking for, force the
         // conformance to be derived.
         // FIXME: We don't actually need to emit the definitions here.
-        if (conformsToProtocol(nominalLookupType->getDeclaredTypeInContext(),
-                               proto, dc, isKnownPrivate))
+        if (conformsToProtocol(nominalDecl->getDeclaredTypeInContext(), proto, dc,
+                               isKnownPrivate))
           anyChange = true;
 
         // Don't just break out of the loop, though...it's possible (though
@@ -115,10 +88,8 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
       }
     }
 
-    if (anyChange) {
+    if (anyChange)
       dc->lookupQualified(type, name, options, this, result.Results);
-      handleProtocolMembers();
-    }
   }
 
   return result;
