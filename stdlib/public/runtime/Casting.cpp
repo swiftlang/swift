@@ -24,6 +24,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "llvm/ADT/DenseMap.h"
 #include "Debug.h"
+#include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
 #include "../SwiftShims/RuntimeShims.h"
@@ -594,7 +595,8 @@ static void _maybeDeallocateOpaqueExistential(OpaqueValue *srcExistential,
 /// address of its storage.
 static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
                                     OpaqueValue *&outValue,
-                                    const Metadata *&outType) {
+                                    const Metadata *&outType,
+                                    bool &inoutCanTake) {
   switch (type->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
@@ -608,20 +610,27 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
 
   case MetadataKind::Existential: {
     auto existentialType = cast<ExistentialTypeMetadata>(type);
-    if (existentialType->isClassBounded()) {
+    
+    switch (existentialType->getRepresentation()) {
+    case ExistentialTypeRepresentation::Class: {
+      // Class existentials can't recursively contain existential containers,
+      // so we can fast-path by not bothering to recur.
       auto existential =
         reinterpret_cast<ClassExistentialContainer*>(value);
       outValue = (OpaqueValue*) &existential->Value;
       outType = swift_getObjectType((HeapObject*) existential->Value);
       return;
-    } else {
-      auto existential =
-        reinterpret_cast<OpaqueExistentialContainer*>(value);
-      OpaqueValue *existentialValue =
-        existential->Type->vw_projectBuffer(&existential->Buffer);
-      findDynamicValueAndType(existentialValue, existential->Type,
-                              outValue, outType);
-      return;
+    }
+    
+    case ExistentialTypeRepresentation::Opaque:
+    case ExistentialTypeRepresentation::ErrorType: {
+      OpaqueValue *innerValue
+        = existentialType->projectValue(value);
+      const Metadata *innerType = existentialType->getDynamicType(value);
+      inoutCanTake &= existentialType->mayTakeValue(value);
+      return findDynamicValueAndType(innerValue, innerType,
+                                     outValue, outType, inoutCanTake);
+    }
     }
   }
     
@@ -654,7 +663,8 @@ extern "C" const Metadata *
 swift::swift_getDynamicType(OpaqueValue *value, const Metadata *self) {
   OpaqueValue *outValue;
   const Metadata *outType;
-  findDynamicValueAndType(value, self, outValue, outType);
+  bool canTake = false;
+  findDynamicValueAndType(value, self, outValue, outType, canTake);
   return outType;
 }
 
@@ -663,7 +673,17 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
   switch (type->getKind()) {
   case MetadataKind::Existential: {
     auto existentialType = cast<ExistentialTypeMetadata>(type);
-    if (!existentialType->isClassBounded()) {
+    
+    switch (existentialType->getRepresentation()) {
+    case ExistentialTypeRepresentation::Class:
+      // Nothing to clean up.
+      break;
+      
+    case ExistentialTypeRepresentation::ErrorType:
+      // TODO: We could clean up from a reclaimed uniquely-referenced error box.
+      break;
+      
+    case ExistentialTypeRepresentation::Opaque:
       auto existential =
         reinterpret_cast<OpaqueExistentialContainer*>(value);
 
@@ -674,6 +694,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
 
       // Deallocate the buffer.
       existential->Type->vw_deallocateBuffer(&existential->Buffer);
+      break;
     }
     return;
   }
@@ -780,11 +801,26 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   // Find the actual type of the source.
   OpaqueValue *srcDynamicValue;
   const Metadata *srcDynamicType;
-  findDynamicValueAndType(src, srcType, srcDynamicValue, srcDynamicType);
+  bool canTake = true;
+  findDynamicValueAndType(src, srcType, srcDynamicValue, srcDynamicType,
+                          canTake);
 
-  // The representation of an existential is different for
-  // class-bounded protocols.
-  if (targetType->isClassBounded()) {
+  auto maybeDeallocateSourceAfterSuccess = [&] {
+    if (shouldDeallocateSource(/*succeeded*/ true, flags)) {
+      // If we're able to take the dynamic value, then clean up any leftover
+      // buffers it may have been contained in.
+      if (canTake && src != srcDynamicValue)
+        deallocateDynamicValue(src, srcType);
+      // Otherwise, deallocate the original value wholesale if we couldn't take
+      // it.
+      else if (!canTake)
+        srcType->vw_destroy(src);
+    }
+  };
+
+  // The representation of an existential is different for some protocols.
+  switch (targetType->getRepresentation()) {
+  case ExistentialTypeRepresentation::Class: {
     auto destExistential =
       reinterpret_cast<ClassExistentialContainer*>(dest);
 
@@ -833,8 +869,10 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
                          srcBridgeWitness,
                          subFlags);
 
-        if (src != srcDynamicValue && shouldDeallocateSource(success, flags)) {
-          deallocateDynamicValue(src, srcType);
+        // Destroy the source value, since we avoided taking or destroying
+        // it above.
+        if (shouldDeallocateSource(success, flags)) {
+          srcType->vw_destroy(src);
         }
 
         return success;
@@ -862,15 +900,13 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 
     auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
     destExistential->Value = object;
-    if (!(flags & DynamicCastFlags::TakeOnSuccess)) {
+    if (!canTake || !(flags & DynamicCastFlags::TakeOnSuccess)) {
       swift_retain_noresult(object);
     }
-    if (src != srcDynamicValue && shouldDeallocateSource(true, flags)) {
-      deallocateDynamicValue(src, srcType);
-    }
+    maybeDeallocateSourceAfterSuccess();
     return true;
-
-  } else {
+  }
+  case ExistentialTypeRepresentation::Opaque: {
     auto destExistential =
       reinterpret_cast<OpaqueExistentialContainer*>(dest);
 
@@ -882,17 +918,38 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 
     // Fill in the type and value.
     destExistential->Type = srcDynamicType;
-    if (flags & DynamicCastFlags::TakeOnSuccess) {
+    if (canTake && (flags & DynamicCastFlags::TakeOnSuccess)) {
       srcDynamicType->vw_initializeBufferWithTake(&destExistential->Buffer,
                                                   srcDynamicValue);
     } else {
       srcDynamicType->vw_initializeBufferWithCopy(&destExistential->Buffer,
                                                   srcDynamicValue);
     }
-    if (src != srcDynamicValue && shouldDeallocateSource(true, flags)) {
-      deallocateDynamicValue(src, srcType);
-    }
+    maybeDeallocateSourceAfterSuccess();
     return true;
+  }
+  case ExistentialTypeRepresentation::ErrorType: {
+    auto destBoxAddr =
+      reinterpret_cast<SwiftError**>(dest);
+    // Check for the ErrorType protocol conformance, which should be the only
+    // one we need.
+    assert(targetType->Protocols.NumProtocols == 1);
+    const WitnessTable *errorWitness;
+    if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
+                              targetType->Protocols,
+                              &errorWitness))
+      return _fail(src, srcType, targetType, flags);
+    
+    BoxPair destBox = swift_allocError(srcDynamicType, errorWitness);
+    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.heapObject);
+    if (canTake && (flags & DynamicCastFlags::TakeOnSuccess)) {
+      srcDynamicType->vw_initializeWithTake(destBox.value, srcDynamicValue);
+    } else {
+      srcDynamicType->vw_initializeWithCopy(destBox.value, srcDynamicValue);
+    }
+    maybeDeallocateSourceAfterSuccess();
+    return true;
+  }
   }
 }
 
@@ -1280,12 +1337,14 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
                                         const ExistentialTypeMetadata *srcType,
                                         const Metadata *targetType,
                                         DynamicCastFlags flags) {
-  if (srcType->isClassBounded()) {
+  switch (srcType->getRepresentation()) {
+  case ExistentialTypeRepresentation::Class: {
     auto classContainer =
       reinterpret_cast<ClassExistentialContainer*>(src);
     void *obj = classContainer->Value;
     return _dynamicCastUnknownClass(dest, obj, targetType, flags);
-  } else {
+  }
+  case ExistentialTypeRepresentation::Opaque: {
     auto opaqueContainer =
       reinterpret_cast<OpaqueExistentialContainer*>(src);
     auto srcCapturedType = opaqueContainer->Type;
@@ -1300,6 +1359,30 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
       _maybeDeallocateOpaqueExistential(src, result, flags);
     return result;
   }
+  case ExistentialTypeRepresentation::ErrorType: {
+    const SwiftError *errorBox =
+      *reinterpret_cast<const SwiftError * const *>(src);
+    auto srcCapturedType = errorBox->getType();
+    const OpaqueValue *srcValue;
+    // A bridged NSError is itself the value.
+    if (errorBox->isPureNSError())
+      srcValue = src;
+    else
+      srcValue = errorBox->getValue();
+    
+    // We can't take or destroy the value out of the box since it might be
+    // shared.
+    auto subFlags = flags - (DynamicCastFlags::TakeOnSuccess
+                             | DynamicCastFlags::DestroyOnFailure);
+    bool result = swift_dynamicCast(dest,
+                                    const_cast<OpaqueValue*>(srcValue),
+                                    srcCapturedType, targetType,
+                                    subFlags);
+    if (shouldDeallocateSource(result, flags))
+      srcType->vw_destroy(src);
+    return result;
+  }
+  }
 }
 
 /// Perform a dynamic cast from an existential type to a
@@ -1312,25 +1395,59 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
   OpaqueValue *srcValue;
   const Metadata *srcCapturedType;
   bool isOutOfLine;
+  bool canTake;
 
-  if (srcType->isClassBounded()) {
+  switch (srcType->getRepresentation()) {
+  case ExistentialTypeRepresentation::Class: {
     auto classContainer =
       reinterpret_cast<const ClassExistentialContainer*>(src);
     srcValue = (OpaqueValue*) &classContainer->Value;
     void *obj = classContainer->Value;
     srcCapturedType = swift_getObjectType(reinterpret_cast<HeapObject*>(obj));
     isOutOfLine = false;
-  } else {
+    canTake = true;
+    break;
+  }
+  case ExistentialTypeRepresentation::Opaque: {
     auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
     srcCapturedType = opaqueContainer->Type;
     srcValue = srcCapturedType->vw_projectBuffer(&opaqueContainer->Buffer);
     isOutOfLine = (src != srcValue);
+    canTake = true;
+    break;
   }
+  case ExistentialTypeRepresentation::ErrorType: {
+    const SwiftError *errorBox
+      = *reinterpret_cast<const SwiftError * const *>(src);
+    
+    srcCapturedType = errorBox->getType();
+    // A bridged NSError is itself the value.
+    if (errorBox->isPureNSError())
+      srcValue = src;
+    else
+      srcValue = const_cast<OpaqueValue*>(errorBox->getValue());
+
+    // The value is out-of-line, but we can't take it, since it may be shared.
+    isOutOfLine = true;
+    canTake = false;
+    break;
+  }
+  }
+  
+  auto subFlags = flags;
+  if (!canTake)
+    subFlags = subFlags - (DynamicCastFlags::DestroyOnFailure
+                           | DynamicCastFlags::TakeOnSuccess);
 
   bool result = swift_dynamicCast(dest, srcValue, srcCapturedType,
-                                  targetType, flags);
-  if (isOutOfLine)
+                                  targetType, subFlags);
+  // Deallocate the existential husk if we took from it.
+  if (canTake && result && isOutOfLine)
     _maybeDeallocateOpaqueExistential(src, result, flags);
+  // If we couldn't take, we still may need to destroy the whole value.
+  else if (!canTake && shouldDeallocateSource(result, flags))
+    srcType->vw_destroy(src);
+
   return result;
 }
 
@@ -1399,12 +1516,14 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
 
   case MetadataKind::Existential: {
     auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
-    if (srcExistentialType->isClassBounded()) {
+    switch (srcExistentialType->getRepresentation()) {
+    case ExistentialTypeRepresentation::Class: {
       auto srcExistential = (ClassExistentialContainer*) src;
       return _dynamicCastUnknownClassToMetatype(dest,
                                                 srcExistential->Value,
                                                 targetType, flags);
-    } else {
+    }
+    case ExistentialTypeRepresentation::Opaque: {
       auto srcExistential = (OpaqueExistentialContainer*) src;
       auto srcValueType = srcExistential->Type;
       auto srcValue = srcValueType->vw_projectBuffer(&srcExistential->Buffer);
@@ -1413,6 +1532,29 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
       if (src != srcValue)
         _maybeDeallocateOpaqueExistential(src, result, flags);
       return result;
+    }
+    case ExistentialTypeRepresentation::ErrorType: {
+      const SwiftError *srcBox
+        = *reinterpret_cast<const SwiftError * const *>(src);
+      
+      auto srcValueType = srcBox->getType();
+      const OpaqueValue *srcValue;
+      if (srcBox->isPureNSError())
+        srcValue = src;
+      else
+        srcValue = srcBox->getValue();
+      
+      // Can't take from a box since the value may be shared.
+      auto subFlags = flags - (DynamicCastFlags::TakeOnSuccess
+                               | DynamicCastFlags::DestroyOnFailure);
+      bool result = _dynamicCastToMetatype(dest,
+                                           const_cast<OpaqueValue*>(srcValue),
+                                           srcValueType,
+                                           targetType, subFlags);
+      if (shouldDeallocateSource(result, flags))
+        srcType->vw_destroy(src);
+      return result;
+    }
     }
   }
 
@@ -1544,12 +1686,14 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
 
   case MetadataKind::Existential: {
     auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
-    if (srcExistentialType->isClassBounded()) {
+    switch (srcExistentialType->getRepresentation()) {
+    case ExistentialTypeRepresentation::Class: {
       auto srcExistential = (ClassExistentialContainer*) src;
       return _dynamicCastUnknownClassToExistentialMetatype(dest,
                                                 srcExistential->Value,
                                                 targetType, flags);
-    } else {
+    }
+    case ExistentialTypeRepresentation::Opaque: {
       auto srcExistential = (OpaqueExistentialContainer*) src;
       auto srcValueType = srcExistential->Type;
       auto srcValue = srcValueType->vw_projectBuffer(&srcExistential->Buffer);
@@ -1558,6 +1702,29 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
       if (src != srcValue)
         _maybeDeallocateOpaqueExistential(src, result, flags);
       return result;
+    }
+    case ExistentialTypeRepresentation::ErrorType: {
+      const SwiftError *srcBox
+        = *reinterpret_cast<const SwiftError * const *>(src);
+      
+      auto srcValueType = srcBox->getType();
+      const OpaqueValue *srcValue;
+      if (srcBox->isPureNSError())
+        srcValue = src;
+      else
+        srcValue = srcBox->getValue();
+      
+      // Can't take from a box since the value may be shared.
+      auto subFlags = flags - (DynamicCastFlags::TakeOnSuccess
+                               | DynamicCastFlags::DestroyOnFailure);
+      bool result = _dynamicCastToExistentialMetatype(dest,
+                                           const_cast<OpaqueValue*>(srcValue),
+                                           srcValueType,
+                                           targetType, subFlags);
+      if (shouldDeallocateSource(result, flags))
+        srcType->vw_destroy(src);
+      return result;
+    }
     }
   }
 

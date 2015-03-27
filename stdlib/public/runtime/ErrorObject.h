@@ -57,11 +57,26 @@ struct SwiftError : NSErrorLayout {
   /// This is only available for native Swift errors.
   const WitnessTable *errorConformance;
   
+  /// Get a pointer to the value contained inside the indirectly-referenced
+  /// box reference.
+  static const OpaqueValue *getIndirectValue(const SwiftError * const *ptr) {
+    // If the box is a bridged NSError, then the box's address is itself the
+    // value.
+    if ((*ptr)->isPureNSError())
+      return reinterpret_cast<const OpaqueValue *>(ptr);
+    return (*ptr)->getValue();
+  }
+  static OpaqueValue *getIndirectValue(SwiftError * const *ptr) {
+    return const_cast<OpaqueValue *>(getIndirectValue(
+                                  const_cast<const SwiftError * const *>(ptr)));
+  }
+  
   /// Get a pointer to the value, which is tail-allocated after
   /// the fixed header.
   const OpaqueValue *getValue() const {
     // If the box is a bridged NSError, then the box's address is itself the
-    // value. We can't provide an address for that..
+    // value. We can't provide an address for that; getIndirectValue must be
+    // used if we haven't established this as an NSError yet..
     assert(!isPureNSError());
   
     auto baseAddr = reinterpret_cast<uintptr_t>(this + 1);
