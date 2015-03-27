@@ -1669,18 +1669,25 @@ static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
   return true;
 }
 
-/// \brief Is the first side-effect instruction in this block a cond_fail that
-/// is guarantueed to fail.
-static bool isCondFailBlock(SILBasicBlock *BB,
-                            CondFailInst *&OrigCondFailInst) {
+/// \brief Returns the first cond_fail if it is the first side-effect
+/// instruction in this block.
+static CondFailInst *getFistCondFail(SILBasicBlock *BB) {
   auto It = BB->begin();
   CondFailInst *CondFail = nullptr;
   // Skip instructions that don't have side-effects.
   while (It != BB->end() && !(CondFail = dyn_cast<CondFailInst>(It))) {
     if (It->mayHaveSideEffects())
-      return false;
+      return nullptr;
     ++It;
   }
+  return CondFail;
+}
+
+/// \brief Is the first side-effect instruction in this block a cond_fail that
+/// is guarantueed to fail.
+static bool isCondFailBlock(SILBasicBlock *BB,
+                            CondFailInst *&OrigCondFailInst) {
+  CondFailInst *CondFail = getFistCondFail(BB);
   if (!CondFail)
     return false;
   auto *IL = dyn_cast<IntegerLiteralInst>(CondFail->getOperand());
@@ -1688,6 +1695,19 @@ static bool isCondFailBlock(SILBasicBlock *BB,
     return false;
   OrigCondFailInst = CondFail;
   return IL->getValue() != 0;
+}
+
+/// \brief Creates a new cond_fail instruction, optionally with an xor inverted
+/// condition.
+static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
+                           SILBuilder &Builder) {
+  if (inverted) {
+    auto *True = Builder.createIntegerLiteral(Orig->getLoc(), Cond.getType(), 1);
+    Cond = Builder.createBuiltinBinaryFunction(Orig->getLoc(), "xor",
+                                               Cond.getType(), Cond.getType(),
+                                               {Cond, True});
+  }
+  Builder.createCondFail(Orig->getLoc(), Cond);
 }
 
 /// simplifyCondBrBlock - Simplify a basic block that ends with a conditional
@@ -1868,17 +1888,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     auto CFCondition = BI->getCondition();
 
     // If the false side is failing, negate the branch condition.
-    if (!IsTrueSideFailing) {
-      auto *True = SILBuilderWithScope<1>(BI).createIntegerLiteral(
-          OrigCFI->getLoc(), OrigCFI->getOperand().getType(), 1);
-      CFCondition = SILBuilderWithScope<1>(BI).createBuiltinBinaryFunction(
-          OrigCFI->getLoc(), "xor", CFCondition.getType(),
-          CFCondition.getType(), {CFCondition, True});
-    }
-
-    // Create the cond_fail and a branch.
-    SILBuilderWithScope<1>(BI)
-        .createCondFail(OrigCFI->getLoc(), CFCondition);
+    SILBuilderWithScope<1> Builder(BI);
+    createCondFail(OrigCFI, CFCondition, !IsTrueSideFailing, Builder);
     SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), LiveBlock, LiveArgs);
 
     BI->eraseFromParent();
@@ -2140,6 +2151,104 @@ bool RemoveUnreachable::run() {
   return Changed;
 }
 
+/// Checks if the block contains a cond_fail as first side-effect instruction
+/// and trys to move it to the predecessors (if benefitial). A sequence
+///
+///     bb1:
+///       br bb3(%c)
+///     bb2:
+///       %i = integer_literal
+///       br bb3(%i)            // at least one input argument must be constant
+///     bb3(%a) // = BB
+///       cond_fail %a          // %a must not have other uses
+///
+/// is replaced with
+///
+///     bb1:
+///       cond_fail %c
+///       br bb3(%c)
+///     bb2:
+///       %i = integer_literal
+///       cond_fail %i
+///       br bb3(%i)
+///     bb3(%a)                 // %a is dead
+///
+static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
+  
+  CondFailInst *CFI = getFistCondFail(BB);
+  if (!CFI)
+    return false;
+  
+  // Find the underlying condition value of the cond_fail.
+  SILValue cond = CFI->getOperand();
+  bool inverted = false;
+  while (auto *BI = dyn_cast<BuiltinInst>(cond)) {
+    
+    // This is not a correctness check, but we only want to to the optimization
+    // if the condition gets dead after moving the cond_fail.
+    if (!BI->hasOneUse())
+      return false;
+    
+    OperandValueArrayRef Args = BI->getArguments();
+    
+    if (BI->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
+      // Check if it's a boolean invertion of the condition.
+      if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
+        if (IL->getValue().isAllOnesValue()) {
+          cond = Args[0];
+          inverted = !inverted;
+          continue;
+        }
+      } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[0])) {
+        if (IL->getValue().isAllOnesValue()) {
+          cond = Args[1];
+          inverted = !inverted;
+          continue;
+        }
+      }
+    }
+    break;
+  }
+  // Check if the condition is a single-used argument in the current block.
+  SILArgument *condArg = dyn_cast<SILArgument>(cond);
+  if (!condArg || !condArg->hasOneUse())
+    return false;
+  
+  if (condArg->getParent() != BB)
+    return false;
+  
+  // Check if some of the predecessor blocks provide a constant for the
+  // cond_fail condition. So that the optimization has a positive effect.
+  bool somePredsAreConst = false;
+  for (auto *Pred : BB->getPreds()) {
+    
+    // The cond_fail must post-dominate the predecessor block. We may not
+    // execute the cond_fail speculatively.
+    if (!Pred->getSingleSuccessor())
+      return false;
+    
+    SILValue incoming = condArg->getIncomingValue(Pred);
+    if (isa<IntegerLiteralInst>(incoming)) {
+      somePredsAreConst = true;
+      break;
+    }
+  }
+  if (!somePredsAreConst)
+    return false;
+  
+  DEBUG(llvm::dbgs() << "### move to predecessors: " << *CFI);
+  
+  // Move the cond_fail to the predecessor blocks.
+  for (auto *Pred : BB->getPreds()) {
+    SILValue incoming = condArg->getIncomingValue(Pred);
+    SILBuilderWithScope<4> Builder(Pred->getTerminator());
+    
+    createCondFail(CFI, incoming, inverted, Builder);
+  }
+  CFI->eraseFromParent();
+  return true;
+}
+
 bool SimplifyCFG::simplifyBlocks() {
   bool Changed = false;
 
@@ -2183,6 +2292,8 @@ bool SimplifyCFG::simplifyBlocks() {
     default:
       break;
     }
+    // If the block has a cond_fail, try to move it to the predecessors.
+    Changed |= tryMoveCondFailToPreds(BB);
 
     // Simplify the block argument list.
     Changed |= simplifyArgs(BB);

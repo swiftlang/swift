@@ -50,5 +50,4 @@ add_swift_library(swiftSILPasses
   MergeCondFail.cpp
   PrettyStackTrace.cpp
   CropOverflowChecks.cpp
-  CondFailOpt.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)

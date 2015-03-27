@@ -1347,6 +1347,217 @@ bb2:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil @dont_remove_cond_fail_wrong_const
+// CHECK:      bb0(%0 : $Builtin.Int1):
+// CHECK-NEXT:   cond_br %0, bb1, bb2
+sil @dont_remove_cond_fail_wrong_const : $@thin (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %i1 = integer_literal $Builtin.Int1, 0
+  cond_fail %i1 : $Builtin.Int1
+  br bb2
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @move_cond_fail
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   [[X:%[0-9]*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   cond_fail [[X]]
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   cond_fail %1
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK-NOT:    cond_fail
+// CHECK:        return
+sil @move_cond_fail : $@thin (Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@thin ()->()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  %i1 = integer_literal $Builtin.Int1, -1
+  br bb3(%i1 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  cond_fail %a3 : $Builtin.Int1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @move_cond_fail_inverted
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   [[X:%[0-9]*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   [[Y:%[0-9]*]] = builtin "xor_Int1"(%2 : $Builtin.Int1, [[X]] : $Builtin.Int1)
+// CHECK-NEXT:   cond_fail [[Y]]
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   [[R:%[0-9]*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   [[S:%[0-9]*]] = builtin "xor_Int1"(%1 : $Builtin.Int1, [[R]] : $Builtin.Int1)
+// CHECK-NEXT:   cond_fail [[S]]
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3({{.*}}):
+// CHECK-NOT:    cond_fail
+// CHECK:        return
+sil @move_cond_fail_inverted : $@thin (Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %2 = integer_literal $Builtin.Int1, -1
+  %f1 = function_ref @external_f : $@thin ()->()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  br bb3(%2 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  %v1 = builtin "xor_Int1"(%a3 : $Builtin.Int1, %2 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %v1 : $Builtin.Int1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_move_cond_fail_no_const
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3({{.*}}):
+// CHECK-NEXT:   cond_fail
+sil @dont_move_cond_fail_no_const : $@thin (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@thin ()->()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  br bb3(%2 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  cond_fail %a3 : $Builtin.Int1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_move_cond_fail_no_postdom
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   integer_literal
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   cond_br
+// CHECK:      bb3({{.*}}):
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   cond_fail
+sil @dont_move_cond_fail_no_postdom : $@thin (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@thin ()->()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  %i1 = integer_literal $Builtin.Int1, -1
+  br bb3(%i1 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  cond_br %2, bb3(%1 : $Builtin.Int1), bb4
+
+bb3(%a3 : $Builtin.Int1):
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  cond_fail %a3 : $Builtin.Int1
+  br bb4
+
+bb4:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_move_cond_fail_multiple_uses
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   integer_literal
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3({{.*}}):
+// CHECK-NEXT:   cond_fail
+sil @dont_move_cond_fail_multiple_uses : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@thin ()->()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  %i1 = integer_literal $Builtin.Int1, -1
+  br bb3(%i1 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  cond_fail %a3 : $Builtin.Int1
+  return %a3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @dont_move_cond_fail_multiple_uses2
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3({{.*}}):
+// CHECK-NEXT:   builtin "xor_Int1"
+// CHECK-NEXT:   cond_fail
+// CHECK-NEXT:   return
+sil @dont_move_cond_fail_multiple_uses2 : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@thin ()->()
+  %i1 = integer_literal $Builtin.Int1, -1
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  br bb3(%i1 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@thin ()->() // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  %v1 = builtin "xor_Int1"(%a3 : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %v1 : $Builtin.Int1
+  return %v1 : $Builtin.Int1
+}
+
+
 // CHECK-LABEL: sil @successful_checked_cast_br_on_alloc_ref
 // CHECK: bb0
 // CHECK-NEXT: alloc_ref
