@@ -123,7 +123,7 @@ namespace {
     }
 
     bool simplifyBlocks();
-    void canonicalizeSwitchEnums();
+    bool canonicalizeSwitchEnums();
     bool dominatorBasedSimplify(DominanceInfo *DT);
 
     /// \brief Remove the basic block if it has no predecessors. Returns true
@@ -2306,7 +2306,8 @@ bool SimplifyCFG::simplifyBlocks() {
 
 /// Canonicalize all switch_enum and switch_enum_addr instructions.
 /// If possible, replace the default with the corresponding unique case.
-void SimplifyCFG::canonicalizeSwitchEnums() {
+bool SimplifyCFG::canonicalizeSwitchEnums() {
+  bool Changed = false;
   for (auto &BB : Fn) {
     TermInst *TI = BB.getTerminator();
   
@@ -2339,7 +2340,10 @@ void SimplifyCFG::canonicalizeSwitchEnums() {
                                   SWI->getOperand(), nullptr, CaseBBs);
     }
     SWI->eraseFromParent();
+    Changed = true;
   }
+
+  return Changed;
 }
 
 bool SimplifyCFG::run() {
@@ -2389,7 +2393,8 @@ bool SimplifyCFG::run() {
   // Split all critical edges from non cond_br terminators.
   Changed |= splitAllCriticalEdges(Fn, true, nullptr, nullptr);
 
-  canonicalizeSwitchEnums();
+  // Canonicalize switch_enum instructions.
+  Changed |= canonicalizeSwitchEnums();
   
   return Changed;
 }
