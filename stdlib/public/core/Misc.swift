@@ -66,15 +66,6 @@ func _withUninitializedString<R>(
   return (bodyResult, stringResult)
 }
 
-/// Check if a given object (of value or reference type) conforms to the given
-/// protocol.
-///
-/// Limitation: `DestType` should be a protocol defined in the `Swift` module.
-@asmname("swift_stdlib_conformsToProtocol")
-public func _stdlib_conformsToProtocol<SourceType, DestType>(
-    value: SourceType, _: DestType.Type
-) -> Bool
-
 @asmname("swift_stdlib_getDemangledTypeName")
 public func _stdlib_getDemangledTypeNameImpl<T>(value: T, result: UnsafeMutablePointer<String>)
 

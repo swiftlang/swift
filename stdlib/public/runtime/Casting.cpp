@@ -2214,79 +2214,10 @@ recur:
 extern "C" OpaqueExistentialContainer
 _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(OpaqueValue *value,
                                             const Metadata *T);
-
 // The return type is incorrect.  It is only important that it is
 // passed using 'sret'.
 extern "C" OpaqueExistentialContainer
 _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
-
-
-/// Given a possibly-existential value, find its dynamic type and the
-/// address of its storage.
-static bool findDynamicValueAndType_NoMetatypes(OpaqueValue *value,
-                                                const Metadata *type,
-                                                OpaqueValue *&outValue,
-                                                const Metadata *&outType) {
-  // FIXME: workaround for <rdar://problem/17695211>.
-  //
-  // Filter out metatypes because 'findDynamicValueAndType' can crash.
-  // Metatypes sometimes contain garbage metadata pointers.
-  //
-  // When the bug is fixed, replace calls to this function with direct calls to
-  // 'findDynamicValueAndType'.
-  if (type->getKind() == MetadataKind::Metatype ||
-      type->getKind() == MetadataKind::ExistentialMetatype)
-    return false;
-  findDynamicValueAndType(value, type, outValue, outType);
-  return true;
-}
-
-static const void *
-findWitnessTableForDynamicCastToExistential1(OpaqueValue *sourceValue,
-                                             const Metadata *sourceType,
-                                             const Metadata *destType) {
-  if (destType->getKind() != MetadataKind::Existential)
-    swift::crash("Swift protocol conformance check failed: "
-                 "destination type is not an existential");
-
-  auto destExistentialMetadata =
-      static_cast<const ExistentialTypeMetadata *>(destType);
-
-  if (destExistentialMetadata->Protocols.NumProtocols != 1)
-    swift::crash("Swift protocol conformance check failed: "
-                 "destination type conforms more than to one protocol");
-
-  auto destProtocolDescriptor = destExistentialMetadata->Protocols[0];
-
-  if (sourceType->getKind() == MetadataKind::Existential)
-    swift::crash("Swift protocol conformance check failed: "
-                 "source type is an existential");
-
-  return swift_conformsToProtocol(sourceType, destProtocolDescriptor);
-}
-
-// func _stdlib_conformsToProtocol<SourceType, DestType>(
-//     value: SourceType, _: DestType.Type
-// ) -> Bool
-extern "C" bool
-swift_stdlib_conformsToProtocol(
-    OpaqueValue *sourceValue, const Metadata *_destType,
-    const Metadata *sourceType, const Metadata *destType) {
-  // Find the actual type of the source.
-  OpaqueValue *sourceDynamicValue;
-  const Metadata *sourceDynamicType;
-  if (!findDynamicValueAndType_NoMetatypes(sourceValue, sourceType,
-                                           sourceDynamicValue,
-                                           sourceDynamicType)) {
-    sourceType->vw_destroy(sourceValue);
-    return false;
-  }
-
-  auto vw = findWitnessTableForDynamicCastToExistential1(
-      sourceDynamicValue, sourceDynamicType, destType);
-  sourceType->vw_destroy(sourceValue);
-  return vw != nullptr;
-}
 
 static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
   auto kind = T->getKind();
