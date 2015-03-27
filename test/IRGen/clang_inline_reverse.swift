@@ -2,24 +2,23 @@
 
 // RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s -emit-ir -module-name clang_inline | FileCheck %s
 
-// REQUIRES: disabled
-// rdar://20308576
-
 // REQUIRES: CPU=i386_or_x86_64
 // XFAIL: linux
 
 import gizmo
 
-// CHECK: define hidden i64 @_TFC12clang_inline16CallStaticInline10ReturnZerofS0_FT_VSs5Int64(%C12clang_inline16CallStaticInline*) {
-// CHECK: define internal i32 @wrappedZero() #0 {
+// CHECK-LABEL: define hidden i64 @_TFC12clang_inline16CallStaticInline10ReturnZerofS0_FT_VSs5Int64(%C12clang_inline16CallStaticInline*) {
 class CallStaticInline {
   func ReturnZero() -> Int64 { return Int64(wrappedZero()) }
 }
 
-// CHECK: define hidden i64 @_TFC12clang_inline17CallStaticInline210ReturnZerofS0_FT_VSs5Int64(%C12clang_inline17CallStaticInline2*) {
-// CHECK: define internal i32 @zero() #0 {
+// CHECK-LABEL: define hidden i64 @_TFC12clang_inline17CallStaticInline210ReturnZerofS0_FT_VSs5Int64(%C12clang_inline17CallStaticInline2*) {
 class CallStaticInline2 {
   func ReturnZero() -> Int64 { return Int64(zero()) }
 }
 
-// CHECK: define internal i32 @innerZero() #2 {
+// CHECK-LABEL: define internal i32 @wrappedZero() #0 {
+
+// CHECK-LABEL: define internal i32 @zero() #0 {
+
+// CHECK-LABEL: define internal i32 @innerZero() #2 {

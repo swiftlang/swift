@@ -7,9 +7,6 @@
 // RUN: FileCheck %s < %t.ll
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
-// REQUIRES: disabled
-// rdar://20308576
-
 // REQUIRES: CPU=i386_or_x86_64
 // XFAIL: linux
 
@@ -19,46 +16,59 @@ import Empty
 
 import gizmo
 
-// CHECK: define hidden i64 @_TFC12clang_inline16CallStaticInline10ReturnZerofS0_FT_VSs5Int64(%C12clang_inline16CallStaticInline*) {
-// CHECK: define internal i32 @zero() #0 {
+// CHECK-LABEL: define hidden i64 @_TFC12clang_inline16CallStaticInline10ReturnZerofS0_FT_VSs5Int64(%C12clang_inline16CallStaticInline*) {
 class CallStaticInline {
   func ReturnZero() -> Int64 { return Int64(zero()) }
 }
 
-// CHECK: define hidden i64 @_TFC12clang_inline17CallStaticInline210ReturnZerofS0_FT_VSs5Int64(%C12clang_inline17CallStaticInline2*) {
-// CHECK: define internal i32 @wrappedZero() #0 {
+// CHECK-LABEL: define hidden i64 @_TFC12clang_inline17CallStaticInline210ReturnZerofS0_FT_VSs5Int64(%C12clang_inline17CallStaticInline2*) {
 class CallStaticInline2 {
   func ReturnZero() -> Int64 { return Int64(wrappedZero()) }
 }
 
-// CHECK: define hidden i32 @_TF12clang_inline10testExternFT_VSs5Int32() {
-// CHECK: define internal i32 @wrappedGetInt() #0 {
+
+// CHECK-LABEL: define hidden i32 @_TF12clang_inline10testExternFT_VSs5Int32() {
 func testExtern() -> CInt {
   return wrappedGetInt()
 }
 
-// CHECK: define hidden i32 @_TF12clang_inline16testAlwaysInlineFT_VSs5Int32() [[SSP:#[0-9]+]] {
+// CHECK-LABEL: define hidden i32 @_TF12clang_inline16testAlwaysInlineFT_VSs5Int32()
+// CHECK:       [[SSP:#[0-9]+]] {
 // NEGATIVE-NOT: @alwaysInlineNumber
 // CHECK:   ret i32 17
 func testAlwaysInline() -> CInt {
   return alwaysInlineNumber()
 }
 
-// CHECK: define hidden i32 @_TF12clang_inline20testInlineRedeclaredFT_VSs5Int32() {
-// CHECK: define internal i32 @zeroRedeclared() #{{[0-9]+}} {
+// CHECK-LABEL: define hidden i32 @_TF12clang_inline20testInlineRedeclaredFT_VSs5Int32() {
 func testInlineRedeclared() -> CInt {
   return zeroRedeclared()
 }
 
-// CHECK: define hidden i32 @_TF12clang_inline27testInlineRedeclaredWrappedFT_VSs5Int32() {
-// CHECK: define internal i32 @wrappedZeroRedeclared() #{{[0-9]+}} {
+// CHECK-LABEL: define hidden i32 @_TF12clang_inline27testInlineRedeclaredWrappedFT_VSs5Int32() {
 func testInlineRedeclaredWrapped() -> CInt {
   return wrappedZeroRedeclared()
 }
 
-// CHECK: define internal i32 @innerZero() [[INNER_ZERO_ATTR:#[0-9]+]] {
-// CHECK: declare i32 @getInt() [[GET_INT_ATTR:#[0-9]+]]
+// CHECK-LABEL: define internal i32 @zero()
+// CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
+
+// CHECK-LABEL: define internal i32 @wrappedZero()
+// CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
+
+// CHECK-LABEL: define internal i32 @wrappedGetInt()
+// CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
+
+// CHECK-LABEL: define internal i32 @zeroRedeclared() #{{[0-9]+}} {
+
+// CHECK-LABEL: define internal i32 @wrappedZeroRedeclared() #{{[0-9]+}} {
+
+// CHECK-LABEL: define internal i32 @innerZero()
+// CHECK:         [[INNER_ZERO_ATTR:#[0-9]+]] {
+// CHECK-LABEL: declare i32 @getInt()
+// CHECK:         [[GET_INT_ATTR:#[0-9]+]]
 
 // CHECK: attributes [[SSP]] = { ssp }
+// CHECK: attributes [[INLINEHINT_SSP_UWTABLE]] = { inlinehint ssp {{.*}}}
 // CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp 
 // CHECK: attributes [[GET_INT_ATTR]] = {
