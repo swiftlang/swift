@@ -22,7 +22,6 @@ import Darwin
 
 #if USE_DIRECTLY
 
-// This is only used when the symbol is /not/ loaded, so it's okay
 @asmname("fnd_get_demangled_name")
 func fnd_get_demangled_name(
   MangledName: UnsafePointer<CChar>,
