@@ -501,8 +501,8 @@ should take action to reclaim that autorelease with
   implicitly ``@owned``.  Only functions with a native calling
   convention may have an error result.
 
-  A function with an error result cannot be called with `apply`.
-  It must be called with `try_apply`.
+  A function with an error result cannot be called with ``apply``.
+  It must be called with ``try_apply``.
 
   Type lowering lowers the ``throws`` annotation on formal function
   types into more concrete error propagation:
