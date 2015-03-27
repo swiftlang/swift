@@ -2890,10 +2890,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.discardTypeResolver();
 
       // Add results for all imported modules.
+      SmallVector<Module::ImportedModule, 4> Imports;
       auto *SF = CurDeclContext->getParentSourceFile();
-      for (auto Imported : SF->getImports()) {
-        Module *TheModule = Imported.first.second;
-        Module::AccessPathTy AccessPath = Imported.first.first;
+      SF->getImportedModules(Imports, Module::ImportFilter::All);
+
+      for (auto Imported : Imports) {
+        Module *TheModule = Imported.second;
+        Module::AccessPathTy AccessPath = Imported.first;
         TheModule->forAllVisibleModules(AccessPath, handleImport);
       }
     }

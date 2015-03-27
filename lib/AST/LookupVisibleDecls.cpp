@@ -856,9 +856,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         return;
       }
 
-      for (auto importPair : SF->getImports())
-        if (!importPair.second)
-          extraImports.push_back(importPair.first);
+      SF->getImportedModules(extraImports, Module::ImportFilter::Private);
     }
   }
 

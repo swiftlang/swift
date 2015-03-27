@@ -270,7 +270,6 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   NameBinder Binder(SF);
 
   SmallVector<std::pair<ImportedModule, ImportOptions>, 8> ImportedModules;
-  ImportedModules.append(SF.getImports().begin(), SF.getImports().end());
 
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.
@@ -286,8 +285,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
     }
   }
 
-  if (ImportedModules.size() > SF.getImports().size())
-    SF.setImports(SF.getASTContext().AllocateCopy(ImportedModules));
+  SF.addImports(ImportedModules);
 
   // FIXME: This algorithm has quadratic memory usage.  (In practice,
   // import statements after the first "chunk" should be rare, though.)

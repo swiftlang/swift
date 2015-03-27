@@ -780,7 +780,8 @@ public:
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
   }
 };
-  
+
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -790,6 +791,7 @@ public:
 class SourceFile final : public FileUnit {
 public:
   class LookupCache;
+  class Impl;
 
   /// The implicit module import that the SourceFile should get.
   enum class ImplicitModuleImportKind {
@@ -799,10 +801,12 @@ public:
   };
 
   /// Possible attributes for imports in source files.
-  ///
-  /// \see getImports
   enum class ImportFlags {
+    /// The imported module is exposed to anyone who imports the parent module.
     Exported = 0x1,
+
+    /// This source file has access to testable declarations in the imported
+    /// module.
     Testable = 0x2
   };
 
@@ -843,6 +847,8 @@ private:
   int BufferID;
 
   friend ASTContext;
+  friend Impl;
+
   ~SourceFile();
 public:
   /// The list of top-level declarations in the source file.
@@ -886,15 +892,8 @@ public:
   SourceFile(Module &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind);
 
-  ArrayRef<std::pair<Module::ImportedModule, ImportOptions>>
-  getImports(bool allowUnparsed = false) const {
-    assert(allowUnparsed || ASTStage >= Parsed || Kind == SourceFileKind::SIL);
-    return Imports;
-  }
   void
-  setImports(ArrayRef<std::pair<Module::ImportedModule, ImportOptions>> IM) {
-    Imports = IM;
-  }
+  addImports(ArrayRef<std::pair<Module::ImportedModule, ImportOptions>> IM);
 
   bool hasTestableImport(const Module *module) const;
 

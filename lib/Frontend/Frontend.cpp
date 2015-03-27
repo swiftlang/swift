@@ -289,23 +289,19 @@ void CompilerInstance::performSema() {
     if (!underlying && !importedHeaderModule && !importModule)
       return;
 
-    auto initialImports = SF->getImports(/*allowUnparsed=*/true);
-
     using ImportPair =
         std::pair<Module::ImportedModule, SourceFile::ImportOptions>;
-    SmallVector<ImportPair, 4> initialImportsBuf{
-      initialImports.begin(), initialImports.end()
-    };
+    SmallVector<ImportPair, 4> additionalImports;
 
     if (underlying)
-      initialImportsBuf.push_back({ { /*accessPath=*/{}, underlying }, {} });
+      additionalImports.push_back({ { /*accessPath=*/{}, underlying }, {} });
     if (importedHeaderModule)
-      initialImportsBuf.push_back({ { /*accessPath=*/{}, importedHeaderModule },
+      additionalImports.push_back({ { /*accessPath=*/{}, importedHeaderModule },
                                     SourceFile::ImportFlags::Exported });
     if (importModule)
-      initialImportsBuf.push_back({ { /*accessPath=*/{}, importModule }, {} });
+      additionalImports.push_back({ { /*accessPath=*/{}, importModule }, {} });
 
-    SF->setImports(Context->AllocateCopy(initialImportsBuf));
+    SF->addImports(additionalImports);
   };
 
   if (Kind == InputFileKind::IFK_Swift_REPL) {

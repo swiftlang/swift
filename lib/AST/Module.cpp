@@ -916,6 +916,17 @@ static Op *lookupOperator(T &container, Identifier name) {
                                                    OperatorKind<Op>::value));
 }
 
+/// A helper class to sneak around C++ access control rules.
+class SourceFile::Impl {
+public:
+  /// Only intended for use by lookupOperatorDeclForName.
+  static ArrayRef<std::pair<Module::ImportedModule, SourceFile::ImportOptions>>
+  getImportsForSourceFile(const SourceFile &SF) {
+    return SF.Imports;
+  }
+};
+
+
 template<typename OP_DECL>
 static Optional<OP_DECL *>
 lookupOperatorDeclForName(Module *M, SourceLoc Loc, Identifier Name,
@@ -954,7 +965,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   // FIXME: We ought to prefer operators elsewhere in this module before we
   // check imports.
   llvm::SmallDenseMap<OP_DECL*, bool, 16> importedOperators;
-  for (auto &imported : SF.getImports()) {
+  for (auto &imported : SourceFile::Impl::getImportsForSourceFile(SF)) {
     bool isExported =
         imported.second.contains(SourceFile::ImportFlags::Exported);
     if (!includePrivate && !isExported)
@@ -1066,7 +1077,8 @@ void Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 void
 SourceFile::getImportedModules(SmallVectorImpl<Module::ImportedModule> &modules,
                                Module::ImportFilter filter) const {
-  for (auto importPair : getImports()) {
+  assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
+  for (auto importPair : Imports) {
     switch (filter) {
     case Module::ImportFilter::All:
       break;
@@ -1289,13 +1301,12 @@ bool FileUnit::forAllVisibleModules(
 
   if (auto SF = dyn_cast<SourceFile>(this)) {
     // Handle privately visible modules as well.
-    for (auto importPair : SF->getImports()) {
-      if (importPair.second.contains(SourceFile::ImportFlags::Exported))
-        continue;
-      Module *M = importPair.first.second;
-      if (!M->forAllVisibleModules(importPair.first.first, fn))
+    // FIXME: Should this apply to all FileUnits?
+    SmallVector<Module::ImportedModule, 4> imports;
+    SF->getImportedModules(imports, Module::ImportFilter::Private);
+    for (auto importPair : imports)
+      if (!importPair.second->forAllVisibleModules(importPair.first, fn))
         return false;
-    }
   }
 
   return true;
@@ -1345,6 +1356,23 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
     decl->print(Printer, PO);
     Printer << "\n";
   }
+}
+
+void SourceFile::addImports(
+    ArrayRef<std::pair<Module::ImportedModule, ImportOptions>> IM) {
+  using ImportPair = std::pair<Module::ImportedModule, ImportOptions>;
+  if (IM.empty())
+    return;
+  ASTContext &ctx = getASTContext();
+  auto newBuf =
+     ctx.AllocateUninitialized<ImportPair>(Imports.size() + IM.size());
+
+  auto iter = newBuf.begin();
+  iter = std::uninitialized_copy(Imports.begin(), Imports.end(), iter);
+  iter = std::uninitialized_copy(IM.begin(), IM.end(), iter);
+  assert(iter == newBuf.end());
+
+  Imports = newBuf;
 }
 
 bool SourceFile::hasTestableImport(const swift::Module *module) const {
@@ -1399,10 +1427,9 @@ static void performAutoImport(SourceFile &SF,
 
   // FIXME: These will be the same for most source files, but we copy them
   // over and over again.
-  std::pair<Module::ImportedModule, SourceFile::ImportOptions> Imports[] = {
-    std::make_pair(Module::ImportedModule({}, M), SourceFile::ImportOptions())
-  };
-  SF.setImports(Ctx.AllocateCopy(Imports));
+  auto Imports =
+    std::make_pair(Module::ImportedModule({}, M), SourceFile::ImportOptions());
+  SF.addImports(Imports);
 }
 
 SourceFile::SourceFile(Module &M, SourceFileKind K,
