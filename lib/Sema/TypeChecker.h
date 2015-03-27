@@ -735,7 +735,7 @@ public:
   void resolveInheritanceClause(DeclContext *dc) override;
 
   /// Check the inheritance clause of the given declaration.
-  void checkInheritanceClause(Decl *decl, DeclContext *DC = nullptr,
+  void checkInheritanceClause(Decl *decl,
                               GenericTypeResolver *resolver = nullptr);
 
   /// Retrieve the set of protocols to which this nominal type declaration

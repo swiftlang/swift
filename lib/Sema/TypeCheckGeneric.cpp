@@ -232,7 +232,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     param->setDepth(depth);
 
     // Check the inheritance clause of this type parameter.
-    tc.checkInheritanceClause(param, parentDC, &resolver);
+    tc.checkInheritanceClause(param, &resolver);
 
     if (builder) {
       // Add the generic parameter to the builder.

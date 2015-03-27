@@ -293,19 +293,32 @@ void TypeChecker::resolveInheritanceClause(DeclContext *dc) {
 /// This routine validates all of the types in the parsed inheritance clause,
 /// recording the superclass (if any and if allowed) as well as the protocols
 /// to which this type declaration conforms.
-void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
+void TypeChecker::checkInheritanceClause(Decl *decl,
                                          GenericTypeResolver *resolver) {
   TypeResolutionOptions options;
-  if (!DC) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+  DeclContext *DC;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    DC = nominal;
+    options |= TR_NominalInheritanceClause;
+  } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    DC = ext;
+    options |= TR_NominalInheritanceClause;
+  } else if (isa<GenericTypeParamDecl>(decl)) {
+    // For generic parameters, we want name lookup to look at just the
+    // signature of the enclosing entity.
+    DC = decl->getDeclContext();
+    if (auto nominal = dyn_cast<NominalTypeDecl>(DC)) {
       DC = nominal;
       options |= TR_NominalInheritanceClause;
-    } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    } else if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
       DC = ext;
       options |= TR_NominalInheritanceClause;
-    } else {
-      DC = decl->getDeclContext();
+    } else if (!DC->isModuleScopeContext()) {
+      // Skip the generic parameter's context entirely.
+      DC = DC->getParent();
     }
+  } else {
+    DC = decl->getDeclContext();
   }
 
   // Establish a default generic type resolver.
@@ -840,7 +853,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
     GP->setDepth(Depth);
 
     // Check the constraints on the type parameter.
-    TC.checkInheritanceClause(GP, DC);
+    TC.checkInheritanceClause(GP);
 
     // Add the generic parameter to the builder.
     builder.addGenericParameter(GP);
