@@ -227,7 +227,7 @@ bb2:
 }
 
 // CHECK-LABEL: @elim_trampoline
-// CHECK: cond_br %0, bb2(%1 : $Int64), bb1(%2 : $Int64)
+// CHECK: cond_br %0, bb2(%1 : $Int64), bb1
 // CHECK: bb1
 // CHECK-NEXT: br bb2
 // CHECK: bb2
@@ -264,7 +264,7 @@ bb3(%4 : $Int64):
 }
 
 // CHECK-LABEL: @elim_trampoline3
-// CHECK: cond_br %0, bb2(%1 : $Int64), bb1(%2 : $Int64)
+// CHECK: cond_br %0, bb2(%1 : $Int64), bb1
 // CHECK: bb1
 // CHECK-NEXT: br bb2
 // CHECK: bb2
@@ -330,7 +330,7 @@ bb5(%6 : $Int64):
 // CHECK: bb4
 // Last cond_br should branch directly to the target of a trampoline
 // instead of the original bb3
-// CHECK: cond_br {{.*}}, bb3({{.*}}), bb4({{.*}})
+// CHECK: cond_br {{.*}}, bb3, bb4({{.*}})
 // CHECK-NOT: bb5
 // CHECK: }
 sil @elim_trampoline5 : $@thin (Int32) -> () {
@@ -382,6 +382,26 @@ bb3(%5 : $Int64):
 
 bb4(%6 : $Int64):
   return %6 : $Int64
+}
+
+// CHECK-LABEL: @elim_common_arg
+// CHECK: bb3:
+// CHECK-NEXT: return %1
+sil @elim_common_arg : $@thin (Builtin.Int1, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64):
+  %f1 = function_ref @external_f : $@thin ()->()
+  cond_br %0, bb1, bb2
+
+bb1:
+  apply %f1() : $@thin ()->()
+  br bb3(%1 : $Int64)
+
+bb2:
+  apply %f1() : $@thin ()->()
+  br bb3(%1 : $Int64)
+  
+bb3(%a1 : $Int64):
+  return %a1 : $Int64
 }
 
 // CHECK-LABEL: @elim_diamonds

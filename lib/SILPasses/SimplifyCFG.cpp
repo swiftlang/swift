@@ -2947,6 +2947,27 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   return true;
 }
 
+static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
+                                             DominanceInfo *DT) {
+  auto *A = BB->getBBArg(i);
+  SmallVector<SILValue, 4> Incoming;
+  if (!A->getIncomingValues(Incoming) || Incoming.empty())
+    return;
+  
+  SILValue V = Incoming[0];
+  for (size_t Idx = 1, Size = Incoming.size(); Idx < Size; ++Idx) {
+    if (Incoming[Idx] != V)
+      return;
+  }
+  
+  // If the incoming values of all predecessors are equal usually this means
+  // that the common incoming value dominates the BB. But: this might be not
+  // the case if BB is unreachable. Therefore we still have to check it.
+  if (!DT->dominates(V.getDef()->getParentBB(), BB))
+    return;
+  A->replaceAllUsesWith(V.getDef());
+}
+
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
   // Ignore blocks with no arguments.
   if (BB->bbarg_empty())
@@ -2966,6 +2987,11 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
   for (int i = BB->getNumBBArg() - 1; i >= 0; --i) {
     SILArgument *A = BB->getBBArg(i);
 
+    // Replace a block argument if all incoming values are equal. If this
+    // succeeds, argument A will have no uses afterwards.
+    if (DT)
+      tryToReplaceArgWithIncomingValue(BB, i, DT);
+    
     // Try to simplify the argument
     if (!A->use_empty()) {
       if (simplifyArgument(BB, i))
