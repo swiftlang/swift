@@ -1393,7 +1393,7 @@ public:
     auto *F = getFunction();
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
-    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->getRCInfo(getFunction());
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
 
     DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F->getName() <<
           " *****\n");

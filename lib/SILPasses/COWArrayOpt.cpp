@@ -956,7 +956,7 @@ class COWArrayOptPass : public SILFunctionTransform {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     auto *RCIA =
-      PM->getAnalysis<RCIdentityAnalysis>()->getRCInfo(getFunction());
+      PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
     SILLoopInfo *LI = LA->getLoopInfo(getFunction());
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");

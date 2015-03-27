@@ -226,7 +226,7 @@ class GlobalARCOpts : public SILFunctionTransform {
 
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
-    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->getRCInfo(getFunction());
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
     if (processFunction(*getFunction(), false, AA, POTA, RCIA)) {
       processFunction(*getFunction(), true, AA, POTA, RCIA);
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);

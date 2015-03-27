@@ -97,6 +97,57 @@ namespace swift {
     virtual void verify() const {}
   };
 
+  /// An abstract base class that implements the boiler plate of cacheing and
+  /// invalidating analysis for specific functions.
+  template<typename AnalysisTy>
+  class FunctionAnalysisBase : public SILAnalysis {
+  protected:
+    typedef llvm::DenseMap<SILFunction *, AnalysisTy*> StorageTy;
+
+    /// Maps functions to their analysis provider.
+    StorageTy Storage;
+
+    /// Construct a new empty analysis for a specific function.
+    virtual AnalysisTy *newFunctionAnalysis() = 0;
+
+    /// Return True if the analysis should be invalidated given trait \K is
+    /// preserved.
+    virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) = 0;
+
+  public:
+    /// Returns an analysis provider for a specific function \p F.
+    AnalysisTy* get(SILFunction *F) {
+      auto &it = Storage.FindAndConstruct(F);
+      if (!it.second)
+        it.second = newFunctionAnalysis();
+      return it.second;
+    }
+
+    virtual void invalidate(SILAnalysis::PreserveKind K) {
+      if (!shouldInvalidate(K)) return;
+
+      for (auto D : Storage)
+        delete D.second;
+
+      Storage.clear();
+    }
+
+    virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
+      if (!shouldInvalidate(K)) return;
+
+      auto &it = Storage.FindAndConstruct(F);
+      if (it.second) {
+        delete it.second;
+        it.second = nullptr;
+      }
+    }
+
+    FunctionAnalysisBase(AnalysisKind K) : SILAnalysis(K), Storage() {}
+    FunctionAnalysisBase(const FunctionAnalysisBase &) = delete;
+    FunctionAnalysisBase &operator=(const FunctionAnalysisBase &) = delete;
+    FunctionAnalysisBase() {}
+  };
+
   /// Keep track of functions that are completely optimized.
   class CompleteFunctions : public SILAnalysis {
     SILModule *M = nullptr;

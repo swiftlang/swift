@@ -60,16 +60,14 @@ private:
                                       SILValue RCIdentity);
 };
 
-class RCIdentityAnalysis : public SILAnalysis {
-  typedef llvm::DenseMap<SILFunction *, RCIdentityFunctionInfo*> RCMap;
-  RCMap RCInfo;
-
+class RCIdentityAnalysis : public FunctionAnalysisBase<RCIdentityFunctionInfo> {
   DominanceAnalysis *DA;
 
 public:
   RCIdentityAnalysis(SILModule *, SILPassManager *PM)
-    : SILAnalysis(AnalysisKind::RCIdentity), RCInfo(),
+    : FunctionAnalysisBase<RCIdentityFunctionInfo>(AnalysisKind::RCIdentity),
       DA(PM->getAnalysis<DominanceAnalysis>()) {}
+
   RCIdentityAnalysis(const RCIdentityAnalysis &) = delete;
   RCIdentityAnalysis &operator=(const RCIdentityAnalysis &) = delete;
 
@@ -77,29 +75,15 @@ public:
     return S->getKind() == AnalysisKind::RCIdentity;
   }
 
-  RCIdentityFunctionInfo* getRCInfo(SILFunction *F) {
-    auto &it = RCInfo.FindAndConstruct(F);
-    if (!it.second)
-      it.second = new RCIdentityFunctionInfo(DA);
-    return it.second;
+  RCIdentityFunctionInfo *newFunctionAnalysis() {
+    return new RCIdentityFunctionInfo(DA);
   }
 
-  virtual void invalidate(SILAnalysis::PreserveKind K) {
-    // Delete RC info for all functions.
-    for (auto D : RCInfo)
-      delete D.second;
-
-    RCInfo.clear();
+  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) {
+    return true;
   }
 
-  virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
-    auto &it = RCInfo.FindAndConstruct(F);
-    if (it.second) {
-      delete it.second;
-      it.second = nullptr;
-    }
-  }
-};
+ };
 
 } // end swift namespace
 

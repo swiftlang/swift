@@ -1075,7 +1075,7 @@ public:
     DominanceInfo *DT = DA->getDomInfo(F);
     assert(DT);
     IVInfo &IVs = IVA->getIVInfo(F);
-    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->getRCInfo(F);
+    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(F);
     auto DestAnalysis = PM->getAnalysis<DestructorAnalysis>();
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };

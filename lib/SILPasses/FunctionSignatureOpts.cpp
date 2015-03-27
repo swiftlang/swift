@@ -832,7 +832,7 @@ public:
       bool CallerSetIsComplete = FNode->isCallerEdgesComplete();
 
       // Otherwise, try to optimize the function signature of F.
-      Changed |= optimizeFunctionSignature(Allocator, RCIA->getRCInfo(&F),
+      Changed |= optimizeFunctionSignature(Allocator, RCIA->get(&F),
                                            &F, CallSites,
                                            CallerSetIsComplete,
                                            DeadFunctions);

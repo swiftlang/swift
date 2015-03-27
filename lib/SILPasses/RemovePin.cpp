@@ -71,7 +71,7 @@ public:
 
   void run() override {
     AA = PM->getAnalysis<AliasAnalysis>();
-    RCIA = PM->getAnalysis<RCIdentityAnalysis>()->getRCInfo(getFunction());
+    RCIA = PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
 
     DEBUG(llvm::dbgs() << "*** Running Pin Removal on "
                        << getFunction()->getName() << "\n");
