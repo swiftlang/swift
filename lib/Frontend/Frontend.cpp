@@ -291,19 +291,19 @@ void CompilerInstance::performSema() {
 
     auto initialImports = SF->getImports(/*allowUnparsed=*/true);
 
-    using ImportPair = std::pair<Module::ImportedModule, bool>;
+    using ImportPair =
+        std::pair<Module::ImportedModule, SourceFile::ImportOptions>;
     SmallVector<ImportPair, 4> initialImportsBuf{
       initialImports.begin(), initialImports.end()
     };
+
     if (underlying)
-      initialImportsBuf.push_back({ { /*accessPath=*/{}, underlying },
-                                    /*exported=*/false });
+      initialImportsBuf.push_back({ { /*accessPath=*/{}, underlying }, {} });
     if (importedHeaderModule)
       initialImportsBuf.push_back({ { /*accessPath=*/{}, importedHeaderModule },
-                                    /*exported=*/true });
+                                    SourceFile::ImportFlags::Exported });
     if (importModule)
-      initialImportsBuf.push_back({ { /*accessPath=*/{}, importModule },
-                                    /*exported=*/false });
+      initialImportsBuf.push_back({ { /*accessPath=*/{}, importModule }, {} });
 
     SF->setImports(Context->AllocateCopy(initialImportsBuf));
   };

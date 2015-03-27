@@ -35,8 +35,8 @@ using namespace swift;
 // NameBinder
 //===----------------------------------------------------------------------===//
 
-typedef Module::ImportedModule ImportedModule;
-typedef llvm::PointerUnion<const ImportedModule*, EnumType*> BoundScope;
+using ImportedModule = Module::ImportedModule;
+using ImportOptions = SourceFile::ImportOptions;
 
 namespace {  
   class NameBinder {    
@@ -51,8 +51,9 @@ namespace {
       return Context.Diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
     
-    void addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
-                   ImportDecl *ID);
+    void addImport(
+        SmallVectorImpl<std::pair<ImportedModule, ImportOptions>> &imports,
+        ImportDecl *ID);
 
     /// Load a module referenced by an import statement.
     ///
@@ -129,9 +130,9 @@ static const char *getImportKindString(ImportKind kind) {
   }
 }
 
-void
-NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
-                      ImportDecl *ID) {
+void NameBinder::addImport(
+    SmallVectorImpl<std::pair<ImportedModule, ImportOptions>> &imports,
+    ImportDecl *ID) {
   Module *M = getModule(ID->getModulePath());
   if (!M) {
     SmallString<64> modulePathStr;
@@ -154,10 +155,8 @@ NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
   }
 
   ID->setModule(M);
-  imports.push_back({ { ID->getDeclPath(), M }, ID->isExported() });
 
   Module *topLevelModule;
-
   if (ID->getModulePath().size() == 1) {
     topLevelModule = M;
   } else {
@@ -165,26 +164,32 @@ NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
     Identifier topLevelName = ID->getModulePath().front().first;
     topLevelModule = Context.getLoadedModule(topLevelName);
     assert(topLevelModule && "top-level module missing");
-    imports.push_back({
-      { ID->getDeclPath(), topLevelModule },
-      ID->isExported()
-    });
   }
 
-  if (auto *testableAttr = ID->getAttrs().getAttribute<TestableAttr>()) {
-    if (Context.LangOpts.EnableTestableAttrRequiresTestableModule &&
-        !topLevelModule->isTestingEnabled()) {
-      diagnose(ID->getModulePath().front().second, diag::module_not_testable,
-               topLevelModule->Name);
-      testableAttr->setInvalid();
-    }
+  auto *testableAttr = ID->getAttrs().getAttribute<TestableAttr>();
+  if (testableAttr && !topLevelModule->isTestingEnabled() &&
+      Context.LangOpts.EnableTestableAttrRequiresTestableModule) {
+    diagnose(ID->getModulePath().front().second, diag::module_not_testable,
+             topLevelModule->Name);
+    testableAttr->setInvalid();
   }
+
+  ImportOptions options;
+  if (ID->isExported())
+    options |= SourceFile::ImportFlags::Exported;
+  if (testableAttr)
+    options |= SourceFile::ImportFlags::Testable;
+  imports.push_back({ { ID->getDeclPath(), M }, options });
+
+  if (topLevelModule != M)
+    imports.push_back({ { ID->getDeclPath(), topLevelModule }, options });
 
   if (ID->getImportKind() != ImportKind::Module) {
     // If we're importing a specific decl, validate the import kind.
     using namespace namelookup;
     auto declPath = ID->getDeclPath();
 
+    // FIXME: Doesn't handle scoped testable imports correctly.
     assert(declPath.size() == 1 && "can't handle sub-decl imports");
     SmallVector<ValueDecl *, 8> decls;
     lookupInModule(topLevelModule, declPath, declPath.front().first, decls,
@@ -264,7 +269,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
 
   NameBinder Binder(SF);
 
-  SmallVector<std::pair<ImportedModule, bool>, 8> ImportedModules;
+  SmallVector<std::pair<ImportedModule, ImportOptions>, 8> ImportedModules;
   ImportedModules.append(SF.getImports().begin(), SF.getImports().end());
 
   // Do a prepass over the declarations to find and load the imported modules

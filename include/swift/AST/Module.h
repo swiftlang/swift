@@ -798,15 +798,25 @@ public:
     Stdlib
   };
 
+  /// Possible attributes for imports in source files.
+  ///
+  /// \see getImports
+  enum class ImportFlags {
+    Exported = 0x1,
+    Testable = 0x2
+  };
+
+  /// \see ImportFlags
+  using ImportOptions = OptionSet<ImportFlags>;
+
 private:
   LookupCache *Cache = nullptr;
   LookupCache &getCache() const;
 
-  /// This is the list of modules that are imported by this module, with the
-  /// second element of the pair declaring whether the module is reexported.
+  /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<Module::ImportedModule, bool>> Imports;
+  ArrayRef<std::pair<Module::ImportedModule, ImportOptions>> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -876,12 +886,13 @@ public:
   SourceFile(Module &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind);
 
-  ArrayRef<std::pair<Module::ImportedModule, bool>>
+  ArrayRef<std::pair<Module::ImportedModule, ImportOptions>>
   getImports(bool allowUnparsed = false) const {
     assert(allowUnparsed || ASTStage >= Parsed || Kind == SourceFileKind::SIL);
     return Imports;
   }
-  void setImports(ArrayRef<std::pair<Module::ImportedModule, bool>> IM) {
+  void
+  setImports(ArrayRef<std::pair<Module::ImportedModule, ImportOptions>> IM) {
     Imports = IM;
   }
 

@@ -2891,8 +2891,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
       // Add results for all imported modules.
       auto *SF = CurDeclContext->getParentSourceFile();
-      for (std::pair<Module::ImportedModule, bool> Imported :
-               SF->getImports()) {
+      for (auto Imported : SF->getImports()) {
         Module *TheModule = Imported.first.second;
         Module::AccessPathTy AccessPath = Imported.first.first;
         TheModule->forAllVisibleModules(AccessPath, handleImport);

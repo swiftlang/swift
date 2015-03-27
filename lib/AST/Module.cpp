@@ -955,7 +955,9 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   // check imports.
   llvm::SmallDenseMap<OP_DECL*, bool, 16> importedOperators;
   for (auto &imported : SF.getImports()) {
-    if (!includePrivate && !imported.second)
+    bool isExported =
+        imported.second.contains(SourceFile::ImportFlags::Exported);
+    if (!includePrivate && !isExported)
       continue;
 
     Optional<OP_DECL *> maybeOp
@@ -964,7 +966,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
       return None;
     
     if (OP_DECL *op = *maybeOp)
-      importedOperators[op] |= imported.second;
+      importedOperators[op] |= isExported;
   }
 
   typename OperatorMap<OP_DECL *>::mapped_type result = { nullptr, true };
@@ -1064,10 +1066,22 @@ void Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
 void
 SourceFile::getImportedModules(SmallVectorImpl<Module::ImportedModule> &modules,
                                Module::ImportFilter filter) const {
-  for (auto importPair : getImports())
-    if (filter == Module::ImportFilter::All ||
-        (filter == Module::ImportFilter::Private) ^ importPair.second)
-      modules.push_back(importPair.first);
+  for (auto importPair : getImports()) {
+    switch (filter) {
+    case Module::ImportFilter::All:
+      break;
+    case Module::ImportFilter::Public:
+      if (!importPair.second.contains(ImportFlags::Exported))
+        continue;
+      break;
+    case Module::ImportFilter::Private:
+      if (importPair.second.contains(ImportFlags::Exported))
+        continue;
+      break;
+    }
+
+    modules.push_back(importPair.first);
+  }
 }
 
 bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
@@ -1276,7 +1290,7 @@ bool FileUnit::forAllVisibleModules(
   if (auto SF = dyn_cast<SourceFile>(this)) {
     // Handle privately visible modules as well.
     for (auto importPair : SF->getImports()) {
-      if (importPair.second)
+      if (importPair.second.contains(SourceFile::ImportFlags::Exported))
         continue;
       Module *M = importPair.first.second;
       if (!M->forAllVisibleModules(importPair.first.first, fn))
@@ -1376,8 +1390,8 @@ static void performAutoImport(SourceFile &SF,
 
   // FIXME: These will be the same for most source files, but we copy them
   // over and over again.
-  std::pair<Module::ImportedModule, bool> Imports[] = {
-    std::make_pair(Module::ImportedModule({}, M), false)
+  std::pair<Module::ImportedModule, SourceFile::ImportOptions> Imports[] = {
+    std::make_pair(Module::ImportedModule({}, M), SourceFile::ImportOptions())
   };
   SF.setImports(Ctx.AllocateCopy(Imports));
 }
