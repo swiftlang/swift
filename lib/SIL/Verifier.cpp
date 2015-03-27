@@ -1334,8 +1334,7 @@ public:
             "result of witness_method must be thin function");
 
     require(methodType->getAbstractCC()
-              == F.getModule().Types.getProtocolWitnessCC(
-                   AMI->getMember().getDecl()->getDeclContext()),
+              == F.getModule().Types.getProtocolWitnessCC(protocol),
             "result of witness_method must have correct @cc for protocol");
 
     require(methodType->isPolymorphic(),

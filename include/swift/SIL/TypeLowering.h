@@ -527,20 +527,13 @@ public:
   /// Return a most-general-possible abstraction pattern.
   AbstractionPattern getMostGeneralAbstraction();
 
-  /// Get the calling convention used by witnesses of a protocol or
-  /// protocol extension.
-  static AbstractCC getProtocolWitnessCC(DeclContext *DC) {
-    assert(DC->isProtocolOrProtocolExtensionContext());
+  /// Get the calling convention used by witnesses of a protocol.
+  static AbstractCC getProtocolWitnessCC(ProtocolDecl *P) {
+    // ObjC protocols use the objc method convention.
+    if (P->isObjC())
+      return AbstractCC::ObjCMethod;
 
-    // ObjC protocols use the objc method
-    // convention.
-    if (auto P = dyn_cast<ProtocolDecl>(DC)) {
-      if (P->isObjC())
-        return AbstractCC::ObjCMethod;
-    }
-    
-    // Native protocols and extensions of @objc protocols use the
-    // witness calling convention.
+    // Native protocols use the witness calling convention.
     return AbstractCC::WitnessMethod;
   }
   

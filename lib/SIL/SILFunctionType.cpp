@@ -1241,10 +1241,9 @@ AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
   // FIXME: Assert that there is a native entry point
   // available. There's no great way to do this.
 
-  // Protocol witnesses and members of protocol extensions are called
-  // using the witness calling convention.
-  if (c.getDecl()->getDeclContext()->isProtocolOrProtocolExtensionContext())
-    return getProtocolWitnessCC(c.getDecl()->getDeclContext());
+  // Protocol witnesses are called using the witness calling convention.
+  if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext()))
+    return getProtocolWitnessCC(proto);
 
   switch (c.kind) {
     case SILDeclRef::Kind::Func:
