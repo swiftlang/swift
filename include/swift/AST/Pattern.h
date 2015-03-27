@@ -654,6 +654,64 @@ public:
   }
 };
 
+/// A pattern that matches an enum case. If the enum value is in the matching
+/// case, then the value is extracted. If there is a subpattern, it is then
+/// matched against the associated value for the case.
+class BoolPattern : public Pattern {
+  TypeLoc ParentType;
+  SourceLoc DotLoc;
+  SourceLoc NameLoc;
+  Identifier Name;
+  Expr *BoolValue;
+  Pattern /*nullable*/ *SubPattern;
+
+public:
+  BoolPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
+                     Identifier Name, Expr *BoolValue,
+                     Pattern *SubPattern, Optional<bool> Implicit = None)
+    : Pattern(PatternKind::Bool),
+      ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
+      BoolValue(BoolValue), SubPattern(SubPattern) {
+    if (Implicit.hasValue() ? *Implicit : !ParentType.hasLocation())
+      setImplicit();
+  }
+
+  bool hasSubPattern() const { return SubPattern; }
+
+  const Pattern *getSubPattern() const {
+    return SubPattern;
+  }
+
+  Pattern *getSubPattern() {
+    return SubPattern;
+  }
+
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+
+  Identifier getName() const { return Name; }
+
+  Expr *getBoolValue() const { return BoolValue; }
+  void setBoolValue(Expr *v) { BoolValue = v; }
+
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceLoc getStartLoc() const {
+    return ParentType.hasLocation() ? ParentType.getSourceRange().Start :
+           DotLoc.isValid()         ? DotLoc
+                                    : NameLoc;
+  }
+  SourceLoc getEndLoc() const {
+    return SubPattern ? SubPattern->getSourceRange().End : NameLoc;
+  }
+  SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
+
+  TypeLoc getParentType() const { return ParentType; }
+
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Bool;
+  }
+};
+
 /// A pattern "x?" which matches ".Some(x)".
 class OptionalSomePattern : public Pattern {
   Pattern *SubPattern;

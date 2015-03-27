@@ -46,6 +46,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
     return OS << "enum case matching pattern";
   case PatternKind::OptionalSome:
     return OS << "optional .Some matching pattern";
+  case PatternKind::Bool:
+    return OS << "bool matching pattern";
   }
   llvm_unreachable("bad PatternKind");
 }
@@ -156,6 +158,13 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
   case PatternKind::OptionalSome:
     cast<OptionalSomePattern>(this)->getSubPattern()->forEachVariable(fn);
     return;
+
+  case PatternKind::Bool: {
+    auto *OP = cast<BoolPattern>(this);
+    if (OP->hasSubPattern())
+      OP->getSubPattern()->forEachVariable(fn);
+    return;
+  }
   }
 }
 
@@ -198,6 +207,12 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   case PatternKind::OptionalSome:
     cast<OptionalSomePattern>(this)->getSubPattern()->forEachNode(f);
     return;
+  case PatternKind::Bool: {
+    auto *OP = cast<BoolPattern>(this);
+    if (OP->hasSubPattern())
+      OP->getSubPattern()->forEachNode(f);
+    return;
+  }
   }
 }
 
@@ -379,6 +394,21 @@ Pattern *Pattern::clone(ASTContext &context,
     break;
   }
 
+  case PatternKind::Bool: {
+    auto bp = cast<BoolPattern>(this);
+    Pattern *sub = nullptr;
+    if (bp->hasSubPattern())
+      sub = bp->getSubPattern()->clone(context, options);
+    result = new (context) BoolPattern(bp->getParentType()
+                                         .clone(context),
+                                       bp->getLoc(),
+                                       bp->getNameLoc(),
+                                       bp->getName(),
+                                       bp->getBoolValue(),
+                                       sub);
+    break;
+  }
+
   case PatternKind::Expr: {
     auto expr = cast<ExprPattern>(this);
     result = new(context) ExprPattern(expr->getSubExpr(),
@@ -414,6 +444,7 @@ Pattern *Pattern::cloneForwardable(ASTContext &context, DeclContext *DC,
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
+  case PatternKind::Bool:
   case PatternKind::Expr:
     llvm_unreachable("cannot forward this kind of pattern");
 
@@ -497,6 +528,7 @@ Expr *Pattern::buildForwardingRefExpr(ASTContext &context) const {
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
+  case PatternKind::Bool:
   case PatternKind::Expr:
     llvm_unreachable("cannot forward this kind of pattern");
 

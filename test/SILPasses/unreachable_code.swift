@@ -172,6 +172,77 @@ func testSwitchEnumOptionalNil(x: Int?) -> Int {
   }
 }
 
+// Do not emit false non-exhaustive warnings if both
+// true and false are covered by the switch.
+func testSwitchEnumBool(b: Bool, xi: Int) -> Int {
+  var x = xi
+  var Cond = b
+  
+  switch Cond { // no warning
+  default:
+    x++
+  }
+
+  switch Cond {
+  case true:
+    x++
+  } // expected-error{{switch must be exhaustive}}
+
+  switch Cond {
+  case false:
+    x++
+  } // expected-error{{switch must be exhaustive}}
+
+  switch Cond { // no warning
+  case true:
+    x++
+  case false:
+    x--
+  }
+
+  return x
+}
+
+// Do not emit false non-exhaustive warnings if both 
+// true and false are covered for a boolean element of a tuple.
+func testSwitchEnumBoolTuple(b1: Bool, b2: Bool, xi: Int) -> Int {
+  var x = xi
+  var Cond = (b1, b2)
+  
+  switch Cond { // no warning
+  default:
+    x++
+  }
+
+  switch Cond {
+  case (true, true):
+    x++
+    // FIXME: Two expect statements are written, because unreachable diagnostics produces N errors
+    // for non-exhaustive switches on tuples of N elements
+  } // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
+
+  switch Cond {
+  case (false, true):
+    x++
+    // FIXME: Two expect statements are written, because unreachable diagnostics produces N errors
+    // for non-exhaustive switches on tuples of N elements
+  } // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
+
+  switch Cond { // no warning
+  case (true, true):
+    x++
+  case (true, false):
+    x++
+  case (false, true):
+    x--
+  case (false, false):
+    x--
+  }
+
+  return x
+}
+
+
 @noreturn @asmname("exit") func exit() -> ()
 func reachableThroughNonFoldedPredecessor(@autoclosure fn: () -> Bool = false) {
   if !_fastPath(fn()) {

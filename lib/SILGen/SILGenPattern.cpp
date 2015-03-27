@@ -22,6 +22,7 @@
 #include "llvm/Support/FormattedStream.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -141,6 +142,12 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
     os << ".Some";
     return;
 
+  case PatternKind::Bool: {
+    auto bp = cast<BoolPattern>(p);
+    os << bp->getName();
+    return;
+  }
+
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Var:
@@ -168,6 +175,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   case PatternKind::Is:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
+  case PatternKind::Bool:
     return true;
 
   // Recur into simple wrapping patterns.
@@ -234,6 +242,13 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
     auto en = cast<OptionalSomePattern>(p);
     return getNumSpecializationsRecursive(en->getSubPattern(), n+1);
   }
+  case PatternKind::Bool: {
+    auto bp = cast<BoolPattern>(p);
+    n++;
+    if (bp->hasSubPattern())
+      n = getNumSpecializationsRecursive(bp->getSubPattern(), n);
+    return n;
+  }
 
   // Recur into simple wrapping patterns.
   case PatternKind::Paren:
@@ -274,6 +289,7 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
+  case PatternKind::Bool:
     return false;
 
   // Recur into simple wrapping patterns.
@@ -483,6 +499,10 @@ private:
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
                                const FailureHandler &failure);
+  void emitBoolDispatch(ArrayRef<RowToSpecialize> rows,
+                        ConsumableManagedValue src,
+                        const SpecializationHandler &handleSpec,
+                        const FailureHandler &failure);
 };
 
 /// A handle to a row in a clause matrix. Does not own memory; use of the
@@ -1056,6 +1076,7 @@ void PatternMatchEmission::bindRefutablePattern(Pattern *pattern,
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
+  case PatternKind::Bool:
   case PatternKind::Is:
     llvm_unreachable("didn't specialize specializable pattern?");
 
@@ -1116,6 +1137,7 @@ void PatternMatchEmission::bindIrrefutablePattern(Pattern *pattern,
   case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
+  case PatternKind::Bool:
   case PatternKind::Is:
     llvm_unreachable("didn't specialize specializable pattern?");
 
@@ -1271,6 +1293,8 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
     return emitEnumElementDispatch(rowsToSpecialize, arg, handler, failure);
+  case PatternKind::Bool:
+    return emitBoolDispatch(rowsToSpecialize, arg, handler, failure);
   }
   llvm_unreachable("bad pattern kind");
 };
@@ -1785,6 +1809,183 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       eltCMV = emitReabstractedSubobject(SGF, loc, origCMV, eltTL,
                                   AbstractionPattern(elt->getArgumentType()),
                                          substEltTy);
+    }
+
+    const FailureHandler *innerFailure = &outerFailure;
+    FailureHandler specializedFailure = [&](SILLocation loc) {
+      ArgUnforwarder unforwarder(SGF);
+      unforwarder.unforwardBorrowedValues(src, origCMV);
+      outerFailure(loc);
+    };
+    if (ArgUnforwarder::requiresUnforwarding(src))
+      innerFailure = &specializedFailure;
+
+    handleCase(eltCMV, specializedRows, *innerFailure);
+    assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
+  }
+
+  // Emit the default block if we needed one.
+  if (defaultBB) {
+    SGF.B.setInsertionPoint(defaultBB);
+    outerFailure(rows.back().Pattern);
+  }
+}
+
+/// Perform specialized dispatch for a sequence of EnumElementPattern or an
+/// OptionalSomePattern.
+void PatternMatchEmission::
+emitBoolDispatch(ArrayRef<RowToSpecialize> rows,
+                        ConsumableManagedValue src,
+                        const SpecializationHandler &handleCase,
+                        const FailureHandler &outerFailure) {
+
+  struct CaseInfo {
+    Pattern *FirstMatcher;
+    bool Irrefutable = false;
+    SmallVector<SpecializedRow, 2> SpecializedRows;
+  };
+
+  SILBasicBlock *curBB = SGF.B.getInsertionBB();
+  auto &Context = SGF.getASTContext();
+
+  // Collect the cases and specialized rows.
+  //
+  // These vectors are completely parallel, but the switch
+  // instructions want only the first information, so we split them up.
+  SmallVector<std::pair<SILValue, SILBasicBlock*>, 4> caseBBs;
+  SmallVector<CaseInfo, 4> caseInfos;
+  SILBasicBlock *defaultBB = nullptr;
+
+  // Define the exhaustive set of Bool values.
+  SmallVector<BooleanLiteralExpr *, 2> BoolValues;
+  BoolValues.push_back(new (Context)
+                           BooleanLiteralExpr(false, SourceLoc(), true));
+  BoolValues.push_back(new (Context)
+                           BooleanLiteralExpr(true, SourceLoc(), true));
+
+  caseBBs.reserve(rows.size());
+  caseInfos.reserve(rows.size());
+
+  // Create destination blocks for all the cases.
+  llvm::DenseMap<Expr*, unsigned> caseToIndex;
+  llvm::DenseMap<BooleanLiteralExpr*, SILValue> elt2SILValue;
+  for (auto &row : rows) {
+    BooleanLiteralExpr *elt;
+    Pattern *subPattern = nullptr;
+    SILValue eltSILValue;
+    auto bp = dyn_cast<BoolPattern>(row.Pattern);
+    assert(bp && "It should be a bool pattern");
+
+    elt = dyn_cast<BooleanLiteralExpr>(bp->getBoolValue());
+    elt = elt->getValue() ? BoolValues[1] : BoolValues[0];
+    assert(elt && "Case expression should be a boolean literal");
+    subPattern = bp->getSubPattern();
+
+    unsigned index = caseInfos.size();
+    auto insertionResult = caseToIndex.insert({elt, index});
+    if (!insertionResult.second) {
+      index = insertionResult.first->second;
+    } else {
+      curBB = SGF.createBasicBlock(curBB);
+      auto *IL = SGF.B.createIntegerLiteral(
+          PatternMatchStmt,
+          SILType::getBuiltinIntegerType(1, Context),
+          APInt(1, elt->getValue()? 1 : 0, 1));
+      eltSILValue = SILValue(IL, 0);
+      elt2SILValue.insert({elt, eltSILValue});
+      caseBBs.push_back({eltSILValue, curBB});
+      caseInfos.resize(caseInfos.size() + 1);
+      caseInfos.back().FirstMatcher = row.Pattern;
+    }
+    assert(caseToIndex[elt] == index);
+    assert(caseBBs[index].first == elt2SILValue.lookup(elt));
+
+    auto &info = caseInfos[index];
+    info.Irrefutable = (info.Irrefutable || row.Irrefutable);
+    info.SpecializedRows.resize(info.SpecializedRows.size() + 1);
+    auto &specRow = info.SpecializedRows.back();
+    specRow.RowIndex = row.RowIndex;
+
+    // Use the row pattern, if it has one.
+    if (subPattern) {
+      specRow.Patterns.push_back(subPattern);
+      // It's also legal to write:
+      //   case .Some { ... }
+      // which is an implicit wildcard.
+    } else {
+      specRow.Patterns.push_back(nullptr);
+    }
+  }
+
+  // Check to see if we need a default block.
+  for (auto val : BoolValues) {
+    if (!caseToIndex.count(val)) {
+      defaultBB = SGF.createBasicBlock(curBB);
+      break;
+    }
+  }
+
+  assert(caseBBs.size() == caseInfos.size());
+
+  // Emit the switch_value
+  SILLocation loc = PatternMatchStmt;
+  loc.setDebugLoc(rows[0].Pattern);
+  SILValue srcValue = src.getFinalManagedValue().forward(SGF);
+
+  // Extract the i1 from the Bool struct.
+  StructDecl *BoolStruct = dyn_cast<StructDecl>(Context.getBoolDecl());
+  auto Members = BoolStruct->lookupDirect(Context.getIdentifier("value"));
+  assert(Members.size() == 1 &&
+         "Bool should have only one property with name 'value'");
+  auto Member = dyn_cast<VarDecl>(Members[0]);
+  assert(Member &&
+         "Bool should have a property with name 'value' of type Int1");
+  auto *ETI = SGF.B.createStructExtract(loc, srcValue, Member);
+
+  SGF.B.createSwitchValue(loc, SILValue(ETI, 0), defaultBB, caseBBs);
+
+  // Okay, now emit all the cases.
+  for (unsigned i = 0, e = caseInfos.size(); i != e; ++i) {
+    auto &caseInfo = caseInfos[i];
+    SILLocation loc = caseInfo.FirstMatcher;
+    auto &specializedRows = caseInfo.SpecializedRows;
+
+    SILBasicBlock *caseBB = caseBBs[i].second;
+    SGF.B.setInsertionPoint(caseBB);
+
+    // We're in conditionally-executed code; enter a scope.
+    Scope scope(SGF.Cleanups, CleanupLocation::getCleanupLocation(loc));
+
+    SILType eltTy;
+    bool hasElt = false;
+
+    ConsumableManagedValue eltCMV;
+    ConsumableManagedValue origCMV;
+
+    // Empty cases.  Try to avoid making an empty tuple value if it's
+    // obviously going to be ignored.  This assumes that we won't even
+    // try to touch the value in such cases, although we may touch the
+    // cleanup (enough to see that it's not present).
+    if (!hasElt) {
+      bool hasNonAny = false;
+      for (auto &specRow : specializedRows) {
+        auto pattern = specRow.Patterns[0];
+        if (pattern &&
+            !isa<AnyPattern>(pattern->getSemanticsProvidingPattern())) {
+          hasNonAny = true;
+          break;
+        }
+      }
+
+      SILValue result;
+      if (hasNonAny) {
+        result = SGF.emitEmptyTuple(loc);
+      } else {
+        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);
+      }
+      origCMV = ConsumableManagedValue::forUnmanaged(result);
+      eltCMV = origCMV;
+
     }
 
     const FailureHandler *innerFailure = &outerFailure;

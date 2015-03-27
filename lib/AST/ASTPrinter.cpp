@@ -495,6 +495,14 @@ void PrintAST::printPattern(const Pattern *pattern) {
     Printer << '?';
     break;
 
+  case PatternKind::Bool: {
+    auto pat = cast<BoolPattern>(pattern);
+    // FIXME: Print element expr.
+    if (pat->hasSubPattern())
+      printPattern(pat->getSubPattern());
+    break;
+  }
+
   case PatternKind::Expr:
     // FIXME: Print expr.
     break;

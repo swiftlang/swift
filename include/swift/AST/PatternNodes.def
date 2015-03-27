@@ -38,6 +38,7 @@ REFUTABLE_PATTERN(Is, Pattern)
 REFUTABLE_PATTERN(NominalType, Pattern)
 REFUTABLE_PATTERN(EnumElement, Pattern)
 REFUTABLE_PATTERN(OptionalSome, Pattern)
+REFUTABLE_PATTERN(Bool, Pattern)
 REFUTABLE_PATTERN(Expr, Pattern)
 
 #undef PATTERN

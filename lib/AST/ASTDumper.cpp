@@ -281,6 +281,17 @@ namespace {
       printRec(P->getSubPattern());
       OS << ')';
     }
+    void visitBoolPattern(BoolPattern *P) {
+      printCommon(P, "pattern_bool");
+      OS << ' ';
+      P->getParentType().getType().print(OS);
+      OS << '.' << P->getName();
+      if (P->hasSubPattern()) {
+        OS << '\n';
+        printRec(P->getSubPattern());
+      }
+      OS << ')';
+    }
 
   };
 
