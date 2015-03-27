@@ -1745,8 +1745,13 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
     // in the type's definition.
     NominalTypeDecl *D = UGT->getDecl();
     SmallVector<Type, 4> GenericArgs;
-    for (auto Param : *D->getGenericParams())
-      GenericArgs.push_back(Param->getArchetype());
+    for (auto Param : *D->getGenericParams()) {
+      auto Archetype = Param->getArchetype();
+      if (!Archetype)
+        return ErrorType::get(getASTContext());
+
+      GenericArgs.push_back(Archetype);
+    }
     Ty = BoundGenericType::get(D, getDeclContext()->getDeclaredTypeInContext(),
                                GenericArgs);
   }

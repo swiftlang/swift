@@ -1084,6 +1084,9 @@ public:
       return Action::Continue; 
 
     auto genericSig = boundGeneric->getDecl()->getGenericSignature();
+    if (!genericSig)
+      return Action::Stop;
+
     auto params = genericSig->getInnermostGenericParams();
     auto args = boundGeneric->getGenericArgs();
 

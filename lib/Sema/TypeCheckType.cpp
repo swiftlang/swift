@@ -410,6 +410,11 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     type = typeDecl->getDeclaredType();
   }
 
+  // FIXME: Defensive check that shouldn't be needed, but prevents a
+  // huge number of crashes on ill-formed code.
+  if (!type)
+    return ErrorType::get(TC.Context);
+
   if (type->is<UnboundGenericType>() &&
       genericArgs.empty() && !allowUnboundGenerics) {
     diagnoseUnboundGenericType(TC, type, loc);
