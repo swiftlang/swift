@@ -1129,8 +1129,16 @@ static bool checkAccessibility(const DeclContext *useDC,
   switch (access) {
   case Accessibility::Private:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
-  case Accessibility::Internal:
-    return useDC->getParentModule() == sourceDC->getParentModule();
+  case Accessibility::Internal: {
+    const Module *sourceModule = sourceDC->getParentModule();
+    const DeclContext *useFile = useDC->getModuleScopeContext();
+    if (useFile->getParentModule() == sourceModule)
+      return true;
+    if (auto *useSF = dyn_cast<SourceFile>(useFile))
+      if (useSF->hasTestableImport(sourceModule))
+        return true;
+    return false;
+  }
   case Accessibility::Public:
     return true;
   }
@@ -1218,7 +1226,7 @@ bool DeclContext::lookupQualified(Type type,
           return true;
         lookupInModule(import.second, import.first, member, decls,
                        NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                       typeResolver);
+                       typeResolver, topLevelScope);
         // If we're able to do an unscoped lookup, we see everything. No need
         // to keep going.
         return !import.first.empty();

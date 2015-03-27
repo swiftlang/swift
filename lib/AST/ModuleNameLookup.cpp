@@ -176,6 +176,10 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
       return !VD->isAccessibleFrom(moduleScopeContext);
     });
     localDecls.erase(newEndIter, localDecls.end());
+
+    // This only applies to immediate imports of the top-level module.
+    if (moduleScopeContext && moduleScopeContext->getParentModule() != module)
+      moduleScopeContext = nullptr;
   }
 
   OverloadSetTy overloads;
@@ -211,7 +215,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
       auto &resultSet = next.first.empty() ? unscopedValues : scopedValues;
       lookupInModule<OverloadSetTy>(next.second, combinedAccessPath,
                                     resultSet, resolutionKind, canReturnEarly,
-                                    typeResolver, cache, nullptr,
+                                    typeResolver, cache, moduleScopeContext,
                                     respectAccessControl, {}, callback);
     }
 

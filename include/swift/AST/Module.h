@@ -896,6 +896,8 @@ public:
     Imports = IM;
   }
 
+  bool hasTestableImport(const Module *module) const;
+
   void clearLookupCache();
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;

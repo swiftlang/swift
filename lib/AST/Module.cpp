@@ -1347,6 +1347,15 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   }
 }
 
+bool SourceFile::hasTestableImport(const swift::Module *module) const {
+  using ImportPair = std::pair<Module::ImportedModule, ImportOptions>;
+  return std::any_of(Imports.begin(), Imports.end(),
+                     [module](ImportPair importPair) -> bool {
+    return importPair.first.second == module &&
+        importPair.second.contains(ImportFlags::Testable);
+  });
+}
+
 void SourceFile::clearLookupCache() {
   if (!Cache)
     return;
