@@ -97,10 +97,11 @@ mirrors.test("BidirectionalStructure") {
 }
 
 mirrors.test("LabeledStructure") {
-  struct Zee : CustomReflectable {
+  struct Zee : CustomReflectable, Printable {
     func makeCustomMirror() -> Mirror {
       return Mirror(children: ["bark": 1, "bite": 0])
     }
+    var description: String { return "Zee" }
   }
 
   let z = Zee().makeCustomMirror()
@@ -116,6 +117,15 @@ mirrors.test("LabeledStructure") {
   let z2 = Zee2().makeCustomMirror()
   expectEqual(.Dictionary, z2.displayStyle)
   expectEqual("[bark: 1, bite: 0]", z2.description)
+
+  struct Heterogeny : CustomReflectable {
+    func makeCustomMirror() -> Mirror {
+      return Mirror(
+        children: ["bark": 1, "bite": Zee()])
+    }
+  }
+  let h = Heterogeny().makeCustomMirror()
+  expectEqual("[bark: 1, bite: Zee]", h.description)
 }
 
 mirrors.test("Legacy") {

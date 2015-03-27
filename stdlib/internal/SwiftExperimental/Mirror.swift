@@ -127,8 +127,8 @@ public struct Mirror {
   /// argument.  Be aware that although an *actual* `Dictionary` is
   /// arbitrarily-ordered, the ordering of the `Mirror`\ 's `children`
   /// will exactly match that of the literal you pass.
-  public init<Element>(
-    children: DictionaryLiteral<String, Element>,
+  public init(
+    children: DictionaryLiteral<String, Any>,
     displayStyle: DisplayStyle? = nil
   ) {
     self.children = Children(
