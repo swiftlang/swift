@@ -235,6 +235,12 @@ CF_TYPE(CGPathRef)
 CF_TYPE(CGPatternRef)
 CF_TYPE(CGShadingRef)
 
+// CoreGraphics private
+CF_TYPE(QLPreviewBubbleRef)
+CF_TYPE(CGRegionRef)
+CF_TYPE(CGRegionEnumeratorRef)
+CF_TYPE(CGSWindowBackdropRef)
+
 // CoreMIDI
 NON_CF_TYPE(MIDIClientRef) // CFExclusions.def
 NON_CF_TYPE(MIDIDeviceListRef) // CFExclusions.def
