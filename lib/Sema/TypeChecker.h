@@ -209,9 +209,6 @@ enum TypeResolutionFlags {
   /// Whether we are the variable type in a for/in statement.
   TR_EnumerationVariable = 0x200,
   
-  /// Whether this type is being used in an inheritance clause.
-  TR_InheritanceClause = 0x400,
-
   /// Whether this type is being used in the inheritance clause of a nominal
   /// type.
   TR_NominalInheritanceClause = 0x800,

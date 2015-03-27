@@ -265,7 +265,7 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
 }
 
 void TypeChecker::resolveInheritanceClause(DeclContext *dc) {
-  TypeResolutionOptions options = TR_InheritanceClause;
+  TypeResolutionOptions options;
 
   // FIXME: Add a cached bit so this isn't O(n) in repeated calls.
   MutableArrayRef<TypeLoc> inheritanceClause;
@@ -295,7 +295,7 @@ void TypeChecker::resolveInheritanceClause(DeclContext *dc) {
 /// to which this type declaration conforms.
 void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
                                          GenericTypeResolver *resolver) {
-  TypeResolutionOptions options = TR_InheritanceClause;
+  TypeResolutionOptions options;
   if (!DC) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       DC = nominal;
@@ -862,7 +862,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
         continue;
       }
 
-      if (TC.validateType(Req.getConstraintLoc(), DC, TR_InheritanceClause)) {
+      if (TC.validateType(Req.getConstraintLoc(), DC)) {
         Req.setInvalid();
         continue;
       }
@@ -974,7 +974,7 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
       }
 
       revertDependentTypeLoc(Req.getConstraintLoc());
-      if (TC.validateType(Req.getConstraintLoc(), dc, TR_InheritanceClause)) {
+      if (TC.validateType(Req.getConstraintLoc(), dc)) {
         Req.setInvalid();
         continue;
       }
