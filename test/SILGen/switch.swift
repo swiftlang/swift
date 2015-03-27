@@ -1336,9 +1336,10 @@ func testLabeledScalarPayload(lsp: LabeledScalarPayload) -> Any {
   }
 }
 
+// There should be no unreachable generated.
 // CHECK-LABEL: sil hidden @_TF6switch19testOptionalPatternFGSqSi_T_
 func testOptionalPattern(value : Int?) {
-  // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, default [[NILBB:bb[0-9]+]]
+  // CHECK: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
   switch value {
   case 1?: a()
   case 2?: b()
@@ -1370,7 +1371,24 @@ func testOptionalEnumMix(a : Int?) -> Int {
   }
 }
 
+// x? and nil should both be considered "similar" and thus handled in the same
+// switch on the enum kind.  There should be no unreachable generated.
+// CHECK-LABEL: sil hidden @_TF6switch26testOptionalEnumMixWithNilFGSqSi_Si
+func testOptionalEnumMixWithNil(a : Int?) -> Int {
+  // CHECK: debug_value %0 : $Optional<Int>  // let a
+  // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.None!enumelt: [[NILBB:bb[0-9]+]]
+  switch a {
+  case let x?:
+    return 0
 
+  // CHECK: [[SOMEBB]](%3 : $Int):
+  // CHECK-NEXT: debug_value %3 : $Int  // let x
+  // CHECK: integer_literal $Builtin.Int2048, 0
 
+  case nil:
+    return 42
 
-
+  // CHECK: [[NILBB]]:
+  // CHECK: integer_literal $Builtin.Int2048, 42
+  }
+}

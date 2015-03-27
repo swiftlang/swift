@@ -944,6 +944,20 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   case PatternKind::Expr: {
     assert(cast<ExprPattern>(P)->isResolved()
            && "coercing unresolved expr pattern!");
+    // case nil is equivalent to .None when switching on Optionals.
+    if (type.getCanonicalTypeOrNull().getAnyOptionalObjectType()) {
+      auto EP = cast<ExprPattern>(P);
+      if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
+        Identifier Name = Context.getIdentifier("None");
+        auto *OptionalEnumDecl =
+            type.getCanonicalTypeOrNull().getEnumOrBoundGenericEnum();
+        auto *NoneEnumElement = OptionalEnumDecl->getElement(Name);
+        P = new (Context) EnumElementPattern(TypeLoc::withoutLoc(type),
+                                             NLE->getLoc(), NLE->getLoc(), Name,
+                                             NoneEnumElement, nullptr, false);
+        return coercePatternToType(P, dc, type, options, resolver);
+      }
+    }
     return typeCheckExprPattern(cast<ExprPattern>(P), dc, type);
   }
       
