@@ -3504,6 +3504,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // return UIApplicationMain(C_ARGC, C_ARGV, nil, ClassName);
     
     CanType NSStringTy = SGM.Types.getNSStringType();
+    CanType OptNSStringTy
+      = OptionalType::get(NSStringTy)->getCanonicalType();
     CanType IUOptNSStringTy
       = ImplicitlyUnwrappedOptionalType::get(NSStringTy)->getCanonicalType();
     
@@ -3522,18 +3524,15 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       ->getCanonicalType();
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
-    CanType IUOptAnyObjectMetaty
-      = ImplicitlyUnwrappedOptionalType::get(anyObjectMetaTy)
-          ->getCanonicalType();
     
     auto NSStringFromClassType = SILFunctionType::get(nullptr,
                   AnyFunctionType::ExtInfo()
                     .withRepresentation(AnyFunctionType::Representation::Thin)
                     .withCallingConv(AbstractCC::C),
                   ParameterConvention::Direct_Unowned,
-                  SILParameterInfo(IUOptAnyObjectMetaty,
+                  SILParameterInfo(anyObjectMetaTy,
                                    ParameterConvention::Direct_Unowned),
-                  SILResultInfo(IUOptNSStringTy,
+                  SILResultInfo(OptNSStringTy,
                                 ResultConvention::Autoreleased),
                   /*error result*/ None,
                   getASTContext());
@@ -3549,15 +3548,13 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                           SILType::getPrimitiveObjectType(anyObjectMetaTy),
                           getASTContext().AllocateCopy(
                             llvm::makeArrayRef(mainClassAnyObjectConformance)));
-    SILValue iuoptMetaTy =
-      B.createEnum(mainClass, metaTy,
-                   getASTContext().getImplicitlyUnwrappedOptionalSomeDecl(),
-                   SILType::getPrimitiveObjectType(IUOptAnyObjectMetaty));
-    SILValue iuoptName = B.createApply(mainClass,
+    SILValue optName = B.createApply(mainClass,
                                NSStringFromClass,
                                NSStringFromClass->getType(),
-                               SILType::getPrimitiveObjectType(IUOptNSStringTy),
-                               {}, iuoptMetaTy);
+                               SILType::getPrimitiveObjectType(OptNSStringTy),
+                               {}, metaTy);
+    SILValue iuoptName = B.createUncheckedRefBitCast(mainClass, optName,
+                              SILType::getPrimitiveObjectType(IUOptNSStringTy));
     
     // Call UIApplicationMain.
     SILParameterInfo argTypes[] = {
