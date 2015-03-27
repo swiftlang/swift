@@ -438,6 +438,15 @@ found_inherited:
   if (!subs.empty()) {
     TypeSubstitutionMap subMap;
     ArchetypeConformanceMap conformanceMap;
+
+    // Fill in the substitution and conformance maps.
+    // FIXME: Unfortunate reliance on Substitution::Archetype here.
+    for (auto sub : subs) {
+      auto arch = sub.getArchetype();
+      conformanceMap[arch] = sub.getConformances();
+      if (arch->isPrimary())
+        subMap[arch] = sub.getReplacement();
+    }
     return foundInherited->subst(getDeclContext()->getParentModule(),
                                  getType(), subs, subMap, conformanceMap);
   }
