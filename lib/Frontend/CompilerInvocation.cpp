@@ -606,6 +606,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableExperimentalUnavailableAsOptional |=
       Args.hasArg(OPT_enable_experimental_unavailable_as_optional);
+
+  Opts.EnableAvailabilityCheckingInImplicitFunctions |=
+      Args.hasArg(OPT_enable_availability_checking_in_implicit_functions);
   
   Opts.EnableCFunctionPointers |=
       Args.hasArg(OPT_enable_c_function_pointers);

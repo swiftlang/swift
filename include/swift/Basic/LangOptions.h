@@ -79,6 +79,11 @@ namespace swift {
     /// \brief Enable experimental treatment of potentially unavailable
     /// symbols as optionals.
     bool EnableExperimentalUnavailableAsOptional = false;
+
+    /// \brief Enable availability checking in implicit functions.
+    /// This is a temporary flag to help testing while staging in
+    /// availability diagnostics on synthesized code.
+    bool EnableAvailabilityCheckingInImplicitFunctions = false;
     
     /// \brief Enable support for native C function pointer types.
     bool EnableCFunctionPointers = false;

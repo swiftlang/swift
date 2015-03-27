@@ -1932,7 +1932,8 @@ void TypeChecker::diagnoseDeprecated(SourceLoc ReferenceLoc,
   // where the compiler will synthesize a reference to
   // a deprecated API element. rdar://problem/20024980 tracks these
   // special-case diagnostics.
-  if (isInsideImplicitFunction(ReferenceDC)) {
+  if (!getLangOpts().EnableAvailabilityCheckingInImplicitFunctions &&
+      isInsideImplicitFunction(ReferenceDC)) {
     return;
   }
 

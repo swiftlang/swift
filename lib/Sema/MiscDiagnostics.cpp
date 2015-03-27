@@ -485,8 +485,10 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   // to unavailable symbols (for example, a synthesized call to
   // to an unavailable default constructor of a super class).
   // We need to handle these properly. rdar://problem/20024980 tracks this.
-  if (TypeChecker::isInsideImplicitFunction(DC))
+  if (!TC.getLangOpts().EnableAvailabilityCheckingInImplicitFunctions &&
+      TypeChecker::isInsideImplicitFunction(DC)) {
     return false;
+  }
 
   SourceLoc Loc = R.Start;
   if (auto Attr = AvailabilityAttr::isUnavailable(D)) {
