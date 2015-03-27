@@ -117,6 +117,10 @@ namespace swift {
     /// it gets disabled when compiling the Swift core stdlib.
     bool EnableObjCAttrRequiresFoundation = true;
 
+    /// If true, <code>@testable import Foo</code> produces an error if \c Foo
+    /// was not compiled with -enable-testing.
+    bool EnableTestableAttrRequiresTestableModule = true;
+
     /// Should access control be respected?
     bool EnableAccessControl = true;
 

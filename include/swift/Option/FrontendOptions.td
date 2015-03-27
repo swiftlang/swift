@@ -74,6 +74,14 @@ def disable_objc_attr_requires_foundation_module :
   HelpText<"Disable requiring uses of @objc to require importing the "
            "Foundation module">;
 
+def enable_testable_attr_requires_testable_module :
+  Flag<["-"], "enable-testable-attr-requires-testable-module">,
+  HelpText<"Enable checking of @testable">;
+
+def disable_testable_attr_requires_testable_module :
+  Flag<["-"], "disable-testable-attr-requires-testable-module">,
+  HelpText<"Disable checking of @testable">;
+
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
 

@@ -638,6 +638,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_objc_attr_requires_foundation_module);
   }
 
+  if (auto A = Args.getLastArg(OPT_enable_testable_attr_requires_testable_module,
+                               OPT_disable_testable_attr_requires_testable_module)) {
+    Opts.EnableTestableAttrRequiresTestableModule
+      = A->getOption().matches(OPT_enable_testable_attr_requires_testable_module);
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
     unsigned attempt;
     if (StringRef(A->getValue()).getAsInteger(10, attempt)) {

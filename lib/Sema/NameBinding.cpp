@@ -172,7 +172,8 @@ NameBinder::addImport(SmallVectorImpl<std::pair<ImportedModule, bool>> &imports,
   }
 
   if (auto *testableAttr = ID->getAttrs().getAttribute<TestableAttr>()) {
-    if (!topLevelModule->isTestingEnabled()) {
+    if (Context.LangOpts.EnableTestableAttrRequiresTestableModule &&
+        !topLevelModule->isTestingEnabled()) {
       diagnose(ID->getModulePath().front().second, diag::module_not_testable,
                topLevelModule->Name);
       testableAttr->setInvalid();
