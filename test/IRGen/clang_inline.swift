@@ -7,6 +7,9 @@
 // RUN: FileCheck %s < %t.ll
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
+// REQUIRES: disabled
+// rdar://20308576
+
 // REQUIRES: CPU=i386_or_x86_64
 // XFAIL: linux
 

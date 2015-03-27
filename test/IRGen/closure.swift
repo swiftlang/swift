@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
 
+// REQUIRES: disabled
+// rdar://20308576
+
 // REQUIRES: CPU=x86_64
 
 // -- partial_apply context metadata

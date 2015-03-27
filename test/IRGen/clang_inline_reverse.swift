@@ -2,6 +2,9 @@
 
 // RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s -emit-ir -module-name clang_inline | FileCheck %s
 
+// REQUIRES: disabled
+// rdar://20308576
+
 // REQUIRES: CPU=i386_or_x86_64
 // XFAIL: linux
 
