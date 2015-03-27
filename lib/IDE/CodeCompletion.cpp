@@ -1986,8 +1986,7 @@ public:
       getTupleExprCompletions(TT);
       Done = true;
     }
-    if (tryStdlibOptionalCompletions(ExprType))
-      Done = true;
+    tryStdlibOptionalCompletions(ExprType);
     if (!Done) {
       lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
                                TypeResolver.get());
