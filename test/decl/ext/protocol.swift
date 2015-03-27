@@ -62,3 +62,15 @@ extension P2 {
   func extP2acceptsP1() { acceptsP1(reqP2a()) }
   func extP2acceptsP2() { acceptsP2(self) }
 }
+
+// ----------------------------------------------------------------------------
+// Using protocol extensions on types that conform to the protocols.
+// ----------------------------------------------------------------------------
+struct S1 : P1 {
+  func reqP1a() -> Bool { return true }
+}
+
+func useS1(s1: S1) -> Bool {
+  s1.reqP1a()
+  return s1.extP1a() && s1.extP1b
+}

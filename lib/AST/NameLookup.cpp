@@ -140,7 +140,22 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         // Determine whether one module takes precedence over another.
         auto secondDecl = collidingDecls.second[secondIdx];
         auto secondModule = secondDecl->getModuleContext();
-         
+
+        // If one declaration is in a protocol or extension thereof and the
+        // other is not, prefer the one that is not.
+        if (firstDecl->getDeclContext()->isProtocolOrProtocolExtensionContext()
+              != secondDecl->getDeclContext()
+                   ->isProtocolOrProtocolExtensionContext()) {
+          if (firstDecl->getDeclContext()
+                ->isProtocolOrProtocolExtensionContext()) {
+            shadowed.insert(firstDecl);
+            break;
+          } else {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+        }
+
         // If one declaration is available and the other is not, prefer the
         // available one.
         if (firstDecl->getAttrs().isUnavailable(ctx) !=
@@ -1346,7 +1361,6 @@ bool DeclContext::lookupQualified(Type type,
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
-  llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> knownConformances;
   while (!stack.empty()) {
     auto current = stack.back();
     stack.pop_back();
