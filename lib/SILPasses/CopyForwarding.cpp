@@ -500,7 +500,7 @@ bool CopyForwarding::areCopyDestUsersDominatedBy(
 
     // Initialize the dominator tree info.
     if (!DT)
-      DT = DomAnalysis->getDomInfo(Copy->getFunction());
+      DT = DomAnalysis->get(Copy->getFunction());
 
     // Check dominance of the parent blocks.
     if (!DT->dominates(Copy->getParent(), UserInst->getParent()))

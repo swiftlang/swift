@@ -612,7 +612,7 @@ class SILCSE : public SILFunctionTransform {
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 
     CSE C;
-    if (C.processFunction(*getFunction(), DA->getDomInfo(getFunction())))
+    if (C.processFunction(*getFunction(), DA->get(getFunction())))
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 

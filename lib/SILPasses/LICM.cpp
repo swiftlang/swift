@@ -454,7 +454,7 @@ public:
     bool Changed = false;
 
     for (auto *TopLevelLoop : *LoopInfo) {
-      if (!DomTree) DomTree = DA->getDomInfo(F);
+      if (!DomTree) DomTree = DA->get(F);
       LoopTreeOptimization Opt(TopLevelLoop, LoopInfo, AA, DomTree);
       Changed |= Opt.optimize();
     }

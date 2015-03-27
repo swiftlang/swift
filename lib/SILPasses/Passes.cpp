@@ -62,6 +62,7 @@ static void registerAnalysisPasses(SILPassManager &PM) {
   PM.registerAnalysis(createCallGraphAnalysis(Mod));
   PM.registerAnalysis(createAliasAnalysis(Mod));
   PM.registerAnalysis(createDominanceAnalysis(Mod));
+  PM.registerAnalysis(createPostDominanceAnalysis(Mod));
   PM.registerAnalysis(createLoopInfoAnalysis(Mod, &PM));
   PM.registerAnalysis(createInductionVariableAnalysis(Mod));
   PM.registerAnalysis(createPostOrderAnalysis(Mod));

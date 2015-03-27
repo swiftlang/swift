@@ -23,75 +23,50 @@ class SILModule;
 class SILValue;
 class SILInstruction;
 
-  class DominanceAnalysis : public SILAnalysis {
-    typedef llvm::DenseMap<SILFunction *, DominanceInfo*> DomMap;
-    typedef llvm::DenseMap<SILFunction *, PostDominanceInfo*> PDomMap;
-    DomMap DomInfo;
-    PDomMap PostDomInfo;
+class DominanceAnalysis : public FunctionAnalysisBase<DominanceInfo> {
+public:
+  DominanceAnalysis()
+  : FunctionAnalysisBase<DominanceInfo>(AnalysisKind::Dominance) {}
 
-  public:
-    virtual ~DominanceAnalysis() {
-      // Delete Dominance Info.
-      for (auto D : DomInfo)
-        delete D.second;
+  DominanceAnalysis(const DominanceAnalysis &) = delete;
+  DominanceAnalysis &operator=(const DominanceAnalysis &) = delete;
 
-      // Delete PostDominanceInfo.
-      for (auto P : PostDomInfo)
-        delete P.second;
-    }
+  static bool classof(const SILAnalysis *S) {
+    return S->getKind() == AnalysisKind::Dominance;
+  }
 
-    DominanceAnalysis(SILModule *) : SILAnalysis(AnalysisKind::Dominance) {}
+  DominanceInfo *newFunctionAnalysis(SILFunction *F) {
+    return new DominanceInfo(F);
+  }
 
-    DominanceInfo* getDomInfo(SILFunction *F) {
-      auto &it = DomInfo.FindAndConstruct(F);
-      if (!it.second)
-        it.second = new DominanceInfo(F);
-      return it.second;
-    }
+  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) {
+    bool branchesPreserved = K & PreserveKind::Branches;
+    return !branchesPreserved;
+  }
+};
 
-    PostDominanceInfo* getPostDomInfo(SILFunction *F) {
-      auto &it = PostDomInfo.FindAndConstruct(F);
-      if (!it.second)
-        it.second = new PostDominanceInfo(F);
-      return it.second;
-    }
+class PostDominanceAnalysis : public FunctionAnalysisBase<PostDominanceInfo> {
+public:
+  PostDominanceAnalysis()
+  : FunctionAnalysisBase<PostDominanceInfo>(AnalysisKind::PostDominance) {}
 
-    static bool classof(const SILAnalysis *S) {
-      return S->getKind() == AnalysisKind::Dominance;
-    }
+  PostDominanceAnalysis(const PostDominanceAnalysis &) = delete;
+  PostDominanceAnalysis &operator=(const PostDominanceAnalysis &) = delete;
 
-    virtual void invalidate(SILAnalysis::PreserveKind K) {
-      if (K & PreserveKind::Branches) return;
+  static bool classof(const SILAnalysis *S) {
+    return S->getKind() == AnalysisKind::PostDominance;
+  }
 
-      // Delete Dominance Info.
-      for (auto D : DomInfo)
-        delete D.second;
+  PostDominanceInfo *newFunctionAnalysis(SILFunction *F) {
+    return new PostDominanceInfo(F);
+  }
 
-      // Delete PostDominanceInfo.
-      for (auto P : PostDomInfo)
-        delete P.second;
+  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) {
+    bool branchesPreserved = K & PreserveKind::Branches;
+    return !branchesPreserved;
+  }
+};
 
-      // Clear the maps.
-      DomInfo.clear();
-      PostDomInfo.clear();
-    }
-
-    virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
-      if (K & PreserveKind::Branches) return;
-
-      auto &it= DomInfo.FindAndConstruct(F);
-      if (it.second) {
-        delete it.second;
-        it.second = nullptr;
-      }
-
-      auto &pit= PostDomInfo.FindAndConstruct(F);
-      if (pit.second) {
-        delete pit.second;
-        pit.second = nullptr;
-      }
-    }
-  };
 } // end namespace swift
 
 

@@ -1407,8 +1407,8 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *POTA = PM->getAnalysis<PostOrderAnalysis>();
-    auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    auto *PDI = DA->getPostDomInfo(F);
+    auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
+    auto *PDI = PDA->get(F);
 
     LSContext Ctx(AA, PDI, POTA->getReversePostOrder(F));
 

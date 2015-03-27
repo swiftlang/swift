@@ -125,7 +125,7 @@ SILValue RCIdentityFunctionInfo::stripOneRCIdentityIncomingValue(SILArgument *A,
 
   // Then make sure that this incoming value is from a BB which is different
   // from our BB and dominates our BB. Otherwise, return SILValue() to bail.
-  DominanceInfo *DI = DA->getDomInfo(A->getFunction());
+  DominanceInfo *DI = DA->get(A->getFunction());
   if (!dominatesArgument(DI, A, V))
     return SILValue();
 
@@ -187,7 +187,7 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
 
   // First make sure that IncomingEdgeBB dominates NonPayloadedEnumBB. If not,
   // return false.
-  DominanceInfo *DI = DA->getDomInfo(F);
+  DominanceInfo *DI = DA->get(F);
   if (!DI->dominates(RCIdentityBB, IncomingEdgeBB))
     return false;
 

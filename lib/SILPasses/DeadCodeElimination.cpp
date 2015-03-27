@@ -89,8 +89,8 @@ class DCE : public SILFunctionTransform {
 
     SILFunction *F = getFunction();
 
-    DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
-    PDT = DA->getPostDomInfo(F);
+    auto* DA = PM->getAnalysis<PostDominanceAnalysis>();
+    PDT = DA->get(F);
 
     // If we have a functions that consists of nothing but a
     // structrually infinite loop like:

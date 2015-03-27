@@ -120,7 +120,7 @@ public:
   }
 
   void run() override {
-    DT = PM->getAnalysis<DominanceAnalysis>()->getDomInfo(getFunction());
+    DT = PM->getAnalysis<DominanceAnalysis>()->get(getFunction());
     Constraints.clear();
     ToRemove.clear();
 

@@ -75,7 +75,7 @@ public:
     return S->getKind() == AnalysisKind::RCIdentity;
   }
 
-  RCIdentityFunctionInfo *newFunctionAnalysis() {
+  RCIdentityFunctionInfo *newFunctionAnalysis(SILFunction *F) {
     return new RCIdentityFunctionInfo(DA);
   }
 

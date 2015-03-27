@@ -842,7 +842,7 @@ class SILMem2Reg : public SILFunctionTransform {
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
 
-    bool Changed = MemoryToRegisters(*F, DA->getDomInfo(F)).run();
+    bool Changed = MemoryToRegisters(*F, DA->get(F)).run();
 
     if (Changed)
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);

@@ -543,7 +543,7 @@ class LoopRotation : public SILFunctionTransform {
     assert(F);
     SILLoopInfo *LI = LA->getLoopInfo(F);
     assert(LI);
-    DominanceInfo *DT = DA->getDomInfo(F);
+    DominanceInfo *DT = DA->get(F);
 
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");

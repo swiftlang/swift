@@ -45,8 +45,12 @@ SILAnalysis *swift::createCallGraphAnalysis(SILModule *M) {
   return new CallGraphAnalysis(M);
 }
 
-SILAnalysis *swift::createDominanceAnalysis(SILModule *M) {
-  return new DominanceAnalysis(M);
+SILAnalysis *swift::createDominanceAnalysis(SILModule *) {
+  return new DominanceAnalysis();
+}
+
+SILAnalysis *swift::createPostDominanceAnalysis(SILModule *) {
+  return new PostDominanceAnalysis();
 }
 
 SILAnalysis *swift::createInductionVariableAnalysis(SILModule *M) {

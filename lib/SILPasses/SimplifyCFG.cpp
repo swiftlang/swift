@@ -65,9 +65,11 @@ namespace {
     bool run();
     
     bool simplifyBlockArgs() {
-      DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
-      DT = DA->getDomInfo(&Fn);
-      PDT = DA->getPostDomInfo(&Fn);
+      auto *DA = PM->getAnalysis<DominanceAnalysis>();
+      auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
+
+      DT = DA->get(&Fn);
+      PDT = PDA->get(&Fn);
       bool Changed = false;
       for (SILBasicBlock &BB : Fn) {
         Changed |= simplifyArgs(&BB);
@@ -2361,14 +2363,16 @@ bool SimplifyCFG::run() {
 
   // Do simplifications that require the dominator tree to be accurate.
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+  PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
+
 
   if (Changed) {
     // Force dominator recomputation since we modifed the cfg.
     DA->invalidate(&Fn, SILAnalysis::PreserveKind::Nothing);
   }
 
-  DT = DA->getDomInfo(&Fn);
-  PDT = DA->getPostDomInfo(&Fn);
+  DT = DA->get(&Fn);
+  PDT = PDA->get(&Fn);
   Changed |= dominatorBasedSimplify(DT);
   DT = nullptr;
   PDT = nullptr;

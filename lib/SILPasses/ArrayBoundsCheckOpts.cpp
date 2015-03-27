@@ -1072,7 +1072,7 @@ public:
     assert(F);
     SILLoopInfo *LI = LA->getLoopInfo(F);
     assert(LI);
-    DominanceInfo *DT = DA->getDomInfo(F);
+    DominanceInfo *DT = DA->get(F);
     assert(DT);
     IVInfo &IVs = IVA->getIVInfo(F);
     auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(F);

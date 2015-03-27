@@ -317,6 +317,7 @@ static void runCommandLineSelectedPasses(SILModule *Module) {
   PM.registerAnalysis(createCallGraphAnalysis(Module));
   PM.registerAnalysis(createAliasAnalysis(Module));
   PM.registerAnalysis(createDominanceAnalysis(Module));
+  PM.registerAnalysis(createPostDominanceAnalysis(Module));
   PM.registerAnalysis(createLoopInfoAnalysis(Module, &PM));
   PM.registerAnalysis(createInductionVariableAnalysis(Module));
   PM.registerAnalysis(createPostOrderAnalysis(Module));

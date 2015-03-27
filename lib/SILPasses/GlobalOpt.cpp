@@ -174,7 +174,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
            == InitF && "wrong init call");
 
     SILFunction *ParentF = AI->getFunction();
-    DominanceInfo *DT = DA->getDomInfo(ParentF);
+    DominanceInfo *DT = DA->get(ParentF);
     auto PFI = ParentFuncs.find(ParentF);
     if (PFI != ParentFuncs.end()) {
       // Found a replacement for this init call.

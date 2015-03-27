@@ -640,7 +640,7 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
   
   ConstantTracker constTracker(Callee, &callerTracker, AI);
   
-  DominanceInfo *DT = DA->getDomInfo(Callee);
+  DominanceInfo *DT = DA->get(Callee);
   SILLoopInfo *LI = LA->getLoopInfo(Callee);
   
   DominanceOrder domOrder(&Callee->front(), DT, Callee->size());
@@ -760,7 +760,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   // First step: collect all the functions we want to inline.
   // We don't change anything yet, which let's the dominance info kept alive.
 
-  DominanceInfo *DT = DA->getDomInfo(Caller);
+  DominanceInfo *DT = DA->get(Caller);
   SILLoopInfo *LI = LA->getLoopInfo(Caller);
 
   ConstantTracker constTracker(Caller);

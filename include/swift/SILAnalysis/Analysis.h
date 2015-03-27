@@ -49,6 +49,7 @@ namespace swift {
       CompleteFuncs,
       CallGraph,
       Dominance,
+      PostDominance,
       Alias,
       LoopInfo,
       IVAnalysis,
@@ -107,8 +108,8 @@ namespace swift {
     /// Maps functions to their analysis provider.
     StorageTy Storage;
 
-    /// Construct a new empty analysis for a specific function.
-    virtual AnalysisTy *newFunctionAnalysis() = 0;
+    /// Construct a new empty analysis for a specific function \p F.
+    virtual AnalysisTy *newFunctionAnalysis(SILFunction *F) = 0;
 
     /// Return True if the analysis should be invalidated given trait \K is
     /// preserved.
@@ -119,7 +120,7 @@ namespace swift {
     AnalysisTy* get(SILFunction *F) {
       auto &it = Storage.FindAndConstruct(F);
       if (!it.second)
-        it.second = newFunctionAnalysis();
+        it.second = newFunctionAnalysis(F);
       return it.second;
     }
 
@@ -199,6 +200,7 @@ namespace swift {
   SILAnalysis *createCallGraphAnalysis(SILModule *M);
   SILAnalysis *createAliasAnalysis(SILModule *M);
   SILAnalysis *createDominanceAnalysis(SILModule *M);
+  SILAnalysis *createPostDominanceAnalysis(SILModule *M);
   SILAnalysis *createLoopInfoAnalysis(SILModule *M, SILPassManager *PM);
   SILAnalysis *createInductionVariableAnalysis(SILModule *M);
   SILAnalysis *createPostOrderAnalysis(SILModule *M);

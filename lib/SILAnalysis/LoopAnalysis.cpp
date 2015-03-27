@@ -22,7 +22,7 @@ SILLoopInfo *SILLoopAnalysis::getLoopInfo(SILFunction *F) {
   if (!LoopInfos.count(F)) {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     assert(DA != nullptr && "Expect a valid dominance analysis");
-    DominanceInfo *DT = DA->getDomInfo(F);
+    DominanceInfo *DT = DA->get(F);
     assert(DT != nullptr && "Expect a valid dominance information");
     LoopInfos[F] = new SILLoopInfo(F, DT);
   }

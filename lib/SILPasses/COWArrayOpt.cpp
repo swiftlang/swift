@@ -358,7 +358,7 @@ class COWArrayOpt {
 public:
   COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA)
     : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
-      Preheader(L->getLoopPreheader()), DomTree(DA->getDomInfo(Function)),
+      Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
       ColdBlocks(DA), CachedSafeLoop(false, false)
     {}
 
@@ -1051,7 +1051,7 @@ class ArrayPropertiesAnalysis {
 public:
   ArrayPropertiesAnalysis(SILLoop *L, DominanceAnalysis *DA)
       : Fun(L->getHeader()->getParent()), Loop(L), Preheader(nullptr),
-        DomTree(DA->getDomInfo(Fun)) {}
+        DomTree(DA->get(Fun)) {}
 
   bool run() {
     Preheader = Loop->getLoopPreheader();
@@ -1738,7 +1738,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     // Specialize the identified loop nest based on the 'array.props' calls.
     if (HasChanged) {
       DEBUG(getFunction()->viewCFG());
-      DominanceInfo *DT = DA->getDomInfo(getFunction());
+      DominanceInfo *DT = DA->get(getFunction());
 
       // Process specialized loop-nests in loop-tree post-order (bottom-up).
       std::reverse(HoistableLoopNests.begin(), HoistableLoopNests.end());
