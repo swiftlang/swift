@@ -675,10 +675,14 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       // Just look at the generic parameters, and then move up to the enclosing
       // context.
       if (options.contains(TR_NominalInheritanceClause)) {
-        auto *nominal = cast<NominalTypeDecl>(DC);
+        GenericParamList *genericParams;
+        if (auto *nominal = dyn_cast<NominalTypeDecl>(DC))
+          genericParams = nominal->getGenericParams();
+        else
+          genericParams = cast<ExtensionDecl>(DC)->getGenericParams();
 
         if (!isa<GenericIdentTypeRepr>(comp)) {
-          if (auto *genericParams = nominal->getGenericParams()) {
+          if (genericParams) {
             auto matchingParam =
                 std::find_if(genericParams->begin(), genericParams->end(),
                              [comp](const GenericTypeParamDecl *param) {

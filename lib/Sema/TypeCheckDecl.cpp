@@ -300,6 +300,9 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       DC = nominal;
       options |= TR_NominalInheritanceClause;
+    } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+      DC = ext;
+      options |= TR_NominalInheritanceClause;
     } else {
       DC = decl->getDeclContext();
     }

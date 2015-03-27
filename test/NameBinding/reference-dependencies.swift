@@ -273,7 +273,7 @@ private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelS
 
 // Deliberately empty.
 private struct PrivateTy6 {}
-// CHECK-DAG: - "PrivateProto3"
+// CHECK-DAG: !private "PrivateProto3"
 extension PrivateTy6 : PrivateProto3 {}
 
 
