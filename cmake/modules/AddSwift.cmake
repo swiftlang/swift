@@ -32,57 +32,6 @@ function(add_dependencies_multiple_targets)
   endif()
 endfunction()
 
-# Like 'llvm_config()', but uses libraries from the selected build
-# configuration in LLVM.  ('llvm_config()' selects the same build configuration
-# in LLVM as we have for Swift.)
-function(swift_llvm_config target)
-  set(link_components ${ARGN})
-
-  if(SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
-    llvm_map_components_to_libnames(libnames ${link_components})
-
-    # Collect dependencies.
-    set(new_libnames)
-    foreach(lib ${libnames})
-      list(APPEND new_libnames "${lib}")
-      get_target_property(extra_libraries "${lib}" INTERFACE_LINK_LIBRARIES)
-      foreach(dep ${extra_libraries})
-        if(NOT "${new_libnames}" STREQUAL "")
-          list(REMOVE_ITEM new_libnames "${dep}")
-        endif()
-        list(APPEND new_libnames "${dep}")
-      endforeach()
-    endforeach()
-    set(libnames "${new_libnames}")
-
-    # Translate library names into full path names.
-    set(new_libnames)
-    foreach(dep ${libnames})
-      if("${dep}" MATCHES "^LLVM")
-        list(APPEND new_libnames
-            "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-      else()
-        list(APPEND new_libnames "${dep}")
-      endif()
-    endforeach()
-    set(libnames "${new_libnames}")
-
-    get_target_property(target_type "${target}" TYPE)
-    if("${target_type}" STREQUAL "STATIC_LIBRARY")
-      target_link_libraries("${target}" INTERFACE ${libnames})
-    elseif("${target_type}" STREQUAL "SHARED_LIBRARY" OR
-           "${target_type}" STREQUAL "MODULE_LIBRARY")
-    else()
-      # HACK: Otherwise (for example, for executables), use a plain signature,
-      # because LLVM CMake does that already.
-      target_link_libraries("${target}" ${libnames})
-    endif()
-  else()
-    # If Swift was not built standalone, dispatch to 'llvm_config()'.
-    llvm_config("${target}" ${ARGN})
-  endif()
-endfunction()
-
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
@@ -1001,7 +950,7 @@ function(_add_swift_library_single target name)
     endforeach()
   endforeach()
 
-  swift_llvm_config("${target}" ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS})
+  swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS})
 
   # Collect compile and link flags for the static and non-static targets.
   # Don't set PROPERTY COMPILE_FLAGS or LINK_FLAGS directly.
@@ -1590,7 +1539,7 @@ function(_add_swift_executable_single name)
       HEADER_FILE_ONLY true)
 
   target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
-  swift_llvm_config("${name}" ${SWIFTEXE_SINGLE_COMPONENT_DEPENDS})
+  swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_COMPONENT_DEPENDS})
 
   set_target_properties(${name}
       PROPERTIES FOLDER "Swift executables")

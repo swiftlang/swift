@@ -20,7 +20,7 @@ function(add_swift_unittest test_dirname)
     endforeach()
 
     set_property(TARGET ${test_dirname} PROPERTY LINK_LIBRARIES ${new_libnames})
-    swift_llvm_config(${test_dirname} support)
+    swift_common_llvm_config(${test_dirname} support)
   endif()
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
