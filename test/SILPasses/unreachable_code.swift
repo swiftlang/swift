@@ -160,6 +160,18 @@ func testSwitchEnum(xi: Int) -> Int {
   return x;
 }
 
+
+// Treat nil as .None and do not emit false 
+// non-exhaustive warning.
+func testSwitchEnumOptionalNil(x: Int?) -> Int {
+  switch x { // no warning
+  case .Some(_):
+    return 1
+  case nil:
+    return -1
+  }
+}
+
 @noreturn @asmname("exit") func exit() -> ()
 func reachableThroughNonFoldedPredecessor(@autoclosure fn: () -> Bool = false) {
   if !_fastPath(fn()) {
