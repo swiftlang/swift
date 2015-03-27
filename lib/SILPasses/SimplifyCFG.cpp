@@ -2369,6 +2369,7 @@ bool SimplifyCFG::run() {
   if (Changed) {
     // Force dominator recomputation since we modifed the cfg.
     DA->invalidate(&Fn, SILAnalysis::PreserveKind::Nothing);
+    PDA->invalidate(&Fn, SILAnalysis::PreserveKind::Nothing);
   }
 
   DT = DA->get(&Fn);
