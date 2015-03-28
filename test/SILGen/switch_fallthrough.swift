@@ -21,9 +21,7 @@ func test1() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
   // CHECK: [[YES_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case foo():
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF18switch_fallthrough1aFT_T_
   // CHECK:   br [[CASE2:bb[0-9]+]]
     a()
@@ -51,9 +49,7 @@ func test2() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
   // CHECK: [[YES_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case foo():
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF18switch_fallthrough1aFT_T_
   // CHECK:   br [[CASE2:bb[0-9]+]]
     a()
@@ -80,9 +76,7 @@ func test3() {
   switch (foo(), bar()) {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
   // CHECK: [[YES_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case (foo(), bar()):
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF18switch_fallthrough1aFT_T_
   // CHECK:   br [[CASE2:bb[0-9]+]]
     a()

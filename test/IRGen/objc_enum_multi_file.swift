@@ -21,29 +21,23 @@ func useFoo(x: Foo) -> Int32 {
 
   switch x {
     // CHECK: <label>:[[CASE_B]]
-    // CHECK-NEXT: br label %[[RESULT_B:.+]]
-    // CHECK: <label>:[[RESULT_B]]
     // CHECK-NEXT: br label %[[FINAL:.+]]
   case .B:
     return 11
 
     // CHECK: <label>:[[CASE_C]]
-    // CHECK-NEXT: br label %[[RESULT_C:.+]]
-    // CHECK: <label>:[[RESULT_C]]
     // CHECK-NEXT: br label %[[FINAL]]
   case .C:
     return 15
 
     // CHECK: <label>:[[CASE_A]]
-    // CHECK-NEXT: br label %[[RESULT_A:.+]]
-    // CHECK: <label>:[[RESULT_A]]
     // CHECK-NEXT: br label %[[FINAL]]
   case .A:
     return 10
   }
 
   // CHECK: <label>:[[FINAL]]
-  // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[RESULT_A]] ], [ 15, %[[RESULT_C]] ], [ 11, %[[RESULT_B]] ]
+  // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[CASE_A]] ], [ 15, %[[CASE_C]] ], [ 11, %[[CASE_B]] ]
   // CHECK: ret i32 %[[RETVAL]]
 }
 
@@ -60,28 +54,22 @@ func useBar(x: Bar) -> Int32 {
 
   switch x {
   // CHECK: <label>:[[CASE_B]]
-  // CHECK-NEXT: br label %[[RESULT_B:.+]]
-  // CHECK: <label>:[[RESULT_B]]
   // CHECK-NEXT: br label %[[FINAL:.+]]
   case .B:
     return 11
 
   // CHECK: <label>:[[CASE_C]]
-  // CHECK-NEXT: br label %[[RESULT_C:.+]]
-  // CHECK: <label>:[[RESULT_C]]
   // CHECK-NEXT: br label %[[FINAL]]
   case .C:
     return 15
 
   // CHECK: <label>:[[CASE_A]]
-  // CHECK-NEXT: br label %[[RESULT_A:.+]]
-  // CHECK: <label>:[[RESULT_A]]
   // CHECK-NEXT: br label %[[FINAL]]
   case .A:
     return 10
   }
 
   // CHECK: <label>:[[FINAL]]
-  // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[RESULT_A]] ], [ 15, %[[RESULT_C]] ], [ 11, %[[RESULT_B]] ]
+  // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[CASE_A]] ], [ 15, %[[CASE_C]] ], [ 11, %[[CASE_B]] ]
   // CHECK: ret i32 %[[RETVAL]]
 }

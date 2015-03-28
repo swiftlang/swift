@@ -435,13 +435,13 @@ class PatternMatchEmission {
   /// pattern match for.
   Stmt *PatternMatchStmt;
   CleanupsDepth PatternMatchStmtDepth;
-  llvm::MapVector<CaseStmt*, SILBasicBlock*> SharedCases;
+  llvm::MapVector<CaseStmt*, std::pair<SILBasicBlock*, bool>> SharedCases;
 
   using CompletionHandlerTy =
     llvm::function_ref<void(PatternMatchEmission &, ClauseRow &)>;
   CompletionHandlerTy CompletionHandler;
-
 public:
+  
   PatternMatchEmission(SILGenFunction &SGF, Stmt *S,
                        CompletionHandlerTy completionHandler)
     : SGF(SGF), PatternMatchStmt(S),
@@ -451,7 +451,7 @@ public:
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
                     const FailureHandler &failure);
 
-  JumpDest getSharedCaseBlockDest(CaseStmt *caseStmt);
+  JumpDest getSharedCaseBlockDest(CaseStmt *caseStmt, bool hasFallthroughTo);
   void emitSharedCaseBlocks();
 
   void emitCaseBody(CaseStmt *caseBlock);
@@ -2044,22 +2044,23 @@ void PatternMatchEmission::emitCaseBody(CaseStmt *caseBlock) {
 }
 
 /// Retrieve the jump destination for a shared case block.
-JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock) {
+JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
+                                                      bool hasFallthroughTo) {
   assert(!caseBlock->hasBoundDecls() &&
          "getting shared case destination for block with bound vars?");
 
-  auto result = SharedCases.insert({caseBlock, nullptr});
+  auto result = SharedCases.insert({caseBlock, {nullptr, hasFallthroughTo}});
 
   // If there's already an entry, use that.
   SILBasicBlock *block;
   if (!result.second) {
-    block = result.first->second;
+    block = result.first->second.first;
     assert(block);
   } else {
     // Create the shared destination at the first place that might
     // have needed it.
     block = SGF.createBasicBlock();
-    result.first->second = block;
+    result.first->second.first = block;
   }
 
   return JumpDest(block, PatternMatchStmtDepth,
@@ -2070,20 +2071,34 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock) {
 void PatternMatchEmission::emitSharedCaseBlocks() {
   for (auto &entry: SharedCases) {
     CaseStmt *caseBlock = entry.first;
-    SILBasicBlock *caseBB = entry.second;
-
+    SILBasicBlock *caseBB = entry.second.first;
+    bool hasFallthroughTo = entry.second.second;
     assert(caseBB->empty());
 
-    // Move the block to after the first predecessor, if there is one.
-    if (!caseBB->pred_empty()) {
+    // If this case can only have one predecessor, then merge it into that
+    // predecessor.  We rely on the SIL CFG here, because unemitted shared case
+    // blocks might fallthrough into this one.
+    if (!hasFallthroughTo && caseBlock->getCaseLabelItems().size() == 1) {
+      SILBasicBlock *predBB = caseBB->getSinglePredecessor();
+      assert(predBB && "Should only have 1 predecesor because it isn't shared");
+      assert(isa<BranchInst>(predBB->getTerminator()) &&
+             "Should have uncond branch to shared block");
+      predBB->getTerminator()->eraseFromParent();
+      caseBB->eraseFromParent();
+
+      // Emit the case body into the predecessor's block.
+      SGF.B.setInsertionPoint(predBB);
+      
+    } else {
+      // Otherwise, move the block to after the first predecessor.
+      assert(!caseBB->pred_empty() && "Emitted an unused shared block?");
       auto predBB = *caseBB->pred_begin();
-      auto &blockList = caseBB->getParent()->getBlocks();
-      blockList.remove(caseBB);
-      blockList.insertAfter(predBB, caseBB);
+      caseBB->moveAfter(predBB);
+
+      // Then emit the case body into the caseBB.
+      SGF.B.setInsertionPoint(caseBB);
     }
-
-    SGF.B.setInsertionPoint(caseBB);
-
+    
     assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
     emitCaseBody(caseBlock);
     assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
@@ -2143,29 +2158,33 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
+ 
   auto completionHandler = [&](PatternMatchEmission &emission,
                                ClauseRow &row) {
     auto caseBlock = row.getClientData<CaseStmt>();
     emitProfilerIncrement(caseBlock);
-
-    // Certain case statements can be entered along multiple paths,
-    // either because they have multiple labels or because of
-    // fallthrough.  However, in both situations, the case cannot have
-    // any bound variables.  If the case binds no variables, just branch
-    // out to the scope of the pattern match statement.
+    
+    // Certain case statements can be entered along multiple paths, either
+    // because they have multiple labels or because of fallthrough.  When we
+    // need multiple entrance path, we factor the paths with a shared block.
     if (!caseBlock->hasBoundDecls()) {
-      JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
+      // Don't emit anything yet, we emit it at the cleanup level of the switch
+      // statement.
+      JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock,
+                                                        row.hasFallthroughTo());
       Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
-
-      // Don't emit anything yet.
-      return;
+    } else {
+      // However, if we don't have a fallthrough or a multi-pattern 'case', we
+      // can just emit the body inline and save some dead blocks.
+      // Emit the statement here.
+      emission.emitCaseBody(caseBlock);
+      
+      // If we don't need a shared block and we have
     }
-
-    // Otherwise, emit the statement here.
-    emission.emitCaseBody(caseBlock);
   };
 
   PatternMatchEmission emission(*this, S, completionHandler);
+  
   Scope switchScope(Cleanups, CleanupLocation(S));
 
   // Enter a break/continue scope.  If we wanted a continue
@@ -2233,7 +2252,8 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   
   // Get the destination block.
   CaseStmt *caseStmt = S->getFallthroughDest();
-  JumpDest sharedDest = context->Emission.getSharedCaseBlockDest(caseStmt);
+  JumpDest sharedDest =
+    context->Emission.getSharedCaseBlockDest(caseStmt, true);
   Cleanups.emitBranchAndCleanups(sharedDest, S);
 }
 

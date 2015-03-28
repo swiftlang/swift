@@ -27,9 +27,7 @@ func g() {}
 func test1() {
   switch foo() {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case _:
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -43,9 +41,7 @@ func test1() {
 func test2() {
   switch foo() {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case _:
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -62,11 +58,8 @@ func test3() {
   switch foo() {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
   // CHECK:   function_ref @_TF6switch6runcedFT_Sb
-  // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
+  // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
 
-  // -- TODO: Clean up these empty waypoint bbs.
-  // CHECK: [[YES_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case _ where runced():
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
@@ -91,9 +84,7 @@ func test4() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
   // CHECK:   function_ref @_TF6switch3barFT_Si
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case _:
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -109,9 +100,7 @@ func test5() {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
   // CHECK:   function_ref @_TF6switch3barFT_Si
   // CHECK:   function_ref @_TF6switch6runcedFT_Sb
-  // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NOT_CASE1:bb[0-9]+]]
-  // CHECK: [[YES_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
+  // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NOT_CASE1:bb[0-9]+]]
   case _ where runced():
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
@@ -122,9 +111,7 @@ func test5() {
   // CHECK:   function_ref @_TF6switch6fungedFT_Sb
   // CHECK:   cond_br {{%.*}}, [[YES_CASE2:bb[0-9]+]], [[NOT_CASE2:bb[0-9]+]]
   // CHECK: [[YES_CASE2]]:
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case (_, _) where funged():
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
@@ -147,9 +134,7 @@ func test6() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
   // CHECK:   function_ref @_TF6switch3barFT_Si
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case (_, _):
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -169,9 +154,7 @@ func test7() {
   // CHECK:   function_ref @_TF6switch6runcedFT_Sb
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NOT_CASE1:bb[0-9]+]]
   // CHECK: [[YES_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case (_, _) where runced():
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -195,9 +178,7 @@ func test8() {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
   // CHECK:   function_ref @_TF6switch3barFT_Si
   // CHECK:   function_ref @_TF6switch6foobarFT_TSiSi_
-  // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NOT_CASE1:bb[0-9]+]]
-  // CHECK: [[YES_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
+  // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NOT_CASE1:bb[0-9]+]]
   case foobar():
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
@@ -247,9 +228,7 @@ func test8() {
   // CHECK:   function_ref @_TF6switch3barFT_Si
   // CHECK:   cond_br {{%.*}}, [[YES_CASE5:bb[0-9]+]], [[NOT_CASE5:bb[0-9]+]]
   // CHECK: [[YES_CASE5]]:
-  // CHECK:   br [[CASE5:bb[0-9]+]]
   case (foo(), bar()):
-  // CHECK: [[CASE5]]:
   // CHECK:   function_ref @_TF6switch1eFT_T_
   // CHECK:   br [[CONT]]
     e()
@@ -274,18 +253,14 @@ func test9() {
   // CHECK:   function_ref @_TF6switch3fooFT_Si
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NOT_CASE1:bb[0-9]+]]
   // CHECK: [[YES_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case (foo(), _):
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[NOT_CASE1]]:
   // CHECK:   function_ref @_TF6switch6foobarFT_TSiSi_
-  // CHECK:   cond_br {{%.*}}, [[YES_CASE2:bb[0-9]+]], [[NOT_CASE2:bb[0-9]+]]
-  // CHECK: [[YES_CASE2]]:
-  // CHECK:   br [[CASE2:bb[0-9]+]]
+  // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NOT_CASE2:bb[0-9]+]]
   case foobar():
   // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
@@ -312,9 +287,7 @@ func test10() {
   // CHECK:   function_ref @_TF6switch3barFT_Si
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NOT_CASE1:bb[0-9]+]]
   // CHECK: [[YES_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case (foo()...bar(), _):
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -344,9 +317,7 @@ func test_isa_1(#p: P) {
   // CHECK:   checked_cast_addr_br take_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   // CHECK: [[IS_X]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case is X:
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -355,9 +326,7 @@ func test_isa_1(#p: P) {
   // CHECK:   checked_cast_addr_br take_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
 // CHECK: [[IS_Y]]:
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case is Y:
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[Y_CONT:bb[0-9]+]]
     b()
@@ -366,17 +335,13 @@ func test_isa_1(#p: P) {
   // CHECK:   checked_cast_addr_br take_on_success P in [[P]] : $*P to Z in {{%.*}} : $*Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
 
   // CHECK: [[IS_Z]]:
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case is Z:
-  // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[Z_CONT:bb[0-9]+]]
     c()
 
   // CHECK: [[IS_NOT_Z]]:
-  // CHECK:   br [[CASE4:bb[0-9]+]]
   case _:
-  // CHECK: [[CASE4]]:
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
     d()
@@ -467,10 +432,8 @@ func test_isa_class_1(let #x: B) {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
 
   // CHECK: [[YES_CASE1]]:
-  // CHECK:   strong_release [[CAST_D1]]
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case is D1 where runced():
-  // CHECK: [[CASE1]]:
+  // CHECK:   strong_release [[CAST_D1]]
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -480,10 +443,8 @@ func test_isa_class_1(let #x: B) {
   // CHECK:   checked_cast_br [[X]] : $B to $D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
 
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]]):
-  // CHECK:   strong_release [[CAST_D2]]
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case is D2:
-  // CHECK: [[CASE2]]:
+  // CHECK:   strong_release [[CAST_D2]]
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
@@ -506,18 +467,14 @@ func test_isa_class_1(let #x: B) {
   // CHECK:   checked_cast_br [[X]] : $B to $C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
 
   // CHECK: [[IS_C]]([[CAST_C:%.*]]):
-  // CHECK:   br [[CASE4]]
   case is C:
-  // CHECK: [[CASE4]]:
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
     d()
 
   // CHECK: [[IS_NOT_C]]:
-  // CHECK:   strong_release [[X]]
-  // CHECK:   br [[CASE5:bb[0-9]+]]
   default:
-  // CHECK: [[CASE5]]:
+  // CHECK:   strong_release [[X]]
   // CHECK:  function_ref @_TF6switch1eFT_T_
   // CHECK:  br [[CONT]]
     e()
@@ -590,12 +547,8 @@ func test_isa_class_2(#x: B) -> AnyObject {
     return y
 
   // CHECK: [[IS_NOT_C]]:
-  // CHECK:   strong_release [[X]]
-  // CHECK:   br [[CASE5:bb[0-9]+]]
   default:
-  // CHECK: [[CASE5]]:
   // CHECK:   function_ref @_TF6switch1eFT_T_
-  // CHECK:   strong_retain [[X]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[X]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     e()
@@ -625,36 +578,28 @@ func test_union_1(#u: MaybePair) {
 
   // CHECK: [[IS_NEITHER]]:
   // CHECK-NOT: release
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case .Neither:
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[IS_LEFT]]({{%.*}}):
   // CHECK-NOT: release
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case (.Left):
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
 
   // CHECK: [[IS_RIGHT]]([[STR:%.*]] : $String):
-  // CHECK:   release_value [[STR]] : $String
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case var .Right:
-  // CHECK: [[CASE3]]:
+  // CHECK:   release_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[IS_BOTH]]([[TUP:%.*]] : $(Int, String)):
-  // CHECK:   release_value [[TUP]] : $(Int, String)
-  // CHECK:   br [[CASE4:bb[0-9]+]]
   case .Both:
-  // CHECK: [[CASE4]]:
+  // CHECK:   release_value [[TUP]] : $(Int, String)
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
     d()
@@ -676,25 +621,19 @@ func test_union_2(#u: MaybePair) {
   // CHECK:   default [[DEFAULT:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case .Neither:
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[IS_LEFT]]({{%.*}}):
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case .Left:
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
 
   // CHECK: [[IS_RIGHT]]({{%.*}}):
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case .Right:
-  // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
@@ -720,38 +659,27 @@ func test_union_3(#u: MaybePair) {
   // CHECK:   default [[DEFAULT:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case .Neither:
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[IS_LEFT]]({{%.*}}):
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case .Left:
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
 
   // CHECK: [[IS_RIGHT]]([[STR:%.*]] : $String):
-  // CHECK:   release_value [[STR]] : $String
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case .Right:
-  // CHECK: [[CASE3]]:
+  // CHECK:   release_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[DEFAULT]]:
-  // -- Emitted up above for some reason --
-  // CHECK:   br [[DEFAULT_IMPL:bb[0-9]+]]
-  // CHECK: [[DEFAULT_IMPL]]:
   // -- Ensure the fully-opaque value is destroyed in the default case.
   // CHECK:   release_value [[SUBJECT]] :
-  // CHECK:   br [[CASE4:bb[0-9]+]]
-  // CHECK: [[CASE4]]:
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
 
@@ -776,33 +704,25 @@ func test_union_4(#u: MaybePair) {
   // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case .Neither(_):
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[IS_LEFT]]({{%.*}}):
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case .Left(_):
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
 
   // CHECK: [[IS_RIGHT]]({{%.*}}):
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case .Right(_):
-  // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[IS_BOTH]]({{%.*}}):
-  // CHECK:   br [[CASE4:bb[0-9]+]]
   case .Both(_):
-  // CHECK: [[CASE4]]:
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
     d()
@@ -823,33 +743,25 @@ func test_union_5(#u: MaybePair) {
   // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case .Neither():
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[IS_LEFT]]({{%.*}}):
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case .Left(_):
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
 
   // CHECK: [[IS_RIGHT]]({{%.*}}):
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case .Right(_):
-  // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[IS_BOTH]]({{%.*}}):
-  // CHECK:   br [[CASE4:bb[0-9]+]]
   case .Both(_, _):
-  // CHECK: [[CASE4]]:
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
     d()
@@ -867,6 +779,7 @@ enum MaybeAddressOnlyPair {
   case Both(P, String)
 }
 
+// CHECK-LABEL: sil hidden @_TF6switch22test_union_addr_only_1FT1uOS_20MaybeAddressOnlyPair_T_
 func test_union_addr_only_1(#u: MaybeAddressOnlyPair) {
   switch u {
   // CHECK: switch_enum_addr [[ENUM_ADDR:%.*]] : $*MaybeAddressOnlyPair,
@@ -876,19 +789,15 @@ func test_union_addr_only_1(#u: MaybeAddressOnlyPair) {
   // CHECK:   case #MaybeAddressOnlyPair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case .Neither:
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
   // CHECK: [[IS_LEFT]]:
   // CHECK:   [[P:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt.1
-  // CHECK:   destroy_addr [[P]]
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case .Left(_):
-  // CHECK: [[CASE2]]:
+  // CHECK:   destroy_addr [[P]]
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
@@ -896,19 +805,16 @@ func test_union_addr_only_1(#u: MaybeAddressOnlyPair) {
   // CHECK: [[IS_RIGHT]]:
   // CHECK:   [[STR_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Right!enumelt.1
   // CHECK:   [[STR:%.*]] = load [[STR_ADDR]]
-  // CHECK:   release_value [[STR]] : $String
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case .Right(_):
-  // CHECK: [[CASE3]]:
+  // CHECK:   release_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[IS_BOTH]]:
   // CHECK:   [[P_STR_TUPLE:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Both!enumelt.1
-  // CHECK:   destroy_addr [[P_STR_TUPLE]]
-  // CHECK:   br [[CASE4:bb[0-9]+]]
   case .Both(_):
+  // CHECK:   destroy_addr [[P_STR_TUPLE]]
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
     d()
@@ -936,7 +842,7 @@ func test_union_generic_instance(#u: Generic<Int, String>) {
 
 enum Foo { case A, B }
 
-// CHECK: sil hidden @_TF6switch22test_switch_two_unionsFT1xOS_3Foo1yS0__T_
+// CHECK-LABEL: sil hidden @_TF6switch22test_switch_two_unionsFT1xOS_3Foo1yS0__T_
 func test_switch_two_unions(#x: Foo, #y: Foo) {
   // CHECK:   [[T0:%.*]] = tuple (%0 : $Foo, %1 : $Foo)
   // CHECK:   [[X:%.*]] = tuple_extract [[T0]] : $(Foo, Foo), 0
@@ -946,27 +852,21 @@ func test_switch_two_unions(#x: Foo, #y: Foo) {
 
   switch (x, y) {
   // CHECK: [[IS_CASE1]]:
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case (_,     Foo.A):
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
     a()
 
   // CHECK: [[IS_NOT_CASE1]]:
   // CHECK:   switch_enum [[X]] : $Foo, case #Foo.B!enumelt: [[IS_CASE2:bb[0-9]+]], default [[IS_NOT_CASE2:bb[0-9]+]]
   // CHECK: [[IS_CASE2]]:
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case (Foo.B, _    ):
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
     b()
 
   // CHECK: [[IS_NOT_CASE2]]:
   // CHECK:   switch_enum [[Y]] : $Foo, case #Foo.B!enumelt: [[IS_CASE3:bb[0-9]+]], default [[UNREACHABLE:bb[0-9]+]]
   // CHECK: [[IS_CASE3]]:
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case (_,     Foo.B):
-  // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
     c()
 
@@ -980,7 +880,7 @@ struct StructPatternTest {
   var y: String
 }
 
-// CHECK: sil hidden @_TF6switch19test_struct_patternFT1sVS_17StructPatternTest_T_
+// CHECK-LABEL: sil hidden @_TF6switch19test_struct_patternFT1sVS_17StructPatternTest_T_
 func test_struct_pattern(#s: StructPatternTest) {
   switch s {
   // CHECK:   [[X:%.*]] = struct_extract [[S:%.*]] : $StructPatternTest, #StructPatternTest.x
@@ -991,9 +891,7 @@ func test_struct_pattern(#s: StructPatternTest) {
   // CHECK: [[IS_CASE1]]:
   // CHECK:   release_value [[Y]]
   // CHECK:   release_value [[S]]
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case StructPatternTest(x: 0):
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -1004,9 +902,7 @@ func test_struct_pattern(#s: StructPatternTest) {
   // CHECK: [[IS_CASE2]]:
   // CHECK:   release_value [[Y]]
   // CHECK:   release_value [[S]]
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case StructPatternTest(y: ""):
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
@@ -1014,9 +910,7 @@ func test_struct_pattern(#s: StructPatternTest) {
   // CHECK: [[IS_NOT_CASE2]]:
   // CHECK:   release_value [[Y]]
   // CHECK:   release_value [[S]]
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case (StructPatternTest(x: _)):
-  // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
@@ -1033,7 +927,7 @@ struct StructPatternTestAO {
 
 func ~=(a: P, b: P) -> Bool { return true }
 
-// CHECK: sil hidden @_TF6switch22test_struct_pattern_aoFT1sVS_19StructPatternTestAO1pPS_1P__T_
+// CHECK-LABEL: sil hidden @_TF6switch22test_struct_pattern_aoFT1sVS_19StructPatternTestAO1pPS_1P__T_
 func test_struct_pattern_ao(#s: StructPatternTestAO, #p: P) {
   // CHECK:   [[S:%.*]] = alloc_stack $StructPatternTestAO
   // CHECK:   copy_addr %0 to [initialization] [[S]]#1
@@ -1050,9 +944,7 @@ func test_struct_pattern_ao(#s: StructPatternTestAO, #p: P) {
   // CHECK:   dealloc_stack [[Y]]#0
   // CHECK:   destroy_addr [[S]]#1
   // CHECK:   dealloc_stack [[S]]#0
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case StructPatternTestAO(x: 0):
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -1063,15 +955,13 @@ func test_struct_pattern_ao(#s: StructPatternTestAO, #p: P) {
   // CHECK:   cond_br {{%.*}}, [[IS_CASE2:bb[0-9]+]], [[IS_NOT_CASE2:bb[0-9]+]]
 
   // CHECK: [[IS_CASE2]]:
+  case StructPatternTestAO(y: p):
   // CHECK:   destroy_addr [[TEMP]]#1
   // CHECK:   dealloc_stack [[TEMP]]#0
   // CHECK:   destroy_addr [[Y]]#1
   // CHECK:   dealloc_stack [[Y]]#0
   // CHECK:   destroy_addr [[S]]#1
   // CHECK:   dealloc_stack [[S]]#0
-  // CHECK:   br [[CASE2:bb[0-9]+]]
-  case StructPatternTestAO(y: p):
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
@@ -1085,9 +975,7 @@ func test_struct_pattern_ao(#s: StructPatternTestAO, #p: P) {
   // CHECK:   dealloc_stack [[Y]]#0
   // CHECK:   destroy_addr [[S]]#1
   // CHECK:   dealloc_stack [[S]]#0
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case StructPatternTestAO(x: _):
-  // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
@@ -1114,11 +1002,9 @@ func test_class_pattern(#k: ClassPatternTest) {
   // CHECK:   cond_br {{%.*}}, [[IS_CASE1:bb[0-9]+]], [[IS_NOT_CASE1:bb[0-9]+]]
 
   // CHECK: [[IS_CASE1]]:
+  case ClassPatternTest(x: 0):
   // CHECK:   release_value [[Y]]
   // CHECK:   strong_release [[C]]
-  // CHECK:   br [[CASE1:bb[0-9]+]]
-  case ClassPatternTest(x: 0):
-  // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -1127,21 +1013,17 @@ func test_class_pattern(#k: ClassPatternTest) {
   // CHECK:   cond_br {{%.*}}, [[IS_CASE2:bb[0-9]+]], [[IS_NOT_CASE2:bb[0-9]+]]
 
   // CHECK: [[IS_CASE2]]:
+  case ClassPatternTest(y: ""):
   // CHECK:   release_value [[Y]]
   // CHECK:   strong_release [[C]]
-  // CHECK:   br [[CASE2:bb[0-9]+]]
-  case ClassPatternTest(y: ""):
-  // CHECK: [[CASE2]]:
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
 
   // CHECK: [[IS_NOT_CASE2]]:
+  case ClassPatternTest(x: _):
   // CHECK:   release_value [[Y]]
   // CHECK:   strong_release [[C]]
-  // CHECK:   br [[CASE3:bb[0-9]+]]
-  case ClassPatternTest(x: _):
-  // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
@@ -1164,10 +1046,8 @@ func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
   // CHECK:   cond_br {{%.*}}, [[IS_CASE1:bb[0-9]+]], [[IS_NOT_CASE1:bb[0-9]+]]
 
   // CHECK: [[IS_CASE1]]:
-  // CHECK:   strong_release [[C]]
-  // CHECK:   br [[CASE1:bb[0-9]+]]
   case ClassPatternTest(x: 0):
-  // CHECK: [[CASE1]]:
+  // CHECK:   strong_release [[C]]
   // CHECK:   function_ref @_TF6switch1aFT_T_
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -1176,10 +1056,8 @@ func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
   // CHECK:   checked_cast_br [[C]] : $ClassPatternTest to $SubclassTestA, [[IS_A:bb[0-9]+]], [[IS_NOT_A:bb[0-9]+]]
 
   // CHECK: [[IS_A]]([[A:%.*]] : $SubclassTestA):
-  // CHECK:   strong_release [[A]]
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case is SubclassTestA:
-  // CHECK: [[CASE2]]:
+  // CHECK:   strong_release [[A]]
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
@@ -1191,11 +1069,9 @@ func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
   // CHECK:   cond_br {{%.*}}, [[IS_CASE3:bb[0-9]+]], [[IS_NOT_CASE3:bb[0-9]+]]
 
   // CHECK: [[IS_CASE3]]:
+  case ClassPatternTest(y: ""):
   // CHECK:   release_value [[Y]]
   // CHECK:   strong_release %0
-  // CHECK:   br [[CASE3:bb[0-9]+]]
-  case ClassPatternTest(y: ""):
-  // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
     c()
@@ -1205,10 +1081,8 @@ func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
   // CHECK:   checked_cast_br %0 : $ClassPatternTest to $SubclassTestB, [[IS_B:bb[0-9]+]], [[IS_NOT_B:bb[0-9]+]]
 
   // CHECK: [[IS_B]]([[B:%.*]] : $SubclassTestB):
-  // CHECK:   strong_release [[B]]
-  // CHECK:   br [[CASE4:bb[0-9]+]]
   case is SubclassTestB:
-  // CHECK: [[CASE4]]:
+  // CHECK:   strong_release [[B]]
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
     d()
