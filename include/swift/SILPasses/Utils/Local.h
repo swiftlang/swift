@@ -15,6 +15,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
@@ -100,6 +101,14 @@ namespace swift {
   /// string literals. Returns a new instruction if optimization was possible.
   SILInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 
+  /// Tries to perform jump-threading on a given checked_cast_br terminator.
+  bool tryCheckedCastBrJumpThreading(TermInst *Term, DominanceInfo *DT,
+                                     SmallVectorImpl<SILBasicBlock *> &BBs);
+
+  /// Returns true if C1, C2 represent equivalent conditions in the
+  /// sense that each is eventually based on the same value.
+  bool areEquivalentConditions(SILValue C1, SILValue C2);
+
   /// If Closure is a partial_apply or thin_to_thick_function with only local
   /// ref count users and a set of post-dominating releases:
   ///
@@ -138,6 +147,107 @@ namespace swift {
   private:
     void computeLifetime();
   };
+
+  /// Base class for BB cloners.
+  class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
+    friend class SILVisitor<BaseThreadingCloner>;
+    friend class SILCloner<BaseThreadingCloner>;
+
+  protected:
+    SILBasicBlock *FromBB, *DestBB;
+
+  public:
+    // A map of old to new available values.
+    SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
+
+    BaseThreadingCloner(SILFunction &F)
+    : SILClonerWithScopes(F), FromBB(nullptr), DestBB(nullptr) {}
+
+    BaseThreadingCloner(SILFunction &F, SILBasicBlock *From, SILBasicBlock *Dest)
+    : SILClonerWithScopes(F), FromBB(From), DestBB(Dest) {}
+
+    void process(SILInstruction *I) { visit(I); }
+
+    SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
+
+    SILValue remapValue(SILValue Value) {
+      // If this is a use of an instruction in another block, then just use it.
+      if (auto SI = dyn_cast<SILInstruction>(Value)) {
+        if (SI->getParent() != FromBB)
+          return Value;
+      } else if (auto BBArg = dyn_cast<SILArgument>(Value)) {
+        if (BBArg->getParent() != FromBB)
+          return Value;
+      } else {
+        assert(isa<SILUndef>(Value) && "Unexpected Value kind");
+        return Value;
+      }
+
+      return SILCloner<BaseThreadingCloner>::remapValue(Value);
+    }
+
+    void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+      DestBB->getInstList().push_back(Cloned);
+      SILClonerWithScopes<BaseThreadingCloner>::postProcess(Orig, Cloned);
+      AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+    }
+  };
+
+  // Cloner used by jump-threading.
+  class ThreadingCloner : public BaseThreadingCloner {
+  public:
+    ThreadingCloner(BranchInst *BI)
+  : BaseThreadingCloner(*BI->getFunction(), BI->getDestBB(),
+      BI->getParent()) {
+      // Populate the value map so that uses of the BBArgs in the DestBB are
+      // replaced with the branch's values.
+      for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
+        ValueMap[FromBB->getBBArg(i)] = BI->getArg(i);
+        AvailVals.push_back(std::make_pair(FromBB->getBBArg(i), BI->getArg(i)));
+      }
+    }
+  };
+
+  /// Helper class for cloning of basic blocks.
+  class BasicBlockCloner : public BaseThreadingCloner {
+  public:
+    BasicBlockCloner(SILBasicBlock *From, SILBasicBlock *To = nullptr)
+  : BaseThreadingCloner(*From->getParent()) {
+      FromBB = From;
+      if (To == nullptr) {
+        // Create a new BB that is to be used as a target
+        // for cloning.
+        To = From->getParent()->createBasicBlock();
+        for (auto *Arg : FromBB->getBBArgs()) {
+          To->createBBArg(Arg->getType(), Arg->getDecl());
+        }
+      }
+      DestBB = To;
+
+      // Populate the value map so that uses of the BBArgs in the SrcBB are
+      // replaced with the BBArgs of the DestBB.
+      for (unsigned i = 0, e = FromBB->bbarg_size(); i != e; ++i) {
+        ValueMap[FromBB->getBBArg(i)] = DestBB->getBBArg(i);
+        AvailVals.push_back(
+            std::make_pair(FromBB->getBBArg(i), DestBB->getBBArg(i)));
+      }
+    }
+
+    // Clone all instructions of the FromBB into DestBB
+    void clone() {
+      for (auto &I : *FromBB) {
+        process(&I);
+      }
+    }
+
+    SILBasicBlock *getDestBB() { return DestBB; }
+  };
+
+  /// Helper function to perform SSA updates in case of jump threading.
+  void updateSSAAfterCloning(BaseThreadingCloner &Cloner,
+                             SILBasicBlock *SrcBB,
+                             SILBasicBlock *DestBB);
+
 
   /// \brief This is a helper class used to optimize casts.
   class CastOptimizer {

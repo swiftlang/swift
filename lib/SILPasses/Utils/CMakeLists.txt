@@ -6,5 +6,6 @@ add_swift_library(swiftSILPassesUtils
   ConstantFolding.cpp
   Generics.cpp
   Devirtualize.cpp
+  CheckedCastBrJumpThreading.cpp
   LINK_LIBRARIES swiftSIL swiftSILAnalysis)
 
