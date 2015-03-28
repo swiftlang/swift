@@ -2704,6 +2704,16 @@ public:
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
   }
+
+  bool hasThickRepresentation() const {
+    return getRepresentation() == Representation::Thick;
+  }
+  bool hasThinRepresentation() const {
+    return getRepresentation() == Representation::Thin;
+  }
+  bool hasBlockRepresentation() const {
+    return getRepresentation() == Representation::Block;
+  }
   
   bool isNoReturn() const {
     return getExtInfo().isNoReturn();
