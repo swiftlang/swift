@@ -510,7 +510,7 @@ private:
 class ClauseRow {
   friend class ClauseMatrix;
   
-  void *ClientData;
+  Stmt *ClientData;
   Pattern *CasePattern;
   Expr *CaseGuardExpr;
   
@@ -526,7 +526,7 @@ class ClauseRow {
   SmallVector<Pattern*, 4> Columns;
 
 public:
-  ClauseRow(void *clientData, Pattern *CasePattern, Expr *CaseGuardExpr,
+  ClauseRow(Stmt *clientData, Pattern *CasePattern, Expr *CaseGuardExpr,
             bool HasFallthroughTo)
     : ClientData(clientData),
       CasePattern(CasePattern),
@@ -539,8 +539,9 @@ public:
       NumRemainingSpecializations = getNumSpecializations(Columns[0]);
   }
 
-  void *getClientData() const {
-    return ClientData;
+  template<typename T>
+  T *getClientData() const {
+    return static_cast<T*>(ClientData);
   }
 
   Pattern *getCasePattern() const { return CasePattern; }
@@ -2135,8 +2136,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   auto completionHandler = [&](PatternMatchEmission &emission,
                                ClauseRow &row) {
-    auto caseBlock = static_cast<CaseStmt*>(row.getClientData());
-
+    auto caseBlock = row.getClientData<CaseStmt>();
     emitProfilerIncrement(caseBlock);
 
     // Certain case statements can be entered along multiple paths,
@@ -2401,7 +2401,7 @@ void SILGenFunction::emitCatchDispatch(Stmt *S, ManagedValue exn,
                                        JumpDest catchFallthroughDest) {
   auto completionHandler = [&](PatternMatchEmission &emission,
                                ClauseRow &row) {
-    auto clause = static_cast<CatchStmt*>(row.getClientData());
+    auto clause = row.getClientData<CatchStmt>();
     emitProfilerIncrement(clause->getBody());
     emitStmt(clause->getBody());
 
