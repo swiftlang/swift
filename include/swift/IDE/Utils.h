@@ -18,6 +18,7 @@
 #include <memory>
 #include <string>
 #include <functional>
+#include <vector>
 
 namespace llvm {
   template<typename Fn> class function_ref;
@@ -32,9 +33,9 @@ namespace clang {
 namespace swift {
   class Module;
   class ValueDecl;
+  class ASTContext;
 
 namespace ide {
-
 struct SourceCompleteResult {
   // Set to true if the input source is fully formed, false otherwise.
   bool IsComplete;
@@ -66,6 +67,12 @@ SourceCompleteResult isSourceInputComplete(StringRef Text);
 void walkOverriddenDecls(const ValueDecl *VD,
                          std::function<void(llvm::PointerUnion<
                              const ValueDecl*, const clang::NamedDecl*>)> Fn);
+
+void collectModuleNames(StringRef SDKPath, std::vector<std::string> &Modules);
+
+std::string getSDKName(StringRef Path);
+
+std::string getSDKVersion(StringRef Path);
 
 struct PlaceholderOccurrence {
   /// The complete placeholder string.

@@ -593,6 +593,8 @@ public:
   /// \returns The requested module, or NULL if the module cannot be found.
   Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
 
+  Module *getModuleByName(StringRef ModuleName);
+
   /// Returns the standard library module, or null if the library isn't present.
   ///
   /// If \p loadIfAbsent is true, the ASTContext will attempt to load the module

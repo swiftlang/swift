@@ -19,6 +19,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 
 using namespace swift;
 using namespace ide;
@@ -298,3 +299,289 @@ ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
       *HadPlaceholder = true;
   });
 }
+
+static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
+  auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
+  if (!BufOrErr) {
+    llvm::errs() << BufOrErr.getError().message() << '\n';
+    return {};
+  }
+
+  std::string Key = "<key>";
+  Key += KeyName;
+  Key += "</key>";
+
+  StringRef Lines = BufOrErr.get()->getBuffer();
+  while (!Lines.empty()) {
+    StringRef CurLine;
+    std::tie(CurLine, Lines) = Lines.split('\n');
+    if (CurLine.find(Key) != StringRef::npos) {
+      std::tie(CurLine, Lines) = Lines.split('\n');
+      unsigned Begin = CurLine.find("<string>") + strlen("<string>");
+      unsigned End = CurLine.find("</string>");
+      return CurLine.substr(Begin, End-Begin);
+    }
+  }
+
+  return {};
+}
+
+std::string ide::getSDKName(StringRef Path) {
+  std::string Name = getPlistEntry(llvm::Twine(Path)+"/SDKSettings.plist",
+                                   "CanonicalName");
+  if (Name.empty() && Path.endswith(".sdk")) {
+    Name = llvm::sys::path::filename(Path).drop_back(strlen(".sdk"));
+  }
+  return Name;
+}
+
+std::string ide::getSDKVersion(StringRef Path) {
+  return getPlistEntry(llvm::Twine(Path)+"/System/Library/CoreServices/        \
+                       SystemVersion.plist", "ProductBuildVersion");
+}
+
+// Modules failing to load are commented-out.
+static const char *OSXModuleList[] = {
+  "AGL",
+  "AVFoundation",
+  "AVKit",
+  "Accelerate",
+  "Accounts",
+  "AddressBook",
+  "AppKit",
+  "AppKitScripting",
+  "AppleScriptKit",
+  "AppleScriptObjC",
+  //  "AppleShareClientCore",
+  "ApplicationServices",
+  "AudioToolbox",
+  "AudioUnit",
+  "AudioVideoBridging",
+  "Automator",
+  "CFNetwork",
+  "CalendarStore",
+  "Carbon",
+  "CloudKit",
+  "Cocoa",
+  "Collaboration",
+  "CoreAudio",
+  "CoreAudioKit",
+  //  "CoreAuthentication",
+  "CoreBluetooth",
+  "CoreData",
+  "CoreFoundation",
+  "CoreGraphics",
+  "CoreLocation",
+  "CoreMIDI",
+  //  "CoreMIDIServer",
+  "CoreMedia",
+  "CoreMediaIO",
+  "CoreServices",
+  "CoreTelephony",
+  "CoreText",
+  "CoreVideo",
+  "CoreWLAN",
+  //  "CoreWiFi",
+  "CryptoTokenKit",
+  //  "DVComponentGlue",
+  "DVDPlayback",
+  "Darwin",
+  "DirectoryService",
+  "DiscRecording",
+  "DiscRecordingUI",
+  "DiskArbitration",
+  "Dispatch",
+  //  "DrawSprocket",
+  "EventKit",
+  "ExceptionHandling",
+  "FWAUserLib",
+  "FinderSync",
+  "ForceFeedback",
+  "Foundation",
+  "GLKit",
+  "GLUT",
+  "GSS",
+  "GameController",
+  "GameKit",
+  "Hypervisor",
+  "ICADevices",
+  "IMServicePlugIn",
+  "IOBluetooth",
+  "IOBluetoothUI",
+  "IOKit",
+  "IOSurface",
+  "ImageCaptureCore",
+  "ImageIO",
+  "InputMethodKit",
+  "InstallerPlugins",
+  "InstantMessage",
+  "JavaFrameEmbedding",
+  "JavaScriptCore",
+  "JavaVM",
+  "LDAP",
+  "LatentSemanticMapping",
+  "MachO",
+  "MapKit",
+  "MediaAccessibility",
+  "MediaLibrary",
+  "MediaToolbox",
+  //  "Message",
+  "MultipeerConnectivity",
+  "NetFS",
+  //  "NetworkExtension",
+  "NotificationCenter",
+  "OSAKit",
+  "ObjectiveC",
+  "OpenAL",
+  "OpenCL",
+  "OpenDirectory",
+  "OpenGL",
+  "PCSC",
+  "PreferencePanes",
+  "PubSub",
+  "Python",
+  //  "QTKit", QTKit is unavailable on Swift.
+  "Quartz",
+  "QuartzCore",
+  "QuickLook",
+  "QuickTime",
+  //  "RubyCocoa",
+  "SceneKit",
+  "ScreenSaver",
+  "Scripting",
+  "ScriptingBridge",
+  "Security",
+  "SecurityFoundation",
+  "SecurityInterface",
+  "ServiceManagement",
+  "Social",
+  "SpriteKit",
+  "StoreKit",
+  "SyncServices",
+  "SystemConfiguration",
+  "TWAIN",
+  "Tcl",
+  "VideoDecodeAcceleration",
+  "VideoToolbox",
+  "WebKit",
+  "XPC",
+  "libkern",
+  "os",
+  //  "vecLib",
+  "vmnet",
+};
+
+// Modules failing to load are commented-out.
+static const char *iOSModuleList[] = {
+  "AVFoundation",
+  "AVKit",
+  "Accelerate",
+  //  "AcceleratorKit",
+  "Accounts",
+  "AdSupport",
+  "AddressBook",
+  "AddressBookUI",
+  "AssetsLibrary",
+  "AudioToolbox",
+  "AudioUnit",
+  "CFNetwork",
+  "CloudKit",
+  "CoreAudio",
+  "CoreAudioKit",
+  //  "CoreAuthentication",
+  "CoreBluetooth",
+  "CoreData",
+  "CoreFoundation",
+  "CoreGraphics",
+  "CoreImage",
+  "CoreLocation",
+  "CoreMIDI",
+  "CoreMedia",
+  "CoreMotion",
+  "CoreTelephony",
+  "CoreText",
+  "CoreVideo",
+  "Darwin",
+  "Dispatch",
+  "EventKit",
+  "EventKitUI",
+  "ExternalAccessory",
+  "Foundation",
+  "GLKit",
+  "GSS",
+  "GameController",
+  "GameKit",
+  "HealthKit",
+  "HomeKit",
+  "ImageIO",
+  "JavaScriptCore",
+  "MachO",
+  "MapKit",
+  "MediaAccessibility",
+  "MediaPlayer",
+  "MediaToolbox",
+  "MessageUI",
+  "MobileCoreServices",
+  "MultipeerConnectivity",
+  "NetworkExtension",
+  "NewsstandKit",
+  "NotificationCenter",
+  //  "NotificationsUI",
+  "ObjectiveC",
+  "OpenAL",
+  "OpenGLES",
+  "PassKit",
+  "Photos",
+  "PhotosUI",
+  //  "PushRegistrar",
+  "QuartzCore",
+  "QuickLook",
+  "SafariServices",
+  "SceneKit",
+  "Security",
+  "Social",
+  "SpriteKit",
+  "StoreKit",
+  "SystemConfiguration",
+  "Twitter",
+  "UIKit",
+  "UIKit.UIGestureRecognizerSubclass",
+  "VideoToolbox",
+  "WatchKit",
+  //  "XPC",
+  "iAd",
+  "libkern",
+  "os",
+};
+
+static const char *DeviceOnlyModuleList[] = {
+  "MetalImage",
+};
+
+
+static ArrayRef<const char *> getOSXModuleList() {
+  return OSXModuleList;
+}
+
+static ArrayRef<const char *> getiOSModuleList() {
+  return iOSModuleList;
+}
+
+static ArrayRef<const char *> getDeviceOnlyModuleList() {
+  return DeviceOnlyModuleList;
+}
+
+void ide::collectModuleNames(StringRef SDKPath,
+                               std::vector<std::string> &Modules) {
+  std::string SDKName = getSDKName(SDKPath);
+  std::string lowerSDKName = StringRef(SDKName).lower();
+  bool isOSXSDK = StringRef(lowerSDKName).find("macosx") != StringRef::npos;
+  bool isDeviceOnly = StringRef(lowerSDKName).find("iphoneos") != StringRef::npos;
+  auto Mods = isOSXSDK ? getOSXModuleList() : getiOSModuleList();
+  Modules.insert(Modules.end(), Mods.begin(), Mods.end());
+  if (isDeviceOnly) {
+    Mods = getDeviceOnlyModuleList();
+    Modules.insert(Modules.end(), Mods.begin(), Mods.end());
+  }
+}
+

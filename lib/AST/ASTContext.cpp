@@ -1129,6 +1129,17 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   return nullptr;
 }
 
+Module *ASTContext::getModuleByName(StringRef ModuleName) {
+  SmallVector<std::pair<Identifier, SourceLoc>, 4>
+  AccessPath;
+  while (!ModuleName.empty()) {
+    StringRef SubModuleName;
+    std::tie(SubModuleName, ModuleName) = ModuleName.split('.');
+    AccessPath.push_back({ getIdentifier(SubModuleName), SourceLoc() });
+  }
+  return getModule(AccessPath);
+}
+
 Module *ASTContext::getStdlibModule(bool loadIfAbsent) {
   if (TheStdlibModule)
     return TheStdlibModule;
