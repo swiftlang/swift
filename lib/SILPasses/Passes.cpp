@@ -302,7 +302,19 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // (CapturePropagation).
 
   PM.setStageName("LowLevel");
-  AddSSAPasses(PM, OptimizationLevelKind::LowLevel);
+
+  PM.add(createLateInliner());
+  AddSimplifyCFGSILCombine(PM);
+  PM.add(createAllocBoxToStack());
+  PM.add(createSROA());
+  PM.add(createMem2Reg());
+  PM.add(createSILCombine());
+  PM.add(createSimplifyCFG());
+  PM.add(createGlobalLoadStoreOpts());
+  PM.add(createCodeMotion(false /* HoistReleases */));
+  PM.add(createGlobalARCOpts());
+  PM.add(createDevirtualizer());
+
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
