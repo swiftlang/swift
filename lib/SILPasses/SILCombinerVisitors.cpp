@@ -1403,6 +1403,7 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
 
   // Look at the parameter.
   auto Params = FnTy->getParameters();
+  (void) Params;
   assert(Params.size() == 1 && "Expect one parameter");
   auto ParamConv = FnTy->getParameters()[0].getConvention();
 
@@ -1416,6 +1417,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
   auto ResultInfo = FnTy->getResult();
+  (void) ResultInfo;
 
   assert(ResultInfo.getConvention() == ResultConvention::Owned &&
          "Expect a @owned return");
@@ -1428,6 +1430,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   // Emit a release for the @owned parameter, or none for a @guaranteed
   // parameter.
   auto Params = FnTy->getParameters();
+  (void) Params;
   assert(Params.size() == 1 && "Expect one parameter");
   auto ParamInfo = FnTy->getParameters()[0].getConvention();
   assert(ParamInfo == ParameterConvention::Direct_Owned ||
