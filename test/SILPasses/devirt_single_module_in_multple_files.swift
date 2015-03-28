@@ -1,3 +1,6 @@
+// REQUIRES: disabled
+// rdar://20337676
+
 // RUN: %target-swiftc_driver -module-name devirt_single_module_in_multiple_files -O  %s %S/Inputs/BaseProblem.swift %S/Inputs/Problems.swift -parse-as-library -emit-sil 2>&1 | FileCheck %s
 
 public func test() {
