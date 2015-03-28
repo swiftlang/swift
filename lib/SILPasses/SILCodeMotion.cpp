@@ -1406,6 +1406,12 @@ public:
 };
 } // end anonymous namespace
 
-SILTransform *swift::createCodeMotion(bool HoistReleases) {
-  return new SILCodeMotion(HoistReleases);
+/// Code motion that does not releases into diamonds.
+SILTransform *swift::createEarlyCodeMotion() {
+  return new SILCodeMotion(false);
+}
+
+/// Code motion that hoists releases into diamonds.
+SILTransform *swift::createLateCodeMotion() {
+  return new SILCodeMotion(true);
 }
