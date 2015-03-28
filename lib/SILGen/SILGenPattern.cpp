@@ -513,6 +513,10 @@ class ClauseRow {
   void *ClientData;
   Pattern *CasePattern;
   Expr *CaseGuardExpr;
+  
+  
+  /// HasFallthroughTo - True if there is a fallthrough into this case.
+  bool HasFallthroughTo;
 
 
   /// The number of remaining specializations until this row becomes
@@ -522,10 +526,12 @@ class ClauseRow {
   SmallVector<Pattern*, 4> Columns;
 
 public:
-  ClauseRow(void *clientData, Pattern *CasePattern, Expr *CaseGuardExpr)
+  ClauseRow(void *clientData, Pattern *CasePattern, Expr *CaseGuardExpr,
+            bool HasFallthroughTo)
     : ClientData(clientData),
       CasePattern(CasePattern),
-      CaseGuardExpr(CaseGuardExpr) {
+      CaseGuardExpr(CaseGuardExpr),
+      HasFallthroughTo(HasFallthroughTo) {
     Columns.push_back(CasePattern);
     if (CaseGuardExpr)
       NumRemainingSpecializations = AlwaysRefutable;
@@ -539,7 +545,8 @@ public:
 
   Pattern *getCasePattern() const { return CasePattern; }
   Expr *getCaseGuardExpr() const { return CaseGuardExpr; }
-
+  bool hasFallthroughTo() const { return HasFallthroughTo; }
+  
   ArrayRef<Pattern *> getColumns() const {
     return Columns;
   }
@@ -980,7 +987,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
       outerFailure(clauses[clauses.rows() - 1].getCasePattern());
       return;
     }
-
+    
     // Try to find a "necessary column".
     Optional<unsigned> column = chooseNecessaryColumn(clauses, firstRow);
 
@@ -1003,13 +1010,21 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
 
     assert(!SGF.B.hasValidInsertionPoint());
     SILBasicBlock *contBB = scope.exit();
-
-    // If the continuation block has no uses, and we have no more rows
-    // to emit, clear the IP and destroy the continuation block.
-    if (contBB->pred_empty() && firstRow == clauses.rows()) {
-      SGF.B.clearInsertionPoint();
-      SGF.eraseBasicBlock(contBB);
-      return;
+    // If the continuation block has no uses, ...
+    if (contBB->pred_empty()) {
+      // If we have no more rows to emit, clear the IP and destroy the
+      // continuation block.
+      if (firstRow == clauses.rows()) {
+        SGF.B.clearInsertionPoint();
+        SGF.eraseBasicBlock(contBB);
+        return;
+      }
+      
+      // Otherwise, if there is no fallthrough, then the next row is
+      // unreachable: emit a dead code diagnostic.
+      if (!clauses[firstRow].hasFallthroughTo())
+        SGF.SGM.diagnose(clauses[firstRow].getCasePattern()->getStartLoc(),
+                         diag::unreachable_case);
     }
   }
 }
@@ -2065,6 +2080,43 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
   }
 }
 
+namespace {
+  class FallthroughFinder : public ASTWalker {
+    bool &Result;
+  public:
+    FallthroughFinder(bool &Result) : Result(Result) {}
+
+    // We walk through statements.  If we find a fallthrough, then we got what
+    // we came for.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      if (isa<FallthroughStmt>(S))
+        Result = true;
+      
+      return { true, S };
+    }
+
+    // Expressions, patterns and decls cannot contain fallthrough statements, so
+    // there is no reason to walk into them.
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      return { false, E };
+    }
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      return { false, P };
+    }
+
+    bool walkToDeclPre(Decl *D) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+  };
+}
+
+
+static bool containsFallthrough(Stmt *S) {
+  bool Result = false;
+  S->walk(FallthroughFinder(Result));
+  return Result;
+}
+
+
 /// Context info used to emit FallthroughStmts.
 /// Since fallthrough-able case blocks must not bind variables, they are always
 /// emitted in the outermost scope of the switch.
@@ -2123,12 +2175,16 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   // a ClauseRow is expensive.
   std::vector<ClauseRow> clauseRows;
   clauseRows.reserve(S->getCases().size());
+  bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
     for (auto &labelItem : caseBlock->getCaseLabelItems()) {
       clauseRows.emplace_back(caseBlock,
                               const_cast<Pattern*>(labelItem.getPattern()),
-                              const_cast<Expr*>(labelItem.getGuardExpr()));
+                              const_cast<Expr*>(labelItem.getGuardExpr()),
+                              hasFallthrough);
     }
+    
+    hasFallthrough = containsFallthrough(caseBlock->getBody());
   }
 
   // Set up an initial clause matrix.
@@ -2271,7 +2327,8 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
   auto subject = ConsumableManagedValue::forOwned(subjectMV);
   
   // Add a row for the pattern we want to match against.
-  ClauseRow row(/*caseBlock*/nullptr, ThePattern, /*where expr*/nullptr);
+  ClauseRow row(/*caseBlock*/nullptr, ThePattern, /*where expr*/nullptr,
+                /*hasFallthroughTo*/false);
   
   SILBasicBlock *MatchFailureBB = 0;
   
@@ -2361,7 +2418,8 @@ void SILGenFunction::emitCatchDispatch(Stmt *S, ManagedValue exn,
   for (CatchStmt *clause : clauses) {
     clauseRows.emplace_back(clause,
                             clause->getErrorPattern(),
-                            clause->getGuardExpr());
+                            clause->getGuardExpr(),
+                            /*hasFallthroughTo*/false);
   }
 
   // Set up an initial clause matrix.
