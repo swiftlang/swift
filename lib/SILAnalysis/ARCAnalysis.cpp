@@ -301,7 +301,35 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   }
 }
 
+/// Is this a terminator instruction which can only use pointers. This is
+/// necessary when we add the invoke instruction.
+static bool isWellBehavedTerminator(TermInst *TI) {
+  switch (TI->getKind()) {
+  case ValueKind::BranchInst:
+  case ValueKind::CondBranchInst:
+  case ValueKind::SwitchValueInst:
+  case ValueKind::SwitchEnumInst:
+  case ValueKind::CheckedCastBranchInst:
+  case ValueKind::CheckedCastAddrBranchInst:
+  case ValueKind::SwitchEnumAddrInst:
+    return true;
+  default:
+    return false;
+  }
+}
 
+static bool canTerminatorUseValue(TermInst *TI, SILValue Ptr,
+                                  AliasAnalysis *AA) {
+  if (!isWellBehavedTerminator(TI))
+    return false;
+
+  // We have a well behaved terminator. Check if all arguments can be proven to
+  // conservatively not alias Ptr. If so, return true.
+  for (Operand &Op : TI->getAllOperands())
+    if (AA->isMayAlias(Ptr, Op.get()))
+      return true;
+  return false;
+}
 
 bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
                         AliasAnalysis *AA) {
@@ -328,6 +356,12 @@ bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
     }
     return false;
   }
+
+  // If we have a terminator instruction, see if it can use ptr. This currently
+  // means that we first show that TI can not indirectly use Ptr and then use
+  // alias analysis on the arguments.
+  if (auto *TI = dyn_cast<TermInst>(User))
+    return canTerminatorUseValue(TI, Ptr, AA);
 
   // TODO: If we add in alias analysis support here for apply inst, we will need
   // to check that the pointer does not escape.

@@ -328,8 +328,10 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
 
   // If we have insertion points and partial merges, return false to avoid
   // control dependency issues.
-  if ((HaveIncInsertPts || HaveDecInsertPts) && Partial)
+  if ((HaveIncInsertPts || HaveDecInsertPts) && Partial) {
+    DEBUG(llvm::dbgs() << "Found partial merge and insert pts. Bailing!\n");
     return false;
+  }
 
   // If we have insertion points for increments, but not for decrements (or
   // vis-a-versa), return false. This prevents us from inserting retains and

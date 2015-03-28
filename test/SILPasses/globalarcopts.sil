@@ -1077,6 +1077,7 @@ bb0(%0 : $Builtin.NativeObject):
 
 bb1:
   apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
   br bb3
 
 bb2:
@@ -1103,6 +1104,7 @@ bb0(%0 : $Builtin.NativeObject):
   cond_br undef, bb1, bb2
 
 bb1:
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
   apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
   br bb3
 
@@ -1222,42 +1224,6 @@ bb1:
 bb2:
   %1 = tuple()
   return %1 : $()
-}
-
-// Make sure that if top down we do not complete the sequence, but bottom up we
-// do not move anything. This prevents us from just moving retains and
-// eliminating releases (or vis-a-versa).
-// CHECK-LABEL: sil @test_complete_incomplete_sequence_mismatch : $@cc(method) @thin (@owned C) -> () {
-// CHECK: strong_retain
-// CHECK: strong_release
-// CHECK: strong_release
-sil @test_complete_incomplete_sequence_mismatch : $@cc(method) @thin (@owned C) -> () {
-bb0(%0 : $C):
-  br bb1(undef : $Builtin.Word)                   // id: %1
-
-bb1(%2 : $Builtin.Word):                          // Preds: bb0 bb5
-  cond_br undef, bb3, bb2                         // id: %3
-
-bb2:                                              // Preds: bb1
-  strong_retain %0 : $C                         // id: %4
-  %5 = ref_element_addr %0 : $C, #C.w         // user: %6
-  %8 = function_ref @rawpointer_use : $@thin (Builtin.RawPointer) -> Bool // user: %15
-  %9 = load %5 : $*Optional<Builtin.NativeObject> // user: %11
-  %10 = unchecked_trivial_bit_cast %9 : $Optional<Builtin.NativeObject> to $Builtin.RawPointer
-  %15 = apply %8(%10) : $@thin (Builtin.RawPointer) -> Bool
-  br bb5                                          // id: %16
-
-bb3:                                              // Preds: bb1
-  strong_release %0 : $C                        // id: %17
-  %18 = tuple ()                                  // user: %19
-  return %18 : $()                                // id: %19
-
-bb4:
-  br bb5                                          // id: %20
-
-bb5:                                              // Preds: bb2 bb4
-  strong_release %0 : $C                        // id: %21
-  br bb1(undef : $Builtin.Word)                   // id: %22
 }
 
 // CHECK-LABEL: sil @arg_merge : $@thin (@owned S) -> () {
@@ -1583,3 +1549,83 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// Make sure that we handle ARC branch uses correctly.
+
+// In the face of partial merges, we *can* remove retains, releases, but we can
+// not move them. So remove these retains, releases.
+//
+// CHECK-LABEL: sil @branch_use1 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @branch_use1 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We currently do not move this retain, release since we are very conservative with partial merges and code motion.
+//
+// CHECK-LABEL: sil @branch_use2 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK: strong_retain
+// CHECK: strong_release
+sil @branch_use2 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We can not eliminate this branch since bb3 uses %0.
+//
+// CHECK-LABEL: sil @branch_use3 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK: strong_retain
+// CHECK: strong_release
+sil @branch_use3 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  br bb3(undef : $Builtin.NativeObject)
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3(%0 : $Builtin.NativeObject)
+
+bb3(%2 : $Builtin.NativeObject):
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
