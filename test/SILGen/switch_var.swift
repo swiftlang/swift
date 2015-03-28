@@ -396,23 +396,19 @@ func test_let() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
   // CHECK: [[YES_CASE3]]:
   // CHECK:   release_value [[VAL]]
-  // CHECK:   release_value [[VAL]]
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   // ExprPatterns implicitly contain a 'let' binding.
   case bars():
-    // CHECK: [[CASE3]]:
     // CHECK:   function_ref @_TF10switch_var1cFT_T_
+    // CHECK:   release_value [[VAL]]
     // CHECK:   br [[CONT]]
     c()
   // CHECK: [[NO_CASE3]]:
   // CHECK:   release_value [[VAL]]
   // CHECK:   br [[LEAVE_CASE3:bb[0-9]+]]
   // CHECK: [[LEAVE_CASE3]]:
-  // CHECK:   release_value [[VAL]]
-  // CHECK:   br [[CASE4:bb[0-9]+]]
   case _:
-    // CHECK: [[CASE4]]:
     // CHECK:   function_ref @_TF10switch_var1dFT_T_
+    // CHECK:   release_value [[VAL]]
     // CHECK:   br [[CONT]]
     d()
   }
