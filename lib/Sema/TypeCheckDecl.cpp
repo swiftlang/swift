@@ -5977,7 +5977,16 @@ static Type checkExtensionGenericParams(
   }
   return BoundGenericType::get(nominal, parentType, genericArgs);
 }
-  
+
+// FIXME: In TypeChecker.cpp; only needed because LLDB creates
+// extensions of typealiases to unbound generic types, which is
+// ill-formed but convenient.
+namespace swift {
+GenericParamList *cloneGenericParams(ASTContext &ctx,
+                                     DeclContext *dc,
+                                     GenericParamList *fromParams,
+                                     GenericParamList *outerParams);
+}
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // If we already validated this extension, there's nothing more to do.
@@ -6002,11 +6011,17 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     auto nominal = unbound->getDecl();
     validateDecl(nominal);
 
-    // If the user omitted generic parameters, deal with them now.
-    // FIXME: This is just to keep the existing code path working in the short
-    // term. It should become an error with Fix-It that suggests the appropriate
-    // generic parameters.
     auto genericParams = ext->getRefComponents().back().GenericParams;
+
+    // The debugger synthesizes typealiases of unbound generic types
+    // to produce its extensions, which subverts bindExtensionDecl's
+    // ability to create the generic parameter lists. Create the list now.
+    if (!genericParams && Context.LangOpts.DebuggerSupport) {
+      genericParams = cloneGenericParams(Context, ext,
+                                         nominal->getGenericParams(),
+                                         nullptr);
+      ext->getRefComponents().back().GenericParams = genericParams;
+    }
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.

@@ -193,12 +193,14 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
   return *boolType;
 }
 
+namespace swift {
+
 /// Clone the given generic parameters in the given list. We don't need any
 /// of the requirements, because they will be inferred.
-static GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                            DeclContext *dc,
-                                            GenericParamList *fromParams,
-                                            GenericParamList *outerParams) {
+GenericParamList *cloneGenericParams(ASTContext &ctx,
+                                     DeclContext *dc,
+                                     GenericParamList *fromParams,
+                                     GenericParamList *outerParams) {
   // Clone generic parameters.
   SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
   for (auto fromGP : *fromParams) {
@@ -217,6 +219,7 @@ static GenericParamList *cloneGenericParams(ASTContext &ctx,
                                            SourceLoc());
   toParams->setOuterParameters(outerParams);
   return toParams;
+}
 }
 
 // FIXME: total hack
