@@ -18,10 +18,9 @@ struct ArrayInt{
   var buffer : ArrayIntBuffer
 }
 
-sil public_external [semantics "array.make_mutable"] @make_mutable : $@cc(method) @thin (@inout ArrayInt) -> Bool {
-  bb0(%0: $*ArrayInt):
-    unreachable
-}
+sil [semantics "array.make_mutable"] @make_mutable : $@cc(method) @thin (@inout ArrayInt) -> Bool
+
+sil [semantics "array.get_count"] @get_count : $@cc(method) @thin (@guaranteed ArrayInt) -> ()
 
 sil @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@cc(cdecl) @thin (UnsafePointer<HeapObject>) -> Bool
 
@@ -190,3 +189,44 @@ bb0(%0 : $*ArrayInt):
   return %12 : $Bool
 }
 
+// Make sure that we properly ignore guaranteed retain, releases.
+//
+// Discussion: We pattern match very closely for now by whenever we see a
+// release, checking if the previous instruction was a guaranteed array semantic
+// call with guaranteed self and the instruction before that a retain on self
+// again. In such a case, we ignore the release.
+//
+// CHECK-LABEL: sil @pins_and_guaranteed_self : $@thin (@inout ArrayInt) -> () {
+// CHECK: bb0
+// CHECK-NOT: strong_pin
+// CHECK-NOT: strong_unpin
+// CHECK: bb1
+// CHECK: strong_pin
+// CHECK: strong_unpin
+sil @pins_and_guaranteed_self : $@thin (@inout ArrayInt) -> () {
+bb0(%0 : $*ArrayInt):
+  %1 = load %0: $*ArrayInt
+  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
+  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %6 = function_ref @get_count : $@cc(method) @thin (@guaranteed ArrayInt) -> ()
+  %7 = strong_pin %3 : $Builtin.NativeObject
+  retain_value %1 : $ArrayInt
+  apply %6(%1) : $@cc(method) @thin (@guaranteed ArrayInt) -> ()
+  release_value %1 : $ArrayInt
+  strong_unpin %7 : $Optional<Builtin.NativeObject>
+
+  // We take advantage of pins being single BB here.
+  br bb1
+
+bb1:
+  %8 = strong_pin %3 : $Builtin.NativeObject
+  retain_value %1 : $ArrayInt
+  apply %6(%1) : $@cc(method) @thin (@guaranteed ArrayInt) -> ()
+  apply %6(%1) : $@cc(method) @thin (@guaranteed ArrayInt) -> ()
+  release_value %1 : $ArrayInt
+  strong_unpin %8 : $Optional<Builtin.NativeObject>
+
+  %9999 = tuple()
+  return %9999 : $()
+}

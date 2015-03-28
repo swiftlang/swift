@@ -64,7 +64,13 @@ public:
   /// Does this semantic call has a self argument.
   ///
   /// For example, kArrayInit and kArrayUninitialized don't.
-  bool hasSelf();
+  bool hasSelf() const;
+
+  /// Does this instruction have guaranteed self.
+  ///
+  /// Once +0 self is enabled, this can be removed in favor of just hasSelf()
+  /// since all of these methods will have guaranteed self always.
+  bool hasGuaranteedSelf() const;
 
   /// Get the self argument.
   SILValue getSelf();

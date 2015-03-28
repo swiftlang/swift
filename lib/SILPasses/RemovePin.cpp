@@ -130,6 +130,30 @@ public:
           // can have arbitrary sideeffects.
         }
 
+        // If we have a strong_release or a release_value, see if our parameter
+        // is in an array semantic guaranteed self call sequence. If so, we can
+        // ignore the release for the retain before the call exactly matches it.
+        //
+        // Discussion: The guaranteed self call sequence is as follows:
+        //
+        // retain (rcid)
+        // ... no releases ...
+        // call arraysemantic_func(@guaranteed_self rcid)
+        // ... no instructions conservatively using rcid in a manner that
+        // ... requires rcid to stay live.
+        // release (rcid)
+        //
+        // I am purposely restricting this to array semantic functions that we
+        // know are well behaved (i.e. the ref counts are the same on both sides
+        // of the callsite).
+        if (isa<StrongReleaseInst>(CurInst) || isa<ReleaseValueInst>(CurInst)) {
+          if (isReleaseEndOfGuaranteedSelfCallSequence(CurInst)) {
+            DEBUG(llvm::dbgs() << "        Ignoring exactly balanced "
+                                  "release.\n");
+            continue;
+          }
+        }
+
         // In all other cases check whether this could be a potentially
         // releasing instruction.
         DEBUG(llvm::dbgs()
@@ -193,6 +217,27 @@ public:
     }
   }
 
+  bool isSafeGuaranteedSemanticFunction(SILInstruction *I) {
+    // Make sure that we are safe.
+    if (!isSafeArraySemanticFunction(I))
+      return false;
+
+    // We do not need to check if call is nullptr, since this was checked
+    // earlier in isSafeArraySemanticFunction.
+    //
+    // TODO: We already created an ArraySemanticsCall in
+    // isSafeArraySemanticFunction. I wonder if we can refactor into a third
+    // method that takes an array semantic call. Then we can reuse the work.
+    ArraySemanticsCall Call(I);
+
+    // If our call does not have guaranteed self, bail.
+    if (!Call.hasGuaranteedSelf())
+      return false;
+
+    // Success!
+    return true;
+  }
+
   /// Removes available pins that could be released by executing of 'I'.
   void invalidateAvailablePins(SILInstruction *I) {
     // Collect pins that we have to clear because they might have been released.
@@ -213,6 +258,49 @@ public:
       DEBUG(llvm::dbgs() << "        Invalidating Pin: " << *P);
       AvailablePins.erase(P);
     }
+  }
+
+  bool isReleaseEndOfGuaranteedSelfCallSequence(SILInstruction *I) {
+    SILBasicBlock *BB = I->getParent();
+
+    // For now just look at the previous instruction if it exists.
+    SILBasicBlock::iterator Start = BB->begin();
+    SILBasicBlock::iterator Iter = I;
+    if (Iter == Start)
+      return false;
+    --Iter;
+
+    // Now grab the RCID of this instruction.
+    SILValue RCID = RCIA->getRCIdentityRoot(I->getOperand(0));
+
+    // See if iter is an apply inst that is a safe guaranteed semantic
+    // function. If not, return false.
+    if (!isSafeGuaranteedSemanticFunction(&*Iter))
+      return false;
+    ApplyInst *AI = cast<ApplyInst>(&*Iter);
+
+    // Make sure that AI's self argument has the same RCID as our
+    // instruction. Otherwise, return false.
+    if (RCID != RCIA->getRCIdentityRoot(AI->getSelfArgument()))
+      return false;
+
+    // Then grab the previous instruction (if it exists).
+    if (Iter == Start)
+      return false;
+    --Iter;
+
+    // See if we have a retain of some sort, if we don't, bail.
+    if (!isa<RetainValueInst>(Iter) && !isa<StrongRetainInst>(Iter)) {
+      return false;
+    }
+
+    // Then make sure that the rcid of the retain is the same as our release. If
+    // not bail.
+    if (RCID != RCIA->getRCIdentityRoot(Iter->getOperand(0)))
+      return false;
+
+    // Success!
+    return true;
   }
 };
 }
