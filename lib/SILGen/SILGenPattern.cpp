@@ -1023,9 +1023,18 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
       
       // Otherwise, if there is no fallthrough, then the next row is
       // unreachable: emit a dead code diagnostic.
-      if (!clauses[firstRow].hasFallthroughTo())
-        SGF.SGM.diagnose(clauses[firstRow].getCasePattern()->getStartLoc(),
-                         diag::unreachable_case);
+      if (!clauses[firstRow].hasFallthroughTo()) {
+        SourceLoc Loc;
+        bool isDefault = false;
+        if (auto *S = clauses[firstRow].getClientData<Stmt>()) {
+          Loc = S->getStartLoc();
+          if (auto *CS = dyn_cast<CaseStmt>(S))
+            isDefault = CS->isDefault();
+        } else {
+          Loc = clauses[firstRow].getCasePattern()->getStartLoc();
+        }
+        SGF.SGM.diagnose(Loc, diag::unreachable_case, isDefault);
+      }
     }
   }
 }
