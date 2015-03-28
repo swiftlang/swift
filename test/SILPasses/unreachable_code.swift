@@ -288,3 +288,24 @@ class D : Super {
   }
 }
 
+
+
+// <rdar://problem/20097963> incorrect DI diagnostic in unreachable code
+enum r20097963Test {
+  case A
+  case B
+}
+
+class r20097963MyClass {
+  func testStr(t: r20097963Test) {
+    let str: String
+    switch t {
+    case .A:
+      str = "A"
+    case .B:
+      str = "B"
+    default:    // expected-warning {{default will never be executed}}
+      str = "unknown"  // Should not be rejected.
+    }
+  }
+}

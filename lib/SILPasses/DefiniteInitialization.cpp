@@ -777,6 +777,11 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       if (Liveness.get(i) == DIKind::No || !TheMemory.isElementLetProperty(i))
         continue;
 
+      // Don't emit errors for unreachable code, or if we have already emitted
+      // a diagnostic.
+      if (!shouldEmitError(InstInfo.Inst))
+        continue;
+      
       std::string PropertyName;
       auto *VD = TheMemory.getPathStringToElement(i, PropertyName);
       diagnose(Module, InstInfo.Inst->getLoc(),
