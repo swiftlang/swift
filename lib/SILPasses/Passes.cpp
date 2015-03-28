@@ -311,7 +311,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.add(createSILCombine());
   PM.add(createSimplifyCFG());
   PM.add(createGlobalLoadStoreOpts());
-  PM.add(createCodeMotion(false /* HoistReleases */));
+  PM.add(createCodeMotion(true /* HoistReleases */));
   PM.add(createGlobalARCOpts());
   PM.add(createDevirtualizer());
 
