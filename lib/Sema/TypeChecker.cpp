@@ -1317,60 +1317,42 @@ void TypeChecker::diagnosePotentialUnavailability(
                                   ReferenceDC, Reason);
 }
 
-/// A class that walks the AST to find locations to add availability fixits.
-/// Given a target source range and a root search node, this class will walk the
-/// search node to find:
-///   (1) the innermost (i.e., deepest) node (if any) that both contains the
-///       target source range and can be guarded with in an IfStmt; and
-///   (2) the innermost declaration (if any) that contains the target range.
-///
-/// We will use (1) to suggest a Fix-It that wraps an unavailable
-/// reference in if #os(...) { ... } and (2) to suggest Fix-Its for
-/// that add @availability annotations. This walker is only applied
-/// when emitting a diagnostic.
-///
+/// A class that walks the AST to find the innermost (i.e., deepest) node that
+/// contains a target SourceRange and matches a particular criterion.
 /// This class finds the innermost nodes of interest by walking
 /// down the root until it has found the target range (in a Pre-visitor)
-/// and then recording innermost nodes on the way back up in the
+/// and then recording the innermost node on the way back up in the
 /// the Post-visitors. It does its best to not search unnecessary subtrees,
 /// although this is complicated by the fact that not all nodes have
 /// source range information.
-class AvailabilityFixitParentFinder : private ASTWalker {
-
-  /// The source range of the potentially unavailable reference
-  /// for which we are trying to create Fix-Its.
-  const SourceRange TargetRange;
-  const SourceManager &SM;
-
-  bool FoundTarget = false;
-
-  Optional<ASTNode> InnermostGuardableNode;
-  Decl *InnermostDecl = nullptr;
-
+class InnermostAncestorFinder : private ASTWalker {
 public:
-  AvailabilityFixitParentFinder(SourceRange TargetRange,
-                                const SourceManager &SM, const Decl *SearchNode)
-      : TargetRange(TargetRange), SM(SM) {
-    assert(TargetRange.isValid());
 
-    // Remove const to make walk() happy. This walker does not modify the
-    // declaration.
-    const_cast<Decl *>(SearchNode)->walk(*this);
-  }
-
-  /// Returns the innermost node containing the target range that can be guarded
-  /// with an if statement or None if no such node was found.
-  Optional<ASTNode> getInnermostGuardableNode() {
-    return InnermostGuardableNode;
-  }
-
-  /// Returns the innermost declaration that contains TargetRange or null
-  /// if no such declaration was found.
-  Decl *getInnermostDecl() {
-    return InnermostDecl;
-  }
+  /// The type of a match predicate, which takes as input a node and its
+  /// parent and returns a bool indicating whether the node matches.
+  typedef std::function<bool(ASTNode, ASTWalker::ParentTy)> MatchPredicate;
 
 private:
+  const SourceRange TargetRange;
+  const SourceManager &SM;
+  const MatchPredicate Predicate;
+
+  bool FoundTarget = false;
+  Optional<ASTNode> InnermostMatchingNode;
+
+public:
+  InnermostAncestorFinder(SourceRange TargetRange, const SourceManager &SM,
+                          ASTNode SearchNode, const MatchPredicate &Predicate)
+      : TargetRange(TargetRange), SM(SM), Predicate(Predicate) {
+    assert(TargetRange.isValid());
+
+    SearchNode.walk(*this);
+  }
+
+  /// Returns the innermost node containing the target range that matches
+  /// the predicate.
+  Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
+
   virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     return std::make_pair(walkToRangePre(E->getSourceRange()), E);
   }
@@ -1381,6 +1363,14 @@ private:
 
   virtual bool walkToDeclPre(Decl *D) override {
     return walkToRangePre(D->getSourceRange());
+  }
+
+  virtual std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+    return std::make_pair(walkToRangePre(P->getSourceRange()), P);
+  }
+
+  virtual bool walkToTypeReprPre(TypeRepr *T) override {
+    return walkToRangePre(T->getSourceRange());
   }
 
   /// Returns true if the walker should traverse an AST node with
@@ -1429,56 +1419,29 @@ private:
     return walkToNodePost(D);
   }
 
-  /// Once we have found the target node, update the observed innermost nodes,
-  /// as we find them, on the way back up the spine of of the tree.
+  /// Once we have found the target node, look for the innermost ancestor
+  /// matching our criteria on the way back up the spine of of the tree.
   bool walkToNodePost(ASTNode Node) {
-    updateIfInnermostGuardableNode(Node);
-    updateIfInnermostDecl(Node);
+    if (!InnermostMatchingNode.hasValue() && Predicate(Node, Parent)) {
+      assert((Node.getSourceRange().isInvalid() && FoundTarget) ||
+             SM.rangeContains(Node.getSourceRange(), TargetRange));
 
-    return !foundAllFixitLocations();
-  }
-
-  void updateIfInnermostGuardableNode(ASTNode Node) {
-    // If the InnermostGuardableNode is already set, this node
-    // is not the innermost, so return early.
-    if (InnermostGuardableNode.hasValue())
-      return;
-
-    // Return early unless the parent is a closure with a single expression body
-    // or a BraceStmt.
-    if (Expr *ParentExpr = Parent.getAsExpr()) {
-      auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
-      if (!ParentClosure || !ParentClosure->hasSingleExpressionBody()) {
-        return;
-      }
-    } else if (auto *ParentStmt = Parent.getAsStmt()) {
-      if (!isa<BraceStmt>(ParentStmt)) {
-        return;
-      }
-    } else {
-      return;
+      InnermostMatchingNode = Node;
+      return false;
     }
 
-    InnermostGuardableNode = Node;
-  }
-
-  void updateIfInnermostDecl(ASTNode Node) {
-    if (InnermostDecl)
-      return;
-
-    if (!Node.is<Decl *>())
-      return;
-
-    InnermostDecl = Node.get<Decl *>();
-  }
-
-  // Returns true if we have found all the locations we were looking for,
-  // including the target range (on the way down) and the innermost guardable
-  // node and declaration (on the way back up).
-  bool foundAllFixitLocations() {
-    return FoundTarget && InnermostGuardableNode.hasValue() && InnermostDecl;
+    return true;
   }
 };
+
+/// Starting from SearchRoot, finds the innermost node containing ChildRange
+/// for which Predicate returns true. Returns None if no such root is found.
+static Optional<ASTNode> findInnermostAncestor(
+    SourceRange ChildRange, const SourceManager &SM, ASTNode SearchRoot,
+    const InnermostAncestorFinder::MatchPredicate &Predicate) {
+  InnermostAncestorFinder Finder(ChildRange, SM, SearchRoot, Predicate);
+  return Finder.getInnermostMatchingNode();
+}
 
 /// Given a reference range and a declaration context containing the range,
 /// find an AST node that contains the source range and
@@ -1683,16 +1646,17 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
   FoundTypeLevelDecl = nullptr;
 
   // Limit tree to search based on the DeclContext of the reference.
-  const Decl *NodeToSearch =
+  const Decl *DeclarationToSearch =
       rootForAvailabilityFixitFinder(ReferenceRange, ReferenceDC, SM);
-  if (!NodeToSearch)
+  if (!DeclarationToSearch)
     return;
 
-  AvailabilityFixitParentFinder Finder(ReferenceRange, SM,
-                                       NodeToSearch);
+  // Const-cast to inject into ASTNode. This search will not modify
+  // the declaration.
+  ASTNode SearchRoot = const_cast<Decl *>(DeclarationToSearch);
 
   // The node to wrap in if #os(...) { ... } is the innermost node in
-  // NodeToSearch that (1) can be guarded with an if statement and (2)
+  // SearchRoot that (1) can be guarded with an if statement and (2)
   // contains the ReferenceRange.
   // We make no guarantee that the Fix-It, when applied, will result in
   // semantically valid code -- but, at a minimum, it should parse. So,
@@ -1700,12 +1664,42 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
   // which would not be valid if the variable is later used. The goal
   // is discoverability of #os() (via the diagnostic and Fix-It) rather than
   // magically fixing the code in all cases.
-  FoundVersionCheckNode = Finder.getInnermostGuardableNode();
+
+  InnermostAncestorFinder::MatchPredicate IsGuardable =
+      [](ASTNode Node, ASTWalker::ParentTy Parent) {
+        if (Expr *ParentExpr = Parent.getAsExpr()) {
+          auto *ParentClosure = dyn_cast<ClosureExpr>(ParentExpr);
+          if (!ParentClosure || !ParentClosure->hasSingleExpressionBody()) {
+            return false;
+          }
+        } else if (auto *ParentStmt = Parent.getAsStmt()) {
+          if (!isa<BraceStmt>(ParentStmt)) {
+            return false;
+          }
+        } else {
+          return false;
+        }
+
+        return true;
+      };
+
+  FoundVersionCheckNode =
+      findInnermostAncestor(ReferenceRange, SM, SearchRoot, IsGuardable);
 
   // Find some Decl that contains the reference range. We use this declaration
   // as a starting place to climb the DeclContext hierarchy to find
   // places to suggest adding @availability() annotations.
-  const Decl *ContainingDecl = Finder.getInnermostDecl();
+  InnermostAncestorFinder::MatchPredicate IsDeclaration = [](
+      ASTNode Node, ASTWalker::ParentTy Parent) { return Node.is<Decl *>(); };
+
+  Optional<ASTNode> FoundDeclarationNode =
+      findInnermostAncestor(ReferenceRange, SM, SearchRoot, IsDeclaration);
+
+  const Decl *ContainingDecl = nullptr;
+  if (FoundDeclarationNode.hasValue()) {
+    ContainingDecl = FoundDeclarationNode.getValue().get<Decl *>();
+  }
+
   if (!ContainingDecl) {
     ContainingDecl = ReferenceDC->getInnermostMethodContext();
   }
