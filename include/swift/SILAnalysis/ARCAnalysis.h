@@ -67,6 +67,13 @@ valueHasARCUsesInInstructionRange(SILValue Op,
                                   SILBasicBlock::iterator End,
                                   AliasAnalysis *AA);
 
+/// If \p Op has arc uses in the instruction range [Start, End), return the last
+/// use of such instruction. Otherwise return None. We assume that Start and End
+/// are both in the same basic block.
+Optional<SILBasicBlock::iterator> valueHasARCUsesInReverseInstructionRange(
+    SILValue Op, SILBasicBlock::iterator Start, SILBasicBlock::iterator End,
+    AliasAnalysis *AA);
+
 /// If \p Op has instructions in the instruction range (Start, End] which may
 /// decrement it, return the first such instruction. Returns None
 /// if no such instruction exists. We assume that Start and End are both in the

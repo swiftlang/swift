@@ -406,6 +406,37 @@ valueHasARCUsesInInstructionRange(SILValue Op,
   return None;
 }
 
+/// If \p Op has arc uses in the instruction range (Start, End], return the
+/// first such instruction. Otherwise return None. We assume that Start and End
+/// are both in the same basic block.
+Optional<SILBasicBlock::iterator>
+swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
+                                                SILBasicBlock::iterator Start,
+                                                SILBasicBlock::iterator End,
+                                                AliasAnalysis *AA) {
+  assert(Start->getParent() == End->getParent() &&
+         "Start and End should be in the same basic block");
+  assert(End != End->getParent()->end() &&
+         "End should be mapped to an actual instruction");
+
+  // If Start == End, then we have an empty range, return false.
+  if (Start == End)
+    return None;
+
+  // Otherwise, until End == Start.
+  while (Start != End) {
+    // Check if Start can use Op in an ARC relevant way. If so, return true.
+    if (mayUseValue(&*End, Op, AA))
+      return End;
+
+    // Otherwise, decrement our iterator.
+    --End;
+  }
+
+  // If all such instructions can not use Op, return false.
+  return None;
+}
+
 /// If \p Op has instructions in the instruction range (Start, End] which may
 /// decrement it, return the first such instruction. Returns None
 /// if no such instruction exists. We assume that Start and End are both in the
