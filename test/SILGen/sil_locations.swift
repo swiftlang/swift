@@ -318,6 +318,7 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
   // CHECK: bb0
   // CHECK: switch_enum_addr {{.*}} [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-10]]:3
   // CHECK: [[FALSE_BB]]:
+  // CHECK: br {{.*}}                                        {{.*}} line:[[@LINE-9]]:3
 
 }
 

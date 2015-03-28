@@ -2153,8 +2153,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     // fallthrough.  However, in both situations, the case cannot have
     // any bound variables.  If the case binds no variables, just branch
     // out to the scope of the pattern match statement.
-    if (!caseBlock->hasBoundDecls() &&
-        (row.hasFallthroughTo() || row.getColumns().size() > 1)) {
+    if (!caseBlock->hasBoundDecls()) {
       JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
       Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
 
