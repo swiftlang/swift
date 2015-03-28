@@ -1273,6 +1273,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("thick_to_objc_metatype", ValueKind::ThickToObjCMetatypeInst)
     .Case("thin_function_to_pointer", ValueKind::ThinFunctionToPointerInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
+    .Case("throw", ValueKind::ThrowInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
     .Case("tuple_extract", ValueKind::TupleExtractInst)
@@ -2492,6 +2493,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::ReturnInst: {
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createReturn(InstLoc, Val);
+    break;
+  }
+  case ValueKind::ThrowInst: {
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createThrow(InstLoc, Val);
     break;
   }
   case ValueKind::BranchInst: {

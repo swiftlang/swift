@@ -691,6 +691,7 @@ public:
   void visitCondBranchInst(CondBranchInst *i);
   void visitReturnInst(ReturnInst *i);
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *i);
+  void visitThrowInst(ThrowInst *i);
   void visitSwitchValueInst(SwitchValueInst *i);
   void visitSwitchEnumInst(SwitchEnumInst *i);
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *i);
@@ -2078,6 +2079,21 @@ void IRGenSILFunction::visitAutoreleaseReturnInst(AutoreleaseReturnInst *i) {
   Explosion temp;
   temp.add(emitObjCAutoreleaseReturnValue(*this, result.claimNext()));
   emitReturnInst(*this, i->getOperand().getType(), temp);
+}
+
+void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
+  // Store the exception to the error slot.
+  llvm::Value *exn = getLoweredSingletonExplosion(i->getOperand());
+  Builder.CreateStore(exn, getCallerErrorResultSlot());
+
+  // Create a normal return, but leaving the return value undefined.
+  auto fnTy = CurFn->getType()->getPointerElementType();
+  auto retTy = cast<llvm::FunctionType>(fnTy)->getReturnType();
+  if (retTy->isVoidTy()) {
+    Builder.CreateRetVoid();
+  } else {
+    Builder.CreateRet(llvm::UndefValue::get(retTy));
+  }
 }
 
 static llvm::BasicBlock *emitBBMapForSwitchValue(

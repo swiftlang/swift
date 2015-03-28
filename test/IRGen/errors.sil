@@ -1,0 +1,32 @@
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @create_error : $@thin () -> @owned _ErrorType {
+entry:
+  unreachable
+}
+
+// CHECK: define void @throws(%swift.refcounted*, %swift.error**) {
+sil @throws : $@thin () -> @error _ErrorType {
+  // CHECK: [[T0:%.*]] = call %swift.error* @create_error()
+  %0 = function_ref @create_error : $@thin () -> @owned _ErrorType
+  %1 = apply %0() : $@thin () -> @owned _ErrorType
+
+  // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1, align 8
+  // CHECK-NEXT: ret void
+  throw %1 : $_ErrorType
+}
+
+// CHECK: define void @doesnt_throw(%swift.refcounted*, %swift.error**) {
+sil @doesnt_throw : $@thin () -> @error _ErrorType {
+  //   We don't have to do anything here because the caller always
+  //   zeroes the error slot before a call.
+  // CHECK-NEXT: entry:
+  // CHECK-NEXT:   ret void
+  %0 = tuple ()
+  return %0 : $()
+}

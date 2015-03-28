@@ -1228,6 +1228,10 @@ public:
     OS << "autorelease_return " << getIDAndType(RI->getOperand());
   }
   
+  void visitThrowInst(ThrowInst *TI) {
+    OS << "throw " << getIDAndType(TI->getOperand());
+  }
+
   void visitSwitchValueInst(SwitchValueInst *SII) {
     OS << "switch_value " << getIDAndType(SII->getOperand());
     for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {

@@ -859,6 +859,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::UnownedRetainInst:
   case ValueKind::UnownedReleaseInst:
   case ValueKind::ReturnInst:
+  case ValueKind::ThrowInst:
   case ValueKind::DebugValueInst:
   case ValueKind::DebugValueAddrInst: {
     unsigned Attr = 0;

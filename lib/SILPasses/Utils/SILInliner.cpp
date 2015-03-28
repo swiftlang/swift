@@ -152,6 +152,13 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
       continue;
     }
 
+    // Modify throw terminators to branch to the error-return BB, rather than
+    // trying to clone the ThrowInst.
+    if (ThrowInst *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
+      (void) TI;
+      llvm_unreachable("cannot remap throw in a non-try_apply call!");
+    }
+
     assert(!isa<AutoreleaseReturnInst>(BI->first->getTerminator()) &&
            "Unexpected autorelease return while inlining non-Objective-C "
            "function?");
@@ -283,6 +290,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     // Return and unreachable are free.
     case ValueKind::UnreachableInst:
     case ValueKind::ReturnInst:
+    case ValueKind::ThrowInst:
       return InlineCost::Free;
 
     case ValueKind::ApplyInst:

@@ -95,6 +95,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::DynamicMethodBranchInst:
   case ValueKind::ReturnInst:
   case ValueKind::AutoreleaseReturnInst:
+  case ValueKind::ThrowInst:
   case ValueKind::FixLifetimeInst:
     return false;
 

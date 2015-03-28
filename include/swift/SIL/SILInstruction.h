@@ -3090,6 +3090,27 @@ public:
   }
 };
 
+/// ThrowInst - Throw a typed error (which, in our system, is
+/// essentially just a funny kind of return).
+class ThrowInst
+  : public UnaryInstructionBase<ValueKind::ThrowInst, TermInst,
+                                /*HAS_RESULT*/ false>
+{
+public:
+  /// Constructs a ThrowInst representing a throw out of the current
+  /// function.
+  ///
+  /// \param loc The location of the throw.
+  /// \param errorValue The value to be thrown.
+  ThrowInst(SILLocation loc, SILValue errorValue)
+    : UnaryInstructionBase(loc, errorValue) {}
+
+  SuccessorListTy getSuccessors() {
+    // No successors.
+    return SuccessorListTy();
+  }
+};
+
 /// BranchInst - An unconditional branch.
 class BranchInst : public TermInst {
   SILSuccessor DestBB;

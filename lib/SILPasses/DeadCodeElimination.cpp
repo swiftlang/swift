@@ -282,6 +282,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
 
   case ValueKind::ReturnInst:
   case ValueKind::AutoreleaseReturnInst:
+  case ValueKind::ThrowInst:
   case ValueKind::CondBranchInst:
   case ValueKind::SwitchEnumInst:
   case ValueKind::SwitchEnumAddrInst:

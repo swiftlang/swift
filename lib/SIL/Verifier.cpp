@@ -2126,6 +2126,24 @@ public:
     require(instResultType.hasRetainablePointerRepresentation(),
             "autoreleased return value must be a reference type");
   }
+
+  void checkThrowInst(ThrowInst *TI) {
+    DEBUG(TI->print(llvm::dbgs()));
+
+    CanSILFunctionType fnType = F.getLoweredFunctionType();
+    require(fnType->hasErrorResult(),
+            "throw in function that doesn't have an error result");
+
+    SILType functionResultType
+      = F.mapTypeIntoContext(fnType->getErrorResult().getSILType());
+    SILType instResultType = TI->getOperand().getType();
+    DEBUG(llvm::dbgs() << "function error result type: ";
+          functionResultType.dump();
+          llvm::dbgs() << "throw operand type: ";
+          instResultType.dump(););
+    require(functionResultType == instResultType,
+            "throw operand type does not match error result type of function");
+  }
   
   void checkSelectEnumCases(SelectEnumInstBase *I) {
     EnumDecl *eDecl = I->getEnumOperand().getType().getEnumOrBoundGenericEnum();

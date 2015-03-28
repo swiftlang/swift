@@ -1508,6 +1508,14 @@ SILCloner<ImplClass>::visitAutoreleaseReturnInst(AutoreleaseReturnInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitThrowInst(ThrowInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createThrow(getOpLocation(Inst->getLoc()),
+                             getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitBranchInst(BranchInst *Inst) {
   auto Args = getOpValueArray<8>(Inst->getArgs());
   doPostProcess(Inst,

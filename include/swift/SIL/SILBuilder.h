@@ -981,6 +981,10 @@ public:
     return insertTerminator(new (F.getModule())
                               AutoreleaseReturnInst(Loc, ReturnValue));
   }
+
+  ThrowInst *createThrow(SILLocation loc, SILValue errorValue) {
+    return insertTerminator(new (F.getModule()) ThrowInst(loc, errorValue));
+  }
   
   CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,
                                    SILBasicBlock *Target1,
