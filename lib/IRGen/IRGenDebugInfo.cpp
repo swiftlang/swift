@@ -737,10 +737,11 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
   }
 
   CanSILFunctionType FnTy = getFunctionType(SILTy);
-  auto Params =
-    Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables ? llvm::DITypeArray()
-    : createParameterTypes(SILTy, DeclCtx);
-  llvm::DICompositeType DIFnTy = DBuilder.createSubroutineType(File, Params);
+  llvm::DICompositeType DIFnTy;
+  if (auto Params = Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
+                        ? llvm::DITypeArray()
+                        : createParameterTypes(SILTy, DeclCtx))
+    DIFnTy = DBuilder.createSubroutineType(File, Params);
   llvm::DIArray TemplateParameters;
   llvm::DISubprogram Decl;
 
@@ -1710,6 +1711,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       FunctionTy =
           IGM.SILMod->Types.getLoweredType(BaseTy).castTo<SILFunctionType>();
     auto Params = createParameterTypes(FunctionTy, DbgTy.getDeclContext());
+    assert(Params && "Expected to create subroutine params");
 
     // Functions are actually stored as a Pointer or a FunctionPairTy:
     // { i8*, %swift.refcounted* }
