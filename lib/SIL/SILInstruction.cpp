@@ -123,6 +123,16 @@ void SILInstruction::moveBefore(SILInstruction *MovePos) {
                                              getParent()->getInstList(), this);
 }
 
+/// Unlink this instruction from its current basic block and insert it into
+/// the basic block that MovePos lives in, right after MovePos.
+void SILInstruction::moveAfter(SILInstruction *MovePos) {
+  // Since MovePos is an instruction, we know that there is always a valid
+  // iterator after it.
+  auto NewPos = std::next(SILBasicBlock::iterator(MovePos));
+  MovePos->getParent()->getInstList().splice(NewPos,
+                                             getParent()->getInstList(), this);
+}
+
 void SILInstruction::dropAllReferences() {
   MutableArrayRef<Operand> PossiblyDeadOps = getAllOperands();
   for (auto OpI = PossiblyDeadOps.begin(),
