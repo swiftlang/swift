@@ -1246,8 +1246,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       }
     }
 
-    Expr *expr = BP->getBoolValue();
-
     // If there is a subpattern, push the bool type down onto it.
     if (BP->hasSubPattern()) {
       Type elementType;
