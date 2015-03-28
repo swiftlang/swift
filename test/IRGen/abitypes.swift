@@ -317,7 +317,7 @@ class Foo {
     return 1
   }
 
-  // x86_64-macosx: define hidden void @_TFC8abitypes3Foo20testGenericTypeParam{{.*}}(%objc_object*, %C8abitypes3Foo*, %swift.type* %T) {
+  // x86_64-macosx: define hidden void @_TFC8abitypes3Foo20testGenericTypeParam{{.*}}(%objc_object*, %swift.type* %T, %C8abitypes3Foo*) {
   func testGenericTypeParam<T: Pasta>(x: T) {
     // x86_64-macosx: [[CAST:%.*]] = bitcast %objc_object* %0 to i8*
     // x86_64-macosx: call void bitcast (void ()* @objc_msgSend to void (i8*, i8*)*)(i8* [[CAST]], i8* %{{.*}})

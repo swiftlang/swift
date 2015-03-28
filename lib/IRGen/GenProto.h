@@ -131,20 +131,46 @@ namespace irgen {
                               SILDeclRef member,
                               ProtocolConformance *conformance,
                               Explosion &out);
-  
-  /// Add the witness arguments necessary for calling a function with
+
+  /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.
   void expandPolymorphicSignature(IRGenModule &IGM,
                                   CanSILFunctionType type,
                                   SmallVectorImpl<llvm::Type*> &types);
 
+  /// Return the number of trailing arguments necessary for calling a
+  /// witness method.
+  inline unsigned getTrailingWitnessSignatureLength(IRGenModule &IGM,
+                                                    CanSILFunctionType type) {
+    return 1;
+  }
+
+  /// Add the trailing arguments necessary for calling a witness method.
+  void expandTrailingWitnessSignature(IRGenModule &IGM,
+                                      CanSILFunctionType type,
+                                      SmallVectorImpl<llvm::Type*> &types);
+
+  struct WitnessMetadata {
+    llvm::Value *SelfMetadata = nullptr;
+  };
+
+  /// Collect any required metadata for a witness method from the end
+  /// of the given parameter list.
+  void collectTrailingWitnessMetadata(IRGenFunction &IGF, SILFunction &fn,
+                                      Explosion &params,
+                                      WitnessMetadata &metadata);
+
   using GetParameterFn = std::function<llvm::Value*(unsigned)>;
 
   /// In the prelude of a generic function, perform the bindings for a
   /// generics clause.
+  ///
+  /// \param witnessMetadata - can be omitted if the function is
+  ///   definitely not a witness method
   void emitPolymorphicParameters(IRGenFunction &IGF,
                                  SILFunction &Fn,
                                  Explosion &args,
+                                 WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
   
   /// Perform the metadata bindings necessary to emit a generic value witness.
@@ -152,12 +178,18 @@ namespace irgen {
                                                        NominalTypeDecl *ntd,
                                                        llvm::Value *selfMeta);
 
+  /// Add the trailing arguments necessary for calling a witness method.
+  void emitTrailingWitnessArguments(IRGenFunction &IGF,
+                                    WitnessMetadata &witnessMetadata,
+                                    Explosion &args);
+
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
                                 CanSILFunctionType origType,
                                 CanSILFunctionType substType,
                                 ArrayRef<Substitution> subs,
+                                WitnessMetadata *witnessMetadata,
                                 Explosion &args);
 
   /// True if a type has a generic-parameter-dependent value witness table.

@@ -1405,7 +1405,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
-                                               ExtraData::None,
                                                attrs);
   
   auto cc = expandAbstractCC(*this, f->getAbstractCC());

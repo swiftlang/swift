@@ -421,6 +421,9 @@ public:
   OperandValueArrayRef slice(unsigned begin) const {
     return OperandValueArrayRef(Operands.slice(begin));
   }
+  OperandValueArrayRef drop_back() const {
+    return OperandValueArrayRef(Operands.drop_back());
+  }
   
   bool operator==(const OperandValueArrayRef RHS) const {
     if (size() != RHS.size())

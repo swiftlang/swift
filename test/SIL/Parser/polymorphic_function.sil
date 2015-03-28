@@ -11,7 +11,7 @@ public protocol mmStreamable {
   func writeTo<Target : mmOutputStreamType>(inout target: Target)
 }
 
-// CHECK-LABEL: sil @test : $() -> () {
+// CHECK-LABEL: sil @test : $@thin () -> () {
 sil @test : $() -> () {
 bb0:
   %281 = alloc_stack $mmStreamable

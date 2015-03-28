@@ -211,7 +211,7 @@ public:
     return e;
   }
 
-  llvm::Value *getSingletonExplosion() const;
+  llvm::Value *getSingletonExplosion(IRGenFunction &IGF) const;
   
   const StaticFunction &getStaticFunction() const {
     assert(kind == Kind::StaticFunction && "not a static function");
@@ -410,7 +410,7 @@ public:
   /// Return the single member of the lowered explosion for the
   /// given SIL value.
   llvm::Value *getLoweredSingletonExplosion(SILValue v) {
-    return getLoweredValue(v).getSingletonExplosion();
+    return getLoweredValue(v).getSingletonExplosion(*this);
   }
   
   LoweredBB &getLoweredBB(SILBasicBlock *bb) {
@@ -725,10 +725,22 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   }
 }
 
-llvm::Value *LoweredValue::getSingletonExplosion() const {
-  assert(kind == Kind::Explosion);
-  assert(explosion.values.size() == 1);
-  return explosion.values[0];
+llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF) const {
+  switch (kind) {
+  case Kind::Address:
+    llvm_unreachable("not a value");
+
+  case Kind::Explosion:
+    assert(explosion.values.size() == 1);
+    return explosion.values[0];
+
+  case Kind::StaticFunction:
+    return staticFunction.getExplosionValue(IGF);
+
+  case Kind::ObjCMethod:
+    return objcMethod.getExplosionValue(IGF);
+  }
+  llvm_unreachable("bad lowered value kind!");
 }
 
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
@@ -915,6 +927,32 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
   paramTI.deallocateStack(IGF, temporary, paramType);
 }
 
+static void bindParameter(IRGenSILFunction &IGF,
+                          SILArgument *param,
+                          Explosion &allParamValues) {
+  // Pull out the parameter value and its formal type.
+  auto &paramTI = IGF.getTypeInfo(param->getType());
+
+  // If the SIL parameter isn't passed indirectly, we need to map it
+  // to an explosion.  Fortunately, in this case we have a guarantee
+  // that it's passed directly in IR.
+  if (param->getType().isObject()) {
+    Explosion paramValues;
+    cast<LoadableTypeInfo>(paramTI).reexplode(IGF, allParamValues, paramValues);
+    IGF.setLoweredExplosion(SILValue(param, 0), paramValues);
+    return;
+  }
+
+  // Okay, the type is passed indirectly in SIL, so we need to map
+  // it to an address.
+  // FIXME: that doesn't mean we should physically pass it
+  // indirectly at this explosion level, but SIL currently gives us
+  // no ability to distinguish between an l-value and a byval argument.
+  Address paramAddr
+    = paramTI.getAddressForPointer(allParamValues.claimNext());
+  IGF.setLoweredAddress(SILValue(param, 0), paramAddr);
+}
+
 /// Emit entry point arguments for a SILFunction with the Swift calling
 /// convention.
 static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
@@ -932,39 +970,54 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
         return IGF.IGM.requiresIndirectResult(retType);
       });
 
+  // The witness method CC passes Self as a final argument.
+  WitnessMetadata witnessMetadata;
+  if (funcTy->getAbstractCC() == AbstractCC::WitnessMethod) {
+    collectTrailingWitnessMetadata(IGF, *IGF.CurSILFn, allParamValues,
+                                   witnessMetadata);
+  }
+
+  // Bind the error result by popping it off the parameter list.
+  if (funcTy->hasErrorResult()) {
+    IGF.setErrorResultSlot(allParamValues.takeLast());
+  }
+
+  // The 'self' argument might be in the context position, which is
+  // now the end of the parameter list.  Bind it now.
+  if (funcTy->hasSelfArgument() &&
+      isSelfContextParameter(funcTy->getSelfParameter())) {
+    SILArgument *selfParam = params.back();
+    params = params.drop_back();
+
+    Explosion selfTemp;
+    selfTemp.add(allParamValues.takeLast());
+    bindParameter(IGF, selfParam, selfTemp);
+
+  // Even if we don't have a 'self', if we have an error result, we
+  // should have a placeholder argument here.
+  } else if (funcTy->hasErrorResult() ||
+             funcTy->hasThickRepresentation()) {
+    llvm::Value *contextPtr = allParamValues.takeLast(); (void) contextPtr;
+    assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
+  }
+
   // Map the remaining SIL parameters to LLVM parameters.
   for (SILArgument *param : params) {
-    // Pull out the parameter value and its formal type.
-    auto &paramTI = IGF.getTypeInfo(param->getType());
-
-    // If the SIL parameter isn't passed indirectly, we need to map it
-    // to an explosion.  Fortunately, in this case we have a guarantee
-    // that it's passed directly in IR.
-    if (param->getType().isObject()) {
-      Explosion paramValues;
-      cast<LoadableTypeInfo>(paramTI).reexplode(IGF, allParamValues, paramValues);
-      IGF.setLoweredExplosion(SILValue(param, 0), paramValues);
-      continue;
-    }
-
-    // Okay, the type is passed indirectly in SIL, so we need to map
-    // it to an address.
-    // FIXME: that doesn't mean we should physically pass it
-    // indirectly at this explosion level, but SIL currently gives us
-    // no ability to distinguish between an l-value and a byval argument.
-    Address paramAddr
-      = paramTI.getAddressForPointer(allParamValues.claimNext());
-    IGF.setLoweredAddress(SILValue(param, 0), paramAddr);
+    bindParameter(IGF, param, allParamValues);
   }
-  
-  // Bind polymorphic arguments.
+
+  // Bind polymorphic arguments.  This can only be done after binding
+  // all the value parameters.
   if (hasPolymorphicParameters(funcTy)) {
     emitPolymorphicParameters(IGF, *IGF.CurSILFn, allParamValues,
+                              &witnessMetadata,
       [&](unsigned paramIndex) -> llvm::Value* {
         SILValue parameter = entry->getBBArgs()[paramIndex];
         return IGF.getLoweredSingletonExplosion(parameter);
       });
   }
+
+  assert(allParamValues.empty() && "didn't claim all parameters!");
 }
 
 /// Emit entry point arguments for the parameters of a C function, or the
@@ -1602,76 +1655,104 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
                         temp, out);
 }
 
+static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
+                                         llvm::Value *selfValue,
+                                         CanAnyMetatypeType selfType) {
+  // If we have a Swift metatype, map it to the heap metadata, which
+  // will be the Class for an ObjC type.
+  switch (selfType->getRepresentation()) {
+  case swift::MetatypeRepresentation::ObjC:
+    return selfValue;
+
+  case swift::MetatypeRepresentation::Thick:
+    // Convert thick metatype to Objective-C metatype.
+    return emitClassHeapMetadataRefForMetatype(IGF, selfValue,
+                                               selfType.getInstanceType());
+
+  case swift::MetatypeRepresentation::Thin:
+    llvm_unreachable("Cannot convert Thin metatype to ObjC metatype");
+  }
+  llvm_unreachable("bad metatype representation");
+}
+
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                                    ApplyInst *AI,
                                          CanSILFunctionType origCalleeType,
                                          CanSILFunctionType substCalleeType,
                                          const LoweredValue &lv,
+                                         llvm::Value *selfValue,
+                                         Explosion &args,
                                          ArrayRef<Substitution> substitutions) {
   llvm::Value *calleeFn, *calleeData;
-  ExtraData extraData;
   
   switch (lv.kind) {
   case LoweredValue::Kind::StaticFunction:
     calleeFn = lv.getStaticFunction().getFunction();
-    calleeData = nullptr;
-    extraData = ExtraData::None;
+    calleeData = selfValue;
     break;
       
   case LoweredValue::Kind::ObjCMethod: {
+    assert(selfValue);
     auto &objcMethod = lv.getObjCMethod();
     ObjCMessageKind kind = ObjCMessageKind::Normal;
     if (objcMethod.getSearchType())
       kind = objcMethod.shouldStartAtSuper()? ObjCMessageKind::Super
                                             : ObjCMessageKind::Peer;
-    return prepareObjCMethodRootCall(IGF, objcMethod.getMethod(),
-                                     origCalleeType,
-                                     substCalleeType,
-                                     substitutions,
-                                     kind);
+
+    CallEmission emission =
+      prepareObjCMethodRootCall(IGF, objcMethod.getMethod(),
+                                origCalleeType, substCalleeType,
+                                substitutions, kind);
+
+    // Convert a metatype 'self' argument to the ObjC Class pointer.
+    // FIXME: Should be represented in SIL.
+    if (auto metatype = dyn_cast<AnyMetatypeType>(
+                          origCalleeType->getSelfParameter().getType())) {
+      selfValue = getObjCClassForValue(IGF, selfValue, metatype);
+    }
+
+    addObjCMethodCallImplicitArguments(IGF, args, objcMethod.getMethod(),
+                                       selfValue,
+                                       objcMethod.getSearchType());
+    return emission;
   }
       
-  case LoweredValue::Kind::Explosion: {
-    Explosion calleeValues = lv.getExplosion(IGF);
-    
+  case LoweredValue::Kind::Explosion: {    
     switch (origCalleeType->getRepresentation()) {
     case AnyFunctionType::Representation::Block: {
+      assert(!selfValue && "block function with self?");
+
+      // Grab the block pointer and make it the first physical argument.
+      llvm::Value *blockPtr = lv.getSingletonExplosion(IGF);
+      blockPtr = IGF.Builder.CreateBitCast(blockPtr, IGF.IGM.ObjCBlockPtrTy);
+      args.add(blockPtr);
+
       // Extract the invocation pointer for blocks.
-      calleeData = calleeValues.claimNext();
-      calleeData = IGF.Builder.CreateBitCast(calleeData, IGF.IGM.ObjCBlockPtrTy);
-      llvm::Value *invokeAddr = IGF.Builder.CreateStructGEP(calleeData, 3);
+      llvm::Value *invokeAddr = IGF.Builder.CreateStructGEP(blockPtr, 3);
       calleeFn = IGF.Builder.CreateLoad(invokeAddr, IGF.IGM.getPointerAlignment());
-      extraData = ExtraData::Block;
+      calleeData = nullptr;
       break;
     }
         
     case AnyFunctionType::Representation::Thin:
     case AnyFunctionType::Representation::Thick: {
+      Explosion calleeValues = lv.getExplosion(IGF);
       calleeFn = calleeValues.claimNext();
-        
-      if (origCalleeType->getRepresentation()
-            == AnyFunctionType::Representation::Thick)
+
+      if (origCalleeType->hasThickRepresentation()) {
+        assert(!selfValue);
         calleeData = calleeValues.claimNext();
-      else
-        calleeData = nullptr;
-        
-      // Guess the "ExtraData" kind from the type of CalleeData.
-      // FIXME: Should get from the type info.
-      if (!calleeData)
-        extraData = ExtraData::None;
-      else if (calleeData->getType() == IGF.IGM.RefCountedPtrTy)
-        extraData = ExtraData::Retainable;
-      else
-        llvm_unreachable("unexpected extra data for function value");
-        
+      } else {
+        calleeData = selfValue;
+      }
       break;
     }
     }
 
     // Cast the callee pointer to the right function type.
     llvm::AttributeSet attrs;
-    auto fnPtrTy = IGF.IGM.getFunctionType(origCalleeType,
-                                           extraData, attrs)->getPointerTo();
+    auto fnPtrTy =
+      IGF.IGM.getFunctionType(origCalleeType, attrs)->getPointerTo();
     calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnPtrTy);
     break;
   }
@@ -1687,39 +1768,6 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     callEmission.addAttribute(llvm::AttributeSet::FunctionIndex, llvm::Attribute::NoInline);
   
   return callEmission;
-}
-
-static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
-                                         SILValue v) {
-  const LoweredValue &lv = IGF.getLoweredValue(v);
-  switch (lv.kind) {
-  case LoweredValue::Kind::Address:
-    llvm_unreachable("address isn't a valid metatype");
-  
-  case LoweredValue::Kind::ObjCMethod:
-  case LoweredValue::Kind::StaticFunction:
-    llvm_unreachable("function isn't a valid metatype");
-  
-  // If we have a Swift metatype, map it to the heap metadata, which will be
-  // the Class for an ObjC type.
-  case LoweredValue::Kind::Explosion: {
-    Explosion e = lv.getExplosion(IGF);
-    llvm::Value *meta = e.claimNext();
-    auto metaType = v.getType().castTo<AnyMetatypeType>();
-    switch (metaType->getRepresentation()) {
-    case swift::MetatypeRepresentation::ObjC:
-      return meta;
-
-    case swift::MetatypeRepresentation::Thick:
-      // Convert thick metatype to Objective-C metatype.
-      return emitClassHeapMetadataRefForMetatype(IGF, meta,
-                                                 metaType.getInstanceType());
-
-    case swift::MetatypeRepresentation::Thin:
-      llvm_unreachable("Cannot convert Thin metatype to ObjC metatype");
-    }
-  }
-  }
 }
 
 void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
@@ -1747,13 +1795,33 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   auto origCalleeType = i->getOrigCalleeType();
   auto substCalleeType = i->getSubstCalleeType();
   
-  CallEmission emission =
-    getCallEmissionForLoweredValue(*this, i, origCalleeType, substCalleeType,
-                                   calleeLV, i->getSubstitutions());
-  
   auto params = origCalleeType->getParametersWithoutIndirectResult();
   auto args = i->getArgumentsWithoutIndirectResult();
   assert(params.size() == args.size());
+
+  // Extract 'self' if it needs to be passed as the context parameter.
+  llvm::Value *selfValue = nullptr;
+  if (origCalleeType->hasSelfArgument() &&
+      isSelfContextParameter(origCalleeType->getSelfParameter())) {
+    SILValue selfArg = args.back();
+    args = args.drop_back();
+    params = params.drop_back();
+
+    if (selfArg.getType().isObject()) {
+      selfValue = getLoweredSingletonExplosion(selfArg);
+    } else {
+      selfValue = getLoweredAddress(selfArg).getAddress();
+    }
+  }
+
+  Explosion llArgs;    
+  CallEmission emission =
+    getCallEmissionForLoweredValue(*this, i, origCalleeType, substCalleeType,
+                                   calleeLV, selfValue, llArgs,
+                                   i->getSubstitutions());
+
+  // Lower the arguments and return value in the callee's generic context.
+  GenericContextScope scope(IGM, origCalleeType->getGenericSignature());
 
   // Save off the indirect return argument, if any.
   SILValue indirectResult;
@@ -1762,35 +1830,6 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   }
 
   // Lower the SIL arguments to IR arguments.
-  Explosion llArgs;
-  
-  // ObjC message sends need special handling for the 'self' argument, which in
-  // SIL gets curried to the end of the argument list but in IR is passed as the
-  // first argument. It additionally may need to be wrapped in an objc_super
-  // struct, and the '_cmd' argument needs to be passed alongside it.
-  if (calleeLV.kind == LoweredValue::Kind::ObjCMethod) {
-    SILValue selfValue = args.back();
-    args = args.slice(0, args.size() - 1);
-    params = params.slice(0, params.size() - 1);
-
-    llvm::Value *selfArg;
-    // Convert a metatype 'self' argument to the ObjC Class pointer.
-    // FIXME: Should be represented in SIL.
-    if (selfValue.getType().is<AnyMetatypeType>()) {
-      selfArg = getObjCClassForValue(*this, selfValue);
-    } else {
-      Explosion selfExplosion = getLoweredExplosion(selfValue);
-      selfArg = selfExplosion.claimNext();
-    }
-
-    addObjCMethodCallImplicitArguments(*this, llArgs,
-                                 calleeLV.getObjCMethod().getMethod(),
-                                 selfArg,
-                                 calleeLV.getObjCMethod().getSearchType());
-  }
-
-  // Lower the arguments and return value in the callee's generic context.
-  GenericContextScope scope(IGM, origCalleeType->getGenericSignature());
   
   // Turn the formal SIL parameters into IR-gen things.
   for (auto index : indices(args)) {
@@ -1798,13 +1837,14 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   }
 
   // Pass the generic arguments.
+  WitnessMetadata witnessMetadata;
   if (hasPolymorphicParameters(origCalleeType)) {
     emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
-                             i->getSubstitutions(), llArgs);
+                             i->getSubstitutions(), &witnessMetadata, llArgs);
   }
 
   // Add all those arguments.
-  emission.addArg(llArgs);
+  emission.setArgs(llArgs, &witnessMetadata);
   
   // If the SIL function takes an indirect-result argument, emit into it.
   if (indirectResult) {
@@ -2012,6 +2052,9 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
 static void emitReturnInst(IRGenSILFunction &IGF,
                            SILType resultTy,
                            Explosion &result) {
+  // The invariant on the out-parameter is that it's always zeroed, so
+  // there's nothing to do here.
+
   // Even if SIL has a direct return, the IR-level calling convention may
   // require an indirect return.
   if (IGF.IndirectReturn.isValid()) {

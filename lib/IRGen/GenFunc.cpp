@@ -14,36 +14,56 @@
 //  includes creating the IR type as well as capturing variables and
 //  performing calls.
 //
-//  Swift function types are always expanded as a struct containing
-//  two opaque pointers.  The first pointer is to a function (should
-//  this be a descriptor?) to which the second pointer is passed,
-//  along with the formal arguments.  The function pointer is opaque
-//  because the alternative would require infinite types to faithfully
-//  represent, since aggregates containing function types can be
-//  passed and returned by value, not necessary as first-class
-//  aggregates.
+//  Swift supports three representations of functions:
 //
-//  There are several considerations for whether to pass the data
-//  pointer as the first argument or the last:
-//    - On CCs that pass anything in registers, dropping the last
-//      argument is significantly more efficient than dropping the
-//      first, and it's not that unlikely that the data might
-//      be ignored.
-//    - A specific instance of that:  we can use the address of a
-//      global "data-free" function directly when taking an
-//      address-of-function.
-//    - Replacing a pointer argument with a different pointer is
-//      quite efficient with pretty much any CC.
-//    - Later arguments can be less efficient to access if they
-//      actually get passed on the stack, but there's some leeway
-//      with a decent CC.
-//    - Passing the data pointer last inteferes with native variadic
-//      arguments, but we probably don't ever want to use native
-//      variadic arguments.
-//  This works out to a pretty convincing argument for passing the
-//  data pointer as the last argument.
+//    - thin, which are just a function pointer;
 //
-//  On the other hand, it is not compatible with blocks.
+//    - thick, which are a pair of a function pointer and
+//      an optional ref-counted opaque context pointer; and
+//
+//    - block, which match the Apple blocks extension: a ref-counted
+//      pointer to a mostly-opaque structure with the function pointer
+//      stored at a fixed offset.
+//
+//  The order of function parameters is as follows:
+//
+//    - indirect return pointer
+//    - block context parameter, if applicable
+//    - expanded formal parameter types
+//    - implicit generic parameters
+//    - thick context parameter, if applicable
+//    - error result out-parameter, if applicable
+//    - witness_method generic parameters, if applicable
+//
+//  The context and error parameters are last because they are
+//  optional: we'd like to be able to turn a thin function into a
+//  thick function, or a non-throwing function into a throwing one,
+//  without adding a thunk.  A thick context parameter is required
+//  (but can be passed undef) if an error result is required.
+//
+//  The additional generic parameters for witness methods follow the
+//  same logic: we'd like to be able to use non-generic method
+//  implementations directly as protocol witnesses if the rest of the
+//  ABI matches up.
+//
+//  Note that some of this business with context parameters and error
+//  results is just IR formalism; on most of our targets, both of
+//  these are passed in registers.  This is also why passing them
+//  as the final argument isn't bad for performance.
+//
+//  For now, function pointer types are always stored as opaque
+//  pointers in LLVM IR; using a well-typed function type is
+//  very challenging because of issues with recursive type expansion,
+//  which can potentially introduce infinite types.  For example:
+//    struct A {
+//      var fn: (A) -> ()
+//    }
+//  Our CC lowering expands the fields of A into the argument list
+//  of A.fn, which is necessarily infinite.  Attempting to use better
+//  types when not in a situation like this would just make the
+//  compiler complacent, leading to a long tail of undiscovered
+//  crashes.  So instead we always store as i8* and require the
+//  bitcast whenever we change representations.
 //
 //===----------------------------------------------------------------------===//
 
@@ -286,37 +306,16 @@ namespace {
   /// Information about the IR-level signature of a function type.
   class FuncSignatureInfo {
   private:
-    /// Each possible currying of a function type has different function
-    /// type variants along each of three orthogonal axes:
-    ///   - the explosion kind desired
-    ///   - whether a data pointer argument is required
-    struct Currying {
-      Signature Signatures[unsigned(ExtraData::Last_ExtraData) + 1];
-
-      Signature &select(ExtraData extraData) {
-        return Signatures[unsigned(extraData)];
-      }
-    };
-
     /// The SIL function type being represented.
     const CanSILFunctionType FormalType;
     
-    /// The ExtraData kind associated with the function reference.
-    ExtraData ExtraDataKind;
-
-    mutable Currying TheSignatures;
+    mutable Signature TheSignature;
     
   public:
-    FuncSignatureInfo(CanSILFunctionType formalType,
-                      ExtraData extraDataKind)
-      : FormalType(formalType), ExtraDataKind(extraDataKind) {}
+    FuncSignatureInfo(CanSILFunctionType formalType)
+      : FormalType(formalType) {}
     
-    ExtraData getExtraDataKind() const {
-      return ExtraDataKind;
-    }
-    
-    Signature getSignature(IRGenModule &IGM, ExtraData extraData) const;
-
+    Signature getSignature(IRGenModule &IGM) const;
   };
 
   /// The @thin function type-info class.
@@ -327,7 +326,7 @@ namespace {
                      Size size, Alignment align,
                      const SpareBitVector &spareBits)
       : PODSingleScalarTypeInfo(storageType, size, spareBits, align),
-        FuncSignatureInfo(formalType, ExtraData::None)
+        FuncSignatureInfo(formalType)
     {
     }
 
@@ -372,7 +371,7 @@ namespace {
     FuncTypeInfo(CanSILFunctionType formalType, llvm::StructType *storageType,
                  Size size, Alignment align, SpareBitVector &&spareBits)
       : ScalarTypeInfo(storageType, size, std::move(spareBits), align),
-        FuncSignatureInfo(formalType, ExtraData::Retainable)
+        FuncSignatureInfo(formalType)
     {
     }
 
@@ -585,7 +584,7 @@ namespace {
                   llvm::PointerType *storageType,
                   Size size, SpareBitVector spareBits, Alignment align)
       : HeapTypeInfo(storageType, size, spareBits, align),
-        FuncSignatureInfo(ty, ExtraData::Block)
+        FuncSignatureInfo(ty)
     {
     }
 
@@ -1237,7 +1236,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
     addIndirectResult();
 
   // Blocks are passed into themselves as their first (non-sret) argument.
-  if (FnType->getRepresentation() == FunctionType::Representation::Block)
+  if (FnType->hasBlockRepresentation())
     ParamIRTypes.push_back(IGM.ObjCBlockPtrTy);
 
   for (auto i : indices(paramTys)) {
@@ -1340,33 +1339,104 @@ void SignatureExpansion::expand(SILParameterInfo param) {
   llvm_unreachable("bad parameter convention");
 }
 
+/// Should the given self parameter be given the special treatment
+/// for self parameters?
+///
+/// It's important that this only return true for things that are
+/// passed as a single pointer.
+bool irgen::isSelfContextParameter(SILParameterInfo param) {
+  // All the indirect conventions pass a single pointer.
+  if (param.isIndirect()) {
+    return true;
+  }
+
+  // Direct conventions depends on the type.
+  CanType type = param.getType();
+
+  // Thick or @objc metatypes (but not existential metatypes).
+  if (auto metatype = dyn_cast<MetatypeType>(type)) {
+    return metatype->getRepresentation() != MetatypeRepresentation::Thin;
+  }
+
+  // Classes and class-bounded archetypes.
+  // No need to apply this to existentials.
+  // The direct check for SubstitutableType works because only
+  // class-bounded generic types can be passed directly.
+  if (type->mayHaveSuperclass() || isa<SubstitutableType>(type)) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Expand the abstract parameters of a SIL function type into the
 /// physical parameters of an LLVM function type.
 void SignatureExpansion::expandParameters() {
-  assert(FnType->getRepresentation() != AnyFunctionType::Representation::Block
+  assert(!FnType->hasBlockRepresentation()
          && "block with non-C calling conv?!");
-         
-  // Some CCs secretly rearrange the parameters.
-  switch (FnType->getAbstractCC()) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod: {
-    auto params = FnType->getParameters();
 
-    for (auto param : params) {
-      expand(param);
+  // First, the formal parameters.  But 'self' is treated as the
+  // context if it has pointer representation.
+  auto params = FnType->getParameters();
+  bool hasSelfContext = false;
+  if (FnType->hasSelfArgument() &&
+      isSelfContextParameter(FnType->getSelfParameter())) {
+    hasSelfContext = true;
+    params = params.drop_back();
+  }
+
+  for (auto param : params) {
+    expand(param);
+  }
+
+  // Next, the generic signature.
+  if (hasPolymorphicParameters(FnType))
+    expandPolymorphicSignature(IGM, FnType, ParamIRTypes);
+
+  // Context is next.
+  if (hasSelfContext) {
+    auto curLength = ParamIRTypes.size(); (void) curLength;
+
+    // TODO: 'swift_context' IR attribute
+    expand(FnType->getSelfParameter());
+
+    assert(ParamIRTypes.size() == curLength + 1 &&
+           "adding 'self' added unexpected number of parameters");
+  } else {
+    auto needsContext = [=]() -> bool {
+      switch (FnType->getRepresentation()) {
+      case SILFunctionType::Representation::Block:
+        llvm_unreachable("adding block parameter in Swift CC expansion?");
+
+      // Always leave space for a context argument if we have an error result.
+      case SILFunctionType::Representation::Thin:
+        return FnType->hasErrorResult();
+
+      case SILFunctionType::Representation::Thick:
+        return true;
+      }
+      llvm_unreachable("bad representation kind");
+    };
+    if (needsContext()) {
+      // TODO: 'swift_context' IR attribute
+      ParamIRTypes.push_back(IGM.RefCountedPtrTy);
     }
-
-    if (hasPolymorphicParameters(FnType))
-      expandPolymorphicSignature(IGM, FnType, ParamIRTypes);
-    break;
-  }
-  case AbstractCC::ObjCMethod:
-  case AbstractCC::C:
-    llvm_unreachable("Expanding C/ObjC parameters in the wrong place!");
-    break;
   }
 
+  // Error results are last.  We always pass them as a pointer to the
+  // formal error type; LLVM will magically turn this into a non-pointer
+  // if we set the right attribute.
+  if (FnType->hasErrorResult()) {
+    // TODO: 'swift_error' IR attribute
+    llvm::Type *errorType =
+      IGM.getStorageType(FnType->getErrorResult().getSILType());
+    ParamIRTypes.push_back(errorType->getPointerTo());
+  }
+
+  // Witness methods have some extra parameter types.
+  if (FnType->getAbstractCC() == AbstractCC::WitnessMethod) {
+    expandTrailingWitnessSignature(IGM, FnType, ParamIRTypes);
+  }
 }
 
 /// Expand the result and parameter types of a SIL function into the
@@ -1384,34 +1454,18 @@ llvm::Type *SignatureExpansion::expandSignatureTypes() {
   case AbstractCC::ObjCMethod:
   case AbstractCC::C:
     return expandExternalSignatureTypes();
-    break;
   }
+  llvm_unreachable("bad abstract calling convention");
 }
 
-Signature FuncSignatureInfo::getSignature(IRGenModule &IGM,
-                                          ExtraData extraData) const {
-  // Compute a reference to the appropriate signature cache.
-  Signature &signature = TheSignatures.select(extraData);
-
+Signature FuncSignatureInfo::getSignature(IRGenModule &IGM) const {
   // If it's already been filled in, we're done.
-  if (signature.isValid())
-    return signature;
+  if (TheSignature.isValid())
+    return TheSignature;
 
   GenericContextScope scope(IGM, FormalType->getGenericSignature());
   SignatureExpansion expansion(IGM, FormalType);
-  
   llvm::Type *resultType = expansion.expandSignatureTypes();
-
-  // Non-block data arguments are last.
-  // See the comment in this file's header comment.
-  switch (extraData) {
-  case ExtraData::Block:
-  case ExtraData::None:
-    break;
-  case ExtraData::Retainable:
-    expansion.ParamIRTypes.push_back(IGM.RefCountedPtrTy);
-    break;
-  }
 
   // Create the appropriate LLVM type.
   llvm::FunctionType *llvmType =
@@ -1419,8 +1473,8 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM,
                             /*variadic*/ false);
 
   // Update the cache and return.
-  signature.set(llvmType, expansion.HasIndirectResult, expansion.Attrs);
-  return signature;
+  TheSignature.set(llvmType, expansion.HasIndirectResult, expansion.Attrs);
+  return TheSignature;
 }
 
 static const FuncSignatureInfo &
@@ -1439,10 +1493,9 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
 
 llvm::FunctionType *
 IRGenModule::getFunctionType(CanSILFunctionType type,
-                             ExtraData extraData,
                              llvm::AttributeSet &attrs) {
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
-  Signature sig = sigInfo.getSignature(*this, extraData);
+  Signature sig = sigInfo.getSignature(*this);
   attrs = sig.getAttributes();
   return sig.getType();
 }
@@ -2452,13 +2505,45 @@ void CallEmission::setFromCallee() {
   Args.set_size(numArgs);
   LastArgWritten = numArgs;
 
-  // Add the data pointer if we have one.
-  // For blocks we emit this after all the arguments have been applied.
-  if (CurCallee.getOrigFunctionType()->getRepresentation()
-        != FunctionType::Representation::Block
-      && CurCallee.hasDataPointer()) {
+  auto fnType = CurCallee.getOrigFunctionType();
+
+  if (fnType->getAbstractCC() == AbstractCC::WitnessMethod) {
+    unsigned n = getTrailingWitnessSignatureLength(IGF.IGM, fnType);
+    while (n--) {
+      Args[--LastArgWritten] = nullptr;
+    }
+  }
+
+  llvm::Value *contextPtr = nullptr;
+  if (CurCallee.hasDataPointer())
+    contextPtr = CurCallee.getDataPointer(IGF);
+
+  // Add the error result if we have one.
+  if (fnType->hasErrorResult()) {
+    // The invariant is that this is always zero-initialized, so we
+    // don't need to do anything extra here.
+    Address errorResultSlot =
+      IGF.getErrorResultSlot(fnType->getErrorResult().getSILType());
+
+    // TODO: Add swift_error attribute.
     assert(LastArgWritten > 0);
-    Args[--LastArgWritten] = CurCallee.getDataPointer(IGF);
+    Args[--LastArgWritten] = errorResultSlot.getAddress();
+    addAttribute(LastArgWritten + 1, llvm::Attribute::NoCapture);
+
+    // Fill in the context pointer if necessary.
+    if (!contextPtr) {
+      contextPtr = llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy);
+    }
+  }
+
+  // Add the data pointer if we have one.
+  // (Note that we're emitting backwards, so this correctly goes
+  // *before* the error pointer.)
+  if (contextPtr) {
+    assert(!fnType->hasBlockRepresentation() &&
+           "block function should not claimed to have data pointer");
+    assert(LastArgWritten > 0);
+    Args[--LastArgWritten] = contextPtr;
   }
 }
 
@@ -2652,22 +2737,25 @@ void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
 
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
-                                 llvm::AttributeSet &attrs,
-                                 ArrayRef<SILParameterInfo> &params) {
+                                 llvm::AttributeSet &attrs) {
+  auto fnType = callee.getOrigFunctionType();
+  auto params = fnType->getParameters();
 
   SmallVector<clang::CanQualType,4> paramTys;
   auto const &clangCtx = IGF.IGM.getClangASTContext();
+
+  // Objective-C methods take two implicit first parameters, 'self'
+  // and '_cmd'.
   if (callee.getAbstractCC() == AbstractCC::ObjCMethod) {
-    // The method will be uncurried to ((ArgsN...), ..., (Args1...),
-    // Self). The self arg gets lowered to the first argument, and the
-    // implicit _cmd argument goes in between it and the rest of the
-    // args.
-    // self
     auto &self = params.back();
     auto clangTy = IGF.IGM.getClangType(self.getSILType());
     paramTys.push_back(clangTy);
     paramTys.push_back(clangCtx.VoidPtrTy);
     params = params.slice(0, params.size() - 1);
+
+  // Blocks take an implicit first parameter of block-context type.
+  } else if (fnType->hasBlockRepresentation()) {
+    paramTys.push_back(clangCtx.VoidPtrTy);
   }
 
   for (auto param : params) {
@@ -2691,21 +2779,23 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   // corresponds to a logical parameter from params.
   unsigned firstParam = 0;
 
+  auto claimNextDirect = [&] {
+    assert(FI.arg_begin()[firstParam].info.isDirect());
+    assert(!FI.arg_begin()[firstParam].info.getPaddingType());
+    out.add(in.claimNext());
+    firstParam++;
+  };
+
   // Handle the ObjC prefix.
   if (callee.getAbstractCC() == AbstractCC::ObjCMethod) {
     // The first two parameters are pointers, and we make some
     // simplifying assumptions.
-    assert(FI.arg_begin()[0].info.isDirect());
-    assert(!FI.arg_begin()[0].info.getPaddingType());
-    assert(FI.arg_begin()[1].info.isDirect());
-    assert(!FI.arg_begin()[1].info.getPaddingType());
+    claimNextDirect();
+    claimNextDirect();
 
-    // We do not have SILParameterInfo for the self and _cmd arguments,
-    // but we expect these to be internally consistent in the compiler
-    // so we shouldn't need to do any coercion.
-    out.add(in.claimNext());
-    out.add(in.claimNext());
-    firstParam = 2;
+  // Or the block prefix.
+  } else if (fnType->hasBlockRepresentation()) {
+    claimNextDirect();
   }
   
   // Get the argument index base for attributes.
@@ -2768,33 +2858,29 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 }
 
 /// Add a new set of arguments to the function.
-void CallEmission::addArg(Explosion &arg) {
-  auto origParams = getCallee().getOrigFunctionType()->getParameters();
-
+void CallEmission::setArgs(Explosion &arg, WitnessMetadata *witnessMetadata) {
   // Convert arguments to a representation appropriate to the calling
   // convention.
   switch (getCallee().getAbstractCC()) {
   case AbstractCC::C:
   case AbstractCC::ObjCMethod: {
     Explosion externalized;
-    // If this is a block, add the block pointer before the other arguments.
-    if (CurCallee.getOrigFunctionType()->getRepresentation()
-          == FunctionType::Representation::Block) {
-      assert(CurCallee.hasDataPointer());
-      externalized.add(CurCallee.getDataPointer(IGF));
-    }
-  
-    externalizeArguments(IGF, getCallee(), arg, externalized, Attrs, origParams);
+    externalizeArguments(IGF, getCallee(), arg, externalized, Attrs);
     arg = std::move(externalized);
     break;
   }
 
+  case AbstractCC::WitnessMethod:
+    // This is basically duplicating emitTrailingWitnessArguments.
+    assert(witnessMetadata);
+    assert(witnessMetadata->SelfMetadata);
+    Args.back() = witnessMetadata->SelfMetadata;
+    SWIFT_FALLTHROUGH;
+
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
-      assert(CurCallee.getOrigFunctionType()->getRepresentation()
-               != FunctionType::Representation::Block
-             && "block with non-C calling convention?!");
+    assert(!CurCallee.getOrigFunctionType()->hasBlockRepresentation()
+           && "block with non-C calling convention?!");
     // Nothing to do.
     break;
   }
@@ -2824,6 +2910,45 @@ Explosion IRGenFunction::collectParameters() {
   for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i)
     params.add(i);
   return params;
+}
+
+/// Fetch the error result slot.
+Address IRGenFunction::getErrorResultSlot(SILType errorType) {
+  if (!ErrorResultSlot) {
+    auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
+
+    IRBuilder builder(IGM.getLLVMContext());
+    builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP);
+
+    // Create the alloca.  We don't use allocateStack because we're
+    // not allocating this in stack order.
+    auto addr = builder.CreateAlloca(errorTI.getStorageType(), nullptr,
+                                     "swifterror");
+    addr->setAlignment(errorTI.getFixedAlignment().getValue());
+    // TODO: add swift_error attribute
+
+    // Initialize at the alloca point.
+    auto nullError = llvm::ConstantPointerNull::get(
+                            cast<llvm::PointerType>(errorTI.getStorageType()));
+    builder.CreateStore(nullError, addr, errorTI.getFixedAlignment());
+
+    ErrorResultSlot = addr;
+  }
+  return Address(ErrorResultSlot, IGM.getPointerAlignment());
+}
+
+/// Fetch the error result slot received from the caller.
+Address IRGenFunction::getCallerErrorResultSlot() {
+  assert(ErrorResultSlot && "no error result slot!");
+  assert(isa<llvm::Argument>(ErrorResultSlot) && "error result slot is local!");
+  return Address(ErrorResultSlot, IGM.getPointerAlignment());
+}
+
+// Set the error result slot.  This should only be done in the prologue.
+void IRGenFunction::setErrorResultSlot(llvm::Value *address) {
+  assert(!ErrorResultSlot && "already have error result slot!");
+  assert(isa<llvm::PointerType>(address->getType()));
+  ErrorResultSlot = address;
 }
 
 /// Emit the basic block that 'return' should branch to and insert it into
@@ -3036,6 +3161,7 @@ static void emitApplyArgument(IRGenFunction &IGF,
 /// Emit the forwarding stub function for a partial application.
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    llvm::Function *staticFnPtr,
+                                   bool calleeHasContext,
                                    llvm::Type *fnTy,
                                    const llvm::AttributeSet &origAttrs,
                                    CanSILFunctionType origType,
@@ -3045,11 +3171,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    HeapLayout const &layout,
                                    ArrayRef<ParameterConvention> conventions) {
   llvm::AttributeSet outAttrs;
-  ExtraData extraData
-    = layout.isKnownEmpty() ? ExtraData::None : ExtraData::Retainable;
-  llvm::FunctionType *fwdTy = IGM.getFunctionType(outType,
-                                                  extraData,
-                                                  outAttrs);
+
+  llvm::FunctionType *fwdTy = IGM.getFunctionType(outType, outAttrs);
   // Build a name for the thunk. If we're thunking a static function reference,
   // include its symbol name in the thunk name.
   llvm::SmallString<20> thunkName;
@@ -3072,7 +3195,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   Explosion origParams = subIGF.collectParameters();
 
   // Create a new explosion for potentially reabstracted parameters.
-  Explosion params;
+  Explosion args;
 
   {
     // Lower the forwarded arguments in the original function's generic context.
@@ -3081,13 +3204,13 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // Forward the indirect return value, if we have one.
     auto &resultTI = IGM.getTypeInfo(outType->getResult().getSILType());
     if (resultTI.getSchema().requiresIndirectResult(IGM))
-      params.add(origParams.claimNext());
+      args.add(origParams.claimNext());
     
     // Reemit the parameters as unsubstituted.
     for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
       emitApplyArgument(subIGF, origType->getParameters()[i],
                         outType->getParameters()[i],
-                        origParams, params);
+                        origParams, args);
     }
   }
 
@@ -3118,41 +3241,51 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     llvm_unreachable("indirect callables not supported");
   }
 
-  // If there's a data pointer required, grab it (it's always the
-  // last parameter) and load out the extra, previously-curried
-  // parameters.
-  llvm::Value *rawData = nullptr;
-  if (!layout.isKnownEmpty()) {
-    // Lower the captured arguments in the original function's generic context.
-    GenericContextScope scope(IGM, origType->getGenericSignature());
-    
-    rawData = origParams.takeLast();
-    Address data = layout.emitCastTo(subIGF, rawData);
+  // Lower the captured arguments in the original function's generic context.
+  GenericContextScope scope(IGM, origType->getGenericSignature());
 
-    unsigned origParamI = outType->getParameters().size();
-    assert(layout.getElements().size() == conventions.size()
-           && "conventions don't match context layout");
-    
-    unsigned i = 0;
-    
+  // This is where the context parameter appears.
+  llvm::Value *rawData = nullptr;
+  Address data;
+  unsigned nextCapturedField = 0;
+  if (!layout.isKnownEmpty()) {
+    rawData = origParams.claimNext();
+    data = layout.emitCastTo(subIGF, rawData);
+
     // Restore type metadata bindings, if we have them.
     if (layout.hasBindings()) {
-      auto bindingLayout = layout.getElements()[i];
+      auto bindingLayout = layout.getElements()[nextCapturedField++];
       // The bindings should be fixed-layout inside the object, so we can
       // pass None here. If they weren't, we'd have a chicken-egg problem.
       auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ None);
       layout.getBindings().restore(subIGF, bindingsAddr);
-      ++i;
     }
 
-    // Calculate non-fixed field offsets.
-    HeapNonFixedOffsets offsets(subIGF, layout);
+  // There's still a placeholder to claim if the target type is thick
+  // or there's an error result.
+  } else if (outType->hasThickRepresentation() ||
+             outType->hasErrorResult()) {
+    llvm::Value *contextPtr = origParams.claimNext(); (void)contextPtr;
+    assert(contextPtr->getType() == IGM.RefCountedPtrTy);
+  }
+
+  // Calculate non-fixed field offsets.
+  HeapNonFixedOffsets offsets(subIGF, layout);
+
+  // If there's a data pointer required, grab it and load out the
+  // extra, previously-curried parameters.
+  if (!layout.isKnownEmpty()) {
+    unsigned origParamI = outType->getParameters().size();
+    assert(layout.getElements().size() == conventions.size()
+           && "conventions don't match context layout");
 
     // Perform the loads.
-    for (unsigned size = layout.getElements().size(); i < size; ++i) {
-      auto &fieldLayout = layout.getElements()[i];
-      auto &fieldTy = layout.getElementTypes()[i];
-      auto fieldConvention = conventions[i];
+    for (unsigned n = layout.getElements().size();
+         nextCapturedField < n;
+         ++nextCapturedField) {
+      auto &fieldLayout = layout.getElements()[nextCapturedField];
+      auto &fieldTy = layout.getElementTypes()[nextCapturedField];
+      auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
       
@@ -3212,10 +3345,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         emitApplyArgument(subIGF,
                           origType->getParameters()[origParamI],
                           substType->getParameters()[origParamI],
-                          param, params);
+                          param, args);
         ++origParamI;
       } else {
-        params.add(param.claimAll());
+        args.add(param.claimAll());
       }
     }
     
@@ -3225,27 +3358,64 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     if (consumesContext && !dependsOnContextLifetime)
       subIGF.emitRelease(rawData);
   }
-  
-  // If we didn't receive a static function, dig the function pointer
-  // out of the context.
+
+  // Derive the callee function pointer.  If we found a function
+  // pointer statically, great.
   llvm::Value *fnPtr;
   if (staticFnPtr) {
     assert(staticFnPtr->getType() == fnTy && "static function type mismatch?!");
     fnPtr = staticFnPtr;
+
+  // Otherwise, it was the last thing we added to the layout.
   } else {
-    // The dynamic function pointer is packed "last" into the context.
-    fnPtr = params.takeLast();
+    // The dynamic function pointer is packed "last" into the context,
+    // and we pulled it out as an argument.  Just pop it off.
+    fnPtr = args.takeLast();
+
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
   }
-  
+
+  // Derive the context argument if needed.  This is either:
+  //   - the saved context argument, in which case it was the last
+  //     thing we added to the layout other than a possible non-static
+  //     function pointer (which we already popped off of 'args'); or
+  //   - 'self', in which case it was the last formal argument.
+  // In either case, it's the last thing in 'args'.
+  llvm::Value *fnContext = nullptr;
+  if (calleeHasContext ||
+      (origType->hasSelfArgument() &&
+       isSelfContextParameter(origType->getSelfParameter()))) {
+    fnContext = args.takeLast();
+  }
+
   // Emit the polymorphic arguments.
   assert(subs.empty() != hasPolymorphicParameters(origType)
          && "should have substitutions iff original function is generic");
-  if (hasPolymorphicParameters(origType))
-    emitPolymorphicArguments(subIGF, origType, substType, subs, params);
-  
-  llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, params.claimAll());
+  if (hasPolymorphicParameters(origType)) {
+    emitPolymorphicArguments(subIGF, origType, substType, subs, nullptr, args);
+  }
+
+  // Okay, this is where the callee context goes.
+  if (fnContext) {
+    // TODO: swift_context marker.
+    args.add(fnContext);
+
+  // Pass a placeholder if necessary.
+  } else if (origType->hasErrorResult()) {
+    args.add(llvm::UndefValue::get(IGM.RefCountedPtrTy));
+  }
+
+  // Pass down the error result.
+  if (origType->hasErrorResult()) {
+    llvm::Value *errorResultPtr = origParams.claimNext();
+    // TODO: swift_error marker.
+    args.add(errorResultPtr);
+  }
+
+  assert(origParams.empty());
+
+  llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, args.claimAll());
   
   if (staticFnPtr) {
     // Use the attributes and calling convention from the static definition if
@@ -3482,13 +3652,12 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   
   // Create the forwarding stub.
   llvm::AttributeSet attrs;
-  auto fnPtrTy = IGF.IGM.getFunctionType(origType,
-                                         fnContext ? ExtraData::Retainable
-                                                   : ExtraData::None, attrs)
+  auto fnPtrTy = IGF.IGM.getFunctionType(origType, attrs)
     ->getPointerTo();
 
   llvm::Function *forwarder = emitPartialApplicationForwarder(IGF.IGM,
                                                               staticFn,
+                                                          fnContext != nullptr,
                                                               fnPtrTy,
                                                               attrs,
                                                               origType,

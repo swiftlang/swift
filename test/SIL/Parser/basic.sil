@@ -12,14 +12,14 @@ sil_global private @globalinit_token0 : $Builtin.Word
 
 // Linkage types.
 
-// CHECK-LABEL: sil shared @clang_thunk : $() -> ()
+// CHECK-LABEL: sil shared @clang_thunk : $@thin () -> ()
 sil shared @clang_thunk : $() -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
 }
 
-// CHECK-LABEL: sil private @internal_fn : $() -> ()
+// CHECK-LABEL: sil private @internal_fn : $@thin () -> ()
 sil private @internal_fn : $() -> () {
 bb0:
   %0 = tuple ()
@@ -38,12 +38,12 @@ class Class2 {
   init()
 }
 
-sil @type_ref1 : $(Class1, Int) -> ()  // CHECK: $(Class1, Int)
+sil @type_ref1 : $(Class1, Int) -> ()  // CHECK-LABEL: sil @type_ref1 : $@thin (Class1, Int)
 
 
 // Instructions
 
-sil @test1 : $() -> () {              // CHECK-LABEL: sil @test1 : $() -> ()
+sil @test1 : $() -> () {              // CHECK-LABEL: sil @test1 : $@thin () -> ()
 bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
   br bb1                              // CHECK:   br bb1
@@ -56,7 +56,7 @@ bb1:
 }
 
 // Forward referenced values.
-sil @test2 : $(Int) -> () {               // CHECK-LABEL: sil @test2 : $(Int) -> ()
+sil @test2 : $(Int) -> () {               // CHECK-LABEL: sil @test2 : $@thin (Int) -> ()
 bb0(%0 : $Int):
   br bb2
 bb1:
@@ -362,7 +362,7 @@ enum Beth {
   case DataCase(Int)
 }
 
-// CHECK: sil @test_union_empty_case : $() -> Beth {
+// CHECK-LABEL: sil @test_union_empty_case : $@thin () -> Beth {
 sil @test_union_empty_case : $() -> Beth {
 bb0:
   // CHECK: %0 = enum $Beth, #Beth.EmptyCase!enumelt
@@ -370,7 +370,7 @@ bb0:
   return %0 : $Beth
 }
 
-// CHECK: sil @test_union_data_case : $(Int) -> Beth {
+// CHECK-LABEL: sil @test_union_data_case : $@thin (Int) -> Beth {
 sil @test_union_data_case : $Int -> Beth {
 bb0(%0 : $Int):
   // CHECK: %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
@@ -521,7 +521,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 sil_global @x : $Int
 sil @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
 
-// CHECK: $() -> ()
+// CHECK-LABEL: @global_code : $@thin () -> ()
 sil private @global_code : $() -> () {
 bb0:
   // CHECK: global_addr @x : $*Int
@@ -1075,7 +1075,7 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
   return %17 : $()
 }
 
-// CHECK: sil @cond_fail_test : $(Builtin.Int1) -> () {
+// CHECK-LABEL: sil @cond_fail_test : $@thin (Builtin.Int1) -> () {
 sil @cond_fail_test : $Builtin.Int1 -> () {
 entry(%0 : $Builtin.Int1):
   // CHECK: cond_fail %0 : $Builtin.Int1

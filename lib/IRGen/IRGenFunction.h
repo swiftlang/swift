@@ -80,7 +80,6 @@ public:
   IRBuilder Builder;
 
   llvm::Function *CurFn;
-  llvm::Value *ContextPtr;
 
   IRGenFunction(IRGenModule &IGM,
                 llvm::Function *fn,
@@ -100,6 +99,16 @@ public:
   
   void emitBBForReturn();
   bool emitBranchToReturnBB();
+
+  /// Return the error result slot, given an error type.  There's
+  /// always only one error type.
+  Address getErrorResultSlot(SILType errorType);
+
+  /// Return the error result slot provided by the caller.
+  Address getCallerErrorResultSlot();
+
+  /// Set the error result slot.
+  void setErrorResultSlot(llvm::Value *address);
   
 private:
   void emitPrologue();
@@ -107,6 +116,7 @@ private:
 
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
+  llvm::Value *ErrorResultSlot = nullptr;
 
 //--- Helper methods -----------------------------------------------------------
 public:

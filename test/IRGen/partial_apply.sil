@@ -350,7 +350,7 @@ bb0(%0 : $Base):
    return %1 : $C
 }
 
-// CHECK-LABEL: define internal %C13partial_apply3Sub* @_TPA_parametric_casting_closure(%C13partial_apply4Base*)
+// CHECK-LABEL: define internal %C13partial_apply3Sub* @_TPA_parametric_casting_closure(%C13partial_apply4Base*, %swift.refcounted*)
 // CHECK: [[RES:%.*]] = tail call %C13partial_apply4Base* @parametric_casting_closure
 // CHECK: [[CASTED:%.*]] = bitcast %C13partial_apply4Base* [[RES]] to %C13partial_apply3Sub*
 // CHECK: ret %C13partial_apply3Sub* [[CASTED]]

@@ -26,6 +26,8 @@ namespace llvm {
 namespace swift {
 namespace irgen {
 
+struct WitnessMetadata;
+
 /// A plan for emitting a series of calls.
 class CallEmission {
 public:
@@ -74,8 +76,8 @@ public:
     return CurCallee.getSubstitutions();
   }
 
-  /// Add a new set of arguments to the function from an explosion.
-  void addArg(Explosion &arg);
+  /// Set the arguments to the function from an explosion.
+  void setArgs(Explosion &arg, WitnessMetadata *witnessMetadata = nullptr);
   
   void addAttribute(unsigned Index, llvm::Attribute::AttrKind Attr);
 

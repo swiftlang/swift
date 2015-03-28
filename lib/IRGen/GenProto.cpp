@@ -3038,12 +3038,6 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   return asOpaquePtr(IGM, fn);
 }
 
-static void emitPolymorphicArgumentsWithInput(IRGenFunction &IGF,
-                                              CanSILFunctionType origFnType,
-                                              CanType substInputType,
-                                              ArrayRef<Substitution> subs,
-                                              Explosion &out);
-
 namespace {
   /// A class which lays out a specific conformance to a protocol.
   class WitnessTableBuilder : public WitnessVisitor<WitnessTableBuilder> {
@@ -4230,7 +4224,8 @@ namespace {
                               *IGF.IGM.SILMod->getSwiftModule()),
         IGF(IGF), ContextParams(Fn.getContextGenericParams()) {}
 
-    void emit(Explosion &in, const GetParameterFn &getParameter);
+    void emit(Explosion &in, WitnessMetadata *witnessMetadata,
+              const GetParameterFn &getParameter);
 
     /// Emit polymorphic parameters for a generic value witness.
     EmitPolymorphicParameters(IRGenFunction &IGF, NominalTypeDecl *ntd)
@@ -4253,6 +4248,7 @@ namespace {
     /// Emit the source value for parameters.
     llvm::Value *emitSourceForParameters(const Source &source,
                                          Explosion &in,
+                                         WitnessMetadata *witnessMetadata,
                                          const GetParameterFn &getParameter) {
       switch (source.getKind()) {
       case SourceKind::Metadata:
@@ -4277,12 +4273,9 @@ namespace {
       }
 
       case SourceKind::WitnessSelf: {
-        // The 'Self' parameter is provided last.
-        // TODO: For default implementations, the witness table pointer for
-        // the 'Self : P' conformance must be provided last along with the
-        // metatype.
-        llvm::Value *metatype = in.takeLast();
-        metatype->setName("Self");
+        assert(witnessMetadata && "no metadata for witness method");
+        llvm::Value *metatype = witnessMetadata->SelfMetadata;
+        assert(metatype && "no Self metadata for witness method");
         
         // Mark this as the cached metatype for Self.
         CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
@@ -4336,10 +4329,12 @@ namespace {
 
 /// Emit a polymorphic parameters clause, binding all the metadata necessary.
 void EmitPolymorphicParameters::emit(Explosion &in,
+                                     WitnessMetadata *witnessMetadata,
                                      const GetParameterFn &getParameter) {
   SourceValues.reserve(getSources().size());
   for (const Source &source : getSources()) {
-    llvm::Value *value = emitSourceForParameters(source, in, getParameter);
+    llvm::Value *value =
+      emitSourceForParameters(source, in, witnessMetadata, getParameter);
     SourceValues.emplace_back();
     SourceValues.back().MetadataForDepths.push_back(value);
   }
@@ -4416,12 +4411,30 @@ EmitPolymorphicParameters::emitWithSourcesBound(Explosion &in) {
   }
 }
 
+/// Collect any required metadata for a witness method from the end of
+/// the given parameter list.
+void irgen::collectTrailingWitnessMetadata(IRGenFunction &IGF,
+                                           SILFunction &fn,
+                                           Explosion &params,
+                                           WitnessMetadata &witnessMetadata) {
+  assert(fn.getLoweredFunctionType()->getAbstractCC()
+           == AbstractCC::WitnessMethod);
+
+  llvm::Value *metatype = params.takeLast();
+  assert(metatype->getType() == IGF.IGM.TypeMetadataPtrTy &&
+         "parameter signature mismatch: witness metadata didn't "
+         "end in metatype?");
+  metatype->setName("Self");
+  witnessMetadata.SelfMetadata = metatype;
+}
+
 /// Perform all the bindings necessary to emit the given declaration.
 void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
                                       SILFunction &Fn,
                                       Explosion &in,
+                                      WitnessMetadata *witnessMetadata,
                                       const GetParameterFn &getParameter) {
-  EmitPolymorphicParameters(IGF, Fn).emit(in, getParameter);
+  EmitPolymorphicParameters(IGF, Fn).emit(in, witnessMetadata, getParameter);
 }
 
 /// Perform the metadata bindings necessary to emit a generic value witness.
@@ -4721,7 +4734,7 @@ namespace {
         IGF(IGF) {}
 
     void emit(CanType substInputType, ArrayRef<Substitution> subs,
-              Explosion &out);
+              WitnessMetadata *witnessMetadata, Explosion &out);
 
   private:
     void emitEarlySources(CanType substInputType, Explosion &out) {
@@ -4754,11 +4767,20 @@ namespace {
   };
 }
 
+void irgen::emitTrailingWitnessArguments(IRGenFunction &IGF,
+                                         WitnessMetadata &witnessMetadata,
+                                         Explosion &args) {
+  llvm::Value *self = witnessMetadata.SelfMetadata;
+  assert(self && "no Self value bound");
+  args.add(self);
+}
+
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
                                      CanSILFunctionType origFnType,
                                      CanSILFunctionType substFnType,
                                      ArrayRef<Substitution> subs,
+                                     WitnessMetadata *witnessMetadata,
                                      Explosion &out) {
   // Grab the apparent 'self' type.  If there isn't a 'self' type,
   // we're not going to try to access this anyway.
@@ -4776,19 +4798,14 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
         substInputType = meta.getInstanceType();
     }
   }
-  emitPolymorphicArgumentsWithInput(IGF, origFnType, substInputType, subs, out);
-}
 
-static void emitPolymorphicArgumentsWithInput(IRGenFunction &IGF,
-                                              CanSILFunctionType origFnType,
-                                              CanType substInputType,
-                                              ArrayRef<Substitution> subs,
-                                              Explosion &out) {
-  EmitPolymorphicArguments(IGF, origFnType).emit(substInputType, subs, out);
+  EmitPolymorphicArguments(IGF, origFnType).emit(substInputType, subs,
+                                                 witnessMetadata, out);
 }
 
 void EmitPolymorphicArguments::emit(CanType substInputType,
                                     ArrayRef<Substitution> subs,
+                                    WitnessMetadata *witnessMetadata,
                                     Explosion &out) {
   // Add all the early sources.
   emitEarlySources(substInputType, out);
@@ -4874,8 +4891,9 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       continue;
 
     case SourceKind::WitnessSelf: {
+      assert(witnessMetadata && "no metadata structure for witness method");
       auto self = IGF.emitTypeMetadataRef(substInputType);
-      out.add(self);
+      witnessMetadata->SelfMetadata = self;
       continue;
     }
 
@@ -4923,15 +4941,6 @@ namespace {
             out.push_back(IGM.WitnessTablePtrTy);
         }
       }
-
-      // For a witness method, add the 'self' parameter.
-      for (auto &source : getSources()) {
-        if (source.getKind() == SourceKind::WitnessSelf) {
-          out.push_back(IGM.TypeMetadataPtrTy);
-          // TODO: Should also provide the protocol witness table,
-          // for default implementations.
-        }
-      }
     }
 
   private:
@@ -4958,6 +4967,20 @@ void irgen::expandPolymorphicSignature(IRGenModule &IGM,
                                        CanSILFunctionType polyFn,
                                        SmallVectorImpl<llvm::Type*> &out) {
   ExpandPolymorphicSignature(IGM, polyFn).expand(out);
+}
+
+void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
+                                           CanSILFunctionType polyFn,
+                                           SmallVectorImpl<llvm::Type*> &out) {
+  assert(polyFn->getAbstractCC() == AbstractCC::WitnessMethod);
+
+  assert(getTrailingWitnessSignatureLength(IGM, polyFn) == 1);
+
+  // A witness method always provides Self.
+  out.push_back(IGM.TypeMetadataPtrTy);
+
+  // TODO: Should also provide the protocol witness table,
+  // for default implementations.
 }
 
 /// Retrieve the protocol witness table for a conformance.

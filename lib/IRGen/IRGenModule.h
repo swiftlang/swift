@@ -578,7 +578,6 @@ public:
   void finishEmitAfterTopLevel();
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
-                                      ExtraData extraData,
                                       llvm::AttributeSet &attrs);
 
   llvm::Constant *getSize(Size size);

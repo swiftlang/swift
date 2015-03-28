@@ -27,13 +27,13 @@ func call_methods<T: P, U>(x: T, y: S, z: U) {
   x.concrete_method()
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 2
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8*, i8** [[GENERIC_METHOD_ADDR]], align 8
-  // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, %swift.type*)*
-  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* {{.*}}, %swift.opaque* {{.*}}, %swift.type* getelementptr inbounds ({{.*}} @_TMdV27sil_generic_witness_methods1S {{.*}}), %swift.type* %T)
+  // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*)*
+  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* {{.*}}, %swift.type* getelementptr inbounds ({{.*}} @_TMdV27sil_generic_witness_methods1S {{.*}}), %swift.opaque* {{.*}}, %swift.type* %T)
   x.generic_method(y)
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 2
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8*, i8** [[GENERIC_METHOD_ADDR]], align 8
-  // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, %swift.type*)*
-  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* {{.*}}, %swift.opaque* {{.*}}, %swift.type* %U, %swift.type* %T)
+  // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*)*
+  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* {{.*}}, %swift.type* %U, %swift.opaque* {{.*}}, %swift.type* %T)
   x.generic_method(z)
 }
 
@@ -54,8 +54,8 @@ func call_existential_methods(x: P, var y: S) {
   // CHECK: [[WTABLE:%.*]] = load i8**, i8*** [[WTABLE_ADDR]], align 8
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[WTABLE]], i32 2
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8*, i8** [[GENERIC_METHOD_ADDR]], align 8
-  // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, %swift.type*)*
-  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* {{.*}}, %swift.opaque* {{%.*}}, %swift.type* getelementptr inbounds ({{.*}} @_TMdV27sil_generic_witness_methods1S {{.*}}), %swift.type* [[METADATA]])
+  // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*)*
+  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* {{.*}}, %swift.type* getelementptr inbounds ({{.*}} @_TMdV27sil_generic_witness_methods1S {{.*}}), %swift.opaque* {{%.*}}, %swift.type* [[METADATA]])
   x.generic_method(y)
 }
 

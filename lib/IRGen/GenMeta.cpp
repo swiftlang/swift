@@ -3769,8 +3769,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   // Use the type of the method we were type-checked against, not the
   // type of the overridden method.
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(methodType,
-                                      ExtraData::None, attrs)->getPointerTo();
+  auto fnTy = IGF.IGM.getFunctionType(methodType, attrs)->getPointerTo();
 
   auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
   auto index = FindClassMethodIndex(IGF.IGM, declaringClass, overridden)

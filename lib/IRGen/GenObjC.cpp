@@ -605,9 +605,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
          "objc method call must be to a func/initializer/getter/setter/dtor");
 
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(origFnType,
-                                      ExtraData::None,
-                                      attrs);
+  auto fnTy = IGF.IGM.getFunctionType(origFnType, attrs);
   bool indirectResult = requiresExternalIndirectResult(IGF.IGM, origFnType);
   if (kind != ObjCMessageKind::Normal)
     fnTy = getMsgSendSuperTy(IGF.IGM, fnTy, indirectResult);
@@ -713,7 +711,7 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
 
   // Compute the appropriate LLVM type for the function.
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(formalType, ExtraData::None, attrs);
+  auto fnTy = IGF.IGM.getFunctionType(formalType, attrs);
 
   // Get the messenger function.
   llvm::Constant *messenger = IGF.IGM.getObjCMsgSendFn();
@@ -730,7 +728,7 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
     args.add(self);
     args.add(IGF.emitObjCSelectorRefLoad("allocWithZone:"));
     args.add(llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy));
-    emission.addArg(args);
+    emission.setArgs(args);
   }
 
   // Emit the call.
@@ -746,11 +744,12 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
                                             const HeapLayout &layout,
                                             SILType selfType) {
   auto &selfTI = IGM.getTypeInfo(selfType);
-  
+ 
+  assert(resultType->getRepresentation()
+           == AnyFunctionType::Representation::Thick);
+ 
   llvm::AttributeSet attrs;
-  llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType,
-                                                  ExtraData::Retainable,
-                                                  attrs);
+  llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType, attrs);
   // FIXME: Give the thunk a real name.
   // FIXME: Maybe cache the thunk by function and closure types?
   llvm::Function *fwd =
@@ -822,7 +821,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   Explosion args;
   addObjCMethodCallImplicitArguments(subIGF, args, method, self, SILType());
   args.add(params.claimAll());
-  emission.addArg(args);
+  emission.setArgs(args);
   
   // Cleanup that always has to occur after the function call.
   auto cleanup = [&]{

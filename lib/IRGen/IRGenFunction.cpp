@@ -35,7 +35,7 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
                              SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
-    CurFn(Fn), ContextPtr(nullptr), DbgScope(DbgScope)
+    CurFn(Fn),  DbgScope(DbgScope)
   {
 
   // Make sure the instructions in this function are attached its debug scope.

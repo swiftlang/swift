@@ -29,6 +29,7 @@ namespace swift {
   class ApplyInst;
   class FuncDecl;
   enum class ResilienceExpansion : unsigned;
+  class SILParameterInfo;
   class Substitution;
   class SILType;
 
@@ -39,6 +40,10 @@ namespace irgen {
   class IRGenFunction;
   class LoadableTypeInfo;
   class TypeInfo;
+
+  /// Should the given self parameter be given the special treatment
+  /// for self parameters?
+  bool isSelfContextParameter(SILParameterInfo parameter);
 
   /// Return the natural level at which to uncurry this function.  This
   /// is the number of additional parameter clauses that are uncurried

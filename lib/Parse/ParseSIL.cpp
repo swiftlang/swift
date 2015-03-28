@@ -892,6 +892,13 @@ bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams,
   TypeAttributes attrs;
   P.parseTypeAttributeList(attrs);
 
+  // Global functions are implicitly @thin.
+  if (IsFuncDecl && !(attrs.has(TAK_thick) || attrs.has(TAK_thin) ||
+                      attrs.has(TAK_objc_block))) {
+    // Use a random location.
+    attrs.setAttr(TAK_thin, P.PreviousLoc);
+  }
+
   // Handle @local_storage, which changes the SIL value category.
   if (attrs.has(TAK_local_storage)) {
     // Require '*' on local_storage values.
