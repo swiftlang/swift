@@ -1936,10 +1936,20 @@ public:
   PatternBindingEntry getPatternEntryForVarDecl(const VarDecl *VD) const {
     return getPatternList()[getPatternEntryIndexForVarDecl(VD)];
   }
+
+  Expr *getWhereExpr() const { return whereExpr; }
+  void setWhereExpr(Expr *E) { whereExpr = E; }
+  BraceStmt *getElseStmt() const { return elseStmt; }
+  void setElseStmt(BraceStmt *S) { elseStmt = S; }
   
   bool isInitializerChecked() const { return isInitializerTypeChecked; }
   void setInitializerChecked() { isInitializerTypeChecked = true; }
 
+  /// Return true if this PBD has any refutable patterns in it or if there is a
+  /// where clause.  This does not check to see if the 'else' is present.
+  bool isRefutable() const;
+  
+  
   /// Does this binding declare something that requires storage?
   bool hasStorage() const;
   

@@ -1050,6 +1050,23 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
+/// Return true if this PBD has any refutable patterns in it or if there is a
+/// where clause.  This does not check to see if the 'else' is present.
+bool PatternBindingDecl::isRefutable() const {
+  // Any pattern binding with a 'where' clause is refutable, because that
+  // condition can fail.
+  if (getWhereExpr())
+    return true;
+
+  // If any of the patterns in the PBD are refutable, then the PBD is too.
+  for (auto entry : getPatternList())
+    if (entry.ThePattern->isRefutablePattern())
+      return true;
+  
+  return false;
+}
+
+
 bool PatternBindingDecl::hasStorage() const {
   // Walk the pattern, to check to see if any of the VarDecls included in it
   // have storage.
