@@ -2013,13 +2013,7 @@ public:
             Protocols.end();
       };
       if (TD->getKind() != DeclKind::Protocol) {
-        if (ContainsErrorProtocol(TD->getProtocols()))
-          return true;
-        auto ExRange = TD->getExtensions();
-        for (auto It = ExRange.begin(); It != ExRange.end(); ++ It)
-          if (ContainsErrorProtocol(It->getProtocols()))
-            return true;
-        return false;
+        return ContainsErrorProtocol(TD->getAllProtocols(TypeResolver.get()));
       }
     }
     return false;
