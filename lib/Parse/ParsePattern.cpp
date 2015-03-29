@@ -953,6 +953,30 @@ Parser::parsePatternTupleAfterLP(SourceLoc LPLoc) {
                                           EllipsisLoc.isValid(), EllipsisLoc));
 }
 
+/// Parse a pattern with an optional type annotation.
+///
+///  typed-pattern ::= mattching-pattern (':' type)?
+///
+ParserResult<Pattern> Parser::parseTypedMatchingPattern() {
+  auto result = parseMatchingPattern();
+  
+  // Now parse an optional type annotation.
+  if (consumeIf(tok::colon)) {
+    if (result.isNull())  // Recover by creating AnyPattern.
+      result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
+    
+    ParserResult<TypeRepr> Ty = parseType();
+    if (Ty.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Pattern>();
+    if (Ty.isNull())
+      Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
+    
+    result = makeParserResult(result,
+                              new (Context) TypedPattern(result.get(), Ty.get()));
+  }
+  
+  return result;
+}
 
 /// matching-pattern ::= 'is' type
 /// matching-pattern ::= matching-pattern-var
@@ -992,12 +1016,6 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     return makeParserCodeCompletionStatus();
   if (subExpr.isNull())
     return nullptr;
-  
-  // The most common case here is to parse something that was a lexically
-  // obvious pattern, which will come back wrapped in an immediate
-  // UnresolvedPatternExpr.  Transform this now to simplify later code.
-  if (auto *UPE = dyn_cast<UnresolvedPatternExpr>(subExpr.get()))
-    return makeParserResult(UPE->getSubPattern());
   
   return makeParserResult(new (Context) ExprPattern(subExpr.get()));
 }

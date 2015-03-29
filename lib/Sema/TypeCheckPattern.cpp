@@ -179,6 +179,7 @@ public:
   ALWAYS_RESOLVED_PATTERN(NominalType)
   ALWAYS_RESOLVED_PATTERN(EnumElement)
   ALWAYS_RESOLVED_PATTERN(Bool)
+  ALWAYS_RESOLVED_PATTERN(Typed)
 #undef ALWAYS_RESOLVED_PATTERN
 
   Pattern *visitVarPattern(VarPattern *P) {
@@ -193,11 +194,6 @@ public:
     return P;
   }
 
-  Pattern *visitTypedPattern(TypedPattern *P) {
-    P->setSubPattern(visit(P->getSubPattern()));
-    return P;
-  }
-  
   Pattern *visitExprPattern(ExprPattern *P) {
     if (P->isResolved())
       return P;

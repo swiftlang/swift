@@ -331,9 +331,7 @@ struct ErrorTypeInVarDeclArrayType2 {
 struct ErrorTypeInVarDeclArrayType3 {
   var v1 : Int[ // expected-note {{to match this opening '['}}
       // expected-error @-1{{expected expression for size of array type}}
-      // expected-error @-2{{expected ']' in array type}}
-
-  var v2 : Int 
+  var v2 : Int // expected-error {{expected ']' in array type}} expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected declaration}}
 }
 
 struct ErrorTypeInVarDeclArrayType4 {

@@ -311,7 +311,7 @@ case (1, 2, 3):
 // patterns in expression-only positions are errors.
 case +++(_, var d, 3): // expected-error{{'+++' is not a prefix unary operator}}
   ()
-case (_, var e, 3) +++ (1, 2, 3): // expected-error{{'var' binding pattern cannot appear in an expression}}
+case (_, var e, 3) +++ (1, 2, 3): // expected-error{{pattern variable binding cannot appear in an expression}}
   ()
 }
 

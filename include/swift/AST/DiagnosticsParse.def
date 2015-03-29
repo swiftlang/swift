@@ -166,14 +166,6 @@ ERROR(let_cannot_be_addressed_property,decl_parsing,none,
 ERROR(disallowed_var_multiple_getset,decl_parsing,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
-ERROR(disallowed_accessors_refutable,decl_parsing,none,
-      "'%select{var|let}0' declarations with accessors cannot have "
-      "a%select{ where condition|n else}1", (bool, bool))
-ERROR(expected_condition_where,decl_parsing,PointsToFirstBadToken,
-      "expected condition after 'where'", ())
-ERROR(let_else_expected_lbrace,decl_parsing,PointsToFirstBadToken,
-      "expected '{' in 'else' body of variable declaration", ())
-
 ERROR(disallowed_type,decl_parsing,none,
       "type not allowed here", ())
 ERROR(disallowed_init,decl_parsing,none,

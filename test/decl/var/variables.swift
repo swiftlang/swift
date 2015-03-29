@@ -8,8 +8,8 @@ var t7, t8 : Int
 var t9, t10 = 20 // expected-error {{type annotation missing in pattern}}
 var t11, t12 : Int = 20 // expected-error {{type annotation missing in pattern}}
 var t13 = 2.0, t14 : Int
-var (x = 123, // expected-error 2 {{expected ',' separator}} expected-error {{expected expression in list of expressions}}
-     y = 456) : (Int,Int) // expected-error 2 {{expected ',' separator}} expected-error {{expected expression in list of expressions}}
+var (x = 123, // expected-error {{default argument is only permitted for a non-curried function parameter}}
+     y = 456) : (Int,Int) // expected-error{{default argument is only permitted for a non-curried function parameter}}
 var bfx : Int, bfy : Int
 
 var _ = 10
