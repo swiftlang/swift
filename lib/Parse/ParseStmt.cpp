@@ -620,25 +620,6 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 }
 
 namespace {
-  class CollectVarsAndAddToScope : public ASTWalker {
-  public:
-    Parser &TheParser;
-    SmallVectorImpl<VarDecl*> &Decls;
-    
-    CollectVarsAndAddToScope(Parser &P, SmallVectorImpl<VarDecl*> &Decls)
-    : TheParser(P), Decls(Decls) {}
-    
-    Pattern *walkToPatternPost(Pattern *P) override {
-      // Handle vars.
-      if (auto *Named = dyn_cast<NamedPattern>(P)) {
-        VarDecl *VD = Named->getDecl();
-        Decls.push_back(VD);
-        TheParser.addToScope(VD);
-      }
-      return P;
-    }
-  };
-
   struct GuardedPattern {
     Pattern *ThePattern = nullptr;
     SourceLoc WhereLoc;
@@ -730,8 +711,11 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   // to do this with a full AST walk, because the freshly parsed pattern
   // represents tuples and var patterns as tupleexprs and
   // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
-  patternResult.get()->walk(CollectVarsAndAddToScope(P, boundDecls));
-      
+  patternResult.get()->forEachVariable([&](VarDecl *VD) {
+    if (VD->hasName()) P.addToScope(VD);
+    boundDecls.push_back(VD);
+  });
+  
   // Now that we have them, mark them as being initialized without a PBD.
   for (auto VD : boundDecls)
     VD->setHasNonPatternBindingInit();
@@ -893,12 +877,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                             Init, /*parent*/CurDeclContext);
       result.push_back(PBD);
       
-      // Add variable bindings from the pattern to the case scope.  We have
-      // to do this with a full AST walk, because the freshly parsed pattern
-      // represents tuples and var patterns as tupleexprs and
-      // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
-      SmallVector<VarDecl *, 4> BoundDecls;
-      Pattern.get()->walk(CollectVarsAndAddToScope(*this, BoundDecls));
+      // Add variable bindings from the pattern to the case scope.
+      addPatternVariablesToScope(Pattern.get());
 
     } while (Tok.is(tok::comma) && peekToken().isNot(tok::kw_let, tok::kw_var)&&
              consumeIf(tok::comma));

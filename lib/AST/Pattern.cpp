@@ -121,13 +121,30 @@ VarDecl *Pattern::getSingleVar() const {
   return nullptr;
 }
 
+namespace {
+  class WalkToVarDecls : public ASTWalker {
+    const std::function<void(VarDecl*)> &fn;
+  public:
+    
+    WalkToVarDecls(const std::function<void(VarDecl*)> &fn)
+    : fn(fn) {}
+    
+    Pattern *walkToPatternPost(Pattern *P) override {
+      // Handle vars.
+      if (auto *Named = dyn_cast<NamedPattern>(P))
+        fn(Named->getDecl());
+      return P;
+    }
+  };
+}
+
+
 /// \brief apply the specified function to all variables referenced in this
 /// pattern.
 void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
   switch (getKind()) {
   case PatternKind::Any:
   case PatternKind::Is:
-  case PatternKind::Expr:
     return;
 
   case PatternKind::Named:
@@ -165,6 +182,13 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
       OP->getSubPattern()->forEachVariable(fn);
     return;
   }
+      
+  case PatternKind::Expr:
+    // An ExprPattern only exists before sema has resolved a refutable pattern
+    // into a concrete pattern.  We have to use an AST Walker to find the
+    // VarDecls buried down inside of it.
+    const_cast<Pattern*>(this)->walk(WalkToVarDecls(fn));
+    return;
   }
 }
 
