@@ -1819,8 +1819,8 @@ public:
     OS << ')';
   }
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
-    OS.indent(Indent) << "(unresolved_pattern_expr ";
-    E->getSubPattern()->print(OS);
+    printCommon(E, "unresolved_pattern_expr") << '\n';
+    printRec(E->getSubPattern());
     OS << ')';
   }
   void visitBindOptionalExpr(BindOptionalExpr *E) {
