@@ -305,12 +305,14 @@ Loop:  // expected-note {{previously declared here}}
 
 /// "let-else"
 func test_let_else(x : Int, y : Int??, cond : Bool) {
+  
   // These are all ok.
   let a? = y else {}
   let b? = y where cond else {}
   let c = x where cond else {}
-  
-  let n? : Int? where cond else {}    // error: needs initializer.
+
+  let n1? where cond else {}    // expected-error {{refutable pattern requires an initializer value to match against}}
+  let n2? : Int? where cond else {}    // error: needs initializer.
   let o? = y                          // error: needs else.
   let p = x where cond                // error: needs else.
   let q = x else {}                   // error: else is unreachable.

@@ -6801,21 +6801,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 }
 
-static bool isPatternSyntacticallyIrrefutable(Pattern *P) {
-  bool foundRefutablePattern = false;
-  P->forEachNode([&](Pattern *Node) {
-    switch (Node->getKind()) {
-#define PATTERN(ID, PARENT) case PatternKind::ID: break;
-#define REFUTABLE_PATTERN(ID, PARENT) \
-   case PatternKind::ID: foundRefutablePattern = true; break;
-#include "swift/AST/PatternNodes.def"
-    }
-  });
-  
-  return !foundRefutablePattern;
-}
-
-
 bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
                                                      DeclContext *dc) {
   // Resolve the pattern, which may contain expression nodes that need to be
@@ -6823,10 +6808,10 @@ bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
   for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
     if (auto *newPattern = resolvePattern(PBD->getPattern(i), dc)) {
       // Check to verify that the pattern is refutable.  Swift 1.x patterns were
-      // written as irrefutable patterns that implicitly destructured an optional.
-      // detect this case, and produce an error with a fixit that introduces the
-      // missing '?' pattern.
-      if (isPatternSyntacticallyIrrefutable(newPattern)) {
+      // written as irrefutable patterns that implicitly destructured an
+      // optional.  Detect this case, and produce an error with a fixit that
+      // introduces the missing '?' pattern.
+      if (!newPattern->isRefutablePattern()) {
         diagnose(newPattern->getStartLoc(),
                  diag::conditional_pattern_bind_not_refutable)
           .fixItInsertAfter(newPattern->getEndLoc(), "?");

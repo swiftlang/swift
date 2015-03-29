@@ -240,6 +240,23 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   }
 }
 
+/// Return true if this pattern (or a subpattern) is refutable.
+bool Pattern::isRefutablePattern() const {
+  bool foundRefutablePattern = false;
+  const_cast<Pattern*>(this)->forEachNode([&](Pattern *Node) {
+    switch (Node->getKind()) {
+#define PATTERN(ID, PARENT) case PatternKind::ID: break;
+#define REFUTABLE_PATTERN(ID, PARENT) \
+case PatternKind::ID: foundRefutablePattern = true; break;
+#include "swift/AST/PatternNodes.def"
+    }
+  });
+    
+  return foundRefutablePattern;
+}
+
+
+
 unsigned Pattern::numTopLevelVariables() const {
   auto pattern = getSemanticsProvidingPattern();
   if (auto tuple = dyn_cast<TuplePattern>(pattern))
