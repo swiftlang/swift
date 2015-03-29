@@ -840,12 +840,25 @@ static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
 /// yet.
 static void checkGenericParamList(ArchetypeBuilder &builder,
                                   GenericParamList *genericParams,
-                                  TypeChecker &TC, DeclContext *DC) {
+                                  TypeChecker &TC) {
   assert(genericParams && "Missing generic parameters");
   unsigned Depth = genericParams->getDepth();
 
+  // Determine where and how to perform name lookup for the generic
+  // parameter lists and where clause.
+  TypeResolutionOptions options;
+  DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
+  DeclContext *parentDC = lookupDC;
+  if (!lookupDC->isModuleScopeContext()) {
+    assert(isa<NominalTypeDecl>(lookupDC) || isa<ExtensionDecl>(lookupDC) ||
+           isa<AbstractFunctionDecl>(lookupDC) &&
+           "not a proper generic parameter context?");
+    options = TR_GenericSignature;
+    parentDC = lookupDC->getParent();
+  }
+
   // Add outer parameters.
-  addContextParamsAndRequirements(builder, DC);
+  addContextParamsAndRequirements(builder, parentDC);
 
   // Assign archetypes to each of the generic parameters.
   for (auto GP : *genericParams) {
@@ -873,12 +886,12 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
     switch (Req.getKind()) {
     case RequirementKind::Conformance: {
       // Validate the types.
-      if (TC.validateType(Req.getSubjectLoc(), DC)) {
+      if (TC.validateType(Req.getSubjectLoc(), lookupDC, options)) {
         Req.setInvalid();
         continue;
       }
 
-      if (TC.validateType(Req.getConstraintLoc(), DC)) {
+      if (TC.validateType(Req.getConstraintLoc(), lookupDC, options)) {
         Req.setInvalid();
         continue;
       }
@@ -898,12 +911,12 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
     }
 
     case RequirementKind::SameType:
-      if (TC.validateType(Req.getFirstTypeLoc(), DC)) {
+      if (TC.validateType(Req.getFirstTypeLoc(), lookupDC, options)) {
         Req.setInvalid();
         continue;
       }
 
-      if (TC.validateType(Req.getSecondTypeLoc(), DC)) {
+      if (TC.validateType(Req.getSecondTypeLoc(), lookupDC, options)) {
         Req.setInvalid();
         continue;
       }
@@ -1044,7 +1057,7 @@ bool TypeChecker::handleSILGenericParams(
       return true;
 
     revertGenericParamList(genericParams);
-    checkGenericParamList(builder, genericParams, *this, DC);
+    checkGenericParamList(builder, genericParams, *this);
     finalizeGenericParamList(builder, genericParams, DC, *this);
   }
   return false;
@@ -3910,7 +3923,7 @@ public:
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(FD->getModuleContext());
-        checkGenericParamList(builder, gp, TC, FD->getDeclContext());
+        checkGenericParamList(builder, gp, TC);
 
         // Infer requirements from parameter patterns.
         for (auto pattern : FD->getBodyParamPatterns()) {
@@ -5213,7 +5226,7 @@ public:
       } else {
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
-        checkGenericParamList(builder, gp, TC, CD->getDeclContext());
+        checkGenericParamList(builder, gp, TC);
 
         // Type check the constructor parameters.
         if (semaFuncParamPatterns(CD)) {
@@ -5541,7 +5554,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (!nominal->IsValidatingGenericSignature()) {
         ArchetypeBuilder builder =
           createArchetypeBuilder(nominal->getModuleContext());
-        checkGenericParamList(builder, gp, *this, nominal->getDeclContext());
+        checkGenericParamList(builder, gp, *this);
         finalizeGenericParamList(builder, gp, nominal, *this);
       }
     }
@@ -5593,8 +5606,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     ArchetypeBuilder builder =
       createArchetypeBuilder(proto->getModuleContext());
-    checkGenericParamList(builder, proto->getGenericParams(), *this,
-                          proto->getDeclContext());
+    checkGenericParamList(builder, proto->getGenericParams(), *this);
     finalizeGenericParamList(builder, proto->getGenericParams(), proto, *this);
 
     checkInheritanceClause(D);
@@ -5963,7 +5975,7 @@ static Type checkExtensionGenericParams(
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  checkGenericParamList(builder, genericParams, tc, ext->getModuleContext());
+  checkGenericParamList(builder, genericParams, tc);
   inferExtendedTypeReqs(builder);
   finalizeGenericParamList(builder, genericParams, ext, tc);
 

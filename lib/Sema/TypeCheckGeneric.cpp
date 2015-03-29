@@ -224,6 +224,17 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
   if (!genericParams)
     return false;
 
+  // Determine where and how to perform name lookup for the generic
+  // parameter lists and where clause.
+  TypeResolutionOptions options;
+  DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
+  if (!lookupDC->isModuleScopeContext()) {
+    assert(isa<NominalTypeDecl>(lookupDC) || isa<ExtensionDecl>(lookupDC) ||
+           isa<AbstractFunctionDecl>(lookupDC) &&
+           "not a proper generic parameter context?");
+    options = TR_GenericSignature;
+  }    
+
   // Visit each of the generic parameters.
   unsigned depth = genericParams->getDepth();
   for (auto param : *genericParams) {
@@ -257,13 +268,14 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
       // Validate the types.
-      if (tc.validateType(req.getSubjectLoc(), parentDC, None, &resolver)) {
+      if (tc.validateType(req.getSubjectLoc(), lookupDC, options, &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
       }
 
-      if (tc.validateType(req.getConstraintLoc(), parentDC, None, &resolver)) {
+      if (tc.validateType(req.getConstraintLoc(), lookupDC, options,
+                          &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
@@ -285,13 +297,15 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     }
 
     case RequirementKind::SameType:
-      if (tc.validateType(req.getFirstTypeLoc(), parentDC, None, &resolver)) {
+      if (tc.validateType(req.getFirstTypeLoc(), lookupDC, options,
+                          &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
       }
 
-      if (tc.validateType(req.getSecondTypeLoc(), parentDC, None, &resolver)) {
+      if (tc.validateType(req.getSecondTypeLoc(), lookupDC, options,
+                          &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
