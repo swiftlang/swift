@@ -266,8 +266,8 @@ static bool isRelease(SILInstruction *Inst, SILValue Value,
         return true;
       }
 
-  if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst)) {
-    if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee())) {
+  if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
+    if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee())) {
       SILFunction *F = FRI->getReferencedFunction();
       auto Params = F->getLoweredFunctionType()->getParameters();
       auto Args = AI->getArguments();
@@ -442,10 +442,24 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   if (!Call)
     return false;
 
-  if (Call.getKind() < ArrayCallKind::kMakeMutable)
+  switch (Call.getKind()) {
+  case ArrayCallKind::kNone:
+  case ArrayCallKind::kArrayPropsIsNative:
+  case ArrayCallKind::kArrayPropsNeedsTypeCheck:
+  case ArrayCallKind::kCheckSubscript:
+  case ArrayCallKind::kCheckIndex:
+  case ArrayCallKind::kGetCount:
+  case ArrayCallKind::kGetCapacity:
+  case ArrayCallKind::kGetElement:
+  case ArrayCallKind::kGetArrayOwner:
+  case ArrayCallKind::kGetElementAddress:
     return true;
-
-  return false;
+  case ArrayCallKind::kMakeMutable:
+  case ArrayCallKind::kMutateUnknown:
+  case ArrayCallKind::kArrayInit:
+  case ArrayCallKind::kArrayUninitialized:
+    return false;
+  }
 }
 
 /// \return true if the given retain instruction is followed by a release on the
