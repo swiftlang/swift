@@ -1016,7 +1016,6 @@ public:
   ParserResult<Pattern> parsePatternTuple();
   ParserResult<Pattern> parsePatternTupleAfterLP(SourceLoc LPLoc);
   
-  ParserResult<Pattern> parseTypedMatchingPattern();
   ParserResult<Pattern> parseMatchingPattern(bool isExprBasic = false);
   ParserResult<Pattern> parseMatchingPatternAsLetOrVar(bool isLet,
                                                        SourceLoc VarLoc,

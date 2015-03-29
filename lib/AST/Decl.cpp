@@ -953,11 +953,13 @@ PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,
                                        unsigned NumPatternEntries,
+                                       Expr *whereExpr, BraceStmt *elseStmt,
                                        DeclContext *Parent)
   : Decl(DeclKind::PatternBinding, Parent),
     StaticLoc(StaticLoc), VarLoc(VarLoc),
     isInitializerTypeChecked(false),
-    numPatternEntries(NumPatternEntries) {
+    numPatternEntries(NumPatternEntries),
+    whereExpr(whereExpr), elseStmt(elseStmt) {
   PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
   PatternBindingDeclBits.StaticSpelling =
        static_cast<unsigned>(StaticSpelling);
@@ -968,13 +970,15 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc VarLoc,
                            ArrayRef<PatternBindingEntry> PatternList,
+                           Expr *whereExpr, BraceStmt *elseStmt,
                            DeclContext *Parent) {
   size_t Size = sizeof(PatternBindingDecl) +
                 PatternList.size() * sizeof(PatternBindingEntry);
   void *D = allocateMemoryForDecl<PatternBindingDecl>(Ctx, Size,
                                                             false);
   auto PBD = ::new (D) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
-                                          PatternList.size(), Parent);
+                                          PatternList.size(),
+                                          whereExpr, elseStmt, Parent);
 
   // Set up the patterns.
   auto entries = PBD->getMutablePatternList();

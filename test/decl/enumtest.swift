@@ -243,7 +243,8 @@ func units(x: Int) -> distance {
 
 
 
-var %% : distance -> distance // expected-error {{expected pattern}}
+var %% : distance -> distance // expected-error {{expected pattern}} \
+   // expected-error {{unary operator cannot be separated from its operand}}
 
 func badTupleElement() {
   typealias X = (x : Int, y : Int)

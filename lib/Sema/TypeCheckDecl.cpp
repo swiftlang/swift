@@ -1307,6 +1307,14 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   
   binding->setIsBeingTypeChecked();
 
+  // Resolve the pattern.
+  if (auto *newPattern = tc.resolvePattern(binding->getPattern(entryNumber),
+                                           binding->getDeclContext())) {
+    binding->setPattern(entryNumber, newPattern);
+  } else {
+    binding->setInvalid();
+  }
+
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&

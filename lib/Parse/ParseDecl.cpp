@@ -3388,6 +3388,9 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
 
+  Expr *WhereExpr = nullptr;
+  BraceStmt *ElseStmt = nullptr;
+  
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
   defer([&]{
@@ -3399,7 +3402,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // can finally create our PatternBindingDecl to represent the
     // pattern/initializer pairs.
     auto PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
-                                          VarLoc, PBDEntries, CurDeclContext);
+                                          VarLoc, PBDEntries, WhereExpr,
+                                          ElseStmt, CurDeclContext);
     
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
     // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
@@ -3426,26 +3430,43 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         initContext->setBinding(PBD);
     }
     
-    // Otherwise return the PBD in "Decls" to the caller.  We add it at a specific
-    // spot to get it in before any accessors, which SILGen seems to want.
+    // Otherwise return the PBD in "Decls" to the caller.  We add it at a
+    // specific spot to get it in before any accessors, which SILGen seems to
+    // want.
     Decls.insert(Decls.begin()+NumDeclsInResult, PBD);
   });
   
   do {
-    ParserResult<Pattern> pattern;
-
-    { // In our recursive parse, remember that we're in a var/let pattern.
+    Pattern *pattern;
+    {
+      // In our recursive parse, remember that we're in a var/let pattern.
       llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-        T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
-      pattern = parseTypedPattern();
+      T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+
+      auto patternRes = parseMatchingPattern(/*isExprBasic*/true);
+
+      if (patternRes.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+      if (patternRes.isNull())
+        return makeParserError();
+
+      pattern = patternRes.get();
     }
-    if (pattern.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-    if (pattern.isNull())
-      return makeParserError();
+
+    // Allow a trailing "(':' type)?" production, forming a TypedPattern.
+    if (consumeIf(tok::colon)) {
+      ParserResult<TypeRepr> Ty = parseType();
+      if (Ty.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
+      
+      auto TyR = Ty.getPtrOrNull();
+      if (!TyR) TyR = new (Context) ErrorTypeRepr(PreviousLoc);
+      
+      pattern = new (Context) TypedPattern(pattern, TyR);
+    }
     
     // Configure all vars with attributes, 'static' and parent pattern.
-    pattern.get()->forEachVariable([&](VarDecl *VD) {
+    pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
       Decls.push_back(VD);
@@ -3453,16 +3474,19 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
-    PBDEntries.push_back({pattern.get(), nullptr});
+    PBDEntries.push_back({pattern, nullptr});
     
     Expr *PatternInit = nullptr;
     
     // Parse an initializer if present.
     if (Tok.is(tok::equal)) {
-      // Record the variables that we're trying to initialize.
+      // Record the variables that we're trying to initialize.  This allows us
+      // to cleanly reject "var x = x" when "x" isn't bound to an enclosing
+      // decl (even though names aren't injected into scope when the initializer
+      // is parsed).
       SmallVector<VarDecl *, 4> Vars;
       Vars.append(CurVars.second.begin(), CurVars.second.end());
-      pattern.get()->collectVariables(Vars);
+      pattern->collectVariables(Vars);
       
       llvm::SaveAndRestore<decltype(CurVars)>
       RestoreCurVars(CurVars, {CurDeclContext, Vars});
@@ -3520,7 +3544,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
       if (init.isNull())
         return makeParserError();
-      
     }
     
     // If we syntactically match the second decl-var production, with a
@@ -3528,11 +3551,11 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     if (Tok.is(tok::l_brace) && !Flags.contains(PD_InLoop)) {
       HasAccessors = true;
       
-      if (auto *boundVar = parseDeclVarGetSet(pattern.get(), Flags, StaticLoc,
+      if (auto *boundVar = parseDeclVarGetSet(pattern, Flags, StaticLoc,
                                               PatternInit != nullptr,
                                               Attributes, Decls)) {
         if (PatternInit && !boundVar->hasStorage()) {
-          diagnose(pattern.get()->getLoc(), diag::getset_init)
+          diagnose(pattern->getLoc(), diag::getset_init)
             .highlight(PatternInit->getSourceRange());
           PatternInit = nullptr;
         }
@@ -3540,10 +3563,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
     
     // Add all parsed vardecls to this scope.
-    addPatternVariablesToScope(pattern.get());
+    addPatternVariablesToScope(pattern);
     
     // Propagate back types for simple patterns, like "var A, B : T".
-    if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern.get())) {
+    if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern)) {
       if (isa<NamedPattern>(TP->getSubPattern()) && PatternInit == nullptr) {
         for (unsigned i = PBDEntries.size() - 1; i != 0; --i) {
           Pattern *PrevPat = PBDEntries[i-1].ThePattern;
@@ -3564,12 +3587,55 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
   } while (consumeIf(tok::comma));
   
-  if (HasAccessors) {
-    if (PBDEntries.size() > 1) {
-      diagnose(VarLoc, diag::disallowed_var_multiple_getset);
-      Status.setIsParseError();
-    }
+  if (HasAccessors && PBDEntries.size() > 1) {
+    diagnose(VarLoc, diag::disallowed_var_multiple_getset);
+    Status.setIsParseError();
   }
+  
+  // Check for a 'where' condition.
+  SourceLoc WhereLoc;
+  if (consumeIf(tok::kw_where, WhereLoc)) {
+    ParserResult<Expr> whereCond = parseExpr(diag::expected_condition_where);
+
+    // If we are doing second pass of code completion, we don't want to
+    // suddenly cut off parsing and throw away the declaration.
+    if (whereCond.hasCodeCompletion() && isCodeCompletionFirstPass())
+      return makeParserCodeCompletionStatus();
+
+    if (HasAccessors) {
+      // If accessors are present, just drop the 'where' to simplify AST
+      // invariants.
+      diagnose(WhereLoc, diag::disallowed_accessors_refutable, isLet, false);
+      Status.setIsParseError();
+    } else if (whereCond.isNull()) {
+      // If we had a parse error, use an ErrorExpr as the guard value so
+      // downstream clients know that the human wrote a 'where' even though we
+      // don't know what it is.
+      WhereExpr = new (Context) ErrorExpr(WhereLoc);
+    } else
+      WhereExpr = whereCond.get();
+  }
+
+  // Check for an 'else' condition.
+  SourceLoc ElseLoc;
+  if (consumeIf(tok::kw_else, ElseLoc)) {
+    ParserResult<BraceStmt> Body =
+      parseBraceItemList(diag::let_else_expected_lbrace);
+    if (Body.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+
+    if (HasAccessors) {
+      // If accessors are present, just drop the 'else' to simplify AST
+      // invariants.
+      diagnose(ElseLoc, diag::disallowed_accessors_refutable, isLet, true);
+      Status.setIsParseError();
+    } else if (Body.isNull()) {
+      // If we had a parse error, synthesize a BraceStmt.
+      ElseStmt = BraceStmt::create(Context, ElseLoc, {}, ElseLoc);
+    } else
+      ElseStmt = Body.get();
+  }
+  
   
   // NOTE: At this point, the DoAtScopeExit object is destroyed and the PBD
   // is added to the program.
