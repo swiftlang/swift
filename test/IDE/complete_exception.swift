@@ -4,13 +4,17 @@
 protocol ErrorPro1 : _ErrorType {}
 class Error1 : _ErrorType {}
 class Error2 : _ErrorType {}
+class Error3 {}
+extension Error3 : _ErrorType{}
 class NoneError1 {}
+
 
 {
   do {} catch #^CATCH1^#
 
 // CATCH1:      Begin completions
 // CATCH1-NOT:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
 // CATCH1-DAG:  Keyword/None:                       let e {|}; name=e{{$}}
@@ -27,6 +31,7 @@ class NoneError1 {}
 // THROW1-NOT:  Decl[LocalVar]/Local:               text[#String#]; name=text{{$}}
 // THROW1-DAG:  Decl[LocalVar]/Local:               e1[#Error1#]; name=e1{{$}}
 // THROW1-DAG:  Decl[LocalVar]/Local:               e2[#Error2#]; name=e2{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
 // THROW1-NOT:  Decl[Protocol]/CurrModule:          ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}

@@ -2004,14 +2004,22 @@ public:
 
   bool isErrorDecl(ValueDecl *VD) {
     // This VD is an exception if it conforms the base error type
-    auto BaseException = CurrDeclContext->getASTContext().getExceptionTypeDecl();
+    // or, if it has extensions that conform the base error type
     if (auto TD = dyn_cast<NominalTypeDecl>(VD)) {
+      auto ContainsErrorProtocol = [&](ArrayRef<ProtocolDecl*> Protocols) {
+        auto BaseException = CurrDeclContext->getASTContext().
+          getExceptionTypeDecl();
+        return std::find(Protocols.begin(), Protocols.end(), BaseException) !=
+            Protocols.end();
+      };
       if (TD->getKind() != DeclKind::Protocol) {
-        auto Protocols = TD->getProtocols();
-        if (std::find(Protocols.begin(), Protocols.end(), BaseException) !=
-            Protocols.end()) {
+        if (ContainsErrorProtocol(TD->getProtocols()))
           return true;
-        }
+        auto ExRange = TD->getExtensions();
+        for (auto It = ExRange.begin(); It != ExRange.end(); ++ It)
+          if (ContainsErrorProtocol(It->getProtocols()))
+            return true;
+        return false;
       }
     }
     return false;
