@@ -331,7 +331,9 @@ struct ErrorTypeInVarDeclArrayType2 {
 struct ErrorTypeInVarDeclArrayType3 {
   var v1 : Int[ // expected-note {{to match this opening '['}}
       // expected-error @-1{{expected expression for size of array type}}
-  var v2 : Int // expected-error {{expected ']' in array type}} expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected declaration}}
+      // expected-error @-2{{expected ']' in array type}}
+
+  var v2 : Int 
 }
 
 struct ErrorTypeInVarDeclArrayType4 {
@@ -559,10 +561,18 @@ func a(s: S[{{g) -> Int {}
 
 
 // rdar://19605567
-// expected-note@+4{{to match this opening '{'}}
 // expected-error@+3{{expected '(' for initializer parameters}}
 // expected-error@+2{{initializers may only be declared within a type}}
 // expected-error@+1{{expected an identifier to name generic parameter}}
-func F() { init<( }
+func F() { init<( } )}
 
-// expected-error@+1{{at end of brace statement}}
+
+// rdar://20337695
+func f1() {
+  
+  // expected-error@+2 {{getter/setter can only be defined for a single variable}}
+  // expected-error@+1 {{refutable pattern requires an initializer value to match against}}
+  let n == C { get {}
+  }
+}
+

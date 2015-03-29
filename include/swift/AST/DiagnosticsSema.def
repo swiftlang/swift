@@ -1627,6 +1627,9 @@ ERROR(fallthrough_into_case_with_var_binding,sema_tcs,none,
 
 ERROR(cannot_infer_type_for_pattern,sema_tcp,none,
       "type annotation missing in pattern", ())
+ERROR(refutable_pattern_requires_initializer,sema_tcd,none,
+      "refutable pattern requires an initializer value to match against", ())
+
 ERROR(pattern_type_mismatch_context,sema_tcp,none,
       "type annotation does not match contextual type %0", (Type))
 ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,

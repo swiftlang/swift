@@ -302,3 +302,20 @@ Loop:  // expected-note {{previously declared here}}
   
 }
 
+
+/// "let-else"
+func test_let_else(x : Int, y : Int??, cond : Bool) {
+  // These are all ok.
+  let a? = y else {}
+  let b? = y where cond else {}
+  let c = x where cond else {}
+  
+  let n? : Int? where cond else {}    // error: needs initializer.
+  let o? = y                          // error: needs else.
+  let p = x where cond                // error: needs else.
+  let q = x else {}                   // error: else is unreachable.
+
+  // error: Computed properties cannot have where/else.
+
+}
+

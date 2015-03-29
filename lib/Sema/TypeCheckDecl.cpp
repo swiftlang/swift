@@ -32,6 +32,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
@@ -1307,6 +1308,22 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   
   binding->setIsBeingTypeChecked();
 
+  // On any path out of this function, make sure to mark the binding as done
+  // being type checked.
+  defer([&]{
+    binding->setIsBeingTypeChecked(false);
+  });
+
+  // Resolve the pattern.
+  if (auto *newPattern = tc.resolvePattern(binding->getPattern(entryNumber),
+                                           binding->getDeclContext())) {
+    binding->setPattern(entryNumber, newPattern);
+  } else {
+    binding->setInvalid();
+    binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
+    return;
+  }
+
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
@@ -1338,7 +1355,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     setBoundVarsTypeError(binding->getPattern(entryNumber), tc.Context);
     binding->setInvalid();
     binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
-    goto done;
+    return;
   }
 
   // If the pattern didn't get a type, it's because we ran into some
@@ -1348,7 +1365,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       setBoundVarsTypeError(binding->getPattern(entryNumber), tc.Context);
       binding->setInvalid();
       binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
-      goto done;
+      return;
     }
   }
   
@@ -1428,9 +1445,6 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       }
     }
   }
-  
-done:
-  binding->setIsBeingTypeChecked(false);
 }
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {

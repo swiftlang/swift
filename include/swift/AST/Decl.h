@@ -1848,23 +1848,40 @@ struct PatternBindingEntry {
 /// pattern "(a, b)" and the initializer "foo()".  The second contains the
 /// pattern "(c, d)" and the initializer "bar()".
 ///
+/// If a pattern binding contains an 'else' statement attached to it, the
+/// pattern is allowed to be refutable and a 'where' is allowed, e.g.:
+///   let x = foo() where x > 42 else {...}
+/// and:
+///   let x? = foo() else {...}
+///
+/// The 'else' statement is checked at the SIL level to make sure it doesn't
+/// fall through, allowing the conditionally bound variables to be injected into
+/// the "fall through" scope.
+///
 class PatternBindingDecl : public Decl {
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
 
   bool isInitializerTypeChecked : 1;
   unsigned numPatternEntries : 31;
+  
+  /// 'where' condition, if present.  Null otherwise.
+  Expr *whereExpr;
+  /// 'else' statement, if present.  Null otherwise.
+  BraceStmt *elseStmt;
+  
   friend class Decl;
   
   PatternBindingDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                      SourceLoc VarLoc, unsigned NumPatternEntries,
-                     DeclContext *Parent);
+                     Expr *whereExpr, BraceStmt *elseStmt, DeclContext *Parent);
 
 public:
   static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
                                     StaticSpellingKind StaticSpelling,
                                     SourceLoc VarLoc,
                                     ArrayRef<PatternBindingEntry> PatternList,
+                                    Expr *whereExpr, BraceStmt *elseStmt,
                                     DeclContext *Parent);
 
   static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
@@ -1872,8 +1889,10 @@ public:
                                     SourceLoc VarLoc,
                                     Pattern *Pat, Expr *E,
                                     DeclContext *Parent) {
-    PatternBindingEntry Entry(Pat, E);
-    return create(Ctx, StaticLoc, StaticSpelling, VarLoc, Entry, Parent);
+    ;
+    return create(Ctx, StaticLoc, StaticSpelling, VarLoc,
+                  PatternBindingEntry(Pat, E), /*where*/nullptr,
+                  /*else*/nullptr, Parent);
   }
 
 

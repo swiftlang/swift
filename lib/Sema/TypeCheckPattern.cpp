@@ -179,7 +179,6 @@ public:
   ALWAYS_RESOLVED_PATTERN(NominalType)
   ALWAYS_RESOLVED_PATTERN(EnumElement)
   ALWAYS_RESOLVED_PATTERN(Bool)
-  ALWAYS_RESOLVED_PATTERN(Typed)
 #undef ALWAYS_RESOLVED_PATTERN
 
   Pattern *visitVarPattern(VarPattern *P) {
@@ -194,6 +193,11 @@ public:
     return P;
   }
 
+  Pattern *visitTypedPattern(TypedPattern *P) {
+    P->setSubPattern(visit(P->getSubPattern()));
+    return P;
+  }
+  
   Pattern *visitExprPattern(ExprPattern *P) {
     if (P->isResolved())
       return P;
@@ -652,19 +656,24 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       P->setType(TupleType::get(typeElts, Context));
     return false;
   }
-
-
+      
   //--- Refutable patterns.
   //
-  // Refutable patterns occur when checking the PatternBindingDecls in an if/let
-  // while/let condition.  They always require an initial value, so they always
-  // allow unspecified types.
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-    assert((options & TR_AllowUnspecifiedTypes) &&
-           "refutable patterns must always be checked in a context where an"
-           " initializer provides an initial value and a type for the pattern");
+  // Refutable patterns occur when checking the PatternBindingDecls in if/let,
+  // while/let, and let/else conditions.
+  case PatternKind::Is:
+  case PatternKind::NominalType:
+  case PatternKind::EnumElement:
+  case PatternKind::OptionalSome:
+  case PatternKind::Bool:
+  case PatternKind::Expr:
+    // In a let/else, these always require an initial value to match against.
+    if (!(options & TR_AllowUnspecifiedTypes)) {
+      diagnose(P->getLoc(), diag::refutable_pattern_requires_initializer);
+      P->setType(ErrorType::get(Context));
+      return true;
+    }
+
     return false;
   }
   llvm_unreachable("bad pattern kind!");
@@ -981,7 +990,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
     // Type-check the type parameter.
     if (validateType(IP->getCastTypeLoc(), dc, TR_InExpression))
-      return false;
+      return true;
 
     auto castType = IP->getCastTypeLoc().getType();
 

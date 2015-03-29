@@ -104,7 +104,7 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
   // expressions followed by (e.g.) let/var decls.
   //
   if (InVarOrLetPattern && isOnlyStartOfMatchingPattern()) {
-    ParserResult<Pattern> pattern = parseMatchingPattern();
+    ParserResult<Pattern> pattern = parseMatchingPattern(/*isExprBasic*/false);
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (pattern.isNull())
