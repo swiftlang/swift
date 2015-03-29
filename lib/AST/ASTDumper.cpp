@@ -229,7 +229,7 @@ namespace {
     }
     
     void visitIsPattern(IsPattern *P) {
-      printCommon(P, "pattern_isa") 
+      printCommon(P, "pattern_is") 
         << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
       P->getCastTypeLoc().getType().print(OS);
       if (auto sub = P->getSubPattern()) {
