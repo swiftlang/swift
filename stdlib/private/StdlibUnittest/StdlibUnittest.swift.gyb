@@ -699,9 +699,6 @@ struct _ParentProcess {
 
         case (_, .Some(let status), true):
           testPassed = !_anyExpectFailed
-
-        default:
-          preconditionFailure("unreachable")
         }
         if testPassed && t.crashOutputMatches.count > 0 {
           // If we still think that the test passed, check if the crash
@@ -737,9 +734,6 @@ struct _ParentProcess {
 
         case (false, true):
           println("[    XFAIL ] \(fullTestName)")
-
-        default:
-          preconditionFailure("unreachable")
         }
       }
 
