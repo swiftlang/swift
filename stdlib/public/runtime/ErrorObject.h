@@ -92,10 +92,7 @@ struct SwiftError : NSErrorLayout {
   
   // True if the object is really an NSError or CFError instance.
   // The type and errorConformance fields don't exist in an NSError.
-  bool isPureNSError() const {
-    // TODO
-    return false;
-  }
+  bool isPureNSError() const;
   
   /// Get the type of the contained value.
   const Metadata *getType() const;

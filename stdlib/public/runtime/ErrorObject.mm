@@ -21,17 +21,26 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Debug.h"
 #include "ErrorObject.h"
+#include "Private.h"
+#include <dlfcn.h>
 #include <objc/runtime.h>
 #include <Foundation/Foundation.h>
 
 using namespace swift;
 
 /// A subclass of NSError used to represent bridged native Swift errors.
+/// This type cannot be subclassed, and should not ever be instantiated
+/// except by the Swift runtime.
 @interface _SwiftNativeNSError : NSError
 @end
 
 @implementation _SwiftNativeNSError
+
++ (instancetype)alloc {
+  swift::crash("_SwiftNativeNSError cannot be instantiated");
+}
 
 - (void)dealloc {
   // We must destroy the contained Swift value.
@@ -107,9 +116,27 @@ swift::swift_deallocError(SwiftError *error, const Metadata *type) {
 }
 
 static const WitnessTable *getNSErrorConformanceToErrorType() {
-  // TODO
-  assert(false && "not implemented");
-  return nullptr;
+  // CFError and NSError are toll-free-bridged, so we can use either type's
+  // witness table interchangeably. CFError's is potentially slightly more
+  // efficient since it doesn't need to dispatch for an unsubclassed NSCFError.
+  // The witness table lives in the Foundation overlay, but it should be safe
+  // to assume that that's been linked in if a user is using NSError in their
+  // Swift source.
+  
+  static auto TheWitnessTable = dlsym(RTLD_DEFAULT,
+                                   "_TWPCSo7CFErrorSs10_ErrorType10Foundation");
+  assert(TheWitnessTable &&
+         "Foundation overlay not loaded, or CFError: ErrorType conformance "
+         "not available");
+  
+  return reinterpret_cast<const WitnessTable *>(TheWitnessTable);
+}
+
+bool SwiftError::isPureNSError() const {
+  static auto TheSwiftNativeNSError = [_SwiftNativeNSError class];
+  // We can do an exact type check; _SwiftNativeNSError shouldn't be subclassed
+  // or proxied.
+  return (Class)_swift_getClass(this) != TheSwiftNativeNSError;
 }
 
 const Metadata *SwiftError::getType() const {
