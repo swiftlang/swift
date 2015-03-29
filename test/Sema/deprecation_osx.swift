@@ -46,3 +46,104 @@ class Sub : Super {
   // rdar://problem/20024980 tracks adding a proper warning in this and similar
   /// cases.
 }
+
+@availability(OSX, introduced=10.9, deprecated=10.10)
+func functionDeprecatedIn10_10() {
+  let _ = ClassDeprecatedIn10_10()
+}
+
+@availability(OSX, introduced=10.9, deprecated=10.9)
+class ClassDeprecatedIn10_9 {
+}
+
+@availability(OSX, introduced=10.8, deprecated=10.10)
+class ClassDeprecatedIn10_10 {
+  var other10_10: ClassDeprecatedIn10_10 = ClassDeprecatedIn10_10()
+
+  func usingDeprecatedIn10_9() {
+    // Following clang, we don't warn here even though we are using a class
+    // that was deprecated before the containing class was deprecated. The
+    // policy is to not warn if the use is inside a declaration that
+    // is deprecated on all deployment targets. We can revisit this policy
+    // if needed.
+    let _ = ClassDeprecatedIn10_9()
+  }
+}
+
+class ClassWithComputedPropertyDeprecatedIn10_10 {
+
+  @availability(OSX, introduced=10.8, deprecated=10.10)
+  var annotatedPropertyDeprecatedIn10_10 : ClassDeprecatedIn10_10 {
+    get {
+      return ClassDeprecatedIn10_10()
+    }
+    set(newValue) {
+      let _ = ClassDeprecatedIn10_10()
+    }
+  }
+
+  // We really shouldn't be emitting three warnings here. It looks like
+  // we are emitting one for each of the setter and getter, as well.
+  var unannotatedPropertyDeprecatedIn10_10 : ClassDeprecatedIn10_10 { // expected-warning 3{{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+    get {
+      return ClassDeprecatedIn10_10() // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+    }
+    set(newValue) {
+      let _ = ClassDeprecatedIn10_10() // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+    }
+  }
+
+  var unannotatedStoredPropertyOfTypeDeprecatedIn10_10 : ClassDeprecatedIn10_10? = nil // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+}
+
+func usesFunctionDeprecatedIn10_10() {
+  let _ = ClassDeprecatedIn10_10() // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+}
+
+@availability(OSX, introduced=10.8, deprecated=10.10)
+func annotatedUsesFunctionDeprecatedIn10_10() {
+  let _ = ClassDeprecatedIn10_10()
+}
+
+func hasParameterDeprecatedIn10_10(p: ClassDeprecatedIn10_10) { // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+}
+
+@availability(OSX, introduced=10.8, deprecated=10.10)
+func annotatedHasParameterDeprecatedIn10_10(p: ClassDeprecatedIn10_10) {
+}
+
+func hasReturnDeprecatedIn10_10() -> ClassDeprecatedIn10_10 { // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+}
+
+@availability(OSX, introduced=10.8, deprecated=10.10)
+func annotatedHasReturnDeprecatedIn10_10() -> ClassDeprecatedIn10_10 {
+}
+
+var globalWithDeprecatedType : ClassDeprecatedIn10_10? = nil // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+
+@availability(OSX, introduced=10.8, deprecated=10.10)
+var annotatedGlobalWithDeprecatedType : ClassDeprecatedIn10_10? = nil
+
+
+enum EnumWithDeprecatedCasePayload {
+  case WithDeprecatedPayload(p: ClassDeprecatedIn10_10) // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+
+  @availability(OSX, introduced=10.8, deprecated=10.10)
+  case AnnotatedWithDeprecatedPayload(p: ClassDeprecatedIn10_10)
+}
+
+extension ClassDeprecatedIn10_10 { // expected-warning {{'ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+
+}
+
+@availability(OSX, introduced=10.8, deprecated=10.10)
+extension ClassDeprecatedIn10_10 {
+  func methodInExtensionOfClassDeprecatedIn10_10() {
+  }
+}
+
+func callMethodInDeprecatedExtension() {
+  let o = ClassDeprecatedIn10_10() // expected-warning {{'ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
+
+  o.methodInExtensionOfClassDeprecatedIn10_10() // expected-warning {{'methodInExtensionOfClassDeprecatedIn10_10()' was deprecated in OS X 10.10}}
+}

@@ -1337,8 +1337,12 @@ public:
   /// implicit function.
   static bool isInsideImplicitFunction(const DeclContext *DC);
 
+  /// Returns the availability attribute indicating deprecation if the
+  /// declaration is deprecated or null otherwise.
+  const AvailabilityAttr *getDeprecated(const Decl *D);
+
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
-  void diagnoseDeprecated(SourceLoc ReferenceLoc,
+  void diagnoseDeprecated(SourceRange SourceRange,
                           const DeclContext *ReferenceDC,
                           const AvailabilityAttr *Attr,
                           DeclName Name);

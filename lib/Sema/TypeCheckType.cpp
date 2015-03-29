@@ -929,8 +929,9 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
       return true;
     }
 
-    if (auto *Attr = TypeDecl->getAttrs().getDeprecated(TC.Context)) {
-      TC.diagnoseDeprecated(Loc, DC, Attr, CI->getIdentifier());
+    if (auto *Attr = TC.getDeprecated(TypeDecl)) {
+      TC.diagnoseDeprecated(CI->getSourceRange(), DC, Attr,
+                            CI->getIdentifier());
     }
 
     // Check for potential unavailability because of the minimum

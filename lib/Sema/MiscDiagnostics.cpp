@@ -532,8 +532,8 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   }
 
   // Diagnose for deprecation
-  if (const AvailabilityAttr *Attr = D->getAttrs().getDeprecated(TC.Context)) {
-    TC.diagnoseDeprecated(R.Start, DC, Attr, D->getFullName());
+  if (const AvailabilityAttr *Attr = TC.getDeprecated(D)) {
+    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
   }
   
   // We only diagnose potentially unavailability here if availability checking
@@ -552,7 +552,6 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   }
   return false;
 }
-
 
 namespace {
 class AvailabilityWalker : public ASTWalker {

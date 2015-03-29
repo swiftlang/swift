@@ -1464,23 +1464,24 @@ static Optional<ASTNode> findInnermostAncestor(
 }
 
 /// Given a reference range and a declaration context containing the range,
-/// find an AST node that contains the source range and
-/// that can be walked to find suitable parents of the SourceRange
-/// for availability Fix-Its.
-const Decl *rootForAvailabilityFixitFinder(SourceRange ReferenceRange,
-                                           const DeclContext *ReferenceDC,
-                                           const SourceManager &SM) {
-  // Drop the const so we can return the decl context as an ASTNode.
-  const Decl *D = ReferenceDC->getInnermostDeclarationDeclContext();
-
-  if (D)
+/// attempt to find a declaration containing the reference. This may not
+/// be the innermost declaration containing the range.
+/// Returns null if no such declaration can be found.
+static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
+                                             const DeclContext *ReferenceDC,
+                                             const SourceManager &SM) {
+  if (const Decl *D = ReferenceDC->getInnermostDeclarationDeclContext())
     return D;
 
   // We couldn't find a suitable node by climbing the DeclContext
   // hierarchy, so fall back to looking for a top-level declaration
   // that contains the reference range. We will hit this case for
   // top-level elements that do not themselves introduce DeclContexts,
-  // such as extensions and global variables.
+  // such as extensions and global variables. If we don't have a reference
+  // range, there is nothing we can do, so return null.
+  if (ReferenceRange.isInvalid())
+    return nullptr;
+
   SourceFile *SF = ReferenceDC->getParentSourceFile();
   if (!SF)
     return nullptr;
@@ -1667,7 +1668,7 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
 
   // Limit tree to search based on the DeclContext of the reference.
   const Decl *DeclarationToSearch =
-      rootForAvailabilityFixitFinder(ReferenceRange, ReferenceDC, SM);
+      findContainingDeclaration(ReferenceRange, ReferenceDC, SM);
   if (!DeclarationToSearch)
     return;
 
@@ -1934,7 +1935,92 @@ bool TypeChecker::isInsideImplicitFunction(const DeclContext *DC) {
   return false;
 }
 
-void TypeChecker::diagnoseDeprecated(SourceLoc ReferenceLoc,
+const AvailabilityAttr *TypeChecker::getDeprecated(const Decl *D) {
+  if (auto *Attr = D->getAttrs().getDeprecated(Context))
+    return Attr;
+
+  // Treat extensions methods as deprecated if their extension
+  // is deprecated.
+  DeclContext *DC = D->getDeclContext();
+  if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
+    return getDeprecated(ED);
+  }
+
+  return nullptr;
+}
+
+/// Returns true if the reference is lexically contained in a declaration
+/// that is deprecated on all deployment targets.
+static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
+                                          const DeclContext *ReferenceDC,
+                                          TypeChecker &TC) {
+  ASTContext &Ctx = TC.Context;
+
+  // Climb the DeclContext hierarchy to see if any of the containing
+  // declarations are deprecated on on all deployment targets.
+  const DeclContext *DC = ReferenceDC;
+  do {
+    auto *D = DC->getInnermostDeclarationDeclContext();
+    if (!D)
+      break;
+
+    if (D->getAttrs().getDeprecated(Ctx)) {
+      return true;
+    }
+
+    // If we are in an accessor, check to see if the associated
+    // property is deprecated.
+    auto *FD = dyn_cast<FuncDecl>(D);
+    if (FD && FD->isAccessor() &&
+        TC.getDeprecated(FD->getAccessorStorageDecl())) {
+      return true;
+    }
+
+    DC = DC->getParent();
+  } while (DC);
+
+
+  // Search the AST starting from our innermost declaration context to see if
+  // if the reference is inside a property declaration but not inside an
+  // accessor (this can happen for the TypeRepr for the declared type of a
+  // property, for example).
+  // We can't rely on the DeclContext hierarchy climb above because properties
+  // do not introduce a new DeclContext. This search is potentially slow, so we
+  // do it last and only if the reference declaration context is a
+  // type or global context.
+
+  if (!ReferenceDC->isTypeContext() && !ReferenceDC->isModuleScopeContext())
+    return false;
+
+  const Decl *DeclToSearch =
+    findContainingDeclaration(ReferenceRange, ReferenceDC, Ctx.SourceMgr);
+
+  // We may not be able to find a declaration to search if the ReferenceRange
+  // is invalid (i.e., we are in synthesized code).
+  if (!DeclToSearch)
+    return false;
+
+  InnermostAncestorFinder::MatchPredicate IsDeclaration =
+      [](ASTNode Node, ASTWalker::ParentTy Parent) {
+        return Node.is<Decl *>();
+  };
+
+  Optional<ASTNode> FoundDeclarationNode =
+      findInnermostAncestor(ReferenceRange, Ctx.SourceMgr,
+                          const_cast<Decl *>(DeclToSearch), IsDeclaration);
+
+  if (FoundDeclarationNode.hasValue()) {
+    const Decl *D = FoundDeclarationNode.getValue().get<Decl *>();
+    D = abstractSyntaxDeclForAvailabilityAttribute(D);
+    if (TC.getDeprecated(D)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
                                      const AvailabilityAttr *Attr,
                                      DeclName Name) {
@@ -1951,6 +2037,13 @@ void TypeChecker::diagnoseDeprecated(SourceLoc ReferenceLoc,
   // special-case diagnostics.
   if (!getLangOpts().EnableAvailabilityCheckingInImplicitFunctions &&
       isInsideImplicitFunction(ReferenceDC)) {
+      return;
+  }
+
+  // We match the behavior of clang to not report deprecation warnigs
+  // inside declarations that are themselves deprecated on all deployment
+  // targets.
+  if (isInsideDeprecatedDeclaration(ReferenceRange, ReferenceDC, *this)) {
     return;
   }
 
@@ -1958,12 +2051,12 @@ void TypeChecker::diagnoseDeprecated(SourceLoc ReferenceLoc,
   clang::VersionTuple DeprecatedVersion = Attr->Deprecated.getValue();
 
   if (Attr->Message.empty()) {
-    diagnose(ReferenceLoc, diag::availability_deprecated, Name, Platform,
+    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name, Platform,
              DeprecatedVersion).highlight(Attr->getRange());
     return;
   }
 
-  diagnose(ReferenceLoc, diag::availability_deprecated_msg, Name, Platform,
+  diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name, Platform,
            DeprecatedVersion, Attr->Message).highlight(Attr->getRange());
 }
 
