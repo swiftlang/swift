@@ -332,7 +332,7 @@ struct ErrorTypeInVarDeclArrayType3 {
   var v1 : Int[ // expected-note {{to match this opening '['}}
       // expected-error @-1{{expected expression for size of array type}}
       // expected-error @-2{{expected ']' in array type}}
-
+  ;
   var v2 : Int 
 }
 
