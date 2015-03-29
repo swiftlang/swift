@@ -4430,7 +4430,8 @@ namespace {
                                                           objcClass->getName());
       ExtensionDecl::RefComponent refComponent{TyR, nullptr};
       auto result = ExtensionDecl::create(Impl.SwiftContext, loc,
-                                          refComponent, { }, dc, decl);
+                                          refComponent, { }, dc, nullptr,
+                                          decl);
       result->setExtendedType(objcClass->getDeclaredType());
       objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;

@@ -5953,18 +5953,20 @@ static Type checkExtensionGenericParams(
 
   // Validate the generic type signature.
   bool invalid = false;
-  sig = tc.validateGenericSignature(genericParams, ext->getDeclContext(), 
+  sig = tc.validateGenericSignature(genericParams, ext->getDeclContext(),
                                     nullptr, inferExtendedTypeReqs, invalid);
   if (invalid) {
     return nullptr;
   }
 
-  // If the generic extension signature is not equivalent to that of the
-  // nominal type, there are extraneous requirements.
+  // For an extension of a non-protocol type, if the generic extension
+  // signature is not equivalent to that of the nominal type, there
+  // are extraneous requirements.
   // Note that we cannot have missing requirements due to requirement
   // inference.
   // FIXME: Figure out an extraneous requirement to point to.
-  if (sig->getCanonicalSignature() !=
+  if (!isa<ProtocolDecl>(nominal) &&
+      sig->getCanonicalSignature() !=
         nominal->getGenericSignature()->getCanonicalSignature()) {
     tc.diagnose(ext->getLoc(), diag::extension_generic_extra_requirements,
                 nominal->getDeclaredType())

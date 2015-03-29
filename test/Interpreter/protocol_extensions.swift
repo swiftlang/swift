@@ -31,5 +31,18 @@ extension CollectionType {
 // CHECK: 2
 println(["a", "b", "c", "d"].indexMatching({$0 == "c"})!)
 
+extension CollectionType where Self.Generator.Element : Equatable {
+  func myIndexOf(element: Generator.Element) -> Index? {
+    for i in indices(self) {
+      if self[i] == element { return i }
+    }
+
+    return nil
+  }
+}
+
+// CHECK: 3
+println(["a", "b", "c", "d", "e"].myIndexOf("d")!)
+
 // CHECK: DONE
 println("DONE")

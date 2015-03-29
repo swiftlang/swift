@@ -420,7 +420,9 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    SourceLoc RAngleLoc)
   : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
     WhereLoc(WhereLoc), Requirements(Requirements),
-    OuterParameters(nullptr), Builder(nullptr)
+    OuterParameters(nullptr),
+    FirstTrailingWhereArg(Requirements.size()),
+    Builder(nullptr)
 {
   std::uninitialized_copy(Params.begin(), Params.end(),
                           reinterpret_cast<GenericTypeParamDecl **>(this + 1));
@@ -453,6 +455,27 @@ GenericParamList::create(const ASTContext &Context,
                                     WhereLoc,
                                     Context.AllocateCopy(Requirements),
                                     RAngleLoc);
+}
+
+void GenericParamList::addTrailingWhereClause(
+       ASTContext &ctx,
+       SourceLoc trailingWhereLoc,
+       ArrayRef<RequirementRepr> trailingRequirements) {
+  assert(TrailingWhereLoc.isInvalid() &&
+         "Already have a trailing where clause?");
+  TrailingWhereLoc = trailingWhereLoc;
+  FirstTrailingWhereArg = Requirements.size();
+
+  // Create a unified set of requirements.
+  auto newRequirements = ctx.AllocateUninitialized<RequirementRepr>(
+                           Requirements.size() + trailingRequirements.size());
+  std::memcpy(newRequirements.data(), Requirements.data(),
+              Requirements.size() * sizeof(RequirementRepr));
+  std::memcpy(newRequirements.data() + Requirements.size(),
+              trailingRequirements.data(),
+              trailingRequirements.size() * sizeof(RequirementRepr));
+
+  Requirements = newRequirements;
 }
 
 GenericSignature *
@@ -670,6 +693,26 @@ GenericParamList::deriveAllArchetypes(ArrayRef<GenericTypeParamDecl *> params,
   return all;
 }
 
+TrailingWhereClause::TrailingWhereClause(
+                       SourceLoc whereLoc,
+                       ArrayRef<RequirementRepr> requirements)
+  : WhereLoc(whereLoc),
+    NumRequirements(requirements.size())
+{
+  memcpy(getRequirements().data(), requirements.data(),
+         NumRequirements * sizeof(RequirementRepr));
+}
+
+TrailingWhereClause *TrailingWhereClause::create(
+                       ASTContext &ctx,
+                       SourceLoc whereLoc,
+                       ArrayRef<RequirementRepr> requirements) {
+  unsigned size = sizeof(TrailingWhereClause)
+                + requirements.size() * sizeof(RequirementRepr);
+  void *mem = ctx.Allocate(size, alignof(TrailingWhereClause));
+  return new (mem) TrailingWhereClause(whereLoc, requirements);
+}
+
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
                                SourceLoc KindLoc,
@@ -807,12 +850,14 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              ArrayRef<RefComponent> refComponents,
                              MutableArrayRef<TypeLoc> inherited,
-                             DeclContext *parent)
+                             DeclContext *parent,
+                             TrailingWhereClause *trailingWhereClause)
   : Decl(DeclKind::Extension, parent),
     DeclContext(DeclContextKind::ExtensionDecl, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
-    Inherited(inherited)
+    Inherited(inherited),
+    TrailingWhere(trailingWhereClause)
 {
   ExtensionDeclBits.Validated = false;
   ExtensionDeclBits.CheckedInheritanceClause = false;
@@ -834,6 +879,7 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
                                      ArrayRef<RefComponent> refComponents,
                                      MutableArrayRef<TypeLoc> inherited,
                                      DeclContext *parent,
+                                     TrailingWhereClause *trailingWhereClause,
                                      ClangNode clangNode) {
   // Determine how much storage we require for this declaration.
   unsigned size = sizeof(ExtensionDecl)
@@ -844,7 +890,8 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
 
   // Construct the extension.
   auto result = ::new (declPtr) ExtensionDecl(extensionLoc, refComponents,
-                                              inherited, parent);
+                                              inherited, parent,
+                                              trailingWhereClause);
   if (clangNode)
     result->setClangNode(clangNode);
 

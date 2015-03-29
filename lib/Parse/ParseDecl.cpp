@@ -2049,7 +2049,8 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ///
 /// \verbatim
 ///   extension:
-///    'extension' attribute-list extension-target inheritance? '{' decl* '}'
+///    'extension' attribute-list extension-target inheritance? where-clause?
+///        '{' decl* '}'
 ///
 ///   extension-target:
 ///     identifier generic-params?
@@ -2107,6 +2108,17 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::colon))
     status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
 
+  // Parse the optional where-clause.
+  TrailingWhereClause *trailingWhereClause = nullptr;
+  if (Tok.is(tok::kw_where)) {
+    SourceLoc whereLoc;
+    SmallVector<RequirementRepr, 4> requirements;
+    if (!parseGenericWhereClause(whereLoc, requirements)) {
+      trailingWhereClause = TrailingWhereClause::create(Context, whereLoc,
+                                                        requirements);
+    }
+  }
+
   // If we have no ref-components, don't try to continue parsing.
   if (refComponents.empty()) {
     if (Tok.is(tok::l_brace))
@@ -2118,7 +2130,8 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,
                                              refComponents,
                                              Context.AllocateCopy(Inherited),
-                                             CurDeclContext);
+                                             CurDeclContext,
+                                             trailingWhereClause);
   ext->getAttrs() = Attributes;
 
   SmallVector<Decl*, 8> MemberDecls;

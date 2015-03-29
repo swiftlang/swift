@@ -387,6 +387,26 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     return;
   }
 
+  // If we have a trailing where clause, deal with it now.
+  // For now, trailing where clauses are only permitted on protocol extensions.
+  if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
+    if (!extendedTy->is<ProtocolType>()) {
+      // Only protocol types are permitted to have trailing where clauses.
+      TC.diagnose(ED, diag::extension_nonprotocol_trailing_where, extendedTy)
+        .highlight(trailingWhereClause->getSourceRange());
+      ED->setTrailingWhereClause(nullptr);
+    } else {
+      // Merge the trailing where clause into the generic parameter list.
+      // FIXME: Long-term, we'd like clients to deal with the trailing where
+      // clause explicitly, but for now it's far more direct to represent
+      // the trailing where clause as part of the requirements.
+      ED->getGenericParams()->addTrailingWhereClause(
+        TC.Context,
+        trailingWhereClause->getWhereLoc(),
+        trailingWhereClause->getRequirements());
+    }
+  }
+
   ED->setExtendedType(extendedTy);
   if (auto nominal = extendedTy->getAnyNominal())
     nominal->addExtension(ED);

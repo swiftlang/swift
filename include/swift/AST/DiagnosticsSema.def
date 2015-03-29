@@ -697,6 +697,8 @@ WARNING(extension_generic_missing_params,sema_tcd,none,
       "extension of generic type %0 requires generic parameters", (Type))
 NOTE(extended_type_here,sema_tcd,none,
       "extended type %0 declared here", (Type))
+ERROR(extension_nonprotocol_trailing_where,sema_tcd,none,
+      "trailing 'where' clause for extension of non-protocol type %0", (Type))
 
 // Protocols
 ERROR(type_does_not_conform,sema_tcd,none,

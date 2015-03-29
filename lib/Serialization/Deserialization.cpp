@@ -2881,7 +2881,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto nominal = baseTy->getAnyNominal();
     auto extension = ExtensionDecl::create(ctx, SourceLoc(), refComponents, { },
-                                           DC);
+                                           DC, nullptr);
     extension->setEarlyAttrValidation();
     declOrOffset = extension;
 

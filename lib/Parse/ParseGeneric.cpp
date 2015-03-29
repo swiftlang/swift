@@ -40,7 +40,6 @@ GenericParamList *Parser::parseGenericParameters() {
 
 GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Parse the generic parameter list.
-  // FIXME: Allow a bare 'where' clause with no generic parameters?
   SmallVector<GenericTypeParamDecl *, 4> GenericParams;
   bool Invalid = false;
   do {

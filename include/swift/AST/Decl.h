@@ -872,6 +872,8 @@ void *allocateMemoryForDecl(AllocatorTy &allocator, size_t baseSize,
 ///
 /// This always represents a requirement spelled in the source code.  It is
 /// never generated implicitly.
+///
+/// \c GenericParamList assumes these are POD-like.
 class RequirementRepr {
   SourceLoc SeparatorLoc;
   RequirementKind Kind : 2;
@@ -1035,6 +1037,9 @@ class GenericParamList {
 
   GenericParamList *OuterParameters;
 
+  SourceLoc TrailingWhereLoc;
+  unsigned FirstTrailingWhereArg;
+
   /// The builder used to build archetypes for this list.
   ArchetypeBuilder *Builder;
 
@@ -1151,17 +1156,32 @@ public:
   /// 'where' keyword is present.
   ArrayRef<RequirementRepr> getRequirements() const { return Requirements; }
 
-  /// \brief Override the set of requirements associated with this generic
-  /// parameter list.
-  ///
-  /// \param NewRequirements The new set of requirements, which is expected
-  /// to be a superset of the existing set of requirements (although this
-  /// property is not checked here). It is assumed that the array reference
-  /// refers to ASTContext-allocated memory.
-  void overrideRequirements(MutableArrayRef<RequirementRepr> NewRequirements) {
-    Requirements = NewRequirements;
+  /// Retrieve only those requirements that are written within the brackets,
+  /// which does not include any requirements written in a trailing where
+  /// clause.
+  ArrayRef<RequirementRepr> getNonTrailingRequirements() const {
+    return Requirements.slice(0, FirstTrailingWhereArg);
   }
-  
+
+  /// Retrieve only those requirements that are written within the brackets,
+  /// which does not include any requirements written in a trailing where
+  /// clause.
+  ArrayRef<RequirementRepr> getTrailingRequirements() const {
+    return Requirements.slice(FirstTrailingWhereArg);
+  }
+
+  /// Determine whether the generic parameters have a trailing where clause.
+  bool hasTrailingWhereClause() const {
+    return FirstTrailingWhereArg < Requirements.size();
+  }
+
+  /// Add a trailing 'where' clause to the list of requirements.
+  ///
+  /// Trailing where clauses are written outside the angle brackets, after the
+  /// main part of a declaration's signature.
+  void addTrailingWhereClause(ASTContext &ctx, SourceLoc trailingWhereLoc,
+                              ArrayRef<RequirementRepr> trailingRequirements);
+
   /// \brief Retrieves the list containing all archetypes described by this
   /// generic parameter clause.
   ///
@@ -1239,6 +1259,26 @@ public:
   SourceLoc getRAngleLoc() const { return Brackets.End; }
 
   SourceRange getSourceRange() const { return Brackets; }
+
+  /// Retrieve the source range covering the where clause.
+  SourceRange getWhereClauseSourceRange() const {
+    if (WhereLoc.isInvalid())
+      return SourceRange();
+
+    return SourceRange(WhereLoc,
+                       Requirements[FirstTrailingWhereArg-1].getSecondTypeLoc()
+                         .getSourceRange().End);
+  }
+
+  /// Retrieve the source range covering the trailing where clause.
+  SourceRange getTrailingWhereClauseSourceRange() const {
+    if (!hasTrailingWhereClause())
+      return SourceRange();
+
+    return SourceRange(TrailingWhereLoc,
+                       Requirements.back().getSecondTypeLoc().getSourceRange()
+                         .End);
+  }
 
   /// Retrieve the depth of this generic parameter list.
   unsigned getDepth() const {
@@ -1370,6 +1410,45 @@ GenericParamList::getNestedGenericParams() const {
   return {NestedGenericParamIterator(this), NestedGenericParamIterator()};
 }
 
+/// A trailing where clause.
+class TrailingWhereClause {
+  SourceLoc WhereLoc;
+
+  /// The number of requirements. The actual requirements are tail-allocated.
+  /// FIXME: uintptr_t is larger than we need, but makes sure that we get the
+  /// right alignment for the requirement for the requirements that follow.
+  uintptr_t NumRequirements;
+
+  TrailingWhereClause(SourceLoc whereLoc,
+                      ArrayRef<RequirementRepr> requirements);
+
+public:
+  /// Create a new trailing where clause with the given set of requirements.
+  static TrailingWhereClause *create(ASTContext &ctx, SourceLoc whereLoc,
+                                     ArrayRef<RequirementRepr> requirements);
+
+  /// Retrieve the location of the 'where' keyword.
+  SourceLoc getWhereLoc() const { return WhereLoc; }
+
+  /// Retrieve the set of requirements.
+  MutableArrayRef<RequirementRepr> getRequirements() {
+    return { reinterpret_cast<RequirementRepr *>(this + 1), NumRequirements };
+  }
+
+  /// Retrieve the set of requirements.
+  ArrayRef<RequirementRepr> getRequirements() const {
+    return { reinterpret_cast<const RequirementRepr *>(this + 1),
+             NumRequirements };
+  }
+
+  /// Compute the source range containing this trailing where clause.
+  SourceRange getSourceRange() const {
+    return SourceRange(WhereLoc,
+                       getRequirements().back().getSecondTypeLoc()
+                         .getSourceRange().End);
+  }
+};
+
 /// Describes what kind of name is being imported.
 ///
 /// If the enumerators here are changed, make sure to update all diagnostics
@@ -1482,7 +1561,6 @@ public:
   }
 };
 
-
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
@@ -1519,6 +1597,12 @@ private:
 
   MutableArrayRef<TypeLoc> Inherited;
 
+  /// The trailing where clause.
+  ///
+  /// Note that this is not currently serialized, because semantic analysis
+  /// moves the trailing where clause into the generic parameter list.
+  TrailingWhereClause *TrailingWhere;
+
   /// \brief The set of protocols to which this extension conforms.
   ArrayRef<ProtocolDecl *> Protocols;
 
@@ -1540,7 +1624,8 @@ private:
 
   ExtensionDecl(SourceLoc extensionLoc, ArrayRef<RefComponent> refComponents,
                 MutableArrayRef<TypeLoc> inherited,
-                DeclContext *parent);
+                DeclContext *parent,
+                TrailingWhereClause *trailingWhereClause);
 
   /// Retrieve the conformance loader (if any), and removing it in the
   /// same operation. The caller is responsible for loading the
@@ -1563,6 +1648,7 @@ public:
                                ArrayRef<RefComponent> refComponents,
                                MutableArrayRef<TypeLoc> inherited,
                                DeclContext *parent,
+                               TrailingWhereClause *trailingWhereClause,
                                ClangNode clangNode = ClangNode());
 
   SourceLoc getStartLoc() const { return ExtensionLoc; }
@@ -1588,6 +1674,16 @@ public:
   /// Retrieve the innermost generic parameter list.
   GenericParamList *getGenericParams() const {
     return getRefComponents().back().GenericParams;
+  }
+
+  /// Retrieve the trailing where clause for this extension, if any.
+  TrailingWhereClause *getTrailingWhereClause() const {
+    return TrailingWhere;
+  }
+
+  /// Set the trailing where clause for this extension.
+  void setTrailingWhereClause(TrailingWhereClause *trailingWhereClause) {
+    TrailingWhere = trailingWhereClause;
   }
 
   /// Retrieve the generic signature for this extension.
