@@ -234,6 +234,88 @@ struct SConforms2b : PConforms2 {
   func pc2() { }
 }
 
+// Satisfying requirements via protocol extensions for fun and profit
+protocol _MySeq { }
+
+protocol MySeq : _MySeq {
+  typealias Generator : GeneratorType
+  func myGenerate() -> Generator
+}
+
+protocol _MyCollection : _MySeq {
+  typealias Index : ForwardIndexType
+
+  var myStartIndex : Index { get }
+  var myEndIndex : Index { get }
+
+  typealias _Element
+  subscript (i: Index) -> _Element { get }
+}
+
+protocol MyCollection : _MyCollection {
+}
+
+struct MyIndexedGenerator<C : _MyCollection> : GeneratorType {
+  var container: C
+  var index: C.Index
+
+  mutating func next() -> C._Element? {
+    if index == container.myEndIndex { return nil }
+    let result = container[index]
+    ++index
+    return result
+  }
+}
+
+struct OtherIndexedGenerator<C : _MyCollection> : GeneratorType {
+  var container: C
+  var index: C.Index
+
+  mutating func next() -> C._Element? {
+    if index == container.myEndIndex { return nil }
+    let result = container[index]
+    ++index
+    return result
+  }
+}
+
+extension _MyCollection {
+  func myGenerate() -> MyIndexedGenerator<Self> {
+    return MyIndexedGenerator(container: self, index: self.myEndIndex)
+  }
+}
+
+struct SomeCollection1 : MyCollection {
+  var myStartIndex: Int { return 0 }
+  var myEndIndex: Int { return 10 }
+
+  subscript (i: Int) -> String {
+    return "blah"
+  }
+}
+
+struct SomeCollection2 : MyCollection {
+  var myStartIndex: Int { return 0 }
+  var myEndIndex: Int { return 10 }
+
+  subscript (i: Int) -> String {
+    return "blah"
+  }
+
+  func myGenerate() -> OtherIndexedGenerator<SomeCollection2> {
+    return OtherIndexedGenerator(container: self, index: self.myEndIndex)
+  }
+}
+
+func testSomeCollections(sc1: SomeCollection1, sc2: SomeCollection2) {
+  var mig = sc1.myGenerate()
+  mig = MyIndexedGenerator(container: sc1, index: sc1.myStartIndex)
+
+  var ig = sc2.myGenerate()
+  ig = MyIndexedGenerator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot assign a value of type 'MyIndexedGenerator<SomeCollection2>' to a value of type 'OtherIndexedGenerator<SomeCollection2>'}}
+}
+
+
 // ----------------------------------------------------------------------------
 // Partial ordering of protocol extension members
 // ----------------------------------------------------------------------------
