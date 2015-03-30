@@ -3834,6 +3834,11 @@ public:
       return true;
     }
 
+    // 'Self' in protocol extensions is not dynamic 'Self'.
+    if (dc->isProtocolExtensionContext()) {
+      return false;
+    }
+
     auto containerTy = dc->getDeclaredTypeOfContext();
     if (containerTy->is<ErrorType>())
       return true;

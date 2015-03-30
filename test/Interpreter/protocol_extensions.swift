@@ -109,5 +109,16 @@ for i in evenOdd.myIndices {
 }
 println()
 
+extension ExtensibleCollectionType {
+  public func myJoin<S : SequenceType where S.Generator.Element == Self>(
+    elements: S
+  ) -> Self {
+    return Swift.join(self, elements)
+  }
+}
+
+// CHECK: a,b,c
+println(",".myJoin(["a", "b", "c"]))
+
 // CHECK: DONE
 println("DONE")

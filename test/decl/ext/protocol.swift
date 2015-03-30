@@ -69,6 +69,24 @@ extension P2 {
   func extP2acceptsP2() { acceptsP2(self) }
 }
 
+// Use of 'Self' as a return type within a protocol extension.
+protocol SelfP1 {
+  typealias AssocType
+}
+
+protocol SelfP2 {
+}
+
+func acceptSelfP1<T, U : SelfP1 where U.AssocType == T>(t: T, u: U) -> T {
+  return t
+}
+
+extension SelfP1 {
+  func tryAcceptSelfP1<Z : SelfP1 where Z.AssocType == Self>(z: Z) -> Self {
+    return acceptSelfP1(self, z)
+  }
+}
+
 // ----------------------------------------------------------------------------
 // Using protocol extensions on types that conform to the protocols.
 // ----------------------------------------------------------------------------
