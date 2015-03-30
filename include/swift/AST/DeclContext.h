@@ -247,6 +247,9 @@ public:
   /// protocol, return the ProtocolDecl, otherwise return null.
   ProtocolDecl *isProtocolOrProtocolExtensionContext() const;
 
+  /// If this DeclContext is a protocol extension, return the extended protocol.
+  ProtocolDecl *isProtocolExtensionContext() const;
+
   /// \brief Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
   ///

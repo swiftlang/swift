@@ -107,3 +107,151 @@ func testP4(s4a: S4a, s4b: S4b) {
   s4a.extP4a() // expected-error{{cannot invoke 'extP4a' with }}
   s4b.extP4a() // ok
 }
+
+// ----------------------------------------------------------------------------
+// Using protocol extensions to satisfy requirements
+// ----------------------------------------------------------------------------
+protocol P5 {
+  func reqP5a()
+}
+
+// extension of P5 provides a witness for P6
+extension P5 {
+  func reqP6a() { reqP5a() }
+}
+
+protocol P6 {
+  func reqP6a()
+}
+
+// S6a uses P5.reqP6a
+struct S6a : P5 { 
+  func reqP5a() { }
+}
+
+extension S6a : P6 { }
+
+// S6b uses P5.reqP6a
+struct S6b : P5, P6 { 
+  func reqP5a() { }
+}
+
+// S6c uses P5.reqP6a
+struct S6c : P6 { 
+}
+
+extension S6c : P5 {
+  func reqP5a() { }
+}
+
+// S6d does not use P5.reqP6a
+struct S6d : P6 { 
+  func reqP6a() { }
+}
+
+extension S6d : P5 {
+  func reqP5a() { }
+}
+
+protocol P7 {
+  typealias P7Assoc
+
+  func getP7Assoc() -> P7Assoc
+}
+
+struct P7FromP8<T> { }
+
+protocol P8 {
+  typealias P8Assoc
+  func getP8Assoc() -> P8Assoc
+}
+
+// extension of P8 provides conformance to P7Assoc
+extension P8 {
+  func getP7Assoc() -> P7FromP8<P8Assoc> { return P7FromP8() }
+}
+
+// Okay, P7 requirements satisfied by P8
+struct P8a : P8, P7 {
+  func getP8Assoc() -> Bool { return true }
+}
+
+func testP8a(p8a: P8a) {
+  var p7 = p8a.getP7Assoc()
+  p7 = P7FromP8<Bool>() // okay, check type of above
+}
+
+// Okay, P7 requirements explicitly specified
+struct P8b : P8, P7 {
+  func getP7Assoc() -> Int { return 5 }
+  func getP8Assoc() -> Bool { return true }
+}
+
+func testP8b(p8b: P8b) {
+  var p7 = p8b.getP7Assoc()
+  p7 = 17 // check type of above
+}
+
+// ----------------------------------------------------------------------------
+// Partial ordering of protocol extension members
+// ----------------------------------------------------------------------------
+
+// Partial ordering between members of protocol extensions and members
+// of concrete types.
+struct S1b : P1 {
+  func reqP1a() -> Bool { return true }
+
+  func extP1a() -> Int { return 0 }
+}
+
+func useS1b(s1b: S1b) {
+  var x = s1b.extP1a() // uses S1b.extP1a due to partial ordering
+  x = 5 // checks that "x" deduced to "Int" above
+  var b: Bool = s1b.extP1a() // still uses P1.ext1Pa due to type annotation
+}
+
+// Partial ordering between members of protocol extensions for
+// different protocols.
+protocol PInherit1 { }
+
+protocol PInherit2 : PInherit1 { }
+
+protocol PInherit3 : PInherit2 { }
+
+protocol PInherit4 : PInherit2 { }
+
+extension PInherit1 {
+  func order1() -> Int { return 0 }
+}
+
+extension PInherit2 {
+  func order1() -> Bool { return true }
+}
+
+extension PInherit3 {
+  func order1() -> Double { return 1.0 }
+}
+
+extension PInherit4 {
+  func order1() -> String { return "hello" }
+}
+
+struct SInherit2 : PInherit2 { }
+struct SInherit3 : PInherit3 { }
+struct SInherit4 : PInherit4 { }
+
+func testPInherit(si2 : SInherit2, si3: SInherit3, si4: SInherit4) {
+  var b1 = si2.order1() // PInherit2.order1
+  b1 = true // check that the above returned Bool
+
+  var d1 = si3.order1() // PInherit3.order1
+  d1 = 3.14159 // check that the above returned Double
+
+  var s1 = si4.order1() // PInherit4.order1
+  s1 = "hello" // check that the above returned String
+
+  // Other versions are still visible, since they may have different
+  // types.
+  b1 = si3.order1() // PInherit2.order1
+  var i1: Int = si3.order1() // PInherit1.order1
+}

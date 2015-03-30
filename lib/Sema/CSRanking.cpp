@@ -305,8 +305,8 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
   }
 
   // If neither or both are protocol types, consider the bases unrelated.
-  bool isProtocol1 = type1->is<ProtocolType>();
-  bool isProtocol2 = type2->is<ProtocolType>();
+  bool isProtocol1 = isa<ProtocolDecl>(dc1);
+  bool isProtocol2 = isa<ProtocolDecl>(dc2);
   if (isProtocol1 == isProtocol2)
     return SelfTypeRelationship::Unrelated;
 
@@ -413,6 +413,32 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
   case Comparison::Worse:
     return false;
+  }
+
+  // Members of protocol extensions have special overloading rules.
+  ProtocolDecl *inProtocolExtension1 = decl1->getDeclContext()
+                                         ->isProtocolExtensionContext();
+  ProtocolDecl *inProtocolExtension2 = decl2->getDeclContext()
+                                         ->isProtocolExtensionContext();
+  if (inProtocolExtension1 && inProtocolExtension2) {
+    // Both members are in protocol extensions.
+
+    // If one protocol inherits from the other, its members are more
+    // specialized.
+    if (inProtocolExtension1 != inProtocolExtension2) {
+      if (inProtocolExtension1->inheritsFrom(inProtocolExtension2))
+        return true;
+      if (inProtocolExtension2->inheritsFrom(inProtocolExtension1))
+        return false;
+    }
+
+    // FIXME: When inProtocolExtension1 == inProtocolExtension2, we should
+    // check the constraints to determine whether one is more specialized
+    // than the other. This might simply be a generalization of the above.
+  } else if (inProtocolExtension1 || inProtocolExtension2) {
+    // One member is in a protocol extension, the other is in a concrete type.
+    // Prefer the member in the concrete type.
+    return inProtocolExtension2;
   }
 
   Type type1 = decl1->getInterfaceType();

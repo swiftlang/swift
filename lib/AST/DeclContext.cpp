@@ -62,6 +62,14 @@ ProtocolDecl *DeclContext::isProtocolOrProtocolExtensionContext() const {
            isNominalTypeOrNominalTypeExtensionContext());
 }
 
+ProtocolDecl *DeclContext::isProtocolExtensionContext() const {
+  if (getContextKind() != DeclContextKind::ExtensionDecl)
+    return nullptr;
+
+  return dyn_cast_or_null<ProtocolDecl>(
+           isNominalTypeOrNominalTypeExtensionContext());
+}
+
 GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
   assert(isProtocolOrProtocolExtensionContext() && "not a protocol");
   return getGenericParamsOfContext()->getParams().front();
