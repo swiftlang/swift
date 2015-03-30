@@ -20,6 +20,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -2184,6 +2185,11 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   ctor->setImplicit();
   ctor->setAccessibility(std::min(classDecl->getFormalAccess(),
                                   superclassCtor->getFormalAccess()));
+
+  // Make sure the constructor is only as available as its superclass's
+  // constructor.
+  AvailabilityInference::applyInferredAvailabilityAttrs(ctor, superclassCtor,
+                                                        ctx);
 
   // Configure 'self'.
   GenericParamList *outerGenericParams = nullptr;

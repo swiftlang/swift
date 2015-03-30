@@ -22,6 +22,8 @@
 #include "llvm/ADT/Optional.h"
 
 namespace swift {
+class ASTContext;
+class Decl;
 
 /// A lattice of version ranges of the form [x.y.z, +Inf).
 class VersionRange {
@@ -182,6 +184,18 @@ public:
     assert(getReasonKind() == Kind::RequiresOSVersionRange);
     return RequiredDeploymentRange.getValue();
   }
+};
+
+
+class AvailabilityInference {
+public:
+  /// Infers the common availability required to access an array of
+  /// declarations and adds attributes reflecting that availability
+  /// to ToDecl.
+  static void
+  applyInferredAvailabilityAttrs(Decl *ToDecl,
+                                 ArrayRef<const Decl *> InferredFromDecls,
+                                 ASTContext &Context);
 };
 
 } // end namespace swift

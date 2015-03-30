@@ -6,6 +6,7 @@ add_swift_library(swiftAST
   ASTPrinter.cpp
   ASTWalker.cpp
   Attr.cpp
+  Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp
