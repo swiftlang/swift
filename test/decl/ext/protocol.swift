@@ -192,6 +192,30 @@ func testP8b(p8b: P8b) {
   p7 = 17 // check type of above
 }
 
+protocol PConforms1 {
+}
+
+extension PConforms1 {
+  func pc2() { } // expected-note{{candidate exactly matches}}
+}
+
+protocol PConforms2 : PConforms1, MakePC2Ambiguous {
+  func pc2() // expected-note{{multiple matching functions named 'pc2()' with type '() -> ()'}}
+}
+
+protocol MakePC2Ambiguous {
+}
+
+extension MakePC2Ambiguous {
+  func pc2() { } // expected-note{{candidate exactly matches}}
+}
+
+struct SConforms2a : PConforms2 { } // expected-error{{type 'SConforms2a' does not conform to protocol 'PConforms2'}}
+
+struct SConforms2b : PConforms2 {
+  func pc2() { }
+}
+
 // ----------------------------------------------------------------------------
 // Partial ordering of protocol extension members
 // ----------------------------------------------------------------------------
