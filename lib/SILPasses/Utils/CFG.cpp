@@ -270,6 +270,129 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
   llvm_unreachable("Missing implementation");
 }
 
+
+template <class SwitchEnumTy, class SwitchEnumCaseTy>
+SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
+                                     SmallVectorImpl<SwitchEnumCaseTy> &Cases,
+                                     SILBasicBlock *OldDest, SILBasicBlock *NewDest) {
+    auto *DefaultBB = S->hasDefault() ? S->getDefaultBB() : nullptr;
+    for (unsigned i = 0, e = S->getNumCases(); i != e; ++i)
+      if (S->getCase(i).second != OldDest)
+        Cases.push_back(S->getCase(i));
+      else
+        Cases.push_back(std::make_pair(S->getCase(i).first, NewDest));
+    if (OldDest == DefaultBB)
+      DefaultBB = NewDest;
+    return DefaultBB;
+}
+
+/// \brief Replace a branch target.
+///
+/// \param T The terminating instruction to modify.
+/// \param OldDest The successor block that will be replaced.
+/// \param NewDest The new target block.
+/// \param PreserveArgs If set, preserve arguments on the replaced edge.
+void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
+                               SILBasicBlock *NewDest, bool PreserveArgs) {
+  SILBuilderWithScope<8> B(T);
+
+  // Only Branch and CondBranch may have arguments.
+  if (auto Br = dyn_cast<BranchInst>(T)) {
+    SmallVector<SILValue, 8> Args;
+    if (PreserveArgs) {
+      for (auto Arg : Br->getArgs())
+        Args.push_back(Arg);
+    }
+    B.createBranch(T->getLoc(), NewDest, Args);
+    Br->dropAllReferences();
+    Br->eraseFromParent();
+    return;
+  }
+
+  if (auto CondBr = dyn_cast<CondBranchInst>(T)) {
+    SmallVector<SILValue, 8> TrueArgs;
+    if (OldDest == CondBr->getFalseBB() || PreserveArgs) {
+      for (auto Arg : CondBr->getTrueArgs())
+        TrueArgs.push_back(Arg);
+    }
+    SmallVector<SILValue, 8> FalseArgs;
+    if (OldDest == CondBr->getTrueBB() || PreserveArgs) {
+      for (auto Arg : CondBr->getFalseArgs())
+        FalseArgs.push_back(Arg);
+    }
+    SILBasicBlock *TrueDest = CondBr->getTrueBB();
+    SILBasicBlock *FalseDest = CondBr->getFalseBB();
+    if (OldDest == CondBr->getTrueBB())
+      TrueDest = NewDest;
+    else
+      FalseDest = NewDest;
+
+    B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(),
+                       TrueDest, TrueArgs, FalseDest, FalseArgs);
+    CondBr->dropAllReferences();
+    CondBr->eraseFromParent();
+    return;
+  }
+
+  if (auto SII = dyn_cast<SwitchValueInst>(T)) {
+    SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> Cases;
+    auto *DefaultBB = replaceSwitchDest(SII, Cases, OldDest, NewDest);
+    B.createSwitchValue(SII->getLoc(), SII->getOperand(), DefaultBB, Cases);
+    SII->eraseFromParent();
+    return;
+  }
+
+  if (auto SEI = dyn_cast<SwitchEnumInst>(T)) {
+    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
+    auto *DefaultBB = replaceSwitchDest(SEI, Cases, OldDest, NewDest);
+    B.createSwitchEnum(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
+    SEI->eraseFromParent();
+    return;
+  }
+
+  if (auto SEI = dyn_cast<SwitchEnumAddrInst>(T)) {
+    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
+    auto *DefaultBB = replaceSwitchDest(SEI, Cases, OldDest, NewDest);
+    B.createSwitchEnumAddr(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
+    SEI->eraseFromParent();
+    return;
+  }
+
+  if (auto DMBI = dyn_cast<DynamicMethodBranchInst>(T)) {
+    assert(OldDest == DMBI->getHasMethodBB() || OldDest == DMBI->getNoMethodBB() && "Invalid edge index");
+    auto HasMethodBB = OldDest == DMBI->getHasMethodBB() ? NewDest : DMBI->getHasMethodBB();
+    auto NoMethodBB = OldDest == DMBI->getNoMethodBB() ? NewDest : DMBI->getNoMethodBB();
+    B.createDynamicMethodBranch(DMBI->getLoc(), DMBI->getOperand(),
+                                DMBI->getMember(), HasMethodBB, NoMethodBB);
+    DMBI->eraseFromParent();
+    return;
+  }
+
+  if (auto CBI = dyn_cast<CheckedCastBranchInst>(T)) {
+    assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
+    auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
+    auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
+    B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
+                              CBI->getCastType(), SuccessBB, FailureBB);
+    CBI->eraseFromParent();
+    return;
+  }
+
+  if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
+    assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
+    auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
+    auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
+    B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
+                                  CBI->getSrc(), CBI->getSourceType(),
+                                  CBI->getDest(), CBI->getTargetType(),
+                                  SuccessBB, FailureBB);
+    CBI->eraseFromParent();
+    return;
+  }
+
+  llvm_unreachable("Missing implementation");
+}
+
 /// \brief Check if the edge from the terminator is critical.
 bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
   assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");

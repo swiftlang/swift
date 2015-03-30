@@ -375,8 +375,7 @@ void CheckedCastBrJumpThreading::modifyCFGForFailurePreds() {
   for (auto *Pred : FailurePreds) {
     TermInst *TI = Pred->getTerminator();
     // Replace branch to BB by branch to TargetFailureBB.
-    // FIXME: Why is it valid to assume EdgeIdx=0 here?
-    changeBranchTarget(TI, 0, TargetFailureBB, /*PreserveArgs=*/true);
+    replaceBranchTarget(TI, BB, TargetFailureBB, /*PreserveArgs=*/true);
     Pred = nullptr;
   }
 }
@@ -404,8 +403,7 @@ void CheckedCastBrJumpThreading::modifyCFGForSuccessPreds() {
       for (auto *Pred : SuccessPreds) {
         TermInst *TI = Pred->getTerminator();
         // Replace branch to BB by branch to TargetSuccessBB.
-        // FIXME: Why is it valid to assume EdgeIdx=0 here?
-        changeBranchTarget(TI, 0, TargetSuccessBB, /*PreserveArgs=*/true);
+        replaceBranchTarget(TI, BB, TargetFailureBB, /*PreserveArgs=*/true);
         SuccessBBArgs.push_back(DomSuccessBB->getBBArg(0));
         Pred = nullptr;
       }
