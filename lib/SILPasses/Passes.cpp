@@ -165,15 +165,6 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   PM.add(createSwiftArrayOpts());
 }
 
-void AddLowLevelLoopOptPasses(SILPassManager &PM) {
-  PM.add(createMem2Reg());
-  PM.add(createLICM());
-  PM.add(createDCE());
-  PM.add(createCSE());
-  PM.add(createSILCombine());
-  PM.add(createSimplifyCFG());
-}
-
 void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   AddSimplifyCFGSILCombine(PM);
   PM.add(createAllocBoxToStack());
@@ -310,6 +301,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.add(createAllocBoxToStack());
   PM.add(createSROA());
   PM.add(createMem2Reg());
+  PM.add(createCSE());
   PM.add(createSILCombine());
   PM.add(createSimplifyCFG());
   PM.add(createGlobalLoadStoreOpts());
@@ -321,7 +313,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.resetAndRemoveTransformations();
 
   PM.setStageName("LateLoopOpt");
-  AddLowLevelLoopOptPasses(PM);
+  PM.add(createLICM());
 
   // Perform the final lowering transformations.
   PM.add(createExternalFunctionDefinitionsElimination());
