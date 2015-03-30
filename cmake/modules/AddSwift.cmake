@@ -173,8 +173,6 @@ function(_add_variant_link_flags
     list(APPEND result "-lpthread" "-ldl")
   endif()
 
-  list(APPEND result "-L" "${CMARK_LIBRARY_DIR}/${CMAKE_BUILD_TYPE}")
-
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
