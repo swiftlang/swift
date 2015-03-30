@@ -1526,7 +1526,7 @@ public:
     SILType operandType = OEI->getOperand().getType();
     require(operandType.isAddress(),
             "open_existential_addr must be applied to address");
-    require(operandType.canUseExistentialRepresentation(
+    require(operandType.canUseExistentialRepresentation(F.getModule(),
                                         ExistentialRepresentation::Opaque),
            "open_existential_addr must be applied to opaque existential");
 
@@ -1542,7 +1542,7 @@ public:
     require(operandType.isObject(),
             "open_existential_ref operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(
+    require(operandType.canUseExistentialRepresentation(F.getModule(),
                                               ExistentialRepresentation::Class),
             "open_existential_ref operand must be class existential");
 
@@ -1560,7 +1560,7 @@ public:
     require(operandType.isObject(),
             "open_existential_box operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(
+    require(operandType.canUseExistentialRepresentation(F.getModule(),
                                               ExistentialRepresentation::Boxed),
             "open_existential_box operand must be boxed existential");
 
@@ -1619,7 +1619,7 @@ public:
     SILType exType = AEBI->getExistentialType();
     require(exType.isObject(),
             "alloc_existential_box #0 result should be a value");
-    require(exType.canUseExistentialRepresentation(
+    require(exType.canUseExistentialRepresentation(F.getModule(),
                                              ExistentialRepresentation::Boxed,
                                              AEBI->getFormalConcreteType()),
             "alloc_existential_box must be used with a boxed existential "
@@ -1651,7 +1651,7 @@ public:
     SILType exType = AEI->getOperand().getType();
     require(exType.isAddress(),
             "init_existential_addr must be applied to an address");
-    require(exType.canUseExistentialRepresentation(
+    require(exType.canUseExistentialRepresentation(F.getModule(),
                                        ExistentialRepresentation::Opaque,
                                        AEI->getFormalConcreteType()),
             "init_existential_addr must be used with an opaque "
@@ -1684,7 +1684,7 @@ public:
     SILType concreteType = IEI->getOperand().getType();
     require(concreteType.getSwiftType()->isBridgeableObjectType(),
             "init_existential_ref operand must be a class instance");
-    require(IEI->getType().canUseExistentialRepresentation(
+    require(IEI->getType().canUseExistentialRepresentation(F.getModule(),
                                      ExistentialRepresentation::Class,
                                      IEI->getFormalConcreteType()),
             "init_existential_ref must be used with a class existential type");
@@ -1716,7 +1716,7 @@ public:
     SILType exType = DEI->getOperand().getType();
     require(exType.isAddress(),
             "deinit_existential_addr must be applied to an address");
-    require(exType.canUseExistentialRepresentation(
+    require(exType.canUseExistentialRepresentation(F.getModule(),
                                        ExistentialRepresentation::Opaque),
             "deinit_existential_addr must be applied to an opaque "
             "existential");
@@ -1726,7 +1726,7 @@ public:
     SILType exType = DEBI->getOperand().getType();
     require(exType.isObject(),
             "dealloc_existential_box must be applied to a value");
-    require(exType.canUseExistentialRepresentation(
+    require(exType.canUseExistentialRepresentation(F.getModule(),
                                        ExistentialRepresentation::Boxed),
             "dealloc_existential_box must be applied to a boxed "
             "existential");

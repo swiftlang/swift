@@ -335,13 +335,15 @@ public:
   /// representation kind for the type. Returns None if the type is not an
   /// existential type.
   ExistentialRepresentation
-  getPreferredExistentialRepresentation(Type containedType = Type()) const;
+  getPreferredExistentialRepresentation(SILModule &M,
+                                        Type containedType = Type()) const;
   
   /// Returns true if the existential type can use operations for the given
   /// existential representation when working with values of the given type,
   /// or when working with an unknown type if containedType is null.
   bool
-  canUseExistentialRepresentation(ExistentialRepresentation repr,
+  canUseExistentialRepresentation(SILModule &M,
+                                  ExistentialRepresentation repr,
                                   Type containedType = Type()) const;
   
   /// True if the type is dependent on a generic signature.

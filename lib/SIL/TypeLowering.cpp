@@ -310,7 +310,7 @@ namespace {
 
     RetTy visitExistentialType(CanType type) {
       switch (SILType::getPrimitiveObjectType(type)
-                .getPreferredExistentialRepresentation()) {
+                .getPreferredExistentialRepresentation(M)) {
       case ExistentialRepresentation::None:
         llvm_unreachable("not an existential type?!");
       // Opaque existentials are address-only.

@@ -814,7 +814,8 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
   // Open the existential and project out the value, then update the
   // self value to use the projection.
   SILValue openingSite;
-  switch (existentialVal.getType().getPreferredExistentialRepresentation()) {
+  switch (existentialVal.getType()
+                            .getPreferredExistentialRepresentation(gen.SGM.M)) {
   case ExistentialRepresentation::None:
     llvm_unreachable("not existential");
   case ExistentialRepresentation::Metatype:
@@ -3251,7 +3252,7 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
   SILType baseType = base.getType();
 
   // If the base is a boxed existential, we will open it later.
-  if (baseType.getPreferredExistentialRepresentation()
+  if (baseType.getPreferredExistentialRepresentation(SGM.M)
         == ExistentialRepresentation::Boxed) {
     assert(!baseType.isAddress()
            && "boxed existential should not be an address");

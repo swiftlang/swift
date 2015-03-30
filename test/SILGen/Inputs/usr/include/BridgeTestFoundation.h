@@ -39,6 +39,14 @@
 
 @end
 
+@interface NSError : NSObject
+
+@property NSInteger code;
+@property NSString *domain;
+@property NSDictionary *userInfo;
+
+@end
+
 __null_unspecified NSString *bar(void);
 void setBar(__null_unspecified NSString *s);
 

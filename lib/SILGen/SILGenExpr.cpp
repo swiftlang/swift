@@ -1963,7 +1963,8 @@ emitOpenExistentialForErasure(SILGenFunction &gen,
   SILType subLoweredTy = gen.getLoweredType(subFormalTy);
   bool isTake = subExistential.hasCleanup();
   SILValue subPayload;
-  switch (subExistential.getType().getPreferredExistentialRepresentation()) {
+  switch (subExistential.getType()
+                            .getPreferredExistentialRepresentation(gen.SGM.M)) {
   case ExistentialRepresentation::None:
     llvm_unreachable("not existential");
   case ExistentialRepresentation::Metatype:
@@ -2114,7 +2115,8 @@ static RValue emitBoxedErasure(SILGenFunction &gen, ErasureExpr *E) {
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   switch (SILType::getPrimitiveObjectType(E->getType()->getCanonicalType())
-            .getPreferredExistentialRepresentation(E->getSubExpr()->getType())){
+            .getPreferredExistentialRepresentation(SGF.SGM.M,
+                                                   E->getSubExpr()->getType())){
   case ExistentialRepresentation::None:
     llvm_unreachable("not an existential type");
   case ExistentialRepresentation::Metatype:
@@ -6624,7 +6626,8 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
   bool isUnique = E->getOpaqueValue()->isUniquelyReferenced();
   SILValue archetypeValue;
   
-  switch (existentialValue.getType().getPreferredExistentialRepresentation()) {
+  switch (existentialValue.getType()
+                            .getPreferredExistentialRepresentation(SGF.SGM.M)) {
   case ExistentialRepresentation::Opaque:
     assert(existentialValue.getValue().getType().isAddress());
     archetypeValue = SGF.B.createOpenExistentialAddr(

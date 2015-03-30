@@ -1,4 +1,6 @@
 typedef __typeof__(__objc_yes) BOOL;
+typedef long NSInteger;
+
 @class NSString;
 
 @protocol NSCopying

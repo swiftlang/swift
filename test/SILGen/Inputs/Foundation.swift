@@ -139,3 +139,5 @@ extension NSObject : Hashable {
 }
 
 public func == (x: NSObject, y: NSObject) -> Bool { return true }
+
+extension NSError: _ErrorType {}
