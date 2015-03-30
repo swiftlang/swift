@@ -90,5 +90,28 @@ ErrorTypeTests.test("dynamic casts") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
+var CanaryHandle = 0
+
+ErrorTypeTests.test("NSError") {
+  NoisyErrorLifeCount = 0
+  NoisyErrorDeathCount = 0
+  autoreleasepool {
+    let ns = NSError(domain: "SomeDomain", code: 321, userInfo: nil)
+
+    objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
+                             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+
+    let e: _ErrorType = ns
+    expectEqual(e.domain, "SomeDomain")
+    expectEqual(e.code, 321)
+
+    let ns2 = e as! NSError
+    expectTrue(ns === ns2)
+    expectEqual(ns2.domain, "SomeDomain")
+    expectEqual(ns2.code, 321)
+  }
+  expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
+}
+
 runAllTests()
 
