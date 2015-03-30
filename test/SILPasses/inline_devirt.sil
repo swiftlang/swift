@@ -1,0 +1,56 @@
+// RUN: %target-sil-opt %s -inline -dce | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+protocol P {
+  func foo() -> Builtin.Int1
+}
+
+struct S : P {
+  func foo() -> Builtin.Int1
+  init()
+}
+
+// CHECK-LABEL: target
+sil [always_inline] @target : $@cc(method) @thin (S) -> Builtin.Int1 {
+// CHECK: bb0
+bb0(%0 : $S):
+  %2 = integer_literal $Builtin.Int1, 0
+  return %2 : $Builtin.Int1
+}
+
+// CHECK-LABEL: witness
+sil [transparent] [thunk] @witness : $@cc(witness_method) @thin (@in_guaranteed S) -> Builtin.Int1 {
+// CHECK: bb0
+bb0(%0 : $*S):
+  // CHECK-NOT: load
+  %1 = load %0 : $*S
+  // CHECK-NOT: function_ref
+  %2 = function_ref @target : $@cc(method) @thin (S) -> Builtin.Int1
+  // CHECK-NOT: apply
+  %3 = apply %2(%1) : $@cc(method) @thin (S) -> Builtin.Int1
+  // CHECK: [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
+  // CHECK: return [[ZERO]]
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: caller
+sil shared @caller : $@thin (@in S) -> Builtin.Int1 {
+// CHECK: bb0
+bb0(%0 : $*S):
+  // CHECK-NOT: witness_method
+  %2 = witness_method $S, #P.foo!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Builtin.Int1
+  // CHECK-NOT: apply
+  %3 = apply %2<S>(%0) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Builtin.Int1
+  // CHECK-DAG: [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
+  // CHECK-DAG: destroy_addr %0
+  // CHECK-DAG: return [[ZERO]]
+  destroy_addr %0 : $*S
+  return %3 : $Builtin.Int1
+}
+
+sil_witness_table S: P module main {
+  method #P.foo!1: @witness
+}
