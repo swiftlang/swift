@@ -383,6 +383,44 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   return false;
 }
 
+/// Determine whether one protocol extension is at least as specialized as
+/// another.
+static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
+                                               DeclContext *dc1,
+                                               DeclContext *dc2) {
+  assert(dc1->isProtocolExtensionContext());
+  assert(dc2->isProtocolExtensionContext());
+
+  // If the two generic signatures are identical, neither is as specialized
+  // as the other.
+  GenericSignature *sig1 = dc1->getGenericSignatureOfContext();
+  GenericSignature *sig2 = dc2->getGenericSignatureOfContext();
+  if (sig1->getCanonicalSignature() == sig2->getCanonicalSignature())
+    return false;
+
+  // Form a constraint system where we've opened up all of the requirements of
+  // the second protocol extension.
+  ConstraintSystem cs(tc, dc1, None);
+  llvm::DenseMap<CanType, TypeVariableType *> replacements;
+  cs.openGeneric(dc2, sig2->getGenericParams(), sig2->getRequirements(),
+                 false, nullptr, ConstraintLocatorBuilder(nullptr),
+                 replacements);
+
+  // Bind the 'Self' type from the first extension to the type parameter from
+  // opening 'Self' of the second extension.
+  Type selfType1 = sig1->getGenericParams()[0];
+  Type selfType2 = sig2->getGenericParams()[0];
+  cs.addConstraint(ConstraintKind::Bind,
+                   replacements[selfType2->getCanonicalType()],
+                   ArchetypeBuilder::mapTypeIntoContext(dc1, selfType1),
+                   nullptr);
+
+  // Solve the system. If the first extension is at least as specialized as the
+  // second, we're done.
+  SmallVector<Solution, 1> solutions;
+  return !cs.solve(solutions, FreeTypeVariableBinding::Disallow);
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -422,19 +460,15 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                                          ->isProtocolExtensionContext();
   if (inProtocolExtension1 && inProtocolExtension2) {
     // Both members are in protocol extensions.
-
-    // If one protocol inherits from the other, its members are more
-    // specialized.
-    if (inProtocolExtension1 != inProtocolExtension2) {
-      if (inProtocolExtension1->inheritsFrom(inProtocolExtension2))
-        return true;
-      if (inProtocolExtension2->inheritsFrom(inProtocolExtension1))
-        return false;
+    // Determine whether the 'Self' type from the first protocol extension
+    // satisfies all of the requirements of the second protocol extension.
+    DeclContext *dc1 = decl1->getDeclContext();
+    DeclContext *dc2 = decl2->getDeclContext();
+    bool better1 = isProtocolExtensionAsSpecializedAs(tc, dc1, dc2);
+    bool better2 = isProtocolExtensionAsSpecializedAs(tc, dc2, dc1);
+    if (better1 != better2) {
+      return better1;
     }
-
-    // FIXME: When inProtocolExtension1 == inProtocolExtension2, we should
-    // check the constraints to determine whether one is more specialized
-    // than the other. This might simply be a generalization of the above.
   } else if (inProtocolExtension1 || inProtocolExtension2) {
     // One member is in a protocol extension, the other is in a concrete type.
     // Prefer the member in the concrete type.

@@ -236,6 +236,7 @@ extension PInherit4 {
   func order1() -> String { return "hello" }
 }
 
+struct SInherit1 : PInherit1 { }
 struct SInherit2 : PInherit2 { }
 struct SInherit3 : PInherit3 { }
 struct SInherit4 : PInherit4 { }
@@ -254,4 +255,76 @@ func testPInherit(si2 : SInherit2, si3: SInherit3, si4: SInherit4) {
   // types.
   b1 = si3.order1() // PInherit2.order1
   var i1: Int = si3.order1() // PInherit1.order1
+}
+
+protocol PConstrained1 {
+  typealias AssocTypePC1
+}
+
+extension PConstrained1 {
+  func pc1() -> Int { return 0 }
+}
+
+extension PConstrained1 where Self.AssocTypePC1 : PInherit2 {
+  func pc1() -> Bool { return true }
+}
+
+extension PConstrained1 where Self.AssocTypePC1 : PInherit3 {
+  func pc1() -> String { return "hello" }
+}
+
+struct SConstrained1 : PConstrained1 {
+  typealias AssocTypePC1 = SInherit1
+}
+
+struct SConstrained2 : PConstrained1 {
+  typealias AssocTypePC1 = SInherit2
+}
+
+struct SConstrained3 : PConstrained1 {
+  typealias AssocTypePC1 = SInherit3
+}
+
+func testPConstrained1(sc1: SConstrained1, sc2: SConstrained2,
+                       sc3: SConstrained3) {
+  var i = sc1.pc1() // PConstrained1.pc1
+  i = 17 // checks type of above
+
+  var b = sc2.pc1() // PConstrained1 (with PInherit2).pc1
+  b = true // checks type of above
+
+  var s = sc3.pc1() // PConstrained1 (with PInherit3).pc1
+  s = "hello" // checks type of above
+}
+
+protocol PConstrained2 {
+  typealias AssocTypePC2
+}
+
+protocol PConstrained3 : PConstrained2 {
+}
+
+extension PConstrained2 where Self.AssocTypePC2 : PInherit1 {
+  func pc2() -> Bool { return true } // expected-note{{found this candidate}}
+}
+
+extension PConstrained3 {
+  func pc2() -> String { return "hello" } // expected-note{{found this candidate}}
+}
+
+struct SConstrained3a : PConstrained3 {
+  typealias AssocTypePC2 = Int
+}
+
+struct SConstrained3b : PConstrained3 {
+  typealias AssocTypePC2 = SInherit3
+}
+
+func testSConstrained3(sc3a: SConstrained3a, sc3b: SConstrained3b) {
+  var s = sc3a.pc2() // PConstrained3.pc2
+  s = "hello"
+
+  sc3b.pc2() // expected-error{{ambiguous use of 'pc2'}}
+  s = sc3b.pc2()
+  var b: Bool = sc3b.pc2()
 }
