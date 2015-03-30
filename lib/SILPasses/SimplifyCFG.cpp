@@ -137,6 +137,7 @@ namespace {
     bool simplifyCondBrBlock(CondBranchInst *BI);
     bool simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI);
     bool simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI);
+    bool simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB);
     bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
     bool simplifyUnreachableBlock(UnreachableInst *UI);
@@ -1321,6 +1322,38 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
   return CastOpt.simplifyCheckedCastAddrBranchInst(CCABI) != nullptr;
 }
 
+// Replace the terminator of BB with a simple branch if all successors go
+// to trampoline jumps to the same destination block. The successor blocks
+// and the destination blocks may have no arguments.
+bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
+  SILBasicBlock *commonDest = nullptr;
+  for (const SILSuccessor &Succ : BB->getSuccessors()) {
+    SILBasicBlock *SuccBlock = Succ.getBB();
+    if (SuccBlock->getNumBBArg() != 0)
+      return false;
+    SILBasicBlock *DestBlock = getTrampolineDest(SuccBlock);
+    if (!DestBlock)
+      return false;
+    if (!commonDest) {
+      commonDest = DestBlock;
+    } else if (DestBlock != commonDest) {
+      return false;
+    }
+  }
+  if (!commonDest)
+    return false;
+  
+  assert(commonDest->getNumBBArg() == 0 &&
+         "getTrampolineDest should have checked that commonDest has no args");
+  
+  TermInst *Term = BB->getTerminator();
+  SILBuilderWithScope<1>(Term).createBranch(Term->getLoc(), commonDest, {});
+  Term->eraseFromParent();
+  addToWorklist(BB);
+  addToWorklist(commonDest);
+  return true;
+}
+
 void RemoveUnreachable::visit(SILBasicBlock *BB) {
   if (!Visited.insert(BB).second)
     return;
@@ -1475,9 +1508,11 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case ValueKind::SwitchValueInst:
       // FIXME: Optimize for known switch values.
+      Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
     case ValueKind::SwitchEnumInst:
       Changed |= simplifySwitchEnumBlock(cast<SwitchEnumInst>(TI));
+      Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
     case ValueKind::UnreachableInst:
       Changed |= simplifyUnreachableBlock(cast<UnreachableInst>(TI));
@@ -1487,6 +1522,9 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case ValueKind::CheckedCastAddrBranchInst:
       Changed |= simplifyCheckedCastAddrBranchBlock(cast<CheckedCastAddrBranchInst>(TI));
+      break;
+    case ValueKind::SwitchEnumAddrInst:
+      Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
     default:
       break;

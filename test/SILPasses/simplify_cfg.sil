@@ -582,10 +582,13 @@ enum A {
 sil @cannot_optimize_switch_enum : $@thin (A) -> () {
 // CHECK: bb0
 bb0(%0 : $A):
+// CHECK: %1 = function_ref
 // CHECK-NEXT: switch_enum %0 : $A, case #A.B!enumelt: bb1, default [[BB:bb[0-9a-zA-Z]+]]
+  %f1 = function_ref @external_f : $@thin ()->()
   switch_enum %0 : $A, case #A.B!enumelt: bb1, default bb2
 
 bb1:
+  apply %f1() : $@thin ()->()
   br bb5
 
 // CHECK: [[BB]]
@@ -594,14 +597,77 @@ bb2:
   switch_enum %0 : $A, case #A.C!enumelt: bb3, default bb4
 
 bb3:
+  apply %f1() : $@thin ()->()
   br bb5
 
 bb4:
+  apply %f1() : $@thin ()->()
   br bb5
 
 bb5:
   %6 = tuple ()
   return %6 : $()
+}
+
+// CHECK-LABEL: sil @identical_switch_enum_dests : $@thin (Optional<Int32>) -> () {
+// CHECK: bb0(%0 : $Optional<Int32>):
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @identical_switch_enum_dests : $@thin (Optional<Int32>) -> () {
+bb0(%0 : $Optional<Int32>):
+  switch_enum %0 : $Optional<Int32>, case #Optional.None!enumelt: bb1, case #Optional.Some!enumelt.1: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @identical_switch_enum_addr_dests : $@thin (@in Optional<Int32>) -> () {
+// CHECK: bb0(%0 : $*Optional<Int32>):
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @identical_switch_enum_addr_dests : $@thin (@in Optional<Int32>) -> () {
+bb0(%0 : $*Optional<Int32>):
+  switch_enum_addr %0 : $*Optional<Int32>, case #Optional.None!enumelt: bb1, case #Optional.Some!enumelt.1: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @identical_switch_value_dests : $@thin (Builtin.Int32) -> () {
+// CHECK: bb0(%0 : $Builtin.Int32):
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @identical_switch_value_dests : $@thin (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = integer_literal $Builtin.Int32, 24
+  %2 = integer_literal $Builtin.Int32, 25
+  switch_value %0 : $Builtin.Int32, case %1: bb1, case %2: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple()
+  return %r : $()
 }
 
 // CHECK-LABEL: @dominator_based_simplify_condbr
