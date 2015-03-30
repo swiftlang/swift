@@ -340,9 +340,8 @@ llvm::MDNode* IRGenDebugInfo::createInlinedAt(SILDebugScope *InlinedScope) {
     InlinedAt = createInlinedAt(CallSite);
 
   auto InlineLoc = getLoc(SM, CallSite->Loc.getDebugSourceLoc());
-  auto DL = llvm::DebugLoc::get(InlineLoc.Line, InlineLoc.Col,
-                                ParentScope, InlinedAt);
-  return DL.getAsMDNode(IGM.getLLVMContext());
+  return llvm::DebugLoc::get(InlineLoc.Line, InlineLoc.Col, ParentScope,
+                             InlinedAt);
 }
 
 #ifndef NDEBUG
