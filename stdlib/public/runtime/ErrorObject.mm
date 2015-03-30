@@ -178,6 +178,7 @@ _swift_getErrorValue_(const SwiftError *errorObject,
     out->type = swift_getObjCClassMetadata((ClassMetadata*)[asError class]);
 
     out->errorConformance = getNSErrorConformanceToErrorType();
+    return;
   }
   
   out->value = errorObject->getValue();
