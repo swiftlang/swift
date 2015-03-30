@@ -18,3 +18,5 @@ func _convertSetToNSSet<T: Hashable>(s: Set<T>) -> NSSet {
 func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
   return Set<T>()
 }
+
+extension NSError: _ErrorType {}

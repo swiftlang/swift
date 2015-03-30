@@ -9,3 +9,5 @@
 
 @property (readonly, copy) NSString *description;
 @end
+
+typedef long NSInteger;

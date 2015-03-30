@@ -13,6 +13,9 @@
 @interface NSMutableArray : NSObject
 @end
 
+@interface NSDictionary : NSObject
+@end
+
 @interface NSSet : NSObject
 @end
 
@@ -55,3 +58,10 @@ __attribute__((availability(macosx,introduced=10.10)))
 
 extern int weak_variable __attribute__((weak_import));
 
+@interface NSError : NSObject
+
+@property NSInteger code;
+@property NSString *domain;
+@property NSDictionary *userInfo;
+
+@end

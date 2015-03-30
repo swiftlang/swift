@@ -5169,6 +5169,25 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
                                CanType instanceFormalType,
                                SILType instanceLoweredType,
                                ArrayRef<ProtocolConformance*> conformances) {
+  // As a special case, an ErrorType existential can represented as a reference
+  // to an already existing NSError or CFError instance.
+  SmallVector<ProtocolDecl*, 4> protocols;
+  
+  if (outType.getSwiftRValueType()->isExistentialType(protocols)
+      && protocols.size() == 1) {
+    switch (getSpecialProtocolID(protocols[0])) {
+    case SpecialProtocol::ErrorType: {
+      // Bitcast the incoming class reference to ErrorType.
+      out.add(IGF.Builder.CreateBitCast(instance, IGF.IGM.ErrorPtrTy));
+      return;
+    }
+
+    case SpecialProtocol::AnyObject:
+    case SpecialProtocol::None:
+      break;
+    }
+  }
+  
   assert(outType.isClassExistentialType() &&
          "creating a non-class existential type");
 
