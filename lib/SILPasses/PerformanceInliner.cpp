@@ -22,8 +22,9 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/Utils/SILInliner.h"
 #include "swift/SILPasses/Utils/ConstantFolding.h"
+#include "swift/SILPasses/Utils/Devirtualize.h"
+#include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -771,10 +772,16 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
     unsigned loopDepth = LI->getLoopDepth(block);
-    for (SILInstruction &I : *block) {
-      constTracker.trackInst(&I);
+    for (auto I = block->begin(), E = block->end(); I != E; ++I) {
+      constTracker.trackInst(&*I);
       
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
+      if (ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
+        // Devirtualize in an attempt expose more opportunities for
+        // inlining.
+        if (auto *DirectAI = devirtualizeApply(AI)) {
+          AI = DirectAI;
+          I = SILBasicBlock::iterator(AI);
+        }
 
         DEBUG(llvm::dbgs() << "    Check:" << *AI);
 
