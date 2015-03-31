@@ -51,6 +51,10 @@ public protocol Resettable {
   func reset()
 }
 
+public extension Resettable {
+  func doReset() { self.reset() }
+}
+
 public class ResettableIntWrapper : Resettable {
   public var value : Int
   public init() { value = 0 }

@@ -18,6 +18,7 @@ var sum = b.x + b.y + computedProperty.value
 var intWrapper = ResettableIntWrapper()
 var r : Resettable = intWrapper
 r.reset()
+r.doReset()
 
 class AnotherIntWrapper : SpecialResettable, ClassProto {
   init() { value = 0 }
