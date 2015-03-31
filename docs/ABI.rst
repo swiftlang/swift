@@ -943,6 +943,7 @@ Types
 ``<type>`` never begins or ends with a number.
 ``<type>`` never begins with an underscore.
 ``<type>`` never begins with ``d``.
+``<type>`` never begins with ``z``.
 
 Note that protocols mangle differently as types and as contexts. A protocol
 context always consists of a single protocol name and so mangles without a
