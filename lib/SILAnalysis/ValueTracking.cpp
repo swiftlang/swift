@@ -53,6 +53,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::AllocValueBufferInst:
   case ValueKind::BuiltinInst:
   case ValueKind::ApplyInst:
+  case ValueKind::TryApplyInst:
   case ValueKind::WitnessMethodInst:
   case ValueKind::CopyAddrInst:
   case ValueKind::RetainValueInst:

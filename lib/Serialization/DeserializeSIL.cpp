@@ -699,6 +699,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     case 2:
       OpCode = (unsigned)ValueKind::BuiltinInst;
       break;
+    case 3:
+      OpCode = (unsigned)ValueKind::TryApplyInst;
+      break;
         
     default:
       llvm_unreachable("unexpected apply inst kind");
@@ -920,6 +923,44 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                     SubstFnTy,
                                     FTI->getResult().getSILType(),
                                     Substitutions, Args);
+    break;
+  }
+  case ValueKind::TryApplyInst: {
+    // Format: attributes such as transparent, the callee's type, a value for
+    // the callee and a list of values for the arguments. Each value in the list
+    // is represented with 2 IDs: ValueID and ValueResultNumber.  The final
+    // two values in the list are the basic block identifiers.
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    SILType FnTy = getSILType(Ty, SILValueCategory::Object);
+    SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object);
+
+    SILBasicBlock *errorBB = getBBForReference(Fn, ListOfValues.back());
+    ListOfValues = ListOfValues.drop_back();
+    SILBasicBlock *normalBB = getBBForReference(Fn, ListOfValues.back());
+    ListOfValues = ListOfValues.drop_back();
+
+    SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
+    auto ArgTys = FTI->getParameterSILTypes();
+    assert((ArgTys.size() << 1) == ListOfValues.size() &&
+           "Argument number mismatch in ApplyInst.");
+    SmallVector<SILValue, 4> Args;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
+      Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
+                                   ArgTys[I>>1]));
+    unsigned NumSub = NumSubs;
+
+    SmallVector<Substitution, 4> Substitutions;
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "missing substitution");
+      Substitutions.push_back(*sub);
+    }
+
+    ResultVal = Builder.createTryApply(Loc,
+                                       getLocalValue(ValID, ValResNum, FnTy),
+                                       SubstFnTy, Substitutions, Args,
+                                       normalBB, errorBB);
     break;
   }
   case ValueKind::PartialApplyInst: {

@@ -171,31 +171,35 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
   }
 }
 
-void swift::replaceWithSpecializedFunction(ApplyInstBase *AI, SILFunction *NewF) {
-  SILLocation Loc = AI->getLoc();
+void swift::replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF) {
+  SILLocation Loc = AI.getLoc();
   ArrayRef<Substitution> Subst;
 
   SmallVector<SILValue, 4> Arguments;
-  for (auto &Op : AI->getArgumentOperands()) {
+  for (auto &Op : AI.getArgumentOperands()) {
     Arguments.push_back(Op.get());
   }
 
-  SILBuilderWithScope<2> Builder(AI);
+  SILBuilderWithScope<2> Builder(AI.getInstruction());
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
 
-  ApplyInstBase *NAI = nullptr;
-
-  if (isa<ApplyInst>(AI))
-    NAI = Builder.createApply(Loc, FRI, Arguments);
-  if (isa<PartialApplyInst>(AI))
-    NAI = Builder.createPartialApply(Loc, FRI,
-                               AI->getSubstCalleeSILType(),
-                               {},
-                               Arguments,
-                               AI->getType());
-
-  AI->replaceAllUsesWith(NAI);
-  recursivelyDeleteTriviallyDeadInstructions(AI, true);
+  if (auto TAI = dyn_cast<TryApplyInst>(AI)) {
+    Builder.createTryApply(Loc, FRI, TAI->getSubstCalleeSILType(),
+                           {}, Arguments, TAI->getNormalBB(),
+                           TAI->getErrorBB());
+  } else {
+    SILInstruction *NAI = nullptr;
+    if (isa<ApplyInst>(AI))
+      NAI = Builder.createApply(Loc, FRI, Arguments);
+    if (auto PAI = dyn_cast<PartialApplyInst>(AI))
+      NAI = Builder.createPartialApply(Loc, FRI,
+                                       PAI->getSubstCalleeSILType(),
+                                       {},
+                                       Arguments,
+                                       PAI->getType());
+    AI.getInstruction()->replaceAllUsesWith(NAI);
+  }
+  recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
 }
 
 bool swift::hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap) {

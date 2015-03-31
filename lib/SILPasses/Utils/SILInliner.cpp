@@ -28,17 +28,17 @@ using namespace swift;
 ///
 /// \returns true on success or false if it is unable to inline the function
 /// (for any reason).
-bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
+bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   SILFunction *CalleeFunction = &Original;
   this->CalleeFunction = CalleeFunction;
 
   // Do not attempt to inline an apply into its parent function.
-  if (AI->getFunction() == CalleeFunction)
+  if (AI.getFunction() == CalleeFunction)
     return false;
 
   SILFunction &F = getBuilder().getFunction();
 
-  assert(AI->getFunction() && AI->getFunction() == &F &&
+  assert(AI.getFunction() && AI.getFunction() == &F &&
          "Inliner called on apply instruction in wrong function?");
   assert(((CalleeFunction->getAbstractCC() != AbstractCC::ObjCMethod &&
            CalleeFunction->getAbstractCC() != AbstractCC::C) ||
@@ -51,16 +51,16 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
   // Compute the SILLocation which should be used by all the inlined
   // instructions.
   if (IKind == InlineKind::PerformanceInline) {
-    Loc = InlinedLocation::getInlinedLocation(AI->getLoc());
+    Loc = InlinedLocation::getInlinedLocation(AI.getLoc());
   } else {
     assert(IKind == InlineKind::MandatoryInline && "Unknown InlineKind.");
-    Loc = MandatoryInlinedLocation::getMandatoryInlinedLocation(AI->getLoc());
+    Loc = MandatoryInlinedLocation::getMandatoryInlinedLocation(AI.getLoc());
   }
 
-  auto AIScope = AI->getDebugScope();
+  auto AIScope = AI.getDebugScope();
   // FIXME: Turn this into an assertion instead.
   if (!AIScope)
-    AIScope = AI->getFunction()->getDebugScope();
+    AIScope = AI.getFunction()->getDebugScope();
 
   if (IKind == InlineKind::MandatoryInline) {
     // Mandatory inlining: every instruction inherits scope/location
@@ -70,7 +70,7 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
     // Performance inlining. Construct a proper inline scope pointing
     // back to the call site.
     CallSiteScope = new (F.getModule())
-      SILDebugScope(AI->getLoc(), F, AIScope);
+      SILDebugScope(AI.getLoc(), F, AIScope);
     CallSiteScope->InlinedCallSite = AIScope->InlinedCallSite;
   }
   assert(CallSiteScope && "call site has no scope");
@@ -82,7 +82,7 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
   // we just leave the new BBs at the end as they are by default.
-  auto IBI = std::next(SILFunction::iterator(AI->getParent()));
+  auto IBI = std::next(SILFunction::iterator(AI.getParent()));
   InsertBeforeBB = IBI != F.end() ? IBI : nullptr;
 
   // Clear argument map and map ApplyInst arguments to the arguments of the
@@ -97,50 +97,53 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
   InstructionMap.clear();
   BBMap.clear();
   // Do not allow the entry block to be cloned again
-  BBMap.insert(std::make_pair(CalleeEntryBB, nullptr));
-  SILBasicBlock::iterator InsertPoint = std::next(SILBasicBlock::iterator(AI));
+  SILBasicBlock::iterator InsertPoint =
+    std::next(SILBasicBlock::iterator(AI.getInstruction()));
+  BBMap.insert(std::make_pair(CalleeEntryBB, InsertPoint->getParent()));
   getBuilder().setInsertionPoint(InsertPoint);
   // Recursively visit callee's BB in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
   visitSILBasicBlock(CalleeEntryBB);
 
-  // If the callee's entry block ends in a return, then we can avoid a split.
-  if (ReturnInst *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
-    // Replace all uses of the apply instruction with the operands of the
-    // return instruction, appropriately mapped.
-    SILValue(AI).replaceAllUsesWith(remapValue(RI->getOperand()));
-    return true;
+  // If we're inlining into a normal apply and the callee's entry
+  // block ends in a return, then we can avoid a split.
+  if (auto nonTryAI = dyn_cast<ApplyInst>(AI)) {
+    if (ReturnInst *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
+      // Replace all uses of the apply instruction with the operands of the
+      // return instruction, appropriately mapped.
+      SILValue(nonTryAI).replaceAllUsesWith(remapValue(RI->getOperand()));
+      return true;
+    }
   }
 
+  // If we're inlining into a try_apply, we already have a return-to BB.
+  SILBasicBlock *ReturnToBB;
+  if (auto tryAI = dyn_cast<TryApplyInst>(AI)) {
+    ReturnToBB = tryAI->getNormalBB();
+
   // Otherwise, split the caller's basic block to create a return-to BB.
-  SILBasicBlock *CallerBB = AI->getParent();
-  // Split the BB and do NOT create a branch between the old and new
-  // BBs; we will create the appropriate terminator manually later.
-  SILBasicBlock *ReturnToBB = CallerBB->splitBasicBlock(InsertPoint);
-  // Place the return-to BB after all the other mapped BBs.
-  if (InsertBeforeBB)
-    F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),
-                         SILFunction::iterator(ReturnToBB));
-  else
-    F.getBlocks().splice(F.getBlocks().end(), F.getBlocks(),
-                         SILFunction::iterator(ReturnToBB));
-  // Create an argument on the return-to BB representing the returned value.
-  SILValue RetArg = new (F.getModule()) SILArgument(ReturnToBB,
-                                                    AI->getType(0));
-  // Replace all uses of the ApplyInst with the new argument.
-  SILValue(AI).replaceAllUsesWith(RetArg);
+  } else {
+    SILBasicBlock *CallerBB = AI.getParent();
+    // Split the BB and do NOT create a branch between the old and new
+    // BBs; we will create the appropriate terminator manually later.
+    ReturnToBB = CallerBB->splitBasicBlock(InsertPoint);
+    // Place the return-to BB after all the other mapped BBs.
+    if (InsertBeforeBB)
+      F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),
+                           SILFunction::iterator(ReturnToBB));
+    else
+      F.getBlocks().splice(F.getBlocks().end(), F.getBlocks(),
+                           SILFunction::iterator(ReturnToBB));
+
+    // Create an argument on the return-to BB representing the returned value.
+    SILValue RetArg = new (F.getModule()) SILArgument(ReturnToBB,
+                                            AI.getInstruction()->getType(0));
+    // Replace all uses of the ApplyInst with the new argument.
+    SILValue(AI.getInstruction()).replaceAllUsesWith(RetArg);
+  }
 
   // Now iterate over the callee BBs and fix up the terminators.
-  getBuilder().setInsertionPoint(CallerBB);
-  // We already know that the callee's entry block does not terminate with a
-  // Return Inst, so it can definitely be cloned with the normal SILCloner
-  // visit function.
-  visit(CalleeEntryBB->getTerminator());
   for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    // Ignore entry block
-    if (BI->first == CalleeEntryBB)
-      continue;
-
     getBuilder().setInsertionPoint(BI->second);
 
     // Modify return terminators to branch to the return-to BB, rather than
@@ -155,8 +158,11 @@ bool SILInliner::inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args) {
     // Modify throw terminators to branch to the error-return BB, rather than
     // trying to clone the ThrowInst.
     if (ThrowInst *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
-      (void) TI;
-      llvm_unreachable("cannot remap throw in a non-try_apply call!");
+      auto tryAI = cast<TryApplyInst>(AI);
+      getBuilder().createBranch(Loc.getValue(), tryAI->getErrorBB(),
+                                remapValue(TI->getOperand()))
+        ->setDebugScope(AIScope);
+      continue;
     }
 
     assert(!isa<AutoreleaseReturnInst>(BI->first->getTerminator()) &&
@@ -294,6 +300,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
       return InlineCost::Free;
 
     case ValueKind::ApplyInst:
+    case ValueKind::TryApplyInst:
     case ValueKind::BuiltinInst:
     case ValueKind::AllocBoxInst:
     case ValueKind::AllocExistentialBoxInst:

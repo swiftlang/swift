@@ -175,23 +175,6 @@ BuiltinInst::BuiltinInst(SILLocation Loc,
          sizeof(Substitution) * Subs.size());
 }
 
-ApplyInstBase::ApplyInstBase(ValueKind Kind, SILLocation Loc, SILValue Callee,
-    SILType SubstCalleeType,
-    ArrayRef<Substitution> Subs,
-    ArrayRef<SILValue> Args,
-    SILType Ty)
-  : SILInstruction(Kind, Loc, Ty),
-    SubstCalleeType(SubstCalleeType),
-    NumSubstitutions(Subs.size()),
-    Operands(this, Args, Callee)
-{
-  static_assert(IsTriviallyCopyable<Substitution>::value,
-                "assuming Substitution is trivial");
-  memcpy(getSubstitutionsStorage(), Subs.begin(),
-         sizeof(Substitution) * Subs.size());
-}
-
-
 ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy,
                      SILType Result,
@@ -208,20 +191,20 @@ ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
                              ArrayRef<Substitution> Subs,
                              ArrayRef<SILValue> Args,
                              SILFunction &F) {
-  void *Buffer = F.getModule().allocate(sizeof(ApplyInst)
-                              + decltype(Operands)::getExtraSize(Args.size())
-                              + sizeof(Substitution) * Subs.size(),
-                            alignof(ApplyInst));
+  void *Buffer = allocate(F, Subs, Args);
   return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeTy,
                                  Result, Subs, Args);
 }
 
-bool ApplyInst::hasSemantics(StringRef SemanticsString) const {
-  if (auto *FRI = dyn_cast<FunctionRefInst>(getCallee()))
+bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
+  if (auto *FRI = dyn_cast<FunctionRefInst>(callee))
     if (auto *F = FRI->getReferencedFunction())
-      return F->hasSemanticsString(SemanticsString);
-
+      return F->hasSemanticsString(semantics);
   return false;
+}
+
+void *swift::allocateApplyInst(SILFunction &F, size_t size, size_t alignment) {
+  return F.getModule().allocate(size, alignment);
 }
 
 PartialApplyInst::PartialApplyInst(SILLocation Loc, SILValue Callee,
@@ -241,12 +224,36 @@ PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,
                                            ArrayRef<SILValue> Args,
                                            SILType ClosureType,
                                            SILFunction &F) {
-  void *Buffer = F.getModule().allocate(sizeof(PartialApplyInst)
-                              + decltype(Operands)::getExtraSize(Args.size())
-                              + sizeof(Substitution) * Subs.size(),
-                            alignof(PartialApplyInst));
+  void *Buffer = allocate(F, Subs, Args);
   return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
                                         Subs, Args, ClosureType);
+}
+
+TryApplyInstBase::TryApplyInstBase(ValueKind valueKind, SILLocation loc,
+                                   SILBasicBlock *normalBB,
+                                   SILBasicBlock *errorBB)
+  : TermInst(valueKind, loc),
+    DestBBs{{this, normalBB}, {this, errorBB}} {}
+
+TryApplyInst::TryApplyInst(SILLocation loc, SILValue callee,
+                           SILType substCalleeTy,
+                           ArrayRef<Substitution> subs,
+                           ArrayRef<SILValue> args,
+                           SILBasicBlock *normalBB, SILBasicBlock *errorBB)
+  : ApplyInstBase(ValueKind::TryApplyInst, loc, callee, substCalleeTy,
+                  subs, args, normalBB, errorBB) {
+}
+
+TryApplyInst *TryApplyInst::create(SILLocation loc, SILValue callee,
+                                   SILType substCalleeTy,
+                                   ArrayRef<Substitution> subs,
+                                   ArrayRef<SILValue> args,
+                                   SILBasicBlock *normalBB,
+                                   SILBasicBlock *errorBB,
+                                   SILFunction &F) {
+  void *buffer = allocate(F, subs, args);
+  return ::new(buffer) TryApplyInst(loc, callee, substCalleeTy,
+                                    subs, args, normalBB, errorBB);
 }
 
 FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)

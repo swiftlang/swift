@@ -40,10 +40,10 @@ public:
   static SILFunction *cloneFunction(SILFunction *F,
                                     TypeSubstitutionMap &InterfaceSubs,
                                     TypeSubstitutionMap &ContextSubs,
-                                    StringRef NewName, ApplyInstBase *Caller) {
+                                    StringRef NewName, ApplySite Caller) {
     // Clone and specialize the function.
     SpecializingCloner SC(F, InterfaceSubs, ContextSubs, NewName,
-                          Caller->getSubstitutions());
+                          Caller.getSubstitutions());
     SC.populateCloned();
     SC.cleanUp(SC.getCloned());
     return SC.getCloned();
@@ -60,8 +60,8 @@ private:
 };
 
 struct GenericSpecializer {
-  /// A list of ApplyInst instructions.
-  typedef SmallVector<ApplyInstBase *, 16> AIList;
+  /// A list of apply instructions.
+  typedef SmallVector<ApplySite, 16> AIList;
 
   GenericSpecializer(SILModule *Mod) : M(Mod) {}
 
@@ -82,7 +82,7 @@ private:
   void collectApplyInst(SILFunction &F);
 
   /// Add the call \p AI into the list of calls to inspect.
-  void addApplyInst(ApplyInstBase *AI);
+  void addApplyInst(ApplySite AI);
 
 public:
   /// Try to specialize a list of calls specified in \p calls.

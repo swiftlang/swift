@@ -527,6 +527,8 @@ public:
   void visitAllocBoxInst(AllocBoxInst *i);
 
   void visitApplyInst(ApplyInst *i);
+  void visitTryApplyInst(TryApplyInst *i);
+  void visitFullApplySite(FullApplySite i);
   void visitPartialApplyInst(PartialApplyInst *i);
   void visitBuiltinInst(BuiltinInst *i);
 
@@ -1677,7 +1679,6 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
 }
 
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
-                                                   ApplyInst *AI,
                                          CanSILFunctionType origCalleeType,
                                          CanSILFunctionType substCalleeType,
                                          const LoweredValue &lv,
@@ -1765,7 +1766,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   Callee callee = Callee::forKnownFunction(origCalleeType, substCalleeType,
                                            substitutions, calleeFn, calleeData);
   CallEmission callEmission(IGF, callee);
-  if (AI->getFunction()->isThunk())
+  if (IGF.CurSILFn->isThunk())
     callEmission.addAttribute(llvm::AttributeSet::FunctionIndex, llvm::Attribute::NoInline);
   
   return callEmission;
@@ -1791,13 +1792,21 @@ void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
-  const LoweredValue &calleeLV = getLoweredValue(i->getCallee());
+  visitFullApplySite(i);
+}
+
+void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
+  visitFullApplySite(i);
+}
+
+void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
+  const LoweredValue &calleeLV = getLoweredValue(site.getCallee());
   
-  auto origCalleeType = i->getOrigCalleeType();
-  auto substCalleeType = i->getSubstCalleeType();
+  auto origCalleeType = site.getOrigCalleeType();
+  auto substCalleeType = site.getSubstCalleeType();
   
   auto params = origCalleeType->getParametersWithoutIndirectResult();
-  auto args = i->getArgumentsWithoutIndirectResult();
+  auto args = site.getArgumentsWithoutIndirectResult();
   assert(params.size() == args.size());
 
   // Extract 'self' if it needs to be passed as the context parameter.
@@ -1817,17 +1826,17 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
 
   Explosion llArgs;    
   CallEmission emission =
-    getCallEmissionForLoweredValue(*this, i, origCalleeType, substCalleeType,
+    getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
                                    calleeLV, selfValue, llArgs,
-                                   i->getSubstitutions());
+                                   site.getSubstitutions());
 
   // Lower the arguments and return value in the callee's generic context.
   GenericContextScope scope(IGM, origCalleeType->getGenericSignature());
 
   // Save off the indirect return argument, if any.
   SILValue indirectResult;
-  if (i->hasIndirectResult()) {
-    indirectResult = i->getIndirectResult();
+  if (site.hasIndirectResult()) {
+    indirectResult = site.getIndirectResult();
   }
 
   // Lower the SIL arguments to IR arguments.
@@ -1841,30 +1850,31 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   WitnessMetadata witnessMetadata;
   if (hasPolymorphicParameters(origCalleeType)) {
     emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
-                             i->getSubstitutions(), &witnessMetadata, llArgs);
+                             site.getSubstitutions(), &witnessMetadata, llArgs);
   }
 
   // Add all those arguments.
   emission.setArgs(llArgs, &witnessMetadata);
+
+  SILInstruction *i = site.getInstruction();
   
   // If the SIL function takes an indirect-result argument, emit into it.
+  Explosion result;
   if (indirectResult) {
     Address a = getLoweredAddress(indirectResult);
     auto &retTI = getTypeInfo(indirectResult.getType());
     emission.emitToMemory(a, retTI);
-    
-    // Create a void value for the formal return.
-    Explosion voidValue;
-    setLoweredExplosion(SILValue(i, 0), voidValue);
-    return;
+
+    // Leave an empty explosion in 'result'.
+  } else {
+    // FIXME: handle the result value being an address?
+    // If the result is a non-address value, emit to an explosion.
+    emission.emitToExplosion(result);
   }
-  
-  // FIXME: handle the result value being an address?
-  
-  // If the result is a non-address value, emit to an explosion.
-  Explosion result;
-  emission.emitToExplosion(result);
-  setLoweredExplosion(SILValue(i, 0), result);
+
+  if (isa<ApplyInst>(i)) {
+    setLoweredExplosion(SILValue(i, 0), result);
+  }
 }
 
 static std::tuple<llvm::Value*, llvm::Value*, CanSILFunctionType>

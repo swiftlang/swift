@@ -1264,6 +1264,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("switch_enum_addr",
           ValueKind::SwitchEnumAddrInst)
     .Case("switch_value", ValueKind::SwitchValueInst)
+    .Case("try_apply", ValueKind::TryApplyInst)
     .Case("unchecked_enum_data", ValueKind::UncheckedEnumDataInst)
     .Case("unchecked_addr_cast", ValueKind::UncheckedAddrCastInst)
     .Case("unchecked_trivial_bit_cast", ValueKind::UncheckedTrivialBitCastInst)
@@ -1630,6 +1631,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   case ValueKind::ApplyInst:
   case ValueKind::PartialApplyInst:
+  case ValueKind::TryApplyInst:
     if (parseCallInstruction(InstLoc, Opcode, B, ResultVal))
       return true;
     break;
@@ -3338,6 +3340,36 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = B.createPartialApply(InstLoc, FnVal, FnTy,
                                      subs, Args, closureTy);
+    break;
+  }
+  case ValueKind::TryApplyInst: {
+    Identifier normalBBName, errorBBName;
+    SourceLoc normalBBLoc, errorBBLoc;
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+        || parseVerbatim("normal")
+        || parseSILIdentifier(normalBBName, normalBBLoc,
+                              diag::expected_sil_block_name)
+        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+        || parseVerbatim("error")
+        || parseSILIdentifier(errorBBName, errorBBLoc,
+                              diag::expected_sil_block_name))
+      return true;
+
+    if (ArgTys.size() != ArgNames.size()) {
+      P.diagnose(TypeLoc, diag::expected_sil_type_kind,
+                 "to have the same number of arg names as arg types");
+      return true;
+    }
+    
+    unsigned argNo = 0;
+    SmallVector<SILValue, 4> args;
+    for (auto &argName : ArgNames)
+      args.push_back(getLocalValue(argName, ArgTys[argNo++], InstLoc));
+
+    SILBasicBlock *normalBB = getBBForReference(normalBBName, normalBBLoc);
+    SILBasicBlock *errorBB = getBBForReference(errorBBName, errorBBLoc);
+    ResultVal = B.createTryApply(InstLoc, FnVal, FnTy,
+                                 subs, args, normalBB, errorBB);
     break;
   }
   }

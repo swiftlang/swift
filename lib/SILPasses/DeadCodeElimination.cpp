@@ -291,6 +291,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
     markValueLive(I->getOperand(0).getDef());
     return;
 
+  case ValueKind::TryApplyInst:
   case ValueKind::SwitchValueInst:
     for (auto &O : I->getAllOperands())
       markValueLive(O.get().getDef());

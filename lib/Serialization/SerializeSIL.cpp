@@ -617,6 +617,31 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     S.writeSubstitutions(AI->getSubstitutions(), SILAbbrCodes);
     break;
   }
+  case ValueKind::TryApplyInst: {
+    // Format: attributes such as transparent and number of substitutions,
+    // the callee's substituted and unsubstituted types, a value for
+    // the callee and a list of values for the arguments. Each value in the list
+    // is represented with 2 IDs: ValueID and ValueResultNumber. The final two
+    // entries in the list are the basic block destinations. The record
+    // is followed by the substitution list.
+    const TryApplyInst *AI = cast<TryApplyInst>(&SI);
+    SmallVector<ValueID, 4> Args;
+    for (auto Arg: AI->getArguments()) {
+      Args.push_back(addValueRef(Arg));
+      Args.push_back(Arg.getResultNumber());
+    }
+    Args.push_back(BasicBlockMap[AI->getNormalBB()]);
+    Args.push_back(BasicBlockMap[AI->getErrorBB()]);
+    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstApplyLayout::Code], 0/*Apply*/,
+        AI->getSubstitutions().size(),
+        S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),
+        S.addTypeRef(AI->getSubstCalleeType()),
+        addValueRef(AI->getCallee()), AI->getCallee().getResultNumber(),
+        Args);
+    S.writeSubstitutions(AI->getSubstitutions(), SILAbbrCodes);
+    break;
+  }
   case ValueKind::PartialApplyInst: {
     const PartialApplyInst *PAI = cast<PartialApplyInst>(&SI);
         SmallVector<ValueID, 4> Args;

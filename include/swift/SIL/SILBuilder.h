@@ -228,6 +228,16 @@ public:
                        ArrayRef<Substitution>(), Args);
   }
 
+  TryApplyInst *createTryApply(SILLocation loc, SILValue fn,
+                               SILType substFnTy,
+                               ArrayRef<Substitution> subs,
+                               ArrayRef<SILValue> args,
+                               SILBasicBlock *normalBB,
+                               SILBasicBlock *errorBB) {
+    return insert(TryApplyInst::create(loc, fn, substFnTy, subs, args,
+                                       normalBB, errorBB, F));
+  }
+
 
   PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
                                        SILType SubstFnTy,

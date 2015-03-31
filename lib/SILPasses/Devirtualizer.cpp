@@ -81,8 +81,8 @@ public:
     }
 
     // Invalidate the analysis of caller functions.
-    for (auto *AI : DevirtualizedCalls) {
-      invalidateAnalysis(AI->getFunction(),
+    for (auto AI : DevirtualizedCalls) {
+      invalidateAnalysis(AI.getInstruction()->getFunction(),
                          SILAnalysis::PreserveKind::Branches);
     }
 

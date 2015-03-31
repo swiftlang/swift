@@ -595,50 +595,55 @@ public:
     return fnTy->substGenericArgs(F.getModule(), M, subs);
   }
 
-  void checkApplyInst(ApplyInst *AI) {
+  void checkFullApplySite(FullApplySite site) {
     // If we have a substitution whose replacement type is an archetype, make
     // sure that the replacement archetype is in the context generic params of
     // the caller function.
     // For each substitution Sub in AI...
-    for (auto &Sub : AI->getSubstitutions()) {
+    for (auto &Sub : site.getSubstitutions()) {
       // If Sub's replacement is not an archetype type or is from an opened
       // existential type, skip it...
       auto *A = Sub.getReplacement()->getAs<ArchetypeType>();
       if (!A)
         continue;
-      require(isArchetypeValidInFunction(A, AI->getFunction()),
+      require(isArchetypeValidInFunction(A, site.getInstruction()->getFunction()),
               "Archetype to be substituted must be valid in function.");
     }
 
     // Then make sure that we have a type that can be substituted for the
     // callee.
-    auto substTy = checkApplySubstitutions(AI->getSubstitutions(),
-                                      AI->getCallee().getType());
-    require(AI->getOrigCalleeType()->getAbstractCC() ==
-            AI->getSubstCalleeType()->getAbstractCC(),
+    auto substTy = checkApplySubstitutions(site.getSubstitutions(),
+                                           site.getCallee().getType());
+    require(site.getOrigCalleeType()->getAbstractCC() ==
+            site.getSubstCalleeType()->getAbstractCC(),
             "calling convention difference between types");
 
-    require(!AI->getSubstCalleeType()->isPolymorphic(),
+    require(!site.getSubstCalleeType()->isPolymorphic(),
             "substituted callee type should not be generic");
 
-    require(!AI->getSubstCalleeType()->hasErrorResult(),
-            "apply instruction cannot call function with error result");
-
     requireSameType(SILType::getPrimitiveObjectType(substTy),
-                    SILType::getPrimitiveObjectType(AI->getSubstCalleeType()),
+                    SILType::getPrimitiveObjectType(site.getSubstCalleeType()),
             "substituted callee type does not match substitutions");
 
     // Check that the arguments and result match.
-    require(AI->getArguments().size() ==
+    require(site.getArguments().size() ==
             substTy->getParameters().size(),
             "apply doesn't have right number of arguments for function");
-    for (size_t i = 0, size = AI->getArguments().size(); i < size; ++i) {
-      requireSameType(AI->getArguments()[i].getType(),
+    for (size_t i = 0, size = site.getArguments().size(); i < size; ++i) {
+      requireSameType(site.getArguments()[i].getType(),
                       substTy->getParameters()[i].getSILType(),
                       "operand of 'apply' doesn't match function input type");
     }
+  }
+
+  void checkApplyInst(ApplyInst *AI) {
+    checkFullApplySite(AI);
+
+    auto substTy = AI->getSubstCalleeType();
     require(AI->getType() == substTy->getResult().getSILType(),
             "type of apply instruction doesn't match function result type");
+    require(!substTy->hasErrorResult(),
+            "apply instruction cannot call function with error result");
 
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.
@@ -647,6 +652,30 @@ public:
       return;
     require(isa<UnreachableInst>(std::next(SILBasicBlock::iterator(AI))),
             "No return apply without an unreachable as a next instruction.");
+  }
+
+  void checkTryApplyInst(TryApplyInst *AI) {
+    checkFullApplySite(AI);
+
+    auto substTy = AI->getSubstCalleeType();
+
+    auto normalBB = AI->getNormalBB();
+    require(normalBB->bbarg_size() == 1,
+            "normal destination of try_apply must take one argument");
+    requireSameType((*normalBB->bbarg_begin())->getType(),
+                    substTy->getResult().getSILType(),
+                    "normal destination of try_apply must take argument "
+                    "of normal result type");
+
+    auto errorBB = AI->getErrorBB();
+    require(substTy->hasErrorResult(),
+            "try_apply must call function with error result");
+    require(errorBB->bbarg_size() == 1,
+            "error destination of try_apply must take one argument");
+    requireSameType((*errorBB->bbarg_begin())->getType(),
+                    substTy->getErrorResult().getSILType(),
+                    "error destination of try_apply must take argument "
+                    "of error result type");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {

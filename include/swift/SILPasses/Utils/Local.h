@@ -67,7 +67,7 @@ namespace swift {
 
   // Rewrite a call, which may previously have been a dynmaic dispath, to a
   // known function reference.
-  void replaceWithSpecializedFunction(ApplyInstBase *AI, SILFunction *NewF);
+  void replaceWithSpecializedFunction(ApplySite site, SILFunction *NewF);
 
   /// \brief Return true if the substitution map contains a
   /// substitution that is an unbound generic type.

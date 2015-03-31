@@ -438,9 +438,19 @@ public:
   }
 };
 
-/// ApplyInst - Represents the full application of a function value.
-class ApplyInstBase : public SILInstruction {
-protected:
+void *allocateApplyInst(SILFunction &F, size_t size, size_t align);
+class PartialApplyInst;
+
+/// ApplyInstBase - An abstract class for different kinds of function
+/// application.
+template <class Impl, class Base,
+          bool IsFullApply = !std::is_same<Impl, PartialApplyInst>::value>
+class ApplyInstBase;
+
+// The partial specialization for non-full applies.  Note that the
+// partial specialization for full applies inherits from this.
+template <class Impl, class Base>
+class ApplyInstBase<Impl, Base, false> : public Base {
   enum {
     Callee
   };
@@ -463,11 +473,30 @@ protected:
     return reinterpret_cast<const Substitution*>(Operands.asArray().end());
   }
 
-  ApplyInstBase(ValueKind Kind, SILLocation Loc, SILValue Callee,
-                SILType SubstCalleeType,
-                ArrayRef<Substitution> Substitutions,
-                ArrayRef<SILValue> Args,
-                SILType Ty);
+protected:
+  template <class... As>
+  ApplyInstBase(ValueKind kind, SILLocation loc, SILValue callee,
+                SILType substCalleeType, ArrayRef<Substitution> substitutions,
+                ArrayRef<SILValue> args, As... baseArgs)
+    : Base(kind, loc, baseArgs...),
+      SubstCalleeType(substCalleeType),
+      NumSubstitutions(substitutions.size()),
+      Operands(this, args, callee) {
+    static_assert(sizeof(Impl) == sizeof(*this),
+        "subclass has extra storage, cannot use TailAllocatedOperandList");
+    memcpy(getSubstitutionsStorage(), substitutions.begin(),
+           sizeof(substitutions[0]) * substitutions.size());
+  }
+
+  static void *allocate(SILFunction &F,
+                        ArrayRef<Substitution> substitutions,
+                        ArrayRef<SILValue> args) {
+    return allocateApplyInst(F,
+                    sizeof(Impl) +
+                    decltype(Operands)::getExtraSize(args.size()) +
+                    sizeof(substitutions[0]) * substitutions.size(),
+                             alignof(Impl));
+  }
 
 public:
   // The operand number of the first argument.
@@ -477,7 +506,7 @@ public:
 
   // Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {
-    return getCallee().getType().castTo<SILFunctionType>();
+    return getCallee().getType().template castTo<SILFunctionType>();
   }
 
   // Get the type of the callee with the applied substitutions.
@@ -537,56 +566,38 @@ public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  /// Return the ast level function type of this partial apply.
-  CanSILFunctionType getFunctionType() const {
-    return getType().castTo<SILFunctionType>();
-  }
-
-  bool hasIndirectResult() const {
-    return getSubstCalleeType()->hasIndirectResult();
-  }
-
-  SILValue getIndirectResult() const {
-    assert(hasIndirectResult() && "apply inst does not have indirect result!");
-    return getArguments().front();
-  }
-
-  OperandValueArrayRef getArgumentsWithoutIndirectResult() const {
-    if (hasIndirectResult())
-      return getArguments().slice(1);
-    return getArguments();
-  }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::ApplyInst ||
-           V->getKind() == ValueKind::PartialApplyInst;
-  }
 };
 
-/// ApplyInst - Represents the full application of a function value.
-class ApplyInst : public ApplyInstBase {
-  ApplyInst(SILLocation Loc, SILValue Callee,
-            SILType SubstCalleeType,
-            SILType ReturnType,
-            ArrayRef<Substitution> Substitutions,
-            ArrayRef<SILValue> Args);
+/// Given the callee operand of an apply or try_apply instruction,
+/// does it have the given semantics?
+bool doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics);
+
+// The partial specialization of ApplyInstBase for full applications.
+// Adds some methods relating to 'self' and to result types that don't
+// make sense for partial applications.
+template <class Impl, class Base>
+class ApplyInstBase<Impl, Base, true>
+  : public ApplyInstBase<Impl, Base, false> {
+  using super = ApplyInstBase<Impl, Base, false>;
+protected:
+  template <class... As>
+  ApplyInstBase(As &&...args)
+    : ApplyInstBase<Impl,Base,false>(std::forward<As>(args)...) {}
 
 public:
-  static ApplyInst *create(SILLocation Loc, SILValue Callee,
-                           SILType SubstCalleeType,
-                           SILType ReturnType,
-                           ArrayRef<Substitution> Substitutions,
-                           ArrayRef<SILValue> Args,
-                           SILFunction &F);
-
   /// Returns true if this apply has a self argument.
   bool hasSelfArgument() const {
-    return getSubstCalleeType()->hasSelfArgument();
+    return this->getSubstCalleeType()->hasSelfArgument();
   }
+
+  using super::getCallee;
+  using super::getSubstCalleeType;
+  using super::hasSubstitutions;
+  using super::getSubstitutions;
+  using super::getNumArguments;
+  using super::getArgument;
+  using super::getArguments;
+  using super::getArgumentOperands;
 
   /// The collection of following routines wrap the representation difference in
   /// between the self substitution being first, but the self parameter of a
@@ -617,7 +628,7 @@ public:
   void setSelfArgument(SILValue V) {
     assert(hasSelfArgument() && "Must have a self argument");
     assert(getNumArguments() && "Should only be called when Callee has "
-                                "arguments.");
+                                      "arguments.");
     getArgumentOperands()[getNumArguments() - 1].set(V);
   }
 
@@ -627,7 +638,7 @@ public:
            "at least a self parameter.");
     assert(hasSubstitutions() && "Should only be called when Callee has "
            "substitutions.");
-    ArrayRef<Operand> ops = getArgumentOperands();
+    ArrayRef<Operand> ops = this->getArgumentOperands();
     ArrayRef<Operand> opsWithoutSelf = ArrayRef<Operand>(&ops[0],
                                                          ops.size()-1);
     return OperandValueArrayRef(opsWithoutSelf);
@@ -664,19 +675,39 @@ public:
     return getArguments();
   }
 
+  bool hasSemantics(StringRef semanticsString) const {
+    return doesApplyCalleeHaveSemantics(getCallee(), semanticsString);
+  }
+};
+
+/// ApplyInst - Represents the full application of a function value.
+class ApplyInst : public ApplyInstBase<ApplyInst, SILInstruction> {
+  ApplyInst(SILLocation Loc, SILValue Callee,
+            SILType SubstCalleeType,
+            SILType ReturnType,
+            ArrayRef<Substitution> Substitutions,
+            ArrayRef<SILValue> Args);
+
+public:
+  static ApplyInst *create(SILLocation Loc, SILValue Callee,
+                           SILType SubstCalleeType,
+                           SILType ReturnType,
+                           ArrayRef<Substitution> Substitutions,
+                           ArrayRef<SILValue> Args,
+                           SILFunction &F);
+
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ApplyInst;
   }
-
-  bool hasSemantics(StringRef SemanticsString) const;
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
 /// application of a function value.
-class PartialApplyInst : public ApplyInstBase {
+class PartialApplyInst
+    : public ApplyInstBase<PartialApplyInst, SILInstruction> {
   PartialApplyInst(SILLocation Loc, SILValue Callee,
                    SILType SubstCalleeType,
                    ArrayRef<Substitution> Substitutions,
@@ -689,6 +720,15 @@ public:
                                   ArrayRef<SILValue> Args,
                                   SILType ClosureType,
                                   SILFunction &F);
+
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+
+  /// Return the ast level function type of this partial apply.
+  CanSILFunctionType getFunctionType() const {
+    return getType().castTo<SILFunctionType>();
+  }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::PartialApplyInst;
@@ -3606,6 +3646,212 @@ public:
   }
 };
 
+/// A private abstract class to store the destinations of a TryApplyInst.
+class TryApplyInstBase : public TermInst {
+public:
+  enum {
+    // Map branch targets to block sucessor indices.
+    NormalIdx,
+    ErrorIdx
+  };
+private:
+  SILSuccessor DestBBs[2];
+
+protected:
+  TryApplyInstBase(ValueKind valueKind, SILLocation loc,
+                   SILBasicBlock *normalBB, SILBasicBlock *errorBB);
+
+public:
+  SuccessorListTy getSuccessors() {
+    return DestBBs;
+  }
+
+  SILBasicBlock *getNormalBB() { return DestBBs[NormalIdx]; }
+  const SILBasicBlock *getNormalBB() const { return DestBBs[NormalIdx]; }
+  SILBasicBlock *getErrorBB() { return DestBBs[ErrorIdx]; }
+  const SILBasicBlock *getErrorBB() const { return DestBBs[ErrorIdx]; }
+};
+
+/// TryApplyInst - Represents the full application of a function that
+/// can produce an error.
+class TryApplyInst
+    : public ApplyInstBase<TryApplyInst, TryApplyInstBase> {
+  TryApplyInst(SILLocation loc, SILValue callee,
+               SILType substCalleeType,
+               ArrayRef<Substitution> substitutions,
+               ArrayRef<SILValue> args,
+               SILBasicBlock *normalBB, SILBasicBlock *errorBB);
+public:
+  static TryApplyInst *create(SILLocation loc, SILValue callee,
+                              SILType substCalleeType,
+                              ArrayRef<Substitution> substitutions,
+                              ArrayRef<SILValue> args,
+                              SILBasicBlock *normalBB,
+                              SILBasicBlock *errorBB,
+                              SILFunction &F);
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::TryApplyInst;
+  }
+};
+
+/// An apply instruction.
+class ApplySite {
+  SILInstruction *Inst;
+public:
+  ApplySite() : Inst(nullptr) {}
+  explicit ApplySite(ValueBase *inst)
+    : Inst(static_cast<SILInstruction*>(inst)) {
+    assert(classof(inst) && "not an apply instruction?");
+  }
+  ApplySite(ApplyInst *inst) : Inst(inst) {}
+  ApplySite(PartialApplyInst *inst) : Inst(inst) {}
+  ApplySite(TryApplyInst *inst) : Inst(inst) {}
+
+  static ApplySite isa(ValueBase *inst) {
+    return (classof(inst) ? ApplySite(inst) : ApplySite());
+  }
+
+  explicit operator bool() const {
+    return Inst != nullptr;
+  }
+
+  SILInstruction *getInstruction() const { return Inst; }
+  SILLocation getLoc() const { return Inst->getLoc(); }
+  SILDebugScope *getDebugScope() const { return Inst->getDebugScope(); }
+  SILFunction *getFunction() const { return Inst->getFunction(); }
+  SILBasicBlock *getParent() const { return Inst->getParent(); }
+
+#define FOREACH_IMPL_RETURN(OPERATION) do {                             \
+    switch (Inst->getKind()) {                                          \
+    case ValueKind::ApplyInst:                                          \
+      return cast<ApplyInst>(Inst)->OPERATION;                          \
+    case ValueKind::PartialApplyInst:                                   \
+      return cast<PartialApplyInst>(Inst)->OPERATION;                   \
+    case ValueKind::TryApplyInst:                                       \
+      return cast<TryApplyInst>(Inst)->OPERATION;                       \
+    default:                                                            \
+      llvm_unreachable("not an apply instruction!");                    \
+    }                                                                   \
+  } while(0)
+
+  /// Return the callee operand.
+  SILValue getCallee() const {
+    FOREACH_IMPL_RETURN(getCallee());
+  }
+
+  /// Get the type of the callee without the applied substitutions.
+  CanSILFunctionType getOrigCalleeType() const {
+    return getCallee().getType().castTo<SILFunctionType>();
+  }
+
+  /// Get the type of the callee with the applied substitutions.
+  CanSILFunctionType getSubstCalleeType() const {
+    return getSubstCalleeSILType().castTo<SILFunctionType>();
+  }
+  SILType getSubstCalleeSILType() const {
+    FOREACH_IMPL_RETURN(getSubstCalleeSILType());
+  }
+
+  bool isCalleeThin() const {
+    return getSubstCalleeType()->hasThinRepresentation();
+  }
+
+  /// True if this application has generic substitutions.
+  bool hasSubstitutions() const {
+    FOREACH_IMPL_RETURN(hasSubstitutions());
+  }
+
+  /// The substitutions used to bind the generic arguments of this function.
+  MutableArrayRef<Substitution> getSubstitutions() const {
+    FOREACH_IMPL_RETURN(getSubstitutions());
+  }
+
+  /// The arguments passed to this instruction.
+  MutableArrayRef<Operand> getArgumentOperands() const {
+    FOREACH_IMPL_RETURN(getArgumentOperands());
+  }
+
+  /// The arguments passed to this instruction.
+  OperandValueArrayRef getArguments() const {
+    FOREACH_IMPL_RETURN(getArguments());
+  }
+
+  /// Returns the number of arguments for this partial apply.
+  unsigned getNumArguments() const { return getArguments().size(); }
+
+  Operand &getArgumentRef(unsigned i) const { return getArgumentOperands()[i]; }
+
+  /// Return the ith argument passed to this instruction.
+  SILValue getArgument(unsigned i) const { return getArguments()[i]; }
+
+  // Set the ith argument of this instruction.
+  void setArgument(unsigned i, SILValue V) const {
+    getArgumentOperands()[i].set(V);
+  }
+#undef FOREACH_IMPL_RETURN
+
+  friend bool operator==(ApplySite lhs, ApplySite rhs) {
+    return lhs.getInstruction() == rhs.getInstruction();
+  }
+  friend bool operator!=(ApplySite lhs, ApplySite rhs) {
+    return lhs.getInstruction() != rhs.getInstruction();
+  }
+
+  static bool classof(const ValueBase *inst) {
+    return (inst->getKind() == ValueKind::ApplyInst ||
+            inst->getKind() == ValueKind::PartialApplyInst ||
+            inst->getKind() == ValueKind::TryApplyInst);
+  }
+};
+
+/// A full function application.
+class FullApplySite : public ApplySite {
+public:
+  FullApplySite() : ApplySite() {}
+  explicit FullApplySite(ValueBase *inst) : ApplySite(inst) {
+    assert(classof(inst) && "not an apply instruction?");
+  }
+  FullApplySite(ApplyInst *inst) : ApplySite(inst) {}
+  FullApplySite(TryApplyInst *inst) : ApplySite(inst) {}
+
+  static FullApplySite isa(ValueBase *inst) {
+    return (classof(inst) ? FullApplySite(inst) : FullApplySite());
+  }
+
+#define FOREACH_IMPL_RETURN(OPERATION) do {                             \
+    switch (Inst->getKind()) {                                          \
+    case ValueKind::ApplyInst:                                          \
+      return cast<ApplyInst>(Inst)->OPERATION;                          \
+    case ValueKind::TryApplyInst:                                       \
+      return cast<TryApplyInst>(Inst)->OPERATION;                       \
+    default:                                                            \
+      llvm_unreachable("not a full apply instruction!");                \
+    }                                                                   \
+  } while(0)
+
+  bool hasIndirectResult() const {
+    return getSubstCalleeType()->hasIndirectResult();
+  }
+
+  SILValue getIndirectResult() const {
+    assert(hasIndirectResult() && "apply inst does not have indirect result!");
+    return getArguments().front();
+  }
+
+  OperandValueArrayRef getArgumentsWithoutIndirectResult() const {
+    if (hasIndirectResult())
+      return getArguments().slice(1);
+    return getArguments();
+  }
+#undef FOREACH_IMPL_RETURN
+
+  static bool classof(const ValueBase *inst) {
+    return (inst->getKind() == ValueKind::ApplyInst ||
+            inst->getKind() == ValueKind::TryApplyInst);
+  }
+};
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
@@ -3646,6 +3892,20 @@ public:
 private:
   void createNode(const SILInstruction &);
 };
+
+// An ApplySite casts like a SILInstruction*.
+template<> struct simplify_type<const ::swift::ApplySite> {
+  typedef ::swift::SILInstruction *SimpleType;
+  static SimpleType getSimplifiedValue(const ::swift::ApplySite &Val) {
+    return Val.getInstruction();
+  }
+};
+template<> struct simplify_type< ::swift::ApplySite>
+  : public simplify_type<const ::swift::ApplySite> {};
+template<> struct simplify_type< ::swift::FullApplySite>
+  : public simplify_type<const ::swift::ApplySite> {};
+template<> struct simplify_type<const ::swift::FullApplySite>
+  : public simplify_type<const ::swift::ApplySite> {};
 
 } // end llvm namespace
 

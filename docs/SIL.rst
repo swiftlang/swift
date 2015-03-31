@@ -504,6 +504,9 @@ should take action to reclaim that autorelease with
   A function with an error result cannot be called with ``apply``.
   It must be called with ``try_apply``.
 
+  ``return`` produces a normal result of the function.  To return
+  an error result, use ``throw``.
+
   Type lowering lowers the ``throws`` annotation on formal function
   types into more concrete error propagation:
 
@@ -2488,13 +2491,6 @@ If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments and return value is
 given with these generic substitutions applied.
 
-TODO: The instruction, when applied to a generic function,
-currently implicitly performs abstraction difference transformations enabled
-by the given substitutions, such as promoting address-only arguments and returns
-to register arguments. This should be fixed.
-
-TODO: should have normal/unwind branch targets, like LLVM ``invoke``.
-
 partial_apply
 `````````````
 ::
@@ -3732,10 +3728,14 @@ return
   return %0 : $T
   // $T must be the return type of the current function
 
-Exits the current function and returns control to the calling function. The
-result of the ``apply`` instruction that invoked the current function will be
-the operand of this ``return`` instruction.  ``return`` does not retain or
-release its operand or any other values.
+Exits the current function and returns control to the calling function. If
+the current function was invoked with an `apply` instruction, the result
+of that function will be the operand of this ``return`` instruction. If
+the current function was invoked with a ``try_apply` instruction, control
+resumes at the normal destination, and the value of the basic block argument
+will be the operand of this ``return`` instruction.
+
+``return`` does not retain or release its operand or any other values.
 
 autorelease_return
 ``````````````````
@@ -3753,6 +3753,23 @@ the operand of this ``return`` instruction. The return value is autoreleased
 into the active Objective-C autorelease pool using the "autoreleased return
 value" optimization. The current function must use the ``@cc(objc_method)``
 calling convention.
+
+throw
+`````
+::
+  
+  sil-terminator ::= 'throw' sil-operand
+
+  throw %0 : $T
+  // $T must be the error result type of the current function
+
+Exits the current function and returns control to the calling
+function. The current function must have an error result, and so the
+function must have been invoked with a ``try_apply` instruction.
+Control will resume in the error destination of that instruction, and
+the basic block argument will be the operand of the ``throw``.
+
+``throw`` does not retain or release its operand or any other values.
 
 br
 ``
@@ -4008,6 +4025,34 @@ control is transferred to ``bb1``, and the result of the cast is passed into
 An exact cast checks whether the dynamic type is exactly the target
 type, not any possible subtype of it.  The source and target types
 must be class types.
+
+try_apply
+`````````
+::
+  
+  sil-terminator ::= 'try_apply' sil-value
+                        sil-apply-substitution-list?
+                        '(' (sil-value (',' sil-value)*)? ')'
+                        ':' sil-type
+    'normal' sil-identifier, 'error' sil-identifier
+
+  try_apply %0(%1, %2, ...) : $(A, B, ...) -> (R, @error E),
+    normal bb1, error bb2
+  bb1(%3 : R):
+  bb2(%4 : E):
+  
+  // Note that the type of the callee '%0' is specified *after* the arguments
+  // %0 must be of a concrete function type $(A, B, ...) -> (R, @error E)
+  // %1, %2, etc. must be of the argument types $A, $B, etc.
+
+Transfers control to the function specified by ``%0``, passing it the
+given arguments.  When ``%0`` returns, control resumes in either the
+normal destination (if it returns with ``return``) or the error
+destination (if it returns with ``throw``).
+
+``%0`` must have a function type with an error result.
+
+The rules on generic substitutions are identical to those of ``apply``.
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~

@@ -81,11 +81,11 @@ void SpecializingCloner::populateCloned() {
 }
 
 
-void GenericSpecializer::addApplyInst(ApplyInstBase *AI) {
-  if (!AI || !AI->hasSubstitutions())
+void GenericSpecializer::addApplyInst(ApplySite AI) {
+  if (!AI || !AI.hasSubstitutions())
     return;
 
-  SILValue CalleeVal = AI->getCallee();
+  SILValue CalleeVal = AI.getCallee();
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
 
   if (!FRI)
@@ -104,18 +104,17 @@ void GenericSpecializer::collectApplyInst(SILFunction &F) {
   // Scan all of the instructions in this function in search of ApplyInsts.
   for (auto &BB : F)
     for (auto &I : BB) {
-      ApplyInstBase *AI = dyn_cast<ApplyInstBase>(&I);
-      if (AI)
+      if (ApplySite AI = ApplySite::isa(&I))
         addApplyInst(AI);
     }
 }
 
-static bool hasSameSubstitutions(ApplyInstBase *A, ApplyInstBase *B) {
+static bool hasSameSubstitutions(ApplySite A, ApplySite B) {
   if (A == B)
     return true;
 
-  ArrayRef<swift::Substitution> SubsA = A->getSubstitutions();
-  ArrayRef<swift::Substitution> SubsB = B->getSubstitutions();
+  ArrayRef<swift::Substitution> SubsA = A.getSubstitutions();
+  ArrayRef<swift::Substitution> SubsB = B.getSubstitutions();
   if (SubsA.size() != SubsB.size())
     return false;
 
@@ -159,8 +158,9 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   for (auto &AI : List) {
     bool Placed = false;
 
-    DEBUG(llvm::dbgs() << "Function: " << AI->getFunction()->getName() <<
-          "; ApplyInst: " << *AI);
+    DEBUG(llvm::dbgs() << "Function: "
+                       << AI.getInstruction()->getFunction()->getName()
+                       << "; ApplyInst: " << *AI.getInstruction());
 
     // Scan the existing buckets and search for a bucket of the right type.
     for (int i = 0, e = Buckets.size(); i < e; ++i) {
@@ -186,18 +186,18 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     assert(Bucket.size() && "Empty bucket!");
 
     DEBUG(llvm::dbgs() << "    Bucket: \n");
-    DEBUG(for (auto *AI : Bucket) {
-      llvm::dbgs() << "        ApplyInst: " << *AI;
+    DEBUG(for (auto AI : Bucket) {
+      llvm::dbgs() << "        ApplyInst: " << *AI.getInstruction();
     });
 
     // Create the substitution maps.
     TypeSubstitutionMap InterfaceSubs
     = F->getLoweredFunctionType()->getGenericSignature()
-    ->getSubstitutionMap(Bucket[0]->getSubstitutions());
+    ->getSubstitutionMap(Bucket[0].getSubstitutions());
 
     TypeSubstitutionMap ContextSubs
     = F->getContextGenericParams()
-    ->getSubstitutionMap(Bucket[0]->getSubstitutions());
+    ->getSubstitutionMap(Bucket[0].getSubstitutions());
 
     // We do not support partial specialization.
     if (hasUnboundGenericTypes(InterfaceSubs)) {
@@ -208,7 +208,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     llvm::SmallString<64> ClonedName;
     {
       llvm::raw_svector_ostream buffer(ClonedName);
-      ArrayRef<Substitution> Subs = Bucket[0]->getSubstitutions();
+      ArrayRef<Substitution> Subs = Bucket[0].getSubstitutions();
       Mangle::Mangler M(buffer);
       Mangle::GenericSpecializationMangler Mangler(M, F, Subs);
       Mangler.mangle();
@@ -223,7 +223,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 
 #ifndef NDEBUG
       // Make sure that NewF's subst type matches the expected type.
-      auto Subs = Bucket[0]->getSubstitutions();
+      auto Subs = Bucket[0].getSubstitutions();
       auto FTy =
       F->getLoweredFunctionType()->substGenericArgs(*M,
                                                     M->getSwiftModule(),
@@ -257,7 +257,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 bool GenericSpecializer::specialize(AIList &calls) {
 
   // Collect the requested call insts.
-  for (auto *C : calls)
+  for (ApplySite C : calls)
     addApplyInst(C);
 
   // Create a worklist. The order does not matter.

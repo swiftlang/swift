@@ -565,6 +565,20 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitTryApplyInst(TryApplyInst *Inst) {
+  auto Args = getOpValueArray<8>(Inst->getArguments());
+  doPostProcess(Inst,
+    getBuilder().createTryApply(getOpLocation(Inst->getLoc()),
+                                getOpValue(Inst->getCallee()),
+                                getOpType(Inst->getSubstCalleeSILType()),
+                                getOpSubstitutions(Inst->getSubstitutions()),
+                                Args,
+                                getOpBasicBlock(Inst->getNormalBB()),
+                                getOpBasicBlock(Inst->getErrorBB())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
   auto Args = getOpValueArray<8>(Inst->getArguments());
   doPostProcess(Inst,

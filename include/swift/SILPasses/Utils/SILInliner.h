@@ -62,7 +62,7 @@ public:
   /// (for any reason). If successful, I now points to the first inlined
   /// instruction, or the next instruction after the removed instruction in the
   /// original function, in case the inlined function is completely trivial
-  bool inlineFunction(ApplyInst *AI, ArrayRef<SILValue> Args);
+  bool inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args);
 
 private:
   void visitDebugValueInst(DebugValueInst *Inst);

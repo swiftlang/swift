@@ -671,6 +671,20 @@ public:
                [&] { OS << ", "; });
     OS << ") : " << AI->getCallee().getType();
   }
+
+  void visitTryApplyInst(TryApplyInst *AI) {
+    OS << "try_apply ";
+    OS << getID(AI->getCallee());
+    printSubstitutions(AI->getSubstitutions());
+    OS << '(';
+    interleave(AI->getArguments(),
+               [&](const SILValue &arg) { OS << getID(arg); },
+               [&] { OS << ", "; });
+    OS << ") : " << AI->getCallee().getType();
+    OS << ", normal " << getID(AI->getNormalBB());
+    OS << ", error " << getID(AI->getErrorBB());
+  }
+  
   
   void visitPartialApplyInst(PartialApplyInst *CI) {
     OS << "partial_apply ";
