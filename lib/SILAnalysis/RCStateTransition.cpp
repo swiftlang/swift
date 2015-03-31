@@ -21,32 +21,6 @@ using namespace swift;
 //                           RCStateTransitionKind
 //===----------------------------------------------------------------------===//
 
-bool swift::isRCStateTransitionEndPoint(RCStateTransitionKind Kind) {
-  switch (Kind) {
-  case RCStateTransitionKind::StrongEntrance:
-    return true;
-  case RCStateTransitionKind::Unknown:
-  case RCStateTransitionKind::StrongIncrement:
-  case RCStateTransitionKind::StrongDecrement:
-    return false;
-  }
-
-  llvm_unreachable("Covered switch isn't covered?!");
-}
-
-/// Returns true if Kind mutates an RCIdentity that already has been introduced.
-bool swift::isRCStateTransitionMutator(RCStateTransitionKind Kind) {
-  switch (Kind) {
-  case RCStateTransitionKind::Unknown:
-  case RCStateTransitionKind::StrongEntrance:
-    return false;
-  case RCStateTransitionKind::StrongIncrement:
-  case RCStateTransitionKind::StrongDecrement:
-    return true;
-  }
-  llvm_unreachable("Covered switch isn't covered?!");
-}
-
 RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
   switch (V->getKind()) {
   case ValueKind::StrongRetainInst:
@@ -70,17 +44,33 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
   }
 }
 
+/// Define test functions for all of our abstract value kinds.
+#define ABSTRACT_VALUE(Name, StartKind, EndKind)                           \
+  bool swift::isRCStateTransition ## Name(RCStateTransitionKind Kind) {    \
+    return unsigned(RCStateTransitionKind::StartKind) <= unsigned(Kind) && \
+      unsigned(RCStateTransitionKind::EndKind) >= unsigned(Kind);          \
+  }
+#include "RCStateTransition.def"
+
+raw_ostream &llvm::operator<<(raw_ostream &os, RCStateTransitionKind Kind) {
+  switch (Kind) {
+#define KIND(K)                                 \
+  case RCStateTransitionKind::K:                \
+    return os << #K;
+#include "RCStateTransition.def"
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
 //===----------------------------------------------------------------------===//
 //                             RCStateTransition
 //===----------------------------------------------------------------------===//
 
-bool RCStateTransition::isEndPoint() const {
-  return isRCStateTransitionEndPoint(getKind());
-}
-
-bool RCStateTransition::isMutator() const {
-  return isRCStateTransitionMutator(getKind());
-}
+#define ABSTRACT_VALUE(Name, Start, End)            \
+  bool RCStateTransition::is ## Name() const {      \
+    return isRCStateTransition ## Name(getKind());  \
+  }
+#include "RCStateTransition.def"
 
 RCStateTransition::RCStateTransition(const RCStateTransition &R) {
   Kind = R.Kind;

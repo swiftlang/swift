@@ -25,32 +25,38 @@ namespace swift {
 //===----------------------------------------------------------------------===//
 
 /// The kind of a RCStateTransition.
-///
-/// TODO: Add in StrongExit.
 enum class RCStateTransitionKind : uint8_t {
-  /// An unknown RCStateTransitionKind.
-  Unknown,
-
-  // The introduction of a strong reference count. This can go on SILArguments
-  // and non-terminator instructions.
-  StrongEntrance,
-
-  // The increment of a strong reference count. This can only represent
-  // non-terminator instructions.
-  StrongIncrement,
-
-  // The decrement of a strong reference count. This can only represent
-  // non-terminator instructions.
-  StrongDecrement,
+#define KIND(K) K,
+#define ABSTRACT_VALUE(Name, StartKind, EndKind) \
+  Name ## _Start = StartKind, Name ## _End = EndKind,
+#include "RCStateTransition.def"
 };
 
 RCStateTransitionKind getRCStateTransitionKind(ValueBase *V);
 
-/// Returns true if Kind is an initial or terminating transition kind.
-bool isRCStateTransitionEndPoint(RCStateTransitionKind Kind);
+/// Define predicates to test for RCStateTransition abstract value kinds.
+#define ABSTRACT_VALUE(Name, Start, End) \
+  bool isRCStateTransition ## Name(RCStateTransitionKind Kind);
+#include "RCStateTransition.def"
 
-/// Returns true if Kind mutates an RCIdentity that already has been introduced.
-bool isRCStateTransitionMutator(RCStateTransitionKind Kind);
+
+template <typename ImplTy, typename ResultTy>
+class RCStateTransitionKindVisitor {
+  ImplTy &asImpl() { return *reinterpret_cast<ImplTy *>(this); }
+public:
+#define KIND(K) ResultTy visit ## K(SILInstruction *) { return ResultTy(); }
+#include "RCStateTransition.def"
+
+  ResultTy visit(SILInstruction *I) {
+    switch (getRCStateTransitionKind(I)) {
+#define KIND(K)                                 \
+  case RCStateTransitionKind::K:                \
+    return asImpl().visit ## K(I);
+#include "RCStateTransition.def"
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+};
 
 //===----------------------------------------------------------------------===//
 //                             RCStateTransition
@@ -98,13 +104,10 @@ public:
 
   RCStateTransitionKind getKind() const { return Kind; }
 
-  /// Returns true if RCStateTransition act as an initial or terminal value to a
-  /// string of RC operations.
-  bool isEndPoint() const;
 
-  /// Returns true if RCStateTransition acts as a mutator on an RC that was
-  /// already created.
-  bool isMutator() const;
+/// Define test functions for the various abstract categorizations we have.
+#define ABSTRACT_VALUE(Name, StartKind, EndKind) bool is ## Name() const;
+#include "RCStateTransition.def"
 
   /// Return true if this Transition is a mutator transition that contains I.
   bool containsMutator(SILInstruction *I) const {
@@ -133,5 +136,9 @@ public:
 };
 
 } // end swift namespace
+
+namespace llvm {
+raw_ostream &operator<<(raw_ostream &os, swift::RCStateTransitionKind Kind);
+} // end llvm namespace
 
 #endif
