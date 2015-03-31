@@ -85,9 +85,6 @@ private:
   void addApplyInst(ApplySite AI);
 
 public:
-  /// Try to specialize a list of calls specified in \p calls.
-  bool specialize(AIList &calls);
-
   /// Collect and specialize calls in a specific order specified by
   /// \p BotUpFuncList.
   bool specialize(const std::vector<SILFunction *> &BotUpFuncList);

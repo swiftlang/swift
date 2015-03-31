@@ -247,30 +247,6 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   return Changed;
 }
 
-/// Try to specialize a list of calls specified in \p calls.
-bool GenericSpecializer::specialize(AIList &calls) {
-
-  // Collect the requested call insts.
-  for (ApplySite C : calls)
-    addApplyInst(C);
-
-  // Create a worklist. The order does not matter.
-  for (auto &P : ApplyInstMap)
-    Worklist.push_back(P.first);
-
-  bool Changed = false;
-
-  // Try to specialize generic calls.
-  while (Worklist.size()) {
-    SILFunction *F = Worklist.back();
-    Worklist.pop_back();
-    if (ApplyInstMap.count(F))
-      Changed |= specializeApplyInstGroup(F, ApplyInstMap[F]);
-  }
-
-  return Changed;
-}
-
 /// Collect and specialize calls in a specific order specified by
 /// \p BotUpFuncList.
 bool GenericSpecializer::specialize(const std::vector<SILFunction *>
