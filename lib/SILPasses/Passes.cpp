@@ -29,7 +29,6 @@
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorOr.h"
@@ -84,7 +83,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 
   if (SILViewSILGenCFG) {
     PM.resetAndRemoveTransformations();
-    PM.add(createCFGPrinter());
+    PM.addCFGPrinter();
     PM.runOneIteration();
   }
 
@@ -92,25 +91,25 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   // passes, just run mandatory inlining with dead transparent function cleanup
   // disabled.
   if (Module.getOptions().DebugSerialization) {
-    PM.add(createMandatoryInlining());
+    PM.addMandatoryInlining();
     PM.run();
     return Ctx.hadError();
   }
 
   // Otherwise run the rest of diagnostics.
-  PM.add(createCapturePromotion());
-  PM.add(createAllocBoxToStack());
-  PM.add(createInOutDeshadowing());
-  PM.add(createNoReturnFolding());
-  PM.add(createDefiniteInitialization());
+  PM.addCapturePromotion();
+  PM.addAllocBoxToStack();
+  PM.addInOutDeshadowing();
+  PM.addNoReturnFolding();
+  PM.addDefiniteInitialization();
 
-  PM.add(createMandatoryInlining());
-  PM.add(createPredictableMemoryOptimizations());
-  PM.add(createDiagnosticConstantPropagation());
-  PM.add(createDiagnoseUnreachable());
-  PM.add(createEmitDFDiagnostics());
+  PM.addMandatoryInlining();
+  PM.addPredictableMemoryOptimizations();
+  PM.addDiagnosticConstantPropagation();
+  PM.addDiagnoseUnreachable();
+  PM.addEmitDFDiagnostics();
   // Canonical swift requires all non cond_br critical edges to be split.
-  PM.add(createSplitNonCondBrCriticalEdges());
+  PM.addSplitNonCondBrCriticalEdges();
   PM.run();
 
   // Generate diagnostics.
@@ -118,7 +117,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 
   if (SILViewGuaranteedCFG) {
     PM.resetAndRemoveTransformations();
-    PM.add(createCFGPrinter());
+    PM.addCFGPrinter();
     PM.runOneIteration();
   }
 
@@ -127,92 +126,92 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 }
 
 void AddSimplifyCFGSILCombine(SILPassManager &PM) {
-  PM.add(createSimplifyCFG());
+  PM.addSimplifyCFG();
   // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
   // cond_br).
-  PM.add(createSILCombine());
+  PM.addSILCombine();
   // Which can expose opportunity for simplifcfg.
-  PM.add(createSimplifyCFG());
+  PM.addSimplifyCFG();
 }
 
 /// Perform semantic annotation/loop base optimizations.
 void AddHighLevelLoopOptPasses(SILPassManager &PM) {
   // Perform classsic SSA optimizations for cleanup.
-  PM.add(createLowerAggregateInstrs());
-  PM.add(createSILCombine());
-  PM.add(createSROA());
-  PM.add(createMem2Reg());
-  PM.add(createDCE());
-  PM.add(createSILCombine());
+  PM.addLowerAggregateInstrs();
+  PM.addSILCombine();
+  PM.addSROA();
+  PM.addMem2Reg();
+  PM.addDCE();
+  PM.addSILCombine();
   AddSimplifyCFGSILCombine(PM);
 
   // Run high-level loop opts.
-  PM.add(createLoopRotate());
+  PM.addLoopRotate();
 
   // Cleanup.
-  PM.add(createDCE());
-  PM.add(createCSE());
-  PM.add(createSILCombine());
-  PM.add(createSimplifyCFG());
-  PM.add(createLICM());
-  PM.add(createRemovePins());
-  PM.add(createABCOpt());
+  PM.addDCE();
+  PM.addCSE();
+  PM.addSILCombine();
+  PM.addSimplifyCFG();
+  PM.addLICM();
+  PM.addRemovePins();
+  PM.addABCOpt();
   // Cleanup.
-  PM.add(createDCE());
-  PM.add(createCOWArrayOpts());
+  PM.addDCE();
+  PM.addCOWArrayOpts();
   // Cleanup.
-  PM.add(createDCE());
-  PM.add(createSwiftArrayOpts());
+  PM.addDCE();
+  PM.addSwiftArrayOpts();
 }
 
 void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   AddSimplifyCFGSILCombine(PM);
-  PM.add(createAllocBoxToStack());
-  PM.add(createCopyForwarding());
-  PM.add(createLowerAggregateInstrs());
-  PM.add(createSILCombine());
-  PM.add(createSROA());
-  PM.add(createMem2Reg());
+  PM.addAllocBoxToStack();
+  PM.addCopyForwarding();
+  PM.addLowerAggregateInstrs();
+  PM.addSILCombine();
+  PM.addSROA();
+  PM.addMem2Reg();
 
   // Perform classsic SSA optimizations.
-  PM.add(createPerformanceConstantPropagation());
-  PM.add(createDCE());
-  PM.add(createCSE());
-  PM.add(createSILCombine());
+  PM.addPerformanceConstantPropagation();
+  PM.addDCE();
+  PM.addCSE();
+  PM.addSILCombine();
   AddSimplifyCFGSILCombine(PM);
 
   // Perform retain/release code motion and run the first ARC optimizer.
-  PM.add(createGlobalLoadStoreOpts());
-  PM.add(createEarlyCodeMotion());
-  PM.add(createGlobalARCOpts());
+  PM.addGlobalLoadStoreOpts();
+  PM.addEarlyCodeMotion();
+  PM.addGlobalARCOpts();
 
   // Devirtualize.
-  PM.add(createDevirtualizer());
-  PM.add(createGenericSpecializer());
-  PM.add(createSILLinker());
+  PM.addDevirtualizer();
+  PM.addGenericSpecializer();
+  PM.addSILLinker();
 
   switch (OpLevel) {
     case OptimizationLevelKind::HighLevel:
       // Does not inline functions with defined semantics.
-      PM.add(createEarlyInliner());
+      PM.addEarlyInliner();
       break;
     case OptimizationLevelKind::MidLevel:
       // Does inline semantics-functions, but not global-init functions.
-      PM.add(createPerfInliner());
+      PM.addPerfInliner();
       break;
     case OptimizationLevelKind::LowLevel:
       // Inlines everything
-      PM.add(createLateInliner());
+      PM.addLateInliner();
       break;
   }
-  PM.add(createSimplifyCFG());
+  PM.addSimplifyCFG();
   // Only hoist releases very late.
   if (OpLevel == OptimizationLevelKind::LowLevel)
-    PM.add(createLateCodeMotion());
+    PM.addLateCodeMotion();
   else
-    PM.add(createEarlyCodeMotion());
-  PM.add(createGlobalARCOpts());
-  PM.add(createRemovePins());
+    PM.addEarlyCodeMotion();
+  PM.addGlobalARCOpts();
+  PM.addRemovePins();
 }
 
 
@@ -220,7 +219,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   if (Module.getOptions().DebugSerialization) {
     SILPassManager PM(&Module);
     registerAnalysisPasses(PM);
-    PM.add(createSILLinker());
+    PM.addSILLinker();
     PM.run();
     return;
   }
@@ -229,8 +228,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   registerAnalysisPasses(PM);
 
   // Start by specializing generics and by cloning functions from stdlib.
-  PM.add(createSILLinker());
-  PM.add(createGenericSpecializer());
+  PM.addSILLinker();
+  PM.addGenericSpecializer();
   PM.run();
   PM.resetAndRemoveTransformations();
 
@@ -257,12 +256,12 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   // Perform lowering optimizations.
   PM.setStageName("Lower");
-  PM.add(createDeadFunctionElimination());
-  PM.add(createDeadObjectElimination());
+  PM.addDeadFunctionElimination();
+  PM.addDeadObjectElimination();
 
   // Hoist globals out of loops.
   // Global-init functions should not be inlined GlobalOpt is done.
-  PM.add(createGlobalOpt());
+  PM.addGlobalOpt();
 
   // Propagate constants into closures and convert to static dispatch.  This
   // should run after specialization and inlining because we don't want to
@@ -270,14 +269,14 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // ClosureSpecialization, because constant propagation is more effective.  At
   // least one round of SSA optimization and inlining should run after this to
   // take advantage of static dispatch.
-  PM.add(createCapturePropagation());
+  PM.addCapturePropagation();
 
   // Specialize closure.
-  PM.add(createClosureSpecializer());
+  PM.addClosureSpecializer();
 
   // Insert inline caches for virtual calls.
-  PM.add(createDevirtualizer());
-  PM.add(createInlineCaches());
+  PM.addDevirtualizer();
+  PM.addInlineCaches();
 
   // Optimize function signatures if we are asked to.
   //
@@ -285,7 +284,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // to run once very late. Make sure to run at least one round of the ARC
   // optimizer after this.
   if (Module.getOptions().EnableFuncSigOpts)
-    PM.add(createFunctionSignatureOpts());
+    PM.addFunctionSignatureOpts();
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
@@ -296,63 +295,43 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.setStageName("LowLevel");
 
-  PM.add(createLateInliner());
+  PM.addLateInliner();
   AddSimplifyCFGSILCombine(PM);
-  PM.add(createAllocBoxToStack());
-  PM.add(createSROA());
-  PM.add(createMem2Reg());
-  PM.add(createCSE());
-  PM.add(createSILCombine());
-  PM.add(createSimplifyCFG());
-  PM.add(createGlobalLoadStoreOpts());
-  PM.add(createLateCodeMotion());
-  PM.add(createGlobalARCOpts());
-  PM.add(createDevirtualizer());
+  PM.addAllocBoxToStack();
+  PM.addSROA();
+  PM.addMem2Reg();
+  PM.addCSE();
+  PM.addSILCombine();
+  PM.addSimplifyCFG();
+  PM.addGlobalLoadStoreOpts();
+  PM.addLateCodeMotion();
+  PM.addGlobalARCOpts();
+  PM.addDevirtualizer();
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
   PM.setStageName("LateLoopOpt");
-  PM.add(createLICM());
+  PM.addLICM();
 
   // Perform the final lowering transformations.
-  PM.add(createExternalFunctionDefinitionsElimination());
-  PM.add(createDeadFunctionElimination());
-  PM.add(createMergeCondFails());
-  PM.add(createCropOverflowChecks());
+  PM.addExternalFunctionDefinitionsElimination();
+  PM.addDeadFunctionElimination();
+  PM.addMergeCondFails();
+  PM.addCropOverflowChecks();
   PM.runOneIteration();
 
   // Call the CFG viewer.
   if (SILViewCFG) {
     PM.resetAndRemoveTransformations();
-    PM.add(createCFGPrinter());
+    PM.addCFGPrinter();
     PM.runOneIteration();
   }
 
   DEBUG(Module.verify());
 }
 
-SILTransform *swift::createPass(PassKind Kind) {
-  assert(unsigned(PassKind::AllPasses_Last) >= unsigned(Kind) &&
-         "Invalid pass kind");
-  switch (Kind) {
-#define PASS(Id, ...)                           \
-  case PassKind::Id:                            \
-    return create##Id();                        \
-    break;
-#include "swift/SILPasses/Passes.def"
-  }
-}
-
 #ifndef NDEBUG
-
-static SILTransform *createPassForName(StringRef Name) {
-  auto P = llvm::StringSwitch<PassKind>(Name)
-#define PASS(Id, ...) .Case(#Id, PassKind::Id)
-#include "swift/SILPasses/Passes.def"
-  ;
-  return createPass(P);
-}
 
 namespace {
 
@@ -457,7 +436,7 @@ void swift::runSILOptimizationPassesWithFileSpecification(SILModule &Module,
 
     for (auto &P : Desc.Passes) {
       DEBUG(llvm::dbgs() << "  Adding Pass: " << P << "\n");
-      PM.add(createPassForName(P));
+      PM.addPassForName(P);
     }
 
     if (Desc.ActionName.equals("run_n_times")) {

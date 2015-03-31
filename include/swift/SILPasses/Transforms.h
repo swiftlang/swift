@@ -35,6 +35,9 @@ namespace swift {
     // The pass manager that runs this pass.
     SILPassManager* PM;
 
+    // The pass kind (used by the pass manager).
+    PassKind passKind = PassKind::invalidPassKind;
+
   public:
     /// C'tor. \p K indicates the kind of derived class.
     SILTransform(SILTransform::TransformKind K) : Kind(K), PM(0) {}
@@ -44,6 +47,19 @@ namespace swift {
 
     /// Returns the kind of derived class.
     TransformKind getKind() const { return Kind; }
+
+    /// Returns the pass kind.
+    PassKind getPassKind() const {
+      assert(passKind != PassKind::invalidPassKind);
+      return passKind;
+    }
+
+    /// Sets the pass kind. This should only be done in the add-functions of
+    /// the pass manager.
+    void setPassKind(PassKind newPassKind) {
+      assert(passKind == PassKind::invalidPassKind);
+      passKind = newPassKind;
+    }
 
     /// Inject the pass manager running this pass.
     void injectPassManager(SILPassManager *PMM) { PM = PMM; }

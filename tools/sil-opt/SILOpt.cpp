@@ -335,7 +335,7 @@ static void runCommandLineSelectedPasses(SILModule *Module) {
   PM.registerAnalysis(createDestructorAnalysis(Module));
 
   for (auto Pass : Passes) {
-    PM.add(createPass(Pass));
+    PM.addPass(Pass);
   }
   PM.run();
 }

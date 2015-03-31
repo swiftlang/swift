@@ -160,6 +160,6 @@ SILTransform *swift::createInstCount() {
 
 void swift::performSILInstCount(SILModule *M) {
   SILPassManager PrinterPM(M);
-  PrinterPM.add(createInstCount());
+  PrinterPM.addInstCount();
   PrinterPM.runOneIteration();
 }

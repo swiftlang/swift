@@ -18,6 +18,7 @@
 #include "swift/SILPasses/PrettyStackTrace.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/TimeValue.h"
@@ -342,3 +343,37 @@ void SILPassManager::setStageName(llvm::StringRef NextStage) {
 const SILOptions &SILPassManager::getOptions() const {
   return Mod->getOptions();
 }
+
+// Define the add-functions for all passes.
+
+#define PASS(Id)                           \
+void SILPassManager::add##Id() {           \
+  SILTransform *T = swift::create##Id();   \
+  T->setPassKind(PassKind::Id);            \
+  Transformations.push_back(T);            \
+}
+#include "swift/SILPasses/Passes.def"
+
+void SILPassManager::addPass(PassKind Kind) {
+  assert(unsigned(PassKind::AllPasses_Last) >= unsigned(Kind) &&
+         "Invalid pass kind");
+  switch (Kind) {
+#define PASS(ID)                           \
+  case PassKind::ID:                       \
+    add##ID();                             \
+    break;
+#include "swift/SILPasses/Passes.def"
+  case PassKind::invalidPassKind:
+    llvm_unreachable("invalid pass kind");
+  }
+}
+
+void SILPassManager::addPassForName(StringRef Name) {
+  auto P = llvm::StringSwitch<PassKind>(Name)
+#define PASS(Id) .Case(#Id, PassKind::Id)
+#include "swift/SILPasses/Passes.def"
+  ;
+  addPass(P);
+}
+
+

@@ -16,6 +16,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "swift/SILAnalysis/Analysis.h"
+#include "Passes.h"
 
 #ifndef SWIFT_SILPASSES_PASSMANAGER_H
 #define SWIFT_SILPASSES_PASSMANAGER_H
@@ -74,11 +75,6 @@ class SILPassManager {
   /// \returns the module that the pass manager owns.
   SILModule *getModule() { return Mod; }
 
-  /// \brief Add another transformation to the pipe. This transfers the
-  /// ownership of the transformation to the pass manager that will delete it
-  /// when done.
-  void add(SILTransform *T) { Transformations.push_back(T); }
-
   /// \brief  Register another analysis. This transfers the ownership of the
   /// analysis to the pass manager that will delete it when done.
   void registerAnalysis(SILAnalysis *A) { Analysis.push_back(A); }
@@ -124,6 +120,16 @@ class SILPassManager {
       A->verify();
     }
   }
+
+  /// Add a pass of a specific kind.
+  void addPass(PassKind Kind);
+
+  /// Add a pass with a given name.
+  void addPassForName(StringRef Name);
+
+  // Each pass gets its own add-function.
+#define PASS(ID) void add##ID();
+#include "Passes.def"
 
   protected:
   bool runFunctionPasses(
