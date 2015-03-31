@@ -13,25 +13,22 @@
 #define DEBUG_TYPE "sil-codemotion"
 #include "swift/SILPasses/Passes.h"
 #include "swift/Basic/BlotMapVector.h"
+#include "swift/SIL/Projection.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
-#include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/ScopedHashTable.h"
-#include "llvm/ADT/Statistic.h"
+#include "swift/SILPasses/Utils/Local.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/RecyclingAllocator.h"
 
 STATISTIC(NumSunk,   "Number of instructions sunk");
 STATISTIC(NumRefCountOpsSimplified, "number of enum ref count ops simplified.");
@@ -157,16 +154,17 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden) {
 /// The 2 instructions given are not identical, but are passed as arguments
 /// to a common successor.  It may be cheaper to pass one of their operands
 /// to the successor instead of the whole instruction.
-/// Return ~0U if no such operand could be found, otherwise return the index
+/// Return None if no such operand could be found, otherwise return the index
 /// of a suitable operand.
-static unsigned cheaperToPassOperandsAsArguments(SILInstruction *First,
-                                                 SILInstruction *Second) {
+static llvm::Optional<unsigned>
+cheaperToPassOperandsAsArguments(SILInstruction *First,
+                                 SILInstruction *Second) {
   // TODO: Add more cases than Struct
   StructInst *FirstStruct = dyn_cast<StructInst>(First);
   StructInst *SecondStruct = dyn_cast<StructInst>(Second);
 
   if (!FirstStruct || !SecondStruct)
-    return ~0U;
+    return None;
 
   assert(First->getNumOperands() == Second->getNumOperands() &&
          First->getNumTypes() == Second->getNumTypes() &&
@@ -179,20 +177,20 @@ static unsigned cheaperToPassOperandsAsArguments(SILInstruction *First,
     if (First->getOperand(i) != Second->getOperand(i)) {
       // Only track one different operand for now
       if (DifferentOperandIndex != ~0U)
-        return ~0U;
+        return None;
       DifferentOperandIndex = i;
     }
   }
 
   if (DifferentOperandIndex == ~0U)
-    return ~0U;
+    return None;
 
   // Found a different operand, now check to see if its type is something
   // cheap enough to sink.
   // TODO: Sink more than just integers.
   const auto &ArgTy = First->getOperand(DifferentOperandIndex).getType();
   if (!ArgTy.is<BuiltinIntegerType>())
-    return ~0U;
+    return None;
 
   return DifferentOperandIndex;
 }
@@ -221,7 +219,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
   // If the instructions are different, but only in terms of a cheap operand
   // then we can still sink it, and create new arguments for this operand.
-  unsigned DifferentOperandIndex = ~0U;
+  llvm::Optional<unsigned> DifferentOperandIndex;
 
   // Check if the Nth argument in all predecessors is identical.
   for (auto P : BB->getPreds()) {
@@ -245,16 +243,16 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
     // If the instructions are close enough, then we should sink them anyway.
     // For example, we should sink 'struct S(%0)' if %0 is small, eg, an integer
-    unsigned DifferentOp = cheaperToPassOperandsAsArguments(FSI, SI);
+    auto MaybeDifferentOp = cheaperToPassOperandsAsArguments(FSI, SI);
     // Couldn't find a suitable operand, so bail.
-    if (DifferentOp == ~0U)
+    if (!MaybeDifferentOp)
       return false;
+    unsigned DifferentOp = *MaybeDifferentOp;
     // Make sure we found the same operand as prior iterations.
-    if (DifferentOperandIndex == ~0U)
-      DifferentOperandIndex = DifferentOp;
-    else if (DifferentOp != DifferentOperandIndex)
+    if (DifferentOperandIndex && DifferentOp != *DifferentOperandIndex)
       return false;
 
+    DifferentOperandIndex = DifferentOp;
     Clones.push_back(SI);
   }
 
@@ -263,7 +261,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
   SILValue Undef = SILUndef::get(FirstPredArg.getType(), BB->getModule());
 
-  if (DifferentOperandIndex != ~0U) {
+  if (DifferentOperandIndex) {
     // Sink one of the instructions to BB
     FSI->moveBefore(BB->begin());
 
@@ -272,7 +270,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     // arguments for each predecessor.
     SILValue(BB->getBBArg(ArgNum)).replaceAllUsesWith(FSI);
 
-    const auto &ArgType = FSI->getOperand(DifferentOperandIndex).getType();
+    const auto &ArgType = FSI->getOperand(*DifferentOperandIndex).getType();
     BB->replaceBBArg(ArgNum, ArgType);
 
     // Update all branch instructions in the predecessors to pass the new
@@ -285,7 +283,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
              "Branch instruction required");
 
       SILInstruction *CloneInst = dyn_cast<SILInstruction>(*CloneIt);
-      TI->setOperand(ArgNum, CloneInst->getOperand(DifferentOperandIndex));
+      TI->setOperand(ArgNum, CloneInst->getOperand(*DifferentOperandIndex));
       // Now delete the clone as we only needed it operand.
       if (CloneInst != FSI)
         recursivelyDeleteTriviallyDeadInstructions(CloneInst);
@@ -295,7 +293,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
     // The sunk instruction should now read from the argument of the BB it
     // was moved to.
-    FSI->setOperand(DifferentOperandIndex, BB->getBBArg(ArgNum));
+    FSI->setOperand(*DifferentOperandIndex, BB->getBBArg(ArgNum));
     return true;
   }
 
