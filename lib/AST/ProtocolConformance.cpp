@@ -999,6 +999,13 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     nominalFunc(nominal);
   }
 
+  // Protocol extensions do not contribute protocol conformances. This
+  // is enforced by semantic analysis, so the early exit here is a
+  // performance optimization and also prevents us from erroneously
+  // including those protocols before they get diagnosed.
+  if (isa<ProtocolDecl>(nominal))
+    return;
+
   // Handle the extensions that we have not yet visited.
   nominal->prepareExtensions();
   for (auto next = lastProcessed.getPointer()

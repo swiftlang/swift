@@ -1709,6 +1709,8 @@ public:
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
+  void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
+
   /// Whether we already validated this extension.
   bool validated() const {
     return ExtensionDeclBits.Validated;

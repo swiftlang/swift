@@ -315,7 +315,6 @@ func testSomeCollections(sc1: SomeCollection1, sc2: SomeCollection2) {
   ig = MyIndexedGenerator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot assign a value of type 'MyIndexedGenerator<SomeCollection2>' to a value of type 'OtherIndexedGenerator<SomeCollection2>'}}
 }
 
-
 // ----------------------------------------------------------------------------
 // Partial ordering of protocol extension members
 // ----------------------------------------------------------------------------
@@ -452,3 +451,13 @@ func testSConstrained3(sc3a: SConstrained3a, sc3b: SConstrained3b) {
   s = sc3b.pc2()
   var b: Bool = sc3b.pc2()
 }
+
+// ----------------------------------------------------------------------------
+// Semantic restrictions
+// ----------------------------------------------------------------------------
+
+// Extension cannot have an inheritance clause.
+protocol BadProto1 { }
+protocol BadProto2 { }
+
+extension BadProto1 : BadProto2 { } // expected-error{{extension of protocol 'BadProto1' cannot have an inheritance clause}}

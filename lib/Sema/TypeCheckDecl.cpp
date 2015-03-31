@@ -348,6 +348,18 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // This breaks infinite recursion, which will be diagnosed separately.
     ext->setCheckedInheritanceClause();
     inheritedClause = ext->getInherited();
+
+    // Protocol extensions cannot have inheritance clauses.
+    if (ext->getExtendedType()->is<ProtocolType>()) {
+      if (!inheritedClause.empty()) {
+        diagnose(ext->getLoc(), diag::extension_protocol_inheritance,
+                 ext->getExtendedType())
+          .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
+                                 inheritedClause.back().getSourceRange().End));
+        ext->setInherited({ });
+        return;
+      }
+    }
   }
 
   // Check all of the types listed in the inheritance clause.
