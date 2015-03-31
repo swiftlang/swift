@@ -172,7 +172,7 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   for (auto *SI : Other.InsertPts)
     Partial |= InsertPts.insert(SI).second;
 
-  DEBUG(llvm::dbgs() << "                Partial: " << (Partial ? "yes" : "no")
+  DEBUG(llvm::dbgs() << "            Partial: " << (Partial ? "yes" : "no")
                      << "\n");
   return true;
 }

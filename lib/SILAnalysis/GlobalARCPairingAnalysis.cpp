@@ -166,7 +166,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
       // Add the decrement to the decrement to move set. If we don't insert
       // anything, just continue.
       if (!MatchSet.Decrements.insert(Decrement)) {
-        DEBUG(llvm::dbgs() << "    SKIPPING! Already processed this decrement");
+        DEBUG(llvm::dbgs() << "    SKIPPING! Already processed this decrement\n");
         continue;
       }
 
@@ -245,7 +245,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
       // Add the decrement to the decrement to move set. If we don't insert
       // anything, just continue.
       if (!MatchSet.Increments.insert(Increment)) {
-        DEBUG(llvm::dbgs() << "    SKIPPING! Already processed this increment");
+        DEBUG(llvm::dbgs() << "    SKIPPING! Already processed this increment.\n");
         continue;
       }
 
