@@ -174,8 +174,10 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
   SILBuilderWithScope<8> B(T);
 
   switch (T->getKind()) {
-  default:
-    llvm_unreachable("Unexpected terminator kind!");
+#define TERMINATOR(ID, PARENT, MEM)
+#define VALUE(ID, PARENT) case ValueKind::ID:
+#include "swift/SIL/SILNodes.def"
+    llvm_unreachable("Unexpected terminator instruction!");
   // Only Branch and CondBranch may have arguments.
   case ValueKind::BranchInst: {
     auto Br = dyn_cast<BranchInst>(T);
@@ -277,7 +279,15 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     CBI->eraseFromParent();
     return;
   }
+
+  case ValueKind::AutoreleaseReturnInst:
+  case ValueKind::ReturnInst:
+  case ValueKind::ThrowInst:
+  case ValueKind::TryApplyInst:
+  case ValueKind::UnreachableInst:
+    llvm_unreachable("Branch target cannot be changed for this terminator instruction!");
   }
+  llvm_unreachable("Not yet implemented!");
 }
 
 
@@ -307,8 +317,10 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   SILBuilderWithScope<8> B(T);
 
   switch (T->getKind()) {
-  default:
-    llvm_unreachable("Unexpected terminator kind!");
+#define TERMINATOR(ID, PARENT, MEM)
+#define VALUE(ID, PARENT) case ValueKind::ID:
+#include "swift/SIL/SILNodes.def"
+    llvm_unreachable("Unexpected terminator instruction!");
   // Only Branch and CondBranch may have arguments.
   case ValueKind::BranchInst: {
     auto Br = dyn_cast<BranchInst>(T);
@@ -320,7 +332,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     B.createBranch(T->getLoc(), NewDest, Args);
     Br->dropAllReferences();
     Br->eraseFromParent();
-    break;
+    return;
   }
 
   case ValueKind::CondBranchInst: {
@@ -346,7 +358,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
         TrueDest, TrueArgs, FalseDest, FalseArgs);
     CondBr->dropAllReferences();
     CondBr->eraseFromParent();
-    break;
+    return;
   }
 
   case ValueKind::SwitchValueInst: {
@@ -355,7 +367,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     auto *DefaultBB = replaceSwitchDest(SII, Cases, OldDest, NewDest);
     B.createSwitchValue(SII->getLoc(), SII->getOperand(), DefaultBB, Cases);
     SII->eraseFromParent();
-    break;
+    return;
   }
 
   case ValueKind::SwitchEnumInst: {
@@ -364,7 +376,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     auto *DefaultBB = replaceSwitchDest(SEI, Cases, OldDest, NewDest);
     B.createSwitchEnum(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
     SEI->eraseFromParent();
-    break;
+    return;
   }
 
   case ValueKind::SwitchEnumAddrInst: {
@@ -373,7 +385,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     auto *DefaultBB = replaceSwitchDest(SEI, Cases, OldDest, NewDest);
     B.createSwitchEnumAddr(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
     SEI->eraseFromParent();
-    break;
+    return;
   }
 
   case ValueKind::DynamicMethodBranchInst: {
@@ -384,7 +396,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     B.createDynamicMethodBranch(DMBI->getLoc(), DMBI->getOperand(),
         DMBI->getMember(), HasMethodBB, NoMethodBB);
     DMBI->eraseFromParent();
-    break;
+    return;
   }
 
   case ValueKind::CheckedCastBranchInst: {
@@ -395,7 +407,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
         CBI->getCastType(), SuccessBB, FailureBB);
     CBI->eraseFromParent();
-    break;
+    return;
   }
 
   case ValueKind::CheckedCastAddrBranchInst: {
@@ -408,9 +420,17 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
         CBI->getDest(), CBI->getTargetType(),
         SuccessBB, FailureBB);
     CBI->eraseFromParent();
-    break;
+    return;
   }
+
+  case ValueKind::AutoreleaseReturnInst:
+  case ValueKind::ReturnInst:
+  case ValueKind::ThrowInst:
+  case ValueKind::TryApplyInst:
+  case ValueKind::UnreachableInst:
+    llvm_unreachable("Branch target cannot be replaced for this terminator instruction!");
   }
+  llvm_unreachable("Not yet implemented!");
 }
 
 /// \brief Check if the edge from the terminator is critical.
