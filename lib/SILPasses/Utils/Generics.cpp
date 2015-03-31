@@ -137,17 +137,11 @@ void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
   llvm::errs() << "}\n";
 }
 
-/// Check if we can clone and remap types this function.
-static bool canSpecializeFunction(SILFunction *F) {
-  return !F->isExternalDeclaration();
-}
-
 bool
 GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   bool Changed = false;
-  // Make sure we can specialize this function.
-  if (!canSpecializeFunction(F))
-    return false;
+
+  assert(F->isDefinition() && "Expected definition to specialize!");
 
   DEBUG(llvm::dbgs() << "*** Processing: " << F->getName() << "\n");
 
