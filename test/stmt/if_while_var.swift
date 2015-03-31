@@ -80,7 +80,9 @@ if let a : AnyObject = foo() { // expected-warning {{condition requires a refuta
   
 }
 
-
+// More complex pattern.
+if let (x) = foo() {  // expected-error {{conditional pattern binding must be refutable; did you mean to match an optional?}}{{11-11=?}}
+}
 
 
 
