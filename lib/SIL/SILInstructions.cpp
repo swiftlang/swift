@@ -780,18 +780,26 @@ CondBranchInst::getArgForDestBB(SILBasicBlock *DestBB, SILArgument *A) {
 }
 
 ArrayRef<Operand> CondBranchInst::getTrueOperands() const {
+  if (NumTrueArgs == 0)
+    return ArrayRef<Operand>();
   return ArrayRef<Operand>(&Operands[1], NumTrueArgs);
 }
 
 MutableArrayRef<Operand> CondBranchInst::getTrueOperands() {
+  if (NumTrueArgs == 0)
+    return MutableArrayRef<Operand>();
   return MutableArrayRef<Operand>(&Operands[1], NumTrueArgs);
 }
 
 ArrayRef<Operand> CondBranchInst::getFalseOperands() const {
+  if (NumFalseArgs == 0)
+    return ArrayRef<Operand>();
   return ArrayRef<Operand>(&Operands[1+NumTrueArgs], NumFalseArgs);
 }
 
 MutableArrayRef<Operand> CondBranchInst::getFalseOperands() {
+  if (NumFalseArgs == 0)
+    return MutableArrayRef<Operand>();
   return MutableArrayRef<Operand>(&Operands[1+NumTrueArgs], NumFalseArgs);
 }
 
