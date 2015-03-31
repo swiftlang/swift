@@ -3260,6 +3260,15 @@ public:
     if (isa<ProtocolDecl>(ED->getParent()))
       return;
 
+    // Types cannot be defined in a protocol extension.
+    if (ED->getDeclContext()->isProtocolExtensionContext()) {
+      if (!ED->isInvalid())
+        TC.diagnose(ED->getLoc(), diag::extension_protocol_type_definition,
+                    ED->getFullName());
+      ED->setInvalid();
+      return;
+    }
+
     TC.checkDeclAttributesEarly(ED);
     TC.computeAccessibility(ED);
 
@@ -3322,6 +3331,15 @@ public:
     // check.
     if (isa<ProtocolDecl>(SD->getParent()))
       return;
+
+    // Types cannot be defined in a protocol extension.
+    if (SD->getDeclContext()->isProtocolExtensionContext()) {
+      if (!SD->isInvalid())
+        TC.diagnose(SD->getLoc(), diag::extension_protocol_type_definition,
+                    SD->getFullName());
+      SD->setInvalid();
+      return;
+    }
 
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
@@ -3458,6 +3476,15 @@ public:
     // check.
     if (isa<ProtocolDecl>(CD->getParent()))
       return;
+
+    // Types cannot be defined in a protocol extension.
+    if (CD->getDeclContext()->isProtocolExtensionContext()) {
+      if (!CD->isInvalid())
+        TC.diagnose(CD->getLoc(), diag::extension_protocol_type_definition,
+                    CD->getFullName());
+      CD->setInvalid();
+      return;
+    }
 
     TC.checkDeclAttributesEarly(CD);
     TC.computeAccessibility(CD);

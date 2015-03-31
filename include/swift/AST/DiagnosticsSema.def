@@ -701,6 +701,8 @@ ERROR(extension_nonprotocol_trailing_where,sema_tcd,none,
       "trailing 'where' clause for extension of non-protocol type %0", (Type))
 ERROR(extension_protocol_inheritance,sema_tcd,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
+ERROR(extension_protocol_type_definition,sema_tcd,none,
+      "type %0 cannot be defined within a protocol extension", (DeclName))
 
 // Protocols
 ERROR(type_does_not_conform,sema_tcd,none,

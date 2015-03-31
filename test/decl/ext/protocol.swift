@@ -461,3 +461,9 @@ protocol BadProto1 { }
 protocol BadProto2 { }
 
 extension BadProto1 : BadProto2 { } // expected-error{{extension of protocol 'BadProto1' cannot have an inheritance clause}}
+
+extension BadProto2 {
+  struct S { } // expected-error{{type 'S' cannot be defined within a protocol extension}}
+  class C { } // expected-error{{type 'C' cannot be defined within a protocol extension}}
+  enum E { } // expected-error{{type 'E' cannot be defined within a protocol extension}}
+}
