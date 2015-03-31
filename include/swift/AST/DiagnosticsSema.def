@@ -1801,8 +1801,9 @@ ERROR(invalid_objc_decl,sema_tcd,none,
       "only classes, protocols, methods, properties, and subscript "
       "declarations can be declared @objc", ())
 ERROR(objc_in_generic_context,sema_objc,none,
-      "%select{method|initializer|variable|subscript}0 in a generic class "
-      "cannot be represented in Objective-C", (int))
+      "%select{method|initializer|variable|subscript}0 in a "
+      "%select{generic class|protocol extension}1 cannot be represented in "
+      "Objective-C", (int, bool))
 ERROR(objc_getter_for_nonobjc_property,sema_tcd,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,sema_tcd,none,

@@ -2190,7 +2190,8 @@ static bool checkObjCInGenericContext(TypeChecker &tc,
              : isa<VarDecl>(value)? 2
              : isa<ConstructorDecl>(value)? 1
              : 0;
-    tc.diagnose(value->getLoc(), diag::objc_in_generic_context, kind);
+    tc.diagnose(value->getLoc(), diag::objc_in_generic_context, kind,
+                dc->isProtocolExtensionContext());
   }
 
   return true;
