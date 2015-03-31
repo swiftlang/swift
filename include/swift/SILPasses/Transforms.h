@@ -88,11 +88,6 @@ namespace swift {
     /// The entry point to the transformation.
     virtual void run() = 0;
 
-    /// Returning true means that a transformation has its own
-    /// optimize-until-no-more-changes loop. In this case the pass manager
-    /// can skip a second run even if the previous run did some changes.
-    virtual bool isSelfRepeating() const { return true; }
-
     static bool classof(const SILTransform *S) {
       return S->getKind() == TransformKind::Function;
     }
