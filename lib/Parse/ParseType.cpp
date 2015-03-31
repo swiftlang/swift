@@ -162,6 +162,11 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
 
   if (ty.isNull())
     return nullptr;
+  
+  bool throws = false;
+  
+  if (consumeIf(tok::kw_throws))
+    throws = true;
 
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
@@ -172,8 +177,15 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     if (SecondHalf.isNull())
       return nullptr;
     auto fnTy = new (Context) FunctionTypeRepr(generics, ty.get(),
-                                               SecondHalf.get());
+                                               SecondHalf.get(),
+                                               throws);
     return makeParserResult(applyAttributeToType(fnTy, attrs));
+  }
+  
+  // Only function types may throw.
+  if (throws) {
+    diagnose(ty.get()->getStartLoc(), diag::throwing_non_function);
+    return nullptr;
   }
 
   if (generics) {

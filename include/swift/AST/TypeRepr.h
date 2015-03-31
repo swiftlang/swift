@@ -341,17 +341,19 @@ class FunctionTypeRepr : public TypeRepr {
   GenericParamList *Generics;
   TypeRepr *ArgsTy;
   TypeRepr *RetTy;
+  bool Throws;
 
 public:
   FunctionTypeRepr(GenericParamList *Generics, TypeRepr *ArgsTy,
-                   TypeRepr *RetTy)
+                   TypeRepr *RetTy, bool throws)
     : TypeRepr(TypeReprKind::Function),
-      Generics(Generics), ArgsTy(ArgsTy), RetTy(RetTy) {
+      Generics(Generics), ArgsTy(ArgsTy), RetTy(RetTy), Throws(throws) {
   }
 
   GenericParamList *getGenericParams() const { return Generics; }
   TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
+  bool throws() const { return Throws; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Function;

@@ -1713,11 +1713,13 @@ static CanAnyFunctionType getDestructorType(DestructorDecl *dd,
     assert(isDeallocating && "There are no foreign destroying destructors");
     extInfo = AnyFunctionType::ExtInfo(AbstractCC::ObjCMethod,
                                        FunctionType::Representation::Thin,
-                                       /*noreturn*/ false);
+                                       /*noreturn*/ false,
+                                       /*throws*/ false);
   } else {
     extInfo = AnyFunctionType::ExtInfo(AbstractCC::Method,
                                        FunctionType::Representation::Thin,
-                                       /*noreturn*/ false);
+                                       /*noreturn*/ false,
+                                       /*throws*/ false);
   }
   
   CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
@@ -1742,11 +1744,13 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
     assert(isDeallocating && "There are no foreign destroying destructors");
     extInfo = AnyFunctionType::ExtInfo(AbstractCC::ObjCMethod,
                                        FunctionType::Representation::Thin,
-                                       /*noreturn*/ false);
+                                       /*noreturn*/ false,
+                                       /*throws*/ false);
   } else {
     extInfo = AnyFunctionType::ExtInfo(AbstractCC::Method,
                                        FunctionType::Representation::Thin,
-                                       /*noreturn*/ false);
+                                       /*noreturn*/ false,
+                                       /*throws*/ false);
   }
   
   CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
@@ -1773,7 +1777,8 @@ static CanAnyFunctionType getIVarInitDestroyerType(ClassDecl *cd,
   auto extInfo = AnyFunctionType::ExtInfo(isObjC? AbstractCC::ObjCMethod
                                                 : AbstractCC::Method,
                                           FunctionType::Representation::Thin,
-                                          /*noreturn*/ false);
+                                          /*noreturn*/ false,
+                                          /*throws*/ false);
   resultType = CanFunctionType::get(emptyTupleTy, resultType, extInfo);
   if (auto params = cd->getGenericParams())
     return CanPolymorphicFunctionType::get(classType, resultType, params, 
@@ -1794,7 +1799,8 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
   auto extInfo = AnyFunctionType::ExtInfo(isObjC? AbstractCC::ObjCMethod
                                                 : AbstractCC::Method,
                                           FunctionType::Representation::Thin,
-                                          /*noreturn*/ false);
+                                          /*noreturn*/ false,
+                                          /*throws*/ false);
   resultType = CanFunctionType::get(emptyTupleTy, resultType, extInfo);
   auto sig = cd->getGenericSignatureOfContext();
   if (sig)
@@ -1854,7 +1860,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
     auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
                                             FunctionType::Representation::Thin,
-                                            /*noreturn*/ false);
+                                            /*noreturn*/ false,
+                                            funcType->throws());
     if (funcType->isNoEscape())
       extInfo = extInfo.withNoEscape();
 
@@ -1918,7 +1925,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
   auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
                                           FunctionType::Representation::Thin,
-                                          /*noreturn*/ false);
+                                          /*noreturn*/ false,
+                                          funcType->throws());
   if (funcType->isNoEscape())
     extInfo = extInfo.withNoEscape();
 
@@ -1946,7 +1954,8 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
     
     auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
                                             FunctionType::Representation::Thin,
-                                            /*noreturn*/ false);
+                                            /*noreturn*/ false,
+                                            funcType->throws());
 
     return CanGenericFunctionType::get(genericSig,
                                        funcType.getInput(),
@@ -2012,7 +2021,8 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 
   auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Freestanding,
                                           FunctionType::Representation::Thin,
-                                          /*noreturn*/ false);
+                                          /*noreturn*/ false,
+                                          funcType->throws());
 
   if (genericSig)
     return CanGenericFunctionType::get(genericSig,

@@ -627,7 +627,9 @@ namespace {
           return Type();
 
         // Build the resulting (non-generic) function type.
-        return FunctionType::get(inputTy, resultTy);
+        return FunctionType::get(inputTy, resultTy,
+                                 FunctionType::ExtInfo().
+                                  withThrows(genericFn->throws()));
       }
 
       // Open up unbound generic types, turning them into bound generic

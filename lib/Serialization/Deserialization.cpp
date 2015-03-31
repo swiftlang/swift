@@ -3177,7 +3177,7 @@ Type ModuleFile::getType(TypeID TID) {
     
     auto Info = FunctionType::ExtInfo(callingConvention.getValue(),
                                 getFunctionRepresentation(thin, blockCompatible),
-                                noreturn, autoClosure, noescape);
+                                noreturn, autoClosure, noescape,/*throws*/false);
     
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);
@@ -3552,7 +3552,8 @@ Type ModuleFile::getType(TypeID TID) {
     
     auto Info = PolymorphicFunctionType::ExtInfo(callingConvention.getValue(),
                                                  rep,
-                                                 noreturn);
+                                                 noreturn,
+                                                 /*throws*/false);
 
     typeOrOffset = PolymorphicFunctionType::get(getType(inputID),
                                                 getType(resultID),
@@ -3603,7 +3604,7 @@ Type ModuleFile::getType(TypeID TID) {
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements);
     auto info = GenericFunctionType::ExtInfo(callingConvention.getValue(),
-                                             rep, noreturn);
+                                             rep, noreturn,/*throws*/false);
 
     auto sig = GenericSignature::get(genericParams, requirements);
     typeOrOffset = GenericFunctionType::get(sig,
@@ -3655,7 +3656,8 @@ Type ModuleFile::getType(TypeID TID) {
     }
     SILFunctionType::ExtInfo extInfo(callingConvention.getValue(),
                                      getFunctionRepresentation(thin, block),
-                                     noreturn, /*autoclosure*/false, noescape);
+                                     noreturn, /*autoclosure*/false, noescape,
+                                     /*throws*/false);
 
     // Process the result.
     auto interfaceResultConvention

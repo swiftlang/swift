@@ -380,7 +380,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Number of curried parameter patterns (tuples).
     unsigned NumParamPatterns : 6;
 
-    /// Whether we are overridden later
+    /// Whether we are overridden later.
     unsigned Overridden : 1;
   };
   enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 10 };
@@ -4514,6 +4514,9 @@ protected:
   GenericParamList *GenericParams;
 
   CaptureInfo Captures;
+  
+  /// Whether or not the function can throw.
+  unsigned Throws : 1;
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, unsigned NumParamPatterns,
@@ -4525,6 +4528,7 @@ protected:
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
     AbstractFunctionDeclBits.Overridden = false;
+    Throws = false;
 
     // Verify no bitfield truncation.
     assert(AbstractFunctionDeclBits.NumParamPatterns == NumParamPatterns);
@@ -4551,6 +4555,13 @@ public:
   /// parsed.
   bool hasBody() const {
     return getBodyKind() != BodyKind::None;
+  }
+  
+  bool throws() const {
+    return Throws;
+  }
+  void setThrows() {
+    Throws = true;
   }
 
   /// Returns the function body, if it was parsed, or nullptr otherwise.

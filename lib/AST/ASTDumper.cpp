@@ -1994,6 +1994,8 @@ public:
   void visitFunctionTypeRepr(FunctionTypeRepr *T) {
     printCommon(T, "type_function");
     OS << '\n'; printRec(T->getArgsTypeRepr());
+    if (T->throws())
+      OS << " throws ";
     OS << '\n'; printRec(T->getResultTypeRepr());
     OS << ')';
   }
@@ -2485,6 +2487,8 @@ namespace {
       printFlag(T->isNoEscape(), "noescape");
 
       printRec("input", T->getInput());
+      if (T->throws())
+        OS << " throws ";
       printRec("output", T->getResult());
     }
 

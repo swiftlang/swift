@@ -1399,8 +1399,23 @@ bool swift::conflicting(const OverloadSignature& sig1,
              (sig2.IsProperty && sig1.Name.getArgumentNames().size() > 0));
   }
   
+  // You cannot overload functions based on whether or not one throws. 
+  auto overloadedOnThrows = false;
+  
+  if (sig1.InterfaceType && sig2.InterfaceType) {
+    if (auto fn1 = sig1.InterfaceType->getAs<AnyFunctionType>()) {
+      if (auto fn2 = sig2.InterfaceType->getAs<AnyFunctionType>()) {
+        if (fn1->throws() != fn2->throws()) {
+          overloadedOnThrows =
+            fn1->getInput()->isEqual(fn2->getInput()) &&
+            fn1->getResult()->isEqual(fn2->getResult());
+        }
+      }
+    }
+  }
+  
   return sig1.Name == sig2.Name &&
-         sig1.InterfaceType == sig2.InterfaceType &&
+         ((sig1.InterfaceType == sig2.InterfaceType) || overloadedOnThrows) &&
          sig1.UnaryOperator == sig2.UnaryOperator &&
          sig1.IsInstanceMember == sig2.IsInstanceMember;
 }

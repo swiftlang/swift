@@ -33,7 +33,8 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         SILFunctionType::Representation::Thick,
                                         /*noreturn*/ FTI->isNoReturn(),
                                         /*autoclosure*/ false,
-                                          /*noescape*/ FTI->isNoEscape());
+                                        /*noescape*/ FTI->isNoEscape(),
+                                        /*throws*/ FTI->throws());
   
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
                                             ParameterConvention::Direct_Owned,

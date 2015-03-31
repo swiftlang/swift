@@ -3723,10 +3723,19 @@ public:
       
       // Validate and consume the function type attributes.
       auto Info = validateAndApplyFunctionTypeAttributes(FD);
+      
+      // For curried functions, 'throws' only applies to the innnermost
+      // function.
+      auto doesThrow = i ? false : FD->throws();
       if (params) {
-        funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
+        funcTy = PolymorphicFunctionType::get(argTy,
+                                              funcTy,
+                                              params,
+                                              Info.withThrows(doesThrow));
       } else {
-        funcTy = FunctionType::get(argTy, funcTy, Info);
+        funcTy = FunctionType::get(argTy,
+                                   funcTy,
+                                   Info.withThrows(doesThrow));
       }
 
     }

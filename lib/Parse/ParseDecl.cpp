@@ -3779,9 +3779,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
+  bool throws = false;
   ParserStatus SignatureStatus =
       parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
-                             FuncRetTy);
+                             throws, FuncRetTy);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -3806,10 +3807,13 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                           FuncLoc, FullName, NameLoc, GenericParams,
                           Type(), BodyParams, FuncRetTy,
                           CurDeclContext);
-                          
+    
     // Add the attributes here so if we need them while parsing the body
     // they are available.
     FD->getAttrs() = Attributes;
+    
+    if (throws)
+      FD->setThrows();
       
     // Pass the function signature to code completion.
     if (SignatureStatus.hasCodeCompletion())

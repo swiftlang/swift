@@ -392,7 +392,8 @@ private:
       ? FunctionType::Representation::Thin
       : FunctionType::Representation::Thick;
     auto extInfo = FunctionType::ExtInfo(AbstractCC::Method, rep,
-                                         /*noreturn*/ false);
+                                         /*noreturn*/ false,
+                                         /*throws*/ polyFormalType->throws());
 
     SubstFormalType = CanFunctionType::get(substSelfType, SubstFormalType,
                                            extInfo);

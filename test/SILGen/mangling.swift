@@ -156,3 +156,31 @@ struct InstanceAndClassProperty {
     set {}
   }
 }
+
+// CHECK-LABEL: sil hidden @_TF8mangling6curry1FT_T_ : $@thin () -> ()
+func curry1() {
+
+}
+
+// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@thin () -> Int
+func bar() throws -> Int { return 0 }
+
+// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@thin () -> () 
+func curry1Throws() throws {
+
+}
+
+// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@thin () -> @owned @callee_owned () -> ()
+func curry2Throws() throws -> () -> () {
+  return curry1
+}
+
+// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@thin () -> @owned @callee_owned () -> ()
+func curry3() -> () throws -> () {
+  return curry1Throws
+}
+
+// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@thin () -> @owned @callee_owned () -> ()
+func curry3Throws() throws -> () throws -> () {
+  return curry1Throws
+}

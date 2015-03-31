@@ -756,6 +756,8 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     // FIXME: Hacked up form of validateAndApplyFunctionTypeAttributes().
     auto info = AnyFunctionType::ExtInfo().withIsNoReturn(
         func->getAttrs().hasAttribute<NoReturnAttr>());
+    
+    info = info.withThrows(func->throws());
 
     // FIXME: We shouldn't even get here if the function isn't locally generic
     // to begin with, but fixing that requires a lot of reengineering for local

@@ -470,6 +470,7 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
   switch (Tok.getKind()) {
   case tok::kw_self:
   case tok::kw_Self:
+  case tok::kw_throws:
   case tok::identifier:
     Loc = consumeIdentifier(&Result);
     return false;

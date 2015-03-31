@@ -643,7 +643,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
 /// Parse a function definition signature.
 ///   func-signature:
-///     func-arguments func-signature-result?
+///     func-arguments func-throws? func-signature-result?
 ///   func-signature-result:
 ///     '->' type
 ///
@@ -653,6 +653,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                DeclName &FullName,
                                SmallVectorImpl<Pattern *> &bodyPatterns,
                                DefaultArgumentInfo &defaultArgs,
+                               bool &throws,
                                TypeRepr *&retType) {
   SmallVector<Identifier, 4> NamePieces;
   NamePieces.push_back(SimpleName);
@@ -691,6 +692,12 @@ Parser::parseFunctionSignature(Identifier SimpleName,
         TuplePattern::create(Context, PreviousLoc, {}, PreviousLoc);
     bodyPatterns.push_back(EmptyTuplePattern);
     FullName = DeclName(Context, SimpleName, { });
+  }
+  
+  // Check for the 'throws' keyword.
+  if (Tok.is(tok::kw_throws)) {
+    throws = true;
+    consumeToken();
   }
 
   // If there's a trailing arrow, parse the rest as the result type.

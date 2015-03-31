@@ -1294,6 +1294,10 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
       Buffer << (uncurryLevel > 0 ? 'f' : 'F');
     break;
   }
+  
+  if (fn->throws())
+    Buffer << 'z';
+  
   mangleType(fn->getInput(), explosion, 0);
   mangleType(fn->getResult(), explosion,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));

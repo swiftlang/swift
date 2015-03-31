@@ -665,6 +665,10 @@ void Remangler::mangleWitnessTableOffset(Node *node) {
   mangleSingleChildNode(node); // entity
 }
 
+void Remangler::mangleThrowsAnnotation(Node *node) {
+  Out << "z";
+}
+
 void Remangler::mangleFieldOffset(Node *node) {
   Out << "Wv";
   mangleChildNodes(node); // directness, entity

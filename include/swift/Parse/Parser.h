@@ -395,7 +395,7 @@ public:
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
     assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
-           Tok.is(tok::kw_Self));
+           Tok.is(tok::kw_Self) || Tok.is(tok::kw_throws));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
     return consumeToken();
@@ -992,6 +992,7 @@ public:
                                       DeclName &fullName,
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
                                       DefaultArgumentInfo &defaultArgs,
+                                      bool &throws,
                                       TypeRepr *&retType);
   ParserStatus parseConstructorArguments(DeclName &FullName,
                                          Pattern *&BodyPattern,

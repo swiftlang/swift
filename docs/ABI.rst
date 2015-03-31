@@ -892,8 +892,8 @@ Types
   type ::= 'a' context identifier            // Type alias (DWARF only)
   type ::= 'b' type type                     // objc block function type
   type ::= 'c' type type                     // C function pointer type
-  type ::= 'F' type type                     // function type
-  type ::= 'f' type type                     // uncurried function type
+  type ::= 'F' throws-annotation? type type  // function type
+  type ::= 'f' throws-annotation? type type  // uncurried function type  
   type ::= 'G' type <type>+ '_'              // generic type application
   type ::= 'K' type type                     // @auto_closure function type
   type ::= 'M' type                          // metatype without representation
@@ -930,6 +930,8 @@ Types
   metatype-repr ::= 't'                      // Thin metatype representation
   metatype-repr ::= 'T'                      // Thick metatype representation
   metatype-repr ::= 'o'                      // ObjC metatype representation
+  throws-annotation ::= 'z'                  // 'throws' annotation on function types
+
 
   type ::= 'u' generic-signature type        // generic type (new)
   type ::= 'q' index                         // dependent generic parameter

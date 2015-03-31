@@ -590,6 +590,8 @@ ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
       "expected type for function result", ())
 ERROR(generic_non_function,type_parsing,PointsToFirstBadToken,
       "only syntactic function types can be generic", ())
+ERROR(throwing_non_function,type_parsing,PointsToFirstBadToken,
+      "only function types may throw", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,

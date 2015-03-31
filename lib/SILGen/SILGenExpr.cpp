@@ -1806,8 +1806,10 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
       }
       break;
     case AnyFunctionType::Representation::Thick: {
-      assert(resultFTy->getRepresentation()
-               == FunctionType::Representation::Block
+      // FIXME: We'll need to fix up no-throw-to-throw function conversions.
+      assert(destRepTy->throws() ||
+             (resultFTy->getRepresentation()
+               == FunctionType::Representation::Block)
              && "only block-to-thick repr changes supported");
       result = SGF.emitBlockToFunc(e, result,
                        SGF.getLoweredType(destRepTy).castTo<SILFunctionType>());

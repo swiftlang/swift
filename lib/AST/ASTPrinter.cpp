@@ -2431,6 +2431,10 @@ public:
   void visitFunctionType(FunctionType *T) {
     printFunctionExtInfo(T->getExtInfo());
     printWithParensIfNotSimple(T->getInput());
+    
+    if (T->throws())
+      Printer << " throws";
+    
     Printer << " -> ";
     T->getResult().print(Printer, Options);
   }

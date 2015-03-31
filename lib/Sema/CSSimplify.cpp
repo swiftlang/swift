@@ -935,6 +935,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return SolutionKind::Error;
     }
   }
+  
+  // Check for trivial subtype matching on function types that throw.
+  if (func1->throws() && !func2->throws()) {
+    if (kind >= TypeMatchKind::Subtype) {
+      return SolutionKind::Error;
+    }
+  }
 
   // A @noreturn function type can be a subtype of a non-@noreturn function
   // type.

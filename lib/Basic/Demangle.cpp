@@ -1589,6 +1589,11 @@ private:
   }
   
   NodePointer demangleFunctionType(Node::Kind kind) {
+    bool throws = false;
+    if (Mangled &&
+        Mangled.nextIf('z')) {
+      throws = true;
+    }
     NodePointer in_args = demangleType();
     if (!in_args)
       return nullptr;
@@ -1596,6 +1601,11 @@ private:
     if (!out_args)
       return nullptr;
     NodePointer block = NodeFactory::create(kind);
+    
+    if (throws) {
+      block->addChild(NodeFactory::create(Node::Kind::ThrowsAnnotation));
+    }
+    
     NodePointer in_node = NodeFactory::create(Node::Kind::ArgumentTuple);
     block->addChild(in_node);
     in_node->addChild(in_args);
@@ -2312,6 +2322,7 @@ private:
     case Node::Kind::Weak:
     case Node::Kind::WillSet:
     case Node::Kind::WitnessTableOffset:
+    case Node::Kind::ThrowsAnnotation:
       return false;
     }
     unreachable("bad node kind");
@@ -3275,6 +3286,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer base = pointer->getChild(0);
     print(base);
     Printer << '.' << pointer->getText();
+    return;
+  }
+  case Node::Kind::ThrowsAnnotation: {
+    Printer<< " throws ";
     return;
   }
   }

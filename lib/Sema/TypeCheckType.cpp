@@ -1313,7 +1313,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                   rep,
                                   attrs.has(TAK_noreturn),
                                   /*autoclosure is a decl attr*/false,
-                                  isNoEscape);
+                                  isNoEscape,
+                                  fnRepr->throws());
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
     if (attrs.has(TAK_callee_owned)) {
@@ -1407,6 +1408,8 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   if (outputTy->is<ErrorType>())
     return outputTy;
 
+  extInfo = extInfo.withThrows(repr->throws());
+  
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto generics = repr->getGenericParams()) {
     return PolymorphicFunctionType::get(inputTy, outputTy, generics, extInfo);
@@ -1425,6 +1428,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   case AnyFunctionType::Representation::Thick:
     break;
   }
+  
   return fnTy;
 }
 
