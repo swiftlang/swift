@@ -782,23 +782,35 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
 
 void CodeCompletionContext::sortCompletionResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
-  std::sort(Results.begin(), Results.end(),
-            [](CodeCompletionResult *LHS, CodeCompletionResult *RHS) {
-    llvm::SmallString<64> LSS;
-    llvm::SmallString<64> RSS;
-    {
-      llvm::raw_svector_ostream LOS(LSS);
-      LHS->getCompletionString()->getName(LOS);
-      llvm::raw_svector_ostream ROS(RSS);
-      RHS->getCompletionString()->getName(ROS);
-    }
-    int Result = LSS.compare_lower(RSS);
+  struct ResultAndName {
+    CodeCompletionResult *result;
+    std::string name;
+  };
+
+  // Caching the name of each field is important to avoid unnecessary calls to
+  // CodeCompletionString::getName().
+  std::vector<ResultAndName> nameCache(Results.size());
+  for (unsigned i = 0, n = Results.size(); i < n; ++i) {
+    auto *result = Results[i];
+    nameCache[i].result = result;
+    llvm::raw_string_ostream OS(nameCache[i].name);
+    result->getCompletionString()->getName(OS);
+    OS.flush();
+  }
+
+  // Sort nameCache, and then transform Results to return the pointers in order.
+  std::sort(nameCache.begin(), nameCache.end(),
+            [](const ResultAndName &LHS, const ResultAndName &RHS) {
+    int Result = StringRef(LHS.name).compare_lower(RHS.name);
     // If the case insensitive comparison is equal, then secondary sort order
     // should be case sensitive.
     if (Result == 0)
-      Result = LSS.compare(RSS);
+      Result = LHS.name.compare(RHS.name);
     return Result < 0;
   });
+
+  std::transform(nameCache.begin(), nameCache.end(), Results.begin(),
+                 [](const ResultAndName &entry) { return entry.result; });
 }
 
 namespace {
