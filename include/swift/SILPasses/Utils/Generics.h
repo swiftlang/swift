@@ -69,20 +69,10 @@ private:
   /// The SIL Module.
   SILModule *M;
 
-  /// Maps a function to all of the ApplyInst that call it.
-  llvm::MapVector<SILFunction *, AIList> ApplyInstMap;
-
   /// A worklist of functions to specialize.
   std::vector<SILFunction*> Worklist;
 
-  bool specializeApplyInstGroup(SILFunction *F, AIList &List);
-
-  /// Scan the function and collect all of the ApplyInst with generic
-  /// substitutions into buckets according to the called function.
-  void collectApplyInst(SILFunction &F);
-
-  /// Add the call \p AI into the list of calls to inspect.
-  void addApplyInst(ApplySite AI);
+  bool specializeApplyInstGroup(llvm::SmallVectorImpl<ApplySite> &NewApplies);
 
 public:
   /// Collect and specialize calls in a specific order specified by

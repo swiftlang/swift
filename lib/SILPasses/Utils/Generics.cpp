@@ -81,7 +81,8 @@ void SpecializingCloner::populateCloned() {
 }
 
 
-void GenericSpecializer::addApplyInst(ApplySite AI) {
+static void addApplyInst(ApplySite AI,
+                         llvm::SmallVectorImpl<ApplySite> &NewApplies) {
   if (!AI || !AI.hasSubstitutions())
     return;
 
@@ -92,21 +93,21 @@ void GenericSpecializer::addApplyInst(ApplySite AI) {
     return;
 
   SILFunction *Callee = FRI->getReferencedFunction();
+  auto &M = AI.getInstruction()->getModule();
   if (Callee->isExternalDeclaration())
-    if (!M->linkFunction(Callee, SILModule::LinkingMode::LinkAll))
+    if (!M.linkFunction(Callee, SILModule::LinkingMode::LinkAll))
       return;
 
-  // Save the ApplyInst into the function/bucket that it calls.
-  ApplyInstMap[Callee].push_back(AI);
+  NewApplies.push_back(AI);
 }
 
-void GenericSpecializer::collectApplyInst(SILFunction &F) {
+static void collectApplyInst(SILFunction &F,
+                             llvm::SmallVectorImpl<ApplySite> &NewApplies) {
   // Scan all of the instructions in this function in search of ApplyInsts.
   for (auto &BB : F)
-    for (auto &I : BB) {
+    for (auto &I : BB)
       if (ApplySite AI = ApplySite::isa(&I))
-        addApplyInst(AI);
-    }
+        addApplyInst(AI, NewApplies);
 }
 
 void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
@@ -122,14 +123,14 @@ void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
 }
 
 bool
-GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
+GenericSpecializer::specializeApplyInstGroup(
+                                 llvm::SmallVectorImpl<ApplySite> &NewApplies) {
   bool Changed = false;
 
-  assert(F->isDefinition() && "Expected definition to specialize!");
+  for (auto &AI : NewApplies) {
+    auto *F = cast<FunctionRefInst>(AI.getCallee())->getReferencedFunction();
+    assert(F->isDefinition() && "Expected definition to specialize!");
 
-  DEBUG(llvm::dbgs() << "*** Processing: " << F->getName() << "\n");
-
-  for (auto &AI : List) {
     DEBUG(llvm::dbgs() << "        ApplyInst: " << *AI.getInstruction());
 
     // Create the substitution maps.
@@ -185,13 +186,11 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 
     Changed = true;
 
-    // Analyze the ApplyInsts in the new function.
-    if (createdFunction) {
-      collectApplyInst(*NewF);
+    if (createdFunction)
       Worklist.push_back(NewF);
-    }
   }
   
+  NewApplies.clear();
   return Changed;
 }
 
@@ -199,22 +198,25 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 /// \p BotUpFuncList.
 bool GenericSpecializer::specialize(const std::vector<SILFunction *>
                                     &BotUpFuncList) {
-  for (auto &F : *M)
-    collectApplyInst(F);
-
   // Initialize the worklist with a call-graph bottom-up list of functions.
   // We specialize the functions in a top-down order, starting from the end
   // of the list.
   Worklist.insert(Worklist.begin(), BotUpFuncList.begin(),
                   BotUpFuncList.end());
 
+  llvm::SmallVector<ApplySite, 16> NewApplies;
   bool Changed = false;
+
   // Try to specialize generic calls.
   while (Worklist.size()) {
     SILFunction *F = Worklist.back();
     Worklist.pop_back();
-    if (ApplyInstMap.count(F))
-      Changed |= specializeApplyInstGroup(F, ApplyInstMap[F]);
+
+    collectApplyInst(*F, NewApplies);
+    if (!NewApplies.empty())
+      Changed |= specializeApplyInstGroup(NewApplies);
+
+    assert(NewApplies.empty() && "Expected all applies processed!");
   }
   return Changed;
 }
