@@ -168,8 +168,9 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
         F.dump();
       }
 
-      // Remember if this pass didn't change anything.
-      if (!currentPassHasInvalidated)
+      // Remember if this pass didn't change anything or it is a pass which
+      // doesn't need to run a second time.
+      if (!currentPassHasInvalidated || SFT->isSelfRepeating())
         completedPasses.set((size_t)SFT->getPassKind());
 
       if (currentPassHasInvalidated && Options.VerifyAll) {
