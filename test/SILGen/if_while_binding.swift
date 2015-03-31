@@ -255,3 +255,26 @@ func if_leading_boolean(a : Int) {
 
 }
 
+
+/// <rdar://problem/20364869> Assertion failure when using 'as' pattern in 'if let'
+class BaseClass {}
+class DerivedClass : BaseClass {}
+
+// CHECK-LABEL: sil hidden @_TF16if_while_binding20testAsPatternInIfLetFGSqCS_9BaseClass_T_
+func testAsPatternInIfLet(a : BaseClass?) {
+  // CHECK-NEXT: bb0(%0 : $Optional<BaseClass>):
+  // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>  // let a
+  // CHECK-NEXT:   retain_value %0 : $Optional<BaseClass>
+  // CHECK-NEXT:   switch_enum %0 : $Optional<BaseClass>, case #Optional.Some!enumelt.1: bb1,
+  // CHECK:      bb1(%4 : $BaseClass):
+  // CHECK-NEXT:   checked_cast_br %4 : $BaseClass to $DerivedClass, bb2,
+
+  // CHECK:      bb2(%6 : $DerivedClass):
+  // CHECK-NEXT:   debug_value %6 : $DerivedClass
+  // CHECK-NEXT:   strong_release %6 : $DerivedClass
+  if let b as DerivedClass = a {
+
+  }
+}
+
+

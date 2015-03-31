@@ -144,7 +144,11 @@ namespace {
 void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
   switch (getKind()) {
   case PatternKind::Any:
+    return;
+
   case PatternKind::Is:
+    if (auto SP = cast<IsPattern>(this)->getSubPattern())
+      SP->forEachVariable(fn);
     return;
 
   case PatternKind::Named:
@@ -166,23 +170,20 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
       elt.getSubPattern()->forEachVariable(fn);
     return;
 
-  case PatternKind::EnumElement: {
-    auto *OP = cast<EnumElementPattern>(this);
-    if (OP->hasSubPattern())
-      OP->getSubPattern()->forEachVariable(fn);
+  case PatternKind::EnumElement:
+    if (auto SP = cast<EnumElementPattern>(this)->getSubPattern())
+      SP->forEachVariable(fn);
     return;
-  }
-  case PatternKind::OptionalSome:
+
+    case PatternKind::OptionalSome:
     cast<OptionalSomePattern>(this)->getSubPattern()->forEachVariable(fn);
     return;
 
-  case PatternKind::Bool: {
-    auto *OP = cast<BoolPattern>(this);
-    if (OP->hasSubPattern())
-      OP->getSubPattern()->forEachVariable(fn);
+  case PatternKind::Bool:
+    if (auto SP = cast<BoolPattern>(this)->getSubPattern())
+      SP->forEachVariable(fn);
     return;
-  }
-      
+
   case PatternKind::Expr:
     // An ExprPattern only exists before sema has resolved a refutable pattern
     // into a concrete pattern.  We have to use an AST Walker to find the
@@ -201,8 +202,12 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   // Leaf patterns have no recursion.
   case PatternKind::Any:
   case PatternKind::Named:
-  case PatternKind::Is:
   case PatternKind::Expr:// FIXME: expr nodes are not modeled right in general.
+    return;
+
+  case PatternKind::Is:
+    if (auto SP = cast<IsPattern>(this)->getSubPattern())
+      SP->forEachNode(f);
     return;
 
   case PatternKind::Paren:
