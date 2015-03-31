@@ -1532,12 +1532,17 @@ bool TypeChecker::typeCheckCondition(StmtCondition &cond, DeclContext *dc) {
       elt.setCondition(E);
       if (r) return true;
     } else {
-      auto CB = elt.getBinding();
-      if (typeCheckConditionalPatternBinding(CB, dc)) {
+      auto PBD = elt.getBinding();
+      //typeCheckDecl(PBD, false);
+      //if (PBD->isInvalid()) {
+        
+      if (typeCheckConditionalPatternBinding(PBD, dc)) {
+        // FIXME: not great for AST fidelity & introduces nulls into the
+        // conditional list.
         elt = StmtConditionElement();
         return true;
       }
-      elt.setBinding(CB);
+      elt.setBinding(PBD);
     }
   }
   return false;

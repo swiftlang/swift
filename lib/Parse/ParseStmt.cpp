@@ -870,10 +870,15 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         Init = new (Context) ErrorExpr(Tok.getLoc());
       }
     
+      // FIXME: Make one PBD for the entire series of patterns!
       auto PBD = PatternBindingDecl::create(Context, SourceLoc(),
                                             StaticSpellingKind::None,
-                                            VarLoc, Pattern.get(),
-                                            Init, /*parent*/CurDeclContext);
+                                            VarLoc,
+                                            PatternBindingEntry(Pattern.get(),
+                                                                Init),
+                                            /*where*/ nullptr,
+                                            PatternBindingElse::getContextual(),
+                                            /*parent*/CurDeclContext);
       result.push_back(PBD);
       
       // Add variable bindings from the pattern to the case scope.

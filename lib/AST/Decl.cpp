@@ -953,7 +953,8 @@ PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,
                                        unsigned NumPatternEntries,
-                                       Expr *whereExpr, BraceStmt *elseStmt,
+                                       Expr *whereExpr,
+                                       PatternBindingElse elseStmt,
                                        DeclContext *Parent)
   : Decl(DeclKind::PatternBinding, Parent),
     StaticLoc(StaticLoc), VarLoc(VarLoc),
@@ -970,7 +971,7 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc VarLoc,
                            ArrayRef<PatternBindingEntry> PatternList,
-                           Expr *whereExpr, BraceStmt *elseStmt,
+                           Expr *whereExpr, PatternBindingElse elseStmt,
                            DeclContext *Parent) {
   size_t Size = sizeof(PatternBindingDecl) +
                 PatternList.size() * sizeof(PatternBindingEntry);
@@ -1025,17 +1026,22 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
 
-  if (elseStmt)
-    return { startLoc, elseStmt->getEndLoc() };
+  // If there is an 'else', it is the last part of the decl.
+  if (auto *elseBody = elseStmt.getExplicitBody())
+    return { startLoc, elseBody->getEndLoc() };
 
+  // If not, but there is a 'where' (e.g. in an if-let conditional), then
+  // it is the last.
   if (whereExpr)
     return { startLoc, whereExpr->getEndLoc() };
 
+  // Otherwise, we take the init of the last pattern in the list.
   if (auto init = getPatternList().back().Init) {
     SourceLoc EndLoc = init->getEndLoc();
     if (EndLoc.isValid())
       return { startLoc, EndLoc };
   }
+  // If the last pattern had no init, we take the end of its pattern.
   return { startLoc, getPatternList().back().ThePattern->getEndLoc() };
 }
 

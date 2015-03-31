@@ -634,6 +634,16 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
+      
+      if (PBD->getElse().isContextual())
+        OS << " contextual_else";
+      else if (PBD->getElse().isUnconditional())
+        OS << " unconditional";
+      else {
+        assert(PBD->getElse().isExplicit());
+        OS << " explicit_else";
+      }
+            
       for (auto entry : PBD->getPatternList()) {
         OS << '\n';
         printRec(entry.ThePattern);
@@ -641,6 +651,14 @@ namespace {
           OS << '\n';
           printRec(entry.Init);
         }
+      }
+      if (auto Where = PBD->getWhereExpr()) {
+        OS << '\n';
+        printRec(Where);
+      }
+      if (auto Else = PBD->getElse().getExplicitBody()) {
+        OS << '\n';
+        printRec(Else);
       }
       OS << ')';
     }

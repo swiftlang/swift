@@ -1140,6 +1140,12 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       // FIXME: Implement once we can pretty-print expressions.
     }
   }
+  
+  if (decl->getWhereExpr())
+    Printer << " where <<cond>>";
+  
+  if (decl->getElse().getExplicitBody())
+    Printer << " else <<elsebody>>";
 }
 
 void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {

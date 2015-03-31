@@ -569,7 +569,8 @@ func F() { init<( } )}
 
 // rdar://20337695
 func f1() {
-  
+ 
+  // expected-error@+3 {{refutable pattern match can fail; add an else {} to handle this condition}} 
   // expected-error@+2 {{getter/setter can only be defined for a single variable}}
   // expected-error@+1 {{refutable pattern requires an initializer value to match against}}
   let n == C { get {}

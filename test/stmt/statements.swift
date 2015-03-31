@@ -312,12 +312,19 @@ func test_let_else(x : Int, y : Int??, cond : Bool) {
   let c = x where cond else {}
 
   let n1? where cond else {}    // expected-error {{refutable pattern requires an initializer value to match against}}
-  let n2? : Int? where cond else {}    // error: needs initializer.
-  let o? = y                          // error: needs else.
-  let p = x where cond                // error: needs else.
+  let n2? : Int? where cond else {}    // expected-error {{refutable pattern requires an initializer value to match against}}
+
+
+  let o? = y
+  // expected-error @-1 {{refutable pattern match can fail; add an else {} to handle this condition}}  {{13-13= else {}}}
+
+  let p = x where cond
+  // expected-error @-1 {{'where' clause on variable binding can fail; add an else {} to handle this condition}}  {{23-23= else {}}}
+
   let q = x else {}                   // error: else is unreachable.
+  // expected-error @-1 {{'else' condition is unreachable, variable binding always succeeds}}
 
   // error: Computed properties cannot have where/else.
-
+  // error: properties in structs, etc cannot be refutable.
 }
 

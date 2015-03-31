@@ -1836,6 +1836,57 @@ struct PatternBindingEntry {
   PatternBindingEntry(Pattern *P, Expr *E) : ThePattern(P), Init(E) {}
 };
 
+/// The 'else' clause of a PatternBindingDecl can be one of three things:
+///   1) not present in an unconditional pattern binding.
+///   2) an explicit BraceStmt written by the user in a conditional pattern
+///      binding.
+///   3) an implicit contextual handler, when the pattern binding exists in an
+///      'if let' condition.
+/// Because C++ doesn't have decent enums, we model this with a PointerIntPair
+/// to encode this all into a single word and manually force the invariants with
+/// this struct.
+///
+struct PatternBindingElse {
+private:
+  llvm::PointerIntPair<BraceStmt*, 1, bool> elseStmt;
+public:
+  /// Create a PatternBindingElse for an unconditional pattern binding.
+  /*implicit*/PatternBindingElse() {
+    elseStmt.setPointerAndInt(nullptr, false);
+  }
+  /// Create a PatternBindingElse for an conditional pattern binding with an
+  /// explicit handler.
+  /*implicit*/PatternBindingElse(BraceStmt *BS) {
+    elseStmt.setPointerAndInt(BS, false);
+  }
+  
+  /// Create a PatternBindingElse for an conditional pattern binding with an
+  /// implicit contextual handler (i.e. an if/let statement).
+  static PatternBindingElse getContextual() {
+    PatternBindingElse result;
+    result.elseStmt.setPointerAndInt(nullptr, true);
+    return result;
+  }
+  
+  bool isContextual() const {
+    return elseStmt.getInt();
+  }
+  
+  bool isUnconditional() const {
+    return elseStmt.getPointer() == nullptr && !isContextual();
+  }
+  
+  bool isExplicit() const {
+    return elseStmt.getPointer() != nullptr;
+  }
+  
+  
+  BraceStmt *getExplicitBody() const {
+    return elseStmt.getPointer();
+  }
+};
+  
+
 /// \brief This decl contains a pattern and optional initializer for a set
 /// of one or more VarDecls declared together.
 ///
@@ -1867,21 +1918,24 @@ class PatternBindingDecl : public Decl {
   
   /// 'where' condition, if present.  Null otherwise.
   Expr *whereExpr;
-  /// 'else' statement, if present.  Null otherwise.
-  BraceStmt *elseStmt;
+  
+  /// 'else' statement, if present.
+  PatternBindingElse elseStmt;
   
   friend class Decl;
   
   PatternBindingDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                      SourceLoc VarLoc, unsigned NumPatternEntries,
-                     Expr *whereExpr, BraceStmt *elseStmt, DeclContext *Parent);
+                     Expr *whereExpr, PatternBindingElse elseStmt,
+                     DeclContext *Parent);
 
 public:
   static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
                                     StaticSpellingKind StaticSpelling,
                                     SourceLoc VarLoc,
                                     ArrayRef<PatternBindingEntry> PatternList,
-                                    Expr *whereExpr, BraceStmt *elseStmt,
+                                    Expr *whereExpr,
+                                    PatternBindingElse elseStmt,
                                     DeclContext *Parent);
 
   static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
@@ -1889,10 +1943,9 @@ public:
                                     SourceLoc VarLoc,
                                     Pattern *Pat, Expr *E,
                                     DeclContext *Parent) {
-    ;
     return create(Ctx, StaticLoc, StaticSpelling, VarLoc,
                   PatternBindingEntry(Pat, E), /*where*/nullptr,
-                  /*else*/nullptr, Parent);
+                  PatternBindingElse(), Parent);
   }
 
 
@@ -1939,8 +1992,8 @@ public:
 
   Expr *getWhereExpr() const { return whereExpr; }
   void setWhereExpr(Expr *E) { whereExpr = E; }
-  BraceStmt *getElseStmt() const { return elseStmt; }
-  void setElseStmt(BraceStmt *S) { elseStmt = S; }
+  PatternBindingElse getElse() const { return elseStmt; }
+  void setElse(PatternBindingElse S) { elseStmt = S; }
   
   bool isInitializerChecked() const { return isInitializerTypeChecked; }
   void setInitializerChecked() { isInitializerTypeChecked = true; }

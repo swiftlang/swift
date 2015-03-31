@@ -1315,15 +1315,98 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   });
 
   // Resolve the pattern.
-  if (auto *newPattern = tc.resolvePattern(binding->getPattern(entryNumber),
-                                           binding->getDeclContext())) {
-    binding->setPattern(entryNumber, newPattern);
-  } else {
+  auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
+                                    binding->getDeclContext());
+  if (!pattern) {
     binding->setInvalid();
     binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
     return;
   }
 
+  binding->setPattern(entryNumber, pattern);
+
+  // If the pattern is refutable, then it must have an initializer associated
+  // with it.
+  if (pattern->isRefutablePattern() && !binding->getInit(entryNumber)) {
+    tc.diagnose(pattern->getStartLoc(),
+                diag::refutable_pattern_requires_initializer)
+      .highlight(pattern->getSourceRange());
+    // Install one to make later invariant checking work better.
+    auto init = new (tc.Context) ErrorExpr(pattern->getSourceRange());
+    binding->setInit(entryNumber, init);
+  }
+
+  // If the 'else' on this is provided contextually, but the pattern is not
+  // refutable, then we give is special handling: Swift 1.x patterns were
+  // written as irrefutable patterns that implicitly destructured an
+  // optional.  Detect this case, and produce an error with a fixit that
+  // introduces the missing '?' pattern.
+  if (binding->getElse().isContextual() && !pattern->isRefutablePattern()) {
+    // Check to verify that the pattern is refutable.  Swift 1.x patterns were
+    // written as irrefutable patterns that implicitly destructured an
+    // optional.  Detect this case, and produce an error with a fixit that
+    // introduces the missing '?' pattern, and recover as if the user wrote
+    // that.
+    if (!pattern->isRefutablePattern()) {
+      tc.diagnose(pattern->getStartLoc(),
+                  diag::conditional_pattern_bind_not_refutable)
+        .fixItInsertAfter(pattern->getEndLoc(), "?");
+      pattern = new (tc.Context) OptionalSomePattern(pattern,
+                                                     pattern->getEndLoc(),
+                                                     true);
+      binding->setPattern(entryNumber, pattern);
+    }
+  }
+  
+  
+  // If this is the last pattern in the list, check the overall pattern binding
+  // refutability.
+  if (entryNumber == binding->getNumPatternEntries()-1) {
+    // If the overall PBD is refutable (i.e., a pattern is refutable or a where
+    // clause is present) then the PBD must have an else on it.  Only diagnose
+    // this if the PBD isn't already marked invalid.
+    if (binding->isRefutable() && binding->getElse().isUnconditional() &&
+        !binding->isInvalid()) {
+      // This PBD can have multiple patterns, find the refutable one.
+      Pattern *RefutablePattern = nullptr;
+      for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
+        if (binding->getPattern(i)->isRefutablePattern()) {
+          RefutablePattern = binding->getPattern(i);
+          break;
+        }
+      // If we found a refutable pattern, complain about it, otherwise there must
+      // be a 'where' clause.
+      if (RefutablePattern)
+        tc.diagnose(RefutablePattern->getStartLoc(),
+                    diag::decl_with_refutable_pattern_requires_else)
+          .highlight(RefutablePattern->getSourceRange())
+          .fixItInsertAfter(binding->getEndLoc(), " else {}");
+      else
+        tc.diagnose(binding->getWhereExpr()->getStartLoc(),
+                    diag::decl_with_where_requires_else)
+          .highlight(binding->getWhereExpr()->getSourceRange())
+          .fixItInsertAfter(binding->getEndLoc(), " else {}");
+
+      binding->setInvalid();
+    }
+
+    // If the binding is not refutable, and there *is* an else, reject it as
+    // unreachable.
+    if (!binding->isRefutable() && !binding->getElse().isUnconditional() &&
+        !binding->isInvalid()) {
+      if (auto *Body = binding->getElse().getExplicitBody())
+        tc.diagnose(Body->getStartLoc(),
+                    diag::decl_cannot_fail_no_else_allowed);
+      else {
+        assert(binding->getElse().isContextual() && "Unknown conditional else");
+        tc.diagnose(pattern->getStartLoc(),
+                    diag::conditional_pattern_bind_not_refutable);
+      }
+        
+      binding->setInvalid();
+    }
+  }
+  
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
@@ -1349,18 +1432,16 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     options |= TR_AllowUnspecifiedTypes;
     options |= TR_AllowUnboundGenerics;
   }
-  if (tc.typeCheckPattern(binding->getPattern(entryNumber),
-                          binding->getDeclContext(),
-                          options)) {
-    setBoundVarsTypeError(binding->getPattern(entryNumber), tc.Context);
+  if (tc.typeCheckPattern(pattern, binding->getDeclContext(), options)) {
+    setBoundVarsTypeError(pattern, tc.Context);
     binding->setInvalid();
-    binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
+    pattern->setType(ErrorType::get(tc.Context));
     return;
   }
 
   // If the pattern didn't get a type, it's because we ran into some
   // unknown types along the way. We'll need to check the initializer.
-  if (!binding->getPattern(entryNumber)->hasType()) {
+  if (!pattern->hasType()) {
     if (tc.typeCheckBinding(binding, entryNumber)) {
       setBoundVarsTypeError(binding->getPattern(entryNumber), tc.Context);
       binding->setInvalid();
@@ -6808,47 +6889,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
 bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
                                                      DeclContext *dc) {
-  // Resolve the pattern, which may contain expression nodes that need to be
-  // processed into pattern nodes (since it was parsed as a refutable pattern).
-  for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-    if (auto *newPattern = resolvePattern(PBD->getPattern(i), dc)) {
-      // Check to verify that the pattern is refutable.  Swift 1.x patterns were
-      // written as irrefutable patterns that implicitly destructured an
-      // optional.  Detect this case, and produce an error with a fixit that
-      // introduces the missing '?' pattern.
-      if (!newPattern->isRefutablePattern()) {
-        diagnose(newPattern->getStartLoc(),
-                 diag::conditional_pattern_bind_not_refutable)
-          .fixItInsertAfter(newPattern->getEndLoc(), "?");
-        newPattern = new (Context) OptionalSomePattern(newPattern,
-                                                       newPattern->getEndLoc(),
-                                                       true);
-      }
-      
-      PBD->setPattern(i, newPattern);
-    } else {
-      PBD->setInvalid();
-    }
-  
-    validatePatternBindingDecl(*this, PBD, i);
-    if (PBD->isInvalid())
-      continue;
-  
-    if (!PBD->isInitializerChecked()) {
-      assert(PBD->getInit(i) &&"conditional pattern binding should have init!");
-      if (typeCheckBinding(PBD, i)) {
-        PBD->setInvalid();
-        if (!PBD->getPattern(i)->hasType()) {
-          PBD->getPattern(i)->setType(ErrorType::get(Context));
-          setBoundVarsTypeError(PBD->getPattern(i), Context);
-          continue;
-        }
-      }
-    }
-    
-    DeclChecker(*this, false, false).visitBoundVars(PBD->getPattern(i));
-  }
-  
+  DeclChecker(*this, false, false).visitPatternBindingDecl(PBD);
   return PBD->isInvalid();
 }
 

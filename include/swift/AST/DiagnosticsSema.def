@@ -1629,6 +1629,14 @@ ERROR(cannot_infer_type_for_pattern,sema_tcp,none,
       "type annotation missing in pattern", ())
 ERROR(refutable_pattern_requires_initializer,sema_tcd,none,
       "refutable pattern requires an initializer value to match against", ())
+ERROR(decl_with_where_requires_else,sema_tcd,none,
+      "'where' clause on variable binding can fail; "
+      "add an else {} to handle this condition", ())
+ERROR(decl_with_refutable_pattern_requires_else,sema_tcd,none,
+      "refutable pattern match can fail; "
+      "add an else {} to handle this condition", ())
+ERROR(decl_cannot_fail_no_else_allowed,sema_tcd,none,
+      "'else' condition is unreachable, variable binding always succeeds", ())
 
 ERROR(pattern_type_mismatch_context,sema_tcp,none,
       "type annotation does not match contextual type %0", (Type))
