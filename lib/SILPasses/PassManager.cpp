@@ -117,18 +117,25 @@ static void printModule(SILModule *Mod) {
 
 bool SILPassManager::
 runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
-  CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
   const SILOptions &Options = getOptions();
 
   for (auto &F : *Mod) {
-    if (F.empty() || CompleteFuncs->isComplete(&F))
+    if (F.empty())
       continue;
+      
+    CompletedPasses &completedPasses = CompletedPassesMap[&F];
 
     for (auto SFT : FuncTransforms) {
       PrettyStackTraceSILFunctionTransform X(SFT);
-      CompleteFuncs->resetChanged();
       SFT->injectPassManager(this);
       SFT->injectFunction(&F);
+      
+      // If nothing changed since the last run of this pass, we can skip this
+      // pass.
+      if (completedPasses.test((size_t)SFT->getPassKind()))
+        continue;
+
+      currentPassHasInvalidated = false;
 
       if (Options.PrintPassName)
         llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
@@ -154,13 +161,18 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 
       // If this pass invalidated anything, print and verify.
       if (doPrintAfter(SFT, &F,
-                       CompleteFuncs->hasChanged() && Options.PrintAll)) {
+                       currentPassHasInvalidated && Options.PrintAll)) {
         llvm::dbgs() << "*** SIL function after " << StageName << " "
                      << SFT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
         F.dump();
       }
-      if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
+
+      // Remember if this pass didn't change anything.
+      if (!currentPassHasInvalidated)
+        completedPasses.set((size_t)SFT->getPassKind());
+
+      if (currentPassHasInvalidated && Options.VerifyAll) {
         F.verify();
         if (SILValidateAnalyses)
           verifyAnalyses();
@@ -196,7 +208,6 @@ void SILPassManager::runOneIteration() {
   }
   NumOptzIterations++;
   NumOptimizationIterations++;
-  CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
   SmallVector<SILFunctionTransform*, 16> PendingFuncTransforms;
 
   // For each transformation:
@@ -217,9 +228,10 @@ void SILPassManager::runOneIteration() {
 
       PrettyStackTraceSILModuleTransform X(SMT);
 
-      CompleteFuncs->resetChanged();
       SMT->injectPassManager(this);
       SMT->injectModule(Mod);
+
+      currentPassHasInvalidated = false;
 
       if (Options.PrintPassName)
         llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
@@ -243,14 +255,14 @@ void SILPassManager::runOneIteration() {
 
       // If this pass invalidated anything, print and verify.
       if (doPrintAfter(SMT, nullptr,
-                       CompleteFuncs->hasChanged() && Options.PrintAll)) {
+                       currentPassHasInvalidated && Options.PrintAll)) {
         llvm::dbgs() << "*** SIL module after " << StageName << " "
                      << SMT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
         printModule(Mod);
       }
 
-      if (CompleteFuncs->hasChanged() && Options.VerifyAll) {
+      if (currentPassHasInvalidated && Options.VerifyAll) {
         Mod->verify();
         if (SILValidateAnalyses)
           verifyAnalyses();
@@ -275,7 +287,6 @@ void SILPassManager::runOneIteration() {
   }
 
   runFunctionPasses(PendingFuncTransforms);
-  CompleteFuncs->setComplete();
 }
 
 void SILPassManager::run() {
@@ -332,8 +343,6 @@ void SILPassManager::resetAndRemoveTransformations() {
   Transformations.clear();
   NumOptimizationIterations = 0;
   anotherIteration = false;
-  CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
-  CompleteFuncs->reset();
 }
 
 void SILPassManager::setStageName(llvm::StringRef NextStage) {

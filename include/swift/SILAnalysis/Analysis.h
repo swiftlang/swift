@@ -149,54 +149,6 @@ namespace swift {
     FunctionAnalysisBase() {}
   };
 
-  /// Keep track of functions that are completely optimized.
-  class CompleteFunctions : public SILAnalysis {
-    SILModule *M = nullptr;
-    llvm::DenseSet<SILFunction*> CompleteFuncs;
-    llvm::DenseSet<SILFunction*> PendingFuncs;
-    bool IsModulePending = false;
-    bool HasChanged = false;
-
-  public:
-    CompleteFunctions(SILModule *MM)
-      : SILAnalysis(AnalysisKind::CompleteFuncs), M(MM) {}
-
-    virtual ~CompleteFunctions();
-
-    static bool classof(const SILAnalysis *S) {
-      return S->getKind() == AnalysisKind::CompleteFuncs;
-    }
-
-    virtual void invalidate(PreserveKind K) {
-      IsModulePending = true;
-      HasChanged = true;
-    }
-
-    virtual void invalidate(SILFunction* F, PreserveKind) {
-      PendingFuncs.insert(F);
-      HasChanged = true;
-    }
-
-    /// Report whether anything was invalidated since the last reset.
-    bool hasChanged() const { return HasChanged; }
-    void resetChanged() { HasChanged = false; }
-
-    bool isComplete(SILFunction *F) const {
-      return CompleteFuncs.count(F);
-    }
-    /// Mark functions complete at the end of the optimization pipeline if they
-    /// haven't changed.
-    void setComplete();
-
-    /// Reset the state of this analysis.
-    void reset() {
-      CompleteFuncs.clear();
-      PendingFuncs.clear();
-      IsModulePending = false;
-      HasChanged = false;
-    }
-  };
-
   SILAnalysis *createCallGraphAnalysis(SILModule *M);
   SILAnalysis *createAliasAnalysis(SILModule *M);
   SILAnalysis *createDominanceAnalysis(SILModule *M);

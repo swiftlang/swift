@@ -27,20 +27,6 @@
 
 using namespace swift;
 
-// anchor for virtual D'tor
-CompleteFunctions::~CompleteFunctions() {}
-
-void CompleteFunctions::setComplete() {
-  CompleteFuncs.clear();
-  if (!IsModulePending)
-    for (auto &F : *M)
-      if (!PendingFuncs.count(&F))
-        CompleteFuncs.insert(&F);
-
-  PendingFuncs.clear();
-  IsModulePending = false;
-}
-
 SILAnalysis *swift::createCallGraphAnalysis(SILModule *M) {
   return new CallGraphAnalysis(M);
 }

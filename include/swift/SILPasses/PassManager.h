@@ -52,11 +52,21 @@ class SILPassManager {
   /// Number of optimization iterations run.
   unsigned NumOptimizationIterations = 0;
 
+  /// A mask which has one bit for each pass. A one for a pass-bit means that
+  /// the pass doesn't need to run, because nothing has changed since the
+  /// previous run of that pass.
+  typedef std::bitset<(size_t)PassKind::AllPasses_Last + 1> CompletedPasses;
+  
+  /// A completed-passes mask for each function.
+  llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
+
+  /// Set to true when a pass invalidates an analysis.
+  bool currentPassHasInvalidated = false;
+  
   public:
   /// C'tor
   SILPassManager(SILModule *M, llvm::StringRef Stage = "") :
     anotherIteration(false), Mod(M), StageName(Stage) {
-    registerAnalysis(new CompleteFunctions(Mod));
   }
 
   const SILOptions &getOptions() const;
@@ -93,6 +103,11 @@ class SILPassManager {
     for (auto AP : Analysis)
       if (!AP->isLocked())
         AP->invalidate(K);
+    
+    currentPassHasInvalidated = true;
+    
+    // Assume that all functions have changed. Clear all masks of all functions.
+    CompletedPassesMap.clear();
   }
 
   /// \brief Broadcast the invalidation of the function to all analysis.
@@ -102,6 +117,10 @@ class SILPassManager {
     for (auto AP : Analysis)
       if (!AP->isLocked())
         AP->invalidate(F, K);
+    
+    currentPassHasInvalidated = true;
+    // Any change let all passes run again.
+    CompletedPassesMap[F].reset();
   }
 
   /// \brief Reset the state of the pass manager and remove all transformation
