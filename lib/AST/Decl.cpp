@@ -1024,6 +1024,13 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
 
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
+
+  if (elseStmt)
+    return { startLoc, elseStmt->getEndLoc() };
+
+  if (whereExpr)
+    return { startLoc, whereExpr->getEndLoc() };
+
   if (auto init = getPatternList().back().Init) {
     SourceLoc EndLoc = init->getEndLoc();
     if (EndLoc.isValid())
