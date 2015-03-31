@@ -109,22 +109,6 @@ void GenericSpecializer::collectApplyInst(SILFunction &F) {
     }
 }
 
-static bool hasSameSubstitutions(ApplySite A, ApplySite B) {
-  if (A == B)
-    return true;
-
-  ArrayRef<swift::Substitution> SubsA = A.getSubstitutions();
-  ArrayRef<swift::Substitution> SubsB = B.getSubstitutions();
-  if (SubsA.size() != SubsB.size())
-    return false;
-
-  for (int i = 0, e = SubsA.size(); i != e; ++i)
-    if (SubsA[i] != SubsB[i])
-      return false;
-
-  return true;
-}
-
 void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
   llvm::errs() << "{\n";
   for (auto &kv : map) {
@@ -145,53 +129,17 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 
   DEBUG(llvm::dbgs() << "*** Processing: " << F->getName() << "\n");
 
-  SmallVector<AIList, 4> Buckets;
-
-  // Sort the incoming ApplyInst instructions into multiple buckets of AI with
-  // exactly the same substitution lists.
   for (auto &AI : List) {
-    bool Placed = false;
-
-    DEBUG(llvm::dbgs() << "Function: "
-                       << AI.getInstruction()->getFunction()->getName()
-                       << "; ApplyInst: " << *AI.getInstruction());
-
-    // Scan the existing buckets and search for a bucket of the right type.
-    for (int i = 0, e = Buckets.size(); i < e; ++i) {
-      assert(Buckets[i].size() && "Found an empty bucket!");
-      if (hasSameSubstitutions(Buckets[i][0], AI)) {
-        Buckets[i].push_back(AI);
-        Placed = true;
-        break;
-      }
-    }
-
-    // Continue if the AI is placed in a bucket.
-    if (Placed)
-      continue;
-
-    // Create a new bucket and place the AI.
-    Buckets.push_back(AIList());
-    Buckets[Buckets.size() - 1].push_back(AI);
-  }
-
-  // For each bucket of AI instructions of the same type.
-  for (auto &Bucket : Buckets) {
-    assert(Bucket.size() && "Empty bucket!");
-
-    DEBUG(llvm::dbgs() << "    Bucket: \n");
-    DEBUG(for (auto AI : Bucket) {
-      llvm::dbgs() << "        ApplyInst: " << *AI.getInstruction();
-    });
+    DEBUG(llvm::dbgs() << "        ApplyInst: " << *AI.getInstruction());
 
     // Create the substitution maps.
     TypeSubstitutionMap InterfaceSubs
     = F->getLoweredFunctionType()->getGenericSignature()
-    ->getSubstitutionMap(Bucket[0].getSubstitutions());
+    ->getSubstitutionMap(AI.getSubstitutions());
 
     TypeSubstitutionMap ContextSubs
     = F->getContextGenericParams()
-    ->getSubstitutionMap(Bucket[0].getSubstitutions());
+    ->getSubstitutionMap(AI.getSubstitutions());
 
     // We do not support partial specialization.
     if (hasUnboundGenericTypes(InterfaceSubs)) {
@@ -202,7 +150,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     llvm::SmallString<64> ClonedName;
     {
       llvm::raw_svector_ostream buffer(ClonedName);
-      ArrayRef<Substitution> Subs = Bucket[0].getSubstitutions();
+      ArrayRef<Substitution> Subs = AI.getSubstitutions();
       Mangle::Mangler M(buffer);
       Mangle::GenericSpecializationMangler Mangler(M, F, Subs);
       Mangler.mangle();
@@ -217,7 +165,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 
 #ifndef NDEBUG
       // Make sure that NewF's subst type matches the expected type.
-      auto Subs = Bucket[0].getSubstitutions();
+      auto Subs = AI.getSubstitutions();
       auto FTy =
       F->getLoweredFunctionType()->substGenericArgs(*M,
                                                     M->getSwiftModule(),
@@ -228,13 +176,13 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     } else {
       // Create a new function.
       NewF = SpecializingCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
-                                               ClonedName, Bucket[0]);
+                                               ClonedName, AI);
       createdFunction = true;
     }
 
     // Replace all of the AI functions with the new function.
-    for (auto &AI : Bucket)
-      replaceWithSpecializedFunction(AI, NewF);
+    replaceWithSpecializedFunction(AI, NewF);
+
     Changed = true;
 
     // Analyze the ApplyInsts in the new function.
