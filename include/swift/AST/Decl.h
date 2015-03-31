@@ -3366,9 +3366,10 @@ public:
   /// Set the raw type of the enum from its inheritance clause.
   void setRawType(Type rawType) { RawType = rawType; }
   
-  /// True if the enum is a "simple" enum, and none of its cases have associated
-  /// payloads.
-  bool isSimpleEnum() const;
+  /// True if the enum has cases, and none of those cases have associated values.
+  ///
+  /// Note that this is false for enums with absolutely no cases.
+  bool hasOnlyCasesWithoutAssociatedValues() const;
 };
 
 /// StructDecl - This is the declaration of a struct, for example:

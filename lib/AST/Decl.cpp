@@ -1753,7 +1753,7 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
     // Hashable conformance.
     case KnownProtocolKind::Equatable:
     case KnownProtocolKind::Hashable:
-      return enumDecl->isSimpleEnum();
+      return enumDecl->hasOnlyCasesWithoutAssociatedValues();
     
     // Enums can explicitly derive their ErrorType conformance.
     case KnownProtocolKind::_ErrorType:
@@ -2246,7 +2246,7 @@ EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
   return nullptr;
 }
 
-bool EnumDecl::isSimpleEnum() const {
+bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   // FIXME: Should probably cache this.
   bool hasElements = false;
   for (auto elt : getAllElements()) {

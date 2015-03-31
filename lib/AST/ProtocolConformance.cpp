@@ -1887,7 +1887,7 @@ void NominalTypeDecl::prepareConformanceTable(LazyResolver *resolver) const {
       ConformanceTable->addSynthesizedConformance(mutableThis, anyObject);
     }
   } else if (auto theEnum = dyn_cast<EnumDecl>(mutableThis)) {
-    if (theEnum->isSimpleEnum()) {
+    if (theEnum->hasOnlyCasesWithoutAssociatedValues()) {
       // Simple enumerations conform to Equatable.
       if (auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable)) {
         ConformanceTable->addSynthesizedConformance(mutableThis, equatable);

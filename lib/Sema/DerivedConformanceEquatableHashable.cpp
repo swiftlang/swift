@@ -38,9 +38,9 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
   if (!enumDecl)
     return false;
   
-  // The enum must be simple.
+  // The enum must not have associated values.
   // TODO: Enums with Equatable/Hashable/Comparable payloads
-  if (!enumDecl->isSimpleEnum())
+  if (!enumDecl->hasOnlyCasesWithoutAssociatedValues())
     return false;
   
   return true;
