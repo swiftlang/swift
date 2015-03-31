@@ -3729,7 +3729,7 @@ return
   // $T must be the return type of the current function
 
 Exits the current function and returns control to the calling function. If
-the current function was invoked with an `apply` instruction, the result
+the current function was invoked with an ``apply`` instruction, the result
 of that function will be the operand of this ``return`` instruction. If
 the current function was invoked with a ``try_apply` instruction, control
 resumes at the normal destination, and the value of the basic block argument
