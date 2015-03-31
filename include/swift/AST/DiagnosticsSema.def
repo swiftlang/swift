@@ -1114,6 +1114,8 @@ ERROR(broken_equatable_requirement,sema_tcd,none,
       "Equatable protocol is broken: unexpected requirement", ())
 ERROR(broken_hashable_requirement,sema_tcd,none,
       "Hashable protocol is broken: unexpected requirement", ())
+ERROR(broken_errortype_requirement,sema_tcd,none,
+      "ErrorType protocol is broken: unexpected requirement", ())
 ERROR(broken_int_hashable_conformance,sema_tcd,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,sema_tcd,none,

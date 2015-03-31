@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "DerivedConformances.h"
 
@@ -96,6 +97,17 @@ static TypeDecl *deriveRawRepresentable_Raw(TypeChecker &tc,
   return rawTypeDecl;
 }
 
+DeclRefExpr *
+DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
+  ASTContext &C = fn->getASTContext();
+
+  Pattern *curriedArgs = fn->getBodyParamPatterns().front();
+  auto selfPattern =
+    cast<NamedPattern>(curriedArgs->getSemanticsProvidingPattern());
+  auto selfDecl = selfPattern->getDecl();
+  return new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+}
+
 static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
@@ -144,17 +156,110 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
                                      body));
   }
 
-  Pattern *curriedArgs = toRawDecl->getBodyParamPatterns().front();
-  auto selfPattern =
-    cast<NamedPattern>(curriedArgs->getSemanticsProvidingPattern());
-  auto selfDecl = selfPattern->getDecl();
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  auto selfRef = createSelfDeclRef(toRawDecl);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
                                        SourceLoc(), cases, SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());
   toRawDecl->setBody(body);
+}
+
+FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
+                                                 NominalTypeDecl *typeDecl,
+                                                 Type contextType,
+                                                 Type propertyInterfaceType,
+                                                 Type propertyContextType) {
+  auto &C = tc.Context;
+  
+  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/true,
+                                        SourceLoc(),
+                                        Identifier(),
+                                        SourceLoc(),
+                                        C.Id_self,
+                                        contextType,
+                                        typeDecl);
+  selfDecl->setImplicit();
+  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
+  selfParam->setType(contextType);
+  selfParam = new (C) TypedPattern(selfParam,
+                                   TypeLoc::withoutLoc(contextType));
+  selfParam->setType(contextType);
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
+  methodParam->setType(TupleType::getEmpty(C));
+  Pattern *params[] = {selfParam, methodParam};
+  
+  FuncDecl *getterDecl =
+    FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+                     DeclName(), SourceLoc(), nullptr, Type(),
+                     params, TypeLoc::withoutLoc(propertyContextType),
+                     typeDecl);
+  getterDecl->setImplicit();
+  
+  // Compute the type of the getter.
+  GenericParamList *genericParams = nullptr;
+  Type type = FunctionType::get(TupleType::getEmpty(C),
+                                propertyContextType);
+  Type selfType = getterDecl->computeSelfType(&genericParams);
+  if (genericParams)
+    type = PolymorphicFunctionType::get(selfType, type, genericParams);
+  else
+    type = FunctionType::get(selfType, type);
+  getterDecl->setType(type);
+  getterDecl->setBodyResultType(propertyContextType);
+  
+  // Compute the interface type of the getter.
+  Type interfaceType = FunctionType::get(TupleType::getEmpty(C),
+                                         propertyInterfaceType);
+  Type selfInterfaceType = getterDecl->computeInterfaceSelfType(false);
+  if (auto sig = typeDecl->getGenericSignatureOfContext())
+    interfaceType = GenericFunctionType::get(sig, selfInterfaceType,
+                                             interfaceType,
+                                             FunctionType::ExtInfo());
+  else
+    interfaceType = type;
+  getterDecl->setInterfaceType(interfaceType);
+  getterDecl->setAccessibility(typeDecl->getFormalAccess());
+  
+  if (typeDecl->hasClangNode())
+    tc.implicitlyDefinedFunctions.push_back(getterDecl);
+  
+  return getterDecl;
+}
+
+std::pair<VarDecl *, PatternBindingDecl *>
+DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
+                                                   NominalTypeDecl *typeDecl,
+                                                   Identifier name,
+                                                   Type propertyInterfaceType,
+                                                   Type propertyContextType,
+                                                   FuncDecl *getterDecl) {
+  auto &C = tc.Context;
+  
+  VarDecl *propDecl = new (C) VarDecl(/*static*/ false,
+                                      /*let*/ false,
+                                      SourceLoc(), name,
+                                      propertyContextType,
+                                      typeDecl);
+  propDecl->setImplicit();
+  propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
+                         SourceLoc());
+  propDecl->setAccessibility(typeDecl->getFormalAccess());
+  propDecl->setInterfaceType(propertyInterfaceType);
+  
+  Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
+  propPat->setType(propertyContextType);
+  propPat = new (C) TypedPattern(propPat,
+                                 TypeLoc::withoutLoc(propertyContextType),
+                                 /*implicit*/ true);
+  
+  auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
+                                           StaticSpellingKind::None,
+                                           SourceLoc(), propPat, nullptr,
+                                           typeDecl);
+  pbDecl->setImplicit();
+  
+  return {propDecl, pbDecl};
 }
 
 static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
@@ -167,77 +272,18 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   Type enumType = enumDecl->getDeclaredTypeInContext();
   
   // Define the getter.
-  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/true,
-                                        SourceLoc(),
-                                        Identifier(),
-                                        SourceLoc(),
-                                        C.Id_self,
-                                        enumType,
-                                        enumDecl);
-  selfDecl->setImplicit();
-  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(enumType);
-  selfParam = new (C) TypedPattern(selfParam, TypeLoc::withoutLoc(enumType));
-  selfParam->setType(enumType);
-  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
-  methodParam->setType(TupleType::getEmpty(tc.Context));
-  Pattern *params[] = {selfParam, methodParam};
-  
-  FuncDecl *getterDecl =
-      FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                       DeclName(), SourceLoc(), nullptr, Type(),
-                       params, TypeLoc::withoutLoc(rawType), enumDecl);
-  getterDecl->setImplicit();
+  auto getterDecl = declareDerivedPropertyGetter(tc, enumDecl, enumType,
+                                                 rawInterfaceType,
+                                                 rawType);
   getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
-  // Compute the type of the getter.
-  GenericParamList *genericParams = nullptr;
-  Type type = FunctionType::get(TupleType::getEmpty(tc.Context), rawType);
-  Type selfType = getterDecl->computeSelfType(&genericParams);
-  if (genericParams)
-    type = PolymorphicFunctionType::get(selfType, type, genericParams);
-  else
-    type = FunctionType::get(selfType, type);
-  getterDecl->setType(type);
-  getterDecl->setBodyResultType(rawType);
-
-  // Compute the interface type of the getter.
-  Type interfaceType = FunctionType::get(TupleType::getEmpty(tc.Context),
-                                         rawInterfaceType);
-  Type selfInterfaceType = getterDecl->computeInterfaceSelfType(false);
-  if (auto sig = enumDecl->getGenericSignatureOfContext())
-    interfaceType = GenericFunctionType::get(sig, selfInterfaceType,
-                                             interfaceType,
-                                             FunctionType::ExtInfo());
-  else
-    interfaceType = type;
-  getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccessibility(enumDecl->getFormalAccess());
-
-  if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(getterDecl);
-
   // Define the property.
-  VarDecl *propDecl = new (C) VarDecl(/*static*/ false,
-                                      /*let*/ false,
-                                      SourceLoc(), C.Id_rawValue,
-                                      rawType, enumDecl);
-  propDecl->setImplicit();
-  propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
-                         SourceLoc());
-  propDecl->setAccessibility(enumDecl->getFormalAccess());
-  propDecl->setInterfaceType(rawInterfaceType);
-  
-  Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
-  propPat->setType(rawType);
-  propPat = new (C) TypedPattern(propPat, TypeLoc::withoutLoc(rawType),
-                                 /*implicit*/ true);
-  
-  auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                           StaticSpellingKind::None,
-                                           SourceLoc(), propPat, nullptr,
-                                           enumDecl);
-  pbDecl->setImplicit();
+  VarDecl *propDecl;
+  PatternBindingDecl *pbDecl;
+  std::tie(propDecl, pbDecl)
+    = declareDerivedReadOnlyProperty(tc, enumDecl, C.Id_rawValue,
+                                     rawType, rawInterfaceType,
+                                     getterDecl);
   
   enumDecl->addMember(getterDecl);
   enumDecl->addMember(propDecl);

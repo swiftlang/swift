@@ -13,6 +13,7 @@ add_swift_library(swiftSema
   NameBinding.cpp
   SourceLoader.cpp
   DerivedConformanceEquatableHashable.cpp
+  DerivedConformanceErrorType.cpp
   DerivedConformanceRawRepresentable.cpp
   MiscDiagnostics.cpp
   OverloadChoice.cpp

@@ -1737,19 +1737,31 @@ void NominalTypeDecl::setGenericParams(GenericParamList *params) {
 
 
 bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
+  // Only known protocols can be derived.
+  auto knownProtocol = protocol->getKnownProtocolKind();
+  if (!knownProtocol)
+    return false;
+  
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
-    // Enums with raw types can derive their RawRepresentable conformance.
-    if (protocol
-          == getASTContext().getProtocol(
-            KnownProtocolKind::RawRepresentable))
+    switch (*knownProtocol) {
+    // Enums with raw types can implicitly derive their RawRepresentable
+    // conformance.
+    case KnownProtocolKind::RawRepresentable:
       return enumDecl->hasRawType();
     
-    // Simple enums can derive Equatable and Hashable conformance.
-    if (protocol
-          == getASTContext().getProtocol(KnownProtocolKind::Equatable)
-        || protocol
-             == getASTContext().getProtocol(KnownProtocolKind::Hashable))
+    // Enums without associated values can implicitly derive Equatable and
+    // Hashable conformance.
+    case KnownProtocolKind::Equatable:
+    case KnownProtocolKind::Hashable:
       return enumDecl->isSimpleEnum();
+    
+    // Enums can explicitly derive their ErrorType conformance.
+    case KnownProtocolKind::_ErrorType:
+      return true;
+    
+    default:
+      return false;
+    }
   }
   return false;
 }
