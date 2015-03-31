@@ -10,30 +10,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "remove-pins"
+#define DEBUG_TYPE "sil-remove-pins"
 
-#include "swift/SIL/Dominance.h"
-#include "swift/SILAnalysis/AliasAnalysis.h"
-#include "swift/SILAnalysis/Analysis.h"
-#include "swift/SILAnalysis/ArraySemantic.h"
-#include "swift/SILAnalysis/ARCAnalysis.h"
-#include "swift/SILAnalysis/LoopAnalysis.h"
-#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/Utils/CFG.h"
-#include "swift/SILPasses/Utils/SILSSAUpdater.h"
-#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-
+#include "swift/SILAnalysis/ARCAnalysis.h"
+#include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/ArraySemantic.h"
+#include "swift/SILAnalysis/LoopAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/Utils/CFG.h"
+#include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/ADT/Statistic.h"
-
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 
 STATISTIC(NumPinPairsRemoved, "Num pin pairs removed");
 
