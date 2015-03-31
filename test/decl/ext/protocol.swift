@@ -88,6 +88,67 @@ extension SelfP1 {
 }
 
 // ----------------------------------------------------------------------------
+// Initializers in protocol extensions
+// ----------------------------------------------------------------------------
+protocol InitP1 {
+  init(string: String)
+}
+
+extension InitP1 {
+  init(int: Int) { self.init(string: "integer") }
+}
+
+struct InitS1 : InitP1 {
+  init(string: String) { }
+}
+
+class InitC1 : InitP1 {
+  required init(string: String) { }
+}
+
+func testInitP1() {
+  var is1 = InitS1(int: 5)
+  is1 = InitS1(string: "blah") // check type
+
+  var ic1 = InitC1(int: 5)
+  ic1 = InitC1(string: "blah") // check type
+}
+
+// ----------------------------------------------------------------------------
+// Subscript in protocol extensions
+// ----------------------------------------------------------------------------
+protocol SubscriptP1 {
+  func readAt(i: Int) -> String
+  func writeAt(i: Int, string: String)
+}
+
+extension SubscriptP1 {
+  subscript(i: Int) -> String {
+    get { return readAt(i) }
+    set(newValue) { writeAt(i, string: newValue) }
+  }
+}
+
+struct SubscriptS1 : SubscriptP1 {
+  func readAt(i: Int) -> String { return "hello" }
+  func writeAt(i: Int, string: String) { }
+}
+
+struct SubscriptC1 : SubscriptP1 {
+  func readAt(i: Int) -> String { return "hello" }
+  func writeAt(i: Int, string: String) { }
+}
+
+func testSubscriptP1(var ss1: SubscriptS1, var sc1: SubscriptC1,
+                     i: Int, s: String) {
+  let s1 = ss1[i]
+  ss1[i] = s
+
+  let s2 = sc1[i]
+  sc1[i] = s
+}
+
+// ----------------------------------------------------------------------------
 // Using protocol extensions on types that conform to the protocols.
 // ----------------------------------------------------------------------------
 struct S1 : P1 {

@@ -1411,17 +1411,20 @@ bool DeclContext::lookupQualified(Type type,
       // If we're looking for initializers, only look at the superclass if the
       // current class permits inheritance. Even then, only find complete
       // object initializers.
+      bool visitSuperclass = true;
       if (member.getBaseName() == ctx.Id_init) {
         if (classDecl->inheritsSuperclassInitializers(typeResolver))
           onlyCompleteObjectInits = true;
         else
-          continue;
+          visitSuperclass = false;
       }
 
-      if (auto superclassType = classDecl->getSuperclass())
-        if (auto superclassDecl = superclassType->getClassOrBoundGenericClass())
-          if (visited.insert(superclassDecl).second)
-            stack.push_back(superclassDecl);
+      if (visitSuperclass) {
+        if (auto superclassType = classDecl->getSuperclass())
+          if (auto superclassDecl = superclassType->getClassOrBoundGenericClass())
+            if (visited.insert(superclassDecl).second)
+              stack.push_back(superclassDecl);
+      }
     }
 
     // If we're not looking at a protocol and we're not supposed to
