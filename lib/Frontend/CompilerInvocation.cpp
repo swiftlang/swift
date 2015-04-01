@@ -621,6 +621,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_access_control);
   }
   
+  if (auto A = Args.getLastArg(OPT_enable_target_os_checking,
+                               OPT_disable_target_os_checking)) {
+    Opts.EnableTargetOSChecking
+      = A->getOption().matches(OPT_enable_target_os_checking);
+  }
+  
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 

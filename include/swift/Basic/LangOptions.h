@@ -124,6 +124,10 @@ namespace swift {
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
+    /// Should we check the target OSs of serialized modules to see that they're
+    /// new enough?
+    bool EnableTargetOSChecking = true;
+
     /// Whether to diagnose extensions of generic types that are missing
     /// generic parameters.
     /// FIXME: This is a staging option.

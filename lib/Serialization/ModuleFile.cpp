@@ -1007,7 +1007,9 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   if (!areCompatibleArchitectures(moduleTarget, ctx.LangOpts.Target) ||
       !areCompatibleOSs(moduleTarget, ctx.LangOpts.Target)) {
     return error(Status::TargetIncompatible);
-  } else if (isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
+  }
+  if (ctx.LangOpts.EnableTargetOSChecking &&
+      isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
     return error(Status::TargetTooNew);
   }
 

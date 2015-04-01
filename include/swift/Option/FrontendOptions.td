@@ -82,6 +82,14 @@ def disable_testable_attr_requires_testable_module :
   Flag<["-"], "disable-testable-attr-requires-testable-module">,
   HelpText<"Disable checking of @testable">;
 
+def enable_target_os_checking :
+  Flag<["-"], "enable-target-os-checking">,
+  HelpText<"Enable checking the target OS of serialized modules">;
+
+def disable_target_os_checking :
+  Flag<["-"], "disable-target-os-checking">,
+  HelpText<"Disable checking the target OS of serialized modules">;
+
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
 
