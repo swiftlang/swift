@@ -9,7 +9,14 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+//
+// FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
+// 
+// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
+// RUN: %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror
+// RUN: %target-run %t/Mirror
 
 // XFAIL: linux
 
@@ -223,6 +230,14 @@ mirrors.test("PlaygroundQuickLook") {
   switch PlaygroundQuickLook(reflect: Y()) {
   case .Text("Why?"): break; default: expectTrue(false)
   }
+}
+
+import MirrorObjC
+mirrors.test("ObjC") {
+  // Some Foundation classes lie about their ivars, which would crash
+  // a mirror; make sure we are not automatically exposing ivars of
+  // Objective-C classes from the default mirror implementation.
+  expectEqual(0, count(Mirror(reflect: HasIVars()).children))
 }
 
 runAllTests()
