@@ -506,7 +506,7 @@ testExplicitlyBridged()
 
 func testRoundTrip() {
   class Test : NSObject {
-    @objc func call(array: [BridgedSwift]) -> [BridgedSwift] { 
+    @objc dynamic func call(array: [BridgedSwift]) -> [BridgedSwift] {
 
       // CHECK-NEXT: ---Passed array---
       println("---Passed array---")
