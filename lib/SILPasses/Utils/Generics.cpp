@@ -16,7 +16,7 @@
 using namespace swift;
 
 /// Create a new empty function with the correct arguments and a unique name.
-SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
+SILFunction *GenericCloner::initCloned(SILFunction *Orig,
                                             TypeSubstitutionMap &InterfaceSubs,
                                             StringRef NewName) {
   SILModule &M = Orig->getModule();
@@ -49,7 +49,7 @@ SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
   return NewF;
 }
 
-void SpecializingCloner::populateCloned() {
+void GenericCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
   SILModule &M = Cloned->getModule();
 
@@ -176,7 +176,7 @@ bool trySpecializeApplyOfGeneric(ApplySite Apply,
 #endif
   } else {
     // Create a new function.
-    NewF = SpecializingCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
+    NewF = GenericCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
                                              ClonedName, Apply);
     if (NewFunction)
       *NewFunction = NewF;

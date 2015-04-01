@@ -26,9 +26,9 @@
 
 using namespace swift;
 
-class SpecializingCloner : public TypeSubstCloner<SpecializingCloner> {
+class GenericCloner : public TypeSubstCloner<GenericCloner> {
 public:
-  SpecializingCloner(SILFunction *F,
+  GenericCloner(SILFunction *F,
                      TypeSubstitutionMap &InterfaceSubs,
                      TypeSubstitutionMap &ContextSubs,
                      StringRef NewName,
@@ -42,7 +42,7 @@ public:
                                     TypeSubstitutionMap &ContextSubs,
                                     StringRef NewName, ApplySite Caller) {
     // Clone and specialize the function.
-    SpecializingCloner SC(F, InterfaceSubs, ContextSubs, NewName,
+    GenericCloner SC(F, InterfaceSubs, ContextSubs, NewName,
                           Caller.getSubstitutions());
     SC.populateCloned();
     SC.cleanUp(SC.getCloned());
