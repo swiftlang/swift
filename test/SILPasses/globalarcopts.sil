@@ -1604,7 +1604,7 @@ bb3:
   return %9999 : $()
 }
 
-// We can not eliminate this branch since bb3 uses %0.
+// We can not ignore this branch since bb3 uses %0.
 //
 // CHECK-LABEL: sil @branch_use3 : $@thin (Builtin.NativeObject) -> () {
 // CHECK: strong_retain
@@ -1625,6 +1625,81 @@ bb2:
   br bb3(%0 : $Builtin.NativeObject)
 
 bb3(%2 : $Builtin.NativeObject):
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we properly ignore the cond_br and do not try to compare the
+// pointer with the Builtin.Int1 arg.
+//
+// CHECK-LABEL: sil @cond_branch_use1 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @cond_branch_use1 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  %2 = integer_literal $Builtin.Int1, 0
+  cond_br %2, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we do not ignore the cond_br and do not try to compare the
+// pointer with the Builtin.Int1 arg.
+//
+// CHECK-LABEL: sil @cond_branch_use2 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK: strong_release
+sil @cond_branch_use2 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  %2 = integer_literal $Builtin.Int1, 0
+  cond_br %2, bb1(%0 : $Builtin.NativeObject), bb2
+
+bb1(%3 : $Builtin.NativeObject):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @cond_branch_use3 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK: strong_release
+sil @cond_branch_use3 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  %2 = integer_literal $Builtin.Int1, 0
+  cond_br %2, bb2(%0 : $Builtin.NativeObject), bb1
+
+bb2(%3 : $Builtin.NativeObject):
+  br bb3
+
+bb1:
+  br bb3
+
+bb3:
   strong_release %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()

@@ -317,7 +317,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
   bool NestingDetected = false;
 
-  // For each non terminator instruction I in BB visited in reverse...
+  // For each terminator instruction I in BB visited in reverse...
   for (auto II = std::next(BB.rbegin()), IE = BB.rend(); II != IE;) {
     SILInstruction &I = *II;
     ++II;

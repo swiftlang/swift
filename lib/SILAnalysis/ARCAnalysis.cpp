@@ -301,34 +301,43 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   }
 }
 
-/// Is this a terminator instruction which can only use pointers. This is
-/// necessary when we add the invoke instruction.
-static bool isWellBehavedTerminator(TermInst *TI) {
-  switch (TI->getKind()) {
-  case ValueKind::BranchInst:
-  case ValueKind::CondBranchInst:
-  case ValueKind::SwitchValueInst:
-  case ValueKind::SwitchEnumInst:
-  case ValueKind::CheckedCastBranchInst:
-  case ValueKind::CheckedCastAddrBranchInst:
-  case ValueKind::SwitchEnumAddrInst:
-    return true;
-  default:
-    return false;
-  }
+static bool doOperandsAlias(ArrayRef<Operand> Ops, SILValue Ptr,
+                            AliasAnalysis *AA) {
+  // If any are not no alias, we have a use.
+  return std::any_of(Ops.begin(), Ops.end(),
+                     [&AA, &Ptr](const Operand &Op) -> bool {
+                       return !AA->isNoAlias(Ptr, Op.get());
+                     });
 }
 
 static bool canTerminatorUseValue(TermInst *TI, SILValue Ptr,
                                   AliasAnalysis *AA) {
-  if (!isWellBehavedTerminator(TI))
-    return false;
+  if (auto *BI = dyn_cast<BranchInst>(TI)) {
+    return doOperandsAlias(BI->getAllOperands(), Ptr, AA);
+  }
 
-  // We have a well behaved terminator. Check if all arguments can be proven to
-  // conservatively not alias Ptr. If so, return true.
-  for (Operand &Op : TI->getAllOperands())
-    if (AA->isMayAlias(Ptr, Op.get()))
-      return true;
-  return false;
+  if (auto *CBI = dyn_cast<CondBranchInst>(TI)) {
+    bool First = doOperandsAlias(CBI->getTrueOperands(), Ptr, AA);
+    bool Second = doOperandsAlias(CBI->getFalseOperands(), Ptr, AA);
+    return First || Second;
+  }
+
+  if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI)) {
+    return doOperandsAlias(SWEI->getAllOperands(), Ptr, AA);
+  }
+
+  if (auto *SWVI = dyn_cast<SwitchValueInst>(TI)) {
+    return doOperandsAlias(SWVI->getAllOperands(), Ptr, AA);
+  }
+
+  auto *CCBI = dyn_cast<CheckedCastBranchInst>(TI);
+  // If we don't have this last case, be conservative and assume that we can use
+  // the value.
+  if (!CCBI)
+    return true;
+
+  // Otherwise, look at the operands.
+  return doOperandsAlias(CCBI->getAllOperands(), Ptr, AA);
 }
 
 bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
