@@ -129,8 +129,13 @@ namespace {
     /// If the block was removed.
     bool removeIfDead(SILBasicBlock *BB);
 
-    bool tryJumpThreading(BranchInst *BI);
     bool tailDuplicateObjCMethodCallSuccessorBlocks();
+    bool tryDominatorBasedJumpThreading(BranchInst *Br,
+                                        CondBranchInst *CondBr,
+                                        DominanceInfo *DT);
+    bool tryJumpThreading(BranchInst *BI,
+                          bool IsTargetCondBrConditionKnown = false,
+                          bool TargetCondBrCondition = false);
     bool simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
 
     bool simplifyBranchOperands(OperandValueArrayRef Operands);
@@ -477,6 +482,16 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceInfo *DT) {
     default:
       break;
     }
+
+    // Try jump threading based on knowledge we have about the edge leading to a
+    // cond_br.
+    if (auto *Br = dyn_cast<BranchInst>(BB.getTerminator()))
+      if (auto *CondBr =
+              dyn_cast<CondBranchInst>(Br->getDestBB()->getTerminator()))
+        if (tryDominatorBasedJumpThreading(Br, CondBr, DT))
+          Changed = true;
+
+
     // Simplify the block argument list.
     Changed |= simplifyArgs(&BB);
   }
@@ -590,9 +605,54 @@ void SimplifyCFG::findLoopHeaders() {
   }
 }
 
+bool SimplifyCFG::tryDominatorBasedJumpThreading(BranchInst *Br,
+                                                 CondBranchInst *CondBr,
+                                                 DominanceInfo *DT) {
+  // Do we know the value of the cond_br instruction along the edge from 'Br' to
+  // the 'CondBr' block.
+  auto Condition = CondBr->getCondition();
+
+  // Defined in same basic block. Nothing to be gleaned from looking up the
+  // edge.
+  if (Condition->getParentBB() == CondBr->getParent())
+    return false;
+
+  auto *BB = Br->getParent();
+  for (auto *DTNode = DT->getNode(BB); DTNode; DTNode = DTNode->getIDom()) {
+    BB = DTNode->getBlock();
+
+    auto *Pred = BB->getSinglePredecessor();
+    if (!Pred)
+      continue;
+
+    auto *PredCondTerm = dyn_cast<CondBranchInst>(Pred->getTerminator());
+    if (!PredCondTerm ||
+        !areEquivalentConditions(PredCondTerm->getCondition(), Condition))
+      continue;
+
+    if (PredCondTerm->getTrueBB() == PredCondTerm->getFalseBB())
+      continue;
+
+    bool ConditionIsTrue = PredCondTerm->getTrueBB() == BB;
+    assert((ConditionIsTrue || PredCondTerm->getFalseBB() == BB) &&
+           "Something is seriously wrong with this CFG");
+
+    auto *F = Br->getFunction();
+    if (tryJumpThreading(Br, true, ConditionIsTrue)) {
+      // We must preserve the dominator tree.
+      DT->recalculate(*F);
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
+
 /// tryJumpThreading - Check to see if it looks profitable to duplicate the
 /// destination of an unconditional jump into the bottom of this block.
-bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
+bool SimplifyCFG::tryJumpThreading(BranchInst *BI,
+                                   bool IsTargetCondBrConditionKnown,
+                                   bool TargetCondBrCondition) {
   auto *DestBB = BI->getDestBB();
   auto *SrcBB = BI->getParent();
   // If the destination block ends with a return, we don't want to duplicate it.
@@ -616,9 +676,9 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // major second order simplifications.  Here we only do it if there are
   // "constant" arguments to the branch or if we know how to fold something
   // given the duplication.
-  bool WantToThread = false;
+  bool WantToThread = IsTargetCondBrConditionKnown;
 
-  if (isa<CondBranchInst>(DestBB->getTerminator()))
+  if (!WantToThread && isa<CondBranchInst>(DestBB->getTerminator()))
     for (auto V : BI->getArgs()) {
       if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
         WantToThread = true;
@@ -681,6 +741,16 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 
   if (NeedToUpdateSSA)
     updateSSAAfterCloning(Cloner, SrcBB, DestBB);
+
+  if (IsTargetCondBrConditionKnown) {
+    auto *NewCondBr = cast<CondBranchInst>(SrcBB->getTerminator());
+
+    auto *BrCond = SILBuilder(NewCondBr).createIntegerLiteral(
+        NewCondBr->getLoc(), NewCondBr->getCondition().getType(),
+        TargetCondBrCondition);
+
+    NewCondBr->setCondition(BrCond);
+  }
 
   // We may be able to simplify DestBB now that it has one fewer predecessor.
   simplifyAfterDroppingPredecessor(DestBB);
