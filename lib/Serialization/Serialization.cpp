@@ -3059,25 +3059,29 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
 #include "swift/AST/Attr.def"
 
-  while (!DeclsAndTypesToWrite.empty()) {
-    auto next = DeclsAndTypesToWrite.front();
-    DeclsAndTypesToWrite.pop();
+  do {
+    // Each of these loops can trigger the others to execute again, so repeat
+    // until /all/ of the pending lists are empty.
+    while (!DeclsAndTypesToWrite.empty()) {
+      auto next = DeclsAndTypesToWrite.front();
+      DeclsAndTypesToWrite.pop();
 
-    if (next.isDecl())
-      writeDecl(next.getDecl());
-    else
-      writeType(next.getType());
+      if (next.isDecl())
+        writeDecl(next.getDecl());
+      else
+        writeType(next.getType());
+    }
+
+    while (!LocalDeclContextsToWrite.empty()) {
+      auto next = LocalDeclContextsToWrite.front();
+      LocalDeclContextsToWrite.pop();
+      writeLocalDeclContext(next);
+    }
 
     while (!DeclContextsToWrite.empty()) {
       auto next = DeclContextsToWrite.front();
       DeclContextsToWrite.pop();
       writeDeclContext(next);
-
-      while (!LocalDeclContextsToWrite.empty()) {
-        auto next = LocalDeclContextsToWrite.front();
-        LocalDeclContextsToWrite.pop();
-        writeLocalDeclContext(next);
-      }
     }
 
     while (!NormalConformancesToWrite.empty()) {
@@ -3085,7 +3089,10 @@ void Serializer::writeAllDeclsAndTypes() {
       NormalConformancesToWrite.pop();
       writeNormalConformance(next);
     }
-  }
+  } while (!DeclsAndTypesToWrite.empty() ||
+           !LocalDeclContextsToWrite.empty() ||
+           !DeclContextsToWrite.empty() ||
+           !NormalConformancesToWrite.empty());
 }
 
 void Serializer::writeAllIdentifiers() {
