@@ -419,7 +419,7 @@ fine::
     }
   }
 
-  let foo = Foo(x: 5)
+  var foo = Foo(x: 5)
   // Still OK; exactly the same as foo = foo.advanced(10)
   foo.=advanced(10)
 
