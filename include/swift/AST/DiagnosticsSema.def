@@ -1646,9 +1646,6 @@ ERROR(decl_cannot_fail_no_else_allowed,sema_tcd,none,
 ERROR(invalid_pattern,sema_tcd,none,
       "invalid pattern", ())
 
-ERROR(invalid_parenthesized_typed_pattern,sema_tcd,none,
-      "typed pattern may not be parenthesized", ())
-
 
 ERROR(pattern_type_mismatch_context,sema_tcp,none,
       "type annotation does not match contextual type %0", (Type))
