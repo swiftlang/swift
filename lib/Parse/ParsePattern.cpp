@@ -879,7 +879,7 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
 /// Parse an element of a tuple pattern.
 ///
 ///   pattern-tuple-element:
-///     (identifier ':')? pattern ('=' expr)?
+///     (identifier ':')? pattern
 std::pair<ParserStatus, Optional<TuplePatternElt>>
 Parser::parsePatternTupleElement() {
   // If this element has a label, parse it.
@@ -892,7 +892,6 @@ Parser::parsePatternTupleElement() {
     consumeToken(tok::colon);
   }
 
-
   // Parse the pattern.
   ParserResult<Pattern>  pattern = parsePattern();
   if (pattern.hasCodeCompletion())
@@ -900,12 +899,6 @@ Parser::parsePatternTupleElement() {
   if (pattern.isNull())
     return std::make_pair(makeParserError(), None);
 
-  // We don't accept initializers here, but parse one if it's there
-  // for recovery purposes.
-  ExprHandle *init = nullptr;
-  if (Tok.is(tok::equal))
-    parseDefaultArgument(*this, nullptr, 0, init);
-  
   auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get(), nullptr,
                              DefaultArgumentKind::None);
 
