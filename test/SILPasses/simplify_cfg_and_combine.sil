@@ -133,3 +133,122 @@ bb2:
   %r = tuple()
   return %r : $()
 }
+
+/// CHECK-LABEL: sil @select_enum_dominates_switch_enum : $@thin (Int32) -> Int32 {
+/// The select_enum dominates the switch_enum and knows exactly which element will be
+/// selected.  So this test ensures we can remove the switch_enum
+/// CHECK-NOT: switch_enum
+/// CHECK: return
+sil @select_enum_dominates_switch_enum : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 0          // users: %5, %9, %9
+  %2 = integer_literal $Builtin.Int1, -1          // users: %7, %37
+  %3 = struct_extract %0 : $Int32, #Int32.value   // users: %5, %13
+  %5 = builtin "cmp_sle_Int32"(%1 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1 // user: %7
+  %7 = builtin "xor_Int1"(%5 : $Builtin.Int1, %2 : $Builtin.Int1) : $Builtin.Int1 // user: %8
+  cond_fail %7 : $Builtin.Int1                    // id: %8
+  br bb1(%1 : $Builtin.Int32, %1 : $Builtin.Int32)  // id: %9
+
+bb1(%10 : $Builtin.Int32, %11 : $Builtin.Int32):    // Preds: bb0 bb6
+  %13 = builtin "cmp_eq_Int32"(%11 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1 // user: %14
+  cond_br %13, bb2, bb4                           // id: %14
+
+bb2:                                              // Preds: bb1
+  %15 = enum $Optional<Int32>, #Optional.None!enumelt // user: %16
+  br bb3(%11 : $Builtin.Int32, %15 : $Optional<Int32>) // id: %16
+
+bb3(%17 : $Builtin.Int32, %18 : $Optional<Int32>):   // Preds: bb2 bb4
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %19 = select_enum %18 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
+  cond_br %19, bb5, bb8                           // id: %20
+
+bb4:                                              // Preds: bb1
+  %21 = integer_literal $Builtin.Int32, 1         // user: %24
+  %23 = integer_literal $Builtin.Int1, 0          // user: %24
+  %24 = builtin "sadd_with_overflow_Int32"(%11 : $Builtin.Int32, %21 : $Builtin.Int32, %23 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %25
+  %25 = tuple_extract %24 : $(Builtin.Int32, Builtin.Int1), 0 // user: %28
+  %26 = struct $Int32 (%11 : $Builtin.Int32)      // user: %27
+  %27 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %26 : $Int32 // user: %28
+  br bb3(%25 : $Builtin.Int32, %27 : $Optional<Int32>) // id: %28
+
+bb5:                                              // Preds: bb3
+  switch_enum %18 : $Optional<Int32>, case #Optional.Some!enumelt.1: bb6, case #Optional.None!enumelt: bb7 // id: %29
+
+bb6:                                              // Preds: bb5
+  %30 = unchecked_enum_data %18 : $Optional<Int32>, #Optional.Some!enumelt.1 // user: %31
+  %31 = struct_extract %30 : $Int32, #Int32.value // user: %34
+  %33 = integer_literal $Builtin.Int1, 0          // user: %34
+  %34 = builtin "smul_with_overflow_Int32"(%10 : $Builtin.Int32, %31 : $Builtin.Int32, %33 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %35
+  %35 = tuple_extract %34 : $(Builtin.Int32, Builtin.Int1), 0 // user: %36
+  br bb1(%35 : $Builtin.Int32, %17 : $Builtin.Int32) // id: %36
+
+bb7:                                              // Preds: bb5
+  cond_fail %2 : $Builtin.Int1                    // id: %37
+  unreachable                                     // id: %38
+
+bb8:                                              // Preds: bb3
+  %39 = struct $Int32 (%10 : $Builtin.Int32)      // user: %40
+  return %39 : $Int32                             // id: %40
+}
+
+/// CHECK-LABEL: sil @select_enum_dominates_switch_enum2 : $@thin (Int32) -> Int32 {
+/// The select_enum dominates the switch_enum and knows exactly which element will be
+/// selected.
+/// In this case, the switch is reached when the select_enum is false.  Given that the switch
+/// only has 2 elements, we know that the other element must be selected.
+/// CHECK-NOT: switch_enum
+/// CHECK: return
+sil @select_enum_dominates_switch_enum2 : $@thin (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 0           // users: %5, %9, %9
+  %2 = integer_literal $Builtin.Int1, -1          // users: %7, %37
+  %3 = struct_extract %0 : $Int32, #Int32.value       // users: %5, %13
+  %5 = builtin "cmp_sle_Int32"(%1 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1 // user: %7
+  %7 = builtin "xor_Int1"(%5 : $Builtin.Int1, %2 : $Builtin.Int1) : $Builtin.Int1 // user: %8
+  cond_fail %7 : $Builtin.Int1                    // id: %8
+  br bb1(%1 : $Builtin.Int32, %1 : $Builtin.Int32)  // id: %9
+
+bb1(%10 : $Builtin.Int32, %11 : $Builtin.Int32):    // Preds: bb0 bb6
+  %13 = builtin "cmp_eq_Int32"(%11 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1 // user: %14
+  cond_br %13, bb2, bb4                           // id: %14
+
+bb2:                                              // Preds: bb1
+  %15 = enum $Optional<Int32>, #Optional.None!enumelt // user: %16
+  br bb3(%11 : $Builtin.Int32, %15 : $Optional<Int32>) // id: %16
+
+bb3(%17 : $Builtin.Int32, %18 : $Optional<Int32>):   // Preds: bb2 bb4
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %19 = select_enum %18 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
+  cond_br %19, bb8, bb5                           // id: %20
+
+bb4:                                              // Preds: bb1
+  %21 = integer_literal $Builtin.Int32, 1          // user: %24
+  %23 = integer_literal $Builtin.Int1, 0          // user: %24
+  %24 = builtin "sadd_with_overflow_Int32"(%11 : $Builtin.Int32, %21 : $Builtin.Int32, %23 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %25
+  %25 = tuple_extract %24 : $(Builtin.Int32, Builtin.Int1), 0 // user: %28
+  %26 = struct $Int32 (%11 : $Builtin.Int32)         // user: %27
+  %27 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %26 : $Int32 // user: %28
+  br bb3(%25 : $Builtin.Int32, %27 : $Optional<Int32>) // id: %28
+
+bb5:                                              // Preds: bb3
+  switch_enum %18 : $Optional<Int32>, case #Optional.Some!enumelt.1: bb6, case #Optional.None!enumelt: bb7 // id: %29
+
+bb6:                                              // Preds: bb5
+  %30 = unchecked_enum_data %18 : $Optional<Int32>, #Optional.Some!enumelt.1 // user: %31
+  %31 = struct_extract %30 : $Int32, #Int32.value     // user: %34
+  %33 = integer_literal $Builtin.Int1, 0          // user: %34
+  %34 = builtin "smul_with_overflow_Int32"(%10 : $Builtin.Int32, %31 : $Builtin.Int32, %33 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %35
+  %35 = tuple_extract %34 : $(Builtin.Int32, Builtin.Int1), 0 // user: %36
+  br bb1(%35 : $Builtin.Int32, %17 : $Builtin.Int32) // id: %36
+
+bb7:                                              // Preds: bb5
+  cond_fail %2 : $Builtin.Int1                    // id: %37
+  unreachable                                     // id: %38
+
+bb8:                                              // Preds: bb3
+  %39 = struct $Int32 (%10 : $Builtin.Int32)         // user: %40
+  return %39 : $Int32                               // id: %40
+}
+
