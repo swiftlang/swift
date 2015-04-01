@@ -202,6 +202,15 @@ namespace {
       printCommon(P, "pattern_tuple");
       if (P->hasVararg())
         OS << " hasVararg";
+
+      OS << " names=";
+      interleave(P->getFields(),
+                 [&](const TuplePatternElt &elt) {
+                   auto name = elt.getLabel();
+                   OS << (name.empty() ? "''" : name.str());
+                 },
+                 [&] { OS << ","; });
+
       for (unsigned i = 0, e = P->getNumFields(); i != e; ++i) {
         OS << '\n';
         printRec(P->getFields()[i].getPattern());

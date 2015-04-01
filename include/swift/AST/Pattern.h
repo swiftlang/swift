@@ -255,7 +255,15 @@ public:
 };
 
 /// An element of a tuple pattern.
+///
+/// The fully general form of this is something like:
+///    label: (pattern) = initexpr
+///
+/// The Init and DefArgKind fields are only used in argument lists for
+/// functions.  They are not parsed as part of normal pattern grammar.
 class TuplePatternElt {
+  Identifier Label;
+  SourceLoc LabelLoc;
   Pattern *ThePattern;
   ExprHandle *Init;
   DefaultArgumentKind DefArgKind;
@@ -265,8 +273,17 @@ public:
   explicit TuplePatternElt(Pattern *P)
     : ThePattern(P), Init(nullptr), DefArgKind(DefaultArgumentKind::None) {}
 
-  TuplePatternElt(Pattern *p, ExprHandle *init, DefaultArgumentKind defArgKind)
+  TuplePatternElt(Identifier Label, SourceLoc LabelLoc,
+                  Pattern *p, ExprHandle *init = nullptr,
+                  DefaultArgumentKind defArgKind = DefaultArgumentKind::None)
     : ThePattern(p), Init(init), DefArgKind(defArgKind) {}
+
+  Identifier getLabel() const { return Label; }
+  SourceLoc getLabelLoc() const { return LabelLoc; }
+  void setLabel(Identifier I, SourceLoc Loc) {
+    Label = I;
+    LabelLoc = Loc;
+  }
 
   Pattern *getPattern() { return ThePattern; }
   const Pattern *getPattern() const { return ThePattern; }

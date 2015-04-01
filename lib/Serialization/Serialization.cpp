@@ -802,7 +802,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     for (auto &elt : tuple->getFields()) {
       // FIXME: Default argument expressions?
       TuplePatternEltLayout::emitRecord(
-        Out, ScratchRecord, abbrCode,
+        Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()),
         getRawStableDefaultArgumentKind(elt.getDefaultArgKind()));
       writePattern(elt.getPattern());
     }

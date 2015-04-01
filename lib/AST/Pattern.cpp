@@ -363,11 +363,12 @@ Pattern *Pattern::clone(ASTContext &context,
       // If we're inheriting a default argument, mark it as such.
       if (elt.getDefaultArgKind() != DefaultArgumentKind::None &&
           (options & Inherited)) {
-        elts.push_back(TuplePatternElt(eltPattern, nullptr,
+        elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
+                                       eltPattern, nullptr,
                                        DefaultArgumentKind::Inherited));
       } else {
-        elts.push_back(TuplePatternElt(eltPattern,
-                                       elt.getInit(),
+        elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
+                                       eltPattern, elt.getInit(),
                                        elt.getDefaultArgKind()));
       }
     }
@@ -524,11 +525,12 @@ Pattern *Pattern::cloneForwardable(ASTContext &context, DeclContext *DC,
       // If we're inheriting a default argument, mark it as such.
       if (elt.getDefaultArgKind() != DefaultArgumentKind::None &&
           (options & Inherited)) {
-        elts.push_back(TuplePatternElt(eltPattern, nullptr,
+        elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
+                                       eltPattern, nullptr,
                                        DefaultArgumentKind::Inherited));
       } else {
-        elts.push_back(TuplePatternElt(eltPattern,
-                                       elt.getInit(),
+        elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
+                                       eltPattern, elt.getInit(),
                                        elt.getDefaultArgKind()));
       }
     }

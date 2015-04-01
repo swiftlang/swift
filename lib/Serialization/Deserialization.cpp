@@ -309,8 +309,10 @@ Pattern *ModuleFile::maybeReadPattern() {
       assert(kind == decls_block::TUPLE_PATTERN_ELT);
 
       // FIXME: Add something for this record or remove it.
+      IdentifierID labelID;
       uint8_t rawDefaultArg;
-      TuplePatternEltLayout::readRecord(scratch, rawDefaultArg);
+      TuplePatternEltLayout::readRecord(scratch, labelID, rawDefaultArg);
+      Identifier label = getIdentifier(labelID);
 
       Pattern *subPattern = maybeReadPattern();
       assert(subPattern);
@@ -322,8 +324,8 @@ Pattern *ModuleFile::maybeReadPattern() {
       if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
         defaultArgKind = *defaultArg;
 
-      elements.push_back(TuplePatternElt(subPattern, nullptr,
-                                         defaultArgKind));
+      elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern,
+                                         nullptr, defaultArgKind));
     }
 
     auto result = TuplePattern::create(getContext(), SourceLoc(),

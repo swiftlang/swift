@@ -568,7 +568,8 @@ mapParsedParameters(Parser &parser,
 
     // Create the tuple pattern elements.
     auto defArgKind = getDefaultArgKind(param.DefaultArg);
-    elements.push_back(TuplePatternElt(pattern, param.DefaultArg, defArgKind));
+    elements.push_back(TuplePatternElt(argName, param.FirstNameLoc, pattern,
+                                       param.DefaultArg, defArgKind));
 
     if (argNames)
       argNames->push_back(argName);
@@ -875,8 +876,23 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
   return new (Context) NamedPattern(var);
 }
 
+/// Parse an element of a tuple pattern.
+///
+///   pattern-tuple-element:
+///     (identifier ':')? pattern ('=' expr)?
 std::pair<ParserStatus, Optional<TuplePatternElt>>
 Parser::parsePatternTupleElement() {
+  // If this element has a label, parse it.
+  Identifier Label;
+  SourceLoc LabelLoc;
+
+  if (Tok.isAny(tok::identifier, tok::kw__) &&
+      peekToken().is(tok::colon)) {
+    LabelLoc = consumeIdentifier(&Label);
+    consumeToken(tok::colon);
+  }
+
+
   // Parse the pattern.
   ParserResult<Pattern>  pattern = parsePattern();
   if (pattern.hasCodeCompletion())
@@ -889,10 +905,11 @@ Parser::parsePatternTupleElement() {
   ExprHandle *init = nullptr;
   if (Tok.is(tok::equal))
     parseDefaultArgument(*this, nullptr, 0, init);
+  
+  auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get(), nullptr,
+                             DefaultArgumentKind::None);
 
-  return std::make_pair(
-      makeParserSuccess(),
-        TuplePatternElt(pattern.get(), nullptr, DefaultArgumentKind::None));
+  return std::make_pair(makeParserSuccess(), Elt);
 }
 
 /// Parse a tuple pattern.

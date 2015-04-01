@@ -313,10 +313,12 @@ public:
   Pattern *visitTupleExpr(TupleExpr *E) {
     // Construct a TuplePattern.
     SmallVector<TuplePatternElt, 4> patternElts;
-    
-    for (auto *subExpr : E->getElements()) {
-      Pattern *pattern = getSubExprPattern(subExpr);
-      patternElts.push_back(TuplePatternElt(pattern));
+
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
+      Pattern *pattern = getSubExprPattern(E->getElement(i));
+      patternElts.push_back(TuplePatternElt(E->getElementName(i),
+                                            E->getElementNameLoc(i),
+                                            pattern));
     }
     
     return TuplePattern::create(TC.Context, E->getLoc(),
