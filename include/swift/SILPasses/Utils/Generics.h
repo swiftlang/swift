@@ -26,39 +26,6 @@
 
 namespace swift {
 
-class GenericCloner : public TypeSubstCloner<GenericCloner> {
-public:
-  GenericCloner(SILFunction *F,
-                TypeSubstitutionMap &InterfaceSubs,
-                TypeSubstitutionMap &ContextSubs,
-                StringRef NewName,
-                ArrayRef<Substitution> ApplySubs)
-  : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
-                    ApplySubs) {}
-  /// Clone and remap the types in \p F according to the substitution
-  /// list in \p Subs.
-  static SILFunction *cloneFunction(SILFunction *F,
-                                    TypeSubstitutionMap &InterfaceSubs,
-                                    TypeSubstitutionMap &ContextSubs,
-                                    StringRef NewName, ApplySite Caller) {
-    // Clone and specialize the function.
-    GenericCloner SC(F, InterfaceSubs, ContextSubs, NewName,
-                          Caller.getSubstitutions());
-    SC.populateCloned();
-    SC.cleanUp(SC.getCloned());
-    return SC.getCloned();
-  }
-
-private:
-  static SILFunction *initCloned(SILFunction *Orig,
-                                 TypeSubstitutionMap &InterfaceSubs,
-                                 StringRef NewName);
-  /// Clone the body of the function into the empty function that was created
-  /// by initCloned.
-  void populateCloned();
-  SILFunction *getCloned() { return &getBuilder().getFunction(); }
-};
-
 bool trySpecializeApplyOfGeneric(ApplySite Apply,
                                  SILFunction **NewFunction =nullptr);
 

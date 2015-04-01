@@ -4,6 +4,7 @@ add_swift_library(swiftSILPassesUtils
   SILInliner.cpp
   SILSSAUpdater.cpp
   ConstantFolding.cpp
+  GenericCloner.cpp
   Generics.cpp
   Devirtualize.cpp
   CheckedCastBrJumpThreading.cpp

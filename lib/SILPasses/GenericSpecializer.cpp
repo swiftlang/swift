@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "specialization"
+#define DEBUG_TYPE "generic-specializer"
 
 #include "swift/SILPasses/Utils/Generics.h"
 #include "swift/SILPasses/Passes.h"
