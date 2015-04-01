@@ -22,6 +22,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
 #include "clang/AST/ASTContext.h"
 #include "swift/Basic/Fallthrough.h"
@@ -240,16 +241,17 @@ public:
     }
   }
 };
+
+using PHINodeVector = llvm::TinyPtrVector<llvm::PHINode*>;
   
 /// Represents a lowered SIL basic block. This keeps track
 /// of SIL branch arguments so that they can be lowered to LLVM phi nodes.
 struct LoweredBB {
   llvm::BasicBlock *bb;
-  std::vector<llvm::PHINode*> phis;
+  PHINodeVector phis;
   
   LoweredBB() = default;
-  explicit LoweredBB(llvm::BasicBlock *bb,
-                     std::vector<llvm::PHINode*> &&phis)
+  explicit LoweredBB(llvm::BasicBlock *bb, PHINodeVector &&phis)
     : bb(bb), phis(std::move(phis))
   {}
 };
@@ -783,11 +785,11 @@ static void emitPHINodesForType(IRGenSILFunction &IGF, SILType type,
   }
 }
 
-static std::vector<llvm::PHINode*>
+static PHINodeVector
 emitPHINodesForBBArgs(IRGenSILFunction &IGF,
                       SILBasicBlock *silBB,
                       llvm::BasicBlock *llBB) {
-  std::vector<llvm::PHINode*> phis;
+  PHINodeVector phis;
   unsigned predecessors = std::distance(silBB->pred_begin(), silBB->pred_end());
   
   IGF.Builder.SetInsertPoint(llBB);
@@ -828,6 +830,11 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
 
   return phis;
 }
+
+static void addIncomingExplosionToPHINodes(IRGenSILFunction &IGF,
+                                           LoweredBB &lbb,
+                                           unsigned &phiIndex,
+                                           Explosion &argValue);
 
 static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
                                  IRGenSILFunction &IGF,
@@ -1215,7 +1222,7 @@ void IRGenSILFunction::emitSILFunction() {
        bb != CurSILFn->end(); bb = bb->getNextNode()) {
     // FIXME: Use the SIL basic block's name.
     llvm::BasicBlock *llBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-    std::vector<llvm::PHINode*> phis = emitPHINodesForBBArgs(*this, bb, llBB);
+    auto phis = emitPHINodesForBBArgs(*this, bb, llBB);
     CurFn->getBasicBlockList().push_back(llBB);
     LoweredBBs[bb] = LoweredBB(llBB, std::move(phis));
   }
@@ -1393,8 +1400,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
   Builder.SetInsertPoint(llBB);
-  // FIXME: emit a phi node to bind the bb arguments from all the predecessor
-  // branches.
 
   bool InEntryBlock = BB->pred_empty();
   bool ArgsEmitted = false;
@@ -1874,6 +1879,34 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
   if (isa<ApplyInst>(i)) {
     setLoweredExplosion(SILValue(i, 0), result);
+  } else {
+    auto tryApplyInst = cast<TryApplyInst>(i);
+
+    // Load the error value.
+    SILType errorType = substCalleeType->getErrorResult().getSILType();
+    Address errorSlot = getErrorResultSlot(errorType);
+    auto errorValue = Builder.CreateLoad(errorSlot);
+
+    auto &normalDest = getLoweredBB(tryApplyInst->getNormalBB());
+    auto &errorDest = getLoweredBB(tryApplyInst->getErrorBB());
+
+    // Zero the error slot to maintain the invariant that it always
+    // contains null.  This will frequently become a dead store.
+    auto nullError = llvm::Constant::getNullValue(errorValue->getType());
+    Builder.CreateStore(nullError, errorSlot);
+
+    // If the error value is non-null, branch to the error destination.
+    auto hasError = Builder.CreateICmpNE(errorValue, nullError);
+    Builder.CreateCondBr(hasError, errorDest.bb, normalDest.bb);
+
+    // Set up the PHI nodes on the normal edge.
+    unsigned firstIndex = 0;
+    addIncomingExplosionToPHINodes(*this, normalDest, firstIndex, result);
+    assert(firstIndex == normalDest.phis.size());
+
+    // Set up the PHI nodes on the error edge.
+    assert(errorDest.phis.size() == 1);
+    errorDest.phis[0]->addIncoming(errorValue, Builder.GetInsertBlock());
   }
 }
 

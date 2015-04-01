@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
-// REQUIRES: CPU=x86_64
 
 sil_stage canonical
 
@@ -17,7 +16,7 @@ sil @throws : $@thin () -> @error _ErrorType {
   %0 = function_ref @create_error : $@thin () -> @owned _ErrorType
   %1 = apply %0() : $@thin () -> @owned _ErrorType
 
-  // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1, align 8
+  // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
   // CHECK-NEXT: ret void
   throw %1 : $_ErrorType
 }
@@ -30,4 +29,39 @@ sil @doesnt_throw : $@thin () -> @error _ErrorType {
   // CHECK-NEXT:   ret void
   %0 = tuple ()
   return %0 : $()
+}
+
+sil @try_apply_helper : $@thin (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType)
+
+// CHECK: define void @try_apply(%objc_object*)
+sil @try_apply : $@thin (@owned AnyObject) -> () {
+entry(%0 : $AnyObject):
+  // CHECK:      [[ERRORSLOT:%.*]] = alloca %swift.error*, align
+  // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
+
+  // CHECK-NEXT: [[RESULT:%.*]] = call %objc_object* @try_apply_helper(%objc_object* %0, %swift.refcounted* undef, %swift.error** nocapture [[ERRORSLOT]])
+  // CHECK-NEXT: [[ERR:%.*]] = load %swift.error*, %swift.error** [[ERRORSLOT]], align
+  // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
+  // CHECK-NEXT: [[T0:%.*]] = icmp ne %swift.error* [[ERR]], null
+  // CHECK-NEXT: br i1 [[T0]],
+  %1 = function_ref @try_apply_helper : $@thin (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType)
+  try_apply %1(%0) : $@thin (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType),
+    normal bb1, error bb2
+
+// CHECK:      [[T0:%.*]] = phi %objc_object* [ [[RESULT]],
+// CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* [[T0]])
+// CHECK-NEXT: br label [[CONT:%[0-9]+]]
+bb1(%2 : $AnyObject):
+  strong_release %2 : $AnyObject
+  br bb3
+
+// CHECK:      [[T0:%.*]] = phi %swift.error* [ [[ERR]],
+// CHECK-NEXT: call void bitcast (void (%objc_object*)* @objc_release to void (%swift.error*)*)(%swift.error* [[T0]])
+// CHECK-NEXT: br label [[CONT]]
+bb2(%3 : $_ErrorType):
+  release_value %3 : $_ErrorType
+  br bb3
+bb3:
+  %4 = tuple ()
+  return %4 : $()
 }

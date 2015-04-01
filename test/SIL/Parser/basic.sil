@@ -1283,6 +1283,30 @@ entry:
   unreachable
 }
 
+// CHECK-LABEL: sil @error_result4 : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType)
+sil @error_result4 : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType) {
+entry(%0 : $Class1):
+  return %0 : $Class1
+}
+
+// CHECK-LABEL: sil @try_apply : $@thin (@owned Class1) -> ()
+sil @try_apply : $@thin (@owned Class1) -> () {
+entry(%0 : $Class1):
+  %1 = function_ref @error_result4 : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType)
+  // CHECK: try_apply %1(%0) : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType), normal bb1, error bb2
+  try_apply %1(%0) : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType),
+    normal bb1, error bb2
+bb1(%2 : $Class1):
+  strong_release %2 : $Class1
+  br bb3
+bb2(%3 : $_ErrorType):
+  release_value %3 : $_ErrorType
+  br bb3
+bb3:
+  %4 = tuple ()
+  return %4 : $()
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
 // CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_
