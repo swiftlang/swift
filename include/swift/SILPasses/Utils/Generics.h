@@ -60,12 +60,9 @@ private:
 };
 
 struct GenericSpecializer {
-  GenericSpecializer(SILModule *Mod) : M(Mod) {}
+  GenericSpecializer() {}
 
 private:
-  /// The SIL Module.
-  SILModule *M;
-
   /// A worklist of functions to specialize.
   std::vector<SILFunction*> Worklist;
 

@@ -122,72 +122,83 @@ void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
   llvm::errs() << "}\n";
 }
 
+bool trySpecializeApplyOfGeneric(ApplySite Apply,
+                                 SILFunction **NewFunction =nullptr) {
+  if (NewFunction)
+    *NewFunction = nullptr;
+
+  assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
+
+  auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
+  assert(F->isDefinition() && "Expected definition to specialize!");
+
+  DEBUG(llvm::dbgs() << "        ApplyInst: " << *Apply.getInstruction());
+
+  // Create the substitution maps.
+  TypeSubstitutionMap InterfaceSubs
+    = F->getLoweredFunctionType()->getGenericSignature()
+    ->getSubstitutionMap(Apply.getSubstitutions());
+
+  TypeSubstitutionMap ContextSubs
+    = F->getContextGenericParams()
+    ->getSubstitutionMap(Apply.getSubstitutions());
+
+  // We do not support partial specialization.
+  if (hasUnboundGenericTypes(InterfaceSubs)) {
+    DEBUG(llvm::dbgs() << "    Can not specialize with interface subs.\n");
+    return false;
+  }
+
+  llvm::SmallString<64> ClonedName;
+  {
+    llvm::raw_svector_ostream buffer(ClonedName);
+    ArrayRef<Substitution> Subs = Apply.getSubstitutions();
+    Mangle::Mangler M(buffer);
+    Mangle::GenericSpecializationMangler Mangler(M, F, Subs);
+    Mangler.mangle();
+  }
+
+  SILFunction *NewF;
+  auto &M = Apply.getInstruction()->getModule();
+  // If we already have this specialization, reuse it.
+  if (auto PrevF = M.lookUpFunction(ClonedName)) {
+    NewF = PrevF;
+
+#ifndef NDEBUG
+    // Make sure that NewF's subst type matches the expected type.
+    auto Subs = Apply.getSubstitutions();
+    auto FTy =
+      F->getLoweredFunctionType()->substGenericArgs(M,
+                                                    M.getSwiftModule(),
+                                                    Subs);
+    assert(FTy == NewF->getLoweredFunctionType() &&
+           "Previously specialized function does not match expected type.");
+#endif
+  } else {
+    // Create a new function.
+    NewF = SpecializingCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
+                                             ClonedName, Apply);
+    if (NewFunction)
+      *NewFunction = NewF;
+  }
+
+  // Replace all of the Apply functions with the new function.
+  replaceWithSpecializedFunction(Apply, NewF);
+  return true;
+}
+
 bool
 GenericSpecializer::specializeApplyInstGroup(
                                  llvm::SmallVectorImpl<ApplySite> &NewApplies) {
   bool Changed = false;
 
+  SILFunction *NewFunction;
   for (auto &AI : NewApplies) {
-    auto *F = cast<FunctionRefInst>(AI.getCallee())->getReferencedFunction();
-    assert(F->isDefinition() && "Expected definition to specialize!");
-
-    DEBUG(llvm::dbgs() << "        ApplyInst: " << *AI.getInstruction());
-
-    // Create the substitution maps.
-    TypeSubstitutionMap InterfaceSubs
-    = F->getLoweredFunctionType()->getGenericSignature()
-    ->getSubstitutionMap(AI.getSubstitutions());
-
-    TypeSubstitutionMap ContextSubs
-    = F->getContextGenericParams()
-    ->getSubstitutionMap(AI.getSubstitutions());
-
-    // We do not support partial specialization.
-    if (hasUnboundGenericTypes(InterfaceSubs)) {
-      DEBUG(llvm::dbgs() << "    Can not specialize with interface subs.\n");
-      continue;
+    if (trySpecializeApplyOfGeneric(AI, &NewFunction)) {
+      if (NewFunction)
+        Worklist.push_back(NewFunction);
+      Changed = true;
     }
-
-    llvm::SmallString<64> ClonedName;
-    {
-      llvm::raw_svector_ostream buffer(ClonedName);
-      ArrayRef<Substitution> Subs = AI.getSubstitutions();
-      Mangle::Mangler M(buffer);
-      Mangle::GenericSpecializationMangler Mangler(M, F, Subs);
-      Mangler.mangle();
-    }
-
-    SILFunction *NewF;
-    bool createdFunction;
-    // If we already have this specialization, reuse it.
-    if (auto PrevF = M->lookUpFunction(ClonedName)) {
-      NewF = PrevF;
-      createdFunction = false;
-
-#ifndef NDEBUG
-      // Make sure that NewF's subst type matches the expected type.
-      auto Subs = AI.getSubstitutions();
-      auto FTy =
-      F->getLoweredFunctionType()->substGenericArgs(*M,
-                                                    M->getSwiftModule(),
-                                                    Subs);
-      assert(FTy == NewF->getLoweredFunctionType() &&
-             "Previously specialized function does not match expected type.");
-#endif
-    } else {
-      // Create a new function.
-      NewF = SpecializingCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
-                                               ClonedName, AI);
-      createdFunction = true;
-    }
-
-    // Replace all of the AI functions with the new function.
-    replaceWithSpecializedFunction(AI, NewF);
-
-    Changed = true;
-
-    if (createdFunction)
-      Worklist.push_back(NewF);
   }
   
   NewApplies.clear();
