@@ -65,7 +65,7 @@ namespace swift {
   /// dead when this instruction is removed.
   void eraseUsesOfInstruction(SILInstruction *Inst);
 
-  // Rewrite a call, which may previously have been a dynmaic dispath, to a
+  // Rewrite a call, which may previously have been a dynamic dispatch, to a
   // known function reference.
   void replaceWithSpecializedFunction(ApplySite site, SILFunction *NewF);
 
