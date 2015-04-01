@@ -96,12 +96,18 @@ var nullaryClosure: Int -> Int = {_ in 0}
 nullaryClosure(0)
 
 
-
-// FIXME: should be rejected
-// <rdar://problem/16737322> Accepts-invalid: functions with nested argument patterns
+// rdar://16737322 - This argument is an unnamed argument that has a labeled
+// tuple type as the type.  Because the labels are in the type, they are not
+// parameter labels, and they are thus not in scope in the body of the function.
 func destructureArgument( (result: Int, error: Bool) ) -> Int {
-  return 0
+  return result  // expected-error {{use of unresolved identifier 'result'}}
 }
+
+// The former is the same as this:
+func destructureArgument2(a: (result: Int, error: Bool) ) -> Int {
+  return result  // expected-error {{use of unresolved identifier 'result'}}
+}
+
 
 class ClassWithObjCMethod {
   @objc
@@ -129,3 +135,6 @@ func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false
 // <rdar://problem/16786168> Functions currently permit 'var inout' parameters
 func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
 func var_inout_error(var inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
+
+
+
