@@ -886,8 +886,8 @@ Parser::parsePatternTupleElement() {
   Identifier Label;
   SourceLoc LabelLoc;
 
-  if (Tok.isAny(tok::identifier, tok::kw__) &&
-      peekToken().is(tok::colon)) {
+  // If the tuple element has a label, parse it.
+  if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
     LabelLoc = consumeIdentifier(&Label);
     consumeToken(tok::colon);
   }
