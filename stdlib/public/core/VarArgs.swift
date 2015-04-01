@@ -41,7 +41,7 @@ public protocol CVarArgType {
 
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  func _encode() -> [Word]
+  var _cVarArgEncoding: [Word] { get }
 }
 
 /// Floating point types need to be passed differently on x86_64
@@ -111,7 +111,7 @@ public func _encodeBitsAsWords<T: CVarArgType>(x: T) -> [Word] {
 extension Int : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -119,7 +119,7 @@ extension Int : CVarArgType {
 extension Int64 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -127,7 +127,7 @@ extension Int64 : CVarArgType {
 extension Int32 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -135,7 +135,7 @@ extension Int32 : CVarArgType {
 extension Int16 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(CInt(self))
   }
 }
@@ -143,7 +143,7 @@ extension Int16 : CVarArgType {
 extension Int8 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(CInt(self))
   }
 }
@@ -152,7 +152,7 @@ extension Int8 : CVarArgType {
 extension UInt : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -160,7 +160,7 @@ extension UInt : CVarArgType {
 extension UInt64 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -168,7 +168,7 @@ extension UInt64 : CVarArgType {
 extension UInt32 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -176,7 +176,7 @@ extension UInt32 : CVarArgType {
 extension UInt16 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
@@ -184,7 +184,7 @@ extension UInt16 : CVarArgType {
 extension UInt8 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
@@ -192,7 +192,7 @@ extension UInt8 : CVarArgType {
 extension COpaquePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -200,7 +200,7 @@ extension COpaquePointer : CVarArgType {
 extension CFunctionPointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -208,7 +208,7 @@ extension CFunctionPointer : CVarArgType {
 extension UnsafePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -216,7 +216,7 @@ extension UnsafePointer : CVarArgType {
 extension UnsafeMutablePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -224,7 +224,7 @@ extension UnsafeMutablePointer : CVarArgType {
 extension AutoreleasingUnsafeMutablePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -232,7 +232,7 @@ extension AutoreleasingUnsafeMutablePointer : CVarArgType {
 extension Float : _CVarArgPassedAsDouble {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(Double(self))
   }
 }
@@ -240,7 +240,7 @@ extension Float : _CVarArgPassedAsDouble {
 extension Double : _CVarArgPassedAsDouble {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -252,7 +252,7 @@ extension Double : _CVarArgPassedAsDouble {
 final public class VaListBuilder {
   
   func append(arg: CVarArgType) {
-    for x in arg._encode() {
+    for x in arg._cVarArgEncoding {
       storage.append(x)
     }
   }
@@ -285,7 +285,7 @@ final public class VaListBuilder {
   }
 
   func append(arg: CVarArgType) {
-    var encoded = arg._encode()
+    var encoded = arg._cVarArgEncoding
 
     if arg is _CVarArgPassedAsDouble
       && sseRegistersUsed < _x86_64CountSSERegisters {

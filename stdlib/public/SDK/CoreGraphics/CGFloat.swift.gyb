@@ -657,7 +657,7 @@ public func yn(n: Int, x: CGFloat) -> CGFloat {
 extension CGFloat : _CVarArgPassedAsDouble {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
-    return native._encode()
+  public var _cVarArgEncoding: [Word] {
+    return native._cVarArgEncoding
   }
 }

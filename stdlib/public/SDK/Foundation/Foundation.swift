@@ -666,7 +666,7 @@ extension Dictionary : _ObjectiveCBridgeable {
 extension NSObject : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public func _encode() -> [Word] {
+  public var _cVarArgEncoding: [Word] {
     _autorelease(self)
     return _encodeBitsAsWords(self)
   }
