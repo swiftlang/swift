@@ -1212,18 +1212,3 @@ extension NSDictionary {
   }
 }
 
-// NSError and CFError conform to the standard ErrorType protocol. Compiler
-// magic allows this to be done as a "toll-free" conversion when an NSError
-// or CFError is used as an ErrorType existential.
-
-extension NSError: _ErrorType {}
-
-extension CFError: _ErrorType {
-  public var domain: String {
-    return CFErrorGetDomain(self) as String
-  }
-
-  public var code: Int {
-    return CFErrorGetCode(self)
-  }
-}

@@ -1,0 +1,116 @@
+import Foundation
+import CoreFoundation
+
+// NSError and CFError conform to the standard ErrorType protocol. Compiler
+// magic allows this to be done as a "toll-free" conversion when an NSError
+// or CFError is used as an ErrorType existential.
+
+extension NSError: _ErrorType {}
+
+extension CFError: _ErrorType {
+  public var domain: String {
+    return CFErrorGetDomain(self) as String
+  }
+
+  public var code: Int {
+    return CFErrorGetCode(self)
+  }
+}
+
+/// An internal protocol to represent Swift error enums that map to standard
+/// Cocoa NSError domains.
+protocol _ObjectiveCBridgeableErrorType: _ErrorType {
+  /// Produce a value of the error type corresponding to the given NSError,
+  /// or return nil if it cannot be bridged.
+  init?(_bridgedNSError: NSError)
+}
+
+%{
+
+# Cocoa domains and their mapping information.
+mappedDomains = {
+  'NSCocoaError': [
+    # TODO: Split this up into subdomains based on the Minimum/Maximum
+    # delimited ranges?
+    'NSFileNoSuchFileError',
+    'NSFileLockingError',
+    'NSFileReadUnknownError',
+    'NSFileReadNoPermissionError',
+    'NSFileReadInvalidFileNameError',
+    'NSFileReadCorruptFileError',
+    'NSFileReadNoSuchFileError',
+    'NSFileReadInapplicableStringEncodingError',
+    'NSFileReadUnsupportedSchemeError',
+    'NSFileReadTooLargeError',
+    'NSFileReadUnknownStringEncodingError',
+    'NSFileWriteUnknownError',
+    'NSFileWriteNoPermissionError',
+    'NSFileWriteInvalidFileNameError',
+    'NSFileWriteFileExistsError',
+    'NSFileWriteInapplicableStringEncodingError',
+    'NSFileWriteUnsupportedSchemeError',
+    'NSFileWriteOutOfSpaceError',
+    'NSFileWriteVolumeReadOnlyError',
+    'NSKeyValueValidationError',
+    'NSFormattingError',
+    'NSUserCancelledError',
+    #'NSFileErrorMinimum',
+    #'NSFileErrorMaximum',
+    #'NSValidationErrorMinimum',
+    #'NSValidationErrorMaximum',
+    #'NSFormattingErrorMinimum',
+    #'NSFormattingErrorMaximum',
+    'NSPropertyListReadCorruptError',
+    'NSPropertyListReadUnknownVersionError',
+    'NSPropertyListReadStreamError',
+    'NSPropertyListWriteStreamError',
+    #'NSPropertyListErrorMinimum',
+    #'NSPropertyListErrorMaximum',
+    #'NSExecutableErrorMinimum',
+    'NSExecutableNotLoadableError',
+    'NSExecutableArchitectureMismatchError',
+    'NSExecutableRuntimeMismatchError',
+    'NSExecutableLoadError',
+    'NSExecutableLinkError',
+    #'NSExecutableErrorMaximum',
+  ],
+}
+
+}%
+
+%for domain in mappedDomains:
+
+// TODO: API review for how to name these enums and cases.
+%{
+EnumName = "_" + domain
+}%
+
+enum ${EnumName}: _ObjectiveCBridgeableErrorType {
+%  for code in mappedDomains[domain]:
+  case ${code}
+%  end
+
+  var domain: String { return ${domain}Domain }
+  var code: Int {
+    switch self {
+%  for code in mappedDomains[domain]:
+    case ${EnumName}.${code}: return Foundation.${code}
+%  end
+    }
+  }
+
+  init?(_bridgedNSError: NSError) {
+    if _bridgedNSError.domain != ${domain}Domain {
+      return nil
+    }
+
+    switch _bridgedNSError.code {
+%  for code in mappedDomains[domain]:
+    case Foundation.${code}: self = ${EnumName}.${code}
+%  end
+    default: return nil
+    }
+  }
+}
+
+%end
