@@ -1,0 +1,135 @@
+// RUN: %target-sil-opt %s -simplify-cfg -sil-combine -simplify-cfg -sil-combine | FileCheck %s
+
+// These require both SimplifyCFG and SILCombine
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @external_f1 : $@thin ()->()
+sil @external_f2 : $@thin ()->()
+sil @external_f3 : $@thin ()->()
+sil @external_f4 : $@thin ()->()
+
+// CHECK-LABEL: sil @select_enum_dominance_simplification : $@thin (Optional<Int32>) -> () {
+// CHECK-NOT: external_f2
+// CHECK-NOT: external_f4
+// CHECK: bb3:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @select_enum_dominance_simplification : $@thin (Optional<Int32>) -> () {
+bb0(%0 : $Optional<Int32>):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %1 = select_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = select_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
+  cond_br %2, bb3, bb4
+
+bb2:
+  %3 = select_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: %f, case #Optional.None!enumelt: %t : $Builtin.Int1
+  cond_br %3, bb5, bb6
+
+bb3:
+  %f1 = function_ref @external_f1 : $@thin ()->()
+  apply %f1() : $@thin ()->()
+  br bb7
+
+bb4:
+  %f2 = function_ref @external_f2 : $@thin ()->()
+  apply %f2() : $@thin ()->()
+  br bb7
+
+bb5:
+  %f3 = function_ref @external_f3 : $@thin ()->()
+  apply %f3() : $@thin ()->()
+  br bb7
+
+bb6:
+  %f4 = function_ref @external_f4 : $@thin ()->()
+  apply %f4() : $@thin ()->()
+  br bb7
+
+bb7:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @switch_enum_dominates_select_enum : $@thin (Optional<Int32>) -> () {
+// CHECK-NOT: external_f2
+// CHECK: bb3:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @switch_enum_dominates_select_enum : $@thin (Optional<Int32>) -> () {
+bb0(%0 : $Optional<Int32>):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  switch_enum %0 : $Optional<Int32>, case #Optional.None!enumelt: bb4, case #Optional.Some!enumelt.1: bb1
+
+bb1:
+  %c = select_enum %0 : $Optional<Int32>, case #Optional.None!enumelt: %f, case #Optional.Some!enumelt.1: %t : $Builtin.Int1
+  cond_br %c, bb2, bb3
+
+bb2:
+  %f1 = function_ref @external_f1 : $@thin ()->()
+  apply %f1() : $@thin ()->()
+  br bb5
+
+bb3:
+  %f2 = function_ref @external_f2 : $@thin ()->()
+  apply %f2() : $@thin ()->()
+  br bb5
+
+bb4:
+  %f3 = function_ref @external_f3 : $@thin ()->()
+  apply %f3() : $@thin ()->()
+  br bb5
+
+bb5:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @switch_enum_dominates_select_enum2 : $@thin (Optional<Int32>) -> Builtin.Int32 {
+// CHECK-DAG: [[L2:%[0-9]+]] = integer_literal {{.*}}, 2
+// CHECK-DAG: [[L1:%[0-9]+]] = integer_literal {{.*}}, 1
+// CHECK: [[R:%[0-9]+]] = select_enum %0 : $Optional<Int32>, case #Optional.None!enumelt: [[L2]], case #Optional.Some!enumelt.1: [[L1]]
+// CHECK-NEXT: return [[R]]
+sil @switch_enum_dominates_select_enum2 : $@thin (Optional<Int32>) -> Builtin.Int32 {
+bb0(%0 : $Optional<Int32>):
+  %i1 = integer_literal $Builtin.Int32, 1
+  %i0 = integer_literal $Builtin.Int32, 0
+  switch_enum %0 : $Optional<Int32>, case #Optional.None!enumelt: bb2, case #Optional.Some!enumelt.1: bb1
+
+bb1:
+  %c = select_enum %0 : $Optional<Int32>, case #Optional.None!enumelt: %i0, case #Optional.Some!enumelt.1: %i1 : $Builtin.Int32
+  br bb3(%c : $Builtin.Int32)
+
+bb2:
+  %i2 = integer_literal $Builtin.Int32, 2
+  br bb3(%i2 : $Builtin.Int32)
+
+bb3(%r : $Builtin.Int32):
+  return %r : $Builtin.Int32
+}
+
+
+// CHECK-LABEL: sil @cond_br_dominates_cond_fail : $@thin (Builtin.Int1) -> () {
+// CHECK: bb0(%0 : $Builtin.Int1):
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @cond_br_dominates_cond_fail : $@thin (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb2, bb1
+
+bb1:
+  cond_fail %0 : $Builtin.Int1
+  br bb2
+
+bb2:
+  %r = tuple()
+  return %r : $()
+}

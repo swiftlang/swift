@@ -710,6 +710,137 @@ bb7(%6 : $Builtin.Int64):
   return %7 : $Int64
 }
 
+// CHECK-LABEL: @dominator_based_simplify_condbr_with_inverts
+// CHECK-NOT:  integer_literal $Builtin.Int64, 1
+// CHECK: [[I2:%[0-9]+]] = integer_literal $Builtin.Int64, 2
+// CHECK: br bb3([[I2]] : $Builtin.Int64)
+// CHECK-NOT:  integer_literal $Builtin.Int64, 3
+// CHECK: [[I4:%[0-9]+]] = integer_literal $Builtin.Int64, 4
+// CHECK: br bb3([[I4]] : $Builtin.Int64)
+// CHECK: bb3([[R:%[0-9]+]] : $Builtin.Int64):
+// CHECK-NEXT: return [[R]]
+sil @dominator_based_simplify_condbr_with_inverts : $@thin (Builtin.Int1) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int1):
+  %l1 = integer_literal $Builtin.Int1, -1
+  %x1 = builtin "xor_Int1"(%0 : $Builtin.Int1, %l1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %x1, bb1, bb4
+
+bb1:
+  cond_br %0, bb2, bb3
+
+bb2:
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb7(%1 : $Builtin.Int64)
+
+bb3:
+  %2 = integer_literal $Builtin.Int64, 2
+  br bb7(%2 : $Builtin.Int64)
+
+bb4:
+  // expect-intrinsics should be transparent for checking the condition.
+  %x2 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %l1 : $Builtin.Int1) : $Builtin.Int1
+  %x3 = builtin "xor_Int1"(%0 : $Builtin.Int1, %l1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %x3, bb5, bb6
+
+bb5:
+  %3 = integer_literal $Builtin.Int64, 3
+  br bb7(%3 : $Builtin.Int64)
+
+bb6:
+  %4 = integer_literal $Builtin.Int64, 4
+  br bb7(%4 : $Builtin.Int64)
+
+bb7(%6 : $Builtin.Int64):
+  return %6 : $Builtin.Int64
+}
+
+// CHECK-LABEL: @switch_enum_dominates_switch_enum_noarg
+// CHECK:      bb0(%0 : $Optional<Builtin.Int32>):
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:   %3 = select_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: %1, case #Optional.Some!enumelt.1: %2
+// CHECK-NEXT:   return %3
+sil @switch_enum_dominates_switch_enum_noarg : $@thin (Optional<Builtin.Int32>) -> Builtin.Int32 {
+bb0(%0 : $Optional<Builtin.Int32>):
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb1, case #Optional.Some!enumelt.1: bb2
+
+bb1:
+  %i1 = integer_literal $Builtin.Int32, 1
+  br bb5(%i1 : $Builtin.Int32)
+
+bb2:
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb3, case #Optional.Some!enumelt.1: bb4
+
+bb3:
+  %i2 = integer_literal $Builtin.Int32, 2
+  br bb5(%i2 : $Builtin.Int32)
+
+bb4:
+  %i3 = integer_literal $Builtin.Int32, 3
+  br bb5(%i3 : $Builtin.Int32)
+
+bb5(%r : $Builtin.Int32):
+  return %r : $Builtin.Int32
+}
+
+// CHECK-LABEL: @switch_enum_dominates_switch_enum_arg
+// CHECK:      bb0(%0 : $Optional<Builtin.Int32>):
+// CHECK-NEXT:   switch_enum %0 {{.*}} case #Optional.Some!enumelt.1: bb2
+// CHECK:      bb2:
+// CHECK-NEXT:   [[D:%[0-9]+]] = unchecked_enum_data %0
+// CHECK-NEXT:   br bb3([[D]] : $Builtin.Int32)
+// CHECK:      bb3([[R:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NEXT:   return [[R]]
+sil @switch_enum_dominates_switch_enum_arg : $@thin (Optional<Builtin.Int32>) -> Builtin.Int32 {
+bb0(%0 : $Optional<Builtin.Int32>):
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb1, case #Optional.Some!enumelt.1: bb2
+
+bb1:
+  %i1 = integer_literal $Builtin.Int32, 1
+  br bb5(%i1 : $Builtin.Int32)
+
+bb2:
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb3, case #Optional.Some!enumelt.1: bb4
+
+bb3:
+  %i2 = integer_literal $Builtin.Int32, 2
+  br bb5(%i2 : $Builtin.Int32)
+
+bb4(%e : $Builtin.Int32):
+  br bb5(%e : $Builtin.Int32)
+
+bb5(%r : $Builtin.Int32):
+  return %r : $Builtin.Int32
+}
+
+// CHECK-LABEL: @switch_enum_dominates_switch_enum_arg_reuse
+// CHECK:      bb0(%0 : $Optional<Builtin.Int32>):
+// CHECK-NEXT:   switch_enum %0 {{.*}} case #Optional.Some!enumelt.1: bb2
+// CHECK:      bb2([[A:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NEXT:   br bb3([[A]] : $Builtin.Int32)
+// CHECK:      bb3([[R:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NEXT:   return [[R]]
+sil @switch_enum_dominates_switch_enum_arg_reuse : $@thin (Optional<Builtin.Int32>) -> Builtin.Int32 {
+bb0(%0 : $Optional<Builtin.Int32>):
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb1, case #Optional.Some!enumelt.1: bb2
+
+bb1:
+  %i1 = integer_literal $Builtin.Int32, 1
+  br bb5(%i1 : $Builtin.Int32)
+
+bb2(%d : $Builtin.Int32):
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb3, case #Optional.Some!enumelt.1: bb4
+
+bb3:
+  %i2 = integer_literal $Builtin.Int32, 2
+  br bb5(%i2 : $Builtin.Int32)
+
+bb4(%e : $Builtin.Int32):
+  br bb5(%e : $Builtin.Int32)
+
+bb5(%r : $Builtin.Int32):
+  return %r : $Builtin.Int32
+}
 // CHECK-LABEL: sil @simplify_loop_header
 // CHECK: bb1(
 // CHECK:  cond_br {{.*}}, bb2, bb3
@@ -1237,52 +1368,6 @@ bb7b:
 
 exit:
   apply %12() : $@thin () -> ()
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: sil @select_enum_dominance_simplification : $@thin (Optional<Int32>) -> () {
-// CHECK: bb1:
-// CHECK: integer_literal $Builtin.Int32, 0
-// CHECK-NEXT: br bb3
-// CHECK: bb2:
-// CHECK: integer_literal $Builtin.Int32, 2
-// CHECK-NEXT: br bb3
-// CHECK: bb3:
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-sil @select_enum_dominance_simplification : $@thin (Optional<Int32>) -> () {
-bb0(%0 : $Optional<Int32>):
-  %t = integer_literal $Builtin.Int1, 1
-  %f = integer_literal $Builtin.Int1, 0
-  %1 = select_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
-  cond_br %1, bb1, bb2
-
-bb1:
-  %2 = select_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: %t, case #Optional.None!enumelt: %f : $Builtin.Int1
-  cond_br %2, bb3, bb4
-
-bb2:
-  %3 = select_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: %f, case #Optional.None!enumelt: %t : $Builtin.Int1
-  cond_br %3, bb5, bb6
-
-bb3:
-  %4 = integer_literal $Builtin.Int32, 0
-  br bb7
-
-bb4:
-  %5 = integer_literal $Builtin.Int32, 1
-  br bb7
-
-bb5:
-  %6 = integer_literal $Builtin.Int32, 2
-  br bb7
-
-bb6:
-  %7 = integer_literal $Builtin.Int32, 3
-  br bb7
-
-bb7:
   %9999 = tuple()
   return %9999 : $()
 }

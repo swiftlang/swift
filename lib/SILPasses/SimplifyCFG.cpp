@@ -220,140 +220,6 @@ void swift::updateSSAAfterCloning(BaseThreadingCloner &Cloner,
   }
 }
 
-static bool isConditional(TermInst *I) {
-  switch (I->getKind()) {
-  case ValueKind::CondBranchInst:
-  case ValueKind::SwitchValueInst:
-  case ValueKind::SwitchEnumInst:
-  case ValueKind::SwitchEnumAddrInst:
-  case ValueKind::CheckedCastBranchInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
-// Replace a SwitchEnumInst with an unconditional branch based on the
-// assertion that it will select a particular element.
-static void simplifySwitchEnumInst(SwitchEnumInst *SEI,
-                                   EnumElementDecl *Element,
-                                   SILBasicBlock *BB) {
-  auto *Dest = SEI->getCaseDestination(Element);
-
-  if (Dest->bbarg_empty()) {
-    SILBuilderWithScope<1>(SEI).createBranch(SEI->getLoc(), Dest);
-    SEI->eraseFromParent();
-    return;
-  }
-
-  SILValue Arg;
-
-  if (BB->bbarg_empty()) {
-    auto &Mod = SEI->getModule();
-    auto OpndTy = SEI->getOperand()->getType(0);
-    auto Ty = OpndTy.getEnumElementType(Element, Mod);
-    auto *UED = SILBuilderWithScope<1>(SEI)
-      .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
-    Arg = SILValue(UED);
-  } else {
-    Arg = BB->getBBArg(0);
-  }
-
-  ArrayRef<SILValue> Args = { Arg };
-  SILBuilderWithScope<1>(SEI).createBranch(SEI->getLoc(), Dest, Args);
-  SEI->eraseFromParent();
-}
-
-static void simplifyCheckedCastBranchInst(CheckedCastBranchInst *CCBI,
-                                          bool SuccessTaken,
-                                          SILBasicBlock *DomBB) {
-  if (SuccessTaken)
-    SILBuilderWithScope<1>(CCBI).createBranch(CCBI->getLoc(),
-                                              CCBI->getSuccessBB(),
-                                              SILValue(DomBB->getBBArg(0)));
-  else
-    SILBuilderWithScope<1>(CCBI).createBranch(CCBI->getLoc(),
-                                              CCBI->getFailureBB());
-
-  CCBI->eraseFromParent();
-}
-
-/// Returns true if BB is the basic block jumped to when CondBr's condition
-/// evaluates to true.
-static bool getBranchTaken(CondBranchInst *CondBr, SILBasicBlock *BB) {
-  if (CondBr->getTrueBB() == BB)
-    return true;
-  else
-    return false;
-}
-
-static EnumElementDecl *
-getOtherElementOfTwoElementEnum(EnumDecl *E, EnumElementDecl *Element) {
-  assert(Element && "This should never be null");
-  if (!Element)
-    return nullptr;
-  EnumElementDecl *OtherElt = nullptr;
-
-  for (EnumElementDecl *Elt : E->getAllElements()) {
-    // Skip the case where we find the select_enum element
-    if (Elt == Element)
-      continue;
-    // If we find another element, then we must have more than 2, so bail.
-    if (OtherElt)
-      return nullptr;
-    OtherElt = Elt;
-  }
-
-  return OtherElt;
-}
-
-/// If PredTerm is a (cond_br (select_enum)) or a (switch_enum), return the decl
-/// that will yield DomBB.
-static NullablePtr<EnumElementDecl> getEnumEltTaken(TermInst *PredTerm,
-                                                    SILBasicBlock *DomBB) {
-  // First check if we have a (cond_br (select_enum)).
-  if (auto *CBI = dyn_cast<CondBranchInst>(PredTerm)) {
-    auto *SEI = dyn_cast<SelectEnumInst>(CBI->getCondition());
-    if (!SEI)
-      return nullptr;
-
-    // Try to find a single literal "true" case.
-    // TODO: More general conditions in which we can relate the BB to a single
-    // case, such as when there's a single literal "false" case.
-    NullablePtr<EnumElementDecl> TrueElement = SEI->getSingleTrueElement();
-    if (TrueElement.isNull())
-      return nullptr;
-
-    // If DomBB is the taken branch, we know that the EnumElementDecl is the one
-    // checked for by enum is tag. Return it.
-    if (getBranchTaken(CBI, DomBB)) {
-      return TrueElement.get();
-    }
-
-    // Ok, DomBB is not the taken branch. If we have an enum with only two
-    // cases, we can still infer the other case for the current branch.
-    EnumDecl *E = SEI->getEnumOperand().getType().getEnumOrBoundGenericEnum();
-
-    // This will return nullptr if we have more than two cases in our decl.
-    return getOtherElementOfTwoElementEnum(E, TrueElement.get());
-  }
-
-  auto *SWEI = dyn_cast<SwitchEnumInst>(PredTerm);
-  if (!SWEI)
-    return nullptr;
-
-  return SWEI->getUniqueCaseForDestination(DomBB);
-}
-
-static void simplifyCondBranchInst(CondBranchInst *BI, bool BranchTaken) {
-  auto LiveArgs =  BranchTaken ?  BI->getTrueArgs(): BI->getFalseArgs();
-  auto *LiveBlock =  BranchTaken ? BI->getTrueBB() : BI->getFalseBB();
-
-  SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), LiveBlock, LiveArgs);
-  BI->dropAllReferences();
-  BI->eraseFromParent();
-}
-
 static SILValue getUnderlyingCondition(SILValue V) {
   if (auto *SEI = dyn_cast<SelectEnumInst>(V))
     V = SEI->getEnumOperand().stripCasts();
@@ -370,98 +236,6 @@ static SILValue getUnderlyingCondition(SILValue V) {
 /// sense that each is eventually based on the same value.
 bool swift::areEquivalentConditions(SILValue C1, SILValue C2) {
   return getUnderlyingCondition(C1) == getUnderlyingCondition(C2);
-}
-
-static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
-  assert(isConditional(Term) && "Expected conditional terminator!");
-
-  auto *BB = Term->getParent();
-  auto Condition = Term->getOperand(0);
-  auto Kind = Term->getKind();
-
-  for (auto *Node = DT->getNode(BB); Node; Node = Node->getIDom()) {
-    auto *DomBB = Node->getBlock();
-    auto *Pred = DomBB->getSinglePredecessor();
-    if (!Pred)
-      continue;
-
-    // We assume that our predecessor terminator has operands like Term since
-    // otherwise it can not be "conditional".
-    auto *PredTerm = Pred->getTerminator();
-    if (!PredTerm->getNumOperands() ||
-        !areEquivalentConditions(PredTerm->getOperand(0), Condition))
-      continue;
-
-    // Okay, DomBB dominates Term, has a single predecessor, and that
-    // predecessor conditionally branches on the same condition. So we
-    // know that DomBB are control-dependent on the edge that takes us
-    // from Pred to DomBB. Since the terminator kind and condition are
-    // the same, we can use the knowledge of which edge gets us to
-    // Inst to optimize Inst.
-    switch (Kind) {
-    case ValueKind::SwitchEnumInst: {
-      if (NullablePtr<EnumElementDecl> EltDecl =
-              getEnumEltTaken(PredTerm, DomBB)) {
-        simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), EltDecl.get(),
-                               DomBB);
-        return true;
-      }
-
-      // FIXME: We could also simplify things in some cases when we
-      //        reach this switch_enum_inst from another
-      //        switch_enum_inst that is branching on the same value
-      //        and taking the default path.
-      continue;
-    }
-    case ValueKind::CondBranchInst: {
-      auto *CBI = cast<CondBranchInst>(Term);
-
-      // If this CBI has an 
-      if (auto *SEI = dyn_cast<SelectEnumInst>(CBI->getCondition())) {
-        if (auto TrueElement = SEI->getSingleTrueElement()) {
-          if (NullablePtr<EnumElementDecl> Element =
-                  getEnumEltTaken(PredTerm, DomBB)) {
-            simplifyCondBranchInst(CBI, Element.get() == TrueElement.get());
-            return true;
-          }
-        }
-      }
-
-      // Ok, we failed to determine an enum element decl.
-      auto *CondBrInst = dyn_cast<CondBranchInst>(PredTerm);
-      if (!CondBrInst)
-        continue;
-      bool BranchTaken = getBranchTaken(CondBrInst, DomBB);
-      simplifyCondBranchInst(CBI, BranchTaken);
-      return true;
-    }
-    case ValueKind::SwitchValueInst:
-    case ValueKind::SwitchEnumAddrInst:
-      // FIXME: Handle these.
-      return false;
-    case ValueKind::CheckedCastBranchInst: {
-      // We need to verify that the result type is the same in the
-      // dominating checked_cast_br.
-      auto *PredCCBI = dyn_cast<CheckedCastBranchInst>(PredTerm);
-      if (!PredCCBI)
-        continue;
-      auto *CCBI = cast<CheckedCastBranchInst>(Term);
-      if (PredCCBI->getCastType() != CCBI->getCastType())
-        continue;
-
-      assert((DomBB == PredCCBI->getSuccessBB() ||
-              DomBB == PredCCBI->getFailureBB()) &&
-          "Dominating block is not a successor of predecessor checked_cast_br");
-
-      simplifyCheckedCastBranchInst(CCBI, DomBB == PredCCBI->getSuccessBB(),
-                                    DomBB);
-      return true;
-    }
-    default:
-      llvm_unreachable("Should only see conditional terminators here!");
-    }
-  }
-  return false;
 }
 
 template <class SwitchEnumTy, class SwitchEnumCaseTy>
@@ -499,6 +273,185 @@ SimplifyCFG::trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT) {
   return Result;
 }
 
+/// Holds information about a use of a terminator condition.
+struct CondUseInfo {
+  CondUseInfo(Operand *Use, size_t SuccessorIdx, bool inverted) :
+  Use(Use), SuccessorIdx(SuccessorIdx), inverted(inverted) {}
+  
+  /// The use.
+  Operand *Use;
+  
+  /// Specifies the successor of the terminator which dominates the use.
+  size_t SuccessorIdx;
+  
+  /// For boolean conditions: true if the use is an inverted condition of the
+  /// original.
+  bool inverted;
+};
+
+/// Returns the underlying condition of a value.
+/// It strips expect-intrinsics and boolean xor-invertions.
+static SILValue getUnderlying(SILValue V, bool &inverted) {
+  if (auto *BI = dyn_cast<BuiltinInst>(V)) {
+    // Expect-intrinsics have no effect, so we can see through them.
+    if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
+      return BI->getArguments()[0];
+    if (BI->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
+      // Check if it's a boolean invertion of the condition.
+      OperandValueArrayRef Args = BI->getArguments();
+      if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
+        if (IL->getValue().isAllOnesValue()) {
+          inverted = !inverted;
+          return Args[0];
+        }
+      }
+    }
+  }
+  return SILValue();
+}
+
+/// Collects uses down the dominator tree.
+/// We collect only uses which are dominated by a successor of the original
+/// terminator instruction.
+static void collectUsesDown(SmallVectorImpl<CondUseInfo> &Uses, SILValue Cond,
+                            bool inverted,
+                            const TermInst::SuccessorListTy &Successors,
+                            DominanceInfo *DT) {
+  for (Operand *UI : Cond.getUses()) {
+    SILInstruction *User = UI->getUser();
+    SILBasicBlock *UserBlock = User->getParentBB();
+    // Check which successor (if any) dominates the use.
+    for (size_t SuccIdx = 0, Size = Successors.size(); SuccIdx < Size;
+         ++SuccIdx) {
+      SILBasicBlock *SuccBB = Successors[SuccIdx].getBB();
+      if (DT->dominates(SuccBB, UserBlock) && SuccBB->getSinglePredecessor()) {
+        
+        // The successor dominates the use. So we collect the use.
+        Uses.push_back({ UI, SuccIdx, inverted });
+        bool newInverted = inverted;
+        if (getUnderlying(User, newInverted) == Cond) {
+          // Continue to collect uses of this User.
+          collectUsesDown(Uses, User, newInverted, Successors, DT);
+        }
+        break;
+      }
+    }
+  }
+}
+
+/// Collects uses up the dominator tree.
+static void collectUsesUp(SmallVectorImpl<CondUseInfo> &Uses, SILValue Cond,
+                          bool inverted,
+                          const TermInst::SuccessorListTy &Successors,
+                          DominanceInfo *DT) {
+  do {
+    collectUsesDown(Uses, Cond, inverted, Successors, DT);
+    Cond = getUnderlying(Cond, inverted);
+  } while (Cond);
+}
+
+/// Replaces uses of a cond_br condition in blocks which are dominated by the
+/// cond_br's successors. Such uses can be replaced with literals.
+static bool propagateCondBrCondition(CondBranchInst *CBR, DominanceInfo *DT) {
+  IntegerLiteralInst *LiteralInsts[2] = { nullptr, nullptr };
+  auto Successors = CBR->getSuccessors();
+  assert(Successors[0].getBB() == CBR->getTrueBB());
+  assert(Successors[1].getBB() == CBR->getFalseBB());
+  SmallVector<CondUseInfo, 8> Uses;
+  SILValue Cond = CBR->getCondition();
+  
+  // Collect all uses of the cond_br condition which are dominated by either the
+  // true- or false-block.
+  collectUsesUp(Uses, Cond, false, Successors, DT);
+
+  bool Changed = false;
+  for (const CondUseInfo &CUI : Uses) {
+    size_t Idx = CUI.SuccessorIdx;
+    int Literal = CUI.inverted ? Idx : 1 - Idx;
+    assert(Literal < 2);
+    if (!LiteralInsts[Literal]) {
+      // Create a 0- or 1- literal in the cond_br's block.
+      SILInstruction *User = CUI.Use->getUser();
+      LiteralInsts[Literal] = SILBuilderWithScope<1>(CBR).
+        createIntegerLiteral(User->getLoc(), Cond.getType(), Literal);
+    }
+    // Replace the use of the cond_br condition with a literal.
+    CUI.Use->set(LiteralInsts[Literal]);
+    Changed = true;
+  }
+  return Changed;
+}
+
+/// Optimizes uses of a switch_enum condition in blocks which are dominated by
+/// the switch_enum's successors.
+static bool propagateSwitchEnumCondition(SwitchEnumInst *SWI, DominanceInfo *DT) {
+  auto Successors = SWI->getSuccessors();
+  SmallVector<CondUseInfo, 8> Uses;
+  SILValue EnumVal = SWI->getOperand();
+  collectUsesUp(Uses, EnumVal, false, Successors, DT);
+  
+  bool Changed = false;
+  for (const CondUseInfo &CUI : Uses) {
+    size_t Idx = CUI.SuccessorIdx;
+    SILBasicBlock *DstBlock = Successors[Idx].getBB();
+    auto Case = SWI->getUniqueCaseForDestination(DstBlock);
+    if (!Case)
+      continue;
+    EnumElementDecl *EnumElement = Case.get();
+    
+    SILInstruction *User = CUI.Use->getUser();
+    if (SwitchEnumInst *DomSWI = dyn_cast<SwitchEnumInst>(User)) {
+      
+      // The SWI successor dominates another switch_enum which share the same
+      // condition.
+      SILBuilderWithScope<1> Builder(DomSWI);
+      ArrayRef<SILValue> Args = { };
+      auto *Dest = DomSWI->getCaseDestination(EnumElement);
+      if (!Dest->bbarg_empty()) {
+        // The destination block gets the enum data as argument.
+        if (DstBlock->bbarg_empty()) {
+          // Create a new enum data.
+          auto OpndTy = EnumVal->getType(0);
+          auto Ty = OpndTy.getEnumElementType(EnumElement, DomSWI->getModule());
+          auto *UED = Builder.createUncheckedEnumData(
+                        DomSWI->getLoc(), EnumVal, EnumElement, Ty);
+          Args = { SILValue(UED) };
+        } else {
+          // Re-use the enum data argument from the original SWI successor.
+          Args = { DstBlock->getBBArg(0) };
+        }
+      }
+      // Replace the dominated switch_enum with a branch.
+      Builder.createBranch(DomSWI->getLoc(), Dest, Args);
+      DomSWI->eraseFromParent();
+      
+      Changed = true;
+      continue;
+    }
+    if (SelectEnumInst *DomSEI = dyn_cast<SelectEnumInst>(User)) {
+
+      // The SWI successor dominates a select_enum which share the same
+      // condition.
+      SILValue selected;
+      for (unsigned i = 0, e = DomSEI->getNumCases(); i < e; ++i) {
+        auto casePair = DomSEI->getCase(i);
+        if (casePair.first == EnumElement) {
+          selected = casePair.second;
+          break;
+        }
+      }
+      if (!selected)
+        selected = DomSEI->getDefaultResult();
+
+      DomSEI->replaceAllUsesWith(selected.getDef());
+      
+      Changed = true;
+      continue;
+    }
+  }
+  return Changed;
+}
+
 // Simplifications that walk the dominator tree to prove redundancy in
 // conditional branching.
 bool SimplifyCFG::dominatorBasedSimplify(DominanceInfo *DT) {
@@ -506,11 +459,22 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceInfo *DT) {
   for (auto &BB : Fn) {
     // Any method called from this loop should update
     // the DT if it changes anything related to dominators.
-    if (isConditional(BB.getTerminator())) {
-      if (trySimplifyConditional(BB.getTerminator(), DT))
-        Changed = true;
-      else if (dyn_cast<CheckedCastBranchInst>(BB.getTerminator()))
-        Changed = trySimplifyCheckedCastBr(BB.getTerminator(), DT);
+    TermInst *Term = BB.getTerminator();
+    switch (Term->getKind()) {
+    case ValueKind::CondBranchInst:
+      Changed = propagateCondBrCondition(cast<CondBranchInst>(Term), DT);
+      break;
+    case ValueKind::SwitchEnumInst:
+      Changed = propagateSwitchEnumCondition(cast<SwitchEnumInst>(Term), DT);
+      break;
+    case ValueKind::SwitchValueInst:
+      // TODO: handle switch_value
+      break;
+    case ValueKind::CheckedCastBranchInst:
+      Changed = trySimplifyCheckedCastBr(BB.getTerminator(), DT);
+      break;
+    default:
+      break;
     }
     // Simplify the block argument list.
     Changed |= simplifyArgs(&BB);
