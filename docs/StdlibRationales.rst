@@ -67,6 +67,32 @@ generally *should* use a keyword.  For example, ``String(33, radix:
    available conversions could show up whenever the user hit the “tab”
    key after an expression.
 
+Protocols with restricted conformance rules
+-------------------------------------------
+
+It is sometimes useful to define a public protocol that only a limited set of
+types can adopt.  There is no language feature in Swift to disallow declaring
+conformances in third-party code: as long as the requirements are implemented
+and the protocol is accessible, the compiler allows the conformance.
+
+The standard library adopts the following pattern: the protocol is declared as
+a regular public type, but it includes at least one requirement named using the
+underscore rule.  That underscored API becomes private to the users according
+to the standard library convention, effectively preventing third-party code from
+declaring a conformance.
+
+For example::
+
+  public protocol CVarArgType {
+    var _cVarArgEncoding: [Word] { get }
+  }
+
+  // Public API that uses CVaListPointer, so CVarArgType has to be public, too.
+  public func withVaList<R>(
+    args: [CVarArgType],
+    @noescape f: (CVaListPointer) -> R
+  ) -> R
+
 Possible future directions
 ==========================
 
