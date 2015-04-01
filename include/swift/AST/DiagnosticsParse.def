@@ -643,8 +643,6 @@ ERROR(expected_rparen_tuple_pattern_list,pattern_parsing,none,
       "expected ')' at end of tuple pattern", ())
 ERROR(untyped_pattern_ellipsis,pattern_parsing,none,
       "'...' cannot be applied to a subpattern which is not explicitly typed", ())
-ERROR(ellipsis_pattern_not_at_end,pattern_parsing,none,
-      "variadic arguments '...' must come at the end of the pattern", ())
 ERROR(non_func_decl_pattern_init,pattern_parsing,none,
       "default argument is only permitted for a non-curried function parameter",())
 ERROR(var_pattern_in_var,pattern_parsing,none,

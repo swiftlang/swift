@@ -911,7 +911,8 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
   ParserStatus ListStatus =
     parseList(tok::r_paren, LPLoc, RPLoc, tok::comma, /*OptionalSep=*/false,
               /*AllowSepAfterLast=*/false,
-              diag::expected_rparen_tuple_pattern_list, [&] () -> ParserStatus {
+              diag::expected_rparen_tuple_pattern_list,
+              [&] () -> ParserStatus {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
     Optional<TuplePatternElt> elt;
@@ -923,29 +924,6 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
 
     // Add this element to the list.
     elts.push_back(*elt);
-
-    // If there is no ellipsis, we're done with the element.
-    if (Tok.isNotEllipsis())
-      return makeParserSuccess();
-    SourceLoc ellLoc = consumeToken();
-
-    // An ellipsis element shall have a specified element type.
-    TypedPattern *typedPattern = dyn_cast<TypedPattern>(elt->getPattern());
-    if (!typedPattern) {
-      diagnose(ellLoc, diag::untyped_pattern_ellipsis)
-        .highlight(elt->getPattern()->getSourceRange());
-      // Return success so that the caller does not attempt recovery -- it
-      // should have already happened when we were parsing the tuple element.
-      return makeParserSuccess();
-    }
-
-    // Variadic elements must come last.
-    if (Tok.is(tok::r_paren)) {
-      EllipsisLoc = ellLoc;
-    } else {
-      diagnose(ellLoc, diag::ellipsis_pattern_not_at_end);
-    }
-
     return makeParserSuccess();
   });
 
