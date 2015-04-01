@@ -1643,3 +1643,46 @@ bb3 (%10: $Builtin.Int32):
   return %10 : $Builtin.Int32
 }
 
+@objc protocol ObjcProto { func foo() }
+
+// CHECK-LABEL: sil @thread_objc_method_call_succ_block
+// CHECK: bb0
+// CHECK:  cond_br {{.*}}, bb1, bb2
+// CHECK: bb1
+// CHECK:  witness_method
+// CHECK:  apply
+// CHECK:  strong_release
+// CHECK:  cond_br {{.*}}, bb3, bb4
+// CHECK: bb2
+// CHECK:  strong_release
+// CHECK:  cond_br {{.*}}, bb3, bb4
+// CHECK: bb3
+// CHECK:  cond_fail
+// CHECK:  br bb4
+// CHECK: bb4:
+// CHECK:  strong_release
+// CHECK:  return
+
+sil @thread_objc_method_call_succ_block : $@thin <T where T : ObjcProto> (Builtin.Int1, @owned T) -> () {
+bb0(%0: $Builtin.Int1, %1 : $T):
+  strong_retain %1 : $T
+  cond_br %0, bb1 , bb2
+
+bb1:
+  %3 = witness_method [volatile] $T, #ObjcProto.foo!1.foreign : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : ObjcProto> (τ_0_0) -> ()
+  %4 = apply %3<T>(%1) : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : ObjcProto> (τ_0_0) -> ()
+  br bb2
+
+bb2:
+  strong_release %1 : $T
+  cond_br %0, bb3, bb4
+
+bb3:
+ cond_fail %0 : $Builtin.Int1
+ br bb4
+
+bb4:
+  strong_release %1 : $T
+  %41 = tuple ()
+  return %41 : $()
+}

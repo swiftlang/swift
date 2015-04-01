@@ -130,6 +130,7 @@ namespace {
     bool removeIfDead(SILBasicBlock *BB);
 
     bool tryJumpThreading(BranchInst *BI);
+    bool tailDuplicateObjCMethodCallSuccessorBlocks();
     bool simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
 
     bool simplifyBranchOperands(OperandValueArrayRef Operands);
@@ -1545,6 +1546,93 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
   return Changed;
 }
 
+static SILBasicBlock *isObjCMethodCallBlock(SILBasicBlock &Block) {
+  auto *Branch = dyn_cast<BranchInst>(Block.getTerminator());
+  if (!Branch)
+    return nullptr;
+
+  for (auto &Inst : Block) {
+    // Look for a objc method call.
+    auto *Apply = dyn_cast<ApplyInst>(&Inst);
+    if (!Apply)
+      continue;
+    auto *Callee = dyn_cast<WitnessMethodInst>(Apply->getCallee());
+    if (!Callee || !Callee->getMember().isForeign)
+      continue;
+
+    return Branch->getDestBB();
+  }
+  return nullptr;
+}
+
+/// We want to duplicate small blocks that contain a least on release and have
+/// multiple predecessor.
+static bool shouldTailDuplicate(SILBasicBlock &Block) {
+  unsigned Cost = 0;
+  bool SawRelease = false;
+
+  if (isa<ReturnInst>(Block.getTerminator()))
+    return false;
+
+  if (Block.getSinglePredecessor())
+    return false;
+
+  for (auto &Inst : Block) {
+    if (!Inst.isTriviallyDuplicatable())
+      return false;
+
+    if (isa<ApplyInst>(&Inst))
+      return false;
+
+    if (isa<ReleaseValueInst>(&Inst) ||
+        isa<StrongReleaseInst>(&Inst))
+      SawRelease = true;
+
+    if (instructionInlineCost(Inst) != InlineCost::Free)
+      if (++Cost == 12)
+        return false;
+  }
+
+  return SawRelease;
+}
+
+
+/// Tail duplicate successor blocks of blocks that perform an objc method call
+/// and who contain releases. Cloning such blocks can allow ARC to sink retain
+/// releases onto the ObjC path.
+bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
+  SmallVector<SILBasicBlock *, 16> ObjCBlocks;
+
+  // Collect blocks to tail duplicate.
+  for (auto &BB : Fn) {
+    SILBasicBlock *DestBB;
+    if ((DestBB = isObjCMethodCallBlock(BB)) && !LoopHeaders.count(DestBB) &&
+        shouldTailDuplicate(*DestBB))
+      ObjCBlocks.push_back(&BB);
+  }
+
+  bool Changed = false;
+  for (auto *BB : ObjCBlocks) {
+    auto *Branch = cast<BranchInst>(BB->getTerminator());
+    auto *DestBB = Branch->getDestBB();
+    Changed = true;
+
+    // Okay, it looks like we want to do this and we can.  Duplicate the
+    // destination block into this one, rewriting uses of the BBArgs to use the
+    // branch arguments as we go.
+    ThreadingCloner Cloner(Branch);
+
+    for (auto &I : *DestBB)
+      Cloner.process(&I);
+
+    Branch->eraseFromParent();
+
+    updateSSAAfterCloning(Cloner, BB, DestBB);
+  }
+
+  return Changed;
+}
+
 bool SimplifyCFG::run() {
   RemoveUnreachable RU(Fn);
 
@@ -1587,6 +1675,12 @@ bool SimplifyCFG::run() {
     // loops.
     RU.run();
     Changed = true;
+  }
+
+  if (tailDuplicateObjCMethodCallSuccessorBlocks()) {
+    Changed = true;
+    if (simplifyBlocks())
+      RU.run();
   }
 
   // Split all critical edges from non cond_br terminators.
