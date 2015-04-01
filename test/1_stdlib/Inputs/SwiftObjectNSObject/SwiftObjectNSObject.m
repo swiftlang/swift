@@ -396,30 +396,26 @@ void TestSwiftObjectNSObject(id c, id d)
 
   printf("NSObjectProtocol.description\n");
 
-  expectTrue ([d description].length > 0);
-  expectTrue ([c description].length > 0);
-  /* FIXME: radar TBD
-     expectTrue ([D description].length > 0);
-     expectTrue ([C description].length > 0);
-     expectTrue ([S description].length > 0);
-     expectTrue ([D_meta description].length > 0);
-     expectTrue ([C_meta description].length > 0);
-     expectTrue ([S_meta description].length > 0);
-  */
+  expectTrue ([[d description] isEqual:@"SwiftObjectNSObject.D"]);
+  expectTrue ([[c description] isEqual:@"SwiftObjectNSObject.C"]);
+  expectTrue ([[D description] isEqual:@"SwiftObjectNSObject.D"]);
+  expectTrue ([[C description] isEqual:@"SwiftObjectNSObject.C"]);
+  expectTrue ([[S description] isEqual:@"SwiftObject"]);
+  expectTrue ([[D_meta description] isEqual:@"SwiftObjectNSObject.D"]);
+  expectTrue ([[C_meta description] isEqual:@"SwiftObjectNSObject.C"]);
+  expectTrue ([[S_meta description] isEqual:@"SwiftObject"]);
 
 
   printf("NSObjectProtocol.debugDescription\n");
 
-  expectTrue ([d debugDescription].length > 0);
-  expectTrue ([c debugDescription].length > 0);
-  /* FIXME: radar TBD
-     expectTrue ([D debugDescription].length > 0);
-     expectTrue ([C debugDescription].length > 0);
-     expectTrue ([S debugDescription].length > 0);
-     expectTrue ([D_meta debugDescription].length > 0);
-     expectTrue ([C_meta debugDescription].length > 0);
-     expectTrue ([S_meta debugDescription].length > 0);
-  */
+  expectTrue ([[d debugDescription] isEqual:@"SwiftObjectNSObject.D"]);
+  expectTrue ([[c debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
+  expectTrue ([[D debugDescription] isEqual:@"SwiftObjectNSObject.D"]);
+  expectTrue ([[C debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
+  expectTrue ([[S debugDescription] isEqual:@"SwiftObject"]);
+  expectTrue ([[D_meta debugDescription] isEqual:@"SwiftObjectNSObject.D"]);
+  expectTrue ([[C_meta debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
+  expectTrue ([[S_meta debugDescription] isEqual:@"SwiftObject"]);
 
 
   printf("NSObjectProtocol.performSelector\n");

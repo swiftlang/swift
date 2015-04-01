@@ -186,6 +186,22 @@ static NSString *_getDescription(SwiftObject *obj) {
   return [convertStringToNSString(tmp.x, tmp.y, tmp.z) autorelease];
 }
 
+static NSString *_getClassDescription(Class cls) {
+  // Cached lookup of NSStringFromClass, which is in Foundation.
+  static NSString *(*NSStringFromClass_fn)(Class cls) = nullptr;
+  
+  if (!NSStringFromClass_fn) {
+    NSStringFromClass_fn = (decltype(NSStringFromClass_fn))(uintptr_t)
+      dlsym(RTLD_DEFAULT, "NSStringFromClass");
+    // If Foundation hasn't loaded yet, fall back to returning the static string
+    // "SwiftObject". The likelihood of someone invoking +description without
+    // ObjC interop is low.
+    if (!NSStringFromClass_fn)
+      return @"SwiftObject";
+  }
+  
+  return NSStringFromClass_fn(cls);
+}
 
 
 @implementation SwiftObject
@@ -390,6 +406,14 @@ static NSString *_getDescription(SwiftObject *obj) {
 - (NSString *)debugDescription {
   return _getDescription(self);
 }
+
++ (NSString *)description {
+  return _getClassDescription(self);
+}
++ (NSString *)debugDescription {
+  return _getClassDescription(self);
+}
+
 - (NSString *)_copyDescription {
   // The NSObject version of this pushes an autoreleasepool in case -description
   // autoreleases, but we're OK with leaking things if we're at the top level
