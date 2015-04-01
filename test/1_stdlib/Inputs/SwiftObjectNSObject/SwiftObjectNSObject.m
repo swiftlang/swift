@@ -506,7 +506,70 @@ void TestSwiftObjectNSObject(id c, id d)
 
   //=== Other methods from class NSObject ===//
 
-  // FIXME: untested
+  // FIXME: mostly untested
+
+  printf("NSObject.instancesRespondToSelector\n");
+
+  // non-class objects need not apply
+  expectFalse([d respondsToSelector:@selector(instancesRespondToSelector:)]);
+  expectFalse([c respondsToSelector:@selector(instancesRespondToSelector:)]);
+  expectTrue ([S respondsToSelector:@selector(instancesRespondToSelector:)]);
+
+  // instance method from root class
+  expectTrue ([D instancesRespondToSelector:@selector(class)]);
+  expectTrue ([C instancesRespondToSelector:@selector(class)]);
+  expectTrue ([S instancesRespondToSelector:@selector(class)]);
+  expectTrue ([D_meta instancesRespondToSelector:@selector(class)]);
+  expectTrue ([C_meta instancesRespondToSelector:@selector(class)]);
+  expectTrue ([S_meta instancesRespondToSelector:@selector(class)]);
+
+  // non-instance class method from root class
+  expectFalse([D instancesRespondToSelector:@selector(alloc)]);
+  expectFalse([C instancesRespondToSelector:@selector(alloc)]);
+  expectFalse([S instancesRespondToSelector:@selector(alloc)]);
+  expectTrue ([D_meta instancesRespondToSelector:@selector(alloc)]);
+  expectTrue ([C_meta instancesRespondToSelector:@selector(alloc)]);
+  expectTrue ([S_meta instancesRespondToSelector:@selector(alloc)]);
+
+  // instance method from subclass C
+  expectTrue ([D instancesRespondToSelector:@selector(cInstanceMethod)]);
+  expectTrue ([C instancesRespondToSelector:@selector(cInstanceMethod)]);
+  expectFalse([S instancesRespondToSelector:@selector(cInstanceMethod)]);
+  expectFalse([D_meta instancesRespondToSelector:@selector(cInstanceMethod)]);
+  expectFalse([C_meta instancesRespondToSelector:@selector(cInstanceMethod)]);
+  expectFalse([S_meta instancesRespondToSelector:@selector(cInstanceMethod)]);
+
+  // class method from subclass C
+  expectFalse([D instancesRespondToSelector:@selector(cClassMethod)]);
+  expectFalse([C instancesRespondToSelector:@selector(cClassMethod)]);
+  expectFalse([S instancesRespondToSelector:@selector(cClassMethod)]);
+  expectTrue ([D_meta instancesRespondToSelector:@selector(cClassMethod)]);
+  expectTrue ([C_meta instancesRespondToSelector:@selector(cClassMethod)]);
+  expectFalse([S_meta instancesRespondToSelector:@selector(cClassMethod)]);
+
+  // instance method from subclass D
+  expectTrue ([D instancesRespondToSelector:@selector(dInstanceMethod)]);
+  expectFalse([C instancesRespondToSelector:@selector(dInstanceMethod)]);
+  expectFalse([S instancesRespondToSelector:@selector(dInstanceMethod)]);
+  expectFalse([D_meta instancesRespondToSelector:@selector(dInstanceMethod)]);
+  expectFalse([C_meta instancesRespondToSelector:@selector(dInstanceMethod)]);
+  expectFalse([S_meta instancesRespondToSelector:@selector(dInstanceMethod)]);
+
+  // class method from subclass D
+  expectFalse([D instancesRespondToSelector:@selector(dClassMethod)]);
+  expectFalse([C instancesRespondToSelector:@selector(dClassMethod)]);
+  expectFalse([S instancesRespondToSelector:@selector(dClassMethod)]);
+  expectTrue ([D_meta instancesRespondToSelector:@selector(dClassMethod)]);
+  expectFalse([C_meta instancesRespondToSelector:@selector(dClassMethod)]);
+  expectFalse([S_meta instancesRespondToSelector:@selector(dClassMethod)]);
+
+  // nonexistent method
+  expectFalse([D instancesRespondToSelector:@selector(DESSLOK)]);
+  expectFalse([C instancesRespondToSelector:@selector(DESSLOK)]);
+  expectFalse([S instancesRespondToSelector:@selector(DESSLOK)]);
+  expectFalse([D_meta instancesRespondToSelector:@selector(DESSLOK)]);
+  expectFalse([C_meta instancesRespondToSelector:@selector(DESSLOK)]);
+  expectFalse([S_meta instancesRespondToSelector:@selector(DESSLOK)]);
 
 
   printf("TestSwiftObjectNSObject: %d error%s\n",

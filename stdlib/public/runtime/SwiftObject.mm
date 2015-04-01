@@ -329,6 +329,11 @@ static NSString *_getDescription(SwiftObject *obj) {
   return class_respondsToSelector((Class) _swift_getClassOfAllocated(self), sel);
 }
 
++ (BOOL)instancesRespondToSelector:(SEL)sel {
+  if (!sel) return NO;
+  return class_respondsToSelector(self, sel);
+}
+
 - (BOOL)conformsToProtocol:(Protocol*)proto {
   if (!proto) return NO;
   auto selfClass = (Class) _swift_getClassOfAllocated(self);
