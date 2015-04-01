@@ -895,21 +895,15 @@ Parser::parsePatternTupleElement() {
         TuplePatternElt(pattern.get(), nullptr, DefaultArgumentKind::None));
 }
 
-ParserResult<Pattern> Parser::parsePatternTuple() {
-  StructureMarkerRAII ParsingPatternTuple(*this, Tok);
-  SourceLoc LPLoc = consumeToken(tok::l_paren);
-  return parsePatternTupleAfterLP(LPLoc);
-}
-
-/// Parse a tuple pattern.  The leading left paren has already been consumed and
-/// we are looking at the next token.  LPLoc specifies its location.
+/// Parse a tuple pattern.
 ///
 ///   pattern-tuple:
 ///     '(' pattern-tuple-body? ')'
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
-ParserResult<Pattern>
-Parser::parsePatternTupleAfterLP(SourceLoc LPLoc) {
+ParserResult<Pattern> Parser::parsePatternTuple() {
+  StructureMarkerRAII ParsingPatternTuple(*this, Tok);
+  SourceLoc LPLoc = consumeToken(tok::l_paren);
   SourceLoc RPLoc, EllipsisLoc;
 
   // Parse all the elements.

@@ -311,6 +311,26 @@ public:
   
   // Convert all tuples to patterns.
   Pattern *visitTupleExpr(TupleExpr *E) {
+    // If the tuple has label names, then they have to match up with the type
+    // being matched.
+    if (false && E->hasElementNames()) {
+      // If there is exactly one tuple element with an UnresolvedPatternExpr
+      // inside of it, then the user wrote something like (x : T).  This is
+      // likely to be a malformed type annotation, so diagnose it with a
+      // specific diagnostic instead of the general "invalid pattern" error.
+      if (E->getNumElements() == 1 &&
+          UnresolvedPatternFinder::hasAny(E->getElement(0)) &&
+          !DiagnosedError) {
+        TC.diagnose(E->getStartLoc(), diag::invalid_parenthesized_typed_pattern)
+          .highlight(E->getSourceRange())
+          .fixItRemove(E->getLParenLoc())
+          .fixItRemove(E->getRParenLoc());
+        DiagnosedError = true;
+      }
+
+      // Otherwise, this may be an expression we're matching against.
+      return nullptr;
+    }
     
     // Construct a TuplePattern.
     SmallVector<TuplePatternElt, 4> patternElts;

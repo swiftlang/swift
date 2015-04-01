@@ -1015,7 +1015,6 @@ public:
   std::pair<ParserStatus, Optional<TuplePatternElt>>
   parsePatternTupleElement();
   ParserResult<Pattern> parsePatternTuple();
-  ParserResult<Pattern> parsePatternTupleAfterLP(SourceLoc LPLoc);
   
   ParserResult<Pattern> parseTypedMatchingPattern();
   ParserResult<Pattern> parseMatchingPattern(bool isExprBasic);

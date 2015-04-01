@@ -49,7 +49,7 @@ static VarDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
     params = paramTuple->getFields();
   } else {
     singleParam = TuplePatternElt(
-                                  cast<ParenPattern>(paramPattern)->getSubPattern());
+                      cast<ParenPattern>(paramPattern)->getSubPattern());
     params = singleParam;
   }
 
