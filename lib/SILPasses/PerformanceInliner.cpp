@@ -778,7 +778,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
       if (ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
         // Devirtualize in an attempt expose more opportunities for
         // inlining.
-        if (auto *DirectAI = devirtualizeApply(AI)) {
+        if (auto *DirectAI = tryDevirtualizeApply(AI)) {
           AI = DirectAI;
           I = SILBasicBlock::iterator(AI);
         }

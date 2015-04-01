@@ -71,7 +71,7 @@ public:
           if (!AI)
             continue;
 
-          if (ApplyInst *NewAI = devirtualizeApply(AI)) {
+          if (ApplyInst *NewAI = tryDevirtualizeApply(AI)) {
             DevirtualizedCalls.push_back(NewAI);
             Changed |= true;
           }

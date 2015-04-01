@@ -481,7 +481,7 @@ static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
 
 /// Attempt to devirtualize the given apply if possible, and return a
 /// new apply in that case, or nullptr otherwise.
-ApplyInst *swift::devirtualizeApply(ApplyInst *AI) {
+ApplyInst *swift::tryDevirtualizeApply(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI);
 
   // Devirtualize apply instructions that call witness_method instructions:

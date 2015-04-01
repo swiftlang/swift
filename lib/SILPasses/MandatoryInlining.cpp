@@ -345,7 +345,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 
       auto *ApplyBlock = InnerAI->getParent();
 
-      if (auto *DirectAI = devirtualizeApply(InnerAI)) {
+      if (auto *DirectAI = tryDevirtualizeApply(InnerAI)) {
         InnerAI = DirectAI;
         I = SILBasicBlock::iterator(InnerAI);
       }
