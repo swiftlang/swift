@@ -232,7 +232,8 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 
 - (struct _NSZone *)zone {
-  return (struct _NSZone *)malloc_zone_from_ptr(self);
+  return (struct _NSZone *)
+    (malloc_zone_from_ptr(self) ?: malloc_default_zone());
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {

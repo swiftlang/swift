@@ -496,14 +496,12 @@ void TestSwiftObjectNSObject(id c, id d)
 
   expectTrue ([d zone] != nil);
   expectTrue ([c zone] != nil);
-  /* FIXME: radar TBD
-     expectTrue ([D zone] != nil);
-     expectTrue ([C zone] != nil);
-     expectTrue ([S zone] != nil);
-     expectTrue ([D_meta zone] != nil);
-     expectTrue ([C_meta zone] != nil);
-     expectTrue ([S_meta zone] != nil);
-  */
+  expectTrue ([D zone] != nil);
+  expectTrue ([C zone] != nil);
+  expectTrue ([S zone] != nil);
+  expectTrue ([D_meta zone] != nil);
+  expectTrue ([C_meta zone] != nil);
+  expectTrue ([S_meta zone] != nil);
 
 
   //=== Other methods from class NSObject ===//
