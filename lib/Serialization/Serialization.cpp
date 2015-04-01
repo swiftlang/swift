@@ -1073,7 +1073,7 @@ Serializer::writeConformance(const ProtocolConformance *conformance,
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(conformance);
-    if (normal->getDeclContext()->getParentModule() == M) {
+    if (!isDeclXRef(getDeclForContext(normal->getDeclContext()))) {
       // A normal conformance in this module file.
       unsigned abbrCode = abbrCodes[NormalProtocolConformanceIdLayout::Code];
       NormalProtocolConformanceIdLayout::emitRecord(Out, ScratchRecord,
