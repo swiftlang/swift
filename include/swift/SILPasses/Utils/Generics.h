@@ -29,10 +29,10 @@ namespace swift {
 class GenericCloner : public TypeSubstCloner<GenericCloner> {
 public:
   GenericCloner(SILFunction *F,
-                     TypeSubstitutionMap &InterfaceSubs,
-                     TypeSubstitutionMap &ContextSubs,
-                     StringRef NewName,
-                     ArrayRef<Substitution> ApplySubs)
+                TypeSubstitutionMap &InterfaceSubs,
+                TypeSubstitutionMap &ContextSubs,
+                StringRef NewName,
+                ArrayRef<Substitution> ApplySubs)
   : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
                     ApplySubs) {}
   /// Clone and remap the types in \p F according to the substitution
