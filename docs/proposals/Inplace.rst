@@ -382,14 +382,48 @@ Notice that compiling either form depends on an assignment to ``lhs``.
 
 A method of a class, however, cannot assign to ``self``, so no
 explicitly-written assignment method can work properly for an
-immutable class.  That said, given an explicitly-written
+immutable class. Therefore, at *least* until there is a way to reseat ``self``
+in a method, explicitly-written assignment methods must be banned for
+class types::
+
+  // Invalid code:
+  class Foo {
+    let x: Int
+    required init(x: Int) { self.x = x }
+
+    func advanced(amount: Int) -> Self {
+      return Self(x: self.x + amount)
+    }
+
+    // Error, because we can't reseat self in a class method
+    func =advanced(amount: Int) {
+      self = Self(x: self.x + amount)
+      // This would also be inappropriate, since it would violate value
+      // semantics:
+      // self.x += amount
+    }
+  }
+
+That said, given an explicitly-written
 non-assignment method that produces a new instance, the rules given
 above for implicitly-generated assignment method semantics work just
-fine.  Therefore, at *least* until there is a way to reseat ``self``
-in a method, explicitly-written assignment methods must be banned for
-class types.
+fine::
 
-The alternative is to say that explicitly-written assignment methods
+  // Valid code:
+  class Foo {
+    let x: Int
+    required init(x: Int) { self.x = x }
+
+    func advanced(amount: Int) -> Self {
+      return Self(x: self.x + amount)
+    }
+  }
+
+  let foo = Foo(x: 5)
+  // Still OK; exactly the same as foo = foo.advanced(10)
+  foo.=advanced(10)
+
+The alternative would be to say that explicitly-written assignment methods
 cannot work properly for immutable classes and “work” with reference
 semantics on other classes.  We consider this approach indefensible,
 especially when one considers that operators encourage writing
