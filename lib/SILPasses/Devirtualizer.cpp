@@ -53,7 +53,7 @@ public:
   void run() override {
 
     /// A list of devirtualized calls.
-    GenericSpecializer::AIList DevirtualizedCalls;
+    llvm::SmallVector<ApplyInst *, 16> DevirtualizedCalls;
 
     bool Changed = false;
 
@@ -82,7 +82,7 @@ public:
 
     // Invalidate the analysis of caller functions.
     for (auto AI : DevirtualizedCalls) {
-      invalidateAnalysis(AI.getInstruction()->getFunction(),
+      invalidateAnalysis(AI->getFunction(),
                          SILAnalysis::PreserveKind::Branches);
     }
 

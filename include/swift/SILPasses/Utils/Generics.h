@@ -60,9 +60,6 @@ private:
 };
 
 struct GenericSpecializer {
-  /// A list of apply instructions.
-  typedef SmallVector<ApplySite, 16> AIList;
-
   GenericSpecializer(SILModule *Mod) : M(Mod) {}
 
 private:
