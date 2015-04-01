@@ -123,7 +123,7 @@ class NotObjC {}
 
   func testPrimitives(b: Bool, i: Int, f: Float, d: Double, u: UInt)
     -> COpaquePointer { return COpaquePointer() }
-  func testString(var s: String) {}
+  func testString(s: String) {}
   func testSelector(sel: Selector, boolean b: ObjCBool) {}
 
   func testCSignedTypes(a: CSignedChar, b: CShort, c: CInt, d: CLong, e: CLongLong) {}
