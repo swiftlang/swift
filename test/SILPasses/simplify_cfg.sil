@@ -1663,8 +1663,8 @@ bb3 (%10: $Builtin.Int32):
 // CHECK:  strong_release
 // CHECK:  return
 
-sil @thread_objc_method_call_succ_block : $@thin <T where T : ObjcProto> (Builtin.Int1, @owned T) -> () {
-bb0(%0: $Builtin.Int1, %1 : $T):
+sil @thread_objc_method_call_succ_block : $@thin <T where T : ObjcProto> (Builtin.Int1, @owned T, Builtin.Int1) -> () {
+bb0(%0: $Builtin.Int1, %1 : $T, %2 : $Builtin.Int1):
   strong_retain %1 : $T
   cond_br %0, bb1 , bb2
 
@@ -1675,7 +1675,7 @@ bb1:
 
 bb2:
   strong_release %1 : $T
-  cond_br %0, bb3, bb4
+  cond_br %2, bb3, bb4
 
 bb3:
  cond_fail %0 : $Builtin.Int1
