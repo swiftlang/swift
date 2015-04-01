@@ -48,12 +48,15 @@ TypeChecker::TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags)
     static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clangImporter->setTypeResolver(*this);
 
+  Context.setLazyResolver(this);
 }
 
 TypeChecker::~TypeChecker() {
   auto clangImporter =
     static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clangImporter->clearTypeResolver();
+
+  Context.setLazyResolver(nullptr);
 }
 
 void TypeChecker::handleExternalDecl(Decl *decl) {

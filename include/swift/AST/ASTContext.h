@@ -336,6 +336,12 @@ public:
                               setVector.size());
   }
 
+  /// Retrieve the lazy resolver for this context.
+  LazyResolver *getLazyResolver() const;
+
+  /// Set the lazy resolver for this context.
+  void setLazyResolver(LazyResolver *resolver);
+
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;

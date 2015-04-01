@@ -67,6 +67,9 @@ struct ASTContext::Implementation {
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
 
+  /// The last resolver.
+  LazyResolver *Resolver = nullptr;
+
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
   /// The declaration of Swift.String.
@@ -375,6 +378,21 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
     return Impl.CurrentConstraintSolverArena->Allocator;
   }
   llvm_unreachable("bad AllocationArena");
+}
+
+LazyResolver *ASTContext::getLazyResolver() const {
+  return Impl.Resolver;
+}
+
+/// Set the lazy resolver for this context.
+void ASTContext::setLazyResolver(LazyResolver *resolver) {
+  if (resolver) {
+    assert(Impl.Resolver == nullptr && "already have a resolver");
+    Impl.Resolver = resolver;
+  } else {
+    assert(Impl.Resolver != nullptr && "no resolver to remove");
+    Impl.Resolver = resolver;
+  }
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
