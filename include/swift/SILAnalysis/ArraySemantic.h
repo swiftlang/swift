@@ -56,10 +56,10 @@ public:
       : ArraySemanticsCall(V, SemanticStr, false) {}
 
   /// Can we hoist this call.
-  bool canHoist(SILInstruction *To, DominanceInfo *DT);
+  bool canHoist(SILInstruction *To, DominanceInfo *DT) const;
 
   /// Determine which kind of array semantics call this is.
-  ArrayCallKind getKind();
+  ArrayCallKind getKind() const;
 
   /// Does this semantic call has a self argument.
   ///
@@ -73,19 +73,19 @@ public:
   bool hasGuaranteedSelf() const;
 
   /// Get the self argument.
-  SILValue getSelf();
+  SILValue getSelf() const;
 
   /// Get the self argument operand.
-  Operand &getSelfOperand();
+  Operand &getSelfOperand() const;
 
   /// Get the index for operations that have one.
-  SILValue getIndex();
+  SILValue getIndex() const;
 
   /// Get the array.props.isNative argument.
-  SILValue getArrayPropertyIsNative();
+  SILValue getArrayPropertyIsNative() const;
 
   /// Get the array.props.needsElementTypeCheck argument.
-  SILValue getArrayPropertyNeedsTypeCheck();
+  SILValue getArrayPropertyNeedsTypeCheck() const;
 
   /// Remove the semantics call replacing it by a release of any @owned
   /// parameter.
@@ -102,10 +102,15 @@ public:
   }
 
   /// Get the semantics call as an ApplyInst.
-  operator ApplyInst *() { return SemanticsCall; }
+  operator ApplyInst *() const { return SemanticsCall; }
 
   /// Is this an semantics call.
-  operator bool() { return SemanticsCall != nullptr; }
+  operator bool() const { return SemanticsCall != nullptr; }
+
+  /// Does this array semantic call touch globals or ivars in a manner that
+  /// causes its effect on reference counts to not be described solely by its
+  /// signature.
+  bool isNoCapture() const;
 
 protected:
   /// Validate the signature of this call.
@@ -116,5 +121,6 @@ protected:
   ApplyInst *hoistOrCopy(SILInstruction *InsertBefore, DominanceInfo *DT,
                          bool LeaveOriginal);
 };
+
 } // End namespace swift.
 #endif

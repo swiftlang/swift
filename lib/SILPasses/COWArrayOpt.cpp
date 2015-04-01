@@ -18,6 +18,8 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
+#include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
@@ -292,6 +294,7 @@ static bool isRelease(SILInstruction *Inst, SILValue Value,
 }
 
 namespace {
+
 /// Optimize Copy-On-Write array checks based on high-level semantics.
 ///
 /// Performs an analysis on all Array users to ensure they do not interfere
@@ -321,6 +324,7 @@ class COWArrayOpt {
   typedef StructUseCollector::UserList UserList;
   typedef StructUseCollector::UserOperList UserOperList;
 
+  AliasAnalysis *AA;
   RCIdentityFunctionInfo *RCIA;
   SILFunction *Function;
   SILLoop *Loop;
@@ -356,11 +360,11 @@ class COWArrayOpt {
   // When matching retains to releases we must not count the same release twice.
   SmallPtrSet<Operand*, 8> MatchedReleases;
 public:
-  COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA)
-    : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
-      Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
-      ColdBlocks(DA), CachedSafeLoop(false, false)
-    {}
+  COWArrayOpt(AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA, SILLoop *L,
+              DominanceAnalysis *DA)
+      : AA(AA), RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
+        Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
+        ColdBlocks(DA), CachedSafeLoop(false, false) {}
 
   bool run();
 
@@ -506,8 +510,8 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
       //   array_operation(..., @owned %ptr)
       //
       // This is not the case for an potentially aliased array because a release
-      // can cause a destrutor to run. The destructor in turn can cause arbitrary
-      // side effects.
+      // can cause a destructor to run. The destructor in turn can cause
+      // arbitrary side effects.
       if (isa<ReleaseValueInst>(II) || isa<StrongReleaseInst>(II))
         continue;
 
@@ -755,6 +759,27 @@ static bool isArrayEltStore(StoreInst *SI) {
   return false;
 }
 
+static bool isGuaranteedCallSequenceRelease(SILInstruction *Release,
+                                            AliasAnalysis *AA,
+                                            RCIdentityFunctionInfo *RCFI) {
+  GuaranteedCallSequence Seq;
+  if (!findGuaranteedCallSequence(Release, AA, RCFI, Seq)) {
+    DEBUG(llvm::dbgs() << "        Failed to find guaranteed call sequence!\n");
+    return false;
+  }
+
+  // Make sure that all of the calls are array semantic calls with guaranteed
+  // self for which self matches our SILValue.
+  bool Result = std::all_of(Seq.ApplyList.begin(), Seq.ApplyList.end(),
+                            [](ApplyInst *AI) -> bool {
+                              ArraySemanticsCall Call(AI);
+                              return Call && Call.hasGuaranteedSelf();
+                            });
+  DEBUG(llvm::dbgs() << "         Found calls with guaranteed self: "
+                     << (Result ? "yes" : "no") << "\n");
+  return Result;
+}
+
 /// Check if a loop has only 'safe' array operations such that we can hoist the
 /// uniqueness check even without having an 'identified' object.
 ///
@@ -783,6 +808,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
   for (auto *BB : Loop->getBlocks()) {
     for (auto &It : *BB) {
       auto *Inst = &It;
+      DEBUG(llvm::dbgs() << "        visiting: " << *Inst);
 
       // Semantic calls are safe.
       ArraySemanticsCall Sem(Inst);
@@ -832,12 +858,19 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
       if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
         continue;
 
-      if (auto *RVI = dyn_cast<RetainValueInst>(Inst))
-        if (isRetainReleasedBeforeMutate(Inst, RVI->getOperand(), false))
+      if (isa<RetainValueInst>(Inst) || isa<StrongRetainInst>(Inst))
+        if (isRetainReleasedBeforeMutate(Inst, Inst->getOperand(0), false))
           continue;
-      if (auto SRI = dyn_cast<StrongRetainInst>(Inst))
-        if (isRetainReleasedBeforeMutate(Inst, SRI->getOperand(), false))
+
+      // If inst is a guaranteed call sequence release on a sequence of array
+      // semantic functions, we can ignore it.
+      if (isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst))
+        if (isGuaranteedCallSequenceRelease(Inst, AA, RCIA))
           continue;
+
+      // Ignore fix_lifetime. It can not increment ref counts.
+      if (isa<FixLifetimeInst>(Inst))
+        continue;
 
       DEBUG(llvm::dbgs() << "     (NO) unknown operation " << *Inst);
       return false;
@@ -967,11 +1000,12 @@ class COWArrayOptPass : public SILFunctionTransform {
     DEBUG(llvm::dbgs() << "COW Array Opts in Func " << getFunction()->getName()
           << "\n");
 
-    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
-    SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
+    auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *LA = PM->getAnalysis<SILLoopAnalysis>();
     auto *RCIA =
       PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
     SILLoopInfo *LI = LA->getLoopInfo(getFunction());
+    auto *AA = PM->getAnalysis<AliasAnalysis>();
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");
       return;
@@ -989,7 +1023,7 @@ class COWArrayOptPass : public SILFunctionTransform {
 
     bool HasChanged = false;
     for (auto *L : Loops)
-      HasChanged |= COWArrayOpt(RCIA, L, DA).run();
+      HasChanged |= COWArrayOpt(AA, RCIA, L, DA).run();
 
     if (HasChanged)
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);

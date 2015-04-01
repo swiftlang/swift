@@ -746,3 +746,152 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 
   return true;
 }
+
+//===----------------------------------------------------------------------===//
+//                          Guaranteed Call Sequence
+//===----------------------------------------------------------------------===//
+
+/// Returns:
+///
+///   1. .Some(true) if the retain completes the squence.
+///   2. .Some(false) if the retain does not complete the sequence but should be
+///       treated asr a use "not a failure".
+///   3. .None if the retain *does* complete the sequence, but we have not seen
+///      any applies implying that the retain matches our release but does not
+///      complete the sequence.
+static llvm::Optional<bool>
+incrementCompletesSequence(SILValue RCID, SILInstruction *Retain,
+                           GuaranteedCallSequence &Seq,
+                           RCIdentityFunctionInfo *RCFI) {
+  SILValue OtherRCID = RCFI->getRCIdentityRoot(Retain->getOperand(0));
+  // And it's RCID does not match our release's RCID, bail.
+  if (OtherRCID != RCID)
+    return false;
+  // If the RCID matches our release, see if we saw any guaranteed
+  // applies. If we did not, return false.
+  if (Seq.ApplyList.empty())
+    return None;
+  // Otherwise, we have a good result!
+  return true;
+}
+
+/// Pattern match a guaranteed call sequence.
+///
+/// A guaranteed call sequence looks as follows:
+///
+///    retain(x)
+///        ... nothing that decrements reference counts ...
+///    call f1(@guaranteed_self x)
+///        ... nothing that decrements or uses ref counts ...
+///    call f2(@guaranteed_self x)
+///        ... nothing that decrements or uses ref counts ...
+///        ...
+///        ... nothing that decrements or uses ref counts ...
+///    call f$(n-1)(@guaranteed_self x)
+///        ... nothing that decrements or uses ref counts ...
+///    call fn(@guaranteed_self x)
+///        ... nothing that uses ref counts ...
+///    release(x)
+bool swift::findGuaranteedCallSequence(SILInstruction *Release,
+                                       AliasAnalysis *AA,
+                                       RCIdentityFunctionInfo *RCFI,
+                                       GuaranteedCallSequence &Seq) {
+  SILBasicBlock *BB = Release->getParent();
+  SILBasicBlock::iterator Iter = Release, Start = BB->begin();
+
+  // If Iter is Start, there is nothing further to do here, any guaranteed call
+  // sequence must be at least 3 instructions long.
+  if (Iter == Start)
+    return false;
+  --Iter;
+
+  SILValue RCID = RCFI->getRCIdentityRoot(Release->getOperand(0));
+
+  // Once we see a conservative use of RCID that is not a guaranteed call, we
+  // are only in a guaranteed call sequence if we match the retain. If we match
+  // any further guaranteed calls, we bail.
+  bool sawUse = false;
+
+  // Once we see an apply, we break out of the sequence if we decrement ref
+  // counts.
+  bool sawApply = false;
+
+  while (Iter != Start) {
+    SILInstruction *I = &*Iter;
+    --Iter;
+
+    // If I is an increment that completes the sequence set retain and return.
+    if (isa<RetainValueInst>(I) || isa<StrongRetainInst>(I)) {
+      // If we don't complete the sequence, then this is a random
+      auto completesSequence = incrementCompletesSequence(RCID, I, Seq, RCFI);
+
+      // If we got back None, then the retain matches our release but we did not
+      // see any apply insts so we have a successful result, but nothing useful
+      // for our caller.
+      if (!completesSequence.hasValue())
+        return false;
+
+      // If we got back .Some(false), then this is a retain on a different
+      // parameter. Mark that we saw a use if I can not be proven to not be used
+      // by I and continue.
+      if (!completesSequence.getValue()) {
+        sawUse |= mayUseValue(I, RCID, AA);
+        continue;
+      }
+
+      // Otherwise, we matched successfully. Set Seq.Retain to I and return
+      // success.
+      Seq.Retain = I;
+      return true;
+    }
+
+    // If I is an apply...
+    if (auto *AI = dyn_cast<ApplyInst>(I)) {
+      // And it has RCID as its guaranteed self parameter...
+      if (AI->hasGuaranteedSelfArgument() &&
+          RCFI->getRCIdentityRoot(AI->getSelfArgument()) == RCID) {
+        // If we saw a use of our value in between either this guaranteed call
+        // and the previous matched guaranteed call (or release), return
+        // false. This is not a guaranteed call sequence.
+        if (sawUse)
+          return false;
+
+        // Otherwise, add AI to our guaranteed call sequence apply list and
+        // continue.
+        sawApply = true;
+        Seq.ApplyList.push_back(AI);
+        continue;
+      }
+
+      // If AI is not a guarantee call, fall through below.
+    }
+
+    // Otherwise, this is an unknown inst inst, if it can decrement RCID's
+    // ref count, return false. We are not in a guaranteed call sequence.
+    if (sawApply && mayDecrementRefCount(I, RCID, AA))
+      return false;
+
+    // If AI can be proven to never touch RCID's ref count, but may use RCID,
+    // we set the sawUse flag.
+    //
+    // This is important since if we see a subsequent guaranteed call, we want
+    // to bail since we can not have uses in between two guaranteed calls.
+    sawUse |= mayUseValue(I, RCID, AA);
+  }
+
+  // If we hit begin, we need to just check for retain_value or strong_retain
+  // values since if we had a guaranteed call as begin(), we can never finish
+  // the sequence.
+  if (!isa<RetainValueInst>(Start) && !isa<StrongRetainInst>(Start))
+    return false;
+
+  // If we fail to complete the sequence at this point for any reason, bail.
+  auto completesSeq = incrementCompletesSequence(RCID, &*Start, Seq, RCFI);
+  if (!completesSeq.hasValue() || !completesSeq.getValue())
+    return false;
+
+  // Otherwise, we succeeded!
+  Seq.Retain = &*Start;
+
+  return true;
+}

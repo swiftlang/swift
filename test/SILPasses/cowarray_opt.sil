@@ -20,10 +20,19 @@ struct MyArray<T> {
 struct MyStruct {
 }
 
-sil public_external [semantics "array.make_mutable"] @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> () {
-bb0(%0: $*MyArray<MyStruct>):
-  unreachable
+class MyArrayContainer<T> {
+  var array: MyArray<T>
+
+  init()
+  deinit
 }
+
+sil [semantics "array.make_mutable"] @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+sil [semantics "array.get_count"] @guaranteed_array_get_count : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+sil [semantics "array.get_capacity"] @guaranteed_array_get_capacity : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+
+// An unknown user
+sil @unknown : $@thin () -> ()
 
 ///////////
 // Tests //
@@ -229,3 +238,99 @@ bb2:
   %7 = tuple()
   return %7 : $()
 }
+
+// CHECK-LABEL: sil @cow_should_ignore_guaranteed_semantic_call_sequence : $@thin (@guaranteed MyArrayContainer<MyStruct>, Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK: [[F:%.*]] = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+// CHECK: apply [[F]](
+// CHECK: bb1:
+// CHECK: bb2:
+// CHECK-NOT: apply [[F]](
+// CHECK: bb3:
+// CHECK: bb4:
+// CHECK-NOT: apply [[F]](
+// CHECK: bb5:
+// CHECK: bb6:
+// CHECK: apply [[F]](
+// CHECK: bb7:
+// CHECK: bb8:
+// CHECK-NOT: apply [[F]](
+// CHECK: bb9:
+sil @cow_should_ignore_guaranteed_semantic_call_sequence : $@thin (@guaranteed MyArrayContainer<MyStruct>, Builtin.NativeObject) -> () {
+bb0(%0 : $MyArrayContainer<MyStruct>, %00 : $Builtin.NativeObject):
+  %1 = ref_element_addr %0 : $MyArrayContainer<MyStruct>, #MyArrayContainer.array
+  %2 = load %1 : $*MyArray<MyStruct>
+  %3 = function_ref @guaranteed_array_get_count : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  %4 = function_ref @guaranteed_array_get_capacity : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  %5 = function_ref @unknown : $@thin () -> ()
+  %6 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  br bb1
+
+bb1:
+  // Simple case. This should hoist.
+  retain_value %2 : $MyArray<MyStruct>
+  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  release_value %2 : $MyArray<MyStruct>
+  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  br bb3
+
+bb3:
+  // Failure case b/c of use in between release and call.
+  retain_value %2 : $MyArray<MyStruct>
+  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  fix_lifetime %0 : $MyArrayContainer<MyStruct>
+  release_value %2 : $MyArray<MyStruct>
+  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb4, bb3
+
+bb4:
+  br bb5
+
+bb5:
+  // Failure case b/c of use in between calls.
+  retain_value %2 : $MyArray<MyStruct>
+  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  fix_lifetime %0 : $MyArrayContainer<MyStruct>
+  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  release_value %2 : $MyArray<MyStruct>
+  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb5, bb6
+
+bb6:
+  br bb7
+
+bb7:
+  // Success b/c use is in between apply and retain and we can move the retain
+  // past the fix_lifetime.
+  retain_value %2 : $MyArray<MyStruct>
+  fix_lifetime %0 : $MyArrayContainer<MyStruct>
+  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  release_value %2 : $MyArray<MyStruct>
+  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb7, bb8
+
+bb8:
+  br bb9
+
+bb9:
+  // Failure b/c of release_value
+  retain_value %00 : $Builtin.NativeObject
+  retain_value %2 : $MyArray<MyStruct>
+  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  release_value %00 : $Builtin.NativeObject
+  release_value %2 : $MyArray<MyStruct>
+  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb9, bb10
+
+bb10:
+  %7 = tuple()
+  return %7 : $()
+}
+

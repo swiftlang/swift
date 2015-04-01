@@ -585,11 +585,6 @@ protected:
     : ApplyInstBase<Impl,Base,false>(std::forward<As>(args)...) {}
 
 public:
-  /// Returns true if this apply has a self argument.
-  bool hasSelfArgument() const {
-    return this->getSubstCalleeType()->hasSelfArgument();
-  }
-
   using super::getCallee;
   using super::getSubstCalleeType;
   using super::hasSubstitutions;
@@ -662,6 +657,15 @@ public:
 
   bool hasIndirectResult() const {
     return getSubstCalleeType()->hasIndirectResult();
+  }
+
+  bool hasSelfArgument() const {
+    return getSubstCalleeType()->hasSelfArgument();
+  }
+
+  bool hasGuaranteedSelfArgument() const {
+    auto C = getSubstCalleeType()->getSelfParameter().getConvention();
+    return C == ParameterConvention::Direct_Guaranteed;
   }
 
   SILValue getIndirectResult() const {

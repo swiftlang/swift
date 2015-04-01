@@ -109,7 +109,7 @@ swift::ArraySemanticsCall::ArraySemanticsCall(ValueBase *V,
 }
 
 /// Determine which kind of array semantics call this is.
-ArrayCallKind swift::ArraySemanticsCall::getKind() {
+ArrayCallKind swift::ArraySemanticsCall::getKind() const {
   if (!SemanticsCall)
     return ArrayCallKind::kNone;
 
@@ -143,11 +143,11 @@ bool swift::ArraySemanticsCall::hasSelf() const {
   return SemanticsCall->getOrigCalleeType()->hasSelfArgument();
 }
 
-SILValue swift::ArraySemanticsCall::getSelf() {
+SILValue swift::ArraySemanticsCall::getSelf() const {
   return SemanticsCall->getSelfArgument();
 }
 
-Operand &swift::ArraySemanticsCall::getSelfOperand() {
+Operand &swift::ArraySemanticsCall::getSelfOperand() const {
   return SemanticsCall->getSelfArgumentOperand();
 }
 
@@ -158,7 +158,7 @@ bool swift::ArraySemanticsCall::hasGuaranteedSelf() const {
     ParameterConvention::Direct_Guaranteed;
 }
 
-SILValue swift::ArraySemanticsCall::getIndex() {
+SILValue swift::ArraySemanticsCall::getIndex() const {
   assert(SemanticsCall && "Must have a semantics call");
   assert(SemanticsCall->getNumArguments() && "Must have arguments");
   assert(getKind() == ArrayCallKind::kCheckSubscript ||
@@ -202,7 +202,7 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
 }
 
 bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
-                                         DominanceInfo *DT) {
+                                         DominanceInfo *DT) const {
   auto Kind = getKind();
   switch (Kind) {
   default:
@@ -431,7 +431,7 @@ static bool hasArrayPropertyIsNative(ArrayCallKind Kind, unsigned &ArgIdx) {
   return false;
 }
 
-SILValue swift::ArraySemanticsCall::getArrayPropertyIsNative() {
+SILValue swift::ArraySemanticsCall::getArrayPropertyIsNative() const {
   unsigned ArgIdx = 0;
   bool HasArg = hasArrayPropertyIsNative(getKind(), ArgIdx);
   (void)HasArg;
@@ -441,7 +441,7 @@ SILValue swift::ArraySemanticsCall::getArrayPropertyIsNative() {
   return SemanticsCall->getArgument(ArgIdx);
 }
 
-SILValue swift::ArraySemanticsCall::getArrayPropertyNeedsTypeCheck() {
+SILValue swift::ArraySemanticsCall::getArrayPropertyNeedsTypeCheck() const {
   unsigned ArgIdx = 0;
   bool HasArg = hasArrayPropertyNeedsTypeCheck(getKind(), ArgIdx);
   (void)HasArg;
@@ -449,4 +449,27 @@ SILValue swift::ArraySemanticsCall::getArrayPropertyNeedsTypeCheck() {
          "Must have an array.props argument");
 
   return SemanticsCall->getArgument(ArgIdx);
+}
+
+/// Certain semantic functions are generally safe because they don't release
+/// the array in unexpected ways.
+bool ArraySemanticsCall::isNoCapture() const {
+  switch (getKind()) {
+  case ArrayCallKind::kNone:
+  case ArrayCallKind::kGetArrayOwner:
+  case ArrayCallKind::kMutateUnknown:
+  case ArrayCallKind::kArrayInit:
+  case ArrayCallKind::kArrayUninitialized:
+    return false;
+  case ArrayCallKind::kArrayPropsIsNative:
+  case ArrayCallKind::kArrayPropsNeedsTypeCheck:
+  case ArrayCallKind::kCheckSubscript:
+  case ArrayCallKind::kCheckIndex:
+  case ArrayCallKind::kGetCount:
+  case ArrayCallKind::kGetCapacity:
+  case ArrayCallKind::kGetElement:
+  case ArrayCallKind::kGetElementAddress:
+  case ArrayCallKind::kMakeMutable:
+    return true;
+  }
 }
