@@ -80,36 +80,6 @@ void GenericCloner::populateCloned() {
   }
 }
 
-
-static void addApplyInst(ApplySite AI,
-                         llvm::SmallVectorImpl<ApplySite> &NewApplies) {
-  if (!AI || !AI.hasSubstitutions())
-    return;
-
-  SILValue CalleeVal = AI.getCallee();
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
-
-  if (!FRI)
-    return;
-
-  SILFunction *Callee = FRI->getReferencedFunction();
-  auto &M = AI.getInstruction()->getModule();
-  if (Callee->isExternalDeclaration())
-    if (!M.linkFunction(Callee, SILModule::LinkingMode::LinkAll))
-      return;
-
-  NewApplies.push_back(AI);
-}
-
-static void collectApplyInst(SILFunction &F,
-                             llvm::SmallVectorImpl<ApplySite> &NewApplies) {
-  // Scan all of the instructions in this function in search of ApplyInsts.
-  for (auto &BB : F)
-    for (auto &I : BB)
-      if (ApplySite AI = ApplySite::isa(&I))
-        addApplyInst(AI, NewApplies);
-}
-
 void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
   llvm::errs() << "{\n";
   for (auto &kv : map) {
@@ -122,8 +92,8 @@ void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
   llvm::errs() << "}\n";
 }
 
-bool trySpecializeApplyOfGeneric(ApplySite Apply,
-                                 SILFunction **NewFunction =nullptr) {
+bool swift::trySpecializeApplyOfGeneric(ApplySite Apply,
+                                        SILFunction **NewFunction) {
   if (NewFunction)
     *NewFunction = nullptr;
 
@@ -185,49 +155,4 @@ bool trySpecializeApplyOfGeneric(ApplySite Apply,
   // Replace all of the Apply functions with the new function.
   replaceWithSpecializedFunction(Apply, NewF);
   return true;
-}
-
-bool
-GenericSpecializer::specializeApplyInstGroup(
-                                 llvm::SmallVectorImpl<ApplySite> &NewApplies) {
-  bool Changed = false;
-
-  SILFunction *NewFunction;
-  for (auto &AI : NewApplies) {
-    if (trySpecializeApplyOfGeneric(AI, &NewFunction)) {
-      if (NewFunction)
-        Worklist.push_back(NewFunction);
-      Changed = true;
-    }
-  }
-  
-  NewApplies.clear();
-  return Changed;
-}
-
-/// Collect and specialize calls in a specific order specified by
-/// \p BotUpFuncList.
-bool GenericSpecializer::specialize(const std::vector<SILFunction *>
-                                    &BotUpFuncList) {
-  // Initialize the worklist with a call-graph bottom-up list of functions.
-  // We specialize the functions in a top-down order, starting from the end
-  // of the list.
-  Worklist.insert(Worklist.begin(), BotUpFuncList.begin(),
-                  BotUpFuncList.end());
-
-  llvm::SmallVector<ApplySite, 16> NewApplies;
-  bool Changed = false;
-
-  // Try to specialize generic calls.
-  while (Worklist.size()) {
-    SILFunction *F = Worklist.back();
-    Worklist.pop_back();
-
-    collectApplyInst(*F, NewApplies);
-    if (!NewApplies.empty())
-      Changed |= specializeApplyInstGroup(NewApplies);
-
-    assert(NewApplies.empty() && "Expected all applies processed!");
-  }
-  return Changed;
 }

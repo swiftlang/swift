@@ -24,7 +24,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-using namespace swift;
+namespace swift {
 
 class GenericCloner : public TypeSubstCloner<GenericCloner> {
 public:
@@ -59,19 +59,9 @@ private:
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 };
 
-struct GenericSpecializer {
-  GenericSpecializer() {}
+bool trySpecializeApplyOfGeneric(ApplySite Apply,
+                                 SILFunction **NewFunction =nullptr);
 
-private:
-  /// A worklist of functions to specialize.
-  std::vector<SILFunction*> Worklist;
-
-  bool specializeApplyInstGroup(llvm::SmallVectorImpl<ApplySite> &NewApplies);
-
-public:
-  /// Collect and specialize calls in a specific order specified by
-  /// \p BotUpFuncList.
-  bool specialize(const std::vector<SILFunction *> &BotUpFuncList);
-};
+} // end namespace swift
 
 #endif
