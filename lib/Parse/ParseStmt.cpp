@@ -84,7 +84,11 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (CodeCompletion)
     CodeCompletion->setExprBeginning(getParserPosition());
 
-  ParserResult<Expr> ResultExpr = parseExpr(diag::expected_expr);
+  auto parseTopLevelExpr = [&](Diag<> ID) {
+    return (Tok.is(tok::kw_throw) ? parseExprThrow(ID) : parseExpr(ID));
+  };
+
+  ParserResult<Expr> ResultExpr = parseTopLevelExpr(diag::expected_expr);
   if (ResultExpr.isNonNull())
     Result = ResultExpr.get();
 

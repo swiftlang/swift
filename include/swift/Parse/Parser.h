@@ -1069,6 +1069,7 @@ public:
   ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
+  ParserResult<Expr> parseExprThrow(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
                                        bool isConfigCondition = false);
