@@ -134,7 +134,7 @@ x☃⃠y
 // rdar://14705150 - crash on invalid
 func test_14705150() {
   var a = 4
-  var b! = a  // expected-error {{pattern variable binding cannot appear in an expression}} expected-error {{refutable pattern match can fail; add an else {} to handle this condition}}
+  var b! = a  // expected-error {{invalid pattern}}
 }
 
 prefix postfix func ++(x: Int) {} // expected-error {{attribute 'prefix' cannot be combined with this attribute}}
