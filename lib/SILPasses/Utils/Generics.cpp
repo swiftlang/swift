@@ -17,15 +17,15 @@ using namespace swift;
 
 /// Create a new empty function with the correct arguments and a unique name.
 SILFunction *GenericCloner::initCloned(SILFunction *Orig,
-                                            TypeSubstitutionMap &InterfaceSubs,
-                                            StringRef NewName) {
+                                       TypeSubstitutionMap &InterfaceSubs,
+                                       StringRef NewName) {
   SILModule &M = Orig->getModule();
   Module *SM = M.getSwiftModule();
 
   CanSILFunctionType FTy =
-  SILType::substFuncType(M, SM, InterfaceSubs,
-                         Orig->getLoweredFunctionType(),
-                         /*dropGenerics = */ true);
+    SILType::substFuncType(M, SM, InterfaceSubs,
+                           Orig->getLoweredFunctionType(),
+                           /*dropGenerics = */ true);
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -61,8 +61,8 @@ void GenericCloner::populateCloned() {
   auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
   while (I != E) {
     SILValue MappedValue =
-    new (M) SILArgument(ClonedEntryBB, remapType((*I)->getType()),
-                        (*I)->getDecl());
+      new (M) SILArgument(ClonedEntryBB, remapType((*I)->getType()),
+                          (*I)->getDecl());
     ValueMap.insert(std::make_pair(*I, MappedValue));
     ++I;
   }
@@ -147,7 +147,7 @@ bool swift::trySpecializeApplyOfGeneric(ApplySite Apply,
   } else {
     // Create a new function.
     NewF = GenericCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
-                                             ClonedName, Apply);
+                                        ClonedName, Apply);
     if (NewFunction)
       *NewFunction = NewF;
   }
