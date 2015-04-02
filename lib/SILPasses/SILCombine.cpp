@@ -350,13 +350,13 @@ class SILCombine : public SILFunctionTransform {
     if (Changed) {
       // Ignore invalidation messages for all analyses that we keep up to date
       // manually.
-      CGA->lock();
+      CGA->lockInvalidation();
 
       // Invalidate everything else.
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
 
       // Unlock all of the analyses that we locked.
-      CGA->unlock();
+      CGA->unlockInvalidation();
     }
   }
 
