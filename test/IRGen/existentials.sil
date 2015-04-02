@@ -60,3 +60,30 @@ entry(%o : $OP2):
   %a = init_existential_ref %o : $OP2 : $OP2, $OP
   return %a : $OP
 }
+
+protocol CP: class {}
+
+// CHECK-DAG: define { %objc_object*, i8** } @class_existential_unowned(%objc_object*, i8**) {
+sil @class_existential_unowned : $@thin (@owned CP) -> @owned CP {
+entry(%s : $CP):
+  %u = ref_to_unowned %s : $CP to $@sil_unowned CP
+  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownWeakRetain to void (%objc_object*)*)(%objc_object* %0)
+  unowned_retain %u : $@sil_unowned CP
+  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownWeakRelease to void (%objc_object*)*)(%objc_object* %0)
+  unowned_release %u : $@sil_unowned CP
+
+  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownRetainUnowned to void (%objc_object*)*)(%objc_object* %0)
+  strong_retain_unowned %u : $@sil_unowned CP
+  %t = unowned_to_ref %u : $@sil_unowned CP to $CP
+  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* %0)
+  strong_release %t : $CP
+
+  %v = ref_to_unmanaged %s : $CP to $@sil_unmanaged CP
+  %z = unmanaged_to_ref %v : $@sil_unmanaged CP to $CP
+
+  // CHECK: [[RESULT_A:%.*]] = insertvalue { %objc_object*, i8** } undef, %objc_object* %0, 0
+  // CHECK: [[RESULT_B:%.*]] = insertvalue { %objc_object*, i8** } [[RESULT_A]], i8** %1, 1
+  // CHECK: ret { %objc_object*, i8** } [[RESULT_B]]
+
+  return %z : $CP
+}
