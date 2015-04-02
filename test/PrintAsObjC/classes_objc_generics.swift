@@ -302,6 +302,8 @@ private class Private : A1 {}
   @objc private func bar() {}
 }
 
+public class NonObjCClass { }
+
 // CHECK-LABEL: @interface Properties
 // CHECK-NEXT: @property (nonatomic) NSInteger i;
 // CHECK-NEXT: @property (nonatomic, readonly) Properties * __nonnull this;
@@ -319,6 +321,7 @@ private class Private : A1 {}
 // CHECK-NEXT: @property (nonatomic) IBOutlet Properties * __null_unspecified typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull array;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull arrayOfClasses;
 // CHECK-NEXT: @property (nonatomic, copy) NS_DICTIONARY(NSString *, NSString *) __nonnull dictionary;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NS_ARRAY(Properties *) __null_unspecified outletCollection;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NS_ARRAY(Properties *)  __nullable outletCollectionOptional;
@@ -364,6 +367,7 @@ private class Private : A1 {}
 
   var string = "abc"
   var array: Array<AnyObject> = []
+  var arrayOfClasses: Array<NonObjCClass> = []
   var dictionary: Dictionary<String, String> = [:]
 
   @IBOutlet var outletCollection: [Properties]!

@@ -715,6 +715,18 @@ private:
     os << SD->getName();
   }
 
+  /// Determine whether the given type contains a type that cannot be printed
+  /// in Objective-C.
+  static bool containsNonObjCType(Type type) {
+    return type.findIf([&](Type type) -> bool {
+      if (auto classDecl = type->getClassOrBoundGenericClass()) {
+        return classDecl->isForeign() || !classDecl->isObjC();
+      }
+
+      return false;
+    });
+  }
+
   /// If \p BGT represents a generic struct used to import Clang types, print
   /// it out.
   bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
@@ -725,7 +737,8 @@ private:
 
     if (SD == ctx.getArrayDecl()) {
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
-      if (!BGT->getGenericArgs()[0]->isAnyObject()) {
+      if (!BGT->getGenericArgs()[0]->isAnyObject() &&
+          !containsNonObjCType(BGT->getGenericArgs()[0])) {
         os << "NS_ARRAY(";
         visitPart(BGT->getGenericArgs()[0], None);
         os << ")";
@@ -742,8 +755,10 @@ private:
 
     if (SD == ctx.getDictionaryDecl()) {
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
-      if (!isNSObject(BGT->getGenericArgs()[0]) ||
-          !BGT->getGenericArgs()[1]->isAnyObject()) {
+      if ((!isNSObject(BGT->getGenericArgs()[0]) ||
+           !BGT->getGenericArgs()[1]->isAnyObject()) &&
+          !containsNonObjCType(BGT->getGenericArgs()[0]) &&
+          !containsNonObjCType(BGT->getGenericArgs()[1])) {
         os << "NS_DICTIONARY(";
         visitPart(BGT->getGenericArgs()[0], None);
         os << ", ";
@@ -762,7 +777,8 @@ private:
 
     if (SD == ctx.getSetDecl()) {
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
-      if (!isNSObject(BGT->getGenericArgs()[0])) {
+      if (!isNSObject(BGT->getGenericArgs()[0]) &&
+          !containsNonObjCType(BGT->getGenericArgs()[0])) {
         os << "NS_SET(";
         visitPart(BGT->getGenericArgs()[0], None);
         os << ")";
@@ -1244,9 +1260,7 @@ public:
                                         const TypeDecl *TD) {
         if (auto CD = dyn_cast<ClassDecl>(TD)) {
           if (!forwardDeclare(CD)) {
-            bool didAddImport = addImport(CD);
-            assert(didAddImport && "local class is not forward-declarable");
-            (void)didAddImport;
+            (void)addImport(CD);
           }
         } else if (auto PD = dyn_cast<ProtocolDecl>(TD))
           forwardDeclare(PD);
