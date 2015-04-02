@@ -75,6 +75,9 @@ public:
   /// This method unlinks 'self' from the containing SILFunction.
   void removeFromParent();
 
+  /// Returns true if this BB is the entry BB of its parent.
+  bool isEntry() const;
+
   //===--------------------------------------------------------------------===//
   // SILInstruction List Inspection and Manipulation
   //===--------------------------------------------------------------------===//

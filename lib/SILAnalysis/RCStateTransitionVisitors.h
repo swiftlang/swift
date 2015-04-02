@@ -35,14 +35,14 @@ template <typename ImplTy, typename ResultTy>
 class RCStateTransitionKindVisitor {
   ImplTy &asImpl() { return *reinterpret_cast<ImplTy *>(this); }
 public:
-#define KIND(K) ResultTy visit ## K(SILInstruction *) { return ResultTy(); }
+#define KIND(K) ResultTy visit ## K(ValueBase *) { return ResultTy(); }
 #include "RCStateTransition.def"
 
-  ResultTy visit(SILInstruction *I) {
-    switch (getRCStateTransitionKind(I)) {
+  ResultTy visit(ValueBase *V) {
+    switch (getRCStateTransitionKind(V)) {
 #define KIND(K)                                 \
   case RCStateTransitionKind::K:                \
-    return asImpl().visit ## K(I);
+    return asImpl().visit ## K(V);
 #include "RCStateTransition.def"
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -123,9 +123,9 @@ public:
                                  bool FreezeOwnedArgEpilogueReleases,
                                  ConsumedArgToEpilogueReleaseMatcher &ERM,
                                  IncToDecStateMapTy &IncToDecStateMap);
-  DataflowResult visitAutoreleasePoolCall(SILInstruction *I);
-  DataflowResult visitStrongDecrement(SILInstruction *I);
-  DataflowResult visitStrongIncrement(SILInstruction *I);
+  DataflowResult visitAutoreleasePoolCall(ValueBase *V);
+  DataflowResult visitStrongDecrement(ValueBase *V);
+  DataflowResult visitStrongIncrement(ValueBase *V);
 };
 
 } // end swift namespace
@@ -156,9 +156,10 @@ public:
   TopDownDataflowRCStateVisitor(RCIdentityFunctionInfo *RCFI,
                                 ARCBBState &BBState,
                                 DecToIncStateMapTy &DecToIncStateMap);
-  DataflowResult visitAutoreleasePoolCall(SILInstruction *I);
-  DataflowResult visitStrongDecrement(SILInstruction *I);
-  DataflowResult visitStrongIncrement(SILInstruction *I);
+  DataflowResult visitAutoreleasePoolCall(ValueBase *V);
+  DataflowResult visitStrongDecrement(ValueBase *V);
+  DataflowResult visitStrongIncrement(ValueBase *V);
+  DataflowResult visitStrongEntrance(ValueBase *V);
 };
 
 } // end swift namespace

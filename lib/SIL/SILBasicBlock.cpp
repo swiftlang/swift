@@ -145,3 +145,7 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
     }
   }
 }
+
+bool SILBasicBlock::isEntry() const {
+  return this == &*getParent()->begin();
+}

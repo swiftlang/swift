@@ -33,13 +33,19 @@ BottomUpDataflowRCStateVisitor::BottomUpDataflowRCStateVisitor(
       EpilogueReleaseMatcher(ERM), IncToDecStateMap(IncToDecStateMap) {}
 
 BottomUpDataflowRCStateVisitor::DataflowResult
-BottomUpDataflowRCStateVisitor::visitAutoreleasePoolCall(SILInstruction *I) {
+BottomUpDataflowRCStateVisitor::visitAutoreleasePoolCall(ValueBase *V) {
   BBState.clear();
-  return DataflowResult();
+
+  // We just cleared our BB State so we have no more possible effects.
+  return DataflowResult(RCStateTransitionDataflowResultKind::NoEffects);
 }
 
 BottomUpDataflowRCStateVisitor::DataflowResult
-BottomUpDataflowRCStateVisitor::visitStrongDecrement(SILInstruction *I) {
+BottomUpDataflowRCStateVisitor::visitStrongDecrement(ValueBase *V) {
+  auto *I = dyn_cast<SILInstruction>(V);
+  if (!I)
+    return DataflowResult();
+
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
 
   // If this instruction is a post dominating release, skip it so we don't pair
@@ -67,7 +73,11 @@ BottomUpDataflowRCStateVisitor::visitStrongDecrement(SILInstruction *I) {
 }
 
 BottomUpDataflowRCStateVisitor::DataflowResult
-BottomUpDataflowRCStateVisitor::visitStrongIncrement(SILInstruction *I) {
+BottomUpDataflowRCStateVisitor::visitStrongIncrement(ValueBase *V) {
+  auto *I = dyn_cast<SILInstruction>(V);
+  if (!I)
+    return DataflowResult();
+
   // Look up the state associated with its operand...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
   BottomUpRefCountState &RefCountState = BBState.getBottomUpRefCountState(Op);
@@ -112,13 +122,18 @@ TopDownDataflowRCStateVisitor::TopDownDataflowRCStateVisitor(
     : RCFI(RCFI), BBState(BBState), DecToIncStateMap(DecToIncStateMap) {}
 
 TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitAutoreleasePoolCall(SILInstruction *I) {
+TopDownDataflowRCStateVisitor::visitAutoreleasePoolCall(ValueBase *V) {
   BBState.clear();
-  return DataflowResult();
+  // We just cleared our BB State so we have no more possible effects.
+  return DataflowResult(RCStateTransitionDataflowResultKind::NoEffects);
 }
 
 TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongDecrement(SILInstruction *I) {
+TopDownDataflowRCStateVisitor::visitStrongDecrement(ValueBase *V) {
+  auto *I = dyn_cast<SILInstruction>(V);
+  if (!I)
+    return DataflowResult();
+
   // Look up the state associated with I's operand...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
   TopDownRefCountState &RefCountState = BBState.getTopDownRefCountState(Op);
@@ -155,7 +170,11 @@ TopDownDataflowRCStateVisitor::visitStrongDecrement(SILInstruction *I) {
 }
 
 TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongIncrement(SILInstruction *I) {
+TopDownDataflowRCStateVisitor::visitStrongIncrement(ValueBase *V) {
+  auto *I = dyn_cast<SILInstruction>(V);
+  if (!I)
+    return DataflowResult();
+
   // Map the increment's operand to a newly initialized or reinitialized ref
   // count state and continue...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
@@ -168,4 +187,25 @@ TopDownDataflowRCStateVisitor::visitStrongIncrement(SILInstruction *I) {
   // Continue processing in case this increment could be a CanUse for a
   // different pointer.
   return DataflowResult(Op, NestingDetected);
+}
+
+TopDownDataflowRCStateVisitor::DataflowResult
+TopDownDataflowRCStateVisitor::visitStrongEntrance(ValueBase *V) {
+  auto *Arg = dyn_cast<SILArgument>(V);
+  if (!Arg)
+    return DataflowResult();
+
+  DEBUG(llvm::dbgs() << "VISITING ARGUMENT: " << *Arg);
+
+  if (!Arg->hasConvention(ParameterConvention::Direct_Owned)) {
+    DEBUG(llvm::dbgs() << "    Not owned! Bailing!\n");
+    return DataflowResult();
+  }
+
+  DEBUG(llvm::dbgs() << "    Initializing state.\n");
+
+  TopDownRefCountState &State = BBState.getTopDownRefCountState(Arg);
+  State.initWithArg(Arg);
+
+  return DataflowResult();
 }

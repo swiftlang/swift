@@ -46,7 +46,7 @@ public:
 
   /// Returns true if this is a SILArgument of the entry BB of a function.
   bool isFunctionArg() const {
-    return getParent() == &*getFunction()->begin();
+    return getParent()->isEntry();
   }
 
   static bool classof(const ValueBase *V) {

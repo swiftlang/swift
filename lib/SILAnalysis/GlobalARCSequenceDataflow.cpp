@@ -60,6 +60,9 @@ static bool processBBTopDown(
 
   bool NestingDetected = false;
 
+  TopDownDataflowRCStateVisitor DataflowVisitor(RCIA, BBState,
+                                                DecToIncStateMap);
+
   // If the current BB is the entry BB, initialize a state corresponding to each
   // of its owned parameters. This enables us to know that if we see a retain
   // before any decrements that the retain is known safe.
@@ -68,26 +71,12 @@ static bool processBBTopDown(
   // code in GlobalARCPairingAnalysis. This is because even if we don't do
   // anything, we will still pair the retain, releases and then the guaranteed
   // parameter will ensure it is known safe to remove them.
-  if (&BB == &*BB.getParent()->begin()) {
+  if (BB.isEntry()) {
     auto Args = BB.getBBArgs();
-    auto SignatureParams =
-        BB.getParent()->getLoweredFunctionType()->getParameters();
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-      SILArgument *A = Args[i];
-      ParameterConvention P = SignatureParams[i].getConvention();
-
-      DEBUG(llvm::dbgs() << "VISITING ARGUMENT: " << *A);
-
-      if (P != ParameterConvention::Direct_Owned)
-        continue;
-
-      TopDownRefCountState &State = BBState.getTopDownRefCountState(Args[i]);
-      State.initWithArg(A);
+      DataflowVisitor.visit(Args[i]);
     }
   }
-
-  TopDownDataflowRCStateVisitor DataflowVisitor(RCIA, BBState,
-                                                DecToIncStateMap);
 
   // For each instruction I in BB...
   for (auto &I : BB) {
