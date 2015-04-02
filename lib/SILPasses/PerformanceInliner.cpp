@@ -756,7 +756,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   bool Changed = false;
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
 
-  SmallVector<ApplyInst*, 8> CallSitesToInline;
+  SmallVector<ApplyInst *, 8> CallSitesToInline;
 
   // First step: collect all the functions we want to inline.
   // We don't change anything yet, which let's the dominance info kept alive.
@@ -892,8 +892,8 @@ public:
   }
 
   void run() override {
-    CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
-    DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
+    CallGraphAnalysis *CGA = PM->getAnalysis<CallGraphAnalysis>();
+    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
 
     if (getOptions().InlineThreshold == 0) {
@@ -904,7 +904,7 @@ public:
     SILPerformanceInliner inliner(getOptions().InlineThreshold,
                                   WhatToInline);
 
-    SmallPtrSet<SILFunction*, 16> Modified;
+    SmallPtrSet<SILFunction *, 16> Modified;
 
     // Inline functions bottom up from the leafs.
     for (auto *F : CGA->getCallGraph().getBottomUpFunctionOrder()) {
