@@ -55,7 +55,7 @@ public class _AnyGeneratorBase {}
 ///
 ///   struct AnySequence<S: SequenceType>
 ///   func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
-///   func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
+///   func anyGenerator<T>(body: ()->T?) -> AnyGenerator<T>
 public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
@@ -103,23 +103,23 @@ public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
 }
 
 internal class _FunctionGenerator<T> : AnyGenerator<T> {
-  init(_ nextImplementation: ()->T?) {
-    self.nextImplementation = nextImplementation
+  init(_ body: ()->T?) {
+    self.body = body
   }
-  override func next() -> T? { return nextImplementation() }
-  let nextImplementation: ()->T?
+  override func next() -> T? { return body() }
+  let body: ()->T?
 }
 
 /// Return a `GeneratorType` instance whose `next` method invokes
-/// `nextImplementation` and returns the result.
+/// `body` and returns the result.
 ///
 /// Example::
 ///
 ///   var x = 7
 ///   let g = anyGenerator { x < 15 ? x++ : nil }
 ///   let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
-public func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T> {
-  return _FunctionGenerator(nextImplementation)
+public func anyGenerator<T>(body: ()->T?) -> AnyGenerator<T> {
+  return _FunctionGenerator(body)
 }
 
 internal final class _GeneratorBox<
