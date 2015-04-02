@@ -219,8 +219,9 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return true
   }
 
-  var arrayPropertyNeedsElementTypeCheck : Bool {
-    return false
+  /// True, if the array is native and does not need a deferred type check.
+  var arrayPropertyIsNativeNoDTC : Bool {
+    return true
   }
 
   /// If the elements are stored contiguously, a pointer to the first
@@ -306,10 +307,9 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
   }
 
-  func getElement(i: Int, hoistedIsNativeBuffer: Bool,
-                  hoistedNeedsElementTypeCheck: Bool) -> T {
+  func getElement(i: Int, hoistedIsNativeNoDTCBuffer: Bool) -> T {
     _sanityCheck(
-      _isValidSubscript(i, hoistedIsNativeBuffer: hoistedIsNativeBuffer),
+      _isValidSubscript(i, hoistedIsNativeBuffer: hoistedIsNativeNoDTCBuffer),
       "Array index out of range")
     // If the index is in bounds, we can assume we have storage.
     return baseAddress[i]
@@ -318,8 +318,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// Get/set the value of the ith element
   public subscript(i: Int) -> T {
     get {
-      return getElement(i, hoistedIsNativeBuffer: true,
-                        hoistedNeedsElementTypeCheck: false)
+      return getElement(i, hoistedIsNativeNoDTCBuffer: true)
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
