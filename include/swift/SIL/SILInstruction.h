@@ -3702,6 +3702,10 @@ public:
 /// An apply instruction.
 class ApplySite {
   SILInstruction *Inst;
+
+protected:
+  explicit ApplySite(void *p) : Inst(static_cast<SILInstruction *>(p)) {}
+
 public:
   ApplySite() : Inst(nullptr) {}
   explicit ApplySite(ValueBase *inst)
@@ -3795,6 +3799,10 @@ public:
   }
 #undef FOREACH_IMPL_RETURN
 
+  static ApplySite getFromOpaqueValue(void *p) {
+    return ApplySite(p);
+  }
+
   friend bool operator==(ApplySite lhs, ApplySite rhs) {
     return lhs.getInstruction() == rhs.getInstruction();
   }
@@ -3811,6 +3819,8 @@ public:
 
 /// A full function application.
 class FullApplySite : public ApplySite {
+  explicit FullApplySite(void *p) : ApplySite(p) {}
+
 public:
   FullApplySite() : ApplySite() {}
   explicit FullApplySite(ValueBase *inst) : ApplySite(inst) {
@@ -3849,6 +3859,10 @@ public:
     return getArguments();
   }
 #undef FOREACH_IMPL_RETURN
+
+  static FullApplySite getFromOpaqueValue(void *p) {
+    return FullApplySite(p);
+  }
 
   static bool classof(const ValueBase *inst) {
     return (inst->getKind() == ValueKind::ApplyInst ||
@@ -3910,6 +3924,43 @@ template<> struct simplify_type< ::swift::FullApplySite>
   : public simplify_type<const ::swift::ApplySite> {};
 template<> struct simplify_type<const ::swift::FullApplySite>
   : public simplify_type<const ::swift::ApplySite> {};
+
+
+template<> struct DenseMapInfo< ::swift::ApplySite> {
+  static ::swift::ApplySite getEmptyKey() {
+    return ::swift::ApplySite::getFromOpaqueValue(
+      llvm::DenseMapInfo<void *>::getEmptyKey());
+  }
+  static ::swift::ApplySite getTombstoneKey() {
+    return ::swift::ApplySite::getFromOpaqueValue(
+      llvm::DenseMapInfo<void *>::getTombstoneKey());
+  }
+  static unsigned getHashValue( ::swift::ApplySite AS) {
+    auto *I = AS.getInstruction();
+    return DenseMapInfo< ::swift::SILInstruction *>::getHashValue(I);
+  }
+  static bool isEqual( ::swift::ApplySite LHS, ::swift::ApplySite RHS) {
+    return LHS == RHS;
+  }
+};
+
+template<> struct DenseMapInfo< ::swift::FullApplySite> {
+  static ::swift::FullApplySite getEmptyKey() {
+    return ::swift::FullApplySite::getFromOpaqueValue(
+      llvm::DenseMapInfo<void*>::getEmptyKey());
+  }
+  static ::swift::FullApplySite getTombstoneKey() {
+    return ::swift::FullApplySite::getFromOpaqueValue(
+      llvm::DenseMapInfo<void*>::getTombstoneKey());
+  }
+  static unsigned getHashValue( ::swift::FullApplySite AS) {
+    auto *I = AS.getInstruction();
+    return DenseMapInfo< ::swift::SILInstruction *>::getHashValue(I);
+  }
+  static bool isEqual( ::swift::FullApplySite LHS, ::swift::FullApplySite RHS) {
+    return LHS == RHS;
+  }
+};
 
 } // end llvm namespace
 
