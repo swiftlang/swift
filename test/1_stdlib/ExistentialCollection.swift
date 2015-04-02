@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
+import SwiftExperimental
 import StdlibUnittest
 
 var tests = TestSuite("ExistentialCollection")

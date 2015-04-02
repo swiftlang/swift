@@ -110,7 +110,6 @@ set(SWIFTLIB_SOURCES
   Bit.swift
   CollectionMirrors.swift.gyb
   CollectionOfOne.swift
-  ExistentialCollection.swift.gyb
   Process.swift
   SliceBuffer.swift
   VarArgs.swift

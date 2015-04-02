@@ -14,7 +14,22 @@
 // FIXME: Various casting issues will have to be fixed to support this
 // collection without the objc runtime.
 
+//===--- Definitions needed only while experimental -----------------------===//
+import Swift
 import SwiftShims
+
+internal typealias _ContiguousArrayStorageBase = AnyObject
+extension _InitializeTo { init() {} }
+extension _CopyToNativeArrayBuffer { init() {} }
+extension _Count { init() {} }
+extension _ContiguousArrayBuffer {
+  var _storage: _ContiguousArrayStorageBase { return owner }
+  init(_ owner: _ContiguousArrayStorageBase) {
+    self = unsafeBitCast(owner, _ContiguousArrayBuffer.self)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 
 % traversals = ['Forward', 'Bidirectional', 'RandomAccess']
 
