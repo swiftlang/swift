@@ -1203,6 +1203,11 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
     ConcreteType = IER->getFormalConcreteType();
     LastArg = IER->getOperand();
   }
+  // If ConcreteType depends on any archetypes, then propagating it does not
+  // help resolve witness table lookups. Catch these cases before calling
+  // gatherAllSubstitutions, which only works on nominal types.
+  if (ConcreteType->hasArchetype())
+    return nullptr;
 
   auto ConcreteTypeSubsts = ConcreteType->gatherAllSubstitutions(
       AI->getModule().getSwiftModule(), nullptr);
@@ -1214,7 +1219,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
     // and therefore the whole Lookup type is concrete. So, we can
     // propagate it, because we know how to devirtualize it.
   }
-
 
   if (Conformances.empty())
     return nullptr;
