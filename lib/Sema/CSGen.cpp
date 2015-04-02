@@ -1594,7 +1594,7 @@ namespace {
                                            LocatorPathElt::getTupleElement(i)));
 
           Type varArgBaseTy;
-          tupleTypeElts.push_back(TupleTypeElt(eltTy, Identifier(),
+          tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel(),
                                                tupleElt.getDefaultArgKind(),
                                                isVararg));
         }

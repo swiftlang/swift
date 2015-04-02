@@ -2430,21 +2430,10 @@ public:
 /// \c where \c consumed[i] is \c TupleShuffleExpr::FirstVariadic). The values
 /// are indices into the source tuple.
 ///
-/// \param sourceLabelsAreMandatory True if labels in the source type are
-/// mandatory to match; false means to make an effort to match them, but
-/// they can also be dropped.
-///
 /// \returns true if no tuple conversion is possible, false otherwise.
 bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
                          SmallVectorImpl<int> &sources,
-                         SmallVectorImpl<unsigned> &variadicArgs,
-                         bool sourceLabelsAreMandatory);
-
-/// Given that an expression has tuple type, are labels in that type
-/// mandatory or advistory?  Mandatory labels must be matched in the
-/// destination type; optional labels can be matched with unlabeled
-/// elements.
-bool hasMandatoryTupleLabels(Expr *expr);
+                         SmallVectorImpl<unsigned> &variadicArgs);
 
 /// \brief Return whether the function argument indicated by `locator` has a
 /// trailing closure.

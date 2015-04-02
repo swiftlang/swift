@@ -110,8 +110,7 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 
 bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
                                       SmallVectorImpl<int> &sources,
-                                      SmallVectorImpl<unsigned> &variadicArgs,
-                                      bool sourceLabelsAreMandatory) {
+                                      SmallVectorImpl<unsigned> &variadicArgs) {
   const int unassigned = -3;
   
   SmallVector<bool, 4> consumed(fromTuple->getFields().size(), false);
@@ -193,13 +192,10 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 
     // Otherwise, assign this input to the next output element.
 
-    // Complain if the input element is named and either the label is
-    // mandatory or we're trying to match it with something with a
-    // different label.
-    if (fromTuple->getFields()[fromNext].hasName() &&
-        (sourceLabelsAreMandatory || elt2.hasName())) {
+    // Fail if the input element is named and we're trying to match it with
+    // something with a different label.
+    if (fromTuple->getFields()[fromNext].hasName() && elt2.hasName())
       return true;
-    }
 
     sources[i] = fromNext;
     consumed[fromNext] = true;
@@ -227,10 +223,6 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
 
   simplifyLocator(anchor, path, targetAnchor, targetPathBuffer, range1, range2);
   return (path.empty() ? anchor : nullptr);
-}
-
-bool constraints::hasMandatoryTupleLabels(Expr *e) {
-  return isa<TupleExpr>(e->getSemanticsProvidingExpr());
 }
 
 bool constraints::hasTrailingClosure(const ConstraintLocatorBuilder &locator) {

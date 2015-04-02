@@ -73,3 +73,11 @@ let a = b ; let b = a // expected-error{{could not infer type for 'a'}} expected
 // <rdar://problem/17501765> Swift should warn about immutable default initialized values
 let uselessValue : String?
 
+
+func tuplePatternDestructuring(x : Int, y : Int) {
+  let (b: g, a: h) = (b: x, a: y)
+ 
+  // <rdar://problem/20392122> Destructuring tuple with labels doesn't work
+  let (i, j) = (b: x, a: y)
+}
+

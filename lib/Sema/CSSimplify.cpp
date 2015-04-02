@@ -22,12 +22,6 @@
 using namespace swift;
 using namespace constraints;
 
-static bool hasMandatoryTupleLabels(const ConstraintLocatorBuilder &locator) {
-  if (Expr *e = locator.trySimplifyToExpr())
-    return hasMandatoryTupleLabels(e);
-  return false;
-}
-
 MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
 void MatchCallArgumentListener::extraArgument(unsigned argIdx) { }
@@ -788,8 +782,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // Compute the element shuffles for conversions.
   SmallVector<int, 16> sources;
   SmallVector<unsigned, 4> variadicArguments;
-  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments,
-                          ::hasMandatoryTupleLabels(locator))) {
+  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments)) {
     // FIXME: Record why the tuple shuffle couldn't be computed.
     if (shouldRecordFailures()) {
       if (tuple1->getNumElements() != tuple2->getNumElements()) {

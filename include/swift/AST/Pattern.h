@@ -276,7 +276,8 @@ public:
   TuplePatternElt(Identifier Label, SourceLoc LabelLoc,
                   Pattern *p, ExprHandle *init = nullptr,
                   DefaultArgumentKind defArgKind = DefaultArgumentKind::None)
-    : ThePattern(p), Init(init), DefArgKind(defArgKind) {}
+    : Label(Label), LabelLoc(LabelLoc),
+      ThePattern(p), Init(init), DefArgKind(defArgKind) {}
 
   Identifier getLabel() const { return Label; }
   SourceLoc getLabelLoc() const { return LabelLoc; }

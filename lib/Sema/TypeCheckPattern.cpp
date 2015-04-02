@@ -706,8 +706,9 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       P->setType(ErrorType::get(Context));
       return true;
     }
-    if (!missingType && !(options & TR_AllowUnspecifiedTypes))
+    if (!missingType && !(options & TR_AllowUnspecifiedTypes)) {
       P->setType(TupleType::get(typeElts, Context));
+    }
     return false;
   }
       
