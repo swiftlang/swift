@@ -463,16 +463,16 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceInfo *DT) {
     TermInst *Term = BB.getTerminator();
     switch (Term->getKind()) {
     case ValueKind::CondBranchInst:
-      Changed = propagateCondBrCondition(cast<CondBranchInst>(Term), DT);
+      Changed |= propagateCondBrCondition(cast<CondBranchInst>(Term), DT);
       break;
     case ValueKind::SwitchEnumInst:
-      Changed = propagateSwitchEnumCondition(cast<SwitchEnumInst>(Term), DT);
+      Changed |= propagateSwitchEnumCondition(cast<SwitchEnumInst>(Term), DT);
       break;
     case ValueKind::SwitchValueInst:
       // TODO: handle switch_value
       break;
     case ValueKind::CheckedCastBranchInst:
-      Changed = trySimplifyCheckedCastBr(BB.getTerminator(), DT);
+      Changed |= trySimplifyCheckedCastBr(BB.getTerminator(), DT);
       break;
     default:
       break;
