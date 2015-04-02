@@ -34,8 +34,8 @@ namespace swift {
 /// time in reverse post-order.
 ///
 /// Inherit from this in the usual CRTP fashion and define a visit()
-/// function. This function will get a vector of ValueBase* which are
-/// the elements of the SCC.
+/// function. This function will get called with a vector of
+/// pointer-to-ValueBase which are the elements of the SCC.
 template <typename ImplClass>
 class SCCVisitor {
 public:
@@ -48,7 +48,7 @@ public:
   void visit(llvm::SmallVectorImpl<ValueBase *> &SCC) { }
 
   void run() {
-    llvm::ReversePostOrderTraversal<SILFunction*> RPOT(&F);
+    llvm::ReversePostOrderTraversal<SILFunction *> RPOT(&F);
 
     for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
       auto *BB = *Iter;
