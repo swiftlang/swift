@@ -1,6 +1,8 @@
 // RUN: %target-run-stdlib-swift | FileCheck %s
 
 // XFAIL: linux
+// REQUIRES: OS=macosx
+// Currently failing on iOS: rdar://problem/20405604
 
 import Foundation
 import Swift

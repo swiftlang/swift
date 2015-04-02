@@ -20,6 +20,8 @@
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
+// Currently failing on iOS: rdar://problem/20405604
 
 import Swift
 
