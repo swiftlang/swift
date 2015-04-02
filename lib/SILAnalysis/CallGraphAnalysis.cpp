@@ -196,11 +196,11 @@ static void orderCallees(const CallGraphEdge::CalleeSetType &Callees,
             });
 }
 
-void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
+void CallGraph::addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode) {
   CallGraphEdge::CalleeSetType CalleeSet;
   bool Complete = false;
 
-  if (tryGetCalleeSet(AI->getCallee(), CalleeSet, Complete)) {
+  if (tryGetCalleeSet(AI.getCallee(), CalleeSet, Complete)) {
     auto *Edge = new (Allocator) CallGraphEdge(AI, CalleeSet, Complete,
                                                EdgeOrdinal++);
     assert(!ApplyToEdgeMap.count(AI) &&
@@ -230,8 +230,8 @@ void CallGraph::removeEdge(CallGraphEdge *Edge) {
     CalleeNode->removeCallerEdge(Edge);
 
   // Remove the edge from the caller's call graph node.
-  auto *Apply = Edge->getApply();
-  auto *CallerNode = getCallGraphNode(Apply->getFunction());
+  auto Apply = Edge->getApply();
+  auto *CallerNode = getCallGraphNode(Apply.getFunction());
   CallerNode->removeCalleeEdge(Edge);
 
   // Remove the mapping from the apply to this edge.
@@ -245,12 +245,12 @@ void CallGraph::removeEdge(CallGraphEdge *Edge) {
 
 // Remove the call graph edges associated with an apply, where the
 // apply is known to the call graph.
-void CallGraph::removeEdgesForApply(ApplyInst *AI) {
+void CallGraph::removeEdgesForApply(FullApplySite AI) {
   assert(ApplyToEdgeMap.count(AI) && "Expected apply to be in edge map!");
   removeEdge(ApplyToEdgeMap[AI]);
 }
 
-void CallGraph::markCallerEdgesOfCalleesIncomplete(ApplyInst *AI) {
+void CallGraph::markCallerEdgesOfCalleesIncomplete(FullApplySite AI) {
   auto *Edge = getCallGraphEdge(AI);
 
   // We are not guaranteed to have an edge for every apply.
@@ -408,7 +408,7 @@ void CallGraph::verify() const {
     assert(P.second->getFunction() == P.first &&
            "Func mapped to node, but node has different Function inside?!");
     for (CallGraphEdge *Edge : P.second->getCalleeEdges()) {
-      assert(Edge->getApply()->getFunction() == P.first &&
+      assert(Edge->getApply().getFunction() == P.first &&
              "ApplyInst in callee set that is not in the Callee function?!");
     }
   }
@@ -424,9 +424,9 @@ void CallGraph::verify() const {
   for (auto &P : ApplyToEdgeMap) {
     assert(P.second->getApply() == P.first &&
            "Apply mapped to CallSiteEdge but not vis-a-versa?!");
-    assert(Functions.count(P.first->getFunction()) &&
+    assert(Functions.count(P.first.getFunction()) &&
            "Apply in func not in module?!");
-    CallGraphNode *Node = getCallGraphNode(P.first->getFunction());
+    CallGraphNode *Node = getCallGraphNode(P.first.getFunction());
     assert(Node && "Apply without call graph node");
 
     bool FoundEdge = false;

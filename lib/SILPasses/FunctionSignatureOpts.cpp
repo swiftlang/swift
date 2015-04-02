@@ -525,7 +525,10 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
   for (const CallGraphEdge *Edge : CallSites) {
     if (!Edge->hasSingleCallee()) continue;
 
-    auto *AI = const_cast<ApplyInst *>(Edge->getApply());
+    auto *AI = dyn_cast<ApplyInst>(Edge->getApply().getInstruction());
+    // TODO: Update for TryApply
+    if (!AI)
+      continue;
 
     // We don't have support for the handling of argument indices that
     // we need when we have an apply of a partial_apply.
@@ -684,7 +687,8 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   ++NumFunctionSignaturesOptimized;
 
   DEBUG(for (auto *Edge : CallSites) {
-    llvm::dbgs()  << "        CALLSITE: " << Edge->getApply();
+      llvm::dbgs()  << "        CALLSITE: " <<
+        *Edge->getApply().getInstruction();
   });
 
   llvm::SmallString<64> NewFName = Analyzer.getOptimizedName();

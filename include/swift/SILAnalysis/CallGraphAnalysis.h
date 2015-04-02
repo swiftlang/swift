@@ -54,7 +54,7 @@ public:
 
 private:
   // The call site represented by this call graph edge.
-  ApplyInst *TheApply;
+  FullApplySite TheApply;
 
   // The set of functions potentially called from this call site. This
   // might include functions that are not actually callable based on
@@ -71,7 +71,7 @@ private:
 public:
   /// Create a call graph edge for a call site where we will fill in
   /// the set of potentially called functions later.
-  CallGraphEdge(ApplyInst *TheApply, CalleeSetType &KnownCallees, bool Complete,
+  CallGraphEdge(FullApplySite TheApply, CalleeSetType &KnownCallees, bool Complete,
                 unsigned Ordinal)
     : TheApply(TheApply),
       // FIXME: Do not allocate memory for the singleton callee case.
@@ -88,9 +88,9 @@ public:
     delete CalleeSet.getPointer();
   }
 
-  const ApplyInst *getApply() const { return TheApply; }
+  const FullApplySite getApply() const { return TheApply; }
 
-  ApplyInst *getApply() { return TheApply; }
+  FullApplySite getApply() { return TheApply; }
 
   /// Return a callee set that is known to be complete.
   const CalleeSetType &getCompleteCalleeSet() const {
@@ -250,7 +250,7 @@ class CallGraph {
   llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
 
   /// A map from an apply inst to its call edge in the call graph.
-  llvm::DenseMap<ApplyInst *, CallGraphEdge *> ApplyToEdgeMap;
+  llvm::DenseMap<FullApplySite , CallGraphEdge *> ApplyToEdgeMap;
 
   /// A vector of SCCs in bottom up SCC order.
   llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
@@ -288,7 +288,7 @@ public:
     return Found->second;
   }
 
-  CallGraphEdge *getCallGraphEdge(ApplyInst *AI) {
+  CallGraphEdge *getCallGraphEdge(FullApplySite AI) {
     auto Found = ApplyToEdgeMap.find(AI);
     if (Found == ApplyToEdgeMap.end())
       return nullptr;
@@ -297,7 +297,7 @@ public:
     return Found->second;
   }
 
-  CallGraphEdge *getCallGraphEdge(ApplyInst *AI) const {
+  CallGraphEdge *getCallGraphEdge(FullApplySite AI) const {
     return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
 
@@ -320,14 +320,14 @@ public:
 
   // Functions for editing an existing call graph.
 
-  void addEdgesForApply(ApplyInst *AI) {
-    addEdgesForApply(AI, getCallGraphNode(AI->getFunction()));
+  void addEdgesForApply(FullApplySite AI) {
+    addEdgesForApply(AI, getCallGraphNode(AI.getFunction()));
   }
 
   void removeEdge(CallGraphEdge *Edge);
-  void removeEdgesForApply(ApplyInst *AI);
+  void removeEdgesForApply(FullApplySite AI);
 
-  void markCallerEdgesOfCalleesIncomplete(ApplyInst *AI);
+  void markCallerEdgesOfCalleesIncomplete(FullApplySite AI);
 
   void verify() const;
 
@@ -336,7 +336,7 @@ private:
   void addEdges(SILFunction *F);
   bool tryGetCalleeSet(SILValue Callee, CallGraphEdge::CalleeSetType &CalleeSet,
                        bool &Complete);
-  void addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode);
+  void addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode);
   void computeBottomUpSCCOrder();
   void computeBottomUpFunctionOrder();
 };
