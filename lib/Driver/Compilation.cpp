@@ -274,7 +274,9 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     if (BlockedIter != State.BlockingCommands.end()) {
       for (auto *Blocked : BlockedIter->second)
         scheduleCommandIfNecessaryAndPossible(Blocked);
-      State.BlockingCommands.erase(BlockedIter);
+      // Don't erase using the iterator; BlockingCommands may have been
+      // updated by this point.
+      State.BlockingCommands.erase(FinishedCmd);
     }
 
     // In order to handle both old dependencies that have disappeared and new
