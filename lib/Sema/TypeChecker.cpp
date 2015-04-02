@@ -307,28 +307,6 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     // The extended type is generic but the extension does not have generic
     // parameters.
     if (typeDecl->getGenericParams() && !ref.GenericParams) {
-      // Emit a diagnostic complaining about the lack of generic parameters.
-      if (TC.Context.LangOpts.DiagnoseGenericExtensions) {
-        SmallString<64> genericParamsTextBuf;
-        {
-          llvm::raw_svector_ostream out(genericParamsTextBuf);
-          out << "<";
-          interleave(*typeDecl->getGenericParams(),
-                     [&](const GenericTypeParamDecl *gp) {
-                       out << gp->getName();
-                     },
-                     [&]() {
-                       out << ", ";
-                     });
-          out << ">";
-        }
-
-        TC.diagnose(tyR->getIdLoc(),
-                    diag::extension_generic_missing_params,
-                    typeDecl->getDeclaredType())
-          .fixItInsertAfter(tyR->getIdLoc(), genericParamsTextBuf);
-      }
-
       if (auto proto = dyn_cast<ProtocolDecl>(typeDecl)) {
         // For a protocol extension, build the generic parameter list.
         ref.GenericParams = proto->createGenericParams(ED);

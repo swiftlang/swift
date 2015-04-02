@@ -200,9 +200,6 @@ def enable_objc_implicit_properties :
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
-def diagnose_generic_extensions : Flag<["-"], "diagnose-generic-extensions">,
-  HelpText<"Diagnose extensions of generic types without type parameters">;
-
 def import_module : Separate<["-"], "import-module">,
   HelpText<"Implicitly import the specified module">;
 
