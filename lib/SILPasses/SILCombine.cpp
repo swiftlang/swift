@@ -346,8 +346,18 @@ class SILCombine : public SILFunctionTransform {
     SILCombiner Combiner(AA, CGA->getCallGraphOrNull(),
                          getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
-    if (Changed)
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+
+    if (Changed) {
+      // Ignore invalidation messages for all analyses that we keep up to date
+      // manually.
+      CGA->lock();
+
+      // Invalidate everything else.
+      invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+
+      // Unlock all of the analyses that we locked.
+      CGA->unlock();
+    }
   }
 
   StringRef getName() override { return "SIL Combine"; }
