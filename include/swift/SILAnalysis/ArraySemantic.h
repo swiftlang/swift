@@ -16,7 +16,9 @@
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
-  class DominanceInfo;
+
+class DominanceInfo;
+class CallGraph;
 
 /// The kind of array operation identified by looking at the semantics attribute
 /// of the called function.
@@ -89,7 +91,9 @@ public:
 
   /// Remove the semantics call replacing it by a release of any @owned
   /// parameter.
-  void removeCall();
+  ///
+  /// Updates the passed in callgraph.
+  void removeCall(CallGraph &CG);
 
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {

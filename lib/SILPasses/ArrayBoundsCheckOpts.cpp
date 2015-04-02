@@ -14,21 +14,22 @@
 
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/Builtins.h"
-#include "swift/SIL/Dominance.h"
-#include "swift/SIL/PatternMatch.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
+#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/DestructorAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
-#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILAnalysis/IVAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
+#include "swift/SILAnalysis/RCIdentityAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
-#include "swift/SILPasses/Utils/SILSSAUpdater.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Utils/SILSSAUpdater.h"
+#include "swift/SIL/Dominance.h"
+#include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -337,7 +338,8 @@ getArrayIndexPair(SILValue Array, SILValue ArrayIndex, ArrayCallKind K) {
 /// after an instruction that may modify any array allowing removal of redundant
 /// checks up to that point and after that point.
 static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
-                                         RCIdentityFunctionInfo *RCIA) {
+                                         RCIdentityFunctionInfo *RCIA,
+                                         CallGraph &CG) {
   ABCAnalysis ABC(false, Arrays, RCIA);
   IndexedArraySet RedundantChecks;
   bool Changed = false;
@@ -397,7 +399,7 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
     }
 
     // Remove the bounds check.
-    ArrayCall.removeCall();
+    ArrayCall.removeCall(CG);
     Changed = true;
   }
   return Changed;
@@ -406,7 +408,8 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
 /// Walk down the dominator tree removing redundant checks.
 static bool removeRedundantChecks(DominanceInfoNode *CurBB,
                                   ArraySet &SafeArrays,
-                                  IndexedArraySet &DominatingSafeChecks) {
+                                  IndexedArraySet &DominatingSafeChecks,
+                                  CallGraph &CG) {
   auto *BB = CurBB->getBlock();
   bool Changed = false;
 
@@ -455,14 +458,14 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
     }
 
     // Remove the bounds check.
-    ArrayCall.removeCall();
+    ArrayCall.removeCall(CG);
     Changed = true;
   }
 
   // Traverse the children in the dominator tree.
   for (auto Child: *CurBB)
     Changed |=
-        removeRedundantChecks(Child, SafeArrays, DominatingSafeChecks);
+        removeRedundantChecks(Child, SafeArrays, DominatingSafeChecks, CG);
 
   // Remove checks we have seen for the first time.
   std::for_each(SafeChecksToPop.begin(), SafeChecksToPop.end(),
@@ -841,7 +844,7 @@ public:
 
 /// Eliminate a check by hoisting it to the loop's preheader.
 static bool hoistCheck(SILBasicBlock *Preheader, ArraySemanticsCall CheckToHoist,
-                       AccessFunction &Access, DominanceInfo *DT) {
+                       AccessFunction &Access, DominanceInfo *DT, CallGraph &CG) {
   // Hoist the access function and the check to the preheader for start and end
   // of the induction.
   assert(CheckToHoist.canHoist(Preheader->getTerminator(), DT) &&
@@ -850,7 +853,7 @@ static bool hoistCheck(SILBasicBlock *Preheader, ArraySemanticsCall CheckToHoist
   Access.hoistCheckToPreheader(CheckToHoist, Preheader, DT);
 
   // Remove the old check in the loop and the match the retain with a release.
-  CheckToHoist.removeCall();
+  CheckToHoist.removeCall(CG);
 
   DEBUG(llvm::dbgs() << "  Bounds check hoisted\n");
   return true;
@@ -861,7 +864,7 @@ static bool hoistCheck(SILBasicBlock *Preheader, ArraySemanticsCall CheckToHoist
 static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
                               ArraySet &SafeArrays, InductionAnalysis &IndVars,
                               SILBasicBlock *Preheader, SILBasicBlock *Header,
-                              SILBasicBlock *ExitingBlk) {
+                              SILBasicBlock *ExitingBlk, CallGraph &CG) {
 
   bool Changed = false;
   auto *CurBB = DTNode->getBlock();
@@ -922,14 +925,14 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
       continue;
     }
     DEBUG(llvm::dbgs() << " can hoist " << *Inst);
-    Changed |= hoistCheck(Preheader, ArrayCall, F, DT);
+    Changed |= hoistCheck(Preheader, ArrayCall, F, DT, CG);
   }
 
   DEBUG(Preheader->getParent()->dump());
   // Traverse the children in the dominator tree.
   for (auto Child: *DTNode)
     Changed |= hoistChecksInLoop(DT, Child, SafeArrays, IndVars, Preheader,
-                                 Header, ExitingBlk);
+                                 Header, ExitingBlk, CG);
 
   return Changed;
 }
@@ -938,7 +941,8 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 /// based redundant bounds check removal.
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
                               IVInfo &IVs, ArraySet &Arrays,
-                              RCIdentityFunctionInfo *RCIA, bool ShouldVerify) {
+                              RCIdentityFunctionInfo *RCIA, bool ShouldVerify,
+                              CallGraph &CG) {
   auto *Header = Loop->getHeader();
   if (!Header) return false;
 
@@ -974,7 +978,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   // Remove redundant checks down the dominator tree starting at the header.
   IndexedArraySet DominatingSafeChecks;
   bool Changed = removeRedundantChecks(DT->getNode(Header), SafeArrays,
-                                       DominatingSafeChecks);
+                                       DominatingSafeChecks, CG);
 
   if (!EnableABCHoisting)
     return Changed;
@@ -1014,7 +1018,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   // Hoist bounds checks.
   if (!SafeArrays.empty())
     Changed |= hoistChecksInLoop(DT, DT->getNode(Header), SafeArrays, IndVars,
-                                 Preheader, Header, ExitingBlk);
+                                 Preheader, Header, ExitingBlk, CG);
   if (Changed) {
     Preheader->getParent()->verify();
   }
@@ -1061,12 +1065,15 @@ public:
     if (!EnableABCOpts)
       return;
 
-    SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
+    auto *LA = PM->getAnalysis<SILLoopAnalysis>();
     assert(LA);
-    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *DA = PM->getAnalysis<DominanceAnalysis>();
     assert(DA);
-    IVAnalysis *IVA = PM->getAnalysis<IVAnalysis>();
+    auto *IVA = PM->getAnalysis<IVAnalysis>();
     assert(IVA);
+    auto *CGA = PM->getAnalysis<CallGraphAnalysis>(); // Just for updating.
+    assert(CGA);
+    CallGraph &CG = CGA->getCallGraph();
 
     SILFunction *F = getFunction();
     assert(F);
@@ -1076,7 +1083,7 @@ public:
     assert(DT);
     IVInfo &IVs = IVA->getIVInfo(F);
     auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(F);
-    auto DestAnalysis = PM->getAnalysis<DestructorAnalysis>();
+    auto *DestAnalysis = PM->getAnalysis<DestructorAnalysis>();
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };
     // Collect all arrays in this function. A release is only 'safe' if we know
@@ -1104,7 +1111,7 @@ public:
     // Remove redundant checks on a per basic block basis.
     bool Changed = false;
     for (auto &BB : *F)
-      Changed |= removeRedundantChecksInBlock(BB, ReleaseSafeArrays, RCIA);
+      Changed |= removeRedundantChecksInBlock(BB, ReleaseSafeArrays, RCIA, CG);
 
     if (ShouldReportBoundsChecks) { reportBoundsChecks(F); };
 
@@ -1128,7 +1135,8 @@ public:
 
         while (!Worklist.empty()) {
           Changed |= hoistBoundsChecks(Worklist.pop_back_val(), DT, LI, IVs,
-                                       ReleaseSafeArrays, RCIA, ShouldVerify);
+                                       ReleaseSafeArrays, RCIA, ShouldVerify,
+                                       CG);
         }
       }
 
