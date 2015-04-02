@@ -483,7 +483,7 @@ testIsEmptyFirstLast${A}()
 //===--- Regression Tests -------------------------------------------------===//
 func rdar16958865() {
   var a: [Int] = []
-  a += SequenceOf([ 42, 4242 ])
+  a += AnySequence([ 42, 4242 ])
   // CHECK-NEXT: [42, 4242]
   println(a)
 }

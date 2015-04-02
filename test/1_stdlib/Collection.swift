@@ -167,6 +167,11 @@ func testCount() {
 }
 testCount()
 
+struct SequenceOnly<T: SequenceType> : SequenceType {
+  var base: T
+  func generate() -> T.Generator { return base.generate() }
+}
+
 func testUnderestimateCount() {
   // CHECK: testing underestimateCount
   println("testing underestimateCount")
@@ -175,7 +180,7 @@ func testUnderestimateCount() {
   // CHECK-NEXT: bidirectional: 5
   println("bidirectional: \(underestimateCount(dict))")
   // CHECK-NEXT: SequenceType only: 0
-  let s = SequenceOf(array)
+  let s = SequenceOnly(base: array)
   println("SequenceType only: \(underestimateCount(s))")
 }
 testUnderestimateCount()
