@@ -336,8 +336,8 @@ std::string ide::getSDKName(StringRef Path) {
 }
 
 std::string ide::getSDKVersion(StringRef Path) {
-  return getPlistEntry(llvm::Twine(Path)+"/System/Library/CoreServices/        \
-                       SystemVersion.plist", "ProductBuildVersion");
+  return getPlistEntry(llvm::Twine(Path)+"/System/Library/CoreServices/"
+                       "SystemVersion.plist", "ProductBuildVersion");
 }
 
 // Modules failing to load are commented-out.
