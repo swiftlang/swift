@@ -317,10 +317,11 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
       if (SILInstruction *Op = llvm::dyn_cast<SILInstruction>(&*OpI.get()))
         Worklist.add(Op);
 
-  // If we have an apply inst, remove any edges from the callgraph.
-  if (auto *AI = dyn_cast<ApplyInst>(&I)) {
-    CG.removeEdgesForApply(AI, true /*Ignore Missing*/);
-  }
+  // If we have a call graph and we've removing an apply, remove the
+  // associated edges from the call graph.
+  if (CG)
+    if (auto *AI = dyn_cast<ApplyInst>(&I))
+      CG->removeEdgesForApply(AI, true /*Ignore Missing*/);
 
   Worklist.remove(&I);
   I.eraseFromParent();
@@ -342,7 +343,7 @@ class SILCombine : public SILFunctionTransform {
 
     // Call Graph Analysis in case we need to perform Call Graph updates.
     auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
-    SILCombiner Combiner(AA, CGA->getCallGraph(),
+    SILCombiner Combiner(AA, CGA->getCallGraphOrNull(),
                          getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     if (Changed)

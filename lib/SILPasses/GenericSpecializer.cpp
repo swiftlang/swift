@@ -131,7 +131,7 @@ public:
 
     // Collect a call-graph bottom-up list of functions and specialize the
     // functions in reverse order.
-    auto &CG = CGA->getCallGraph();
+    auto &CG = CGA->getOrBuildCallGraph();
     auto GS = GenericSpecializer();
 
     // Try to specialize generic calls.

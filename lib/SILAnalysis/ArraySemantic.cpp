@@ -400,14 +400,15 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
   } // End switch.
 }
 
-void swift::ArraySemanticsCall::removeCall(CallGraph &CG) {
+void swift::ArraySemanticsCall::removeCall(CallGraph *CG) {
   if (getSelfParameterConvention(SemanticsCall) ==
       ParameterConvention::Direct_Owned)
     SILBuilderWithScope<1>(SemanticsCall)
         .createReleaseValue(SemanticsCall->getLoc(), getSelf());
 
   // Invalidate any information in the callgraph.
-  CG.removeEdgesForApply(SemanticsCall, true/*Ignore Missing*/);
+  if (CG)
+    CG->removeEdgesForApply(SemanticsCall, true/*Ignore Missing*/);
 
   SemanticsCall->eraseFromParent();
   SemanticsCall = nullptr;

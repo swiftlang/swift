@@ -339,7 +339,7 @@ getArrayIndexPair(SILValue Array, SILValue ArrayIndex, ArrayCallKind K) {
 /// checks up to that point and after that point.
 static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
                                          RCIdentityFunctionInfo *RCIA,
-                                         CallGraph &CG) {
+                                         CallGraph *CG) {
   ABCAnalysis ABC(false, Arrays, RCIA);
   IndexedArraySet RedundantChecks;
   bool Changed = false;
@@ -409,7 +409,7 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
 static bool removeRedundantChecks(DominanceInfoNode *CurBB,
                                   ArraySet &SafeArrays,
                                   IndexedArraySet &DominatingSafeChecks,
-                                  CallGraph &CG) {
+                                  CallGraph *CG) {
   auto *BB = CurBB->getBlock();
   bool Changed = false;
 
@@ -844,7 +844,7 @@ public:
 
 /// Eliminate a check by hoisting it to the loop's preheader.
 static bool hoistCheck(SILBasicBlock *Preheader, ArraySemanticsCall CheckToHoist,
-                       AccessFunction &Access, DominanceInfo *DT, CallGraph &CG) {
+                       AccessFunction &Access, DominanceInfo *DT, CallGraph *CG) {
   // Hoist the access function and the check to the preheader for start and end
   // of the induction.
   assert(CheckToHoist.canHoist(Preheader->getTerminator(), DT) &&
@@ -864,7 +864,7 @@ static bool hoistCheck(SILBasicBlock *Preheader, ArraySemanticsCall CheckToHoist
 static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
                               ArraySet &SafeArrays, InductionAnalysis &IndVars,
                               SILBasicBlock *Preheader, SILBasicBlock *Header,
-                              SILBasicBlock *ExitingBlk, CallGraph &CG) {
+                              SILBasicBlock *ExitingBlk, CallGraph *CG) {
 
   bool Changed = false;
   auto *CurBB = DTNode->getBlock();
@@ -942,7 +942,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
 static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
                               IVInfo &IVs, ArraySet &Arrays,
                               RCIdentityFunctionInfo *RCIA, bool ShouldVerify,
-                              CallGraph &CG) {
+                              CallGraph *CG) {
   auto *Header = Loop->getHeader();
   if (!Header) return false;
 
@@ -1073,7 +1073,7 @@ public:
     assert(IVA);
     auto *CGA = PM->getAnalysis<CallGraphAnalysis>(); // Just for updating.
     assert(CGA);
-    CallGraph &CG = CGA->getCallGraph();
+    CallGraph *CG = CGA->getCallGraphOrNull();
 
     SILFunction *F = getFunction();
     assert(F);

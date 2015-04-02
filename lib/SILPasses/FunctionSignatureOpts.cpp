@@ -788,7 +788,7 @@ public:
 
     DEBUG(llvm::dbgs() << "**** Optimizing Function Signatures ****\n\n");
 
-    CallGraph &CG = CGA->getCallGraph();
+    CallGraph &CG = CGA->getOrBuildCallGraph();
 
     // Construct a map from Callee -> Call Site Set.
 

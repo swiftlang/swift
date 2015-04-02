@@ -331,7 +331,7 @@ class COWArrayOpt {
   SILLoop *Loop;
   SILBasicBlock *Preheader;
   DominanceInfo *DomTree;
-  CallGraph &CG;
+  CallGraph *CG;
   bool HasChanged = false;
 
   // Keep track of cold blocks.
@@ -363,7 +363,7 @@ class COWArrayOpt {
   SmallPtrSet<Operand*, 8> MatchedReleases;
 public:
   COWArrayOpt(AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA, SILLoop *L,
-              DominanceAnalysis *DA, CallGraph &CG)
+              DominanceAnalysis *DA, CallGraph *CG)
       : AA(AA), RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
         Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
         CG(CG), ColdBlocks(DA), CachedSafeLoop(false, false) {}
@@ -1008,7 +1008,7 @@ class COWArrayOptPass : public SILFunctionTransform {
       PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
     SILLoopInfo *LI = LA->getLoopInfo(getFunction());
     auto *AA = PM->getAnalysis<AliasAnalysis>();
-    CallGraph &CG = PM->getAnalysis<CallGraphAnalysis>()->getCallGraph();
+    CallGraph *CG = PM->getAnalysis<CallGraphAnalysis>()->getCallGraphOrNull();
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");
       return;
@@ -1565,10 +1565,10 @@ class ArrayPropertiesSpecializer {
   SILBasicBlock *HoistableLoopPreheader;
 
   /// Just for updating.
-  CallGraph &CG;
+  CallGraph *CG;
 public:
   ArrayPropertiesSpecializer(DominanceInfo *DT, SILLoopAnalysis *LA,
-                             SILBasicBlock *Hoistable, CallGraph &CG)
+                             SILBasicBlock *Hoistable, CallGraph *CG)
       : DomTree(DT), LoopAnalysis(LA), HoistableLoopPreheader(Hoistable),
         CG(CG) {}
 
@@ -1674,7 +1674,7 @@ static void collectArrayPropsCalls(
 /// This is true for array.props.isNative and false for
 /// array.props.needsElementTypeCheck.
 static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C,
-                                  CallGraph &CG) {
+                                  CallGraph *CG) {
   auto CallKind = C.getKind();
   assert(CallKind == ArrayCallKind::kArrayPropsIsNative ||
          CallKind == ArrayCallKind::kArrayPropsNeedsTypeCheck);
@@ -1767,7 +1767,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SILLoopInfo *LI = LA->getLoopInfo(getFunction());
-    CallGraph &CG = PM->getAnalysis<CallGraphAnalysis>()->getCallGraph();
+    CallGraph *CG = PM->getAnalysis<CallGraphAnalysis>()->getCallGraphOrNull();
 
     bool HasChanged = false;
 

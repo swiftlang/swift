@@ -140,11 +140,11 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
-  /// Call Graph in case we need to update it when deleting code.
-  CallGraph &CG;
+  /// The call graph, if we have one, or nullptr otherwise.
+  CallGraph *CG;
 
 public:
-  SILCombiner(AliasAnalysis *AA, CallGraph &CG, bool removeCondFails)
+  SILCombiner(AliasAnalysis *AA, CallGraph *CG, bool removeCondFails)
       : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
         Iteration(0), Builder(0),
         CastOpt(/* ReplaceInstUsesAction */

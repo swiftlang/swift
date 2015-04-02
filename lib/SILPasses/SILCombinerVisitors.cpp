@@ -629,7 +629,8 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
                                         Subs, Args);
   NAI->setDebugScope(AI->getDebugScope());
 
-  CG.addEdgesForApply(NAI);
+  if (CG)
+    CG->addEdgesForApply(NAI);
 
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
@@ -1274,7 +1275,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
       replaceInstUsesWith(*AI, NewAI, 0);
       eraseInstFromFunction(*AI);
 
-      CG.addEdgesForApply(NewAI);
+      if (CG)
+        CG->addEdgesForApply(NewAI);
 
       return nullptr;
     }
@@ -1540,7 +1542,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
                 Builder, AI, OrigThinFun, CastedThinFun)) {
           replaceInstUsesWith(*AI, NewAI, 0);
           eraseInstFromFunction(*AI);
-          CG.addEdgesForApply(NewAI);
+          if (CG)
+            CG->addEdgesForApply(NewAI);
           return nullptr;
         }
 

@@ -731,7 +731,7 @@ public:
     ClosureSpecializer C;
 
     // Specialize going bottom-up in the call graph.
-    for (auto *F : CGA->getCallGraph().getBottomUpFunctionOrder()) {
+    for (auto *F : CGA->getOrBuildCallGraph().getBottomUpFunctionOrder()) {
       // If F is an external declaration, attempt to link in its definition. If
       // we fail to do so, there is nothing further that we can do.
       if (F->isExternalDeclaration() &&

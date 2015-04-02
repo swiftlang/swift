@@ -360,7 +360,14 @@ public:
     return S->getKind() == AnalysisKind::CallGraph;
   }
 
+  bool haveCallGraph() { return CG; }
+  CallGraph *getCallGraphOrNull() { return CG; }
   CallGraph &getCallGraph() {
+    assert(haveCallGraph() && "Expected constructed call graph!");
+    return *CG;
+  }
+
+  CallGraph &getOrBuildCallGraph() {
     if (!CG)
       CG = new CallGraph(M, false);
     return *CG;

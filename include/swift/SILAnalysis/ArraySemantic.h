@@ -92,8 +92,8 @@ public:
   /// Remove the semantics call replacing it by a release of any @owned
   /// parameter.
   ///
-  /// Updates the passed in callgraph.
-  void removeCall(CallGraph &CG);
+  /// Updates the passed in callgraph if non-null.
+  void removeCall(CallGraph *CG);
 
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {
