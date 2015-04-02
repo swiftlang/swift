@@ -42,38 +42,38 @@ enum class DynamicCastFeasibility {
 
 /// Classify the feasibility of a dynamic cast.  The source and target
 /// types should be unlowered formal types.
-DynamicCastFeasibility classifyDynamicCast(Module *context,
-                                           CanType sourceType,
-                                           CanType targetType,
-                                           bool isSourceTypeExact = false,
-                                           bool isWholdModuleOpts = false);
+DynamicCastFeasibility classifyDynamicCast(
+    Module *context,
+    CanType sourceType, CanType targetType,
+    bool isSourceTypeExact = false,
+    bool isWholdModuleOpts = false);
 
-SILValue emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
-                                               SILLocation loc, SILValue value,
-                                               SILType loweredTargetType,
-                                               CanType formalSourceType,
-                                               CanType formalTargetType);
+SILValue emitSuccessfulScalarUnconditionalCast(
+    SILBuilder &B, Module *M, SILLocation loc, SILValue value,
+    SILType loweredTargetType,
+    CanType formalSourceType, CanType formalTargetType,
+    SILInstruction *existingCast = nullptr);
 
-void emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
-                                             SILLocation loc,
-                                             CastConsumptionKind consumption,
-                                             SILValue src, CanType sourceType,
-                                             SILValue dest, CanType targetType);
+bool emitSuccessfulIndirectUnconditionalCast(
+    SILBuilder &B, Module *M, SILLocation loc,
+    CastConsumptionKind consumption,
+    SILValue src, CanType sourceType,
+    SILValue dest, CanType targetType,
+    SILInstruction *existingCast = nullptr);
 
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions, or does we need to use the indirect instructions?
-bool canUseScalarCheckedCastInstructions(SILModule &M, CanType sourceType,
-                                         CanType targetType);
+bool canUseScalarCheckedCastInstructions(
+    SILModule &M, CanType sourceType, CanType targetType);
 
 /// Carry out the operations required for an indirect conditional cast
 /// using a scalar cast operation.
-void emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
-                                           SILLocation loc,
-                                           CastConsumptionKind consumption,
-                                           SILValue src, CanType sourceType,
-                                           SILValue dest, CanType targetType,
-                                           SILBasicBlock *trueBB,
-                                           SILBasicBlock *falseBB);
+void emitIndirectConditionalCastWithScalar(
+    SILBuilder &B, Module *M, SILLocation loc,
+    CastConsumptionKind consumption,
+    SILValue src, CanType sourceType,
+    SILValue dest, CanType targetType,
+    SILBasicBlock *trueBB, SILBasicBlock *falseBB);
 
 /// \brief Does the type conform to the _ObjectiveCBridgeable protocol.
 bool isObjectiveCBridgeable(Module *M, CanType Ty);

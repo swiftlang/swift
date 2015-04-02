@@ -691,9 +691,20 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
                                              SILLocation loc, SILValue value,
                                              SILType loweredTargetType,
                                              CanType sourceType,
-                                             CanType targetType) {
+                                             CanType targetType,
+                                             SILInstruction *existingCast) {
   assert(classifyDynamicCast(M, sourceType, targetType)
            == DynamicCastFeasibility::WillSucceed);
+
+  // Casts to/from existential types cannot be further improved.
+  if (sourceType.isAnyExistentialType() ||
+      targetType.isAnyExistentialType()) {
+    if (existingCast)
+      // Indicate that the existing cast cannot be further improved.
+      return SILValue();
+
+    llvm_unreachable("Casts to/from existentials are not supported yet");
+  }
 
   // Fast path changes that don't change the type.
   if (sourceType == targetType)
@@ -708,24 +719,41 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
   return result.Value;
 }
 
-void swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
+bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
                                                     SILLocation loc,
                                                CastConsumptionKind consumption,
                                                     SILValue src,
                                                     CanType sourceType,
                                                     SILValue dest,
-                                                    CanType targetType) {
+                                                    CanType targetType,
+                                                    SILInstruction *existingCast) {
   assert(classifyDynamicCast(M, sourceType, targetType)
            == DynamicCastFeasibility::WillSucceed);
 
   assert(src.getType().isAddress());
   assert(dest.getType().isAddress());
 
-  if (!src.getType().isExistentialType() && dest.getType().isExistentialType()) {
-    B.createUnconditionalCheckedCastAddr(
-        loc, consumption, src,
-        sourceType, dest, targetType);
-    return;
+  // Casts from non-existentials into existentials and
+  // vice-versa cannot be improved yet.
+  // Therefore generate a simple unconditional_checked_cast_aadr.
+  if (src.getType().isAnyExistentialType() !=
+      dest.getType().isAnyExistentialType()) {
+    // If there is an existing cast with the same arguments,
+    // indicate we cannot improve it.
+    if (existingCast) {
+      auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(existingCast);
+      if (UCCAI && UCCAI->getSrc() == src && UCCAI->getDest() == dest &&
+          UCCAI->getSourceType() == sourceType &&
+          UCCAI->getTargetType() == targetType &&
+          UCCAI->getConsumptionKind() == consumption) {
+        // Indicate that the existing cast cannot be further improved.
+        return false;
+      }
+    }
+
+    B.createUnconditionalCheckedCastAddr(loc, consumption, src, sourceType,
+                                         dest, targetType);
+    return true;
   }
 
   Source source(src, sourceType, consumption);
@@ -735,6 +763,7 @@ void swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
   assert(result.Value == dest);
   assert(result.Consumption == CastConsumptionKind::TakeAlways);
   (void) result;
+  return true;
 }
 
 /// Can the given cast be performed by the scalar checked-cast

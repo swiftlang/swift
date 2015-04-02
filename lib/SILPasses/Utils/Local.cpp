@@ -793,31 +793,11 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   }
 
   if (!ResultNotUsed) {
-
-    bool useIndirectUnconditionalCastEmitter = true;
-
-    // emitSuccessfulIndirectUnconditionalCast can handle only
-    // address types currently.
-    if (!Src.getType().isAddress() || !Dest.getType().isAddress())
-      useIndirectUnconditionalCastEmitter = false;
-
-    // emitSuccessfulIndirectUnconditionalCast cannot handle casts
-    // between metatypes yet.
-    if (isa<AnyMetatypeType>(Src.getType().getSwiftRValueType()) ||
-        isa<AnyMetatypeType>(Dest.getType().getSwiftRValueType())) {
-      useIndirectUnconditionalCastEmitter = false;
-    }
-
-
-    if (useIndirectUnconditionalCastEmitter) {
-      emitSuccessfulIndirectUnconditionalCast(
-          Builder, Mod.getSwiftModule(), Loc, Inst->getConsumptionKind(), Src,
-          SourceType, Dest, TargetType);
-    } else {
-      // Generate an unconditional cast
-      Builder.createUnconditionalCheckedCastAddr(
-          Loc, Inst->getConsumptionKind(), Src, SourceType, Dest, TargetType);
-    }
+    if (!emitSuccessfulIndirectUnconditionalCast(
+            Builder, Mod.getSwiftModule(), Loc, Inst->getConsumptionKind(), Src,
+            SourceType, Dest, TargetType, Inst))
+      // No optimization was possible.
+      return nullptr;
   }
 
   auto *NewI = Builder.createBranch(Loc, SuccessBB);
@@ -898,18 +878,13 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   SILValue CastedValue;
   if (Op.getType() != LoweredTargetType) {
     if (!ResultNotUsed) {
-      // emitSuccessfulScalarUnconditionalCast cannot
-      // further simplify casts from/to existentials.
-      if (LoweredTargetType.isAnyExistentialType() ||
-          LoweredSourceType.isAnyExistentialType()) {
+      CastedValue = emitSuccessfulScalarUnconditionalCast(
+          Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
+          LoweredSourceType.getSwiftRValueType(),
+          LoweredTargetType.getSwiftRValueType(), Inst);
+      if (!CastedValue)
         CastedValue =
             Builder.createUnconditionalCheckedCast(Loc, Op, LoweredTargetType);
-      } else {
-        CastedValue = emitSuccessfulScalarUnconditionalCast(
-            Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
-            LoweredSourceType.getSwiftRValueType(),
-            LoweredTargetType.getSwiftRValueType());
-      }
     } else {
       CastedValue = SILUndef::get(LoweredTargetType, Mod);
     }
@@ -1180,17 +1155,17 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
     SILBuilderWithScope<1> Builder(Inst);
 
-    // emitSuccessfulScalarUnconditionalCast cannot
-    // further simplify casts from/to existentials.
-    if (LoweredTargetType.isAnyExistentialType() ||
-        LoweredSourceType.isAnyExistentialType())
-      return nullptr;
-
     auto Result = emitSuccessfulScalarUnconditionalCast(Builder,
                       Mod.getSwiftModule(), Loc, Op,
                       LoweredTargetType,
                       LoweredSourceType.getSwiftRValueType(),
-                      LoweredTargetType.getSwiftRValueType());
+                      LoweredTargetType.getSwiftRValueType(),
+                      Inst);
+
+    if (!Result) {
+      // No optimization was possible.
+      return nullptr;
+    }
 
     ReplaceInstUsesAction(Inst, Result.getDef());
     EraseInstAction(Inst);
@@ -1253,10 +1228,14 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
       return nullptr;
 
     SILBuilderWithScope<1> Builder(Inst);
-    emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(), Loc,
-                                            Inst->getConsumptionKind(),
+    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
+                                            Loc, Inst->getConsumptionKind(),
                                             Src, SourceType,
-                                            Dest, TargetType);
+                                            Dest, TargetType, Inst)) {
+      // No optimization was possible.
+      return nullptr;
+    }
+
     Inst->replaceAllUsesWithUndef();
     EraseInstAction(Inst);
     WillSucceedAction();
