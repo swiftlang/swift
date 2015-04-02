@@ -75,10 +75,8 @@ static llvm::cl::opt<OptGroup> OptimizationGroup(
     llvm::cl::desc("Predefined optimization groups:"),
     llvm::cl::values(clEnumValN(OptGroup::Diagnostics, "diagnostics",
                                 "Run diagnostic passes"),
-                     clEnumValN(OptGroup::Performance, "performance",
-                                "Run performance passes"),
                      clEnumValN(OptGroup::Performance, "O",
-                                "Alias for -performance"),
+                                "Run performance passes"),
                      clEnumValEnd),
     llvm::cl::init(OptGroup::Unknown));
 
