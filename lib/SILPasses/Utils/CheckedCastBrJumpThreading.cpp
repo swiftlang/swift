@@ -654,6 +654,14 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     if (SuccessPreds.empty() && FailurePreds.empty())
       return false;
 
+    // If this check is reachable via success, failure and unknown
+    // at the same time, then we don't know the outcome of the
+    // dominating check. No jump-threading is possible in this case.
+    if (!SuccessPreds.empty() && !FailurePreds.empty() &&
+        !UnknownPreds.empty()) {
+      return false;
+    }
+
     unsigned TotalPreds =
         SuccessPreds.size() + FailurePreds.size() + UnknownPreds.size();
 
