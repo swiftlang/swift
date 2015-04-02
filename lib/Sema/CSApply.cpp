@@ -5854,6 +5854,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         TROptions |= TR_OverrideType;
         TROptions |= TR_FromNonInferredPattern;
         TROptions |= TR_InExpression;
+        TROptions |= TR_ImmediateFunctionInput;
         if (tc.coercePatternToType(params, closure, fnType->getInput(),
                                    TROptions))
           return { false, nullptr };

@@ -1647,6 +1647,13 @@ ERROR(invalid_pattern,sema_tcd,none,
 
 ERROR(pattern_type_mismatch_context,sema_tcp,none,
       "type annotation does not match contextual type %0", (Type))
+ERROR(label_single_entry_tuple,sema_tcp,none,
+      "label is not allowed on single element tuple pattern", ())
+NOTE(remove_parens_for_type_annotation,sema_tcp,none,
+     "remove the parentheses to make this a type annotation", ())
+NOTE(remove_label_for_tuple_pattern,sema_tcp,none,
+     "remove the label to make this a tuple pattern", ())
+
 ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
 ERROR(tuple_pattern_length_mismatch,sema_tcp,none,

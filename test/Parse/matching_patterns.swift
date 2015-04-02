@@ -206,13 +206,13 @@ case let .Payload(x):
 case let .Payload(name: x):
   acceptInt(x)
   acceptString("\(x)")
-case let .Payload((name: x)):
+case let .Payload((name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} expected-note {{remove the label to make this a tuple pattern}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)):
+case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} expected-note {{remove the label to make this a tuple pattern}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)):
+case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} expected-note {{remove the label to make this a tuple pattern}}
   acceptInt(x)
   acceptString("\(x)")
 case .Payload(let x):
@@ -346,3 +346,14 @@ case _?: break
 case (1?)?: break
 case (_?)?: break
 }
+
+
+
+// <rdar://problem/20365753> Bogus diagnostic "refutable pattern match can fail"
+// expected-error @+4 {{refutable pattern match can fail; add an else {} to handle this condition}}
+// expected-error @+3 {{label is not allowed on single element tuple pattern}}
+// expected-note @+2 {{remove the parentheses to make this a type annotation}} {{5-6=}} {{26-27=}}
+// expected-note @+1 {{remove the label to make this a tuple pattern}} {{6-21=}}
+let (responseObject: Int?) = op1
+
+
