@@ -76,8 +76,11 @@ let uselessValue : String?
 
 func tuplePatternDestructuring(x : Int, y : Int) {
   let (b: g, a: h) = (b: x, a: y)
- 
+  
   // <rdar://problem/20392122> Destructuring tuple with labels doesn't work
   let (i, j) = (b: x, a: y)
+
+  // FIXME: This diagnostic isn't right: rdar://20395243
+  let (x: g1, a: h1) = (b: x, a: y)  // expected-error {{'(b: Int, a: Int)' is not convertible to '(x: (b: Int, a: Int), a: (b: Int, a: Int))'}}
 }
 
