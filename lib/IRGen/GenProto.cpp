@@ -725,7 +725,7 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T) const override {
       Address destValue = projectValue(IGF, dest);
-      Address srcValue = projectValue(IGF, dest);
+      Address srcValue = projectValue(IGF, src);
       IGF.emitUnknownWeakCopyAssign(destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     }
@@ -734,7 +734,7 @@ namespace {
                             Address dest, Address src,
                             SILType T) const override {
       Address destValue = projectValue(IGF, dest);
-      Address srcValue = projectValue(IGF, dest);
+      Address srcValue = projectValue(IGF, src);
       IGF.emitUnknownWeakCopyInit(destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     }
@@ -743,7 +743,7 @@ namespace {
                         Address dest, Address src,
                         SILType T) const override {
       Address destValue = projectValue(IGF, dest);
-      Address srcValue = projectValue(IGF, dest);
+      Address srcValue = projectValue(IGF, src);
       IGF.emitUnknownWeakTakeAssign(destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     }
@@ -752,7 +752,7 @@ namespace {
                             Address dest, Address src,
                             SILType T) const override {
       Address destValue = projectValue(IGF, dest);
-      Address srcValue = projectValue(IGF, dest);
+      Address srcValue = projectValue(IGF, src);
       IGF.emitUnknownWeakTakeInit(destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     }
