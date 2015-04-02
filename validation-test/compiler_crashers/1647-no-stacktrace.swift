@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -emit-silgen
+// RUN: %target-swift-frontend %s -emit-silgen
 // XFAIL: no_asserts
 
 // Distributed under the terms of the MIT license
