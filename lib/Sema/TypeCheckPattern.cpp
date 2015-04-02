@@ -964,8 +964,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     }
 
     // Coerce each tuple element to the respective type.
-    // TODO: detect and diagnose shuffling
-    // TODO: permit shuffling
     P->setType(type);
 
     for (unsigned i = 0, e = TP->getNumFields(); i != e; ++i) {
@@ -978,7 +976,18 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         CoercionType = ErrorType::get(Context);
       else
         CoercionType = tupleTy->getFields()[i].getType();
-
+      
+      // If the tuple pattern had a label for the tuple element, it must match
+      // the label for the tuple type being matched.
+      // TODO: detect and diagnose shuffling
+      // TODO: permit shuffling
+      if (!elt.getLabel().empty() &&
+          elt.getLabel() != tupleTy->getFields()[i].getName()) {
+        diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
+                 elt.getLabel(), tupleTy->getFields()[i].getName());
+        hadError = true;
+      }
+      
       TypeResolutionOptions subOptions = options - TR_Variadic;
       if (isVararg)
         subOptions |= TR_Variadic;

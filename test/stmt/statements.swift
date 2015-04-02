@@ -303,6 +303,23 @@ Loop:  // expected-note {{previously declared here}}
 }
 
 
+enum MyEnumWithCaseLabels {
+  case Case(one: String, two: Int)
+}
+
+func testMyEnumWithCaseLabels(a : MyEnumWithCaseLabels) {
+  // <rdar://problem/20135489> Enum case labels are ignored in "case let" statements
+  switch a {
+  case let .Case(one: _, two: x): break // ok
+  case let .Case(xxx: _, two: x): break // expected-error {{tuple pattern element label 'xxx' must be 'one'}}
+  // TODO: In principle, reordering like this could be supported.
+  case let .Case(two: _, one: x): break // expected-error 2 {{tuple pattern element label}}
+  }
+}
+
+
+
+
 /// "let-else"
 func test_let_else(x : Int, y : Int??, cond : Bool) {
   
@@ -327,4 +344,8 @@ func test_let_else(x : Int, y : Int??, cond : Bool) {
   // error: Computed properties cannot have where/else.
   // error: properties in structs, etc cannot be refutable.
 }
+
+
+
+
 

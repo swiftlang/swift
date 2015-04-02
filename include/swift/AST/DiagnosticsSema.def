@@ -1651,6 +1651,8 @@ ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
 ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
+ERROR(tuple_pattern_label_mismatch,sema_tcp,none,
+      "tuple pattern element label %0 must be %1", (Identifier, Identifier))
 ERROR(enum_element_pattern_member_not_found,sema_tcp,none,
       "enum case '%0' not found in type %1", (StringRef, Type))
 ERROR(bool_pattern_member_not_found,sema_tcp,none,
