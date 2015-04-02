@@ -1913,7 +1913,8 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       pattern->setImplicit();
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
       pattern = new (context) TypedPattern(pattern, tyLoc);
-      patternElts.push_back(TuplePatternElt(pattern));
+      patternElts.push_back(TuplePatternElt(var->getName(), SourceLoc(),
+                                            pattern));
     }
   }
 

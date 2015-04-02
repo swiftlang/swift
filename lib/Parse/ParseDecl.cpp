@@ -2427,7 +2427,8 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
         auto *TP = cast<TuplePattern>(Indices);
         for (const auto &elt : TP->getFields()) {
           ValueArgElements.push_back(
-            TuplePatternElt(clonePattern(elt.getPattern())));
+            TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
+                            clonePattern(elt.getPattern())));
         }
         isVararg = TP->hasVararg();
       }
