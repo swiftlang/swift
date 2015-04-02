@@ -223,11 +223,16 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
   ++NumAppliesWithoutEdges;
 }
 
-void CallGraph::removeEdgesForApply(ApplyInst *AI) {
+void CallGraph::removeEdgesForApply(ApplyInst *AI, bool IgnoreMissing) {
   auto *CallerNode = getCallGraphNode(AI->getFunction());
+  auto *Edge = getCallGraphEdge(AI);
 
-  assert(ApplyToEdgeMap.count(AI) && "Expected apply to be in edge map!");
-  auto *Edge = ApplyToEdgeMap[AI];
+  // If we don't have edge and are ignoring applies without any state, return
+  // early. There is nothing further to do.
+  if (!Edge && IgnoreMissing)
+    return;
+
+  assert(Edge && "Expected apply to be in edge map!");
 
   auto &CalleeSet = Edge->getPartialCalleeSet();
   for (auto *CalleeNode : CalleeSet)

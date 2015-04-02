@@ -49,7 +49,7 @@ STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 /// particular, we DCE instructions as we go, to avoid adding them to the
 /// worklist (this significantly speeds up SILCombine on code where many
 /// instructions are dead or constant).
-static void addReachableCodeToWorklist(SILBasicBlock *BB, SILCombiner &SC) {
+void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
   llvm::SmallVector<SILBasicBlock*, 256> Worklist;
   llvm::SmallVector<SILInstruction*, 128> InstrsForSILCombineWorklist;
   llvm::SmallPtrSet<SILBasicBlock*, 64> Visited;
@@ -68,7 +68,16 @@ static void addReachableCodeToWorklist(SILBasicBlock *BB, SILCombiner &SC) {
       if (isInstructionTriviallyDead(Inst)) {
         ++NumDeadInst;
         DEBUG(llvm::dbgs() << "SC: DCE: " << *Inst << '\n');
-        Inst->eraseFromParent();
+
+        // We pass in false here since we need to signal to
+        // eraseInstFromFunction to not add this instruction's operands to the
+        // worklist since we have not initialized the worklist yet.
+        //
+        // The reason to just use a default argument here is that it allows us
+        // to centralize all instruction removal in SILCombine into this one
+        // function. This is important if we want to be able to update analyses
+        // in a clean manner.
+        eraseInstFromFunction(*Inst, false /*Don't add operands to worklist*/);
         continue;
       }
 
@@ -85,7 +94,7 @@ static void addReachableCodeToWorklist(SILBasicBlock *BB, SILCombiner &SC) {
   // function down. This jives well with the way that it adds all uses of
   // instructions to the worklist after doing a transformation, thus avoiding
   // some N^2 behavior in pathological cases.
-  SC.addInitialGroup(InstrsForSILCombineWorklist);
+  addInitialGroup(InstrsForSILCombineWorklist);
 }
 
 //===----------------------------------------------------------------------===//
@@ -107,7 +116,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
                      << F.getName() << "\n");
 
   // Add reachable instructions to our worklist.
-  addReachableCodeToWorklist(F.begin(), *this);
+  addReachableCodeToWorklist(F.begin());
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
@@ -296,16 +305,22 @@ replaceInstUsesWith(SILInstruction &I, ValueBase *V, unsigned IIndex,
 // instruction, visit methods should use this method to delete the given
 // instruction and upon completion of their peephole return the value returned
 // by this method.
-SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I) {
+SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
+                                                   bool AddOperandsToWorklist) {
   DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
 
   assert(I.use_empty() && "Cannot erase instruction that is used!");
   // Make sure that we reprocess all operands now that we reduced their
   // use counts.
-  if (I.getNumOperands() < 8)
+  if (I.getNumOperands() < 8 && AddOperandsToWorklist)
     for (auto &OpI : I.getAllOperands())
       if (SILInstruction *Op = llvm::dyn_cast<SILInstruction>(&*OpI.get()))
         Worklist.add(Op);
+
+  // If we have an apply inst, remove any edges from the callgraph.
+  if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+    CG.removeEdgesForApply(AI, true /*Ignore Missing*/);
+  }
 
   Worklist.remove(&I);
   I.eraseFromParent();
@@ -324,7 +339,11 @@ class SILCombine : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
-    SILCombiner Combiner(AA, getOptions().RemoveRuntimeAsserts);
+
+    // Call Graph Analysis in case we need to perform Call Graph updates.
+    auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
+    SILCombiner Combiner(AA, CGA->getCallGraph(),
+                         getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     if (Changed)
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);

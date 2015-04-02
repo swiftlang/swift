@@ -26,6 +26,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -139,15 +140,20 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
+  /// Call Graph in case we need to update it when deleting code.
+  CallGraph &CG;
+
 public:
-  SILCombiner(AliasAnalysis *AA, bool removeCondFails)
-    : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
-      Iteration(0), Builder(0),
-      CastOpt(/* ReplaceInstUsesAction */
-              [&](SILInstruction *I,
-                  ValueBase * V) { replaceInstUsesWith(*I, V); },
-              /* EraseAction */
-              [&](SILInstruction *I) { eraseInstFromFunction(*I); }) { }
+  SILCombiner(AliasAnalysis *AA, CallGraph &CG, bool removeCondFails)
+      : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
+        Iteration(0), Builder(0),
+        CastOpt(/* ReplaceInstUsesAction */
+                [&](SILInstruction *I, ValueBase * V) {
+                  replaceInstUsesWith(*I, V);
+                },
+                /* EraseAction */
+                [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
+        CG(CG) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -178,7 +184,8 @@ public:
   // instruction, visit methods should use this method to delete the given
   // instruction and upon completion of their peephole return the value returned
   // by this method.
-  SILInstruction *eraseInstFromFunction(SILInstruction &I);
+  SILInstruction *eraseInstFromFunction(SILInstruction &I,
+                                        bool AddOperandsToWorklist = true);
 
   void addInitialGroup(ArrayRef<SILInstruction *> List) {
     Worklist.addInitialGroup(List);
@@ -260,6 +267,10 @@ public:
 private:
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
+
+  /// Add reachable code to the worklist. Meant to be used when starting to
+  /// process a new function.
+  void addReachableCodeToWorklist(SILBasicBlock *BB);
 };
 
 } // end namespace swift
