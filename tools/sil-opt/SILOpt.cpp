@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
@@ -25,6 +26,7 @@
 #include "swift/SILPasses/PassManager.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -47,7 +49,7 @@ InputFilename(llvm::cl::desc("input file"), llvm::cl::init("-"),
               llvm::cl::Positional);
 
 static llvm::cl::opt<std::string>
-OutputFilename("o", llvm::cl::desc("output filename"), llvm::cl::init("-"));
+OutputFilename("o", llvm::cl::desc("output filename"));
 
 static llvm::cl::list<std::string>
 ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
@@ -298,6 +300,9 @@ static llvm::cl::opt<bool>
 EmitVerboseSIL("emit-verbose-sil",
                llvm::cl::desc("Emit locations during sil emission."));
 
+static llvm::cl::opt<bool>
+EmitSIB("emit-sib", llvm::cl::desc("Emit serialized AST + SIL file(s)"));
+
 static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
@@ -471,15 +476,37 @@ int main(int argc, char **argv) {
     runCommandLineSelectedPasses(CI.getSILModule());
   }
 
-  std::error_code EC;
-  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
-  if (EC) {
-    llvm::errs() << "while opening '" << OutputFilename << "': "
-                 << EC.message() << '\n';
-    return 1;
+  if (EmitSIB) {
+    llvm::SmallString<128> OutputFile;
+    if (OutputFilename.size()) {
+      OutputFile = OutputFilename;
+    } else if (ModuleName.size()) {
+      OutputFile = ModuleName;
+      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+    } else {
+      OutputFile = CI.getMainModule()->getName().str();
+      llvm::sys::path::replace_extension(OutputFile, SIB_EXTENSION);
+    }
+
+    SerializationOptions serializationOpts;
+    serializationOpts.OutputPath = OutputFile.c_str();
+    serializationOpts.SerializeAllSIL = true;
+    serializationOpts.IsSIB = true;
+
+    serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
+  } else {
+    const StringRef OutputFile = OutputFilename.size() ?
+                                   StringRef(OutputFilename) : "-";
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
+    if (EC) {
+      llvm::errs() << "while opening '" << OutputFile << "': "
+                   << EC.message() << '\n';
+      return 1;
+    }
+    CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
+                             EnableSILSortOutput, !DisableASTDump);
   }
-  CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
-                           EnableSILSortOutput, !DisableASTDump);
 
   bool HadError = CI.getASTContext().hadError();
 
