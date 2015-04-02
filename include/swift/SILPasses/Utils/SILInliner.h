@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include <functional>
 
 namespace swift {
 
@@ -45,10 +46,11 @@ public:
   };
 
   SILInliner(SILFunction &To, SILFunction &From, InlineKind IKind,
-             TypeSubstitutionMap &ContextSubs, ArrayRef<Substitution> ApplySubs)
+             TypeSubstitutionMap &ContextSubs, ArrayRef<Substitution> ApplySubs,
+             std::function<void(SILInstruction *)> Callback =nullptr)
     : TypeSubstCloner<SILInliner>(To, From, ContextSubs, ApplySubs, true),
-      IKind(IKind),
-    CalleeEntryBB(nullptr), CallSiteScope(nullptr) {
+    IKind(IKind), CalleeEntryBB(nullptr), CallSiteScope(nullptr),
+    Callback(Callback) {
   }
 
   /// inlineFunction - This method inlines a callee function, assuming that it
@@ -79,6 +81,10 @@ private:
       // Create an inlined version of the scope.
       Cloned->setDebugScope(getOrCreateInlineScope(Orig));
 
+    // Call client-supplied callback function.
+    if (Callback)
+      Callback(Cloned);
+
     // We intentionally do not call
     // SILClonerWithScopes<SILInliner>::postProcess() here as it does
     // the wrong thing for inlined functions.
@@ -108,6 +114,7 @@ private:
   SILDebugScope *CallSiteScope;
   SILFunction *CalleeFunction;
   llvm::SmallDenseMap<SILDebugScope *, SILDebugScope *> InlinedScopeCache;
+  std::function<void(SILInstruction *)> Callback;
 };
 
 } // end namespace swift
