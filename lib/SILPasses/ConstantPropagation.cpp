@@ -680,7 +680,7 @@ static SILValue constantFoldInstruction(SILInstruction &I,
   // Constant fold extraction of a constant element.
   if (TupleExtractInst *TEI = dyn_cast<TupleExtractInst>(&I)) {
     if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
-      return TheTuple->getElements()[TEI->getFieldNo()];
+      return TheTuple->getElement(TEI->getFieldNo());
   }
 
   // Constant fold extraction of a constant struct element.

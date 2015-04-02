@@ -46,7 +46,7 @@ static VarDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
   Pattern *paramPattern = fn->getBodyParamPatterns().back();
   ArrayRef<TuplePatternElt> params;
   if (auto paramTuple = dyn_cast<TuplePattern>(paramPattern)) {
-    params = paramTuple->getFields();
+    params = paramTuple->getElements();
   } else {
     singleParam = TuplePatternElt(
                       cast<ParenPattern>(paramPattern)->getSubPattern());
@@ -166,8 +166,8 @@ static Pattern *buildIndexForwardingPattern(AbstractStorageDecl *storage,
     addVarPatternFor(pp);
   } else {
     auto tp = cast<TuplePattern>(indices);
-    for (auto &field : tp->getFields()) {
-      addVarPatternFor(field.getPattern());
+    for (auto &element : tp->getElements()) {
+      addVarPatternFor(element.getPattern());
     }
   }
 
@@ -489,7 +489,7 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   Pattern *paramPattern = accessor->getBodyParamPatterns().back();
   ArrayRef<TuplePatternElt> params;
   if (auto paramTuple = dyn_cast<TuplePattern>(paramPattern)) {
-    params = paramTuple->getFields();
+    params = paramTuple->getElements();
   } else {
     singleParam = TuplePatternElt(
                     cast<ParenPattern>(paramPattern)->getSubPattern());
@@ -509,7 +509,7 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx, FuncDecl *accessor) {
   auto subscript = cast<SubscriptDecl>(accessor->getAccessorStorageDecl());
   auto indexType = subscript->getIndicesType();
   if (auto indexTuple = indexType->getAs<TupleType>()) {
-    return buildTupleForwardingRefExpr(ctx, params, indexTuple->getFields());
+    return buildTupleForwardingRefExpr(ctx, params, indexTuple->getElements());
   } else {
     return buildTupleForwardingRefExpr(ctx, params, TupleTypeElt(indexType));
   }
@@ -1996,17 +1996,17 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
       return nullptr;
     }
 
-    for (unsigned i = 0, n = bodyTuple->getNumFields(); i != n; ++i) {
+    for (unsigned i = 0, n = bodyTuple->getNumElements(); i != n; ++i) {
       // Forward the value.
       auto subExpr = forwardArguments(tc, classDecl, toDecl,
-                                      bodyTuple->getFields()[i].getPattern(),
+                                      bodyTuple->getElement(i).getPattern(),
                                       { });
       if (!subExpr)
         return nullptr;
       values.push_back(subExpr);
       
       // Dig out the name.
-      auto subPattern = bodyTuple->getFields()[i].getPattern();
+      auto subPattern = bodyTuple->getElement(i).getPattern();
       do {
         if (auto typed = dyn_cast<TypedPattern>(subPattern)) {
           subPattern = typed->getSubPattern();
@@ -2131,7 +2131,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     bool anyChanged = false;
     SmallVector<TupleTypeElt, 4> elements;
     unsigned index = 0;
-    for (const auto &elt : tuple->getFields()) {
+    for (const auto &elt : tuple->getElements()) {
       Type eltTy = elt.getType().transform(inheritDefaultArgs);
       if (!eltTy)
         return Type();
@@ -2149,7 +2149,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
       if (!anyChanged) {
         // Copy all of the previous elements.
         for (unsigned i = 0; i != index; ++i) {
-          const TupleTypeElt &FromElt =tuple->getFields()[i];
+          const TupleTypeElt &FromElt = tuple->getElement(i);
           elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
                                           FromElt.getDefaultArgKind(),
                                           FromElt.isVararg()));

@@ -686,8 +686,8 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   bool iOSOnlyUsedOnOSX = false;
   bool Valid = true;
   if (ArgTuple) {
-    auto fields = ArgTuple->getFields();
-    switch (ArgTuple->getNumFields()) {
+    auto fields = ArgTuple->getElements();
+    switch (ArgTuple->getNumElements()) {
     case 0:
       // (iOS only) No arguments.
       if (!isiOS(TC)) {

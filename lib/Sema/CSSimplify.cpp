@@ -86,7 +86,7 @@ ArrayRef<TupleTypeElt> constraints::decomposeArgParamType(Type type,
                                                           TupleTypeElt &scalar){
   switch (type->getKind()) {
   case TypeKind::Tuple:
-    return cast<TupleType>(type.getPointer())->getFields();
+    return cast<TupleType>(type.getPointer())->getElements();
 
   case TypeKind::Paren:
     scalar = cast<ParenType>(type.getPointer())->getUnderlyingType();
@@ -679,7 +679,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // Equality and subtyping have fairly strict requirements on tuple matching,
   // requiring element names to either match up or be disjoint.
   if (kind < TypeMatchKind::Conversion) {
-    if (tuple1->getFields().size() != tuple2->getFields().size()) {
+    if (tuple1->getNumElements() != tuple2->getNumElements()) {
       // Record this failure.
       if (shouldRecordFailures()) {
         recordFailure(getConstraintLocator(locator),
@@ -689,9 +689,9 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       return SolutionKind::Error;
     }
 
-    for (unsigned i = 0, n = tuple1->getFields().size(); i != n; ++i) {
-      const auto &elt1 = tuple1->getFields()[i];
-      const auto &elt2 = tuple2->getFields()[i];
+    for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
+      const auto &elt1 = tuple1->getElement(i);
+      const auto &elt2 = tuple2->getElement(i);
 
       // If the names don't match, we may have a conflict.
       if (elt1.getName() != elt2.getName()) {
@@ -811,8 +811,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     unsigned idx1 = sources[idx2];
 
     // Match up the types.
-    const auto &elt1 = tuple1->getFields()[idx1];
-    const auto &elt2 = tuple2->getFields()[idx2];
+    const auto &elt1 = tuple1->getElement(idx1);
+    const auto &elt2 = tuple2->getElement(idx2);
     switch (matchTypes(elt1.getType(), elt2.getType(), subKind, subFlags,
                        locator.withPathElement(
                          LocatorPathElt::getTupleElement(idx1)))) {
@@ -828,7 +828,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
   // If we have variadic arguments to check, do so now.
   if (hasVarArg) {
-    const auto &elt2 = tuple2->getFields().back();
+    const auto &elt2 = tuple2->getElements().back();
     auto eltType2 = elt2.getVarargBaseTy();
 
     for (unsigned idx1 : variadicArguments) {
@@ -853,9 +853,9 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
                                           TypeMatchKind kind, unsigned flags,
                                           ConstraintLocatorBuilder locator) {
-  int scalarFieldIdx = tuple2->getFieldForScalarInit();
+  int scalarFieldIdx = tuple2->getElementForScalarInit();
   assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
-  const auto &elt = tuple2->getFields()[scalarFieldIdx];
+  const auto &elt = tuple2->getElement(scalarFieldIdx);
   auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
   return matchTypes(type1, scalarFieldTy, kind, flags,
                     locator.withPathElement(ConstraintLocator::ScalarToTuple));
@@ -866,7 +866,7 @@ ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
                                           TypeMatchKind kind, unsigned flags,
                                           ConstraintLocatorBuilder locator) {
   assert(tuple1->getNumElements() == 1 && "Wrong number of elements");
-  assert(!tuple1->getFields()[0].isVararg() && "Should not be variadic");
+  assert(!tuple1->getElement(0).isVararg() && "Should not be variadic");
 
   return matchTypes(tuple1->getElementType(0),
                     type2, kind, flags,
@@ -886,7 +886,7 @@ static bool isFunctionTypeAcceptingNoArguments(Type type) {
   if (!tupleTy) return false;
 
   // Look for any non-defaulted, non-variadic elements.
-  for (const auto &elt : tupleTy->getFields()) {
+  for (const auto &elt : tupleTy->getElements()) {
     // Defaulted arguments are okay.
     if (elt.getDefaultArgKind() != DefaultArgumentKind::None)
       continue;
@@ -1617,11 +1617,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // the same name.
     bool tuplesWithMismatchedNames = false;
     if (tuple1 && tuple2) {
-      int scalar1 = tuple1->getFieldForScalarInit();
-      int scalar2 = tuple2->getFieldForScalarInit();
+      int scalar1 = tuple1->getElementForScalarInit();
+      int scalar2 = tuple2->getElementForScalarInit();
       if (scalar1 >= 0 && scalar2 >= 0) {
-        auto name1 = tuple1->getFields()[scalar1].getName();
-        auto name2 = tuple2->getFields()[scalar2].getName();
+        auto name1 = tuple1->getElement(scalar1).getName();
+        auto name2 = tuple2->getElement(scalar2).getName();
         tuplesWithMismatchedNames = !name1.empty() && name1 != name2;
       }
     }
@@ -1633,10 +1633,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       //
       // A scalar type can be converted to a tuple so long as there is at
       // most one non-defaulted element.
-      if ((tuple2->getFields().size() == 1 &&
-           !tuple2->getFields()[0].isVararg()) ||
+      if ((tuple2->getNumElements() == 1 &&
+           !tuple2->getElement(0).isVararg()) ||
           (kind >= TypeMatchKind::Conversion &&
-           tuple2->getFieldForScalarInit() >= 0)) {
+           tuple2->getElementForScalarInit() >= 0)) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::ScalarToTuple);
 
@@ -1647,8 +1647,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     if (tuple1 && !tuplesWithMismatchedNames) {
       // A single-element tuple can be a trivial subtype of a scalar.
-      if (tuple1->getFields().size() == 1 &&
-          !tuple1->getFields()[0].isVararg()) {
+      if (tuple1->getNumElements() == 1 &&
+          !tuple1->getElement(0).isVararg()) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::TupleToScalar);
       }
@@ -2711,7 +2711,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // Resolve a number reference into the tuple type.
     unsigned Value = 0;
     if (!nameStr.getAsInteger(10, Value) &&
-        Value < baseTuple->getFields().size()) {
+        Value < baseTuple->getNumElements()) {
       fieldIdx = Value;
     } else {
       fieldIdx = baseTuple->getNamedElementId(name.getBaseName());
@@ -4244,8 +4244,8 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
     auto funcTy = type1->getRValueType();
     Identifier nameToAdd;
     if (auto tupleTy = funcTy->getAs<TupleType>()) {
-      int scalarIdx = tupleTy->getFieldForScalarInit();
-      nameToAdd = tupleTy->getFields()[scalarIdx].getName();
+      int scalarIdx = tupleTy->getElementForScalarInit();
+      nameToAdd = tupleTy->getElement(scalarIdx).getName();
       funcTy = tupleTy->getElementType(scalarIdx);
     }
 
@@ -4285,9 +4285,9 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
 
   case FixKind::ScalarToTuple: {
     auto tuple2 = type2->castTo<TupleType>();
-    int scalarFieldIdx = tuple2->getFieldForScalarInit();
+    int scalarFieldIdx = tuple2->getElementForScalarInit();
     assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
-    const auto &elt = tuple2->getFields()[scalarFieldIdx];
+    const auto &elt = tuple2->getElement(scalarFieldIdx);
     auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
     return matchTypes(type1, scalarFieldTy, matchKind, subFlags,
                       locator.withPathElement(

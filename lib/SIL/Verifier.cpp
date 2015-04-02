@@ -1113,11 +1113,11 @@ public:
   void checkTupleInst(TupleInst *TI) {
     CanTupleType ResTy = requireObjectType(TupleType, TI, "Result of tuple");
 
-    require(TI->getElements().size() == ResTy->getFields().size(),
+    require(TI->getElements().size() == ResTy->getNumElements(),
             "Tuple field count mismatch!");
 
     for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
-      require(TI->getElements()[i].getType().getSwiftType()
+      require(TI->getElement(i).getType().getSwiftType()
                ->isEqual(ResTy.getElementType(i)),
               "Tuple element arguments do not match tuple type!");
     }
@@ -1304,7 +1304,7 @@ public:
     require(operandTy.is<TupleType>(),
             "must derive tuple_element_addr from tuple");
 
-    ArrayRef<TupleTypeElt> fields = operandTy.castTo<TupleType>()->getFields();
+    ArrayRef<TupleTypeElt> fields = operandTy.castTo<TupleType>()->getElements();
     require(EI->getFieldNo() < fields.size(),
             "invalid field index for element_addr instruction");
     require(EI->getType().getSwiftRValueType()

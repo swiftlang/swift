@@ -1032,13 +1032,13 @@ Pattern *Traversal::visitParenPattern(ParenPattern *P) {
 }
 
 Pattern *Traversal::visitTuplePattern(TuplePattern *P) {
-  for (auto &field : P->getFields()) {
-    if (Pattern *newField = doIt(field.getPattern()))
-      field.setPattern(newField);
+  for (auto &element : P->getElements()) {
+    if (Pattern *newField = doIt(element.getPattern()))
+      element.setPattern(newField);
     else
       return nullptr;
 
-    if (auto handle = field.getInit()) {
+    if (auto handle = element.getInit()) {
       if (auto init = doIt(handle->getExpr())) {
         handle->setExpr(init, handle->alreadyChecked());
       } else {

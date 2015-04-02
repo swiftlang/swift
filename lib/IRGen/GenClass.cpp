@@ -1043,10 +1043,10 @@ namespace {
         if (FieldLayout->getElements().empty()
             || FieldLayout->getElements().size() == FirstFieldIndex) {
           instanceStart = instanceSize;
-        } else if (FieldLayout->getElements()[FirstFieldIndex].getKind()
+        } else if (FieldLayout->getElement(FirstFieldIndex).getKind()
                      == ElementLayout::Kind::Fixed) {
           // FIXME: assumes layout is always sequential!
-          instanceStart = FieldLayout->getElements()[FirstFieldIndex].getByteOffset();
+          instanceStart = FieldLayout->getElement(FirstFieldIndex).getByteOffset();
         } else {
           // FIXME: arrange to initialize this at runtime
           instanceStart = Size(0);
@@ -1208,7 +1208,7 @@ namespace {
       // If we have the destructor body, we know whether SILGen
       // generated a -dealloc body.
       if (auto braceStmt = destructor->getBody())
-        return !braceStmt->getElements().empty();
+        return braceStmt->getNumElements() != 0;
 
       // We don't have a destructor body, so hunt for the SIL function
       // for it.
@@ -1387,7 +1387,7 @@ namespace {
     llvm::Constant *buildIvar(VarDecl *ivar, SILType loweredType) {
       assert(Layout && FieldLayout && "can't build ivar for category");
       // FIXME: this is not always the right thing to do!
-      auto &elt = FieldLayout->getElements()[NextFieldIndex++];
+      auto &elt = FieldLayout->getElement(NextFieldIndex++);
       auto &ivarTI = IGM.getTypeInfo(loweredType);
       
       llvm::Constant *offsetPtr;

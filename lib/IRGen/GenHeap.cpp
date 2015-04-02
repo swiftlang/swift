@@ -85,7 +85,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
     llvm::Value *totalAlign = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                          layout.getAlignment().getMaskValue());
     for (unsigned i : indices(layout.getElements())) {
-      auto &elt = layout.getElements()[i];
+      auto &elt = layout.getElement(i);
       auto eltTy = layout.getElementTypes()[i];
       switch (elt.getKind()) {
       case ElementLayout::Kind::InitialNonFixedSize:
@@ -103,11 +103,11 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         // Start calculating non-fixed offsets from the end of the first fixed
         // field.
         assert(i > 0 && "shouldn't begin with a non-fixed field");
-        auto &prevElt = layout.getElements()[i-1];
+        auto &prevElt = layout.getElement(i-1);
         auto prevType = layout.getElementTypes()[i-1];
         // Start calculating offsets from the last fixed-offset field.
         if (!offset) {
-          Size lastFixedOffset = layout.getElements()[i-1].getByteOffset();
+          Size lastFixedOffset = layout.getElement(i-1).getByteOffset();
           if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getType())) {
             // If the last fixed-offset field is also fixed-size, we can
             // statically compute the end of the fixed-offset fields.
@@ -189,7 +189,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
   if (layout.hasBindings()) {
     // The type metadata bindings should be at a fixed offset, so we can pass
     // None for NonFixedOffsets. If we didn't, we'd have a chicken-egg problem.
-    auto bindingsAddr = layout.getElements()[0].project(IGF, structAddr, None);
+    auto bindingsAddr = layout.getElement(0).project(IGF, structAddr, None);
     layout.getBindings().restore(IGF, bindingsAddr);
   }
 
@@ -198,7 +198,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
 
   // Destroy the fields.
   for (unsigned i : indices(layout.getElements())) {
-    auto &field = layout.getElements()[i];
+    auto &field = layout.getElement(i);
     auto fieldTy = layout.getElementTypes()[i];
     if (field.isPOD())
       continue;

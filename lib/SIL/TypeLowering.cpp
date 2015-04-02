@@ -685,7 +685,7 @@ namespace {
       // The children are just the elements of the lowered tuple.
       auto silTy = getLoweredType();
       auto tupleTy = silTy.castTo<TupleType>();
-      children.reserve(tupleTy->getFields().size());
+      children.reserve(tupleTy->getNumElements());
       unsigned index = 0;
       for (auto elt : tupleTy.getElementTypes()) {
         auto silElt = SILType::getPrimitiveType(elt, silTy.getCategory());
@@ -1308,7 +1308,7 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
 
     changed = (changed || substEltType != loweredSubstEltType);
 
-    auto &substElt = substType->getFields()[i];
+    auto &substElt = substType->getElement(i);
     loweredElts.push_back(substElt.getWithType(loweredSubstEltType));
   }
   

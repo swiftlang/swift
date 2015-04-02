@@ -520,6 +520,7 @@ public:
   }
 
   ArrayRef<TypeRepr *> getElements() const { return Elements; }
+  TypeRepr *getElement(unsigned i) const { return Elements[i]; }
   SourceRange getParens() const { return Parens; }
   SourceLoc getEllipsisLoc() const { return Ellipsis; }
   bool hasEllipsis() const { return Ellipsis.isValid(); }

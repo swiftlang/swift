@@ -632,24 +632,24 @@ namespace {
     auto argTy = expr->getArg()->getType();
     auto argTupleTy = argTy->castTo<TupleType>();
     auto argTupleExpr = dyn_cast<TupleExpr>(expr->getArg());
-    Type firstArgTy = getInnerParenType(argTupleTy->getFields()[0].getType());
+    Type firstArgTy = getInnerParenType(argTupleTy->getElement(0).getType());
     Type secondArgTy =
-    getInnerParenType(argTupleTy->getFields()[1].getType());
+    getInnerParenType(argTupleTy->getElement(1).getType());
     
-    auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElements()[0]);
-    auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElements()[1]);
+    auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElement(0));
+    auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElement(1));
     
     auto favoredExprTy = CS.getFavoredType(expr);
     
     // If the parent has been favored on the way down, propagate that
     // information to its children.
     if (!firstFavoredTy) {
-      CS.setFavoredType(argTupleExpr->getElements()[0], favoredExprTy);
+      CS.setFavoredType(argTupleExpr->getElement(0), favoredExprTy);
       firstFavoredTy = favoredExprTy;
     }
     
     if (!secondFavoredTy) {
-      CS.setFavoredType(argTupleExpr->getElements()[1], favoredExprTy);
+      CS.setFavoredType(argTupleExpr->getElement(1), favoredExprTy);
       secondFavoredTy = favoredExprTy;
     }
     
@@ -676,8 +676,8 @@ namespace {
       
       Type paramTy = fnTy->getInput();
       auto paramTupleTy = paramTy->castTo<TupleType>();
-      auto firstParamTy = paramTupleTy->getFields()[0].getType();
-      auto secondParamTy = paramTupleTy->getFields()[1].getType();
+      auto firstParamTy = paramTupleTy->getElement(0).getType();
+      auto secondParamTy = paramTupleTy->getElement(1).getType();
       
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
@@ -1585,9 +1585,9 @@ namespace {
       case PatternKind::Tuple: {
         auto tuplePat = cast<TuplePattern>(pattern);
         SmallVector<TupleTypeElt, 4> tupleTypeElts;
-        tupleTypeElts.reserve(tuplePat->getNumFields());
-        for (unsigned i = 0, e = tuplePat->getFields().size(); i != e; ++i) {
-          auto tupleElt = tuplePat->getFields()[i];
+        tupleTypeElts.reserve(tuplePat->getNumElements());
+        for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
+          auto tupleElt = tuplePat->getElement(i);
           bool isVararg = tuplePat->hasVararg() && i == e-1;
           Type eltTy = getTypeForPattern(tupleElt.getPattern(),forFunctionParam,
                                          locator.withPathElement(

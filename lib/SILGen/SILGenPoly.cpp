@@ -1454,7 +1454,7 @@ static CanType stripInputTupleLabels(CanType inputTy) {
   auto tupleTy = dyn_cast<TupleType>(inputTy);
   if (!tupleTy)
     return inputTy;
-  auto unlabeled = map<SmallVector<TupleTypeElt, 4>>(tupleTy->getFields(),
+  auto unlabeled = map<SmallVector<TupleTypeElt, 4>>(tupleTy->getElements(),
     [&](const TupleTypeElt &orig) {
       return TupleTypeElt(stripInputTupleLabels(CanType(orig.getType())));
     });
@@ -1572,7 +1572,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   if (isFree) {
     auto inputTy = cast<TupleType>(reqtOrigInputTy.getAsType());
     auto trimmedInputTy = TupleType::get(
-                 inputTy->getFields().slice(0, inputTy->getFields().size() - 1),
+                 inputTy->getElements().slice(0, inputTy->getNumElements() - 1),
                  getASTContext())->getCanonicalType();
     reqtOrigInputTy = AbstractionPattern(trimmedInputTy);
   }

@@ -322,7 +322,7 @@ private:
       assert(tuple->getNumElements() == 1);
       selfType = buildSubstSelfType(tuple.getElementType(0), selfType, ctx);
 
-      auto field = tuple->getFields()[0].getWithType(selfType);
+      auto field = tuple->getElement(0).getWithType(selfType);
       return CanType(TupleType::get(field, ctx));
     }
 
@@ -2229,7 +2229,7 @@ namespace {
       // up directly.
       if (auto tuple = dyn_cast<TupleExpr>(e)) {
         for (auto i : indices(tuple->getElements())) {
-          emit(tuple->getElements()[i],
+          emit(tuple->getElement(i),
                origParamType.getTupleElementType(i));
         }
         return;
@@ -2484,7 +2484,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
       } else if (innerIndex == TupleShuffleExpr::FirstVariadic) {
         assert(outerIndex + 1 == outerTuple->getNumElements());
 
-        auto &varargsField = outerTuple->getFields()[outerIndex];
+        auto &varargsField = outerTuple->getElement(outerIndex);
         assert(varargsField.isVararg());
         assert(!varargsInfo.hasValue() && "already had varargs entry?");
 
@@ -2648,7 +2648,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
       
     // If we're supposed to create a varargs array with the rest, do so.
     } else if (innerIndex == TupleShuffleExpr::FirstVariadic) {
-      auto &varargsField = outerTuple->getFields()[outerIndex];
+      auto &varargsField = outerTuple->getElement(outerIndex);
       assert(varargsField.isVararg() &&
              "Cannot initialize nonvariadic element");
       assert(varargsInfo.hasValue());
@@ -2679,7 +2679,7 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
                              AbstractionPattern origParamType) {
   auto innerTuple
     = cast<TupleType>(E->getSubExpr()->getType()->getCanonicalType());
-  emitShuffle(E->getSubExpr(), E, innerTuple->getFields(),
+  emitShuffle(E->getSubExpr(), E, innerTuple->getElements(),
               E->getDefaultArgsOwner(),
               E->getCallerDefaultArgs(),
               E->getElementMapping(),
@@ -2696,11 +2696,11 @@ void ArgEmitter::emitScalarToTuple(ScalarToTupleExpr *scalarToTuple,
   ConcreteDeclRef defaultArgsOwner;
   SmallVector<int, 4> elementMapping;
   
-  auto tupleElts = scalarToTuple->getType()->castTo<TupleType>()->getFields();
+  auto tupleElts = scalarToTuple->getType()->castTo<TupleType>()->getElements();
   
   bool isVararg = false;
   for (unsigned i : indices(scalarToTuple->getElements())) {
-    auto element = scalarToTuple->getElements()[i];
+    auto element = scalarToTuple->getElement(i);
     if (element.isNull()) {
       // Scalar element goes here. It might go into the varargs.
       if (tupleElts[i].isVararg()) {

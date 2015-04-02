@@ -43,7 +43,7 @@ void substituteInputSugarArgumentType(Type argTy,
     
   if (TupleType *argTupleTy = argTy->getAs<TupleType>()) {
     // Recursively walk tuple arguments.
-    for (auto &field : argTupleTy->getFields()) {
+    for (auto &field : argTupleTy->getElements()) {
       substituteInputSugarArgumentType(field.getType(), resultTy,
                                        resultSugarTy, uniqueSugarTy);
       if (!uniqueSugarTy)

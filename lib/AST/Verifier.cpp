@@ -1121,10 +1121,10 @@ struct ASTNodeBase {};
         abort();
       }
 
-      if (E->getFieldNumber() >= tupleType->getFields().size()) {
+      if (E->getFieldNumber() >= tupleType->getNumElements()) {
         Out << "field index " << E->getFieldNumber()
             << " for TupleElementExpr is out of range [0,"
-            << tupleType->getFields().size() << ")\n";
+            << tupleType->getNumElements() << ")\n";
         abort();
       }
 
@@ -1167,8 +1167,8 @@ struct ASTNodeBase {};
           
           checkSameOrSubType(InputExprObjectTy, FunctionInputObjectTy,
                              "object argument and 'self' parameter");
-        } else if (!TT || TT->getFields().size() != 1 ||
-                   TT->getFields()[0].getType()->getCanonicalType()
+        } else if (!TT || TT->getNumElements() != 1 ||
+                   TT->getElement(0).getType()->getCanonicalType()
                      != InputExprTy) {
           Out << "Argument type does not match parameter type in ApplyExpr:"
                  "\nArgument type: ";
@@ -1330,7 +1330,7 @@ struct ASTNodeBase {};
           continue;
         if (subElem == TupleShuffleExpr::FirstVariadic) {
           varargsStartIndex = i + 1;
-          varargsType = TT->getFields()[i].getVarargBaseTy();
+          varargsType = TT->getElement(i).getVarargBaseTy();
           break;
         }
         if (subElem == TupleShuffleExpr::CallerDefaultInitialize) {
@@ -2146,7 +2146,7 @@ struct ASTNodeBase {};
       PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
 
       if (TP->hasVararg()) {
-        auto *LastPattern = TP->getFields().back().getPattern();
+        auto *LastPattern = TP->getElements().back().getPattern();
         if (!isa<TypedPattern>(LastPattern)) {
           Out << "a vararg subpattern of a TuplePattern should be "
                  "a TypedPattern\n";
@@ -2160,7 +2160,7 @@ struct ASTNodeBase {};
       PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
 
       if (TP->hasVararg()) {
-        auto *LastPattern = TP->getFields().back().getPattern();
+        auto *LastPattern = TP->getElements().back().getPattern();
         Type T = cast<TypedPattern>(LastPattern)->getType()->getCanonicalType();
         if (auto *BGT = T->getAs<BoundGenericType>()) {
           if (BGT->getDecl() == Ctx.getArrayDecl())

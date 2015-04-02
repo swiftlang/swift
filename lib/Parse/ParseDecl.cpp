@@ -2425,7 +2425,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
           TuplePatternElt(clonePattern(PP->getSubPattern())));
       } else {
         auto *TP = cast<TuplePattern>(Indices);
-        for (const auto &elt : TP->getFields()) {
+        for (const auto &elt : TP->getElements()) {
           ValueArgElements.push_back(
             TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
                             clonePattern(elt.getPattern())));

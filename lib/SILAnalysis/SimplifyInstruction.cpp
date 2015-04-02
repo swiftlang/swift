@@ -134,7 +134,7 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
 SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
   // tuple_extract(tuple(x, y), 0) -> x
   if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
-    return TheTuple->getElements()[TEI->getFieldNo()];
+    return TheTuple->getElement(TEI->getFieldNo());
 
   // tuple_extract(apply([add|sub|...]overflow(x,y)),  0) -> x
   // tuple_extract(apply(checked_trunc(ext(x))), 0) -> x

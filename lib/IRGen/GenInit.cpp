@@ -82,7 +82,7 @@ OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF, SILType T,
   // Lay out the type as a heap object.
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, T, this);
   assert(!layout.isKnownEmpty() && "non-empty type had empty layout?");
-  auto &elt = layout.getElements()[0];
+  auto &elt = layout.getElement(0);
 
   // Allocate a new object.
   // TODO: lifetime intrinsics?

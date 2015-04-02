@@ -2786,7 +2786,7 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
       assert(subInitializations.size() == E->getElements().size() &&
              "initialization for tuple has wrong number of elements");
       for (unsigned i = 0, size = subInitializations.size(); i < size; ++i) {
-        SGF.emitExprInto(E->getElements()[i], subInitializations[i].get());
+        SGF.emitExprInto(E->getElement(i), subInitializations[i].get());
       }
       return RValue();
     }
@@ -2959,7 +2959,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
   // Prepare a new tuple to hold the shuffled result.
   RValue result(E->getType()->getCanonicalType());
   
-  auto outerFields = E->getType()->castTo<TupleType>()->getFields();
+  auto outerFields = E->getType()->castTo<TupleType>()->getElements();
   auto shuffleIndexIterator = E->getElementMapping().begin();
   auto shuffleIndexEnd = E->getElementMapping().end();
   unsigned callerDefaultArgIndex = 0;
@@ -3030,7 +3030,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
                                       ScalarToTupleExpr *E,
                                       Initialization *I) {
   auto tupleType = cast<TupleType>(E->getType()->getCanonicalType());
-  auto outerFields = tupleType->getFields();
+  auto outerFields = tupleType->getElements();
   unsigned scalarField = E->getScalarField();
   bool isScalarFieldVariadic = outerFields[scalarField].isVararg();
 
@@ -3072,7 +3072,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
       continue;
     }
 
-    auto &element = E->getElements()[i];
+    const auto &element = E->getElement(i);
     // If this element comes from a default argument generator, emit a call to
     // that generator in-place.
     assert(outerFields[i].hasInit() &&
@@ -3114,7 +3114,7 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
   RValue result(E->getType()->getCanonicalType());
   
   // Create a tuple from the scalar along with any default values or varargs.
-  auto outerFields = E->getType()->castTo<TupleType>()->getFields();
+  auto outerFields = E->getType()->castTo<TupleType>()->getElements();
   for (unsigned i = 0, e = outerFields.size(); i != e; ++i) {
     // Handle the variadic argument. If we didn't emit the scalar field yet,
     // it goes into the variadic array; otherwise, the variadic array is empty.
@@ -3134,7 +3134,7 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
       break;
     }
 
-    auto &element = E->getElements()[i];
+    const auto &element = E->getElement(i);
 
     // A null element indicates that this is the position of the scalar. Add
     // the scalar here.
@@ -3948,8 +3948,8 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   
   // Emit the elementwise arguments.
   SmallVector<RValue, 4> elements;
-  for (size_t i = 0, size = TP->getFields().size(); i < size; ++i) {
-    auto *P = cast<TypedPattern>(TP->getFields()[i].getPattern());
+  for (size_t i = 0, size = TP->getNumElements(); i < size; ++i) {
+    auto *P = cast<TypedPattern>(TP->getElement(i).getPattern());
     
     elements.push_back(
       emitImplicitValueConstructorArg(gen, Loc,
@@ -4337,7 +4337,7 @@ namespace {
     }
     
     void visitTuplePattern(TuplePattern *P) {
-      for (auto &elt : P->getFields())
+      for (auto &elt : P->getElements())
         visit(elt.getPattern());
     }
     
@@ -4668,7 +4668,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     
   case PatternKind::Tuple: {
     auto tuple = cast<TuplePattern>(pattern);
-    auto fields = tuple->getFields();
+    auto fields = tuple->getElements();
     
     SmallVector<RValue, 4> elements;
     std::move(src).extractElements(elements);

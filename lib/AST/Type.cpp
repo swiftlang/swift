@@ -354,7 +354,7 @@ bool TypeBase::isUnspecializedGeneric() {
 
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(this);
-    for (auto &Elt : tupleTy->getFields())
+    for (auto &Elt : tupleTy->getElements())
       if (Elt.getType()->isUnspecializedGeneric())
         return true;
 
@@ -440,7 +440,7 @@ public:
   Type visitTupleType(TupleType *tt) {
     // Look through lvalues in tuples.
     SmallVector<TupleTypeElt, 4> elts;
-    for (auto &elt : tt->getFields()) {
+    for (auto &elt : tt->getElements()) {
       elts.push_back(elt.getWithType(visit(elt.getType())));
     }
     return TupleType::get(elts, tt->getASTContext());
@@ -570,16 +570,16 @@ static Type getStrippedType(const ASTContext &context, Type type,
     SmallVector<TupleTypeElt, 4> elements;
     bool anyChanged = false;
     unsigned idx = 0;
-    for (const auto &elt : tuple->getFields()) {
+    for (const auto &elt : tuple->getElements()) {
       Type eltTy = getStrippedType(context, elt.getType(),
                                    stripLabels, stripDefaultArgs);
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
           (elt.hasInit() && stripDefaultArgs) ||
           (elt.hasName() && stripLabels)) {
         if (!anyChanged) {
-          elements.reserve(tuple->getFields().size());
+          elements.reserve(tuple->getNumElements());
           for (unsigned i = 0; i != idx; ++i) {
-            const TupleTypeElt &elt = tuple->getFields()[i];
+            const TupleTypeElt &elt = tuple->getElement(i);
             Identifier newName = stripLabels? Identifier() : elt.getName();
             DefaultArgumentKind newDefArg
               = stripDefaultArgs? DefaultArgumentKind::None
@@ -626,7 +626,7 @@ Type TypeBase::getRelabeledType(ASTContext &ctx,
     SmallVector<TupleTypeElt, 4> elements;
     unsigned i = 0;
     bool anyChanged = false;
-    for (const auto &elt : tupleTy->getFields()) {
+    for (const auto &elt : tupleTy->getElements()) {
       if (elt.getName() != labels[i])
         anyChanged = true;
 
@@ -733,7 +733,7 @@ Type TypeBase::getRValueInstanceType() {
   
   // Look through argument list tuples.
   if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getFields()[0].isVararg())
+    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
       type = tupleTy->getElementType(0);
   }
   
@@ -913,11 +913,11 @@ CanType TypeBase::getCanonicalType() {
 
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(this);
-    assert(!TT->getFields().empty() && "Empty tuples are always canonical");
+    assert(TT->getNumElements() != 0 && "Empty tuples are always canonical");
 
     SmallVector<TupleTypeElt, 8> CanElts;
-    CanElts.reserve(TT->getFields().size());
-    for (const TupleTypeElt &field : TT->getFields()) {
+    CanElts.reserve(TT->getNumElements());
+    for (const TupleTypeElt &field : TT->getElements()) {
       assert(!field.getType().isNull() &&
              "Cannot get canonical type of un-typechecked TupleType!");
       CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
@@ -1288,10 +1288,10 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::Tuple: {
     auto tMe = cast<TupleType>(me);
     auto tThem = cast<TupleType>(them);
-    if (tMe->getFields().size() != tThem->getFields().size())
+    if (tMe->getNumElements() != tThem->getNumElements())
       return false;
-    for (size_t i = 0, sz = tMe->getFields().size(); i < sz; ++i) {
-      auto &myField = tMe->getFields()[i], &theirField = tThem->getFields()[i];
+    for (size_t i = 0, sz = tMe->getNumElements(); i < sz; ++i) {
+      auto &myField = tMe->getElement(i), &theirField = tThem->getElement(i);
       if (myField.hasInit() != theirField.hasInit())
         return false;
       
@@ -1616,7 +1616,7 @@ bool TypeBase::canOverride(Type other, bool allowUnsafeParameterOverride,
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.
 bool TupleType::hasAnyDefaultValues() const {
-  for (const TupleTypeElt &Elt : Fields)
+  for (const TupleTypeElt &Elt : Elements)
     if (Elt.hasInit())
       return true;
   return false;
@@ -1625,8 +1625,8 @@ bool TupleType::hasAnyDefaultValues() const {
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
-  for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
-    if (Fields[i].getName() == I)
+  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
+    if (Elements[i].getName() == I)
       return i;
   }
 
@@ -1634,22 +1634,22 @@ int TupleType::getNamedElementId(Identifier I) const {
   return -1;
 }
 
-/// getFieldForScalarInit - If a tuple of this type can be initialized with a
+/// getElementForScalarInit - If a tuple of this type can be initialized with a
 /// scalar, return the field number that the scalar is assigned to.  If not,
 /// return -1.
-int TupleType::getFieldForScalarInit() const {
-  if (Fields.empty()) return -1;
+int TupleType::getElementForScalarInit() const {
+  if (Elements.empty()) return -1;
   
   int FieldWithoutDefault = -1;
-  for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
+  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     // Ignore fields with a default value.
-    if (Fields[i].hasInit()) continue;
+    if (Elements[i].hasInit()) continue;
     
     // If we already saw a non-vararg field missing a default value, then we
     // cannot assign a scalar to this tuple.
     if (FieldWithoutDefault != -1) {
       // Vararg fields are okay; they'll just end up being empty.
-      if (Fields[i].isVararg())
+      if (Elements[i].isVararg())
         continue;
     
       return -1;
@@ -2535,7 +2535,7 @@ case TypeKind::Id:
     bool anyChanged = false;
     SmallVector<TupleTypeElt, 4> elements;
     unsigned Index = 0;
-    for (const auto &elt : tuple->getFields()) {
+    for (const auto &elt : tuple->getElements()) {
       Type eltTy = elt.getType().transform(fn);
       if (!eltTy)
         return Type();
@@ -2551,7 +2551,7 @@ case TypeKind::Id:
       if (!anyChanged) {
         // Copy all of the previous elements.
         for (unsigned I = 0; I != Index; ++I) {
-          const TupleTypeElt &FromElt =tuple->getFields()[I];
+          const TupleTypeElt &FromElt =tuple->getElement(I);
           elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
                                           FromElt.getDefaultArgKind(),
                                           FromElt.isVararg()));

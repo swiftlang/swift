@@ -71,7 +71,7 @@ bool DestructorAnalysis::isSafeType(Type Ty) {
 
   // A tuple type is safe if its elements are safe.
   if (auto Tuple = dyn_cast<TupleType>(Canonical)) {
-    for (auto &Elt : Tuple->getFields())
+    for (auto &Elt : Tuple->getElements())
       if (!isSafeType(Elt.getType()))
         return cacheResult(Canonical, false);
     return cacheResult(Canonical, true);

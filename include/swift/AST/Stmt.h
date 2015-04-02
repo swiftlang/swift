@@ -131,6 +131,10 @@ public:
   
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
+  unsigned getNumElements() const { return NumElements; }
+
+  ASTNode getElement(unsigned i) const { return getElements()[i]; }
+
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
     return MutableArrayRef<ASTNode>(getElementsStorage(), NumElements);

@@ -337,6 +337,8 @@ public:
   /// Return the element layouts.  This is parallel to the fields
   /// passed in the constructor.
   ArrayRef<ElementLayout> getElements() const { return Elements; }
+  const ElementLayout &getElement(unsigned i) const { return Elements[i]; }
+  
   llvm::Type *getType() const { return Ty; }
   Size getSize() const { return MinimumSize; }
   Alignment getAlignment() const { return MinimumAlign; }

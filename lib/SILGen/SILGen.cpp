@@ -593,7 +593,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the Objective-C -dealloc entry point if it has
   // something to do beyond messaging the superclass's -dealloc.
-  if (!dd->getBody()->getElements().empty())
+  if (dd->getBody()->getNumElements() != 0)
     emitObjCDestructorThunk(dd);
 
   // Emit the ivar initializer, if needed.
@@ -716,7 +716,7 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
       continue;
     }
 
-    for (auto &elt : tuplePattern->getFields()) {
+    for (auto &elt : tuplePattern->getElements()) {
       if (auto handle = elt.getInit()) {
         emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl,index),
                                 handle->getExpr());

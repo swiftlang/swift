@@ -970,7 +970,7 @@ public:
     // Check to see if the type of the tuple can be inferred accurately from the
     // elements.
     bool SimpleType = true;
-    for (auto &Elt : TI->getType().castTo<TupleType>()->getFields()) {
+    for (auto &Elt : TI->getType().castTo<TupleType>()->getElements()) {
       if (Elt.hasName() || Elt.isVararg() || Elt.hasInit()) {
         SimpleType = false;
         break;

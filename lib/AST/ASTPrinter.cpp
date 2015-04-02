@@ -431,7 +431,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
   case PatternKind::Tuple: {
     Printer << "(";
     auto TP = cast<TuplePattern>(pattern);
-    auto Fields = TP->getFields();
+    auto Fields = TP->getElements();
     for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
       const auto &Elt = Fields[i];
       if (i != 0)
@@ -1433,7 +1433,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
        CurrPattern != NumPatterns; ++CurrPattern) {
     if (auto *BodyTuple = dyn_cast<TuplePattern>(BodyPatterns[CurrPattern])) {
       Printer << "(";
-      for (unsigned i = 0, e = BodyTuple->getFields().size(); i != e; ++i) {
+      for (unsigned i = 0, e = BodyTuple->getNumElements(); i != e; ++i) {
         if (i > 0)
           Printer << ", ";
 
@@ -1441,17 +1441,17 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
         bool ArgNameIsAPIByDefault = (CurrPattern == 0 &&
                                       AFD->argumentNameIsAPIByDefault(i)) ||
           CurrPattern > 0 ||
-          (BodyTuple->getFields()[i].getDefaultArgKind() != 
+          (BodyTuple->getElement(i).getDefaultArgKind() !=
              DefaultArgumentKind::None &&
            Options.PrintDefaultParameterPlaceholder);
 
-        printOneParameter(BodyTuple->getFields()[i].getPattern(),
+        printOneParameter(BodyTuple->getElement(i).getPattern(),
                           ArgNameIsAPIByDefault,
                           /*StripOuterSliceType=*/i == e - 1 &&
                             BodyTuple->hasVararg(),
                           /*Curried=*/CurrPattern > 0);
         if (Options.PrintDefaultParameterPlaceholder &&
-            BodyTuple->getFields()[i].getDefaultArgKind() !=
+            BodyTuple->getElement(i).getDefaultArgKind() !=
                 DefaultArgumentKind::None)
           Printer << " = default";
       }
@@ -1535,8 +1535,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           auto BodyParams = decl->getBodyParamPatterns();
           auto ValueParam = BodyParams.back()->getSemanticsProvidingPattern();
           if (auto *TP = dyn_cast<TuplePattern>(ValueParam)) {
-            if (!TP->isImplicit() && !TP->getFields().empty()) {
-              auto *P = TP->getFields().begin()->getPattern()->
+            if (!TP->isImplicit() && TP->getNumElements() != 0) {
+              auto *P = TP->getElement(0).getPattern()->
                             getSemanticsProvidingPattern();
               Identifier Name = P->getBodyName();
               if (!Name.empty() && !P->isImplicit()) {
@@ -2251,7 +2251,7 @@ public:
   void visitTupleType(TupleType *T) {
     Printer << "(";
 
-    auto Fields = T->getFields();
+    auto Fields = T->getElements();
     for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
       if (i)
         Printer << ", ";

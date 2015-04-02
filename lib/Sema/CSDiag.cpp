@@ -517,7 +517,7 @@ ResolvedLocator constraints::resolveLocatorToDecl(
         unsigned index = path[0].getValue();
         if (auto tuple = dyn_cast<TuplePattern>(
                            parameterPattern->getSemanticsProvidingPattern())) {
-          parameterPattern = tuple->getFields()[index].getPattern();
+          parameterPattern = tuple->getElement(index).getPattern();
           impliesFullPattern = false;
           path = path.slice(1);
           continue;
@@ -531,7 +531,7 @@ ResolvedLocator constraints::resolveLocatorToDecl(
         unsigned index = path[0].getValue2();
         if (auto tuple = dyn_cast<TuplePattern>(
                            parameterPattern->getSemanticsProvidingPattern())) {
-          parameterPattern = tuple->getFields()[index].getPattern();
+          parameterPattern = tuple->getElement(index).getPattern();
           impliesFullPattern = false;
           path = path.slice(1);
           continue;
@@ -555,8 +555,8 @@ ResolvedLocator constraints::resolveLocatorToDecl(
     parameterPattern = parameterPattern->getSemanticsProvidingPattern();
     if (impliesFullPattern) {
       if (auto tuple = dyn_cast<TuplePattern>(parameterPattern)) {
-        if (tuple->getFields().size() == 1) {
-          parameterPattern = tuple->getFields()[0].getPattern();
+        if (tuple->getNumElements() == 1) {
+          parameterPattern = tuple->getElement(0).getPattern();
           parameterPattern = parameterPattern->getSemanticsProvidingPattern();
         }
       }
@@ -676,8 +676,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     auto tuple1 = failure.getFirstType()->castTo<TupleType>();
     auto tuple2 = failure.getSecondType()->castTo<TupleType>();
     tc.diagnose(loc, diag::invalid_tuple_size, tuple1, tuple2,
-                tuple1->getFields().size(),
-                tuple2->getFields().size())
+                tuple1->getNumElements(), tuple2->getNumElements())
       .highlight(range1).highlight(range2);
     break;
   }
@@ -789,7 +788,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     Identifier name;
     unsigned idx = failure.getValue();
     if (auto tupleTy = failure.getFirstType()->getAs<TupleType>()) {
-      name = tupleTy->getFields()[idx].getName();
+      name = tupleTy->getElement(idx).getName();
     } else {
       // Scalar.
       assert(idx == 0);
@@ -1685,7 +1684,7 @@ void FailureDiagnosis::suggestPotentialOverloads(
       paramNames.push_back(Identifier());
       paramTypes.push_back(parenType->getUnderlyingType());
     } else if (auto tupleType = paramList->getAs<TupleType>()) {
-      for (auto field : tupleType->getFields()) {
+      for (auto field : tupleType->getElements()) {
         paramNames.push_back(field.getName());
         paramTypes.push_back(field.getType());
       }
@@ -1770,13 +1769,13 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
   auto argTyName2 = getUserFriendlyTypeName(argTypes[1]);
   
   if (argTyName1.compare(argTyName2)) {
-    CS->TC.diagnose(argExpr->getElements()[0]->getLoc(),
+    CS->TC.diagnose(argExpr->getElement(0)->getLoc(),
                     diag::cannot_apply_binop_to_args,
                     overloadName,
                     argTyName1,
                     argTyName2);
   } else {
-    CS->TC.diagnose(argExpr->getElements()[0]->getLoc(),
+    CS->TC.diagnose(argExpr->getElement(0)->getLoc(),
                     diag::cannot_apply_binop_to_same_args,
                     overloadName,
                     argTyName1);
@@ -1784,7 +1783,7 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
   
   if (paramLists.size())
     suggestPotentialOverloads(overloadName,
-                              argExpr->getElements()[0]->getLoc(),
+                              argExpr->getElement(0)->getLoc(),
                               paramLists,
                               argTypes);
   
@@ -2082,7 +2081,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
         paramNames.push_back(Identifier());
         paramTypes.push_back(parenType->getUnderlyingType());
       } else if (auto tupleType = paramLists[0]->getAs<TupleType>()) {
-        for (auto field : tupleType->getFields()) {
+        for (auto field : tupleType->getElements()) {
           paramNames.push_back(field.getName());
           paramTypes.push_back(field.getType());
         }

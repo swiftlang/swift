@@ -515,7 +515,7 @@ struct InitializationForPattern
   // TupleInitialization.
   InitializationPtr visitTuplePattern(TuplePattern *P) {
     TupleInitialization *init = new TupleInitialization();
-    for (auto &elt : P->getFields())
+    for (auto &elt : P->getElements())
       init->subInitializations.push_back(visit(elt.getPattern()));
     return InitializationPtr(init);
   }
@@ -936,8 +936,8 @@ struct ArgumentInitVisitor :
 
   void visitTuplePattern(TuplePattern *P) {
     // Destructure tuples into their elements.
-    for (size_t i = 0, size = P->getFields().size(); i < size; ++i)
-      visit(P->getFields()[i].getPattern());
+    for (size_t i = 0, size = P->getNumElements(); i < size; ++i)
+      visit(P->getElement(i).getPattern());
   }
 
   void visitAnyPattern(AnyPattern *P) {
@@ -2014,7 +2014,7 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
     return visit(P->getSubPattern());
   }
   void visitTuplePattern(TuplePattern *P) {
-    for (auto &elt : P->getFields())
+    for (auto &elt : P->getElements())
       visit(elt.getPattern());
   }
   void visitAnyPattern(AnyPattern *P) {}

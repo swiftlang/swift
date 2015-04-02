@@ -60,7 +60,7 @@ namespace {
     const TupleTypeElt &getField(SILType T) const {
       auto tup = T.castTo<TupleType>();
       
-      return tup->getFields()[Index];
+      return tup->getElement(Index);
     }
     
     SILType getType(IRGenModule&, SILType t) const {
@@ -353,7 +353,7 @@ namespace {
 
 const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
   TupleTypeBuilder builder(IGM, SILType::getPrimitiveAddressType(CanType(tuple)));
-  return builder.layout(tuple->getFields());
+  return builder.layout(tuple->getElements());
 }
 
 /// A convenient macro for delegating an operation to all of the

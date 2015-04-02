@@ -160,8 +160,8 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
   void visitTuplePattern(TuplePattern *P) {
     // We print tuples as "(x, y)".
     ResultString += "(";
-    for (unsigned i = 0, e = P->getNumFields(); i != e; ++i) {
-      visit(P->getFields()[i].getPattern());
+    for (unsigned i = 0, e = P->getNumElements(); i != e; ++i) {
+      visit(P->getElement(i).getPattern());
       if (i + 1 != e)
         ResultString += ", ";
     }
@@ -438,7 +438,7 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
     if (!TLCD || TLCD->getBody()->getElements().empty())
       continue;
 
-    auto Entry = TLCD->getBody()->getElements()[0];
+    auto Entry = TLCD->getBody()->getElement(0);
 
     // Check to see if the TLCD has an expression that we have to transform.
     if (Expr *E = Entry.dyn_cast<Expr*>())

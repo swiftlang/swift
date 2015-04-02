@@ -168,7 +168,7 @@ struct SubstDependentSILType
     
     SmallVector<TupleTypeElt, 4> elements;
     
-    for (auto &elt : t->getFields())
+    for (auto &elt : t->getElements())
       elements.push_back(elt.getWithType(visit(CanType(elt.getType()))));
     
     return TupleType::get(elements, t->getASTContext())

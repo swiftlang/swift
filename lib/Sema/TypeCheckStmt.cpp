@@ -905,7 +905,7 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
 
   switch (pattern->getKind()) {
   case PatternKind::Tuple:
-    for (auto &field : cast<TuplePattern>(pattern)->getFields()) {
+    for (auto &field : cast<TuplePattern>(pattern)->getElements()) {
       unsigned curArgIndex = nextArgIndex++;
       if (field.getInit() &&
           field.getPattern()->hasType() &&

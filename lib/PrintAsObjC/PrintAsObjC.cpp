@@ -320,7 +320,7 @@ private:
 
     } else {
       const TuplePattern *bodyParams = cast<TuplePattern>(bodyPatterns.back());
-      if (bodyParams->getNumFields() == 0) {
+      if (bodyParams->getNumElements() == 0) {
         // Zero arguments.
         os << selectorString;
         selectorString = "";
@@ -339,7 +339,7 @@ private:
                                                   clangParam,
                                                   isNSUIntegerSubscript);
         };
-        interleave(bodyParams->getFields(), printNextParam,
+        interleave(bodyParams->getElements(), printNextParam,
                    [this] { os << " "; });
       }
     }

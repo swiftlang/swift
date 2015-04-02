@@ -103,7 +103,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
     os << "var " << cast<NamedPattern>(p)->getBodyName();
     return;
   case PatternKind::Tuple: {
-    unsigned numFields = cast<TuplePattern>(p)->getNumFields();
+    unsigned numFields = cast<TuplePattern>(p)->getNumElements();
     if (numFields == 0)
       os << "()";
     else if (numFields == 1)
@@ -212,7 +212,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // Tuple and nominal-type patterns are not themselves directly refutable.
   case PatternKind::Tuple: {
     auto tuple = cast<TuplePattern>(p);
-    for (auto &elt : tuple->getFields())
+    for (auto &elt : tuple->getElements())
       n = getNumSpecializationsRecursive(elt.getPattern(), n);
     return n;
   }
@@ -1397,7 +1397,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     specializedRows[i].RowIndex = rows[i].RowIndex;
 
     auto pattern = cast<TuplePattern>(rows[i].Pattern);
-    for (auto &elt : pattern->getFields()) {
+    for (auto &elt : pattern->getElements()) {
       specializedRows[i].Patterns.push_back(elt.getPattern());
     }
   }

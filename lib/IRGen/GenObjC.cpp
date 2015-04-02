@@ -796,7 +796,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   Explosion params = subIGF.collectParameters();
   llvm::Value *context = params.takeLast();
   Address dataAddr = layout.emitCastTo(subIGF, context);
-  auto &fieldLayout = layout.getElements()[0];
+  auto &fieldLayout = layout.getElement(0);
   Address selfAddr = fieldLayout.project(subIGF, dataAddr, None);
   Explosion selfParams;
   if (retainsSelf)
@@ -870,7 +870,7 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   // FIXME: non-fixed offsets
   NonFixedOffsets offsets = None;
   Address dataAddr = layout.emitCastTo(IGF, data);
-  auto &fieldLayout = layout.getElements()[0];
+  auto &fieldLayout = layout.getElement(0);
   auto &fieldType = layout.getElementTypes()[0];
   Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
   Explosion selfParams;

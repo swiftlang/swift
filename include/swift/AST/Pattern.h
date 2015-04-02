@@ -56,7 +56,7 @@ class alignas(8) Pattern {
     friend class TuplePattern;
     unsigned : NumPatternBits;
     unsigned HasVararg : 1;
-    unsigned NumFields : NumBitsAllocated - NumPatternBits - 1;
+    unsigned NumElements : NumBitsAllocated - NumPatternBits - 1;
   };
 
   class TypedPatternBitfields {
@@ -300,28 +300,29 @@ public:
 class TuplePattern : public Pattern {
   SourceLoc LPLoc, RPLoc;
   // TuplePatternBits.HasVararg
-  // TuplePatternBits.NumFields
+  // TuplePatternBits.NumElements
 
-  TuplePatternElt *getFieldsBuffer() {
+  TuplePatternElt *getElementsBuffer() {
     return reinterpret_cast<TuplePatternElt *>(this+1);
   }
-  const TuplePatternElt *getFieldsBuffer() const {
+  const TuplePatternElt *getElementsBuffer() const {
     return reinterpret_cast<const TuplePatternElt *>(this + 1);
   }
 
   SourceLoc *getEllipsisLocPtr() {
     assert(TuplePatternBits.HasVararg);
-    return reinterpret_cast<SourceLoc *>(getFieldsBuffer()+getNumFields());
+    return reinterpret_cast<SourceLoc *>(getElementsBuffer()+getNumElements());
   }
   const SourceLoc *getEllipsisLocPtr() const {
     assert(TuplePatternBits.HasVararg);
-    return reinterpret_cast<const SourceLoc *>(getFieldsBuffer()+getNumFields());
+    return reinterpret_cast<const SourceLoc *>
+       (getElementsBuffer()+getNumElements());
   }
 
-  TuplePattern(SourceLoc lp, unsigned numFields, SourceLoc rp, bool hasVararg,
+  TuplePattern(SourceLoc lp, unsigned numElements, SourceLoc rp, bool hasVararg,
                SourceLoc ellipsis, bool implicit)
       : Pattern(PatternKind::Tuple), LPLoc(lp), RPLoc(rp) {
-    TuplePatternBits.NumFields = numFields;
+    TuplePatternBits.NumElements = numElements;
     TuplePatternBits.HasVararg = hasVararg;
     if (hasVararg)
       *getEllipsisLocPtr() = ellipsis;
@@ -345,17 +346,20 @@ public:
                                SourceLoc ellipsis = SourceLoc(),
                                Optional<bool> implicit = None);
 
-  unsigned getNumFields() const {
-    return TuplePatternBits.NumFields;
+  unsigned getNumElements() const {
+    return TuplePatternBits.NumElements;
   }
 
-  MutableArrayRef<TuplePatternElt> getFields() {
-    return MutableArrayRef<TuplePatternElt>(getFieldsBuffer(),
-                                            getNumFields());
+  MutableArrayRef<TuplePatternElt> getElements() {
+    return MutableArrayRef<TuplePatternElt>(getElementsBuffer(),
+                                            getNumElements());
   }
-  ArrayRef<TuplePatternElt> getFields() const {
-    return ArrayRef<TuplePatternElt>(getFieldsBuffer(), getNumFields());
+  ArrayRef<TuplePatternElt> getElements() const {
+    return ArrayRef<TuplePatternElt>(getElementsBuffer(), getNumElements());
   }
+
+  const TuplePatternElt &getElement(unsigned i) const {return getElements()[i];}
+  TuplePatternElt &getElement(unsigned i) { return getElements()[i]; }
 
   bool hasVararg() const { return TuplePatternBits.HasVararg; }
 

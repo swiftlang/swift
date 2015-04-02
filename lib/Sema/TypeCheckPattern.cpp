@@ -680,8 +680,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       elementOptions |= TR_FunctionInput;
 
     bool missingType = false;
-    for (unsigned i = 0, e = tuplePat->getFields().size(); i != e; ++i) {
-      TuplePatternElt &elt = tuplePat->getFields()[i];
+    for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
+      TuplePatternElt &elt = tuplePat->getElement(i);
       Pattern *pattern = elt.getPattern();
       bool isVararg = tuplePat->hasVararg() && i == e-1;
       TypeResolutionOptions eltOptions = elementOptions;
@@ -801,7 +801,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         && !isa<TuplePattern>(semantic)) {
       if (auto tupleType = type->getAs<TupleType>()) {
         if (tupleType->getNumElements() == 1
-            && !tupleType->getFields()[0].isVararg()) {
+            && !tupleType->getElement(0).isVararg()) {
           auto elementTy = tupleType->getElementType(0);
           if (coercePatternToType(sub, dc, elementTy, subOptions, resolver))
             return true;
@@ -926,10 +926,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     
     // Sometimes a paren is just a paren. If the tuple pattern has a single
     // element, we can reduce it to a paren pattern.
-    bool canDecayToParen = TP->getNumFields() == 1;
+    bool canDecayToParen = TP->getNumElements() == 1;
     auto decayToParen = [&]() -> bool {
       assert(canDecayToParen);
-      Pattern *sub = TP->getFields()[0].getPattern();
+      Pattern *sub = TP->getElement(0).getPattern();
       if (this->coercePatternToType(sub, dc, type, subOptions, resolver))
         return true;
       
@@ -956,7 +956,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
     // The number of elements must match exactly.
     // TODO: incomplete tuple patterns, with some syntax.
-    if (!hadError && tupleTy->getFields().size() != TP->getNumFields()) {
+    if (!hadError && tupleTy->getNumElements() != TP->getNumElements()) {
       if (canDecayToParen)
         return decayToParen();
       diagnose(TP->getLParenLoc(), diag::tuple_pattern_length_mismatch, type);
@@ -966,8 +966,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     // Coerce each tuple element to the respective type.
     P->setType(type);
 
-    for (unsigned i = 0, e = TP->getNumFields(); i != e; ++i) {
-      TuplePatternElt &elt = TP->getFields()[i];
+    for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
+      TuplePatternElt &elt = TP->getElement(i);
       Pattern *pattern = elt.getPattern();
       bool isVararg = TP->hasVararg() && i == e-1;
 
@@ -975,16 +975,16 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       if (hadError)
         CoercionType = ErrorType::get(Context);
       else
-        CoercionType = tupleTy->getFields()[i].getType();
+        CoercionType = tupleTy->getElement(i).getType();
       
       // If the tuple pattern had a label for the tuple element, it must match
       // the label for the tuple type being matched.
       // TODO: detect and diagnose shuffling
       // TODO: permit shuffling
       if (!elt.getLabel().empty() &&
-          elt.getLabel() != tupleTy->getFields()[i].getName()) {
+          elt.getLabel() != tupleTy->getElement(i).getName()) {
         diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
-                 elt.getLabel(), tupleTy->getFields()[i].getName());
+                 elt.getLabel(), tupleTy->getElement(i).getName());
         hadError = true;
       }
       
@@ -1009,6 +1009,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         }
       }
     }
+
 
     return hadError;
   }

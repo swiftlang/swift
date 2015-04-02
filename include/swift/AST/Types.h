@@ -1150,44 +1150,46 @@ typedef ArrayRefView<TupleTypeElt,CanType,getCanTupleEltType>
 /// optional name.
 ///
 class TupleType : public TypeBase, public llvm::FoldingSetNode {
-  const ArrayRef<TupleTypeElt> Fields;
+  const ArrayRef<TupleTypeElt> Elements;
   
 public:
   /// get - Return the uniqued tuple type with the specified elements.
   /// Returns a ParenType instead if there is exactly one element which
   /// is unlabeled and not varargs, so it doesn't accidentally construct
   /// a tuple which is impossible to write.
-  static Type get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C);
+  static Type get(ArrayRef<TupleTypeElt> Elements, const ASTContext &C);
 
   /// getEmpty - Return the empty tuple type '()'.
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
 
   /// getFields - Return the fields of this tuple.
-  ArrayRef<TupleTypeElt> getFields() const { return Fields; }
+  ArrayRef<TupleTypeElt> getElements() const { return Elements; }
 
-  unsigned getNumElements() const { return Fields.size(); }
-  
-  /// getElementType - Return the type of the specified field.
-  Type getElementType(unsigned FieldNo) const {
-    return Fields[FieldNo].getType();
+  unsigned getNumElements() const { return Elements.size(); }
+
+  const TupleTypeElt &getElement(unsigned i) const { return Elements[i]; }
+
+  /// getElementType - Return the type of the specified element.
+  Type getElementType(unsigned ElementNo) const {
+    return Elements[ElementNo].getType();
   }
 
   TupleEltTypeArrayRef getElementTypes() const {
-    return TupleEltTypeArrayRef(getFields());
+    return TupleEltTypeArrayRef(getElements());
   }
   
-  /// getNamedElementId - If this tuple has a field with the specified name,
-  /// return the field index, otherwise return -1.
+  /// getNamedElementId - If this tuple has a element with the specified name,
+  /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
   
   /// hasAnyDefaultValues - Return true if any of our elements has a default
   /// value.
   bool hasAnyDefaultValues() const;
   
-  /// getFieldForScalarInit - If a tuple of this type can be initialized with a
-  /// scalar, return the field number that the scalar is assigned to.  If not,
-  /// return -1.
-  int getFieldForScalarInit() const;
+  /// getElementForScalarInit - If a tuple of this type can be initialized with
+  /// a scalar, return the element number that the scalar is assigned to.  If
+  /// not, return -1.
+  int getElementForScalarInit() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1195,23 +1197,23 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Fields);
+    Profile(ID, Elements);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, 
-                      ArrayRef<TupleTypeElt> Fields);
+                      ArrayRef<TupleTypeElt> Elements);
   
 private:
-  TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
+  TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties)
-     : TypeBase(TypeKind::Tuple, CanCtx, properties), Fields(fields) {
+     : TypeBase(TypeKind::Tuple, CanCtx, properties), Elements(elements) {
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
-  CanType getElementType(unsigned fieldNo) const {
-    return CanType(getPointer()->getElementType(fieldNo));
+  CanType getElementType(unsigned elementNo) const {
+    return CanType(getPointer()->getElementType(elementNo));
   }
   CanTupleEltTypeArrayRef getElementTypes() const {
-    return CanTupleEltTypeArrayRef(getPointer()->getFields());
+    return CanTupleEltTypeArrayRef(getPointer()->getElements());
   }
 END_CAN_TYPE_WRAPPER(TupleType, Type)
 
@@ -3873,7 +3875,7 @@ inline Type TypeBase::getRValueObjectType() {
 
   // Look through argument list tuples.
   if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 && !tupleTy->getFields()[0].isVararg())
+    if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).isVararg())
       type = tupleTy->getElementType(0);
   }
   

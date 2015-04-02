@@ -112,7 +112,7 @@ static Type stripInitializers(Type origType) {
   return origType.transform([&](Type type) -> Type {
              if (auto tupleTy = type->getAs<TupleType>()) {
                SmallVector<TupleTypeElt, 4> fields;
-               for (const auto &field : tupleTy->getFields()) {
+               for (const auto &field : tupleTy->getElements()) {
                  fields.push_back(TupleTypeElt(field.getType(),
                                                field.getName(),
                                                DefaultArgumentKind::None,

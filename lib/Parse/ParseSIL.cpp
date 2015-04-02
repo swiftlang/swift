@@ -2379,12 +2379,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SmallVector<TupleTypeElt, 4> TypeElts;
     if (P.Tok.isNot(tok::r_paren)) {
       do {
-        if (TypeElts.size() > TT->getFields().size()) {
+        if (TypeElts.size() > TT->getNumElements()) {
           P.diagnose(P.Tok, diag::sil_tuple_inst_wrong_value_count,
-                     TT->getFields().size());
+                     TT->getNumElements());
           return true;
         }
-        Type EltTy = TT->getFields()[TypeElts.size()].getType();
+        Type EltTy = TT->getElement(TypeElts.size()).getType();
         if (parseValueRef(Val,
                  SILType::getPrimitiveObjectType(EltTy->getCanonicalType()),
                  SILFileLocation(P.Tok.getLoc())))
@@ -2396,9 +2396,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     HadError |= P.parseToken(tok::r_paren,
                              diag::expected_tok_in_sil_instr,")");
 
-    if (TypeElts.size() != TT->getFields().size()) {
+    if (TypeElts.size() != TT->getNumElements()) {
       P.diagnose(OpcodeLoc, diag::sil_tuple_inst_wrong_value_count,
-                 TT->getFields().size());
+                 TT->getNumElements());
       return true;
     }
 
@@ -2477,13 +2477,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     TupleType *TT = Val.getType().getAs<TupleType>();
     if (P.Tok.isNot(tok::integer_literal) ||
         P.Tok.getText().getAsInteger(10, Field) ||
-        Field >= TT->getFields().size()) {
+        Field >= TT->getNumElements()) {
       P.diagnose(P.Tok, diag::sil_tuple_inst_wrong_field);
       return true;
     }
     P.consumeToken(tok::integer_literal);
 
-    auto ResultTy = TT->getFields()[Field].getType()->getCanonicalType();
+    auto ResultTy = TT->getElement(Field).getType()->getCanonicalType();
     if (Opcode == ValueKind::TupleElementAddrInst)
       ResultVal = B.createTupleElementAddr(InstLoc, Val, Field,
                                   SILType::getPrimitiveAddressType(ResultTy));

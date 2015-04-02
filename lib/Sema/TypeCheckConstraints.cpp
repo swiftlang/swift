@@ -113,14 +113,14 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
                                       SmallVectorImpl<unsigned> &variadicArgs) {
   const int unassigned = -3;
   
-  SmallVector<bool, 4> consumed(fromTuple->getFields().size(), false);
+  SmallVector<bool, 4> consumed(fromTuple->getNumElements(), false);
   sources.clear();
   variadicArgs.clear();
-  sources.assign(toTuple->getFields().size(), unassigned);
+  sources.assign(toTuple->getNumElements(), unassigned);
 
   // Match up any named elements.
-  for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
-    const auto &toElt = toTuple->getFields()[i];
+  for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
+    const auto &toElt = toTuple->getElement(i);
 
     // Skip unnamed elements.
     if (!toElt.hasName())
@@ -130,7 +130,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
     int matched = -1;
     {
       int index = 0;
-      for (auto field : fromTuple->getFields()) {
+      for (auto field : fromTuple->getElements()) {
         if (field.getName() == toElt.getName() && !consumed[index]) {
           matched = index;
           break;
@@ -147,19 +147,19 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
   }  
 
   // Resolve any unmatched elements.
-  unsigned fromNext = 0, fromLast = fromTuple->getFields().size();
+  unsigned fromNext = 0, fromLast = fromTuple->getNumElements();
   auto skipToNextAvailableInput = [&] {
     while (fromNext != fromLast && consumed[fromNext])
       ++fromNext;
   };
   skipToNextAvailableInput();
 
-  for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
+  for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
     // Check whether we already found a value for this element.
     if (sources[i] != unassigned)
       continue;
 
-    const auto &elt2 = toTuple->getFields()[i];
+    const auto &elt2 = toTuple->getElement(i);
 
     // Variadic tuple elements match the rest of the input elements.
     if (elt2.isVararg()) {
@@ -168,7 +168,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
         // Labeled elements can't be adopted into varargs even if
         // they're non-mandatory.  There isn't a really strong reason
         // for this, though.
-        if (fromTuple->getFields()[fromNext].hasName()) {
+        if (fromTuple->getElement(fromNext).hasName()) {
           return true;
         }
 
@@ -194,7 +194,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.
-    if (fromTuple->getFields()[fromNext].hasName() && elt2.hasName())
+    if (fromTuple->getElement(fromNext).hasName() && elt2.hasName())
       return true;
 
     sources[i] = fromNext;
@@ -248,7 +248,7 @@ static unsigned getNumArgs(ValueDecl *value) {
     fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
   Type argTy = fnTy->getInput();
   if (auto tuple = argTy->getAs<TupleType>()) {
-    return tuple->getFields().size();
+    return tuple->getNumElements();
   } else {
     return 1;
   }
@@ -711,7 +711,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (AE->getElements().size() != 1)
       return nullptr;
 
-    TypeExpr *TyExpr = dyn_cast<TypeExpr>(AE->getElements()[0]);
+    TypeExpr *TyExpr = dyn_cast<TypeExpr>(AE->getElement(0));
     if (!TyExpr)
       return nullptr;
 
@@ -731,7 +731,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     TypeRepr *keyTypeRepr, *valueTypeRepr;
     
-    if (auto EltTuple = dyn_cast<TupleExpr>(DE->getElements()[0])) {
+    if (auto EltTuple = dyn_cast<TupleExpr>(DE->getElement(0))) {
       TypeExpr *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
       if (!KeyTyExpr)
         return nullptr;
@@ -743,19 +743,19 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       keyTypeRepr = KeyTyExpr->getTypeRepr();
       valueTypeRepr = ValueTyExpr->getTypeRepr();
     } else {
-      auto *TE = dyn_cast<TypeExpr>(DE->getElements()[0]);
+      auto *TE = dyn_cast<TypeExpr>(DE->getElement(0));
       if (!TE) return nullptr;
       
       auto *TRE = dyn_cast_or_null<TupleTypeRepr>(TE->getTypeRepr());
       if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
       while (TRE->isParenType()) {
-        TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElements()[0]);
+        TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElement(0));
         if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
       }
 
       assert(TRE->getElements().size() == 2);
-      keyTypeRepr = TRE->getElements()[0];
-      valueTypeRepr = TRE->getElements()[1];
+      keyTypeRepr = TRE->getElement(0);
+      valueTypeRepr = TRE->getElement(1);
     }
 
     auto *NewTypeRepr =
@@ -2184,7 +2184,7 @@ static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
 
   if (callee == ctx.getForceBridgeFromObjectiveC(nullptr) ||
       callee == ctx.getConditionallyBridgeFromObjectiveC(nullptr))
-    return cast<TupleExpr>(call->getArg())->getElements()[0];
+    return cast<TupleExpr>(call->getArg())->getElement(0);
 
   return nullptr;
 }

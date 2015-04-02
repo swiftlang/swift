@@ -1478,14 +1478,14 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     SmallVector<TupleTypeElt, 4> elements;
     bool anyChanged = false;
     unsigned idx = 0;
-    for (const auto &elt : tupleTy->getFields()) {
+    for (const auto &elt : tupleTy->getElements()) {
       Type eltTy = mapSignatureParamType(ctx, elt.getType());
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
           elt.hasInit()) {
         if (!anyChanged) {
-          elements.reserve(tupleTy->getFields().size());
+          elements.reserve(tupleTy->getNumElements());
           for (unsigned i = 0; i != idx; ++i) {
-            const TupleTypeElt &elt = tupleTy->getFields()[i];
+            const TupleTypeElt &elt = tupleTy->getElement(i);
             elements.push_back(TupleTypeElt(elt.getType(), elt.getName(),
                                             DefaultArgumentKind::None,
                                             elt.isVararg()));
@@ -3032,7 +3032,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
   // Look through a named 1-tuple.
   if (auto tupleTy = indexTy->getAs<TupleType>()) {
     if (tupleTy->getNumElements() == 1 &&
-        !tupleTy->getFields()[0].isVararg()) {
+        !tupleTy->getElement(0).isVararg()) {
       indexTy = tupleTy->getElementType(0);
     }
   }
@@ -3255,7 +3255,7 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
       continue;
     }
 
-    for (auto &Elt : Params->getFields()) {
+    for (auto &Elt : Params->getElements()) {
       if (Index == 0) {
         Found = &Elt;
         break;
@@ -3475,7 +3475,7 @@ bool FuncDecl::isUnaryOperator() const {
   if (!argTuple)
     return true;
 
-  return argTuple->getNumFields() == 1 && !argTuple->hasVararg();
+  return argTuple->getNumElements() == 1 && !argTuple->hasVararg();
 }
 
 bool FuncDecl::isBinaryOperator() const {
@@ -3489,8 +3489,8 @@ bool FuncDecl::isBinaryOperator() const {
   if (!argTuple)
     return false;
   
-  return argTuple->getNumFields() == 2
-    || (argTuple->getNumFields() == 1 && argTuple->hasVararg());
+  return argTuple->getNumElements() == 2
+    || (argTuple->getNumElements() == 1 && argTuple->hasVararg());
 }
 
 bool FuncDecl::isOverridingDecl(const FuncDecl *Method) const {
@@ -3543,10 +3543,10 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   const Pattern *paramPattern = getBodyParamPatterns()[1];
   Type paramType;
   if (auto tuplePattern = dyn_cast<TuplePattern>(paramPattern)) {
-    if (tuplePattern->getFields().size() != 1 || tuplePattern->hasVararg())
+    if (tuplePattern->getNumElements() != 1 || tuplePattern->hasVararg())
       return false;
 
-    paramType = tuplePattern->getFields()[0].getPattern()->getType();
+    paramType = tuplePattern->getElement(0).getPattern()->getType();
   } else {
     paramType = paramPattern->getType();
   }
@@ -3787,7 +3787,7 @@ ObjCSelector ConstructorDecl::getObjCSelector() const {
   const TuplePattern *tuple = nullptr;
   if (argNames.size() == 1 && 
       (tuple = dyn_cast<TuplePattern>(getBodyParamPatterns()[1]))) {
-    const auto &elt = tuple->getFields()[0];
+    const auto &elt = tuple->getElement(0);
     auto pattern = elt.getPattern()->getSemanticsProvidingPattern();
     if (pattern->hasType()) {
       if (pattern->getType()->isEqual(TupleType::getEmpty(ctx))) {

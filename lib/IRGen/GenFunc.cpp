@@ -3254,7 +3254,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
     // Restore type metadata bindings, if we have them.
     if (layout.hasBindings()) {
-      auto bindingLayout = layout.getElements()[nextCapturedField++];
+      auto bindingLayout = layout.getElement(nextCapturedField++);
       // The bindings should be fixed-layout inside the object, so we can
       // pass None here. If they weren't, we'd have a chicken-egg problem.
       auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ None);
@@ -3283,7 +3283,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     for (unsigned n = layout.getElements().size();
          nextCapturedField < n;
          ++nextCapturedField) {
-      auto &fieldLayout = layout.getElements()[nextCapturedField];
+      auto &fieldLayout = layout.getElement(nextCapturedField);
       auto &fieldTy = layout.getElementTypes()[nextCapturedField];
       auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
@@ -3615,7 +3615,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     
     // Store necessary bindings, if we have them.
     if (layout.hasBindings()) {
-      auto &bindingsLayout = layout.getElements()[i];
+      auto &bindingsLayout = layout.getElement(i);
       Address bindingsAddr = bindingsLayout.project(IGF, dataAddr, offsets);
       layout.getBindings().save(IGF, bindingsAddr);
       ++i;
@@ -3623,7 +3623,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     
     // Store the context arguments.
     for (unsigned end = layout.getElements().size(); i < end; ++i) {
-      auto &fieldLayout = layout.getElements()[i];
+      auto &fieldLayout = layout.getElement(i);
       auto &fieldTy = layout.getElementTypes()[i];
       Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
       switch (argConventions[i]) {

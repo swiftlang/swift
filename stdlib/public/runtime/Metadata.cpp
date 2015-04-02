@@ -578,7 +578,7 @@ static OpaqueValue *tuple_forEachField(OpaqueValue *destTuple,
                                        forEachOperation member) {
   auto &metatype = *(const TupleTypeMetadata*) _metatype;
   for (size_t i = 0, e = metatype.NumElements; i != e; ++i) {
-    auto &eltInfo = metatype.getElements()[i];
+    auto &eltInfo = metatype.getElement(i);
     auto eltValueWitnesses = eltInfo.Type->getValueWitnesses();
 
     OpaqueValue *destElt = eltInfo.findIn(destTuple);
@@ -807,7 +807,7 @@ static void tuple_storeExtraInhabitant(OpaqueValue *tuple,
                                        int index,
                                        const Metadata *_metatype) {
   auto &metatype = *(const TupleTypeMetadata*) _metatype;
-  auto &eltInfo = metatype.getElements()[0];
+  auto &eltInfo = metatype.getElement(0);
 
   assert(eltInfo.Offset == 0);
   OpaqueValue *elt = tuple;
@@ -818,7 +818,7 @@ static void tuple_storeExtraInhabitant(OpaqueValue *tuple,
 static int tuple_getExtraInhabitantIndex(const OpaqueValue *tuple,
                                          const Metadata *_metatype) {
   auto &metatype = *(const TupleTypeMetadata*) _metatype;
-  auto &eltInfo = metatype.getElements()[0];
+  auto &eltInfo = metatype.getElement(0);
 
   assert(eltInfo.Offset == 0);
   const OpaqueValue *elt = tuple;
@@ -958,8 +958,8 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
       auto layout = BasicLayout::initialForValueType();
       performBasicLayout(layout, elements, numElements,
         [&](size_t i, const Metadata *elt, size_t offset) {
-          metadata->getElements()[i].Type = elt;
-          metadata->getElements()[i].Offset = offset;
+          metadata->getElement(i).Type = elt;
+          metadata->getElement(i).Offset = offset;
         });
 
       witnesses->size = layout.size;

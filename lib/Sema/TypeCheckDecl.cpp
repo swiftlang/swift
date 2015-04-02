@@ -817,7 +817,7 @@ static void revertDependentPattern(Pattern *pattern) {
   case PatternKind::Tuple: {
     // Recurse into tuple elements.
     auto tuple = cast<TuplePattern>(pattern);
-    for (auto &field : tuple->getFields()) {
+    for (auto &field : tuple->getElements()) {
       revertDependentPattern(field.getPattern());
     }
     break;
@@ -1180,7 +1180,7 @@ static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   // Build tuple literals for tuple types.
   if (auto tupleType = type->getAs<TupleType>()) {
     SmallVector<Expr *, 2> inits;
-    for (const auto &elt : tupleType->getFields()) {
+    for (const auto &elt : tupleType->getElements()) {
       if (elt.isVararg())
         return nullptr;
 
@@ -3666,7 +3666,7 @@ public:
           unsigned firstParamIdx = FD->getParent()->isTypeContext();
           auto *firstParamPattern = FD->getBodyParamPatterns()[firstParamIdx];
           auto *tuplePattern = cast<TuplePattern>(firstParamPattern);
-          auto *paramPattern = tuplePattern->getFields().front().getPattern();
+          auto *paramPattern = tuplePattern->getElements().front().getPattern();
           auto *paramTypePattern = cast<TypedPattern>(paramPattern);
           paramTypePattern->getTypeLoc().setType(valueTy, true);
         } else if (FD->isGetter() && FD->isImplicit()) {
@@ -3711,8 +3711,8 @@ public:
       // Look through single-entry tuple elements, which can exist when there
       // are default values.
       if (auto *TP = dyn_cast<TuplePattern>(BodyPattern))
-        if (TP->getNumFields() == 1 && !TP->hasVararg())
-          BodyPattern =TP->getFields()[0].getPattern();
+        if (TP->getNumElements() == 1 && !TP->hasVararg())
+          BodyPattern =TP->getElement(0).getPattern();
       // Look through typedpatterns and parens.
       BodyPattern = BodyPattern->getSemanticsProvidingPattern();
       
@@ -3923,7 +3923,7 @@ public:
     // Look through parentheses.
     if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
       if (!parenRepr->isParenType()) return false;
-      return checkDynamicSelfReturn(func, parenRepr->getElements()[0],
+      return checkDynamicSelfReturn(func, parenRepr->getElement(0),
                                     optionalDepth);
     }
 
@@ -4234,7 +4234,7 @@ public:
       auto paramPattern = FD->getBodyParamPatterns()[
                             FD->getDeclContext()->isTypeContext() ? 1 : 0];
       if (auto paramTuple = dyn_cast<TuplePattern>(paramPattern)) {
-        ArrayRef<TuplePatternElt> fields = paramTuple->getFields();
+        ArrayRef<TuplePatternElt> fields = paramTuple->getElements();
         unsigned n = fields.size();
         bool anyDefaultArguments = false;
         for (unsigned i = n; i > 0; --i) {
@@ -4421,7 +4421,7 @@ public:
     if (parentTupleInput) {
       if (paramPatterns) {
         // FIXME: If we ever allow argument reordering, this is incorrect.
-        ArrayRef<TuplePatternElt> sharedParams = paramPatterns->getFields();
+        ArrayRef<TuplePatternElt> sharedParams = paramPatterns->getElements();
         sharedParams = sharedParams.slice(0,
                                           parentTupleInput->getNumElements());
 
@@ -4435,7 +4435,7 @@ public:
     } else {
       // Otherwise, the parent has a single parameter with no label.
       if (paramPatterns) {
-        checkParam(paramPatterns->getFields().front().getPattern(),
+        checkParam(paramPatterns->getElements().front().getPattern(),
                    parentInput);
       } else {
         checkParam(rawParamPatterns, parentInput);
@@ -6287,7 +6287,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
   case PatternKind::Tuple: {
     std::string result = "(";
     bool first = true;
-    for (auto elt : cast<TuplePattern>(pattern)->getFields()) {
+    for (auto elt : cast<TuplePattern>(pattern)->getElements()) {
       if (auto sub = buildDefaultInitializerString(tc, dc, elt.getPattern())) {
         if (first) {
           first = false;
@@ -6753,7 +6753,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 
         // Check whether any of the tuple elements are missing an initializer.
         bool missingInit = false;
-        for (auto &elt : paramTuple->getFields()) {
+        for (auto &elt : paramTuple->getElements()) {
           if (elt.hasInit())
             continue;
 
@@ -6882,7 +6882,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
             cast<ConstructorDecl>(func)->isObjCZeroParameterWithLongSelector())
           numParameters = 0;
         else if (auto tuple = dyn_cast<TuplePattern>(bodyPattern))
-          numParameters = tuple->getNumFields();
+          numParameters = tuple->getNumElements();
         else
           numParameters = 1;
 
@@ -6970,7 +6970,7 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
     SourceLoc loc;
     bool needColon = false;
     if (tuplePattern) {
-      auto origPattern = tuplePattern->getFields()[i].getPattern();
+      auto origPattern = tuplePattern->getElement(i).getPattern();
       if (auto param = cast_or_null<ParamDecl>(origPattern->getSingleVar())) {
         // The parameter has an explicitly-specified API name, and it's wrong.
         if (param->getArgumentNameLoc() != param->getLoc() &&

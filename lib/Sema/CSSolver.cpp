@@ -258,9 +258,9 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
     // scalar type as its supertype.
     // FIXME: There is a way more general property here, where we can drop
     // one label from the tuple, maintaining the rest.
-    int scalarIdx = tupleTy->getFieldForScalarInit();
+    int scalarIdx = tupleTy->getElementForScalarInit();
     if (scalarIdx >= 0) {
-      auto &elt = tupleTy->getFields()[scalarIdx];
+      auto &elt = tupleTy->getElement(scalarIdx);
       if (elt.isVararg()) // FIXME: Should we keep the name?
         result.push_back(elt.getVarargBaseTy());
       else if (elt.hasName())
@@ -825,7 +825,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
       if (auto tupleTy = type->getAs<TupleType>()) {
         if (tupleTy->getNumElements() == 1 &&
-            !tupleTy->getFields()[0].isVararg())
+            !tupleTy->getElement(0).isVararg())
           type = tupleTy->getElementType(0);
       }
     }
@@ -1052,7 +1052,7 @@ static bool tryTypeVariableBindings(
 
       if (binding.Kind == AllowedBindingKind::Subtypes) {
         if (auto tupleTy = type->getAs<TupleType>()) {
-          int scalarIdx = tupleTy->getFieldForScalarInit();
+          int scalarIdx = tupleTy->getElementForScalarInit();
           if (scalarIdx >= 0) {
             auto eltType = tupleTy->getElementType(scalarIdx);
             if (exploredTypes.insert(eltType->getCanonicalType()).second)

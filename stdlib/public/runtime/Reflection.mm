@@ -388,7 +388,7 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   result.first = String(buf, strlen(buf));
   
   // Get a Mirror for the nth element.
-  auto &elt = Tuple->getElements()[i];
+  auto &elt = Tuple->getElement(i);
   auto bytes = reinterpret_cast<const char*>(value);
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
 

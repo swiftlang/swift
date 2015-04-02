@@ -109,7 +109,7 @@ static CanType getElementTypeRec(CanType T, unsigned EltNo,
   // If this is a tuple type, walk into it.
   if (TupleType *TT = T->getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
-    for (auto &Elt : TT->getFields()) {
+    for (auto &Elt : TT->getElements()) {
       auto FieldType = Elt.getType()->getCanonicalType();
       unsigned NumFieldElements = getElementCountRec(FieldType, false);
       if (EltNo < NumFieldElements)
@@ -213,7 +213,7 @@ static void getPathStringToElementRec(CanType T, unsigned EltNo,
                                       std::string &Result) {
   if (CanTupleType TT = dyn_cast<TupleType>(T)) {
     unsigned FieldNo = 0;
-    for (auto &Field : TT->getFields()) {
+    for (auto &Field : TT->getElements()) {
       CanType FieldTy = Field.getType()->getCanonicalType();
       unsigned NumFieldElements = getElementCountRec(FieldTy, false);
       
@@ -329,7 +329,7 @@ static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
                                       SmallVectorImpl<SILValue> &ElementAddrs) {
   CanType AggType = Pointer.getType().getSwiftRValueType();
   TupleType *TT = AggType->castTo<TupleType>();
-  for (auto &Field : TT->getFields()) {
+  for (auto &Field : TT->getElements()) {
     (void)Field;
     ElementAddrs.push_back(B.createTupleElementAddr(Loc, Pointer,
                                                     ElementAddrs.size()));
@@ -342,7 +342,7 @@ static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
   TupleType *TT = V.getType().getSwiftRValueType()->castTo<TupleType>();
-  for (auto &Field : TT->getFields()) {
+  for (auto &Field : TT->getElements()) {
     (void)Field;
     ElementVals.push_back(B.emitTupleExtract(Loc, V, ElementVals.size()));
   }

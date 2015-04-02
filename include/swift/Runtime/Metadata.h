@@ -1559,6 +1559,9 @@ struct TupleTypeMetadata : public Metadata {
     return reinterpret_cast<const Element *>(this+1);
   }
 
+  const Element &getElement(unsigned i) const { return getElements()[i]; }
+  Element &getElement(unsigned i) { return getElements()[i]; }
+
   static bool classof(const Metadata *metadata) {
     return metadata->getKind() == MetadataKind::Tuple;
   }

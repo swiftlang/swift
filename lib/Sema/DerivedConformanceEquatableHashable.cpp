@@ -124,11 +124,11 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
 /// Derive the body for an '==' operator for an enum
 static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
   auto args = cast<TuplePattern>(eqDecl->getBodyParamPatterns().back());
-  auto aPattern = args->getFields()[0].getPattern();
+  auto aPattern = args->getElement(0).getPattern();
   auto aParamPattern =
     cast<NamedPattern>(aPattern->getSemanticsProvidingPattern());
   auto aParam = aParamPattern->getDecl();
-  auto bPattern = args->getFields()[1].getPattern();
+  auto bPattern = args->getElement(1).getPattern();
   auto bParamPattern =
     cast<NamedPattern>(bPattern->getSemanticsProvidingPattern());
   auto bParam = bParamPattern->getDecl();

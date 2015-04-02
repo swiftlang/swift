@@ -3324,7 +3324,7 @@ namespace {
     VarDecl *getSingleVar(Pattern *pattern) {
       pattern = pattern->getSemanticsProvidingPattern();
       if (auto tuple = dyn_cast<TuplePattern>(pattern)) {
-        pattern = tuple->getFields()[0].getPattern()
+        pattern = tuple->getElement(0).getPattern()
                     ->getSemanticsProvidingPattern();
       }
 
@@ -3452,7 +3452,7 @@ namespace {
 
       auto paramVarDecl = new (context) ParamDecl(
           /*isLet=*/false, SourceLoc(), Identifier(), loc,
-          tuple->getFields()[0].getPattern()->getSingleVar()->getName(),
+          tuple->getElement(0).getPattern()->getSingleVar()->getName(),
           elementTy, dc);
       auto valuePattern = createTypedNamedPattern(paramVarDecl);
       ValueElts.push_back(TuplePatternElt(valuePattern));
@@ -3657,10 +3657,10 @@ namespace {
       // Find the getter indices and make sure they match.
       {
         auto tuple = dyn_cast<TuplePattern>(getter->getBodyParamPatterns()[1]);
-        if (tuple && tuple->getFields().size() != 1)
+        if (tuple && tuple->getNumElements() != 1)
           return nullptr;
 
-        getterIndices = tuple->getFields()[0].getPattern();
+        getterIndices = tuple->getElement(0).getPattern();
       }
 
       // Check the form of the setter.
@@ -3671,13 +3671,13 @@ namespace {
         if (!tuple)
           return nullptr;
 
-        if (tuple->getFields().size() != 2)
+        if (tuple->getNumElements() != 2)
           return nullptr;
 
         // The setter must accept elements of the same type as the getter
         // returns.
         // FIXME: Adjust C++ references?
-        auto setterElementTy = tuple->getFields()[0].getPattern()->getType();
+        auto setterElementTy = tuple->getElement(0).getPattern()->getType();
         if (!elementTy->isEqual(setterElementTy)) {
           auto nonOptionalElementTy = elementTy->getAnyOptionalObjectType();
           if (nonOptionalElementTy.isNull())
@@ -3695,7 +3695,7 @@ namespace {
               ImplicitlyUnwrappedOptionalType::get(nonOptionalElementTy);
         }
 
-        setterIndices = tuple->getFields()[1].getPattern();
+        setterIndices = tuple->getElement(1).getPattern();
 
         // The setter must use the same indices as the getter.
         // FIXME: Adjust C++ references?

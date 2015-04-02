@@ -502,7 +502,7 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
   if (!tuple)
     return SourceLoc();
 
-  const auto &tupleElt = tuple->getFields()[getParameterIndex()];
+  const auto &tupleElt = tuple->getElement(getParameterIndex());
   if (auto typed = dyn_cast<TypedPattern>(tupleElt.getPattern())) {
     return getOptionalityLoc(typed->getTypeLoc().getTypeRepr());
   }
@@ -576,7 +576,7 @@ static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
   SmallVector<TupleTypeElt, 4> result;
 
   if (auto tupleTy = dyn_cast<TupleType>(type.getPointer())) {
-    result.append(tupleTy->getFields().begin(), tupleTy->getFields().end());
+    result.append(tupleTy->getElements().begin(), tupleTy->getElements().end());
     return result;
   }
 
@@ -1699,7 +1699,7 @@ static bool isNonContravariantSelfParamType(Type type) {
 
   // Decompose tuples.
   if (auto tuple = type->getAs<TupleType>()) {
-    for (auto &elt: tuple->getFields()) {
+    for (auto &elt: tuple->getElements()) {
       if (isNonContravariantSelfParamType(elt.getType()))
         return true;
     }

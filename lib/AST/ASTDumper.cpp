@@ -204,19 +204,19 @@ namespace {
         OS << " hasVararg";
 
       OS << " names=";
-      interleave(P->getFields(),
+      interleave(P->getElements(),
                  [&](const TuplePatternElt &elt) {
                    auto name = elt.getLabel();
                    OS << (name.empty() ? "''" : name.str());
                  },
                  [&] { OS << ","; });
 
-      for (unsigned i = 0, e = P->getNumFields(); i != e; ++i) {
+      for (auto &elt : P->getElements()) {
         OS << '\n';
-        printRec(P->getFields()[i].getPattern());
-        if (P->getFields()[i].getInit()) {
+        printRec(elt.getPattern());
+        if (elt.getInit()) {
           OS << '\n';
-          printRec(P->getFields()[i].getInit()->getExpr());
+          printRec(elt.getInit()->getExpr());
         }
       }
       OS << ')';
@@ -2255,7 +2255,7 @@ namespace {
       printCommon(T, label, "tuple_type");
       printField("num_elements", T->getNumElements());
       Indent += 2;
-      for (const auto &elt : T->getFields()) {
+      for (const auto &elt : T->getElements()) {
         OS << "\n";
         OS.indent(Indent) << "(";
         PrintWithColorRAII(OS, TypeFieldColor) << "tuple_type_elt";

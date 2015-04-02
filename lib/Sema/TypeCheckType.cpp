@@ -1835,8 +1835,8 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (elements.size() == 1 && elements[0].hasName() &&
         !(options & TR_EnumCase)) {
       if (!complained) {
-        auto named = cast<NamedTypeRepr>(repr->getElements()[0]);
-        TC.diagnose(repr->getElements()[0]->getStartLoc(),
+        auto named = cast<NamedTypeRepr>(repr->getElement(0));
+        TC.diagnose(repr->getElement(0)->getStartLoc(),
                     diag::tuple_single_element)
           .fixItRemoveChars(named->getStartLoc(),
                             named->getTypeRepr()->getStartLoc());
@@ -2128,7 +2128,7 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
 
   bool Diagnose = (Reason != ObjCReason::DontDiagnose);
   if (auto *TP = dyn_cast<TuplePattern>(P)) {
-    auto Fields = TP->getFields();
+    auto Fields = TP->getElements();
     unsigned NumParams = Fields.size();
 
     // Varargs are not representable in Objective-C.
@@ -2385,7 +2385,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   // Figure out the type of the indices.
   Type IndicesType = SD->getIndicesType();
   if (auto TupleTy = IndicesType->getAs<TupleType>()) {
-    if (TupleTy->getNumElements() == 1 && !TupleTy->getFields()[0].isVararg())
+    if (TupleTy->getNumElements() == 1 && !TupleTy->getElement(0).isVararg())
       IndicesType = TupleTy->getElementType(0);
   }
 
@@ -2551,7 +2551,7 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     
     Type Input = FT->getInput();
     if (auto InputTuple = Input->getAs<TupleType>()) {
-      for (auto &Elt : InputTuple->getFields()) {
+      for (auto &Elt : InputTuple->getElements()) {
         if (!isRepresentableInObjC(DC, Elt.getType()))
           return false;
       }

@@ -530,7 +530,7 @@ AggregateAvailableValues(SILInstruction *Inst, SILType LoadTy,
   if (TupleType *TT = LoadTy.getAs<TupleType>()) {
     SmallVector<SILValue, 4> ResultElts;
     
-    for (unsigned EltNo : indices(TT->getFields())) {
+    for (unsigned EltNo : indices(TT->getElements())) {
       SILType EltTy = LoadTy.getTupleElementType(EltNo);
       unsigned NumSubElt = getNumSubElements(EltTy, M);
       

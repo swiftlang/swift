@@ -461,7 +461,7 @@ static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
                                             CanTupleType type) {
   bool hasLabels = false;
   llvm::SmallString<128> buffer;
-  for (auto &elt : type->getFields()) {
+  for (auto &elt : type->getElements()) {
     if (elt.hasName()) {
       hasLabels = true;
       buffer.append(elt.getName().str());

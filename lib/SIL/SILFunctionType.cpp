@@ -1371,8 +1371,8 @@ static CanType getBridgedInputType(TypeConverter &tc,
     SmallVector<TupleTypeElt, 4> bridgedFields;
     bool changed = false;
 
-    for (unsigned i : indices(tuple->getFields())) {
-      auto &elt = tuple->getFields()[i];
+    for (unsigned i : indices(tuple->getElements())) {
+      auto &elt = tuple->getElement(i);
 
       auto clangInputTy = getClangParamType(i);
 
@@ -1893,7 +1893,7 @@ namespace {
 
       SmallVector<TupleTypeElt, 8> substElts;
       substElts.reserve(origType->getNumElements());
-      for (auto &origElt : origType->getFields()) {
+      for (auto &origElt : origType->getElements()) {
         auto substEltType = visit(CanType(origElt.getType()));
         substElts.push_back(origElt.getWithType(substEltType));
       }

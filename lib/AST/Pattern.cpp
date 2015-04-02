@@ -161,7 +161,7 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
     return getSemanticsProvidingPattern()->forEachVariable(fn);
 
   case PatternKind::Tuple:
-    for (auto elt : cast<TuplePattern>(this)->getFields())
+    for (auto elt : cast<TuplePattern>(this)->getElements())
       elt.getPattern()->forEachVariable(fn);
     return;
 
@@ -218,7 +218,7 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
     return cast<VarPattern>(this)->getSubPattern()->forEachNode(f);
 
   case PatternKind::Tuple:
-    for (auto elt : cast<TuplePattern>(this)->getFields())
+    for (auto elt : cast<TuplePattern>(this)->getElements())
       elt.getPattern()->forEachNode(f);
     return;
 
@@ -265,7 +265,7 @@ case PatternKind::ID: foundRefutablePattern = true; break;
 unsigned Pattern::numTopLevelVariables() const {
   auto pattern = getSemanticsProvidingPattern();
   if (auto tuple = dyn_cast<TuplePattern>(pattern))
-    return tuple->getNumFields();
+    return tuple->getNumElements();
   return 1;
 }
 
@@ -356,8 +356,8 @@ Pattern *Pattern::clone(ASTContext &context,
   case PatternKind::Tuple: {
     auto tuple = cast<TuplePattern>(this);
     SmallVector<TuplePatternElt, 2> elts;
-    elts.reserve(tuple->getNumFields());
-    for (const auto &elt : tuple->getFields()) {
+    elts.reserve(tuple->getNumElements());
+    for (const auto &elt : tuple->getElements()) {
       auto eltPattern = elt.getPattern()->clone(context, options);
 
       // If we're inheriting a default argument, mark it as such.
@@ -518,8 +518,8 @@ Pattern *Pattern::cloneForwardable(ASTContext &context, DeclContext *DC,
   case PatternKind::Tuple: {
     auto tuple = cast<TuplePattern>(this);
     SmallVector<TuplePatternElt, 2> elts;
-    elts.reserve(tuple->getNumFields());
-    for (const auto &elt : tuple->getFields()) {
+    elts.reserve(tuple->getNumElements());
+    for (const auto &elt : tuple->getElements()) {
       auto eltPattern = elt.getPattern()->cloneForwardable(context, DC, options);
 
       // If we're inheriting a default argument, mark it as such.
@@ -610,10 +610,10 @@ Expr *Pattern::buildForwardingRefExpr(ASTContext &context) const {
     SmallVector<Expr*, 2> elts;
     SmallVector<Identifier, 2> labels;
     SmallVector<SourceLoc, 2> labelLocs;
-    elts.reserve(tuple->getNumFields());
-    labels.reserve(tuple->getNumFields());
-    labelLocs.reserve(tuple->getNumFields());
-    for (const auto &elt : tuple->getFields()) {
+    elts.reserve(tuple->getNumElements());
+    labels.reserve(tuple->getNumElements());
+    labelLocs.reserve(tuple->getNumElements());
+    for (const auto &elt : tuple->getElements()) {
       elts.push_back(elt.getPattern()->buildForwardingRefExpr(context));
       labels.push_back(Identifier()); // FIXME?
       labelLocs.push_back(SourceLoc());
@@ -674,7 +674,8 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                             alignof(TuplePattern));
   TuplePattern *pattern = ::new(buffer) TuplePattern(lp, n, rp, hasVararg,
                                                      ellipsis, *implicit);
-  memcpy(pattern->getFieldsBuffer(), elts.data(), n * sizeof(TuplePatternElt));
+  memcpy(pattern->getElementsBuffer(), elts.data(),
+         n * sizeof(TuplePatternElt));
   return pattern;
 }
 
@@ -700,7 +701,7 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
 SourceRange TuplePattern::getSourceRange() const {
   if (LPLoc.isValid())
     return { LPLoc, RPLoc };
-  auto Fields = getFields();
+  auto Fields = getElements();
   if (Fields.empty())
     return {};
   return { Fields.front().getPattern()->getStartLoc(),

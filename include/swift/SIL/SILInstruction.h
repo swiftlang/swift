@@ -1857,8 +1857,8 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
-  // Return the ith value referenced by this TupleInst.
-  SILValue getElementValue(unsigned i) const {
+  // Return the i'th value referenced by this TupleInst.
+  SILValue getElement(unsigned i) const {
     return getElements()[i];
   }
 

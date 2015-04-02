@@ -607,7 +607,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
     switch (Pat->getKind()) {
     case PatternKind::Tuple:
-      for (auto &field : cast<TuplePattern>(Pat)->getFields())
+      for (auto &field : cast<TuplePattern>(Pat)->getElements())
         checkPattern(field.getPattern(), Reason);
       return;
     case PatternKind::Paren:

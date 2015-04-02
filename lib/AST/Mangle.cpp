@@ -147,7 +147,7 @@ namespace {
     }
 
     VarDecl *visitTuplePattern(TuplePattern *P) {
-      for (auto &elt : P->getFields()) {
+      for (auto &elt : P->getElements()) {
         VarDecl *var = visit(elt.getPattern());
         if (var) return var;
       }
@@ -805,12 +805,12 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     // type ::= 'T' tuple-field+ '_'  // tuple
     // type ::= 't' tuple-field+ '_'  // variadic tuple
     // tuple-field ::= identifier? type
-    if (tuple->getFields().size() > 0
-        && tuple->getFields().back().isVararg())
+    if (tuple->getNumElements() > 0
+        && tuple->getElements().back().isVararg())
       Buffer << 't';
     else
       Buffer << 'T';
-    for (auto &field : tuple->getFields()) {
+    for (auto &field : tuple->getElements()) {
       if (field.hasName())
         mangleIdentifier(field.getName());
       mangleType(field.getType(), explosion, 0);

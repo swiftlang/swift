@@ -1281,7 +1281,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType ST = getSILType(Ty2, (SILValueCategory)TyCategory2);
     TupleType *TT = ST.getAs<TupleType>();
 
-    auto ResultTy = TT->getFields()[TyID].getType();
+    auto ResultTy = TT->getElement(TyID).getType();
     switch ((ValueKind)OpCode) {
     default: llvm_unreachable("Out of sync with parent switch");
     case ValueKind::TupleElementAddrInst:
@@ -1306,7 +1306,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(TT && "Type of a TupleInst should be TupleType");
     SmallVector<SILValue, 4> OpList;
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2) {
-      Type EltTy = TT->getFields()[I >> 1].getType();
+      Type EltTy = TT->getElement(I >> 1).getType();
       OpList.push_back(
         getLocalValue(ListOfValues[I], ListOfValues[I+1],
                       getSILType(EltTy, SILValueCategory::Object)));

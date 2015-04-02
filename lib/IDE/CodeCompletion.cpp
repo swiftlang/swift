@@ -1061,10 +1061,10 @@ private:
     TupleType *InTuple = In->getAs<TupleType>();
     if (!InTuple)
       return;
-    auto Fields = InTuple->getFields();
-    if (Fields.empty())
+    auto Elements = InTuple->getElements();
+    if (Elements.empty())
       return;
-    if (!Fields[0].hasName())
+    if (!Elements[0].hasName())
       FoundFunctionsWithoutFirstKeyword = true;
   }
 
@@ -1311,8 +1311,8 @@ public:
                             const Pattern *P) {
     if (auto *TP = dyn_cast<TuplePattern>(P)) {
       bool NeedComma = false;
-      for (unsigned i = 0, end = TP->getNumFields(); i < end; ++i) {
-        TuplePatternElt TupleElt = TP->getFields()[i];
+      for (unsigned i = 0, end = TP->getNumElements(); i < end; ++i) {
+        TuplePatternElt TupleElt = TP->getElement(i);
         if (NeedComma)
           Builder.addComma();
         NeedComma = true;
@@ -1347,7 +1347,7 @@ public:
       else
         Builder.addAnnotatedLeftParen();
       bool NeedComma = false;
-      for (auto TupleElt : TT->getFields()) {
+      for (auto TupleElt : TT->getElements()) {
         if (NeedComma)
           Builder.addComma();
         Type EltT = TupleElt.isVararg() ? TupleElt.getVarargBaseTy()
@@ -1406,8 +1406,8 @@ public:
     if (auto *TT = dyn_cast<TupleType>(AFT->getInput().getPointer())) {
       bool NeedComma = false;
       // Iterate over the tuple type fields, corresponding to each parameter.
-      for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
-        const auto &TupleElt = TT->getFields()[i];
+      for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
+        const auto &TupleElt = TT->getElement(i);
         switch (TupleElt.getDefaultArgKind()) {
         case DefaultArgumentKind::None:
         case DefaultArgumentKind::Normal:
@@ -1432,7 +1432,7 @@ public:
           Builder.addComma();
         if (BodyTuple) {
           // If we have a local name for the parameter, pass in that as well.
-          auto ParamPat = BodyTuple->getFields()[i].getPattern();
+          auto ParamPat = BodyTuple->getElement(i).getPattern();
           Builder.addCallParameter(Name, ParamPat->getBodyName(), ParamType,
                                    TupleElt.isVararg());
         } else {
@@ -1448,7 +1448,7 @@ public:
         T = PT->getUnderlyingType();
       }
       if (BodyTuple) {
-        auto ParamPat = BodyTuple->getFields().front().getPattern();
+        auto ParamPat = BodyTuple->getElement(0).getPattern();
         Builder.addCallParameter(Identifier(), ParamPat->getBodyName(), T,
                                  /*IsVarArg*/false);
       } else
@@ -1911,7 +1911,7 @@ public:
 
   void getTupleExprCompletions(TupleType *ExprType) {
     unsigned Index = 0;
-    for (auto TupleElt : ExprType->getFields()) {
+    for (auto TupleElt : ExprType->getElements()) {
       CodeCompletionResultBuilder Builder(
           Sink,
           CodeCompletionResult::ResultKind::Pattern,

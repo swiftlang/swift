@@ -3363,12 +3363,12 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   bool hasInits = false;
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
-                                 fromTuple->getFields().size());
+                                 fromTuple->getElements().size());
   SmallVector<Expr *, 2> callerDefaultArgs;
   ConcreteDeclRef defaultArgsOwner;
 
-  for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
-    const auto &toElt = toTuple->getFields()[i];
+  for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
+    const auto &toElt = toTuple->getElement(i);
     auto toEltType = toElt.getType();
 
     // If we're default-initializing this member, there's nothing to do.
@@ -3414,7 +3414,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
     // We're matching one element to another. If the types already
     // match, there's nothing to do.
-    const auto &fromElt = fromTuple->getFields()[sources[i]];
+    const auto &fromElt = fromTuple->getElement(sources[i]);
     auto fromEltType = fromElt.getType();
     if (fromEltType->isEqual(toEltType)) {
       // Get the sugared type directly from the tuple expression, if there
@@ -3465,9 +3465,9 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   // Convert all of the variadic arguments to the destination type.
   ArraySliceType *arrayType = nullptr;
   if (hasVarArg) {
-    Type toEltType = toTuple->getFields().back().getVarargBaseTy();
+    Type toEltType = toTuple->getElements().back().getVarargBaseTy();
     for (int fromFieldIdx : variadicArgs) {
-      const auto &fromElt = fromTuple->getFields()[fromFieldIdx];
+      const auto &fromElt = fromTuple->getElement(fromFieldIdx);
       Type fromEltType = fromElt.getType();
 
       // If the source and destination types match, there's nothing to do.
@@ -3509,7 +3509,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     if (tc.requireArrayLiteralIntrinsics(expr->getStartLoc()))
       return nullptr;
     arrayType = cast<ArraySliceType>(
-          toTuple->getFields().back().getType().getPointer());
+          toTuple->getElements().back().getType().getPointer());
   }
 
   // Compute the updated 'from' tuple type, since we may have
@@ -3556,7 +3556,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
   // If the destination type is variadic, compute the injection function to use.
   Type arrayType = nullptr;
-  const auto &lastField = toTuple->getFields().back();
+  const auto &lastField = toTuple->getElements().back();
 
   if (lastField.isVararg()) {
     // Find the appropriate injection function.
@@ -3566,7 +3566,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   }
 
   // If we're initializing the varargs list, use its base type.
-  const auto &field = toTuple->getFields()[toScalarIdx];
+  const auto &field = toTuple->getElement(toScalarIdx);
   Type toScalarType;
   if (field.isVararg())
     toScalarType = field.getVarargBaseTy();
@@ -3586,7 +3586,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   SmallVector<TupleTypeElt, 4> sugarFields;
   bool hasInit = false;
   int i = 0;
-  for (auto &field : toTuple->getFields()) {
+  for (auto &field : toTuple->getElements()) {
     if (field.hasInit()) {
       hasInit = true;
       break;
@@ -3620,7 +3620,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   SmallVector<ScalarToTupleExpr::Element, 4> elements;
   ConcreteDeclRef defaultArgsOwner = nullptr;
   i = 0;
-  for (auto &field : toTuple->getFields()) {
+  for (auto &field : toTuple->getElements()) {
     // Use a null entry to indicate that this is the scalar field.
     if (i == toScalarIdx) {
       elements.push_back(ScalarToTupleExpr::Element());
@@ -3886,7 +3886,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   // over some of the weirdness with tuples vs. parentheses.
   auto getArg = [&](unsigned i) -> Expr * {
     if (argTuple)
-      return argTuple->getElements()[i];
+      return argTuple->getElement(i);
     assert(i == 0 && "Scalar only has a single argument");
 
     if (argParen)
@@ -4129,7 +4129,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
   auto closureExpr = cast<ClosureExpr>(expr);
   assert(closureExpr->hasSingleExpressionBody());
   
-  auto member = closureExpr->getBody()->getElements()[0];
+  auto member = closureExpr->getBody()->getElement(0);
   
   // A single-expression body contains a single return statement.
   auto returnStmt = dyn_cast<ReturnStmt>(member.get<Stmt *>());
@@ -4359,8 +4359,8 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
       auto *params = fnTy->getInput()->getAs<TupleType>();
       if (!params)
         return false;
-      return std::any_of(params->getFields().begin(),
-                         params->getFields().end(),
+      return std::any_of(params->getElements().begin(),
+                         params->getElements().end(),
                          [](TupleTypeElt field) {
                            return field.hasName();
                          });
@@ -4408,7 +4408,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::ScalarToTuple: {
       auto toTuple = toType->castTo<TupleType>();
       return coerceScalarToTuple(expr, toTuple,
-                                 toTuple->getFieldForScalarInit(), locator);
+                                 toTuple->getElementForScalarInit(), locator);
     }
 
     case ConversionRestrictionKind::TupleToScalar: {
@@ -4618,10 +4618,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Tuple-to-scalar conversion.
-  // FIXME: Will go away when tuple labels go away.
   if (auto fromTuple = fromType->getAs<TupleType>()) {
     if (fromTuple->getNumElements() == 1 &&
-        !fromTuple->getFields()[0].isVararg() &&
+        !fromTuple->getElement(0).isVararg() &&
         !toType->is<TupleType>()) {
       expr = new (cs.getASTContext()) TupleElementExpr(
                                         expr,
@@ -4650,7 +4649,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // load.
     bool performLoad = true;
     if (auto toTuple = toType->getAs<TupleType>()) {
-      int scalarIdx = toTuple->getFieldForScalarInit();
+      int scalarIdx = toTuple->getElementForScalarInit();
       if (scalarIdx >= 0 &&
           toTuple->getElementType(scalarIdx)->is<InOutType>())
         performLoad = false;
@@ -4678,7 +4677,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     // Coerce scalar to tuple.
-    int toScalarIdx = toTuple->getFieldForScalarInit();
+    int toScalarIdx = toTuple->getElementForScalarInit();
     if (toScalarIdx != -1) {
       return coerceScalarToTuple(expr, toTuple, toScalarIdx, locator);
     }
@@ -5195,9 +5194,9 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
       // FIXME: We want this issue to disappear completely when single-element
       // labelled tuples go away.
       if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
-        int scalarFieldIdx = tupleTy->getFieldForScalarInit();
+        int scalarFieldIdx = tupleTy->getElementForScalarInit();
         if (scalarFieldIdx >= 0) {
-          auto &field = tupleTy->getFields()[scalarFieldIdx];
+          auto &field = tupleTy->getElement(scalarFieldIdx);
           if (field.hasName()) {
             llvm::SmallString<16> str;
             str = ".";
@@ -5320,7 +5319,7 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
     if (newName.empty()) {
       // Delete the old name.
       diag.fixItRemoveChars(tuple->getElementNameLocs()[i],
-                            tuple->getElements()[i]->getStartLoc());
+                            tuple->getElement(i)->getStartLoc());
       continue;
     }
 
@@ -5329,7 +5328,7 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
       llvm::SmallString<16> str;
       str += newName.str();
       str += ": ";
-      diag.fixItInsert(tuple->getElements()[i]->getStartLoc(), str);
+      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), str);
       continue;
     }
     
@@ -5542,7 +5541,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
           if (tupleTy->getElementTypes().size()) {
             if (auto tuple = dyn_cast<TupleExpr>(affected))
               affected = tuple->getElement(0);
-            type = tupleTy->getFields()[0].getType()->getRValueType();
+            type = tupleTy->getElement(0).getType()->getRValueType();
           }
         }
 
@@ -6000,7 +5999,7 @@ static bool argumentNamesMatch(Expr *arg, ArrayRef<Identifier> names) {
     return false;
 
   for (unsigned i = 0, n = tupleType->getNumElements(); i != n; ++i) {
-    if (tupleType->getFields()[i].getName() != names[i])
+    if (tupleType->getElement(i).getName() != names[i])
       return false;
   }
 

@@ -1582,6 +1582,7 @@ public:
 
   /// Retrieve the elements stored in the collection.
   ArrayRef<Expr *> getElements() const;
+  Expr *getElement(unsigned i) const { return getElements()[i]; }
 
   SourceLoc getLBracketLoc() const { return LBracketLoc; }
   SourceLoc getRBracketLoc() const { return RBracketLoc; }
@@ -2527,6 +2528,8 @@ public:
   MutableArrayRef<Element> getElements() { return Elements; }
   ArrayRef<Element> getElements() const { return Elements; }
 
+  Element getElement(unsigned i) const { return Elements[i]; }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ScalarToTuple;
   }
@@ -2579,10 +2582,10 @@ public:
   static SequenceExpr *create(ASTContext &ctx, ArrayRef<Expr*> elements);
 
   SourceLoc getStartLoc() const {
-    return getElements()[0]->getStartLoc();
+    return getElement(0)->getStartLoc();
   }
   SourceLoc getEndLoc() const {
-    return getElements()[getNumElements() - 1]->getEndLoc();
+    return getElement(getNumElements() - 1)->getEndLoc();
   }
   
   unsigned getNumElements() const { return NumElements; }
