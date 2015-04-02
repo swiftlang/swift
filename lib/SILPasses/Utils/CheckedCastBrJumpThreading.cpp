@@ -403,7 +403,7 @@ void CheckedCastBrJumpThreading::modifyCFGForSuccessPreds() {
       for (auto *Pred : SuccessPreds) {
         TermInst *TI = Pred->getTerminator();
         // Replace branch to BB by branch to TargetSuccessBB.
-        replaceBranchTarget(TI, BB, TargetFailureBB, /*PreserveArgs=*/true);
+        replaceBranchTarget(TI, BB, TargetSuccessBB, /*PreserveArgs=*/true);
         SuccessBBArgs.push_back(DomSuccessBB->getBBArg(0));
         Pred = nullptr;
       }
