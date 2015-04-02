@@ -33,6 +33,18 @@ static unsigned getTupleSize(CanType t) {
   return 1;
 }
 
+/// Return the number of rvalue elements in the given canonical type.
+static unsigned getRValueSize(CanType type) {
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    unsigned count = 0;
+    for (auto eltType : tupleType.getElementTypes())
+      count += getRValueSize(eltType);
+    return count;
+  }
+
+  return 1;
+}
+
 namespace {
 class ExplodeTupleValue
   : public CanTypeVisitor<ExplodeTupleValue,
@@ -139,7 +151,6 @@ public:
   }
 
   ~ImplodeLoadableTupleValue() {
-    assert(values.empty() && "values not exhausted imploding tuple?!");
   }
 };
 
@@ -293,6 +304,10 @@ public:
     // our initialization.
     assert(I->kind == Initialization::Kind::LetValue);
     SILValue V = implodeTupleValues<ImplodeKind::Copy>(values, gen, t, loc);
+
+    // This will have just used up the first values in the list, pop them off.
+    values = values.slice(getRValueSize(t));
+
     I->bindValue(V, gen);
     I->finishInitialization(gen);
   }
@@ -378,6 +393,10 @@ public:
     // our initialization.
     assert(I->kind == Initialization::Kind::LetValue);
     SILValue V = implodeTupleValues<ImplodeKind::Forward>(values, gen, t, loc);
+
+    // This will have just used up the first values in the list, pop them off.
+    values = values.slice(getRValueSize(t));
+
     I->bindValue(V, gen);
     I->finishInitialization(gen);
   }
@@ -431,18 +450,6 @@ public:
 };
 
 } // end anonymous namespace
-
-/// Return the number of rvalue elements in the given canonical type.
-static unsigned getRValueSize(CanType type) {
-  if (auto tupleType = dyn_cast<TupleType>(type)) {
-    unsigned count = 0;
-    for (auto eltType : tupleType.getElementTypes())
-      count += getRValueSize(eltType);
-    return count;
-  }
-
-  return 1;
-}
 
 RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
   : values(values.begin(), values.end()), type(type), elementsToBeAdded(0) {

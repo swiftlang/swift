@@ -533,3 +533,22 @@ func dontEmitIgnoredLoadExpr(a : NonTrivialStruct) -> NonTrivialStruct.Type {
 // CHECK-NEXT: release_value %0
 // CHECK-NEXT: return %2 : $@thin NonTrivialStruct.Type
 
+
+// <rdar://problem/18851497> Swiftc fails to compile nested destructuring tuple binding
+// CHECK-LABEL: sil hidden @_TF11expressions21implodeRecursiveTupleFGSqTTSiSi_Si__T_
+// CHECK-NEXT: bb0(%0 : $Optional<((Int, Int), Int)>):
+func implodeRecursiveTuple(expr: ((Int, Int), Int)?) {
+
+  // CHECK:      [[WHOLE:%[0-9]+]] = load {{.*}} : $*((Int, Int), Int)
+  // CHECK-NEXT: [[WHOLE0:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
+  // CHECK-NEXT: [[WHOLE00:%[0-9]+]] = tuple_extract [[WHOLE0]] : $(Int, Int), 0
+  // CHECK-NEXT: [[WHOLE01:%[0-9]+]] = tuple_extract [[WHOLE0]] : $(Int, Int), 1
+  // CHECK-NEXT: [[WHOLE1:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 1
+
+  // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[WHOLE00]] : $Int, [[WHOLE01]] : $Int)
+  // CHECK-NEXT: debug_value [[X]] : $(Int, Int)  // let x
+  // CHECK-NEXT: debug_value [[WHOLE1]] : $Int  // let y
+
+  let (x, y) = expr!
+}
+
