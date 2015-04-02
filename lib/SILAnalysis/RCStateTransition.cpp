@@ -11,11 +11,33 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-global-arc-opts"
+
 #include "RCStateTransition.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
+
+//===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+static bool isAutoreleasePoolCall(SILInstruction *I) {
+  auto *AI = dyn_cast<ApplyInst>(I);
+  if (!AI)
+    return false;
+
+  auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+  if (!FRI)
+    return false;
+
+  return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
+      .Case("objc_autoreleasePoolPush", true)
+      .Case("objc_autoreleasePoolPop", true)
+      .Default(false);
+}
 
 //===----------------------------------------------------------------------===//
 //                           RCStateTransitionKind
@@ -39,6 +61,10 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
     return RCStateTransitionKind::Unknown;
   }
 
+  case ValueKind::ApplyInst:
+    if (isAutoreleasePoolCall(cast<SILInstruction>(V)))
+      return RCStateTransitionKind::AutoreleasePoolCall;
+    SWIFT_FALLTHROUGH;
   default:
     return RCStateTransitionKind::Unknown;
   }

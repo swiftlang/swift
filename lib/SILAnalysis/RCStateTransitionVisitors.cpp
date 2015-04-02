@@ -101,3 +101,71 @@ BottomUpDataflowRCStateVisitor::visitStrongIncrement(SILInstruction *I) {
 #endif
   return DataflowResult(Op);
 }
+
+//===----------------------------------------------------------------------===//
+//                       TopDownDataflowRCStateVisitor
+//===----------------------------------------------------------------------===//
+
+TopDownDataflowRCStateVisitor::TopDownDataflowRCStateVisitor(
+    RCIdentityFunctionInfo *RCFI, ARCBBState &BBState,
+    DecToIncStateMapTy &DecToIncStateMap)
+    : RCFI(RCFI), BBState(BBState), DecToIncStateMap(DecToIncStateMap) {}
+
+TopDownDataflowRCStateVisitor::DataflowResult
+TopDownDataflowRCStateVisitor::visitAutoreleasePoolCall(SILInstruction *I) {
+  BBState.clear();
+  return DataflowResult();
+}
+
+TopDownDataflowRCStateVisitor::DataflowResult
+TopDownDataflowRCStateVisitor::visitStrongDecrement(SILInstruction *I) {
+  // Look up the state associated with I's operand...
+  SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
+  TopDownRefCountState &RefCountState = BBState.getTopDownRefCountState(Op);
+
+  DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
+
+  // If we are tracking an increment on the ref count root associated with
+  // the decrement and the decrement matches, pair this decrement with a
+  // copy of the increment state and then clear the original increment state
+  // so that we are ready to process further values.
+  if (RefCountState.isRefCountInstMatchedToTrackedInstruction(I)) {
+    // Copy the current value of ref count state into the result map.
+    DecToIncStateMap[I] = RefCountState;
+    DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:\n"
+                       << RefCountState.getRCRoot());
+
+    // Clear the ref count state in preparation for more pairs.
+    RefCountState.clear();
+  }
+#if NDEBUG
+  else {
+    if (RefCountState.isTrackingRefCountInst()) {
+      DEBUG(llvm::dbgs() << "    FAILED MATCH INCREMENT:\n"
+                         << RefCountState.getValue());
+    } else {
+      DEBUG(llvm::dbgs() << "    FAILED MATCH. NO INCREMENT.\n");
+    }
+  }
+#endif
+
+  // Otherwise we continue processing the reference count decrement to see if
+  // the decrement can affect any other pointers that we are tracking.
+  return DataflowResult(Op);
+}
+
+TopDownDataflowRCStateVisitor::DataflowResult
+TopDownDataflowRCStateVisitor::visitStrongIncrement(SILInstruction *I) {
+  // Map the increment's operand to a newly initialized or reinitialized ref
+  // count state and continue...
+  SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
+  TopDownRefCountState &State = BBState.getTopDownRefCountState(Op);
+  bool NestingDetected = State.initWithInst(I);
+
+  DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
+                     << (State.isKnownSafe() ? "yes" : "no") << "\n");
+
+  // Continue processing in case this increment could be a CanUse for a
+  // different pointer.
+  return DataflowResult(Op, NestingDetected);
+}

@@ -24,7 +24,6 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -32,21 +31,6 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 //                                 Utilities
 //===----------------------------------------------------------------------===//
-
-static bool isAutoreleasePoolCall(SILInstruction &I) {
-  ApplyInst *AI = dyn_cast<ApplyInst>(&I);
-  if (!AI)
-    return false;
-
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
-  if (!FRI)
-    return false;
-
-  return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
-      .Case("objc_autoreleasePoolPush", true)
-      .Case("objc_autoreleasePoolPop", true)
-      .Default(false);
-}
 
 namespace {
 
@@ -102,72 +86,28 @@ static bool processBBTopDown(
     }
   }
 
+  TopDownDataflowRCStateVisitor DataflowVisitor(RCIA, BBState,
+                                                DecToIncStateMap);
+
   // For each instruction I in BB...
   for (auto &I : BB) {
 
     DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
 
-    // If we see an autorelease pool call, be conservative and clear all state
-    // that we are currently tracking in the BB.
-    if (isAutoreleasePoolCall(I)) {
-      BBState.clear();
+    auto Result = DataflowVisitor.visit(&I);
+
+    // If this instruction can have no further effects on another instructions,
+    // continue. This happens for instance if we have cleared all of the state
+    // we are tracking.
+    if (Result.Kind == RCStateTransitionDataflowResultKind::NoEffects)
       continue;
-    }
 
-    SILValue Op;
-    RCStateTransitionKind TransitionKind = getRCStateTransitionKind(&I);
+    // Make sure that we propagate out whether or not nesting was detected.
+    NestingDetected |= Result.NestingDetected;
 
-    // If I is a ref count increment instruction...
-    if (TransitionKind == RCStateTransitionKind::StrongIncrement) {
-      // map its operand to a newly initialized or reinitialized ref count
-      // state and continue...
-      Op = RCIA->getRCIdentityRoot(I.getOperand(0));
-      TopDownRefCountState &State = BBState.getTopDownRefCountState(Op);
-      NestingDetected |= State.initWithInst(&I);
-
-      DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
-                         << (State.isKnownSafe() ? "yes" : "no") << "\n");
-
-      // Continue processing in case this increment could be a CanUse for a
-      // different pointer.
-    }
-
-    // If we have a reference count decrement...
-    if (TransitionKind == RCStateTransitionKind::StrongDecrement) {
-      // Look up the state associated with its operand...
-      Op = RCIA->getRCIdentityRoot(I.getOperand(0));
-      TopDownRefCountState &RefCountState = BBState.getTopDownRefCountState(Op);
-
-      DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
-
-      // If we are tracking an increment on the ref count root associated with
-      // the decrement and the decrement matches, pair this decrement with a
-      // copy of the increment state and then clear the original increment state
-      // so that we are ready to process further values.
-      if (RefCountState.isRefCountInstMatchedToTrackedInstruction(&I)) {
-        // Copy the current value of ref count state into the result map.
-        DecToIncStateMap[&I] = RefCountState;
-        DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:\n"
-                           << RefCountState.getRCRoot());
-
-        // Clear the ref count state in preparation for more pairs.
-        RefCountState.clear();
-      }
-#if NDEBUG
-      else {
-        if (RefCountState.isTrackingRefCountInst()) {
-          DEBUG(llvm::dbgs() << "    FAILED MATCH INCREMENT:\n"
-                             << RefCountState.getValue());
-        } else {
-          DEBUG(llvm::dbgs() << "    FAILED MATCH. NO INCREMENT.\n");
-        }
-      }
-#endif
-
-      // Otherwise we continue processing the reference count decrement to
-      // see if the decrement can affect any other pointers that we are
-      // tracking.
-    }
+    // This SILValue may be null if we were unable to find a specific RCIdentity
+    // that the instruction "visits".
+    SILValue Op = Result.RCIdentity;
 
     // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : BBState.getTopDownStates()) {

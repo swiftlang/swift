@@ -130,4 +130,37 @@ public:
 
 } // end swift namespace
 
+//===----------------------------------------------------------------------===//
+//                       TopDownDataflowRCStateVisitor
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// A visitor for performing the bottom up dataflow depending on the
+/// RCState. Enables behavior to be cleanly customized depending on the
+/// RCStateTransition associated with an instruction.
+class TopDownDataflowRCStateVisitor
+    : public RCStateTransitionKindVisitor<TopDownDataflowRCStateVisitor,
+                                          RCStateTransitionDataflowResult> {
+  /// A local typedef to make things cleaner.
+  using DataflowResult = RCStateTransitionDataflowResult;
+  using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
+  using DecToIncStateMapTy =
+      BlotMapVector<SILInstruction *, TopDownRefCountState>;
+
+  RCIdentityFunctionInfo *RCFI;
+  ARCBBState &BBState;
+  DecToIncStateMapTy &DecToIncStateMap;
+
+public:
+  TopDownDataflowRCStateVisitor(RCIdentityFunctionInfo *RCFI,
+                                ARCBBState &BBState,
+                                DecToIncStateMapTy &DecToIncStateMap);
+  DataflowResult visitAutoreleasePoolCall(SILInstruction *I);
+  DataflowResult visitStrongDecrement(SILInstruction *I);
+  DataflowResult visitStrongIncrement(SILInstruction *I);
+};
+
+} // end swift namespace
+
 #endif
