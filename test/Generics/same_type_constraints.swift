@@ -43,39 +43,6 @@ struct SatisfySameTypeAssocTypeRequirementDependent<T>
   func foo<F3: Fooable where F3.Foo == T>(f: F3) {}
 }
 
-// Pulled in from old standard library to keep the following test
-// (LazySequenceOf) valid.
-public struct GeneratorOf<T> : GeneratorType, SequenceType {
-
-  /// Construct an instance whose `next()` method calls `nextElement`.
-  public init(_ nextElement: ()->T?) {
-    self._next = nextElement
-  }
-  
-  /// Construct an instance whose `next()` method pulls its results
-  /// from `base`.
-  public init<G: GeneratorType where G.Element == T>(var _ base: G) {
-    self._next = { base.next() }
-  }
-  
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
-  ///
-  /// Requires: `next()` has not been applied to a copy of `self`
-  /// since the copy was made, and no preceding call to `self.next()`
-  /// has returned `nil`.
-  public mutating func next() -> T? {
-    return _next()
-  }
-
-  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`\ s
-  /// a copy of itself
-  public func generate() -> GeneratorOf {
-    return self
-  }
-  let _next: ()->T?
-}
-
 // rdar://problem/19009056
 public struct LazySequenceOf<S : SequenceType, A where S.Generator.Element == A> : SequenceType {
   public func generate() -> GeneratorOf<A> { 

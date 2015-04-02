@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-func pipe<T>(input: AnySequence<T>, output: SinkOf<T>) {
+func pipe<T>(input: SequenceOf<T>, output: SinkOf<T>) {
   for x in input {
     output.put(x)
   }
@@ -16,7 +16,7 @@ struct Print<T : Printable> : SinkType {
 var z = [ 1, 2, 3 ]
 
 func printArray<T : Printable>(x: [T]) {
-  pipe(AnySequence(x), SinkOf(Print<T>()))
+  pipe(SequenceOf(x), SinkOf(Print<T>()))
   println()
 }
 
