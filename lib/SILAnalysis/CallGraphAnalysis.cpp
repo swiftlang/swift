@@ -393,33 +393,33 @@ void CallGraph::verify() const {
   for (auto &F : M)
     Functions.insert(&F);
 
-  // For every (SILFunction, CallGraphNode) pair FuncPair in the SILFunction to
-  // CallGraphNode map check that:
+  // For every pair (SILFunction, CallGraphNode) in the
+  // function-to-node map, verify:
   //
-  //    a. FuncPair.first is a SILFunction in the current module.
-  //    b. FuncPair.first is the SILFunction inside the CallGraphNode
-  //    FuncPair.second.
-  //    c. All callee CallGraphEdges mapped to FuncPair.second have ApplyInsts
-  //       which are in the SILFunction FuncPair.first.
+  //    a. The function is in the current module.
+  //    b. The call graph node is for that same function.
+  //    c. All the callee edges of the node have an apply that lives
+  //       in that function.
   //
   for (auto &P : FunctionToNodeMap) {
-    assert(Functions.count(P.first) && "Func in FunctionToNodeMap but not "
-                                       "in module!?");
+    assert(Functions.count(P.first) &&
+           "Function in call graph but not in module!?");
     assert(P.second->getFunction() == P.first &&
            "Func mapped to node, but node has different Function inside?!");
     for (CallGraphEdge *Edge : P.second->getCalleeEdges()) {
       assert(Edge->getApply().getFunction() == P.first &&
-             "ApplyInst in callee set that is not in the Callee function?!");
+             "Apply in callee set that is not in the callee function?!");
     }
   }
 
-  // For every pair (ApplyInst, CallGraphEdge) ApplyPair in the Apply to
-  // CallGraphEdge map, check that:
+  // For every pair (FullApplySite, CallGraphEdge) in the apply-to-edge
+  // map, verify:
   //
-  //    a. ApplyPair.second.getApply() == ApplyPair.first.
-  //    b. ApplyPair.first->getFunction() is in the SILFunction to
-  //       CallGraphNode map and the CallGraphEdge for ApplyPair is one of
-  //       CallSiteEdges in the mapped to CallGraphNode.
+  //    a. The edge's apply is identical to the map key that maps
+  //       to the edge.
+  //    b. The apply is in a function in the module.
+  //    c. That function has a call graph node.
+  //    d. The edge is one of the callee edges of that call graph node.
   //
   for (auto &P : ApplyToEdgeMap) {
     assert(P.second->getApply() == P.first &&
