@@ -225,6 +225,10 @@ namespace {
     void visitColdBlocks(SmallVectorImpl<ApplyInst *> &CallSitesToInline,
                                SILBasicBlock *root, DominanceInfo *DT);
 
+    void collectCallSitesToInline(SILFunction *Caller,
+                                SmallVectorImpl<ApplyInst *> &CallSitesToInline,
+                                  DominanceAnalysis *DA,
+                                  SILLoopAnalysis *LA);
   public:
     SILPerformanceInliner(int threshold,
                           InlineSelection WhatToInline)
@@ -746,21 +750,10 @@ static bool isProfitableInColdBlock(ApplyInst *AI) {
   return true;
 }
 
-
-
-/// \brief Attempt to inline all calls smaller than our threshold.
-/// returns True if a function was inlined.
-bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
-                                                    DominanceAnalysis *DA,
-                                                    SILLoopAnalysis *LA) {
-  bool Changed = false;
-  DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
-
-  SmallVector<ApplyInst *, 8> CallSitesToInline;
-
-  // First step: collect all the functions we want to inline.
-  // We don't change anything yet, which let's the dominance info kept alive.
-
+void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
+                                SmallVectorImpl<ApplyInst *> &CallSitesToInline,
+                                                     DominanceAnalysis *DA,
+                                                     SILLoopAnalysis *LA) {
   DominanceInfo *DT = DA->get(Caller);
   SILLoopInfo *LI = LA->getLoopInfo(Caller);
 
@@ -769,6 +762,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
   // Go through all instructions and find candidates for inlining.
   // We do this in dominance order for the constTracker.
+  SmallVector<ApplyInst *, 8> InitialCandidates;
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
     unsigned loopDepth = LI->getLoopDepth(block);
@@ -788,14 +782,14 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
         auto *Callee = getEligibleFunction(AI);
         if (Callee) {
           if (isProfitableToInline(AI, loopDepth, DA, LA, constTracker))
-            CallSitesToInline.push_back(AI);
+            InitialCandidates.push_back(AI);
         }
       }
     }
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
       if (ColdBlockInfo::isSlowPath(block, child)) {
         // Handle cold blocks separately.
-        visitColdBlocks(CallSitesToInline, child, DT);
+        visitColdBlocks(InitialCandidates, child, DT);
         return false;
       }
       return true;
@@ -804,24 +798,42 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
   // Calculate how many times a callee is called from this caller.
   llvm::DenseMap<SILFunction *, unsigned> CalleeCount;
-  for (auto AI : CallSitesToInline) {
+  for (auto AI : InitialCandidates) {
     SILFunction *Callee = getReferencedFunction(AI);
     assert(Callee && "apply_inst does not have a direct callee anymore");
     CalleeCount[Callee]++;
   }
 
-  // Second step: do the actual inlining.
-
-  for (auto AI : CallSitesToInline) {
-
+  // Now copy each candidate callee that has a small enough number of
+  // call sites into the final set of call sites.
+  for (auto AI : InitialCandidates) {
     SILFunction *Callee = getReferencedFunction(AI);
     assert(Callee && "apply_inst does not have a direct callee anymore");
     
     const unsigned CallsToCalleeThreshold = 1024;
-    if (CalleeCount[Callee] > CallsToCalleeThreshold) {
-      DEBUG(llvm::dbgs() << "    FAIL: CalleeCount exceeded:" <<  *AI);
-      continue;
-    }
+    if (CalleeCount[Callee] <= CallsToCalleeThreshold)
+      CallSitesToInline.push_back(AI);
+  }
+}
+
+/// \brief Attempt to inline all calls smaller than our threshold.
+/// returns True if a function was inlined.
+bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
+                                                    DominanceAnalysis *DA,
+                                                    SILLoopAnalysis *LA) {
+  bool Changed = false;
+  DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
+
+  // First step: collect all the functions we want to inline.  We
+  // don't change anything yet so that the dominator information
+  // remains valid.
+  SmallVector<ApplyInst *, 8> CallSitesToInline;
+  collectCallSitesToInline(Caller, CallSitesToInline, DA, LA);
+
+  // Second step: do the actual inlining.
+  for (auto AI : CallSitesToInline) {
+    SILFunction *Callee = getReferencedFunction(AI);
+    assert(Callee && "apply_inst does not have a direct callee anymore");
 
     DEBUG(llvm::dbgs() << "    Inline:" <<  *AI);
     
