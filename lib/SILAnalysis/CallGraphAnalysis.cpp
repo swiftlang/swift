@@ -223,29 +223,31 @@ void CallGraph::addEdgesForApply(ApplyInst *AI, CallGraphNode *CallerNode) {
   ++NumAppliesWithoutEdges;
 }
 
-void CallGraph::removeEdgesForApply(ApplyInst *AI, bool IgnoreMissing) {
-  auto *CallerNode = getCallGraphNode(AI->getFunction());
-  auto *Edge = getCallGraphEdge(AI);
-
-  // If we don't have edge and are ignoring applies without any state, return
-  // early. There is nothing further to do.
-  if (!Edge && IgnoreMissing)
-    return;
-
-  assert(Edge && "Expected apply to be in edge map!");
-
+void CallGraph::removeEdge(CallGraphEdge *Edge) {
+  // Remove the edge from all the potential callee call graph nodes.
   auto &CalleeSet = Edge->getPartialCalleeSet();
   for (auto *CalleeNode : CalleeSet)
     CalleeNode->removeCallerEdge(Edge);
 
+  // Remove the edge from the caller's call graph node.
+  auto *Apply = Edge->getApply();
+  auto *CallerNode = getCallGraphNode(Apply->getFunction());
   CallerNode->removeCalleeEdge(Edge);
+
+  // Remove the mapping from the apply to this edge.
+  ApplyToEdgeMap.erase(Apply);
 
   // Call the destructor for the edge. The memory will be reclaimed
   // when the call graph is deleted by virtue of the bump pointer
   // allocator.
   Edge->~CallGraphEdge();
+}
 
-  ApplyToEdgeMap.erase(AI);
+// Remove the call graph edges associated with an apply, where the
+// apply is known to the call graph.
+void CallGraph::removeEdgesForApply(ApplyInst *AI) {
+  assert(ApplyToEdgeMap.count(AI) && "Expected apply to be in edge map!");
+  removeEdge(ApplyToEdgeMap[AI]);
 }
 
 void CallGraph::markCallerEdgesOfCalleesIncomplete(ApplyInst *AI) {

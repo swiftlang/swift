@@ -408,7 +408,8 @@ void swift::ArraySemanticsCall::removeCall(CallGraph *CG) {
 
   // Invalidate any information in the callgraph.
   if (CG)
-    CG->removeEdgesForApply(SemanticsCall, true/*Ignore Missing*/);
+    if (auto *Edge = CG->getCallGraphEdge(SemanticsCall))
+      CG->removeEdge(Edge);
 
   SemanticsCall->eraseFromParent();
   SemanticsCall = nullptr;

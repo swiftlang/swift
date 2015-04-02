@@ -321,7 +321,8 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
   // associated edges from the call graph.
   if (CG)
     if (auto *AI = dyn_cast<ApplyInst>(&I))
-      CG->removeEdgesForApply(AI, true /*Ignore Missing*/);
+      if (auto *Edge = CG->getCallGraphEdge(AI))
+        CG->removeEdge(Edge);
 
   Worklist.remove(&I);
   I.eraseFromParent();

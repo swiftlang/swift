@@ -324,10 +324,8 @@ public:
     addEdgesForApply(AI, getCallGraphNode(AI->getFunction()));
   }
 
-  /// Remove all edges associated with \p AI from the callgraph. If
-  /// IgnoreMissing is set to false, this asserts if the apply does not have any
-  /// edges associated with it. This can be overridden by passing in true.
-  void removeEdgesForApply(ApplyInst *AI, bool IgnoreMissing = false);
+  void removeEdge(CallGraphEdge *Edge);
+  void removeEdgesForApply(ApplyInst *AI);
 
   void markCallerEdgesOfCalleesIncomplete(ApplyInst *AI);
 
