@@ -521,7 +521,7 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
 /// `===` and `!==` implementations for these types.
 public protocol AnyCollectionType : CollectionType {
   /// Identifies the underlying collection stored by `self`. Instances
-  /// copied from one another have the same `underlyingCollectionID`.
+  /// copied from one another have the same `_underlyingCollectionID`.
   var _underlyingCollectionID: ObjectIdentifier {get}
 }
 
@@ -625,7 +625,8 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   }
 
   /// Uniquely identifies the stored underlying collection.
-  public var _underlyingCollectionID: ObjectIdentifier {
+  public // due to language limitations only
+  var _underlyingCollectionID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
   
