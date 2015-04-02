@@ -16,6 +16,7 @@
 
 //===--- Definitions needed only while experimental -----------------------===//
 import Swift
+import SwiftShims
 
 internal typealias _ContiguousArrayStorageBase = AnyObject
 extension _InitializeTo { init() {} }
@@ -262,6 +263,7 @@ public func ~> <Element>(
 internal protocol _ForwardIndexBoxType : class {
   var typeID: ObjectIdentifier {get}
   func successor() -> _ForwardIndexBoxType
+  func increment()
   func equals(other: _ForwardIndexBoxType) -> Bool
   func _unbox<T: ForwardIndexType>() -> T?
   func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
@@ -283,6 +285,8 @@ internal class _ForwardIndexBox<
   func successor() -> _ForwardIndexBoxType {
     return self.dynamicType(self.base.successor())
   }
+
+  func increment() { ++self.base }
   
   func unsafeUnbox(other: _ForwardIndexBoxType) -> BaseIndex {
     return (unsafeDowncast(other) as _ForwardIndexBox).base
@@ -320,7 +324,7 @@ internal class _ForwardIndexBox<
   var typeID: ObjectIdentifier { return _typeID(self) }
   
   internal // private
-  let base: BaseIndex
+  var base: BaseIndex
 }
 
 //===--- BidirectionalIndex -----------------------------------------------===//
@@ -328,6 +332,7 @@ internal class _ForwardIndexBox<
 
 internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
   func predecessor() -> _BidirectionalIndexBoxType
+  func decrement()
 }
 
 internal class _BidirectionalIndexBox<
@@ -344,6 +349,8 @@ internal class _BidirectionalIndexBox<
   func predecessor() -> _BidirectionalIndexBoxType {
     return self.dynamicType(self.base.predecessor())
   }
+
+  func decrement() { --self.base }
 }
 
 //===--- RandomAccessIndex -----------------------------------------------===//
@@ -461,6 +468,32 @@ public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
 }
+
+/// Replace `i` with its `successor()` and return the updated value of `i`.
+public prefix func ++ (inout i: ${Self}) -> ${Self} {
+  let rawBox = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(i._box))
+  if _fastPath(_swift_isUniquelyReferenced_nonNull_native(rawBox)) {
+    i._box.increment()
+  }
+  else {
+    i = i.successor()
+  }
+  return i
+}
+
+%   if Traversal != 'Forward':
+/// Replace `i` with its `predecessor()` and return the updated value of `i`.
+public prefix func -- (inout i: ${Self}) -> ${Self} {
+  let rawBox = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(i._box))
+  if _fastPath(_swift_isUniquelyReferenced_nonNull_native(rawBox)) {
+    i._box.decrement()
+  }
+  else {
+    i = i.predecessor()
+  }
+  return i
+}
+%   end
 % end
 
 //===--- Collections ------------------------------------------------------===//

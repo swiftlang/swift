@@ -33,6 +33,91 @@ tests.test("AnyGenerator") {
   expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(g))
 }
 
+let initialCallCounts = [
+  "successor": 0, "predecessor": 0,
+  "preincrement": 0, "predecrement": 0,
+  "postincrement": 0, "postdecrement": 0,
+  "advancedBy": 0, "distanceTo": 0
+]
+
+var callCounts = initialCallCounts
+  
+struct InstrumentedIndex<I: RandomAccessIndexType> : RandomAccessIndexType {
+  typealias Distance = I.Distance
+
+  var base: I
+  
+  init(_ base: I) {
+    self.base = base
+  }
+  
+  static func resetCounts() {
+    callCounts = initialCallCounts
+  }
+  
+  func successor() -> InstrumentedIndex {
+    ++callCounts["successor"]!
+    return InstrumentedIndex(base.successor())
+  }
+  
+  mutating func preincrement() {
+    ++callCounts["preincrement"]!
+    ++base
+  }
+  
+  mutating func postincrement() {
+    ++callCounts["postincrement"]!
+    base++
+  }
+  
+  func predecessor() -> InstrumentedIndex {
+    ++callCounts["predecessor"]!
+    return InstrumentedIndex(base.predecessor())
+  }
+  
+  mutating func predecrement() {
+    ++callCounts["predecrement"]!
+    --base
+  }
+  
+  mutating func postdecrement() {
+    ++callCounts["postdecrement"]!
+    base--
+  }
+
+  func advancedBy(distance: Distance) -> InstrumentedIndex {
+    ++callCounts["advancedBy"]!
+    return InstrumentedIndex(base.advancedBy(distance))
+  }
+  
+  func distanceTo(other: InstrumentedIndex) -> Distance {
+    ++callCounts["distanceTo"]!
+    return base.distanceTo(other.base)
+  }
+}
+
+prefix func ++ <I>(inout x: InstrumentedIndex<I>) -> InstrumentedIndex<I> {
+  x.preincrement()
+  return x
+}
+
+postfix func ++ <I>(inout x: InstrumentedIndex<I>) -> InstrumentedIndex<I> {
+  let r = x
+  x.postincrement()
+  return r
+}
+
+prefix func -- <I>(inout x: InstrumentedIndex<I>) -> InstrumentedIndex<I> {
+  x.predecrement()
+  return x
+}
+
+postfix func -- <I>(inout x: InstrumentedIndex<I>) -> InstrumentedIndex<I> {
+  let r = x
+  x.postdecrement()
+  return r
+}
+
 tests.test("Sequence") {
   let fib = [1, 2, 3, 5, 8, 13, 21]
   expectEqual(fib, Array(AnySequence(fib)))
@@ -40,6 +125,42 @@ tests.test("Sequence") {
   expectEqual(fib, Array(AnySequence(fib).generate()))
   expectCrashLater()
   let x = AnyGenerator<Int>()
+}
+
+tests.test("ForwardIndex") {
+  var i = AnyForwardIndex(InstrumentedIndex(0))
+  i = i.successor()
+  expectEqual(1, callCounts["successor"])
+  expectEqual(0, callCounts["preincrement"])
+  expectEqual(0, callCounts["postincrement"])
+  ++i
+  expectEqual(1, callCounts["successor"])
+  expectEqual(1, callCounts["preincrement"])
+  expectEqual(0, callCounts["postincrement"])
+  i++
+  expectEqual(2, callCounts["successor"])
+  expectEqual(1, callCounts["preincrement"])
+  expectEqual(0, callCounts["postincrement"])
+}
+
+tests.test("BidirectionalIndex") {
+  var i = AnyBidirectionalIndex(InstrumentedIndex(0))
+  expectEqual(0, callCounts["predecessor"])
+  expectEqual(0, callCounts["predecrement"])
+  expectEqual(0, callCounts["postdecrement"])
+
+  i = i.predecessor()
+  expectEqual(1, callCounts["predecessor"])
+  expectEqual(0, callCounts["predecrement"])
+  expectEqual(0, callCounts["postdecrement"])
+  --i
+  expectEqual(1, callCounts["predecessor"])
+  expectEqual(1, callCounts["predecrement"])
+  expectEqual(0, callCounts["postdecrement"])
+  i--
+  expectEqual(2, callCounts["predecessor"])
+  expectEqual(1, callCounts["predecrement"])
+  expectEqual(0, callCounts["postdecrement"])
 }
 
 tests.test("ForwardCollection") {

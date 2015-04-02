@@ -87,6 +87,20 @@ public protocol _Incrementable : Equatable {
   ///
   /// Requires: `self` has a well-defined successor.
   func successor() -> Self
+
+  /// Replace `self` with its `successor()` and return the updated
+  /// value of `self`.
+  ///
+  /// Note: models of this protocol need not implement `++`; a default
+  /// implementation is supplied by the Swift standard library.
+  prefix func ++ (inout _: Self) -> Self
+
+  /// Replace `self` with its `successor()` and return the original
+  /// value of `self`.
+  ///
+  /// Note: models of this protocol need not implement `++`; a default
+  /// implementation is supplied by the Swift standard library.
+  postfix func ++ (inout _: Self) -> Self
 }
 
 //===----------------------------------------------------------------------===//
@@ -119,16 +133,20 @@ public protocol _ForwardIndexType : _Incrementable {
   typealias _DisabledRangeIndex = _DisabledRangeIndex_
 }
 
+/// Replace `i` with its `successor()` and return the updated value of
+/// `i`.
 @transparent
-public prefix func ++ <T : _Incrementable> (inout x: T) -> T {
-  x = x.successor()
-  return x
+public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
+  i = i.successor()
+  return i
 }
 
+/// Replace `i` with its `successor()` and return the original
+/// value of `i`.
 @transparent
-public postfix func ++ <T : _Incrementable> (inout x: T) -> T {
-  var ret = x
-  x = x.successor()
+public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
+  var ret = i
+  i = i.successor()
   return ret
 }
 
@@ -222,6 +240,20 @@ public protocol _BidirectionalIndexType : _ForwardIndexType {
   ///
   /// Requires: `self` has a well-defined predecessor.
   func predecessor() -> Self
+
+  /// Replace `self` with its `predecessor()` and return the updated
+  /// value of `self`.
+  ///
+  /// Note: models of this protocol need not implement `--`; a default
+  /// implementation is supplied by the Swift standard library.
+  prefix func -- (inout _: Self) -> Self
+
+  /// Replace `self` with its `predecessor()` and return the original
+  /// value of `self`.
+  ///
+  /// Note: models of this protocol need not implement `--`; a default
+  /// implementation is supplied by the Swift standard library.
+  postfix func -- (inout _: Self) -> Self
 }
 
 /// An *index* that can step backwards via application of its
@@ -229,17 +261,21 @@ public protocol _BidirectionalIndexType : _ForwardIndexType {
 public protocol BidirectionalIndexType 
   : ForwardIndexType, _BidirectionalIndexType {}
 
+/// Replace `i` with its `predecessor()` and return the updated value
+/// of `i`.
 @transparent
-public prefix func -- <T: _BidirectionalIndexType> (inout x: T) -> T {
-  x = x.predecessor()
-  return x
+public prefix func -- <T: _BidirectionalIndexType> (inout i: T) -> T {
+  i = i.predecessor()
+  return i
 }
 
 
+/// Replace `i` with its `predecessor()` and return the original
+/// value of `i`.
 @transparent
-public postfix func -- <T: _BidirectionalIndexType> (inout x: T) -> T {
-  var ret = x
-  x = x.predecessor()
+public postfix func -- <T: _BidirectionalIndexType> (inout i: T) -> T {
+  var ret = i
+  i = i.predecessor()
   return ret
 }
 
