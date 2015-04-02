@@ -74,10 +74,10 @@ if a == 0, where b == 0 {}  // expected-error {{expected 'let' or 'var' in condi
 if let a = foo() {  // expected-warning {{condition requires a refutable pattern match; did you mean to match an optional?}}{{9-9=?}}
 }
 
+// rdar://20364082
+if let a : AnyObject = foo() {
+// expected-error@-1 {{type annotation is not permitted in condition; did you mean to match an optional?}}{{9-9=?}} {{10-21=}}
 
-if let a : AnyObject = foo() { // expected-warning {{condition requires a refutable pattern match; did you mean to match an optional?}}{{9-9=?}}
-                               // expected-error@-1 {{type annotation is not permitted in refutable match}}{{10-21=}}
-  
 }
 
 // More complex pattern.

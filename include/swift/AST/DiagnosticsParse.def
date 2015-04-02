@@ -741,9 +741,9 @@ ERROR(conditional_var_initializer_required,stmt_parsing,none,
 WARNING(expected_refutable_pattern_maybe_optional,stmt_parsing,none,
       "condition requires a refutable pattern match; "
       "did you mean to match an optional?", ())
-ERROR(refutable_pattern_no_type_annotation,stmt_parsing,none,
-      "type annotation is not permitted in refutable match", ())
-
+ERROR(no_type_annotation_in_condition,stmt_parsing,none,
+      "type annotation is not permitted in condition; did you mean to match"
+      " an optional?", ())
 
 
 // If Statement

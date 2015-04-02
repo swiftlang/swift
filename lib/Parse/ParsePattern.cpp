@@ -1054,24 +1054,25 @@ parseSwift1IfLetPattern(bool isLet, SourceLoc VarLoc) {
   
   Identifier Name;
   SourceLoc idLoc = consumeIdentifier(&Name);
-  
-  // Produce a nice diagnostic - complain about (and rewrite to 'x?').
-  diagnose(idLoc, diag::expected_refutable_pattern_maybe_optional)
-  .fixItInsertAfter(idLoc, "?");
-  
+
   // If the type annotation is present, parse it and error.
   SourceLoc ColonLoc;
-  if (consumeIf(tok::colon, ColonLoc)) {
+  if (!consumeIf(tok::colon, ColonLoc)) {
+    // Produce a nice diagnostic - complain about (and rewrite to 'x?').
+    diagnose(idLoc, diag::expected_refutable_pattern_maybe_optional)
+    .fixItInsertAfter(idLoc, "?");
+  } else {
     auto type = parseType();
     if (type.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
     if (type.isNull())
       return nullptr;
     
-    diagnose(idLoc, diag::refutable_pattern_no_type_annotation)
-    .fixItRemove(SourceRange(ColonLoc, type.get()->getEndLoc()));
+    diagnose(idLoc, diag::no_type_annotation_in_condition)
+      .fixItInsertAfter(idLoc, "?")
+      .fixItRemove(SourceRange(ColonLoc, type.get()->getEndLoc()));
   }
-  
+
   // Return a pattern of "let x?".
   auto result = createBindingFromPattern(idLoc, Name, isLet);
   result = new (Context) OptionalSomePattern(result, idLoc, true);
