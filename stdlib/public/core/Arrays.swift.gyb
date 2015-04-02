@@ -200,9 +200,11 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
   public subscript(index: Int) -> Element {
 %if Self == 'Array':
     get {
-      let isNativeNoDTC = _getArrayPropertyIsNativeNoDTC()
-      _checkSubscript(index, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
-      return _getElement(index, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
+      let isNative = _getArrayPropertyIsNative()
+      _checkSubscript(index, hoistedIsNativeBuffer: isNative)
+      let needsTypeCheck = _getArrayPropertyNeedsElementTypeCheck()
+      return _getElement(index, hoistedIsNativeBuffer: isNative,
+                         hoistedNeedsElementTypeCheck: needsTypeCheck)
     }
     // on non-Objective-C, this should just be NativeOwner for all other
     // cases, including ArraySlice.
@@ -288,15 +290,13 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
   @semantics("array.props.isNative")
   public // @testable
   func _getArrayPropertyIsNative() -> Bool {
-   return _buffer.arrayPropertyIsNativeNoDTC
+   return _buffer.arrayPropertyIsNative
   }
 
-  /// Returns true if the array is native and does not need a deferred type
-  /// check.
-  @semantics("array.props.isNativeNoDTC")
+  @semantics("array.props.needsElementTypeCheck")
   public // @testable
-  func _getArrayPropertyIsNativeNoDTC() -> Bool {
-   return _buffer.arrayPropertyIsNativeNoDTC
+  func _getArrayPropertyNeedsElementTypeCheck() -> Bool {
+   return _buffer.arrayPropertyNeedsElementTypeCheck
   }
 
   @semantics("array.get_count")
@@ -348,21 +348,6 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
                   "${Self} index out of range")
   }
 
-%if Self == 'Array':
-  /// Check that the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`
-  @semantics("array.check_subscript")
-  public // @testable
-  func _checkSubscript(index: Int, hoistedIsNativeNoDTCBuffer: Bool) {
-    // Using this specialized version of ArrayBuffer._isValidSubscript (for
-    // the Array subscript-getter) ensures that CSE can eliminate the _precondition
-    // checks in _isValidSubscript in most cases.
-    _precondition(_buffer._isValidSubscript(index,
-                        hoistedIsNativeNoDTCBuffer: hoistedIsNativeNoDTCBuffer),
-                  "${Self} index out of range")
-  }
-%end
-
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`
   @semantics("array.check_index")
   func _checkIndex(index: Int) {
@@ -373,9 +358,11 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
   @semantics("array.get_element")
   @inline(__always)
   public // @testable
-  func _getElement(index: Int, hoistedIsNativeNoDTCBuffer : Bool) -> Element {
+  func _getElement(index: Int, hoistedIsNativeBuffer : Bool,
+                   hoistedNeedsElementTypeCheck: Bool) -> Element {
     return _buffer.getElement(index,
-                    hoistedIsNativeNoDTCBuffer : hoistedIsNativeNoDTCBuffer)
+                    hoistedIsNativeBuffer : hoistedIsNativeBuffer,
+                    hoistedNeedsElementTypeCheck : hoistedNeedsElementTypeCheck)
   }
 
   @semantics("array.get_element_address")

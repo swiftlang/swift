@@ -90,14 +90,6 @@ struct _BridgeStorage<
     }
   }
   
-  @inline(__always)
-  public // @testable
-  func isNativeWithClearedSpareBits(bits: Int) -> Bool {
-    return (_bitPattern(rawValue) &
-            (_objCTaggedPointerBits | _objectPointerIsObjCBit |
-             (UInt(bits)) << _objectPointerLowSpareBitShift)) == 0
-  }
-
   public // @testable
   var isObjC: Bool {
     @inline(__always) get {

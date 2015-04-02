@@ -451,7 +451,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   switch (Call.getKind()) {
   case ArrayCallKind::kNone:
   case ArrayCallKind::kArrayPropsIsNative:
-  case ArrayCallKind::kArrayPropsIsNativeNoDTC:
+  case ArrayCallKind::kArrayPropsNeedsTypeCheck:
   case ArrayCallKind::kCheckSubscript:
   case ArrayCallKind::kCheckIndex:
   case ArrayCallKind::kGetCount:
@@ -1618,6 +1618,14 @@ static SILValue createAnd(SILBuilder &B, SILLocation Loc, SILValue Opd1,
   return B.createBuiltin(Loc, AndFn, Opd1.getType(), {}, Args);
 }
 
+/// Create a not function.
+static SILValue createNot(SILBuilder &B, SILLocation Loc, SILValue Opd1) {
+  auto XorFn = getBinaryFunction("xor", Opd1.getType(), B.getASTContext());
+  auto One = B.createIntegerLiteral(Loc, Opd1.getType(), 1);
+  SILValue Args[] = {Opd1, One};
+  return B.createBuiltin(Loc, XorFn, Opd1.getType(), {}, Args);
+}
+
 /// Create a check over all array.props calls that they have the 'fast native
 /// swift' array value: isNative && !needsElementTypeCheck must be true.
 static SILValue
@@ -1631,12 +1639,11 @@ createFastNativeArraysCheck(SmallVectorImpl<ArraySemanticsCall> &ArrayProps,
 
   for (auto Call : ArrayProps) {
     auto Loc = (*Call).getLoc();
-    auto CallKind = Call.getKind();
-    if (CallKind == ArrayCallKind::kArrayPropsIsNative ||
-        CallKind == ArrayCallKind::kArrayPropsIsNativeNoDTC) {
-      auto Val = createStructExtract(B, Loc, SILValue(Call, 0), 0);
+    auto Val = createStructExtract(B, Loc, SILValue(Call, 0), 0);
+    if (Call.getKind() == ArrayCallKind::kArrayPropsNeedsTypeCheck)
+      Result = createAnd(B, Loc, Result, createNot(B, Loc, Val));
+    if (Call.getKind() == ArrayCallKind::kArrayPropsIsNative)
       Result = createAnd(B, Loc, Result, Val);
-    }
   }
   return Result;
 }
@@ -1668,14 +1675,17 @@ static void collectArrayPropsCalls(
 /// array.props.needsElementTypeCheck.
 static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C,
                                   CallGraph &CG) {
-  assert(C.getKind() == ArrayCallKind::kArrayPropsIsNative ||
-         C.getKind() == ArrayCallKind::kArrayPropsIsNativeNoDTC);
+  auto CallKind = C.getKind();
+  assert(CallKind == ArrayCallKind::kArrayPropsIsNative ||
+         CallKind == ArrayCallKind::kArrayPropsNeedsTypeCheck);
   ApplyInst *AI = C;
 
   SILType IntBoolTy = SILType::getBuiltinIntegerType(1, B.getASTContext());
 
   auto BoolTy = AI->getType();
-  auto C0 = B.createIntegerLiteral(AI->getLoc(), IntBoolTy, 1);
+  auto C0 = B.createIntegerLiteral(
+      AI->getLoc(), IntBoolTy,
+      CallKind == ArrayCallKind::kArrayPropsIsNative ? 1 : 0);
   auto BoolVal = B.createStruct(AI->getLoc(), BoolTy, {C0});
 
   (*C).replaceAllUsesWith(BoolVal);

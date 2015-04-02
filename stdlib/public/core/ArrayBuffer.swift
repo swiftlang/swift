@@ -70,7 +70,9 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
 
   var needsElementTypeCheck: Bool {
     // NSArray's need an element typecheck when the element type isn't AnyObject
-    return !_isNativeNoDTC && !(AnyObject.self is T.Type)
+    return _isClassOrObjCExistential(T.self) && (
+      _storage.isObjC || (_storage.spareBits & deferredTypeCheckMask != 0)
+    ) && !(AnyObject.self is T.Type)
   }
   
   //===--- private --------------------------------------------------------===//
@@ -89,12 +91,17 @@ extension _ArrayBuffer {
   }
 
   var arrayPropertyIsNative : Bool {
-    return _isNative
+    if !_isClassOrObjCExistential(T.self) {
+      return true
+    }
+    return !_storage.isObjC
   }
 
-  /// True, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeNoDTC : Bool {
-    return _isNativeNoDTC
+  var arrayPropertyNeedsElementTypeCheck : Bool {
+    if !_isClassOrObjCExistential(T.self) {
+      return false
+    }
+    return needsElementTypeCheck
   }
 
   /// Return true iff this buffer's storage is uniquely-referenced.
@@ -178,6 +185,33 @@ extension _ArrayBuffer {
   // checks one element. The reason for this is that the ARC optimizer does not
   // handle loops atm. and so can get blocked by the presence of a loop (over
   // the range). This loop is not necessary for a single element access.
+  func _typeCheck(index: Int, hoistedNeedsElementTypeCheck: Bool) {
+    if !_isClassOrObjCExistential(T.self) {
+      return
+    }    
+    if _slowPath(hoistedNeedsElementTypeCheck) {
+      _typeCheckSlowPath(index)
+    } else {
+      // For memory safety we need to check the actual storage. Because of
+      // hoisting of array properties hoistedNeedsElementTypeCheck might not be
+      // correct in case inout rules where violated. If inout rules are violated
+      // we want to catch this be failing.
+      // Example:
+      //  func f(inout a : A[AClass]) {
+      //    let b = a.props.isNative() // Hoisted.
+      //    for i in 0..a.count {
+      //              _typeCheck(a, i, b)
+      //       .. += _getElement(a, i, b)
+      //       g() // g should not be able to access 'a' but could if inout
+      //           // safety was violated.
+      //    }
+      //  }
+      _precondition(!needsElementTypeCheck,
+           "inout rules were violated: the array was overwritten by an NSArray")
+    }
+
+  }
+
   @inline(never)
   internal func _typeCheckSlowPath(index: Int) {
     if _fastPath(_isNative) {
@@ -204,7 +238,7 @@ extension _ArrayBuffer {
       // enumerateObjectsAtIndexes:options:usingBlock: in the
       // non-native case.
       for i in subRange {
-        _typeCheckSlowPath(i)
+        _typeCheck(i, hoistedNeedsElementTypeCheck: true)
       }
     }
   }
@@ -340,27 +374,6 @@ extension _ArrayBuffer {
     return true
   }
 
-  /// Return whether the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`
-  internal func _isValidSubscript(index : Int,
-                                  hoistedIsNativeNoDTCBuffer : Bool) -> Bool {
-    // This is the same function as _isValidSubscript with hoistedIsNativeBuffer,
-    // except for the _precondition checks. See the comments there.
-    if _fastPath(hoistedIsNativeNoDTCBuffer) {
-      if (_isClassOrObjCExistential(T.self)) {
-        _precondition(_isNativeNoDTC,
-          "inout rules were violated: the array was overwritten by an NSArray")
-      }
-      return _native._isValidSubscript(index,
-                                   hoistedIsNativeBuffer: true)
-    }
-    if (_isClassOrObjCExistential(T.self)) {
-      _precondition(!_isNativeNoDTC,
-        "inout rules were violated: the array was overwritten by a native array")
-    }
-    return true
-  }
-
   /// How many elements the buffer can store without reallocation
   public
   var capacity: Int {
@@ -368,12 +381,13 @@ extension _ArrayBuffer {
   }
 
   @inline(__always)
-  func getElement(i: Int, hoistedIsNativeNoDTCBuffer: Bool) -> T {
-    if _fastPath(hoistedIsNativeNoDTCBuffer) {
-      return _native[i]
-    }
+  func getElement(i: Int, hoistedIsNativeBuffer: Bool,
+                  hoistedNeedsElementTypeCheck: Bool) -> T {
     if _isClassOrObjCExistential(T.self) {
-      _typeCheckSlowPath(i)
+      _typeCheck(i, hoistedNeedsElementTypeCheck: hoistedNeedsElementTypeCheck)
+    }
+    if _fastPath(hoistedIsNativeBuffer) {
+      return _native[i]
     }
     return unsafeBitCast(_nonNative.objectAtIndex(i), T.self)
   }
@@ -382,7 +396,8 @@ extension _ArrayBuffer {
   public
   subscript(i: Int) -> T {
     get {
-      return getElement(i, hoistedIsNativeNoDTCBuffer:_isNativeNoDTC)
+      return getElement(i, hoistedIsNativeBuffer:!_storage.isObjC,
+                        hoistedNeedsElementTypeCheck: needsElementTypeCheck)
     }
     
     nonmutating set {
@@ -486,16 +501,6 @@ extension _ArrayBuffer {
     }
     else {
       return _storage.isNative
-    }
-  }
-
-  /// True, if the array is native and does not need a deferred type check.
-  var _isNativeNoDTC: Bool {
-    if !_isClassOrObjCExistential(T.self) {
-      return true
-    }
-    else {
-      return _storage.isNativeWithClearedSpareBits(deferredTypeCheckMask)
     }
   }
 

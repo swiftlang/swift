@@ -150,10 +150,7 @@ ArrayTraps.test("unsafeLength") {
 
 var ArraySemanticOptzns = TestSuite("ArraySemanticOptzns")
 
-class BaseClass {
-}
-
-class ElementClass : BaseClass {
+class ElementClass {
   var val: String
   init(_ x: String) {
     val = x
@@ -175,10 +172,12 @@ class ViolateInoutSafeySwitchToObjcBuffer {
   func runLoop(inout A: [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
-    let isNativeNoDTC = A._getArrayPropertyIsNativeNoDTC()
+    let isNative = A._getArrayPropertyIsNative()
+    let needsTypeCheck = A._getArrayPropertyNeedsElementTypeCheck()
     for i in 0..<A.count {
-      A._checkSubscript(i, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
-      A._getElement(i, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
+      A._checkSubscript(i, hoistedIsNativeBuffer: isNative)
+      A._getElement(i, hoistedIsNativeBuffer: isNative,
+        hoistedNeedsElementTypeCheck: needsTypeCheck)
       accessArrayViaInoutVolation()
     }
   }
@@ -202,21 +201,25 @@ ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
 class ViolateInoutSafeyNeedElementTypeCheck {
   final var anArray : [ElementClass] = []
 
+  let nsArray = NSArray(
+    objects: ElementClass("a"), ElementClass("b"), ElementClass("c"))
+
   @inline(never)
   func accessArrayViaInoutVolation() {
     // Overwrite the array with one that needs an element type check.
-    let ba: [BaseClass] = [ BaseClass(), BaseClass() ]
-    anArray = ba as! [ElementClass]
+    anArray = _convertNSArrayToArray(nsArray)
   }
 
   @inline(never)
   func runLoop(inout A : [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
-    let isNativeNoDTC = A._getArrayPropertyIsNativeNoDTC()
+    let needsTypeCheck = A._getArrayPropertyNeedsElementTypeCheck()
     for i in 0..<A.count {
-      A._checkSubscript(i, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
-      A._getElement(i, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
+      let isNative = A._getArrayPropertyIsNative()
+      A._checkSubscript(i, hoistedIsNativeBuffer: isNative)
+      A._getElement(i, hoistedIsNativeBuffer: isNative,
+        hoistedNeedsElementTypeCheck: needsTypeCheck)
       accessArrayViaInoutVolation()
     }
   }
