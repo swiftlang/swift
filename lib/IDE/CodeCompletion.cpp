@@ -1235,7 +1235,7 @@ public:
     }
 
     DeducedAssociatedTypes Types;
-    for (auto Conformance : NTD->getAllConformances(TypeResolver.get())) {
+    for (auto Conformance : NTD->getAllConformances()) {
       if (!Conformance->isComplete())
         continue;
       Conformance->forEachTypeWitness(TypeResolver.get(),
@@ -2025,7 +2025,7 @@ public:
             Protocols.end();
       };
       if (TD->getKind() != DeclKind::Protocol) {
-        return ContainsErrorProtocol(TD->getAllProtocols(TypeResolver.get()));
+        return ContainsErrorProtocol(TD->getAllProtocols());
       }
     }
     return false;

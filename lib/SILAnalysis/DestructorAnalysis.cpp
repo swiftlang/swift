@@ -87,7 +87,7 @@ bool DestructorAnalysis::implementsDestructorSafeContainerProtocol(
   ProtocolDecl *DestructorSafeContainer =
       getASTContext().getProtocol(KnownProtocolKind::_DestructorSafeContainer);
 
-  for (auto Proto : NomDecl->getAllProtocols(nullptr))
+  for (auto Proto : NomDecl->getAllProtocols())
     if (Proto == DestructorSafeContainer)
       return true;
 

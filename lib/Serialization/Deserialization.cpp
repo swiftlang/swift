@@ -456,7 +456,6 @@ ProtocolConformance *ModuleFile::readConformance(llvm::BitstreamCursor &Cursor){
 
     SmallVector<ProtocolConformance *, 2> conformances;
     nominal->lookupConformance(module, proto,
-                               nominal->getASTContext().getLazyResolver(),
                                conformances);
     assert(!conformances.empty() && "Could not find conformance");
     return conformances.front();

@@ -409,8 +409,7 @@ public:
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolDecl *, 2>
-  getLocalProtocols(LazyResolver *resolver,
-                    ConformanceLookupKind lookupKind
+  getLocalProtocols(ConformanceLookupKind lookupKind
                       = ConformanceLookupKind::All,
                     SmallVectorImpl<ConformanceDiagnostic> *diagnostics
                       = nullptr) const;
@@ -426,8 +425,7 @@ public:
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolConformance *, 2>
-  getLocalConformances(LazyResolver *resolver,
-                       ConformanceLookupKind lookupKind
+  getLocalConformances(ConformanceLookupKind lookupKind
                          = ConformanceLookupKind::All,
                        SmallVectorImpl<ConformanceDiagnostic> *diagnostics
                          = nullptr) const;

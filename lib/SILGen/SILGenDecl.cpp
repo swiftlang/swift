@@ -1374,8 +1374,7 @@ public:
     if (isa<ProtocolDecl>(theType))
       return;
 
-    for (auto *conformance : theType->getAllConformances(nullptr,
-                                                         /*sorted=*/true)) {
+    for (auto *conformance : theType->getAllConformances(/*sorted=*/true)) {
       if (conformance->isComplete() &&
           isa<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(conformance);
@@ -1496,7 +1495,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     // Emit witness tables.
-    for (auto c : cast<NominalTypeDecl>(d)->getLocalConformances(nullptr)) {
+    for (auto c : cast<NominalTypeDecl>(d)->getLocalConformances()) {
       if (Types.protocolRequiresWitnessTable(c->getProtocol()) &&
           c->isComplete() && isa<NormalProtocolConformance>(c))
         getWitnessTable(c);
@@ -1550,7 +1549,7 @@ public:
     if (!e->getExtendedType()->isExistentialType()) {
       // Emit witness tables for protocol conformances introduced by the
       // extension.
-      for (auto *conformance : e->getLocalConformances(nullptr)) {
+      for (auto *conformance : e->getLocalConformances()) {
         if (conformance->isComplete() &&
             isa<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(conformance);

@@ -2849,7 +2849,8 @@ checkConformsToProtocol(TypeChecker &TC,
   }
 
   // Foreign classes cannot conform to objc protocols.
-  if (Proto->isObjC())
+  if (Proto->isObjC() &&
+      !Proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
     if (auto clas = canT->getClassOrBoundGenericClass())
       if (clas->isForeign()) {
         TC.diagnose(ComplainLoc,
@@ -2858,6 +2859,7 @@ checkConformsToProtocol(TypeChecker &TC,
         conformance->setState(ProtocolConformanceState::Invalid);
         return conformance;
       }
+  }
 
   // If the protocol contains missing requirements, it can't be conformed to
   // at all.

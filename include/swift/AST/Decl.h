@@ -2978,7 +2978,7 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   mutable ConformanceLookupTable *ConformanceTable = nullptr;
 
   /// Prepare the conformance table.
-  void prepareConformanceTable(LazyResolver *resolver) const;
+  void prepareConformanceTable() const;
 
   friend class ASTContext;
   friend class MemberLookupTable;
@@ -3143,8 +3143,7 @@ public:
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
-  void getImplicitProtocols(LazyResolver *resolver,
-                            SmallVectorImpl<ProtocolDecl *> &protocols);
+  void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
   /// Look for conformances of this nominal type to the given
   /// protocol.
@@ -3153,25 +3152,19 @@ public:
   /// FIXME: This is currently unused.
   ///
   /// \param protocol The protocol whose conformance is requested.
-  ///
-  /// \param resolver Lazy resolver that will be used for the
-  /// resolution of inherited types (where required).
-  ///
   /// \param conformances Will be populated with the set of protocol
   /// conformances found for this protocol.
   ///
   /// \returns true if any conformances were found. 
   bool lookupConformance(
          Module *module, ProtocolDecl *protocol,
-         LazyResolver *resolver,
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
 
   /// Retrieve all of the protocols that this nominal type conforms to.
-  SmallVector<ProtocolDecl *, 2> getAllProtocols(LazyResolver *resolver) const;
+  SmallVector<ProtocolDecl *, 2> getAllProtocols() const;
 
   /// Retrieve all of the protocol conformances for this nominal type.
   SmallVector<ProtocolConformance *, 2> getAllConformances(
-                                          LazyResolver *resolver,
                                           bool sorted = false) const;
 
   /// Register an externally-created protocol conformance in the

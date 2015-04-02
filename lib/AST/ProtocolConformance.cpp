@@ -1125,7 +1125,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           llvm::SaveAndRestore<bool> visiting(VisitingSuperclass, true);
 
           // Resolve the conformances of the superclass.
-          superclassDecl->prepareConformanceTable(resolver);
+          superclassDecl->prepareConformanceTable();
           superclassDecl->ConformanceTable->updateLookupTable(
             superclassDecl,
             ConformanceStage::Resolved,
@@ -1451,7 +1451,7 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     // If the explicit protocol for the left-hand side is implied by
     // the explicit protocol for the right-hand side, the left-hand
     // side supersedes the right-hand side.
-    for (auto rhsProtocol : rhsExplicitProtocol->getAllProtocols(nullptr)){
+    for (auto rhsProtocol : rhsExplicitProtocol->getAllProtocols()) {
       if (rhsProtocol == lhsExplicitProtocol) {
         diagnoseSuperseded = false;
         return Ordering::Before;
@@ -1461,7 +1461,7 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     // If the explicit protocol for the right-hand side is implied by
     // the explicit protocol for the left-hand side, the right-hand
     // side supersedes the left-hand side.
-    for (auto lhsProtocol : lhsExplicitProtocol->getAllProtocols(nullptr)){
+    for (auto lhsProtocol : lhsExplicitProtocol->getAllProtocols()) {
       if (lhsProtocol == rhsExplicitProtocol) {
         diagnoseSuperseded = false;
         return Ordering::After;
@@ -1574,7 +1574,7 @@ DeclContext *ConformanceLookupTable::getConformingContext(
                                      ->VisitingSuperclass,
                                    true);
 
-      superclassDecl->prepareConformanceTable(resolver);
+      superclassDecl->prepareConformanceTable();
       superclassDecl->ConformanceTable->resolveConformances(superclassDecl,
                                                             protocol,
                                                             resolver);
@@ -1866,12 +1866,13 @@ void ConformanceLookupTable::dump(raw_ostream &os) const {
   }
 }
 
-void NominalTypeDecl::prepareConformanceTable(LazyResolver *resolver) const {
+void NominalTypeDecl::prepareConformanceTable() const {
   if (ConformanceTable)
     return;
 
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   ASTContext &ctx = getASTContext();
+  auto resolver = ctx.getLazyResolver();
   ConformanceTable = new (ctx) ConformanceLookupTable(ctx, mutableThis,
                                                       resolver);
 
@@ -1926,35 +1927,32 @@ void NominalTypeDecl::prepareConformanceTable(LazyResolver *resolver) const {
 
 bool NominalTypeDecl::lookupConformance(
        Module *module, ProtocolDecl *protocol,
-       LazyResolver *resolver,
        SmallVectorImpl<ProtocolConformance *> &conformances) const {
-  prepareConformanceTable(resolver);
+  prepareConformanceTable();
   return ConformanceTable->lookupConformance(
            module,
            const_cast<NominalTypeDecl *>(this),
            protocol,
-           resolver,
+           getASTContext().getLazyResolver(),
            conformances);
 }
 
-SmallVector<ProtocolDecl *, 2> NominalTypeDecl::getAllProtocols(
-                                 LazyResolver *resolver) const {
-  prepareConformanceTable(resolver);
+SmallVector<ProtocolDecl *, 2> NominalTypeDecl::getAllProtocols() const {
+  prepareConformanceTable();
   SmallVector<ProtocolDecl *, 2> result;
   ConformanceTable->getAllProtocols(const_cast<NominalTypeDecl *>(this),
-                                    resolver,
+                                    getASTContext().getLazyResolver(),
                                     result);
   return result;
 }
 
 SmallVector<ProtocolConformance *, 2> NominalTypeDecl::getAllConformances(
-                                        LazyResolver *resolver,
                                         bool sorted) const
 {
-  prepareConformanceTable(resolver);
+  prepareConformanceTable();
   SmallVector<ProtocolConformance *, 2> result;
   ConformanceTable->getAllConformances(const_cast<NominalTypeDecl *>(this),
-                                       resolver,
+                                       getASTContext().getLazyResolver(),
                                        result);
 
   if (sorted) {
@@ -1995,21 +1993,19 @@ SmallVector<ProtocolConformance *, 2> NominalTypeDecl::getAllConformances(
 }
 
 void NominalTypeDecl::getImplicitProtocols(
-       LazyResolver *resolver,
        SmallVectorImpl<ProtocolDecl *> &protocols) {
-  prepareConformanceTable(resolver);
+  prepareConformanceTable();
   ConformanceTable->getImplicitProtocols(this, protocols);
 }
 
 void NominalTypeDecl::registerProtocolConformance(
        ProtocolConformance *conformance) {
-  prepareConformanceTable(/*FIXME:*/nullptr);
+  prepareConformanceTable();
   ConformanceTable->registerProtocolConformance(conformance);
 }
 
 SmallVector<ProtocolDecl *, 2>
 DeclContext::getLocalProtocols(
-  LazyResolver *resolver,
   ConformanceLookupKind lookupKind,
   SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
 {
@@ -2021,11 +2017,11 @@ DeclContext::getLocalProtocols(
     return result;
 
   // Update to record all potential conformances.
-  nominal->prepareConformanceTable(resolver);
+  nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<DeclContext *>(this),
-    resolver,
+    nominal->getASTContext().getLazyResolver(),
     lookupKind,
     &result,
     nullptr,
@@ -2035,7 +2031,6 @@ DeclContext::getLocalProtocols(
 
 SmallVector<ProtocolConformance *, 2>
 DeclContext::getLocalConformances(
-  LazyResolver *resolver,
   ConformanceLookupKind lookupKind,
   SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
 {
@@ -2046,12 +2041,16 @@ DeclContext::getLocalConformances(
   if (!nominal)
     return result;
 
+  // Protocols don't have conformances.
+  if (isa<ProtocolDecl>(nominal))
+    return { };
+
   // Update to record all potential conformances.
-  nominal->prepareConformanceTable(resolver);
+  nominal->prepareConformanceTable();
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<DeclContext *>(this),
-    resolver,
+    nominal->getASTContext().getLazyResolver(),
     lookupKind,
     nullptr,
     &result,

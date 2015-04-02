@@ -816,7 +816,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
-  if (!nominal->lookupConformance(this, protocol, resolver, conformances))
+  if (!nominal->lookupConformance(this, protocol, conformances))
     return { nullptr, ConformanceKind::DoesNotConform };
 
   // FIXME: Ambiguity resolution.

@@ -223,7 +223,7 @@ static void addImplicitConformances(
               llvm::SmallSetVector<ProtocolDecl *, 4> &allProtocols) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     SmallVector<ProtocolDecl *, 2> protocols;
-    nominal->getImplicitProtocols(&tc, protocols);
+    nominal->getImplicitProtocols(protocols);
     allProtocols.insert(protocols.begin(), protocols.end());
   }
 }
@@ -2766,8 +2766,7 @@ public:
     // Check each of the conformances associated with this context.
     SmallVector<ConformanceDiagnostic, 4> diagnostics;
     SmallVector<ProtocolDecl *, 4> protocols;
-    for (auto conformance : D->getLocalConformances(&TC,
-                                                    ConformanceLookupKind::All,
+    for (auto conformance : D->getLocalConformances(ConformanceLookupKind::All,
                                                     &diagnostics)) {
       // Check and record normal conformances.
       if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {

@@ -1947,7 +1947,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
 
   bool needsCategory = false;
   if (!needsCategory) {
-    for (auto conformance : ext->getLocalConformances(nullptr)) {
+    for (auto conformance : ext->getLocalConformances()) {
       if (conformance->getProtocol()->isObjC()) {
         needsCategory = true;
         break;

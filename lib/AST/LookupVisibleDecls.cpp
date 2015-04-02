@@ -333,7 +333,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
   if (!CurrNominal)
     return;
 
-  for (auto Conformance : CurrNominal->getAllConformances(TypeResolver)) {
+  for (auto Conformance : CurrNominal->getAllConformances()) {
     auto Proto = Conformance->getProtocol();
     if (!Proto->isAccessibleFrom(FromContext))
       continue;
