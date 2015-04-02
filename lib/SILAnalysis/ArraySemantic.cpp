@@ -454,26 +454,3 @@ SILValue swift::ArraySemanticsCall::getArrayPropertyNeedsTypeCheck() const {
 
   return SemanticsCall->getArgument(ArgIdx);
 }
-
-/// Certain semantic functions are generally safe because they don't release
-/// the array in unexpected ways.
-bool ArraySemanticsCall::isNoCapture() const {
-  switch (getKind()) {
-  case ArrayCallKind::kNone:
-  case ArrayCallKind::kGetArrayOwner:
-  case ArrayCallKind::kMutateUnknown:
-  case ArrayCallKind::kArrayInit:
-  case ArrayCallKind::kArrayUninitialized:
-    return false;
-  case ArrayCallKind::kArrayPropsIsNative:
-  case ArrayCallKind::kArrayPropsNeedsTypeCheck:
-  case ArrayCallKind::kCheckSubscript:
-  case ArrayCallKind::kCheckIndex:
-  case ArrayCallKind::kGetCount:
-  case ArrayCallKind::kGetCapacity:
-  case ArrayCallKind::kGetElement:
-  case ArrayCallKind::kGetElementAddress:
-  case ArrayCallKind::kMakeMutable:
-    return true;
-  }
-}

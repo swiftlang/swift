@@ -111,11 +111,6 @@ public:
   /// Is this an semantics call.
   operator bool() const { return SemanticsCall != nullptr; }
 
-  /// Does this array semantic call touch globals or ivars in a manner that
-  /// causes its effect on reference counts to not be described solely by its
-  /// signature.
-  bool isNoCapture() const;
-
 protected:
   /// Validate the signature of this call.
   bool isValidSignature();
