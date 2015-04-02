@@ -77,6 +77,8 @@ static llvm::cl::opt<OptGroup> OptimizationGroup(
                                 "Run diagnostic passes"),
                      clEnumValN(OptGroup::Performance, "performance",
                                 "Run performance passes"),
+                     clEnumValN(OptGroup::Performance, "O",
+                                "Alias for -performance"),
                      clEnumValEnd),
     llvm::cl::init(OptGroup::Unknown));
 
