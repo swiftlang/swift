@@ -170,29 +170,29 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
          First->getNumTypes() == Second->getNumTypes() &&
          "Types should be identical");
 
-  unsigned DifferentOperandIndex = ~0U;
+  llvm::Optional<unsigned> DifferentOperandIndex;
 
   // Check operands.
   for (unsigned i = 0, e = First->getNumOperands(); i != e; ++i) {
     if (First->getOperand(i) != Second->getOperand(i)) {
       // Only track one different operand for now
-      if (DifferentOperandIndex != ~0U)
+      if (DifferentOperandIndex)
         return None;
       DifferentOperandIndex = i;
     }
   }
 
-  if (DifferentOperandIndex == ~0U)
+  if (!DifferentOperandIndex)
     return None;
 
   // Found a different operand, now check to see if its type is something
   // cheap enough to sink.
   // TODO: Sink more than just integers.
-  const auto &ArgTy = First->getOperand(DifferentOperandIndex).getType();
+  const auto &ArgTy = First->getOperand(*DifferentOperandIndex).getType();
   if (!ArgTy.is<BuiltinIntegerType>())
     return None;
 
-  return DifferentOperandIndex;
+  return *DifferentOperandIndex;
 }
 
 // Try to sink values from the Nth argument \p ArgNum.
