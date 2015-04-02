@@ -25,6 +25,7 @@
 #include "ErrorObject.h"
 #include "Private.h"
 #include <dlfcn.h>
+#include <objc/objc-internal.h>
 #include <objc/runtime.h>
 #include <Foundation/Foundation.h>
 
@@ -194,4 +195,85 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
                            void **scratch,
                            ErrorValueResult *out) {
   return _swift_getErrorValue(errorObject, scratch, out);
+}
+
+bool
+swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
+                                    OpaqueValue *src,
+                                    const Metadata *srcType,
+                                    const Metadata *destType,
+                                    DynamicCastFlags flags) {
+  static Class TheNSErrorClass = [NSError class];
+  static CFTypeID TheCFErrorTypeID = CFErrorGetTypeID();
+  // @asmname("swift_stdlib_bridgeNSErrorToErrorType")
+  // public func _stdlib_bridgeNSErrorToErrorType<
+  //   T: _ObjectiveCBridgeableErrorType
+  // >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
+  static auto bridgeNSErrorToErrorType
+    = reinterpret_cast<bool (*)(NSError *, OpaqueValue*, const Metadata *,
+                                const WitnessTable *)>
+        (dlsym(RTLD_DEFAULT, "swift_stdlib_bridgeNSErrorToErrorType"));
+  // protocol _ObjectiveCBridgeableErrorType
+  static auto TheObjectiveCBridgeableErrorTypeProtocol
+    = reinterpret_cast<const ProtocolDescriptor *>
+        (dlsym(RTLD_DEFAULT, "_TMp10Foundation30_ObjectiveCBridgeableErrorType"));
+
+  // If the Foundation overlay isn't loaded, then NSErrors can't be bridged.
+  if (!bridgeNSErrorToErrorType || !TheObjectiveCBridgeableErrorTypeProtocol)
+    return false;
+  
+  // Is the input type an NSError?
+  switch (srcType->getKind()) {
+  case MetadataKind::Class:
+    // Native class should be an NSError subclass.
+    if (![(Class)srcType isSubclassOfClass: TheNSErrorClass])
+      return false;
+    break;
+  case MetadataKind::ForeignClass: {
+    // Foreign class should be CFError.
+    CFTypeRef srcInstance = *reinterpret_cast<CFTypeRef *>(src);
+    if (CFGetTypeID(srcInstance) != TheCFErrorTypeID)
+      return false;
+    break;
+  }
+  case MetadataKind::ObjCClassWrapper: {
+    // ObjC class should be an NSError subclass.
+    auto srcWrapper = static_cast<const ObjCClassWrapperMetadata *>(srcType);
+    if (![(Class)srcWrapper->getClassObject()
+            isSubclassOfClass: TheNSErrorClass])
+      return false;
+    break;
+  }
+  // Not a class.
+  case MetadataKind::Enum:
+  case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::Function:
+  case MetadataKind::ThinFunction:
+  case MetadataKind::Block:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::Metatype:
+  case MetadataKind::Opaque:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Struct:
+  case MetadataKind::Tuple:
+    return false;
+  }
+  
+  // Is the target type a bridgeable error?
+  auto witness = swift_conformsToProtocol(destType,
+                                      TheObjectiveCBridgeableErrorTypeProtocol);
+  
+  if (!witness)
+    return false;
+  
+  // If so, attempt the bridge.
+  NSError *srcInstance = *reinterpret_cast<NSError * const*>(src);
+  objc_retain(srcInstance);
+  if (bridgeNSErrorToErrorType(srcInstance, dest, destType, witness)) {
+    if (flags & DynamicCastFlags::TakeOnSuccess)
+      objc_release(srcInstance);
+    return true;
+  }
+  return false;
 }

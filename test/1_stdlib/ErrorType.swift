@@ -113,5 +113,41 @@ ErrorTypeTests.test("NSError") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
+ErrorTypeTests.test("NSError-to-enum bridging") {
+  NoisyErrorLifeCount = 0
+  NoisyErrorDeathCount = 0
+  autoreleasepool {
+    let ns = NSError(domain: NSCocoaErrorDomain,
+                     code: NSFileNoSuchFileError,
+                     userInfo: nil)
+
+    objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
+                             .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+  
+    let e: _ErrorType = ns
+
+    let cocoaCode: Int?
+    switch e {
+    case let x as _NSCocoaError:
+      cocoaCode = x.code
+    default:
+      cocoaCode = nil
+    }
+
+    expectEqual(cocoaCode, NSFileNoSuchFileError)
+
+    let isNoSuchFileError: Bool
+    switch e {
+    case _NSCocoaError.NSFileNoSuchFileError:
+      isNoSuchFileError = true
+    default:
+      isNoSuchFileError = false
+    }
+
+    expectTrue(isNoSuchFileError)
+  }
+  expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
+}
+
 runAllTests()
 

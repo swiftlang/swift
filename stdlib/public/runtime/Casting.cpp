@@ -1842,6 +1842,12 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                                                          targetBridgeWitness,
                                                          flags);
       }
+      
+      // If the source is an NSError, and the target is a bridgeable ErrorType,
+      // try to bridge.
+      if (tryDynamicCastNSErrorToValue(dest, src, srcType, targetType, flags)) {
+        return true;
+      }
 #endif
       break;
     }
@@ -2404,7 +2410,7 @@ static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
 
 namespace {
 
-// protocol _ObjectiveCBridgeableWitnessTable {
+// protocol _ObjectiveCBridgeable {
 struct _ObjectiveCBridgeableWitnessTable {
   // typealias _ObjectiveCType: class
   const Metadata *ObjectiveCType;

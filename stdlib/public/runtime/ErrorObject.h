@@ -131,6 +131,18 @@ extern "C" void swift_getErrorValue(const SwiftError *errorObject,
                                     void **scratch,
                                     ErrorValueResult *out);
 
+#if SWIFT_OBJC_INTEROP
+/// Attempt to dynamically cast an NSError instance to a Swift ErrorType
+/// implementation using the _ObjectiveCBridgeableErrorType protocol.
+///
+/// srcType must be some kind of class metadata.
+bool tryDynamicCastNSErrorToValue(OpaqueValue *dest,
+                                  OpaqueValue *src,
+                                  const Metadata *srcType,
+                                  const Metadata *destType,
+                                  DynamicCastFlags flags);
+#endif
+
 } // namespace swift
 
 #endif
