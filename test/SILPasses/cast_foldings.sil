@@ -1,0 +1,24 @@
+// RUN: %target-sil-opt -sil-combine -verify %s | FileCheck %s
+
+import Swift
+
+@objc class NSCloud {}
+
+// CHECK-LABEL: sil @dont_fold_unconditional_checked_cast_to_existentials
+// CHECK: unconditional_checked_cast %1 : $NSCloud to $AnyObject
+sil @dont_fold_unconditional_checked_cast_to_existentials : $@thin () -> AnyObject {
+entry:
+  %0 = alloc_stack $NSCloud
+  %1 = load %0#1 : $*NSCloud
+  %2 = unconditional_checked_cast %1 : $NSCloud to $AnyObject
+  dealloc_stack %0#0 : $*@local_storage NSCloud
+  return %2 : $AnyObject
+}
+
+// CHECK-LABEL: sil @dont_fold_unconditional_checked_cast_from_existentials
+// CHECK: unconditional_checked_cast %0 : $AnyObject to $NSCloud
+sil @dont_fold_unconditional_checked_cast_from_existentials : $@thin (AnyObject) -> NSCloud {
+entry (%0 : $AnyObject):
+  %1 = unconditional_checked_cast %0 : $AnyObject to $NSCloud
+  return %1 : $NSCloud
+}

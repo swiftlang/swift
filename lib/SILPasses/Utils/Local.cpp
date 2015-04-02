@@ -1180,6 +1180,12 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
     SILBuilderWithScope<1> Builder(Inst);
 
+    // emitSuccessfulScalarUnconditionalCast cannot
+    // further simplify casts from/to existentials.
+    if (LoweredTargetType.isAnyExistentialType() ||
+        LoweredSourceType.isAnyExistentialType())
+      return nullptr;
+
     auto Result = emitSuccessfulScalarUnconditionalCast(Builder,
                       Mod.getSwiftModule(), Loc, Op,
                       LoweredTargetType,
