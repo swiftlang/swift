@@ -787,9 +787,8 @@ public:
 
   void addPatternVariablesToScope(ArrayRef<Pattern *> Patterns);
 
-  ParserStatus parseDeclOperator(ParseDeclOptions Flags,
-                                 DeclAttributes &Attributes,
-                                 SmallVectorImpl<Decl *> &Decls);
+  ParserResult<OperatorDecl> parseDeclOperator(ParseDeclOptions Flags,
+                                               DeclAttributes &Attributes);
   ParserResult<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
                                                      Identifier Name,
                                                      SourceLoc NameLoc,
@@ -798,11 +797,10 @@ public:
                                                       Identifier Name,
                                                       SourceLoc NameLoc,
                                                       DeclAttributes &Attrs);
-  ParserStatus parseDeclInfixOperator(SourceLoc OperatorLoc,
-                                      Identifier Name,
-                                      SourceLoc NameLoc,
-                                      DeclAttributes &Attributes,
-                                      SmallVectorImpl<Decl *> &Decls);
+  ParserResult<OperatorDecl> parseDeclInfixOperator(SourceLoc OperatorLoc,
+                                                    Identifier Name,
+                                                    SourceLoc NameLoc,
+                                                    DeclAttributes &Attrs);
 
   //===--------------------------------------------------------------------===//
   // SIL Parsing.

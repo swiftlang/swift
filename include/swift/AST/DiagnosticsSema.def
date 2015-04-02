@@ -1022,13 +1022,6 @@ ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,
 NOTE(decl_init_here,sema_tcd,none,
      "initial value is here", ())
 
-// In-place functions
-ERROR(in_place_non_struct_enum_protocol,sema_tcd,none,
-      "only structs and enums may have in-place methods", ())
-ERROR(in_place_returns_void,sema_tcd,none,
-      "in-place methods must return void", ())
-ERROR(in_place_static,sema_tcd,none,
-      "in-place methods may not be static", ())
 
 // Inheritance
 ERROR(duplicate_inheritance,sema_tcd,none,

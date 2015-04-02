@@ -136,11 +136,6 @@ ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
 ERROR(lex_editor_placeholder,lexing,none,
       "editor placeholder in source file", ())
 
-ERROR(lex_func_nospace_equal,lexing,none,
-      "expected space between 'func' and '='", ())
-ERROR(lex_equal_space_funcname,lexing,none,
-      "unexpected space within in-place method name", ())
-
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
@@ -391,13 +386,8 @@ ERROR(unknown_infix_operator_associativity,decl_parsing,none,
       "'%0' is not a valid infix operator associativity; must be 'none', 'left', or 'right'", (StringRef))
 ERROR(operator_precedence_redeclared,decl_parsing,none,
       "'precedence' for infix operator declared multiple times", ())
-ERROR(operator_mutating_redeclared,decl_parsing,none,
-      "'mutating' for infix operator declared multiple times", ())
-ERROR(operator_assignment_to_mutating,decl_parsing,none,
-      "'assignment' is no longer a valid infix operator attribute; "
-      "use 'mutating'", ())
-ERROR(operator_has_assignment_redeclared,decl_parsing,none,
-      "'has_assignment' for infix operator declared multiple times", ())
+ERROR(operator_assignment_redeclared,decl_parsing,none,
+      "'assignment' for infix operator declared multiple times", ())
 ERROR(expected_infix_operator_precedence,decl_parsing,none,
       "expected integer literal after 'precedence' in 'operator' declaration body", ())
 ERROR(invalid_infix_operator_precedence,decl_parsing,none,
@@ -869,8 +859,6 @@ ERROR(invalid_postfix_operator,expr_parsing,none,
 
 ERROR(expected_member_name,expr_parsing,PointsToFirstBadToken,
       "expected member name following '.'", ())
-ERROR(expected_identifier_following_period_equal,expr_parsing,
-      PointsToFirstBadToken, "expected identifier following '.='", ())
 ERROR(expected_dollar_numeric,expr_parsing,none,
       "expected numeric value following '$'", ())
 ERROR(dollar_numeric_too_large,expr_parsing,none,

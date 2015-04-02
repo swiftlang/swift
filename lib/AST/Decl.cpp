@@ -3967,8 +3967,7 @@ void InfixOperatorDecl::collectOperatorKeywordRanges(SmallVectorImpl
       Ranges.push_back(CharSourceRange(Loc, strlen(Word.data())));
   };
   AddToRange(AssociativityLoc, "associativity");
-  AddToRange(MutatingLoc, "mutating");
-  AddToRange(HasAssignmentLoc, "has_assignment");
+  AddToRange(AssignmentLoc, "assignment");
   AddToRange(PrecedenceLoc, "precedence");
 }
 

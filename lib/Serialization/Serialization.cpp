@@ -1913,10 +1913,10 @@ void Serializer::writeDecl(const Decl *D) {
                                     contextID,
                                     associativity,
                                     op->getPrecedence(),
-                                    op->isMutating(),
+                                    op->isAssignment(),
                                     op->isAssociativityImplicit(),
                                     op->isPrecedenceImplicit(),
-                                    op->isMutatingImplicit());
+                                    op->isAssignmentImplicit());
     break;
   }
 

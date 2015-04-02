@@ -130,7 +130,6 @@ PUNCTUATOR(pound,         "#")
 
 PUNCTUATOR(amp_prefix,    "&")
 PUNCTUATOR(arrow,         "->")
-PUNCTUATOR(period_equal,  ".=")
 
 PUNCTUATOR(backtick,      "`")
 

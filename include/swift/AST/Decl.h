@@ -552,10 +552,10 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     unsigned Associativity : 2;
     unsigned Precedence : 8;
-    unsigned Mutating : 1;
+    unsigned Assignment : 1;
     unsigned IsAssocImplicit : 1;
     unsigned IsPrecedenceImplicit : 1;
-    unsigned IsMutatingImplicit : 1;
+    unsigned IsAssignmentImplicit : 1;
   };
   enum { NumInfixOperatorDeclBits = NumDeclBits + 14 };
   static_assert(NumInfixOperatorDeclBits <= 32, "fits in an unsigned");
@@ -5537,7 +5537,7 @@ public:
 class InfixOperatorDecl : public OperatorDecl {
   SourceLoc AssociativityLoc, AssociativityValueLoc,
     PrecedenceLoc, PrecedenceValueLoc,
-    MutatingLoc, HasAssignmentLoc;
+    AssignmentLoc;
 
 public:
   InfixOperatorDecl(DeclContext *DC,
@@ -5551,9 +5551,8 @@ public:
                     bool IsPrecedenceImplicit,
                     SourceLoc PrecedenceLoc,
                     SourceLoc PrecedenceValueLoc,
-                    bool IsMutatingImplicit,
-                    SourceLoc MutatingLoc,
-                    SourceLoc HasAssignmentLoc,
+                    bool IsAssignmentImplicit,
+                    SourceLoc AssignmentLoc,
                     SourceLoc RBraceLoc,
                     InfixData InfixData)
     : OperatorDecl(DeclKind::InfixOperator, DC,
@@ -5566,8 +5565,7 @@ public:
       AssociativityValueLoc(AssociativityValueLoc),
       PrecedenceLoc(PrecedenceLoc),
       PrecedenceValueLoc(PrecedenceValueLoc),
-      MutatingLoc(MutatingLoc),
-      HasAssignmentLoc(HasAssignmentLoc) {
+      AssignmentLoc(AssignmentLoc) {
     if (!InfixData.isValid()) {
       setInvalid();
     } else {
@@ -5578,11 +5576,11 @@ public:
       InfixOperatorDeclBits.Precedence = InfixData.getPrecedence();
       InfixOperatorDeclBits.Associativity =
         static_cast<unsigned>(InfixData.getAssociativity());
-      InfixOperatorDeclBits.Mutating =
-         unsigned(InfixData.isMutating());
+      InfixOperatorDeclBits.Assignment =
+         unsigned(InfixData.isAssignment());
       InfixOperatorDeclBits.IsPrecedenceImplicit = IsPrecedenceImplicit;
       InfixOperatorDeclBits.IsAssocImplicit = IsAssocImplicit;
-      InfixOperatorDeclBits.IsMutatingImplicit = IsMutatingImplicit;
+      InfixOperatorDeclBits.IsAssignmentImplicit = IsAssignmentImplicit;
     }
   }
   
@@ -5590,7 +5588,7 @@ public:
   SourceLoc getAssociativityValueLoc() const { return AssociativityValueLoc; }
   SourceLoc getPrecedenceLoc() const { return PrecedenceLoc; }
   SourceLoc getPrecedenceValueLoc() const { return PrecedenceValueLoc; }
-  SourceLoc getMutatingLoc() const { return MutatingLoc; }
+  SourceLoc getAssignmentLoc() const { return AssignmentLoc; }
 
   unsigned getPrecedence() const {
     return InfixOperatorDeclBits.Precedence;
@@ -5600,14 +5598,14 @@ public:
     return Associativity(InfixOperatorDeclBits.Associativity);
   }
   
-  bool isMutating() const {
-    return InfixOperatorDeclBits.Mutating;
+  bool isAssignment() const {
+    return InfixOperatorDeclBits.Assignment;
   }
 
   InfixData getInfixData() const {
     if (isInvalid())
       return InfixData();
-    return InfixData(getPrecedence(), getAssociativity(), isMutating());
+    return InfixData(getPrecedence(), getAssociativity(), isAssignment());
   }
 
   bool isAssociativityImplicit() const {
@@ -5616,8 +5614,8 @@ public:
   bool isPrecedenceImplicit() const {
     return InfixOperatorDeclBits.IsPrecedenceImplicit;
   }
-  bool isMutatingImplicit() const {
-    return InfixOperatorDeclBits.IsMutatingImplicit;
+  bool isAssignmentImplicit() const {
+    return InfixOperatorDeclBits.IsAssignmentImplicit;
   }
 
   void collectOperatorKeywordRanges(SmallVectorImpl<CharSourceRange> &Ranges);

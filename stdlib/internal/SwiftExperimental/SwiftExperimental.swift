@@ -46,13 +46,13 @@ public func ∘<T, U, V>(g: U -> V, f: T -> U) -> (T -> V) {
 }
 
 infix operator ∖ { associativity left precedence 140 }
-infix operator ∖= { associativity right precedence 90 mutating }
+infix operator ∖= { associativity right precedence 90 assignment }
 infix operator ∪ { associativity left precedence 140 }
-infix operator ∪= { associativity right precedence 90 mutating }
+infix operator ∪= { associativity right precedence 90 assignment }
 infix operator ∩ { associativity left precedence 150 }
-infix operator ∩= { associativity right precedence 90 mutating }
+infix operator ∩= { associativity right precedence 90 assignment }
 infix operator ⨁ { associativity left precedence 140 }
-infix operator ⨁= { associativity right precedence 90 mutating }
+infix operator ⨁= { associativity right precedence 90 assignment }
 infix operator ∈ { associativity left precedence 130 }
 infix operator ∉ { associativity left precedence 130 }
 infix operator ⊂ { associativity left precedence 130 }

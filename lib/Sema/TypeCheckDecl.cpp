@@ -4042,8 +4042,7 @@ public:
 
     // Validate the mutating attribute if present, and install it into the bit
     // on funcdecl (instead of just being a DeclAttribute).
-    if (FD->getAttrs().hasAttribute<MutatingAttr>() ||
-        FD->getName().isInPlaceName())
+    if (FD->getAttrs().hasAttribute<MutatingAttr>())
       FD->setMutating(true);
     else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
       FD->setMutating(false);
@@ -4111,29 +4110,6 @@ public:
     assert(!FD->getType()->isDependentType());
 
     validateAttributes(TC, FD);
-
-    if (FD->getName().isInPlaceName()) {
-      // Only structs, enums, and protocols may declare in-place methods.
-      Type contextType = FD->getDeclContext()->getDeclaredTypeInContext();
-      bool contextTypeIsValueType = contextType &&
-        (contextType->getStructOrBoundGenericStruct() ||
-         contextType->getEnumOrBoundGenericEnum());
-      ProtocolDecl *protocolContext =
-          dyn_cast<ProtocolDecl>(FD->getDeclContext());
-      if (!contextTypeIsValueType && !protocolContext) {
-        TC.diagnose(FD, diag::in_place_non_struct_enum_protocol);
-      }
-      // In-place methods must return void.
-      if (!FD->getResultType()->isVoid()) {
-        TC.diagnose(FD, diag::in_place_returns_void)
-          .highlight(FD->getBodyResultTypeLoc().getSourceRange());
-      }
-      // In-place methods may not be static.
-      if (FD->isStatic()) {
-        // TODO: give different diagnostic depending on spelling of 'static'?
-        TC.diagnose(FD, diag::in_place_static);
-      }
-    }
 
     // Member functions need some special validation logic.
     if (auto contextType = FD->getDeclContext()->getDeclaredTypeInContext()) {

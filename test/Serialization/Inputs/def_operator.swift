@@ -14,7 +14,7 @@ infix operator -* {
 infix operator *-* {
   associativity none
   precedence 10
-  mutating
+  assignment
 }
 
 prefix public func ~~~(x: Bool) -> () {}

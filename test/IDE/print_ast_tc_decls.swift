@@ -1060,16 +1060,16 @@ protocol d2600_ProtocolWithOperator1 {
 // PASS_2500-NEXT: {{^}}  postfix func <*>(_: Int){{$}}
 // PASS_2500-NEXT: {{^}}}{{$}}
 
-struct d2601_TestMutating {}
+struct d2601_TestAssignment {}
 infix operator %%% { }
-func %%%(inout lhs: d2601_TestMutating, rhs: d2601_TestMutating) -> Int {
+func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
 // PASS_2500-LABEL: {{^}}infix operator %%% {
 // PASS_2500-NOT: associativity
 // PASS_2500-NOT: precedence
-// PASS_2500-NOT: mutating
-// PASS_2500: {{^}}func %%%(inout lhs: d2601_TestMutating, rhs: d2601_TestMutating) -> Int{{$}}
+// PASS_2500-NOT: assignment
+// PASS_2500: {{^}}func %%%(inout lhs: d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 infix operator %%< {
 // PASS_2500-LABEL: {{^}}infix operator %%< {{{$}}
@@ -1077,7 +1077,7 @@ infix operator %%< {
 // PASS_2500-NEXT: {{^}}  associativity left{{$}}
   precedence 47
 // PASS_2500-NEXT: {{^}}  precedence 47{{$}}
-// PASS_2500-NOT:         mutating
+// PASS_2500-NOT:         assignment
 }
 
 infix operator %%> {
@@ -1085,15 +1085,15 @@ infix operator %%> {
   associativity right
 // PASS_2500-NEXT: {{^}}  associativity right{{$}}
 // PASS_2500-NOT: precedence
-// PASS_2500-NOT: mutating
+// PASS_2500-NOT: assignment
 }
 
 infix operator %%<> {
 // PASS_2500-LABEL: {{^}}infix operator %%<> {{{$}}
   precedence 47
-  mutating
+  assignment
 // PASS_2500-NEXT: {{^}}  precedence 47{{$}}
-// PASS_2500-NEXT: {{^}}  mutating{{$}}
+// PASS_2500-NEXT: {{^}}  assignment{{$}}
 // PASS_2500-NOT: associativity
 }
 // PASS_2500: {{^}}}{{$}}

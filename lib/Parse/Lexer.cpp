@@ -592,13 +592,9 @@ void Lexer::lexOperatorIdentifier() {
     while (*CurPtr == '.')
       ++CurPtr;
     
-    if (*CurPtr == '<' && CurPtr-TokStart == 2) {
-      // Lex ..< as an identifier.
+    // Lex ..< as an identifier.
+    if (*CurPtr == '<' && CurPtr-TokStart == 2)
       ++CurPtr;
-    } else if (*CurPtr == '=' && CurPtr-TokStart == 1) {
-      // Lex .= as a single operator.
-      ++CurPtr;
-    }
     
   } else {
     CurPtr = TokStart;
@@ -625,19 +621,8 @@ void Lexer::lexOperatorIdentifier() {
   if (CurPtr-TokStart == 1) {
     switch (TokStart[0]) {
     case '=':
-      if (CurToken.is(tok::kw_func)) {
-        if (leftBound) {
-          diagnose(TokStart, diag::lex_func_nospace_equal)
-            .fixItInsert(getSourceLoc(TokStart), " ");
-        }
-        if (!rightBound) {
-          diagnose(TokStart, diag::lex_equal_space_funcname);
-        }
-      } else {
-        if (leftBound != rightBound) {
-          diagnose(TokStart, diag::lex_unary_equal_is_reserved, leftBound);
-        }
-      }
+      if (leftBound != rightBound)
+        diagnose(TokStart, diag::lex_unary_equal_is_reserved, leftBound);
       // always emit 'tok::equal' to avoid trickle down parse errors
       return formToken(tok::equal, TokStart);
     case '&':
@@ -664,8 +649,6 @@ void Lexer::lexOperatorIdentifier() {
     case ('*' << 8) | '/': // */
       diagnose(TokStart, diag::lex_unexpected_block_comment_end);
       return formToken(tok::unknown, TokStart);
-    case ('.' << 8) | '=': // .=
-      return formToken(tok::period_equal, TokStart);
     }
   } else {
     // If there is a "//" in the middle of an identifier token, it starts
@@ -849,8 +832,9 @@ void Lexer::lexNumber() {
 
   // Lex things like 4.x as '4' followed by a tok::period.
   if (*CurPtr == '.') {
-    // x.0.1 is sub-tuple access, not x.float_literal
-    if (!isDigit(CurPtr[1]) || CurToken.is(tok::period))
+    // NextToken is the soon to be previous token
+    // Therefore: x.0.1 is sub-tuple access, not x.float_literal
+    if (!isDigit(CurPtr[1]) || NextToken.is(tok::period))
       return formToken(tok::integer_literal, TokStart);
   } else {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is
@@ -1373,7 +1357,6 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
-  CurToken = NextToken;
   NextToken.setAtStartOfLine(CurPtr == BufferStart);
 
   // Remember where we started so that we can find the comment range.

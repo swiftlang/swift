@@ -1682,7 +1682,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       Status = DeclResult;
       break;
     case tok::kw_operator:
-      Status = parseDeclOperator(Flags, Attributes, Entries);
+      DeclResult = parseDeclOperator(Flags, Attributes);
+      Status = DeclResult;
       break;
     case tok::kw_protocol:
       DeclResult = parseDeclProtocol(Flags, Attributes);
@@ -3715,11 +3716,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     NonglobalError = true;
   }
 
-  SourceLoc EqualLoc;
-  if (Tok.is(tok::equal)) {
-    EqualLoc = consumeToken();
-  }
-  bool isIdentifier = Tok.is(tok::identifier);
   if (parseAnyIdentifier(SimpleName, diag::expected_identifier_in_decl,
                          "function")) {
     ParserStatus NameStatus =
@@ -3728,12 +3724,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                                 diag::invalid_diagnostic);
     if (NameStatus.isError())
       return nullptr;
-  }
-  if (isIdentifier && EqualLoc.isValid()) {
-    llvm::SmallString<32> str;
-    str += "=";
-    str += SimpleName.str();
-    SimpleName = Context.getIdentifier(str);
   }
 
   DebuggerContextChange DCC(*this, SimpleName, DeclKind::Func);
@@ -4669,15 +4659,14 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return makeParserResult(DD);
 }
 
-ParserStatus Parser::parseDeclOperator(ParseDeclOptions Flags,
-                                       DeclAttributes &Attributes,
-                                       SmallVectorImpl<Decl *> &Decls) {
+ParserResult<OperatorDecl> 
+Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc OperatorLoc = consumeToken(tok::kw_operator);
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
 
   if (!Tok.isAnyOperator() && !Tok.is(tok::exclaim_postfix)) {
     diagnose(Tok, diag::expected_operator_name_after_operator);
-    return makeParserError();
+    return nullptr;
   }
 
   DebuggerContextChange DCC (*this);
@@ -4687,26 +4676,18 @@ ParserStatus Parser::parseDeclOperator(ParseDeclOptions Flags,
 
   if (!Tok.is(tok::l_brace)) {
     diagnose(Tok, diag::expected_lbrace_after_operator);
-    return makeParserError();
+    return nullptr;
   }
   
-  unsigned OldSize = Decls.size();
-  ParserStatus Status;
   ParserResult<OperatorDecl> Result;
-  if (Attributes.hasAttribute<PrefixAttr>()) {
+  if (Attributes.hasAttribute<PrefixAttr>())
     Result = parseDeclPrefixOperator(OperatorLoc, Name, NameLoc, Attributes);
-    Status = Result;
-  } else if (Attributes.hasAttribute<PostfixAttr>()) {
+  else if (Attributes.hasAttribute<PostfixAttr>())
     Result = parseDeclPostfixOperator(OperatorLoc, Name, NameLoc, Attributes);
-    Status = Result;
-  } else {
+  else {
     if (!Attributes.hasAttribute<InfixAttr>())
       diagnose(OperatorLoc, diag::operator_decl_no_fixity);
-    Status = parseDeclInfixOperator(OperatorLoc, Name, NameLoc, Attributes,
-                                    Decls);
-  }
-  if (!Result.isNull()) {
-    Decls.push_back(Result.get());
+    Result = parseDeclInfixOperator(OperatorLoc, Name, NameLoc, Attributes);
   }
 
   if (Tok.is(tok::r_brace))
@@ -4714,15 +4695,10 @@ ParserStatus Parser::parseDeclOperator(ParseDeclOptions Flags,
   
   if (!DCC.movedToTopLevel() && !AllowTopLevel) {
     diagnose(OperatorLoc, diag::operator_decl_inner_scope);
-    return makeParserError();
+    return nullptr;
   }
   
-  for (unsigned i = OldSize; i < Decls.size(); i++) {
-    auto ParserResult = DCC.fixupParserResult(Status, Decls[i]);
-    Status |= ParserResult;
-    Decls[i] = ParserResult.getPtrOrNull();
-  }
-  return Status;
+  return DCC.fixupParserResult(Result);
 }
 
 ParserResult<OperatorDecl>
@@ -4774,42 +4750,39 @@ Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
   return makeParserResult(Res);
 }
 
-ParserStatus
+ParserResult<OperatorDecl>
 Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
-                               SourceLoc NameLoc, DeclAttributes &Attributes,
-                               SmallVectorImpl<Decl *> &Decls) {
+                               SourceLoc NameLoc, DeclAttributes &Attributes) {
   SourceLoc LBraceLoc = consumeToken(tok::l_brace);
 
   // Initialize InfixData with default attributes:
-  // precedence 100, associativity none, non-mutating
+  // precedence 100, associativity none, non-assignment
   unsigned char precedence = 100;
   Associativity associativity = Associativity::None;
-  bool mutating = false;
-  bool hasAssignment = false;
+  bool assignment = false;
   
   SourceLoc AssociativityLoc, AssociativityValueLoc,
     PrecedenceLoc, PrecedenceValueLoc,
-    MutatingLoc,
-    HasAssignmentLoc;
+    AssignmentLoc;
   
   while (!Tok.is(tok::r_brace)) {
     if (!Tok.is(tok::identifier)) {
       diagnose(Tok, diag::expected_operator_attribute);
       skipUntilDeclRBrace();
-      return makeParserError();
+      return nullptr;
     }
     
     if (Tok.getText().equals("associativity")) {
       if (AssociativityLoc.isValid()) {
         diagnose(Tok, diag::operator_associativity_redeclared);
         skipUntilDeclRBrace();
-        return makeParserError();
+        return nullptr;
       }
       AssociativityLoc = consumeToken();
       if (!Tok.is(tok::identifier)) {
         diagnose(Tok, diag::expected_infix_operator_associativity);
         skipUntilDeclRBrace();
-        return makeParserError();
+        return nullptr;
       }
       auto parsedAssociativity
         = llvm::StringSwitch<Optional<Associativity>>(Tok.getText())
@@ -4820,7 +4793,7 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
       if (!parsedAssociativity) {
         diagnose(Tok, diag::unknown_infix_operator_associativity, Tok.getText());
         skipUntilDeclRBrace();
-        return makeParserError();
+        return nullptr;
       }
       associativity = *parsedAssociativity;
 
@@ -4832,13 +4805,13 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
       if (PrecedenceLoc.isValid()) {
         diagnose(Tok, diag::operator_precedence_redeclared);
         skipUntilDeclRBrace();
-        return makeParserError();
+        return nullptr;
       }
       PrecedenceLoc = consumeToken();
       if (!Tok.is(tok::integer_literal)) {
         diagnose(Tok, diag::expected_infix_operator_precedence);
         skipUntilDeclRBrace();
-        return makeParserError();
+        return nullptr;
       }
       if (Tok.getText().getAsInteger(0, precedence)) {
         diagnose(Tok, diag::invalid_infix_operator_precedence);
@@ -4848,38 +4821,21 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
       PrecedenceValueLoc = consumeToken();
       continue;
     }
-
-    if (Tok.getText().equals("mutating") ||
-        Tok.getText().equals("assignment")) {
-      if (MutatingLoc.isValid()) {
-        diagnose(Tok, diag::operator_mutating_redeclared);
+    
+    if (Tok.getText().equals("assignment")) {
+      if (AssignmentLoc.isValid()) {
+        diagnose(Tok, diag::operator_assignment_redeclared);
         skipUntilDeclRBrace();
-        return makeParserError();
+        return nullptr;
       }
-      bool isAssignment = Tok.getText().equals("assignment");
-      MutatingLoc = consumeToken();
-      mutating = true;
-      if (isAssignment) {
-        diagnose(MutatingLoc, diag::operator_assignment_to_mutating)
-          .fixItReplace(MutatingLoc, "mutating");
-      }
-      continue;
-    }
-
-    if (Tok.getText().equals("has_assignment")) {
-      if (HasAssignmentLoc.isValid()) {
-        diagnose(Tok, diag::operator_has_assignment_redeclared);
-        skipUntilDeclRBrace();
-        return makeParserError();
-      }
-      HasAssignmentLoc = consumeToken();
-      hasAssignment = true;
+      AssignmentLoc = consumeToken();
+      assignment = true;
       continue;
     }
     
     diagnose(Tok, diag::unknown_infix_operator_attribute, Tok.getText());
     skipUntilDeclRBrace();
-    return makeParserError();
+    return nullptr;
   }
   
   SourceLoc RBraceLoc = Tok.getLoc();
@@ -4889,31 +4845,9 @@ Parser::parseDeclInfixOperator(SourceLoc OperatorLoc, Identifier Name,
                       AssociativityLoc.isInvalid(), AssociativityLoc,
                       AssociativityValueLoc, PrecedenceLoc.isInvalid(),
                       PrecedenceLoc, PrecedenceValueLoc,
-                      MutatingLoc.isInvalid(), MutatingLoc,
-                      HasAssignmentLoc, RBraceLoc,
-                      InfixData(precedence, associativity, mutating));
+                      AssignmentLoc.isInvalid(), AssignmentLoc,
+                      RBraceLoc,
+                      InfixData(precedence, associativity, assignment));
   Res->getAttrs() = Attributes;
-  Decls.push_back(Res);
-
-  if (HasAssignmentLoc.isValid()) {
-    llvm::SmallString<32> StringBuf;
-    StringBuf += Name.str();
-    StringBuf += "=";
-    Identifier AssignmentName = Context.getIdentifier(StringBuf);
-    auto AssignmentRes = new (Context)
-      InfixOperatorDecl(CurDeclContext, SourceLoc(), AssignmentName,
-                        SourceLoc(), SourceLoc(),
-                        true, SourceLoc(),
-                        SourceLoc(), true,
-                        SourceLoc(), SourceLoc(),
-                        true, SourceLoc(), SourceLoc(),
-                        SourceLoc(),
-                        InfixData(IntrinsicPrecedences::AssignExpr,
-                                  Associativity::Right,
-                                  /*mutating*/true));
-    AssignmentRes->setImplicit(true);
-    AssignmentRes->getAttrs() = Attributes;
-    Decls.push_back(AssignmentRes);
-  }
-  return makeParserSuccess();
+  return makeParserResult(Res);
 }
