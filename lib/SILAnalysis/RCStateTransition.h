@@ -20,9 +20,16 @@
 
 namespace swift {
 
+class RCIdentityFunctionInfo;
+class ConsumedArgToEpilogueReleaseMatcher;
+
+} // end swift namespace
+
 //===----------------------------------------------------------------------===//
 //                           RCStateTransitionKind
 //===----------------------------------------------------------------------===//
+
+namespace swift {
 
 /// The kind of a RCStateTransition.
 enum class RCStateTransitionKind : uint8_t {
@@ -32,31 +39,13 @@ enum class RCStateTransitionKind : uint8_t {
 #include "RCStateTransition.def"
 };
 
+/// \returns the RCStateTransitionKind corresponding to \p V.
 RCStateTransitionKind getRCStateTransitionKind(ValueBase *V);
 
 /// Define predicates to test for RCStateTransition abstract value kinds.
 #define ABSTRACT_VALUE(Name, Start, End) \
   bool isRCStateTransition ## Name(RCStateTransitionKind Kind);
 #include "RCStateTransition.def"
-
-
-template <typename ImplTy, typename ResultTy>
-class RCStateTransitionKindVisitor {
-  ImplTy &asImpl() { return *reinterpret_cast<ImplTy *>(this); }
-public:
-#define KIND(K) ResultTy visit ## K(SILInstruction *) { return ResultTy(); }
-#include "RCStateTransition.def"
-
-  ResultTy visit(SILInstruction *I) {
-    switch (getRCStateTransitionKind(I)) {
-#define KIND(K)                                 \
-  case RCStateTransitionKind::K:                \
-    return asImpl().visit ## K(I);
-#include "RCStateTransition.def"
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
-  }
-};
 
 //===----------------------------------------------------------------------===//
 //                             RCStateTransition
@@ -103,7 +92,6 @@ public:
   }
 
   RCStateTransitionKind getKind() const { return Kind; }
-
 
 /// Define test functions for the various abstract categorizations we have.
 #define ABSTRACT_VALUE(Name, StartKind, EndKind) bool is ## Name() const;

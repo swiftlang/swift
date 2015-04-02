@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-global-arc-opts"
 #include "GlobalARCSequenceDataflow.h"
 #include "ARCBBState.h"
+#include "RCStateTransitionVisitors.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
@@ -317,6 +318,10 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
   bool NestingDetected = false;
 
+  BottomUpDataflowRCStateVisitor
+    DataflowVisitor(RCIA, BBState, FreezeOwnedArgEpilogueReleases,
+                    ConsumedArgToReleaseMap, IncToDecStateMap);
+
   // For each terminator instruction I in BB visited in reverse...
   for (auto II = std::next(BB.rbegin()), IE = BB.rend(); II != IE;) {
     SILInstruction &I = *II;
@@ -324,80 +329,20 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
     DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
 
-    // If we see an autorelease pool, be conservative and clear *everything*.
-    if (isAutoreleasePoolCall(I)) {
-      BBState.clear();
-      continue;
-    }
+    auto Result = DataflowVisitor.visit(&I);
 
-    // If this instruction is a post dominating release, skip it so we don't
-    // pair it up with anything.
-    if (FreezeOwnedArgEpilogueReleases &&
-        ConsumedArgToReleaseMap.isReleaseMatchedToArgument(&I))
+    // If this instruction can have no further effects on another instructions,
+    // continue. This happens for instance if we have cleared all of the state
+    // we are tracking.
+    if (Result.Kind == RCStateTransitionDataflowResultKind::NoEffects)
       continue;
 
-    SILValue Op;
-    RCStateTransitionKind TransitionKind = getRCStateTransitionKind(&I);
+    // Make sure that we propagate out whether or not nesting was detected.
+    NestingDetected |= Result.NestingDetected;
 
-    // If I is a ref count decrement instruction...
-    if (TransitionKind == RCStateTransitionKind::StrongDecrement) {
-      // map its operand to a newly initialized or reinitialized ref count
-      // state and continue...
-      Op = RCIA->getRCIdentityRoot(I.getOperand(0));
-      BottomUpRefCountState &State = BBState.getBottomUpRefCountState(Op);
-      NestingDetected |= State.initWithInst(&I);
-
-      // If we are running with 'frozen' owned arg releases, check if we have a
-      // frozen use in the side table. If so, this release must be known safe.
-      if (FreezeOwnedArgEpilogueReleases) {
-        State.KnownSafe |= ConsumedArgToReleaseMap.argumentHasRelease(Op);
-      }
-
-      DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT! Known Safe: "
-                         << (State.isKnownSafe() ? "yes" : "no") << "\n");
-
-      // Continue on to see if our reference decrement could potentially affect
-      // any other pointers via a use or a decrement.
-    }
-
-    // If we have a reference count increment...
-    if (TransitionKind == RCStateTransitionKind::StrongIncrement) {
-      // Look up the state associated with its operand...
-      Op = RCIA->getRCIdentityRoot(I.getOperand(0));
-      BottomUpRefCountState &RefCountState =
-          BBState.getBottomUpRefCountState(Op);
-
-      DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT!\n");
-
-      // If we find a state initialized with a matching increment, pair this
-      // decrement with a copy of the ref count state and then clear the ref
-      // count state in preparation for any future pairs we may see on the same
-      // pointer.
-      if (RefCountState.isRefCountInstMatchedToTrackedInstruction(&I)) {
-        // Copy the current value of ref count state into the result map.
-        IncToDecStateMap[&I] = RefCountState;
-        DEBUG(llvm::dbgs() << "    MATCHING DECREMENT:"
-                           << RefCountState.getRCRoot());
-
-        // Clear the ref count state so it can be used for future pairs we may
-        // see.
-        RefCountState.clear();
-      }
-#ifndef NDEBUG
-      else {
-        if (RefCountState.isTrackingRefCountInst()) {
-          DEBUG(llvm::dbgs()
-                << "    FAILED MATCH DECREMENT:" << RefCountState.getRCRoot());
-        } else {
-          DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT. Not tracking a "
-                                "decrement.\n");
-        }
-      }
-#endif
-
-      // Otherwise we continue processing the reference count decrement to
-      // see if the increment can act as a use for other values.
-    }
+    // This SILValue may be null if we were unable to find a specific RCIdentity
+    // that the instruction "visits".
+    SILValue Op = Result.RCIdentity;
 
     // For all other (reference counted value, ref count state) we are
     // tracking...
@@ -445,8 +390,9 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
   return NestingDetected;
 }
 
-void ARCSequenceDataflowEvaluator::mergeSuccessors(
-    ARCBBStateInfoHandle &DataHandle) {
+void
+ARCSequenceDataflowEvaluator::
+mergeSuccessors(ARCBBStateInfoHandle &DataHandle) {
   SILBasicBlock *BB = DataHandle.getBB();
   ARCBBState &BBState = DataHandle.getState();
 

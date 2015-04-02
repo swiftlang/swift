@@ -115,3 +115,4 @@ bool RCStateTransition::merge(const RCStateTransition &Other) {
 
   return true;
 }
+
