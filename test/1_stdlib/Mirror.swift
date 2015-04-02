@@ -36,12 +36,12 @@ extension Mirror: Printable {
 
 mirrors.test("RandomAccessStructure") {
   struct Eggs : CustomReflectable {
-    func makeCustomMirror() -> Mirror {
+    func customMirror() -> Mirror {
       return Mirror(unlabeledChildren: ["aay", "bee", "cee"])
     }
   }
 
-  let x = Eggs().makeCustomMirror()
+  let x = Eggs().customMirror()
   
   expectEqual("[nil: \"aay\", nil: \"bee\", nil: \"cee\"]", x.description)
 }
@@ -68,12 +68,12 @@ func find(substring: String, within domain: String) -> String.Index? {
 
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
-    func makeCustomMirror() -> Mirror {
+    func customMirror() -> Mirror {
       return Mirror(unlabeledChildren: Set(letters), displayStyle: .Set)
     }
   }
 
-  let w = DoubleYou().makeCustomMirror()
+  let w = DoubleYou().customMirror()
   expectEqual(.Set, w.displayStyle)
   expectEqual(count(letters), numericCast(count(w.children)))
   
@@ -88,13 +88,13 @@ mirrors.test("ForwardStructure") {
 
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
-    func makeCustomMirror() -> Mirror {
+    func customMirror() -> Mirror {
       return Mirror(unlabeledChildren: letters, displayStyle: .Collection)
     }
   }
 
   // Test that the basics seem to work
-  let y = Why().makeCustomMirror()
+  let y = Why().customMirror()
   expectEqual(.Collection, y.displayStyle)
 
   let description = y.description
@@ -105,38 +105,38 @@ mirrors.test("BidirectionalStructure") {
 
 mirrors.test("LabeledStructure") {
   struct Zee : CustomReflectable, Printable {
-    func makeCustomMirror() -> Mirror {
+    func customMirror() -> Mirror {
       return Mirror(children: ["bark": 1, "bite": 0])
     }
     var description: String { return "Zee" }
   }
 
-  let z = Zee().makeCustomMirror()
+  let z = Zee().customMirror()
   expectEqual("[bark: 1, bite: 0]", z.description)
   expectEmpty(z.displayStyle)
 
   struct Zee2 : CustomReflectable {
-    func makeCustomMirror() -> Mirror {
+    func customMirror() -> Mirror {
       return Mirror(
         children: ["bark": 1, "bite": 0], displayStyle: .Dictionary)
     }
   }
-  let z2 = Zee2().makeCustomMirror()
+  let z2 = Zee2().customMirror()
   expectEqual(.Dictionary, z2.displayStyle)
   expectEqual("[bark: 1, bite: 0]", z2.description)
 
   struct Heterogeny : CustomReflectable {
-    func makeCustomMirror() -> Mirror {
+    func customMirror() -> Mirror {
       return Mirror(
         children: ["bark": 1, "bite": Zee()])
     }
   }
-  let h = Heterogeny().makeCustomMirror()
+  let h = Heterogeny().customMirror()
   expectEqual("[bark: 1, bite: Zee]", h.description)
 }
 
 mirrors.test("Legacy") {
-  let m = Mirror(reflect: [1, 2, 3])
+  let m = Mirror(reflecting: [1, 2, 3])
   let x0: [Mirror.Child] = [
     (label: "[0]", value: 1),
     (label: "[1]", value: 2),
@@ -149,7 +149,7 @@ mirrors.test("Legacy") {
 }
 
 mirrors.test("Addressing") {
-  let m0 = Mirror(reflect: [1, 2, 3])
+  let m0 = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m0.descendant(0) as? Int)
   expectEqual(1, m0.descendant("[0]") as? Int)
   expectEqual(2, m0.descendant(1) as? Int)
@@ -157,7 +157,7 @@ mirrors.test("Addressing") {
   expectEqual(3, m0.descendant(2) as? Int)
   expectEqual(3, m0.descendant("[2]") as? Int)
   
-  let m1 = Mirror(reflect: (a: ["one", "two", "three"], b: 4))
+  let m1 = Mirror(reflecting: (a: ["one", "two", "three"], b: 4))
   let ott0 = m1.descendant(0) as? [String]
   expectNotEmpty(ott0)
   let ott1 = m1.descendant(".0") as? [String]
@@ -175,7 +175,7 @@ mirrors.test("Addressing") {
   expectEqual("three", m1.descendant(".0", "[2]") as? String)
 
   struct Zee : CustomReflectable {
-    func makeCustomMirror() -> Mirror {
+    func customMirror() -> Mirror {
       return Mirror(children: ["bark": 1, "bite": 0])
     }
   }
@@ -185,7 +185,7 @@ mirrors.test("Addressing") {
     (a: ["five"], b: Zee()),
     (a: [], b: Zee())]
 
-  let m = Mirror(reflect: x)
+  let m = Mirror(reflecting: x)
   let two = m.descendant(0, ".0", 1)
   expectEqual("two", two as? String)
   expectEqual(1, m.descendant(1, 1, "bark") as? Int)
@@ -195,7 +195,7 @@ mirrors.test("Addressing") {
 
 mirrors.test("Invalid Path Type") {
   struct X : MirrorPathType {}
-  let m = Mirror(reflect: [1, 2, 3])
+  let m = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m.descendant(0) as? Int)
   expectCrashLater()
   m.descendant(X())
@@ -204,30 +204,30 @@ mirrors.test("Invalid Path Type") {
 mirrors.test("PlaygroundQuickLook") {
   // Customization works.
   struct CustomQuickie : CustomPlaygroundQuickLookable {
-    func makeCustomPlaygroundQuickLook() -> PlaygroundQuickLook {
+    func customPlaygroundQuickLook() -> PlaygroundQuickLook {
       return .Point(1.25, 42)
     }
   }
-  switch PlaygroundQuickLook(reflect: CustomQuickie()) {
+  switch PlaygroundQuickLook(reflecting: CustomQuickie()) {
   case .Point(1.25, 42): break; default: expectTrue(false)
   }
   
   // PlaygroundQuickLook support from Legacy Mirrors works.
-  switch PlaygroundQuickLook(reflect: true) {
+  switch PlaygroundQuickLook(reflecting: true) {
   case .Logical(true): break; default: expectTrue(false)
   }
 
   // With no Legacy Mirror QuickLook support, we fall back to
   // toDebugString().
   struct X {}
-  switch PlaygroundQuickLook(reflect: X()) {
+  switch PlaygroundQuickLook(reflecting: X()) {
   case .Text(let text) where text.hasSuffix(".(X #1)"): break;
   default: expectTrue(false)
   }
   struct Y : DebugPrintable {
     var debugDescription: String { return "Why?" }
   }
-  switch PlaygroundQuickLook(reflect: Y()) {
+  switch PlaygroundQuickLook(reflecting: Y()) {
   case .Text("Why?"): break; default: expectTrue(false)
   }
 }
@@ -237,7 +237,13 @@ mirrors.test("ObjC") {
   // Some Foundation classes lie about their ivars, which would crash
   // a mirror; make sure we are not automatically exposing ivars of
   // Objective-C classes from the default mirror implementation.
-  expectEqual(0, count(Mirror(reflect: HasIVars()).children))
+  expectEqual(0, count(Mirror(reflecting: HasIVars()).children))
 }
 
+mirrors.test("String.init") {
+  expectEqual("42", String(42))
+  expectEqual("42", String("42"))
+  expectEqual("42", String(reflecting: 42))
+  expectEqual("\"42\"", String(reflecting: "42"))
+}
 runAllTests()

@@ -30,16 +30,16 @@ public struct Mirror {
   ///
   /// If the dynamic type of `instance` conforms to
   /// `CustomReflectable`, returns the result of calling its
-  /// `makeCustomMirror` method.  Otherwise, returns a mirror synthesized
+  /// `customMirror` method.  Otherwise, returns a mirror synthesized
   /// for `instance` by the language.
   ///
   /// Note: If the dynamic type of `instance` has value semantics,
   /// subsequent mutations of `instance` will not observable in
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
-  public init(reflect instance: Any) {
+  public init(reflecting instance: Any) {
     if let customized? = instance as? CustomReflectable {
-      self = customized.makeCustomMirror()
+      self = customized.customMirror()
     }
     else {
       self = Mirror(Swift.reflect(instance))
@@ -101,7 +101,7 @@ public struct Mirror {
   /// collections, e.g.::
   ///
   ///   extension MyArray : CustomReflectable {
-  ///     func makeCustomMirror() -> Mirror 
+  ///     func customMirror() -> Mirror 
   ///       return Mirror(unlabelledChildren: self, .Collection)
   ///     }
   ///   }
@@ -156,7 +156,7 @@ public protocol CustomReflectable {
   ///
   /// Note: if `Self` has value semantics, the `Mirror` should be
   /// unaffected by subsequent mutations of `self`.
-  func makeCustomMirror() -> Mirror
+  func customMirror() -> Mirror
 }
 
 //===--- Addressing -------------------------------------------------------===//
@@ -174,7 +174,7 @@ extension String : MirrorPathType {}
 extension Mirror {
   internal struct _Dummy : CustomReflectable {
     var mirror: Mirror
-    func makeCustomMirror() -> Mirror { return mirror }
+    func customMirror() -> Mirror { return mirror }
   }
   
   /// Return a specific descendant of the reflected instance, or `nil`
@@ -218,7 +218,7 @@ extension Mirror {
   ) -> Any? {
     var result: Any = _Dummy(mirror: self)
     for e in [first] + rest {
-      let children = Mirror(reflect: result).children
+      let children = Mirror(reflecting: result).children
       let position: Children.Index
       if let label? = e as? String {
         position = _find(children) { $0.label == label } ?? children.endIndex
@@ -321,7 +321,7 @@ extension PlaygroundQuickLook {
   ///
   /// If the dynamic type of `instance` conforms to
   /// `CustomPlaygroundQuickLookable`, returns the result of calling
-  /// its `makeCustomPlaygroundQuickLook` method.  Otherwise, returns
+  /// its `customPlaygroundQuickLook` method.  Otherwise, returns
   /// a `PlaygroundQuickLook` synthesized for `instance` by the
   /// language.  Note: in some cases the result may be
   /// `.Text(toDebugString(instance))`.
@@ -330,9 +330,9 @@ extension PlaygroundQuickLook {
   /// subsequent mutations of `instance` will not observable in
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
-  public init(reflect instance: Any) {
+  public init(reflecting instance: Any) {
     if let customized? = instance as? CustomPlaygroundQuickLookable {
-      self = customized.makeCustomPlaygroundQuickLook()
+      self = customized.customPlaygroundQuickLook()
     }
     else {
       if let q? = Swift.reflect(instance).quickLookObject {
@@ -356,7 +356,7 @@ public protocol CustomPlaygroundQuickLookable {
   ///
   /// Note: if `Self` has value semantics, the `Mirror` should be
   /// unaffected by subsequent mutations of `self`.
-  func makeCustomPlaygroundQuickLook() -> PlaygroundQuickLook
+  func customPlaygroundQuickLook() -> PlaygroundQuickLook
 }
 
 
@@ -420,3 +420,61 @@ extension DictionaryLiteral : CollectionType {
   }
 }
 #endif
+
+// This typealias implies renaming "Printable" to
+// "CustomStringConvertible".
+//
+// protocol CustomStringConvertible {
+//   var description: String
+// }
+typealias CustomStringConvertible = Printable
+
+// This typealias implies renaming "DebugPrintable" to
+// "CustomDebugStringConvertible".
+//
+// protocol CustomDebugStringConvertible {
+//   var debugDescription: String
+// }
+typealias CustomDebugStringConvertible = DebugPrintable
+
+// With the addition of the following APIs, we will retire the
+// toString and toDebugString functions that do the same thing.  Swift
+// is standardizing on using initializers for things that feel like
+// "type conversions."
+extension String {  
+  /// Initialize `self` with the textual representation of `instance`.
+  ///
+  /// * If `T` conforms to `Streamable`, the result is obtained by
+  ///   calling `instance.writeTo(s)` on an empty string s.
+  /// * Otherwise, if `T` conforms to `CustomStringConvertible`, the
+  ///   result is `instance`\ 's `description`
+  /// * Otherwise, if `T` conforms to `CustomDebugStringConvertible`,
+  ///   the result is `instance`\ 's `debugDescription`
+  /// * Otherwise, an unspecified result is supplied automatically by
+  ///   the Swift standard library.
+  ///
+  /// See Also: `String.init<T>(reflecting: T)`
+  public init<T>(_ instance: T) {
+    self = toString(instance)
+  }
+
+  /// Initialize `self` with a detailed textual representation of
+  /// `instance`, suitable for debugging.
+  ///
+  /// * If `T` conforms to `CustomDebugStringConvertible`, the result
+  ///   is `instance`\ 's `debugDescription`
+  ///
+  /// * Otherwise, if `T` conforms to `CustomStringConvertible`, the result
+  ///   is `instance`\ 's `description`
+  ///
+  /// * Otherwise, if `T` conforms to `Streamable`, the result is
+  ///   obtained by calling `instance.writeTo(s)` on an empty string s.
+  ///
+  /// * Otherwise, an unspecified result is supplied automatically by
+  ///   the Swift standard library.
+  ///
+  /// See Also: `String.init<T>(T)`
+  public init<T>(reflecting instance: T) {
+    self = toDebugString(instance)
+  }
+}
