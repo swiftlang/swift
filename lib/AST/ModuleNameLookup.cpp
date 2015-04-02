@@ -255,7 +255,7 @@ void namelookup::lookupInModule(Module *startModule,
                                 LazyResolver *typeResolver,
                                 const DeclContext *moduleScopeContext,
                                 ArrayRef<Module::ImportedModule> extraImports) {
-  assert(!moduleScopeContext || moduleScopeContext->isModuleScopeContext());
+  assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
   bool respectAccessControl = startModule->Ctx.LangOpts.EnableAccessControl;
   ::lookupInModule<CanTypeSet>(startModule, topAccessPath, decls,
@@ -278,7 +278,7 @@ void namelookup::lookupVisibleDeclsInModule(
     LazyResolver *typeResolver,
     const DeclContext *moduleScopeContext,
     ArrayRef<Module::ImportedModule> extraImports) {
-  assert(!moduleScopeContext || moduleScopeContext->isModuleScopeContext());
+  assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   ModuleLookupCache cache;
   bool respectAccessControl = M->Ctx.LangOpts.EnableAccessControl;
   ::lookupInModule<NamedCanTypeSet>(M, accessPath, decls,

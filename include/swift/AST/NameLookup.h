@@ -374,7 +374,7 @@ void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                     DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
                     LazyResolver *typeResolver,
-                    const DeclContext *moduleScopeContext = nullptr,
+                    const DeclContext *moduleScopeContext,
                     ArrayRef<Module::ImportedModule> extraImports = {});
 
 /// Performs a qualified lookup into the given module and, if necessary, its
@@ -385,7 +385,7 @@ lookupVisibleDeclsInModule(Module *M, Module::AccessPathTy accessPath,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,
                            LazyResolver *typeResolver,
-                           const DeclContext *moduleScopeContext = nullptr,
+                           const DeclContext *moduleScopeContext,
                            ArrayRef<Module::ImportedModule> extraImports = {});
 } // end namespace namelookup
 } // end namespace swift

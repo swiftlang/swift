@@ -194,7 +194,7 @@ void NameBinder::addImport(
     SmallVector<ValueDecl *, 8> decls;
     lookupInModule(topLevelModule, declPath, declPath.front().first, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                   /*resolver*/nullptr);
+                   /*resolver*/nullptr, &SF);
 
     if (decls.empty()) {
       diagnose(ID, diag::no_decl_in_module)
