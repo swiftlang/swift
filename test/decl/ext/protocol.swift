@@ -191,11 +191,11 @@ struct S4d : P4 {
 }
 
 extension P4 where Self.AssocP4 == Int {
-  func extP4Int() { }
+  final func extP4Int() { }
 }
 
 extension P4 where Self.AssocP4 == Bool {
-  func extP4a() -> Bool { return reqP4a() }
+  final func extP4a() -> Bool { return reqP4a() }
 }
 
 func testP4(s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {

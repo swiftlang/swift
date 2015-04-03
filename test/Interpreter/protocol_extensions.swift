@@ -122,7 +122,7 @@ println(",".myJoin(["a", "b", "c"]))
 
 // Constrained extensions for specific types.
 extension CollectionType where Self.Generator.Element == String {
-  var myCommaSeparatedList: String {
+  final var myCommaSeparatedList: String {
     if startIndex == endIndex { return "" }
 
     var result = ""
