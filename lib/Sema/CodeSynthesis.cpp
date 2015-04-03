@@ -200,7 +200,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = FuncDecl::create(
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
-      /*GenericParams=*/nullptr, Type(), getterParams,
+      SourceLoc(), /*GenericParams=*/nullptr, Type(), getterParams,
       TypeLoc::withoutLoc(storageType), storage->getDeclContext());
   getter->setImplicit();
 
@@ -264,7 +264,7 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   FuncDecl *setter = FuncDecl::create(
       TC.Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, /*generic=*/nullptr, Type(), params,
+      Identifier(), loc, SourceLoc(), /*generic=*/nullptr, Type(), params,
       TypeLoc::withoutLoc(setterRetTy), storage->getDeclContext());
   setter->setImplicit();
 
@@ -400,7 +400,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
 
   auto *materializeForSet = FuncDecl::create(
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
-      Identifier(), loc, /*generic=*/nullptr, Type(), params,
+      Identifier(), loc, SourceLoc(), /*generic=*/nullptr, Type(), params,
       TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   

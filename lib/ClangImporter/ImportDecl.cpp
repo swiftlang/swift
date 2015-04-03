@@ -436,7 +436,7 @@ static FuncDecl *makeRawValueTrivialGetter(StructDecl *optionSetDecl,
 
   FuncDecl *getterDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      DeclName(), SourceLoc(), nullptr, Type(), params,
+      DeclName(), SourceLoc(), SourceLoc(),  nullptr, Type(), params,
       TypeLoc::withoutLoc(rawType), optionSetDecl);
   getterDecl->setImplicit();
   
@@ -498,7 +498,7 @@ static FuncDecl *makeRawValueTrivialSetter(StructDecl *importedDecl,
 
   FuncDecl *setterDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      DeclName(), SourceLoc(), nullptr, Type(), params,
+      DeclName(), SourceLoc(), SourceLoc(), nullptr, Type(), params,
       TypeLoc::withoutLoc(voidTy), importedDecl);
   setterDecl->setImplicit();
   setterDecl->setMutating();
@@ -590,7 +590,7 @@ static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
   auto *getterDecl = FuncDecl::create(C, SourceLoc(),
                                       StaticSpellingKind::KeywordStatic,
                                       SourceLoc(), Identifier(), SourceLoc(),
-                                      nullptr, getterType, params,
+                                      SourceLoc(), nullptr, getterType, params,
                                       TypeLoc::withoutLoc(optionSetType),
                                       optionSetDecl);
   getterDecl->setImplicit();
@@ -859,7 +859,7 @@ static FuncDecl *makeEnumRawValueGetter(EnumDecl *enumDecl,
 
   auto getterDecl =
     FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                     DeclName(), SourceLoc(), nullptr,
+                     DeclName(), SourceLoc(), SourceLoc(), nullptr,
                      Type(), params,
                      TypeLoc::withoutLoc(enumDecl->getRawType()), enumDecl);
   getterDecl->setImplicit();
@@ -2330,7 +2330,7 @@ namespace {
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = FuncDecl::create(
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None, loc,
-          name, nameLoc,
+          name, nameLoc, SourceLoc(),
           /*GenericParams=*/nullptr, type, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc, decl);
 
@@ -2753,7 +2753,8 @@ namespace {
 
       auto result = FuncDecl::create(
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None,
-          SourceLoc(), name, SourceLoc(), /*GenericParams=*/nullptr, Type(),
+          SourceLoc(), name, SourceLoc(), SourceLoc(),
+          /*GenericParams=*/nullptr, Type(),
           bodyPatterns, TypeLoc(), dc, decl);
 
       result->setAccessibility(Accessibility::Public);
@@ -3411,8 +3412,8 @@ namespace {
       // Create the getter thunk.
       auto thunk = FuncDecl::create(
           context, SourceLoc(), StaticSpellingKind::None, loc,
-          Identifier(), SourceLoc(), nullptr, getterType, getterArgs,
-          TypeLoc::withoutLoc(elementTy), dc);
+          Identifier(), SourceLoc(), SourceLoc(), nullptr, getterType,
+          getterArgs, TypeLoc::withoutLoc(elementTy), dc);
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
       thunk->setAccessibility(Accessibility::Public);
@@ -3488,9 +3489,8 @@ namespace {
       // Create the setter thunk.
       auto thunk = FuncDecl::create(
           context, SourceLoc(), StaticSpellingKind::None, setter->getLoc(),
-          Identifier(), SourceLoc(),
-          nullptr, setterType, setterArgs, 
-          TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
+          Identifier(), SourceLoc(), SourceLoc(), nullptr, setterType,
+          setterArgs, TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
       thunk->setBodyResultType(TupleType::getEmpty(context));
       thunk->setInterfaceType(interfaceType);
       thunk->setAccessibility(Accessibility::Public);
@@ -5681,8 +5681,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   // Create the getter function declaration.
   auto func = FuncDecl::create(context, SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), Identifier(),
-                               SourceLoc(), nullptr, getterType, getterArgs,
-                               TypeLoc::withoutLoc(type), dc);
+                               SourceLoc(), SourceLoc(), nullptr, getterType,
+                               getterArgs, TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
   func->setBodyResultType(type);
   func->setAccessibility(Accessibility::Public);

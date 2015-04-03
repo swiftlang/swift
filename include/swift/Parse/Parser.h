@@ -990,7 +990,7 @@ public:
                                       DeclName &fullName,
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
                                       DefaultArgumentInfo &defaultArgs,
-                                      bool &throws,
+                                      SourceLoc &throws,
                                       TypeRepr *&retType);
   ParserStatus parseConstructorArguments(DeclName &FullName,
                                          Pattern *&BodyPattern,

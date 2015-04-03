@@ -2534,8 +2534,8 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   // Start the function.
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
                              /* FIXME*/DeclLoc, Identifier(),
-                             DeclLoc, /*GenericParams=*/nullptr, Type(), Params,
-                             ReturnType, P->CurDeclContext);
+                             DeclLoc, SourceLoc(), /*GenericParams=*/nullptr,
+                             Type(), Params, ReturnType, P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
   // default to mutating.  get/address default to non-mutating.
@@ -3768,10 +3768,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
-  bool throws = false;
+  SourceLoc throwsLoc;
   ParserStatus SignatureStatus =
       parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
-                             throws, FuncRetTy);
+                             throwsLoc, FuncRetTy);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -3793,16 +3793,13 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
     // Create the decl for the func and add it to the parent scope.
     FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
-                          FuncLoc, FullName, NameLoc, GenericParams,
-                          Type(), BodyParams, FuncRetTy,
+                          FuncLoc, FullName, NameLoc, throwsLoc,
+                          GenericParams, Type(), BodyParams, FuncRetTy,
                           CurDeclContext);
     
     // Add the attributes here so if we need them while parsing the body
     // they are available.
     FD->getAttrs() = Attributes;
-    
-    if (throws)
-      FD->setThrows();
       
     // Pass the function signature to code completion.
     if (SignatureStatus.hasCodeCompletion())

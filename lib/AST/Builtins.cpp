@@ -166,7 +166,7 @@ getBuiltinFunction(Identifier Id,
                                             Identifier());
   DeclName Name(Context, Id, ArgNames);
   auto FD = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
-                          SourceLoc(), Name, SourceLoc(),
+                          SourceLoc(), Name, SourceLoc(), SourceLoc(),
                           /*GenericParams=*/nullptr, FnType, ParamPattern,
                           TypeLoc::withoutLoc(ResType),
                           DC);
@@ -239,8 +239,8 @@ getBuiltinGenericFunction(Identifier Id,
   DeclName Name(Context, Id, ArgNames);
   auto func = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), Name,
-                               SourceLoc(), GenericParams, FnType, ParamPattern,
-                               TypeLoc::withoutLoc(ResBodyType),
+                               SourceLoc(), SourceLoc(), GenericParams, FnType,
+                               ParamPattern, TypeLoc::withoutLoc(ResBodyType),
                                DC);
     
   func->setInterfaceType(InterfaceType);

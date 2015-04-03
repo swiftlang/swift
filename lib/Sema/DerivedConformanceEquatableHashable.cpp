@@ -236,7 +236,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   DeclName name(C, C.Id_EqualsOperator, { Identifier(), Identifier() });
   auto eqDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                            SourceLoc(), name,
-                           SourceLoc(),
+                           SourceLoc(), SourceLoc(),
                            genericParams,
                            Type(), params,
                            TypeLoc::withoutLoc(boolTy),
@@ -396,7 +396,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   
   FuncDecl *getterDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                       Identifier(), SourceLoc(), nullptr, Type(),
+                       Identifier(), SourceLoc(), SourceLoc(), nullptr, Type(),
                        params, TypeLoc::withoutLoc(intType), enumDecl);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(deriveBodyHashable_enum_hashValue);

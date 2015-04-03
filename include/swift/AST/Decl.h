@@ -4514,9 +4514,6 @@ protected:
   GenericParamList *GenericParams;
 
   CaptureInfo Captures;
-  
-  /// Whether or not the function can throw.
-  unsigned Throws : 1;
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, unsigned NumParamPatterns,
@@ -4528,7 +4525,6 @@ protected:
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
     AbstractFunctionDeclBits.Overridden = false;
-    Throws = false;
 
     // Verify no bitfield truncation.
     assert(AbstractFunctionDeclBits.NumParamPatterns == NumParamPatterns);
@@ -4555,13 +4551,6 @@ public:
   /// parsed.
   bool hasBody() const {
     return getBodyKind() != BodyKind::None;
-  }
-  
-  bool throws() const {
-    return Throws;
-  }
-  void setThrows() {
-    Throws = true;
   }
 
   /// Returns the function body, if it was parsed, or nullptr otherwise.
@@ -4780,6 +4769,7 @@ class FuncDecl : public AbstractFunctionDecl {
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
+  SourceLoc ThrowsLoc;  // Location of the 'throws' token.
 
   TypeLoc FnRetType;
 
@@ -4802,11 +4792,11 @@ class FuncDecl : public AbstractFunctionDecl {
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
            SourceLoc FuncLoc, DeclName Name,
-           SourceLoc NameLoc, unsigned NumParamPatterns,
+           SourceLoc NameLoc, SourceLoc ThrowsLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
                            NumParamPatterns, GenericParams),
-      StaticLoc(StaticLoc), FuncLoc(FuncLoc),
+      StaticLoc(StaticLoc), FuncLoc(FuncLoc), ThrowsLoc(ThrowsLoc),
       OverriddenOrDerivedForDecl(),
       OperatorAndAddressorKind(nullptr, AddressorKind::NotAddressor) {
     FuncDeclBits.IsStatic = StaticLoc.isValid() || getName().isOperator();
@@ -4824,7 +4814,7 @@ class FuncDecl : public AbstractFunctionDecl {
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
                               StaticSpellingKind StaticSpelling,
                               SourceLoc FuncLoc, DeclName Name,
-                              SourceLoc NameLoc,
+                              SourceLoc NameLoc, SourceLoc ThrowsLoc,
                               GenericParamList *GenericParams, Type Ty,
                               unsigned NumParamPatterns,
                               DeclContext *Parent,
@@ -4835,7 +4825,7 @@ public:
   static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
                                       StaticSpellingKind StaticSpelling,
                                       SourceLoc FuncLoc, DeclName Name,
-                                      SourceLoc NameLoc,
+                                      SourceLoc NameLoc, SourceLoc ThrowsLoc,
                                       GenericParamList *GenericParams, Type Ty,
                                       unsigned NumParamPatterns,
                                       DeclContext *Parent);
@@ -4843,8 +4833,8 @@ public:
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
                           StaticSpellingKind StaticSpelling,
                           SourceLoc FuncLoc, DeclName Name, SourceLoc NameLoc,
-                          GenericParamList *GenericParams, Type Ty,
-                          ArrayRef<Pattern *> BodyParams,
+                          SourceLoc ThrowsLoc, GenericParamList *GenericParams,
+                          Type Ty, ArrayRef<Pattern *> BodyParams,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
 
@@ -4889,6 +4879,7 @@ public:
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
+  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
 
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : FuncLoc;
@@ -5061,6 +5052,11 @@ public:
   /// Returns true if a function declaration overrides a given
   /// method  from its direct or indirect superclass.
   bool isOverridingDecl(const FuncDecl *method) const;
+  
+  /// Returns true if the function declaration has a 'throws' annotation.
+  bool throws() const {
+    return ThrowsLoc.isValid();
+  }
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const AbstractFunctionDecl *D) {
