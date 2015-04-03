@@ -74,8 +74,7 @@ public struct Mirror {
   /// to the one used for instances of the kind indicated by the
   /// `DisplayStyle` case name when the `Mirror` is used for display.
   public enum DisplayStyle {
-  case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set,
-    ObjectiveCObject
+  case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set
   }
 
   /// Initialize with the given collection of `children` and optional
@@ -252,7 +251,7 @@ extension Mirror.DisplayStyle {
     case .MembershipContainer: self = .Set
     case .Container: preconditionFailure("unused!")
     case .Optional: self = .Optional
-    case .ObjCObject: self = .ObjectiveCObject
+    case .ObjCObject: self = .Class
     }
   }
 }
