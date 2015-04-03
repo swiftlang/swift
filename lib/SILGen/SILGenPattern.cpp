@@ -2248,25 +2248,22 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
 
 /// Recursively emit the pieces of a condition in an if/while stmt.
 static void
-emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
+emitStmtConditionWithBodyRec(LabeledConditionalStmt *CondStmt,
+                             unsigned CondElement,
                              JumpDest SuccessDest, JumpDest CondFailDest,
                              SILGenFunction &gen) {
-  Stmt *Body;
-  StmtCondition Condition;
-  
-  if (auto *If = dyn_cast<IfStmt>(CondStmt)) {
-    Body = If->getThenStmt();
-    Condition = If->getCond();
-  } else {
-    auto *While = cast<WhileStmt>(CondStmt);
-    Body = While->getBody();
-    Condition = While->getCond();
-  }
+  StmtCondition Condition = CondStmt->getCond();
   
   // In the base case, we have already emitted all of the pieces of the
   // condition.  There is nothing to do except to finally emit the Body, which
   // will be in the scope of any emitted patterns.
   if (CondElement == Condition.size()) {
+    Stmt *Body;
+    if (auto *If = dyn_cast<IfStmt>(CondStmt))
+      Body = If->getThenStmt();
+    else
+      Body = cast<WhileStmt>(CondStmt)->getBody();
+
     gen.emitProfilerIncrement(Body);
     gen.emitStmt(Body);
     
@@ -2398,7 +2395,8 @@ emitStmtConditionWithBodyRec(Stmt *CondStmt, unsigned CondElement,
 ///      will release all bound values.  The last block in the list will
 ///      continue execution after the condition fails and is fully cleaned up.
 ///
-void SILGenFunction::emitStmtConditionWithBody(Stmt *S,SILBasicBlock *SuccessBB,
+void SILGenFunction::emitStmtConditionWithBody(LabeledConditionalStmt *S,
+                                               SILBasicBlock *SuccessBB,
                                                SILBasicBlock *FailBB) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");

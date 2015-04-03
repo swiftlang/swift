@@ -744,7 +744,8 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  void emitStmtConditionWithBody(Stmt *S, SILBasicBlock *SuccessBB,
+  void emitStmtConditionWithBody(LabeledConditionalStmt *S,
+                                 SILBasicBlock *SuccessBB,
                                  SILBasicBlock *FailBB);
 
   void emitSwitchStmt(SwitchStmt *S);

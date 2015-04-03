@@ -399,13 +399,31 @@ public:
 /// condition of an 'if' or 'while' statement.
 using StmtCondition = MutableArrayRef<StmtConditionElement>;
 
+/// This is the common base class between statements that can have labels, and
+/// also have complex "if let" style conditions: 'if' and 'while'.
+class LabeledConditionalStmt : public LabeledStmt {
+  StmtCondition Cond;
+public:
+  LabeledConditionalStmt(StmtKind Kind, bool Implicit,
+                         LabeledStmtInfo LabelInfo, StmtCondition Cond)
+    : LabeledStmt(Kind, Implicit, LabelInfo), Cond(Cond) {}
+
+  StmtCondition getCond() const { return Cond; }
+  void setCond(StmtCondition e) { Cond = e; }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() >= StmtKind::First_LabeledConditionalStmt &&
+           S->getKind() <= StmtKind::Last_LabeledConditionalStmt;
+  }
+};
+  
+  
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
 /// ElseLoc location is not specified and the Else statement is null. After
 /// type-checking, the condition is of type Builtin.Int1.
-class IfStmt : public LabeledStmt {
+class IfStmt : public LabeledConditionalStmt {
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
-  StmtCondition Cond;
   Stmt *Then;
   Stmt *Else;
   
@@ -413,9 +431,10 @@ public:
   IfStmt(LabeledStmtInfo LabelInfo, SourceLoc IfLoc, StmtCondition Cond,
          Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
          Optional<bool> implicit = None)
-  : LabeledStmt(StmtKind::If, getDefaultImplicitFlag(implicit, IfLoc),
-                LabelInfo),
-    IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
+  : LabeledConditionalStmt(StmtKind::If,
+                           getDefaultImplicitFlag(implicit, IfLoc),
+                           LabelInfo, Cond),
+    IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {}
 
   IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
          Stmt *Else, Optional<bool> implicit, ASTContext &Ctx);
@@ -429,9 +448,6 @@ public:
   SourceLoc getEndLoc() const {
     return (Else ? Else->getEndLoc() : Then->getEndLoc());
   }
-
-  StmtCondition getCond() const { return Cond; }
-  void setCond(StmtCondition e) { Cond = e; }
 
   Stmt *getThenStmt() const { return Then; }
   void setThenStmt(Stmt *s) { Then = s; }
@@ -507,7 +523,7 @@ public:
   
 /// WhileStmt - while statement. After type-checking, the condition is of
 /// type Builtin.Int1.
-class WhileStmt : public LabeledStmt {
+class WhileStmt : public LabeledConditionalStmt {
   SourceLoc WhileLoc;
   StmtCondition Cond;
   Stmt *Body;
@@ -515,15 +531,13 @@ class WhileStmt : public LabeledStmt {
 public:
   WhileStmt(LabeledStmtInfo LabelInfo, SourceLoc WhileLoc, StmtCondition Cond,
             Stmt *Body, Optional<bool> implicit = None)
-  : LabeledStmt(StmtKind::While, getDefaultImplicitFlag(implicit, WhileLoc),
-                LabelInfo),
-    WhileLoc(WhileLoc), Cond(Cond), Body(Body) {}
+  : LabeledConditionalStmt(StmtKind::While,
+                           getDefaultImplicitFlag(implicit, WhileLoc),
+                           LabelInfo, Cond),
+    WhileLoc(WhileLoc), Body(Body) {}
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(WhileLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
-
-  StmtCondition getCond() const { return Cond; }
-  void setCond(StmtCondition e) { Cond = e; }
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
