@@ -1,8 +1,6 @@
 // RUN: %target-run-stdlib-swift | FileCheck %s
 
 // XFAIL: linux
-// REQUIRES: OS=macosx
-// Currently failing on iOS: rdar://problem/20405604
 
 import Foundation
 import Swift
@@ -11,7 +9,7 @@ import Swift
 func hex(x: UInt64) -> String { return String(x, radix:16) }
 
 func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + hex(UInt64(unsafeBitCast(x, Word.self)))
+  return "@0x" + hex(UInt64(unsafeBitCast(x, UWord.self)))
 }
 
 func hexAddr(x: AnyObject?) -> String {

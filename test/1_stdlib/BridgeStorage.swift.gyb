@@ -20,8 +20,6 @@
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 
 // REQUIRES: objc_interop
-// REQUIRES: OS=macosx
-// Currently failing on iOS: rdar://problem/20405604
 
 import Swift
 
@@ -139,7 +137,7 @@ class C {
 }
 import Foundation
 
-func isOSNewerThan(major: Int, minor: Int, patch: Int = 0) -> Bool {
+func isOSAtLeast(major: Int, minor: Int, patch: Int = 0) -> Bool {
   let vers = (majorVersion: major, minorVersion: minor, patchVersion: patch)
   // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
   let procInfo: AnyObject = NSProcessInfo.processInfo()
@@ -157,14 +155,16 @@ func expectTagged(s: NSString, expected: Bool) -> NSString {
   let mask: UWord = 0
 #endif
 
-  var taggedStringsSupported: Bool
+  var osSupportsTaggedStrings: Bool
 #if os(iOS)
-  // NSTaggedPointerString is not yet enabled as of iOS 8.0.
-  taggedStringsSupported = false
+  // NSTaggedPointerString is enabled starting in iOS 9.0.
+  osSupportsTaggedStrings = isOSAtLeast(9,0)
 #elseif os(OSX)
   // NSTaggedPointerString is enabled starting in OS X 10.10.
-  taggedStringsSupported = isOSNewerThan(10,10)  &&  mask != 0
+  osSupportsTaggedStrings = isOSAtLeast(10,10)
 #endif
+
+  let taggedStringsSupported = osSupportsTaggedStrings && mask != 0
 
   let tagged = unsafeBitCast(s, UWord.self) & mask != 0
 
