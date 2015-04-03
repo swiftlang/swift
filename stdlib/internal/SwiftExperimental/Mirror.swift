@@ -370,6 +370,18 @@ public protocol CustomPlaygroundQuickLookable {
 /// Swift dictionary literal without causing a `Dictionary` to be
 /// created.  This capability can be especially important when the
 /// order of elements in the literal is significant.
+///
+/// For example::
+///
+///   struct IntPairs {
+///     var elements: [(Int, Int)]
+///     init(_ pairs: DictionaryLiteral<Int,Int>) {
+///       elements = Array(pairs)
+///     }
+///   }
+///
+///   let x = IntPairs([1:2, 1:1, 3:4, 2:1])
+///   println(x.elements)  // [(1, 2), (1, 1), (3, 4), (2, 1)]
 public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
   /// Store `elements`
   public init(dictionaryLiteral elements: (Key, Value)...) {
