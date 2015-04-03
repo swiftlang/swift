@@ -123,33 +123,22 @@ static CanType getSubstFormalRValueType(Expr *expr) {
   return expr->getType()->getRValueType()->getCanonicalType();
 }
 
-static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
-  auto type =
-    formalStorageType->getReferenceStorageReferent()->getCanonicalType();
-  return AbstractionPattern(type);
-}
-
-/// Return the LValueTypeData for the formal type of a declaration
-/// that needs no substitutions.
-static LValueTypeData getUnsubstitutedTypeData(SILGenFunction &gen,
-                                               CanType formalRValueType) {
-  return {
-    AbstractionPattern(formalRValueType),
-    formalRValueType,
-    gen.getLoweredType(formalRValueType).getObjectType(),
-  };
-}
-
-static LValueTypeData getMemberTypeData(SILGenFunction &gen,
-                                        Type memberStorageType,
-                                        Expr *lvalueExpr) {
-  auto origFormalType = getOrigFormalRValueType(memberStorageType);
-  auto substFormalType = getSubstFormalRValueType(lvalueExpr);
+static LValueTypeData getStorageTypeData(SILGenFunction &gen,
+                                        AbstractStorageDecl *storage,
+                                        CanType substFormalType) {
+  auto origFormalType = gen.SGM.Types.getAbstractionPattern(storage)
+                                     .getReferenceStorageReferentType();
   return {
     origFormalType,
     substFormalType,
     gen.getLoweredType(origFormalType, substFormalType).getObjectType()
   };
+}
+
+static LValueTypeData getStorageTypeData(SILGenFunction &gen,
+                                        AbstractStorageDecl *storage,
+                                        Expr *lvalueExpr) {
+  return getStorageTypeData(gen, storage, getSubstFormalRValueType(lvalueExpr));
 }
 
 /// SILGenLValue - An ASTVisitor for building logical lvalues.
@@ -348,14 +337,15 @@ void PathComponent::dump() const {
 
 /// Return the LValueTypeData for a value whose type is its own
 /// lowering.
-static LValueTypeData getValueTypeData(SILValue value, SILModule &M) {
-  assert(value.getType().isObject() ||
-         value.getType().isAddressOnly(M));
+static LValueTypeData getValueTypeData(SILType type, SILModule &M) {
   return {
-    AbstractionPattern(value.getType().getSwiftRValueType()),
-    value.getType().getSwiftRValueType(),
-    value.getType().getObjectType()
+    AbstractionPattern(type.getSwiftRValueType()),
+    type.getSwiftRValueType(),
+    type.getObjectType()
   };
+}
+static LValueTypeData getValueTypeData(SILValue value, SILModule &M) {
+  return getValueTypeData(value.getType(), M);
 }
 
 /// Given the address of an optional value, unsafely project out the
@@ -486,7 +476,8 @@ namespace {
   class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
     static LValueTypeData getOpenedArchetypeTypeData(CanArchetypeType type) {
       return {
-        AbstractionPattern(type), type, SILType::getPrimitiveObjectType(type)
+        AbstractionPattern::getOpaque(), type,
+        SILType::getPrimitiveObjectType(type)
       };
     }
   public:
@@ -1222,7 +1213,7 @@ namespace {
 
     void print(raw_ostream &OS) const override {
       OS << "OrigToSubstComponent("
-         << OrigType.getAsType() << ", "
+         << OrigType << ", "
          << getSubstFormalType() << ", "
          << getTypeOfRValue() << ")\n";
     }
@@ -1272,7 +1263,7 @@ namespace {
 
     void print(raw_ostream &OS) const override {
       OS << "SubstToOrigComponent("
-         << getOrigFormalType().getAsType() << ", "
+         << getOrigFormalType() << ", "
          << getSubstFormalType() << ", "
          << getTypeOfRValue() << ")\n";
     }
@@ -1471,7 +1462,7 @@ SILGenFunction::emitLValueForAddressedNonMemberVarDecl(SILLocation loc,
                                                        CanType formalRValueType,
                                                        AccessKind accessKind,
                                                        AccessSemantics semantics) {
-  auto typeData = getUnsubstitutedTypeData(*this, formalRValueType);
+  auto typeData = getStorageTypeData(*this, var, formalRValueType);
   LValue lv;
   addNonMemberVarDeclAddressorComponent(*this, var, typeData, lv);
   return lv;
@@ -1483,7 +1474,7 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
                                             AccessKind accessKind,
                                             AccessSemantics semantics) {
   LValue lv;
-  auto typeData = getUnsubstitutedTypeData(gen, formalRValueType);
+  auto typeData = getStorageTypeData(gen, var, formalRValueType);
 
   switch (var->getAccessStrategy(semantics, accessKind)) {
 
@@ -1522,12 +1513,13 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
 
 LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
                                                 AccessKind accessKind) {
-  auto formalRValueType = getSubstFormalRValueType(e);
-  auto typeData = getUnsubstitutedTypeData(gen, formalRValueType);
+  SILType tempType = gen.getLoweredType(getSubstFormalRValueType(e));
 
-  SILValue address = gen.emitTemporaryAllocation(e, typeData.TypeOfRValue);
+  // FIXME: this is a leak?
+  SILValue address = gen.emitTemporaryAllocation(e, tempType.getObjectType());
   LValue lv;
-  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address), typeData);
+  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address),
+                         getValueTypeData(tempType, gen.SGM.M));
   return std::move(lv);
 }
 
@@ -1590,7 +1582,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(var, accessKind, strategy));
-  LValueTypeData typeData = getMemberTypeData(gen, var->getType(), e);
+  LValueTypeData typeData = getStorageTypeData(gen, var, e);
 
   // Use the property accessors if the variable has accessors and this isn't a
   // direct access to underlying storage.
@@ -1652,7 +1644,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
                                         AccessKind accessKind) {
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
-  auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
+  auto typeData = getStorageTypeData(gen, decl, e);
 
   AccessStrategy strategy =
     decl->getAccessStrategy(e->getAccessSemantics(), accessKind);
@@ -1761,21 +1753,18 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
                                             AccessKind accessKind) {
   SILGenLValue sgl(*this);
   LValue lv;
-  
+
   auto baseType = base.getType().getSwiftRValueType();
+  LValueTypeData baseTypeData = getValueTypeData(base.getValue(), SGM.M);
 
   // Refer to 'self' as the base of the lvalue.
-  lv.add<ValueComponent>(base, getUnsubstitutedTypeData(*this, baseType));
+  lv.add<ValueComponent>(base, baseTypeData);
 
-  auto origFormalType = getOrigFormalRValueType(ivar->getType());
   auto substFormalType = base.getType().getSwiftRValueType()
     ->getTypeOfMember(F.getModule().getSwiftModule(),
                       ivar, nullptr)
     ->getCanonicalType();
-  LValueTypeData typeData = {
-    origFormalType, substFormalType,
-    getLoweredType(origFormalType, substFormalType).getObjectType()
-  };
+  LValueTypeData typeData = getStorageTypeData(*this, ivar, substFormalType);
 
   // Find the substituted storage type.
   SILType varStorageType =
@@ -1790,7 +1779,7 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
     auto formalRValueType =
       ivar->getType()->getRValueType()->getReferenceStorageReferent();
     auto typeData =
-      getUnsubstitutedTypeData(*this, formalRValueType->getCanonicalType());
+      getStorageTypeData(*this, ivar, formalRValueType->getCanonicalType());
     lv.add<OwnershipComponent>(typeData);
   }
 
@@ -1995,9 +1984,6 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
     ->getAnyOptionalObjectType()
     ->getCanonicalType();
   
-  auto archetype = formalOptionalTy->getNominalOrBoundGenericNominal()
-    ->getGenericParams()->getPrimaryArchetypes()[0];
-  
   // Take the payload from the optional.
   // Cheat a bit in the +0 case—UncheckedTakeEnumData will never actually
   // invalidate an Optional enum value.
@@ -2016,7 +2002,7 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
   
   // Reabstract it to the substituted form, if necessary.
   return emitOrigToSubstValue(loc, origPayload,
-                              AbstractionPattern(archetype),
+                              AbstractionPattern::getOpaque(),
                               formalPayloadTy, C);
 }
 

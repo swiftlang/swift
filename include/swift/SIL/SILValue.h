@@ -317,7 +317,7 @@ public:
     // It's probably not worth optimizing for the case of switching
     // operands on a single value.
     removeFromCurrent();
-    assert(cast<ValueBase>(Owner) != newValue.getDef() &&
+    assert(reinterpret_cast<ValueBase*>(Owner) != newValue.getDef() &&
         "Cannot add a value as an operand of the instruction that defines it!");
     TheValue = newValue;
     insertIntoCurrent();

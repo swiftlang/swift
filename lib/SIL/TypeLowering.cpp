@@ -85,70 +85,6 @@ static bool hasSingletonMetatype(CanType instanceType) {
   return HasSingletonMetatype().visit(instanceType);
 }
 
-static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
-                            StringRef moduleName, StringRef typeName) {
-  if (!cacheSlot) {
-    cacheSlot = ([&] {
-      Module *mod = C.getLoadedModule(C.getIdentifier(moduleName));
-      if (!mod)
-        return CanType();
-
-      // Do a general qualified lookup instead of a direct lookupValue because
-      // some of the types we want are reexported through overlays and
-      // lookupValue would only give us types actually declared in the overlays
-      // themselves.
-      SmallVector<ValueDecl *, 2> decls;
-      mod->lookupQualified(ModuleType::get(mod), C.getIdentifier(typeName),
-                           NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                           /*resolver=*/nullptr, decls);
-      if (decls.size() != 1)
-        return CanType();
-
-      const TypeDecl *typeDecl = dyn_cast<TypeDecl>(decls.front());
-      if (!typeDecl)
-        return CanType();
-
-      assert(typeDecl->getDeclaredType() &&
-             "bridged type must be type-checked");
-      return typeDecl->getDeclaredType()->getCanonicalType();
-    })();
-  }
-  CanType t = *cacheSlot;
-
-  // It is possible that we won't find a briding type (e.g. String) when we're
-  // parsing the stdlib itself.
-  if (t) {
-    DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
-            << " mapped to ";
-          if (t)
-            t->print(llvm::dbgs());
-          else
-            llvm::dbgs() << "<null>";
-          llvm::dbgs() << '\n');
-  }
-  return t;
-}
-
-#define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
-  CanType TypeConverter::get##BridgedType##Type() {         \
-    return getKnownType(BridgedType##Ty, M.getASTContext(), \
-                        #BridgedModule, #BridgedType);      \
-  }
-#include "swift/SIL/BridgedTypes.def"
-
-AbstractionPattern TypeConverter::getMostGeneralAbstraction() {
-  if (!MostGeneralArchetype) {
-    MostGeneralArchetype =
-      ArchetypeType::getNew(Context,
-                            /*parent*/ nullptr,
-                            /*associated/protocol type*/ (ProtocolDecl*) 0,
-                            /*name*/ Identifier(),
-                            /*conformsto*/ {},
-                            /*superclass*/ Type())->getCanonicalType();
-  }
-  return AbstractionPattern(MostGeneralArchetype);
-}
-
 CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
   auto decl = capture.getDecl();
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
@@ -722,14 +658,8 @@ namespace {
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
-        // Lower the type according to the abstraction level of its original
-        // declaration.
-        auto origTy = AbstractionPattern(prop->getType());
-        auto substTy = silTy.getSwiftRValueType()
-          ->getTypeOfMember(M.getSwiftModule(), prop, nullptr);
-        
-        children.push_back(
-                         Child{prop, M.Types.getTypeLowering(origTy, substTy)});
+        SILType propTy = silTy.getFieldType(prop, M);        
+        children.push_back(Child{prop, M.Types.getTypeLowering(propTy)});
       }
     }
   };
@@ -813,12 +743,9 @@ namespace {
         
         for (auto elt : enumDecl->getAllElements()) {
           if (!elt->hasArgumentType()) continue;
-          auto origTy = AbstractionPattern(elt->getArgumentType());
-          auto substTy = silTy.getSwiftRValueType()
-            ->getTypeOfMember(M.getSwiftModule(), elt, nullptr,
-                              elt->getArgumentInterfaceType());
+          SILType substTy = silTy.getEnumElementType(elt, M);
           elts.push_back(NonTrivialElement{elt,
-                                     M.Types.getTypeLowering(origTy, substTy)});
+                                     M.Types.getTypeLowering(substTy)});
         }
         
         auto isDependent = IsDependent_t(silTy.isDependentType());
@@ -1203,7 +1130,8 @@ TypeConverter::~TypeConverter() {
   // our independent TypeLowerings.
   for (auto &ti : IndependentTypes) {
     // Destroy only the unique entries.
-    CanType srcType = CanType(ti.first.OrigType);
+    CanType srcType = ti.first.OrigType;
+    if (!srcType) continue;
     CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
     if (srcType == mappedType || isa<InOutType>(srcType))
       ti.second->~TypeLowering();
@@ -1218,8 +1146,11 @@ void *TypeLowering::operator new(size_t size, TypeConverter &tc,
 }
 
 const TypeLowering *TypeConverter::find(TypeKey k) {
+  if (!k.isCacheable()) return nullptr;
+
   auto &Types = k.isDependent() ? DependentTypes : IndependentTypes;
-  auto found = Types.find(k);
+  auto ck = k.getCachingKey();
+  auto found = Types.find(ck);
   if (found == Types.end())
     return nullptr;
   // We place a null placeholder in the hashtable to catch
@@ -1245,11 +1176,14 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
 }
 
 void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
+  if (!k.isCacheable()) return;
+
   auto &Types = k.isDependent() ? DependentTypes : IndependentTypes;
   // TODO: Types[k] should always be null at this point, except that we
   // rely on type lowering to discover recursive value types right now.
-  if (!Types[k])
-    Types[k] = tl;
+  auto ck = k.getCachingKey();
+  if (!Types[ck])
+    Types[ck] = tl;
 }
 
 #ifndef NDEBUG
@@ -1353,13 +1287,10 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     } else {
       MetatypeRepresentation repr;
       
-      auto origMeta = dyn_cast<MetatypeType>(origType.getAsType());
+      auto origMeta = origType.getAs<MetatypeType>();
       if (!origMeta) {
         // If the metatype matches a dependent type, it must be thick.
-        assert((isa<SubstitutableType>(origType.getAsType())
-                || isa<DependentMemberType>(origType.getAsType()))
-           && "metatype matches in position that isn't a dependent type "
-              "or metatype?!");
+        assert(origType.isOpaque());
         repr = MetatypeRepresentation::Thick;
       } else {
         // Otherwise, we're thin if the metatype is thinnable both
@@ -1419,12 +1350,12 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
       getLoweredASTFunctionType(substFnType, uncurryLevel, None);
 
     AbstractionPattern origLoweredType = [&] {
-      if (substType == origType.getAsType()) {
+      if (origType.isExactType(substType)) {
         return AbstractionPattern(substLoweredType);
       } else if (origType.isOpaque()) {
         return origType;
       } else {
-        auto origFnType = cast<AnyFunctionType>(origType.getAsType());
+        auto origFnType = cast<AnyFunctionType>(origType.getType());
         return AbstractionPattern(getLoweredASTFunctionType(origFnType,
                                                             uncurryLevel,
                                                             None));
@@ -2239,148 +2170,26 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
   }
 }
 
-Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc,
-                                          const clang::Type *clangTy,
-                                          BridgedTypePurpose purpose) {
-  switch (cc) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
-    // No bridging needed for native CCs.
-    return t;
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    // Map native types back to bridged types.
-
-    // Look through optional types.
-    if (auto valueTy = t->getOptionalObjectType()) {
-      auto Ty = getLoweredCBridgedType(valueTy, clangTy, false);
-      return Ty ? OptionalType::get(Ty) : Ty;
-    }
-    if (auto valueTy = t->getImplicitlyUnwrappedOptionalObjectType()) {
-      auto Ty = getLoweredCBridgedType(valueTy, clangTy, false);
-      return Ty ? ImplicitlyUnwrappedOptionalType::get(Ty) : Ty;
-    }
-    return getLoweredCBridgedType(t, clangTy, purpose == ForResult);
-  }
-};
-
-Type TypeConverter::getLoweredCBridgedType(Type t,
-                                           const clang::Type *clangTy,
-                                           bool bridgedCollectionsAreOptional) {
-  // Bridge String back to NSString.
-  auto nativeStringTy = getStringType();
-  if (nativeStringTy && t->isEqual(nativeStringTy)) {
-    Type bridgedTy = getNSStringType();
-    if (bridgedCollectionsAreOptional && clangTy)
-      bridgedTy = OptionalType::get(bridgedTy);
-    return bridgedTy;
-  }
-
-  // Bridge Bool back to ObjC bool, unless the original Clang type was _Bool.
-  auto nativeBoolTy = getBoolType();
-  if (nativeBoolTy && t->isEqual(nativeBoolTy)) {
-    if (clangTy && clangTy->isBooleanType())
-      return t;
-    return getObjCBoolType();
-  }
-
-  // Class metatypes bridge to ObjC metatypes.
-  if (auto metaTy = t->getAs<MetatypeType>()) {
-    if (metaTy->getInstanceType()->getClassOrBoundGenericClass()) {
-      return MetatypeType::get(metaTy->getInstanceType(),
-                               MetatypeRepresentation::ObjC);
-    }
-  }
-
-  // ObjC-compatible existential metatypes.
-  if (auto metaTy = t->getAs<ExistentialMetatypeType>()) {
-    if (metaTy->getInstanceType()->isObjCExistentialType()) {
-      return ExistentialMetatypeType::get(metaTy->getInstanceType(),
-                                          MetatypeRepresentation::ObjC);
-    }
-  }
-  
-  if (auto funTy = t->getAs<FunctionType>()) {
-    switch (funTy->getRepresentation()) {
-    case AnyFunctionType::Representation::Block:
-      // Functions that are already represented as blocks don't need bridging.
-      return t;
-    case AnyFunctionType::Representation::Thin:
-      // TODO: Bridge thin functions to C function pointers?
-      return t;
-    case AnyFunctionType::Representation::Thick:
-      // C function pointers don't bridge.
-      // TODO: A proper representation for C function pointers.
-      if (funTy->getAbstractCC() == AbstractCC::C)
-        return funTy;
-      // Thick functions (TODO: conditionally) get bridged to blocks.
-      return FunctionType::get(funTy->getInput(), funTy->getResult(),
-                               funTy->getExtInfo().withRepresentation(
-                                        FunctionType::Representation::Block));
-    }
-  }
-
-  // Array bridging.
-  if (auto arrayDecl = Context.getArrayDecl()) {
-    if (t->getAnyNominal() == arrayDecl) {
-      Type bridgedTy = getNSArrayType();
-      if (bridgedCollectionsAreOptional && clangTy)
-        bridgedTy = OptionalType::get(bridgedTy);
-      return bridgedTy;
-    }
-  }
-
-  // Dictionary bridging.
-  if (auto dictDecl = Context.getDictionaryDecl()) {
-    if (t->getAnyNominal() == dictDecl) {
-      Type bridgedTy = getNSDictionaryType();
-      if (bridgedCollectionsAreOptional && clangTy)
-        bridgedTy = OptionalType::get(bridgedTy);
-      return bridgedTy;
-    }
-  }
-
-  // Set bridging.
-  if (auto setDecl = Context.getSetDecl()) {
-    if (t->getAnyNominal() == setDecl) {
-      Type bridgedTy = getNSSetType();
-      if (bridgedCollectionsAreOptional && clangTy)
-        bridgedTy = OptionalType::get(bridgedTy);
-      return bridgedTy;
-    }
-  }
-
-  return t;
-}
-
-SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
+SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
                                                  Type lvalueType) {
   // The l-value type is the result of applying substitutions to
   // the type-of-reference.  Essentially, we want to apply those
   // same substitutions to value->getType().
 
   // Canonicalize and lower the l-value's object type.
-  CanType origType;
-  if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
-    origType = subscript->getElementType()->getCanonicalType();
-  } else {
-    origType = value->getType()->getCanonicalType();
-  }
-
+  AbstractionPattern origType = getAbstractionPattern(value);
   CanType substType = lvalueType->getCanonicalType();
 
   // Remove a layer of l-value type if present.
   if (auto substLVType = dyn_cast<LValueType>(substType))
     substType = substLVType.getObjectType();
 
-  SILType silSubstType
-    = getLoweredType(AbstractionPattern(origType), substType).getAddressType();
+  SILType silSubstType = getLoweredType(origType, substType).getAddressType();
   substType = silSubstType.getSwiftRValueType();
 
   // Fast path: if the unsubstituted type from the variable equals the
   // substituted type from the l-value, there's nothing to do.
-  if (origType == substType)
+  if (origType.isExactType(substType))
     return silSubstType;
 
   // Type substitution preserves structural type structure, and the
@@ -2390,7 +2199,7 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
 
   // The only really significant manipulation there is with @weak and
   // @unowned.
-  if (auto refType = dyn_cast<ReferenceStorageType>(origType)) {
+  if (auto refType = origType.getAs<ReferenceStorageType>()) {
     substType = CanType(ReferenceStorageType::get(substType,
                                                   refType->getOwnership(),
                                                   Context));
@@ -2428,7 +2237,8 @@ void TypeConverter::popGenericContext(GenericSignature *sig) {
   // the dependent TypeLowerings.
   for (auto &ti : DependentTypes) {
     // Destroy only the unique entries.
-    CanType srcType = CanType(ti.first.OrigType);
+    CanType srcType = ti.first.OrigType;
+    if (!srcType) continue;
     CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
     if (srcType == mappedType || isa<LValueType>(srcType))
       ti.second->~TypeLowering();

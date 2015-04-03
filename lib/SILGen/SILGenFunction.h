@@ -995,7 +995,7 @@ public:
   /// convention.
   ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
                                         AbstractCC destCC,
-                                        CanType origNativeTy,
+                                        AbstractionPattern origNativeTy,
                                         CanType substNativeTy,
                                         CanType bridgedTy);
   

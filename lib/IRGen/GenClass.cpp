@@ -1370,7 +1370,8 @@ namespace {
       // metadata statically, so compute the field layout using the
       // originally-declared type.
       SILType fieldType =
-        IGM.getLoweredType(AbstractionPattern(var->getType()), var->getType());
+        IGM.getLoweredType(IGM.SILMod->Types.getAbstractionPattern(var),
+                           var->getType());
       Ivars.push_back(buildIvar(var, fieldType));
 
       // Build property accessors for the ivar if necessary.

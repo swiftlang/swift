@@ -75,10 +75,15 @@ std::string SILType::getAsString() const {
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
   assert(field->getDeclContext() == getNominalOrBoundGenericNominal());
-  auto origFieldTy = AbstractionPattern(field->getType());
-  auto substFieldTy =
-    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
-                                          field, nullptr);
+  AbstractionPattern origFieldTy = M.Types.getAbstractionPattern(field);
+  CanType substFieldTy;
+  if (field->hasClangNode()) {
+    substFieldTy = origFieldTy.getType();
+  } else {
+    substFieldTy =
+      getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
+                                            field, nullptr)->getCanonicalType();
+  }
   auto loweredTy = M.Types.getLoweredType(origFieldTy, substFieldTy);
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
     return loweredTy.getAddressType();
@@ -90,13 +95,12 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
   assert(elt->hasArgumentType());
-  auto origEltTy = elt->getArgumentType();
   auto substEltTy =
     getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
                                           elt, nullptr,
                                           elt->getArgumentInterfaceType());
   auto loweredTy =
-    M.Types.getLoweredType(AbstractionPattern(origEltTy), substEltTy);
+    M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
 

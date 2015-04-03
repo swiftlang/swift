@@ -1250,7 +1250,8 @@ llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
     auto memberTy =
         BaseTy->getTypeOfMember(IGM.SILMod->getSwiftModule(), VD, nullptr);
     DebugTypeInfo DbgTy(VD, IGM.getTypeInfoForUnlowered(
-                                AbstractionPattern(VD->getType()), memberTy));
+                                IGM.SILMod->Types.getAbstractionPattern(VD),
+                                memberTy));
     Elements.push_back(createMemberType(DbgTy, VD->getName().str(),
                                         OffsetInBits, Scope, File, Flags));
   }

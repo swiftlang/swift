@@ -3900,6 +3900,12 @@ inline Type TypeBase::getReferenceStorageReferent() {
   return this;
 }
 
+inline CanType CanType::getReferenceStorageReferentImpl(CanType type) {
+  if (auto refType = dyn_cast<ReferenceStorageType>(type))
+    return refType.getReferentType();
+  return type;
+}
+
 inline bool TypeBase::mayHaveSuperclass() {
   if (getClassOrBoundGenericClass())
     return true;

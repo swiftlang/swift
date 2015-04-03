@@ -30,6 +30,7 @@ namespace swift {
   class VarDecl;
 
 namespace Lowering {
+  class AbstractionPattern;
   class TypeConverter;
 }
 
@@ -522,7 +523,7 @@ NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
 
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
-                                            CanType orig,
+                                            Lowering::AbstractionPattern orig,
                                             CanAnyFunctionType subst,
                                             CanAnyFunctionType substInterface);
 

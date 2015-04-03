@@ -164,6 +164,7 @@ class CanType : public Type {
   static bool isObjCExistentialTypeImpl(CanType type);
   static CanType getAnyOptionalObjectTypeImpl(CanType type,
                                               OptionalTypeKind &kind);
+  static CanType getReferenceStorageReferentImpl(CanType type);
   static ClassDecl *getClassBoundImpl(CanType type);
 
 public:
@@ -250,6 +251,10 @@ public:
 
   CanType getAnyOptionalObjectType(OptionalTypeKind &kind) const {
     return getAnyOptionalObjectTypeImpl(*this, kind);
+  }
+
+  CanType getReferenceStorageReferent() const {
+    return getReferenceStorageReferentImpl(*this);
   }
   
   // Direct comparison is allowed for CanTypes - they are known canonical.

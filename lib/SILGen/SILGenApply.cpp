@@ -1868,7 +1868,7 @@ ManagedValue SILGenFunction::emitApply(
   if (!hasAbsDiffs) return managedScalar;
 
   // Remove abstraction differences.
-  if (origResultType.getAsType() != substResultType) {
+  if (!origResultType.isExactType(substResultType)) {
     managedScalar = emitOrigToSubstValue(loc, managedScalar,
                                          origResultType,
                                          substResultType,
@@ -2104,7 +2104,7 @@ namespace {
     void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
       // If it was a tuple in the original type, the parameters will
       // have been exploded.
-      if (isa<TupleType>(origParamType.getAsType())) {
+      if (origParamType.isTuple()) {
         emitExpanded(std::move(arg), origParamType);
         return;
       }
@@ -2362,7 +2362,7 @@ namespace {
                                          arg.getType(), ctxt);
       } else {
         value = SGF.emitNativeToBridgedValue(loc, value, CC,
-                                             origParamType.getAsType(),
+                                             origParamType,
                                              arg.getType(), param.getType());
       }
       Args.push_back(value);
@@ -2444,6 +2444,8 @@ void ArgEmitter::emitShuffle(Expr *inner,
   };
 
   // The original parameter type.
+  SmallVector<AbstractionPattern, 8>
+    origInnerElts(innerElts.size(), AbstractionPattern::getInvalid());
   AbstractionPattern innerOrigParamType = AbstractionPattern::getInvalid();
   // Flattened inner parameter sequence.
   SmallVector<SILParameterInfo, 8> innerParams;
@@ -2454,12 +2456,10 @@ void ArgEmitter::emitShuffle(Expr *inner,
   SILParameterInfo variadicParamInfo; // innerExtents will point at this
   Optional<SmallVector<ArgSpecialDest, 8>> innerSpecialDests;
 
+
   // First, construct an abstraction pattern and parameter sequence
   // which we can use to emit the inner tuple.
   {
-    SmallVector<TupleTypeElt, 8> origInnerElts(innerElts.begin(),
-                                               innerElts.end());
-
     unsigned nextParamIndex = 0;
     for (unsigned outerIndex : indices(outerTuple.getElementTypes())) {
       CanType substEltType = outerTuple.getElementType(outerIndex);
@@ -2479,8 +2479,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
         innerExtents[innerIndex].Used = true;
 #endif
         innerExtents[innerIndex].Params = eltParams;
-        origInnerElts[innerIndex] =
-          origInnerElts[innerIndex].getWithType(origEltType.getAsType());
+        origInnerElts[innerIndex] = origEltType;
       } else if (innerIndex == TupleShuffleExpr::FirstVariadic) {
         assert(outerIndex + 1 == outerTuple->getNumElements());
 
@@ -2532,8 +2531,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
 
             // Propagate the element abstraction pattern.
             origInnerElts[innerIndex] =
-              origInnerElts[innerIndex].getWithType(
-                varargsInfo->getBaseAbstractionPattern().getAsType());
+              varargsInfo->getBaseAbstractionPattern();
           }
         }
       }
@@ -2544,9 +2542,12 @@ void ArgEmitter::emitShuffle(Expr *inner,
     // tuple elements.  
     innerOrigParamType = origParamType;
     if (!origParamType.isOpaque()) {
-      auto origInnerTuple = TupleType::get(origInnerElts, SGF.getASTContext());
-      innerOrigParamType
-        = AbstractionPattern(origInnerTuple->getCanonicalType());
+      // That "tuple" might not actually be a tuple.
+      if (innerElts.size() == 1 && !innerElts[0].hasName()) {
+        innerOrigParamType = origInnerElts[0];
+      } else {
+        innerOrigParamType = AbstractionPattern::getTuple(origInnerElts);
+      }
     }
 
     // Flatten the parameters from innerExtents into innerParams, and

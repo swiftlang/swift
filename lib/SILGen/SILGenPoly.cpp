@@ -500,7 +500,7 @@ namespace {
 
     void translate(AbstractionPattern origType, CanType substType) {
       // Tuples are exploded recursively.
-      if (isa<TupleType>(origType.getAsType())) {
+      if (origType.isTuple()) {
         return translateParallelExploded(origType, cast<TupleType>(substType));
       }
       if (auto substTuple = dyn_cast<TupleType>(substType)) {
@@ -1463,7 +1463,7 @@ static CanType stripInputTupleLabels(CanType inputTy) {
 }
 
 static AbstractionPattern stripInputTupleLabels(AbstractionPattern p) {
-  return AbstractionPattern(stripInputTupleLabels(p.getAsType()));
+  return p.transformType(static_cast<CanType(*)(CanType)>(stripInputTupleLabels));
 }
 
 static SILValue getWitnessFunctionRef(SILGenFunction &gen,
@@ -1570,11 +1570,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // For a free function witness, discard the 'self' parameter of the
   // requirement.
   if (isFree) {
-    auto inputTy = cast<TupleType>(reqtOrigInputTy.getAsType());
-    auto trimmedInputTy = TupleType::get(
-                 inputTy->getElements().slice(0, inputTy->getNumElements() - 1),
-                 getASTContext())->getCanonicalType();
-    reqtOrigInputTy = AbstractionPattern(trimmedInputTy);
+    reqtOrigInputTy = reqtOrigInputTy.dropLastTupleElement();
   }
 
   // Translate the argument values from the requirement abstraction level to

@@ -576,16 +576,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
 
   // Get the linkage for SILGlobalVariable.
   SILLinkage link = getSILLinkage(getDeclLinkage(gDecl), forDef);
-
-  Type ty = gDecl->getType();
-  // If a NSString * global was imported as a String, emit a SIL global of type
-  // NSString.
-  if (gDecl->getClangDecl() && ty->isEqual(M.Types.getStringType())) {
-    ty = M.Types.getNSStringType();
-  }
-
-  auto silTy = M.Types.getLoweredType(AbstractionPattern(ty),
-                   ty->getCanonicalType()).getObjectType();
+  SILType silTy = M.Types.getLoweredTypeOfGlobal(gDecl);
 
   auto *silGlobal = SILGlobalVariable::create(M, link,
                                               makeModuleFragile ? IsFragile : IsNotFragile,
@@ -1725,7 +1716,7 @@ void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
 static SILValue emitBridgeObjCReturnValue(SILGenFunction &gen,
                                           SILLocation loc,
                                           SILValue result,
-                                          CanType origNativeTy,
+                                          AbstractionPattern origNativeTy,
                                           CanType substNativeTy,
                                           CanType bridgedTy) {
   Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
@@ -1747,7 +1738,9 @@ static void emitObjCReturnValue(SILGenFunction &gen,
                                 CanType nativeTy,
                                 SILResultInfo resultInfo) {
   // Bridge the result.
-  result = emitBridgeObjCReturnValue(gen, loc, result, nativeTy, nativeTy,
+  result = emitBridgeObjCReturnValue(gen, loc, result,
+                                     AbstractionPattern(nativeTy),
+                                     nativeTy,
                                      resultInfo.getType());
 
   // Autorelease the bridged result if necessary.
@@ -2371,13 +2364,12 @@ getWitnessFunctionType(SILModule &M,
                        CanAnyFunctionType witnessSubstIfaceTy,
                        unsigned uncurryLevel) {
   // Lower the types to uncurry and get ExtInfo.
-  CanType origLoweredTy;
-  if (auto origFTy = dyn_cast<AnyFunctionType>(origRequirementTy.getAsType()))
-    origLoweredTy = M.Types.getLoweredASTFunctionType(origFTy,
-                                                      uncurryLevel,
-                                                      None);
-  else
-    origLoweredTy = origRequirementTy.getAsType();
+  AbstractionPattern origLoweredTy = origRequirementTy;
+  if (auto origFTy = origRequirementTy.getAs<AnyFunctionType>())
+    origLoweredTy =
+      AbstractionPattern(M.Types.getLoweredASTFunctionType(origFTy,
+                                                           uncurryLevel,
+                                                           None));
   auto witnessLoweredTy
     = M.Types.getLoweredASTFunctionType(witnessSubstTy, uncurryLevel, None);
   auto witnessLoweredIfaceTy

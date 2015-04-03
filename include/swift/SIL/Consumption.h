@@ -27,7 +27,7 @@ enum IsTake_t : bool { IsNotTake, IsTake };
 /// Is an operation an "initialization"?  An initialization simply
 /// fills in an uninitialized address with a value; a
 /// non-initialization also consumes the value already there.
-enum IsInitialization_t { IsNotInitialization, IsInitialization };
+enum IsInitialization_t : bool { IsNotInitialization, IsInitialization };
 
 /// The behavior of a dynamic cast operation on the source value.
 enum class CastConsumptionKind : unsigned char {

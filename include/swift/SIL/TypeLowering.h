@@ -15,7 +15,8 @@
 
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/SIL/AbstractionPattern.h"
-#include "swift/SIL/SILType.h"
+#include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -27,11 +28,14 @@ namespace clang {
 }
 
 namespace swift {
-  class ValueDecl;
+  class AnyFunctionRef;
+  enum IsInitialization_t : bool;
+  enum IsTake_t : bool;
   class SILBuilder;
   class SILLocation;
   class SILModule;
-  class AnyFunctionRef;
+  class SILValue;
+  class ValueDecl;
 
 namespace Lowering {
 
@@ -434,9 +438,26 @@ class TypeConverter {
     UniqueLoweringEntry = ~0U
   };
 
+  struct CachingTypeKey {
+    AbstractionPattern::CachingKey OrigType;
+    CanType SubstType;
+    unsigned UncurryLevel;
+
+    friend bool operator==(const CachingTypeKey &lhs,
+                           const CachingTypeKey &rhs) {
+      return lhs.OrigType == rhs.OrigType
+          && lhs.SubstType == rhs.SubstType
+          && lhs.UncurryLevel == rhs.UncurryLevel;
+    }
+    friend bool operator!=(const CachingTypeKey &lhs,
+                           const CachingTypeKey &rhs) {
+      return !(lhs == rhs);
+    }
+  };
+
   struct TypeKey {
     /// An unsubstituted version of a type, dictating its abstraction patterns.
-    CanType OrigType;
+    AbstractionPattern OrigType;
 
     /// The substituted version of the type, dictating the types that
     /// should be used in the lowered type.
@@ -444,29 +465,30 @@ class TypeConverter {
 
     /// The uncurrying level of the type.
     unsigned UncurryLevel;
+
+    CachingTypeKey getCachingKey() const {
+      assert(isCacheable());
+      return { OrigType.getCachingKey(), SubstType, UncurryLevel };
+    }
+
+    bool isCacheable() const {
+      return OrigType.hasCachingKey();
+    }
     
     IsDependent_t isDependent() const {
       if (SubstType->isDependentType())
         return IsDependent;
-      if (OrigType->isDependentType())
+      if (!OrigType.isOpaque() && OrigType.getType()->isDependentType())
         return IsDependent;
       return IsNotDependent;
     }
-    
-    friend bool operator==(const TypeKey &lhs, const TypeKey &rhs) {
-      return lhs.OrigType == rhs.OrigType
-          && lhs.SubstType == rhs.SubstType
-          && lhs.UncurryLevel == rhs.UncurryLevel;
-    }
-    friend bool operator!=(const TypeKey &lhs, const TypeKey &rhs) {
-      return !(lhs == rhs);
-    }
   };
-  friend struct llvm::DenseMapInfo<TypeKey>;
+
+  friend struct llvm::DenseMapInfo<CachingTypeKey>;
   
   TypeKey getTypeKey(AbstractionPattern origTy, CanType substTy,
                      unsigned uncurryLevel) {
-    return {origTy.getAsType(), substTy, uncurryLevel};
+    return {origTy, substTy, uncurryLevel};
   }
   
   /// Find an cached TypeLowering by TypeKey, or return null if one doesn't
@@ -477,10 +499,10 @@ class TypeConverter {
   
   /// Mapping for types independent on contextual generic parameters, which is
   /// cleared when the generic context is popped.
-  llvm::DenseMap<TypeKey, const TypeLowering *> IndependentTypes;
+  llvm::DenseMap<CachingTypeKey, const TypeLowering *> IndependentTypes;
   /// Mapping for types dependent on contextual generic parameters, which is
   /// cleared when the generic context is popped.
-  llvm::DenseMap<TypeKey, const TypeLowering *> DependentTypes;
+  llvm::DenseMap<CachingTypeKey, const TypeLowering *> DependentTypes;
   
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
   
@@ -505,8 +527,6 @@ class TypeConverter {
   Optional<CanType> BridgedType##Ty;
 #include "swift/SIL/BridgedTypes.def"
 
-  CanType MostGeneralArchetype;
-  
   const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
   const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
   const TypeLowering &getTypeLoweringForLoweredFunctionType(TypeKey key);
@@ -525,7 +545,9 @@ public:
   CaptureKind getDeclCaptureKind(CapturedValue capture);
 
   /// Return a most-general-possible abstraction pattern.
-  AbstractionPattern getMostGeneralAbstraction();
+  AbstractionPattern getMostGeneralAbstraction() {
+    return AbstractionPattern::getOpaque();
+  }
 
   /// Get the calling convention used by witnesses of a protocol.
   static AbstractCC getProtocolWitnessCC(ProtocolDecl *P) {
@@ -591,7 +613,7 @@ public:
   /// SILType is an address, returns the TypeLowering for the pointed-to
   /// type.
   const TypeLowering &getTypeLowering(SILType t);
-  
+
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
     return getTypeLowering(t, uncurryLevel).getLoweredType();
@@ -608,6 +630,13 @@ public:
     assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }
+
+  AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage);
+  AbstractionPattern getAbstractionPattern(VarDecl *var);
+  AbstractionPattern getAbstractionPattern(SubscriptDecl *subscript);
+  AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
+
+  SILType getLoweredTypeOfGlobal(VarDecl *var);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.
@@ -683,7 +712,8 @@ public:
   /// \see getLoweredBridgedType
   enum BridgedTypePurpose {
     ForArgument,
-    ForResult
+    ForResult,
+    ForMemory,
   };
 
   /// Map an AST-level type to the corresponding foreign representation type we
@@ -711,7 +741,8 @@ public:
   /// type of the storage of the value.
   ///
   /// \return - always an address type
-  SILType getSubstitutedStorageType(ValueDecl *value, Type lvalueType);
+  SILType getSubstitutedStorageType(AbstractStorageDecl *value,
+                                    Type lvalueType);
 
   /// Retrieve the set of archetypes open in the given context.
   GenericParamList *getEffectiveGenericParamsForContext(DeclContext *dc);
@@ -796,23 +827,29 @@ private:
 } // namespace swift
 
 namespace llvm {
-  template<> struct DenseMapInfo<swift::Lowering::TypeConverter::TypeKey> {
-    typedef swift::Lowering::TypeConverter::TypeKey TypeKey;
-    static TypeKey getEmptyKey() {
-      return {DenseMapInfo<swift::CanType>::getEmptyKey(),
-              swift::CanType(), 0};
+  template<> struct DenseMapInfo<swift::Lowering::TypeConverter::CachingTypeKey> {
+    typedef swift::Lowering::TypeConverter::CachingTypeKey CachingTypeKey;
+
+    using APCachingKey = swift::Lowering::AbstractionPattern::CachingKey;
+    using CachingKeyInfo = DenseMapInfo<APCachingKey>;
+
+    using CanTypeInfo = DenseMapInfo<swift::CanType>;
+
+    // Use the second field because the first field can validly be null.
+    static CachingTypeKey getEmptyKey() {
+      return {APCachingKey(), CanTypeInfo::getEmptyKey(), 0};
     }
-    static TypeKey getTombstoneKey() {
-      return {DenseMapInfo<swift::CanType>::getTombstoneKey(),
-              swift::CanType(), 0};
+    static CachingTypeKey getTombstoneKey() {
+      return {APCachingKey(), CanTypeInfo::getTombstoneKey(), 0};
     }
-    static unsigned getHashValue(TypeKey val) {
-      auto hashOrig = DenseMapInfo<swift::CanType>::getHashValue(val.OrigType);
+    static unsigned getHashValue(CachingTypeKey val) {
+      auto hashOrig =
+        CachingKeyInfo::getHashValue(val.OrigType);
       auto hashSubst =
         DenseMapInfo<swift::CanType>::getHashValue(val.SubstType);
       return hash_combine(hashOrig, hashSubst, val.UncurryLevel);
     }
-    static bool isEqual(TypeKey LHS, TypeKey RHS) {
+    static bool isEqual(CachingTypeKey LHS, CachingTypeKey RHS) {
       return LHS == RHS;
     }
   };

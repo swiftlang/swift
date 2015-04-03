@@ -848,10 +848,10 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
                                       substLoweredFormalType);
 }
 
-static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
-  auto type =
-    formalStorageType->getReferenceStorageReferent()->getCanonicalType();
-  return AbstractionPattern(type);
+static AbstractionPattern
+getOrigFormalRValueType(SILGenFunction &gen, VarDecl *field) {
+  auto origType = gen.SGM.Types.getAbstractionPattern(field);
+  return origType.getReferenceStorageReferentType();
 }
 
 static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
@@ -960,7 +960,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     ArgumentSource baseRV = prepareAccessorBaseArg(loc, base, accessor);
 
     AbstractionPattern origFormalType =
-      getOrigFormalRValueType(field->getType());
+      getOrigFormalRValueType(*this, field);
     auto substFormalType = propTy->getCanonicalType();
 
     return emitRValueWithAccessor(*this, loc, field, substitutions,
@@ -1007,9 +1007,9 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 
   // Check for an abstraction difference.
   AbstractionPattern origFormalType =
-    getOrigFormalRValueType(field->getType());
+    getOrigFormalRValueType(*this, field);
   bool hasAbstractionChange = false;
-  if (origFormalType.getAsType() != substFormalType) {
+  if (!origFormalType.isExactType(substFormalType)) {
     auto &abstractedTL = getTypeLowering(origFormalType, substFormalType);
     hasAbstractionChange =
       (abstractedTL.getLoweredType() != lowering.getLoweredType());
@@ -1519,7 +1519,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
   
   // Bridge the result back to ObjC.
   result = gen.emitNativeToBridgedValue(loc, result, AbstractCC::C,
-                        result.getType().getSwiftRValueType(),
+                        AbstractionPattern(result.getType().getSwiftRValueType()),
                         result.getType().getSwiftRValueType(),
                         blockTy->getSILResult().getSwiftRValueType());
   
@@ -1629,7 +1629,8 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
     SILValue v = new (gen.SGM.M) SILArgument(entry, param.getSILType());
     auto mv = gen.emitManagedRValueWithCleanup(v, tl);
     args.push_back(gen.emitNativeToBridgedValue(loc, mv, AbstractCC::C,
-                                        param.getType(), param.getType(),
+                                        AbstractionPattern(param.getType()),
+                                        param.getType(),
                                         blockParam.getType()));
   }
   
@@ -5056,7 +5057,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
       auto origArg = originalFnTy->getParameters()[i].getSILType();
       
       managedArgs.push_back(emitNativeToBridgedValue(fd, mv, AbstractCC::C,
-                                                 mv.getSwiftType(),
+                                          AbstractionPattern(mv.getSwiftType()),
                                                  mv.getSwiftType(),
                                                  origArg.getSwiftRValueType()));
     }
@@ -6115,7 +6116,7 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
 ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
                                                       ManagedValue v,
                                                       AbstractCC destCC,
-                                                      CanType origNativeTy,
+                                                AbstractionPattern origNativeTy,
                                                       CanType substNativeTy,
                                                       CanType loweredBridgedTy){
   switch (destCC) {
@@ -6819,7 +6820,7 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
 
     LValueTypeData unownedTypeData(
       AbstractionPattern(
-        CanUnmanagedStorageType::get(typeData.OrigFormalType.getAsType())),
+        CanUnmanagedStorageType::get(typeData.OrigFormalType.getType())),
       CanUnmanagedStorageType::get(typeData.SubstFormalType),
       rvalueType);
     lv.add<AutoreleasingWritebackComponent>(unownedTypeData);

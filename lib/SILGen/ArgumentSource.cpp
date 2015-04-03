@@ -106,7 +106,7 @@ ManagedValue ArgumentSource::materialize(SILGenFunction &SGF,
 
   // Fast path: if the types match exactly, no abstraction difference
   // is possible and we can just materialize as normal.
-  if (origFormalType.getAsType() == substFormalType)
+  if (origFormalType.isExactType(substFormalType))
     return std::move(*this).materialize(SGF);
 
   auto &destTL =
@@ -138,7 +138,7 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
 
   // If there are no abstraction changes, we can just forward
   // normally.
-  if (origFormalType.getAsType() == substFormalType ||
+  if (origFormalType.isExactType(substFormalType) ||
       destTL.getLoweredType() == SGF.getLoweredType(substFormalType)) {
     std::move(*this).forwardInto(SGF, dest);
     return;

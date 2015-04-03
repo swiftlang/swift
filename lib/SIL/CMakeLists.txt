@@ -1,4 +1,6 @@
 add_swift_library(swiftSIL
+  AbstractionPattern.cpp
+  Bridging.cpp
   Dominance.cpp
   DynamicCasts.cpp
   PrettyStackTrace.cpp
