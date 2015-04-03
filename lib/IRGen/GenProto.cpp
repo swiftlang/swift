@@ -5213,26 +5213,6 @@ void irgen::emitExistentialMetatypeContainer(IRGenFunction &IGF,
                               });
 }
 
-static void getWitnessMethodValue(IRGenFunction &IGF,
-                                  AbstractFunctionDecl *fn,
-                                  ProtocolDecl *fnProto,
-                                  llvm::Value *wtable,
-                                  llvm::Value *metadata,
-                                  Explosion &out) {
-  // Find the actual witness.
-  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
-  auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
-  llvm::Value *witness = emitLoadOfOpaqueWitness(IGF, wtable, index);
-
-  // Cast the witness pointer to i8*.
-  witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
-
-  // Build the value.
-  out.add(witness);
-  if (metadata)
-    out.add(metadata);
-}
-
 void
 irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                               CanType baseTy,
@@ -5250,8 +5230,16 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                       ProtocolEntry(fnProto, IGF.IGM.getProtocolInfo(fnProto)),
                       conformance); // FIXME conformance for concrete type
 
+  // Find the witness we're interested in.
+  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
+  auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
+  llvm::Value *witness = emitLoadOfOpaqueWitness(IGF, wtable, index);
+  
+  // Cast the witness pointer to i8*.
+  witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
+  
   // Build the value.
-  getWitnessMethodValue(IGF, fn, fnProto, wtable, nullptr, out);
+  out.add(witness);
 }
 
 llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
