@@ -91,7 +91,7 @@ public protocol _IncrementableDefaultsType {
 
 extension _IncrementableDefaultsType {
   @inline(__always)
-  public mutating func _successorInPlace() { self = self.successor() }
+  final public mutating func _successorInPlace() { self = self.successor() }
 }
 
 /// This protocol is an implementation detail of `ForwardIndexType`; do
@@ -244,7 +244,7 @@ public protocol _BidirectionalIndexDefaultsType : _ForwardIndexType {
 
 extension _BidirectionalIndexDefaultsType {
   @inline(__always)
-  public mutating func _predecessorInPlace() { self = self.predecessor() }
+  final public mutating func _predecessorInPlace() { self = self.predecessor() }
 }
 
 /// This protocol is an implementation detail of `BidirectionalIndexType`; do
