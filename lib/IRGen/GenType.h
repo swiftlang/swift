@@ -46,7 +46,8 @@ namespace swift {
   class EnumDecl;
   class UnownedStorageType;
   class WeakStorageType;
-
+  enum IsTake_t : bool;
+  
 namespace irgen {
   class Alignment;
   class ProtocolInfo;
@@ -56,7 +57,7 @@ namespace irgen {
   class TypeInfo;
   class UnownedTypeInfo;
   class WeakTypeInfo;
-
+  
 /// Either a type or a forward-declaration.
 typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
 
@@ -222,6 +223,24 @@ public:
 /// Generate code to verify that static type assumptions agree with the runtime.
 void emitTypeLayoutVerifier(IRGenFunction &IGF,
                             ArrayRef<CanType> formalTypes);
+
+/// Build a value witness that initializes an array front-to-back.
+void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
+                                    const TypeInfo &type,
+                                    Address destArray,
+                                    Address srcArray,
+                                    llvm::Value *count,
+                                    SILType T,
+                                    IsTake_t take);
+
+/// Build a value witness that initializes an array back-to-front.
+void emitInitializeArrayBackToFront(IRGenFunction &IGF,
+                                    const TypeInfo &type,
+                                    Address destArray,
+                                    Address srcArray,
+                                    llvm::Value *count,
+                                    SILType T,
+                                    IsTake_t take);
   
 } // end namespace irgen
 } // end namespace swift

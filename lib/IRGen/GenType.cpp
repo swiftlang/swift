@@ -155,15 +155,13 @@ void TypeInfo::destroyArray(IRGenFunction &IGF, Address array,
 }
 
 /// Build a value witness that initializes an array front-to-back.
-static void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
+void irgen::emitInitializeArrayFrontToBack(IRGenFunction &IGF,
                                            const TypeInfo &type,
                                            Address destArray,
                                            Address srcArray,
                                            llvm::Value *count,
                                            SILType T,
-                 void (TypeInfo::*emitInitializeElement)(IRGenFunction &,
-                                                         Address, Address,
-                                                         SILType) const) {
+                                           IsTake_t take) {
   auto &IGM = IGF.IGM;
                    
   auto entry = IGF.Builder.GetInsertBlock();
@@ -187,8 +185,11 @@ static void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
   IGF.Builder.CreateCondBr(done, exit, loop);
   
   IGF.Builder.emitBlock(loop);
-  (type.*emitInitializeElement)(IGF, dest, src, T);
-  
+  if (take)
+    type.initializeWithTake(IGF, dest, src, T);
+  else
+    type.initializeWithCopy(IGF, dest, src, T);
+
   auto nextCounter = IGF.Builder.CreateSub(counter,
                                    llvm::ConstantInt::get(IGM.SizeTy, 1));
   auto nextDest = type.indexArray(IGF, dest,
@@ -205,19 +206,17 @@ static void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
 }
 
 /// Build a value witness that initializes an array back-to-front.
-static void emitInitializeArrayBackToFront(IRGenFunction &IGF,
+void irgen::emitInitializeArrayBackToFront(IRGenFunction &IGF,
                                            const TypeInfo &type,
                                            Address destArray,
                                            Address srcArray,
                                            llvm::Value *count,
                                            SILType T,
-                 void (TypeInfo::*emitInitializeElement)(IRGenFunction &,
-                                                         Address, Address,
-                                                         SILType) const) {
+                                           IsTake_t take) {
   auto &IGM = IGF.IGM;
   
   auto destEnd = type.indexArray(IGF, destArray, count, T);
-  auto srcEnd = type.indexArray(IGF, destArray, count, T);
+  auto srcEnd = type.indexArray(IGF, srcArray, count, T);
   
   auto entry = IGF.Builder.GetInsertBlock();
   auto iter = IGF.createBasicBlock("iter");
@@ -229,9 +228,9 @@ static void emitInitializeArrayBackToFront(IRGenFunction &IGF,
   auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
   counter->addIncoming(count, entry);
   auto destVal = IGF.Builder.CreatePHI(destEnd.getType(), 2);
-  destVal->addIncoming(destArray.getAddress(), entry);
+  destVal->addIncoming(destEnd.getAddress(), entry);
   auto srcVal = IGF.Builder.CreatePHI(srcEnd.getType(), 2);
-  srcVal->addIncoming(srcArray.getAddress(), entry);
+  srcVal->addIncoming(srcEnd.getAddress(), entry);
   Address dest(destVal, destArray.getAlignment());
   Address src(srcVal, srcArray.getAlignment());
   
@@ -244,8 +243,11 @@ static void emitInitializeArrayBackToFront(IRGenFunction &IGF,
                               llvm::ConstantInt::getSigned(IGM.SizeTy, -1), T);
   auto prevSrc = type.indexArray(IGF, src,
                               llvm::ConstantInt::getSigned(IGM.SizeTy, -1), T);
-                   
-  (type.*emitInitializeElement)(IGF, prevDest, prevSrc, T);
+  
+  if (take)
+    type.initializeWithTake(IGF, prevDest, prevSrc, T);
+  else
+    type.initializeWithCopy(IGF, prevDest, prevSrc, T);
   
   auto nextCounter = IGF.Builder.CreateSub(counter,
                                    llvm::ConstantInt::get(IGM.SizeTy, 1));
@@ -269,8 +271,7 @@ void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
     return;
   }
   
-  emitInitializeArrayFrontToBack(IGF, *this, dest, src, count, T,
-                                 &TypeInfo::initializeWithCopy);
+  emitInitializeArrayFrontToBack(IGF, *this, dest, src, count, T, IsNotTake);
 }
 
 void TypeInfo::initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
@@ -285,8 +286,7 @@ const {
     return;
   }
   
-  emitInitializeArrayFrontToBack(IGF, *this, dest, src, count, T,
-                                 &TypeInfo::initializeWithTake);
+  emitInitializeArrayFrontToBack(IGF, *this, dest, src, count, T, IsTake);
 }
 
 void TypeInfo::initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
@@ -301,8 +301,7 @@ const {
     return;
   }
   
-  emitInitializeArrayBackToFront(IGF, *this, dest, src, count, T,
-                                 &TypeInfo::initializeWithTake);
+  emitInitializeArrayBackToFront(IGF, *this, dest, src, count, T, IsTake);
 }
 
 ExplosionSchema TypeInfo::getSchema() const {

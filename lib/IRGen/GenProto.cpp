@@ -2046,126 +2046,39 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
                                           CanType abstractType);
 
 /// Build a value witness that initializes an array front-to-back.
-static void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
+static void emitInitializeArrayFrontToBackWitness(IRGenFunction &IGF,
                                            llvm::Function::arg_iterator argv,
                                            CanType abstractType,
                                            SILType concreteType,
                                            const TypeInfo &type,
-                                 void (*emitInitializeElement)(IRGenFunction &,
-                                                               SILType,
-                                                               const TypeInfo &,
-                                                               Address,
-                                                               Address)) {
-  auto &IGM = IGF.IGM;
-
+                                           IsTake_t take) {
   Address destArray = getArgAs(IGF, argv, type, "dest");
   Address srcArray = getArgAs(IGF, argv, type, "src");
   llvm::Value *count = getArg(argv, "count");
   getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-  auto entry = IGF.Builder.GetInsertBlock();
-  auto iter = IGF.createBasicBlock("iter");
-  auto loop = IGF.createBasicBlock("loop");
-  auto exit = IGF.createBasicBlock("exit");
-  IGF.Builder.CreateBr(iter);
-  IGF.Builder.emitBlock(iter);
+  emitInitializeArrayFrontToBack(IGF, type, destArray, srcArray, count,
+                                 concreteType, take);
 
-  auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
-  counter->addIncoming(count, entry);
-  auto destVal = IGF.Builder.CreatePHI(destArray.getType(), 2);
-  destVal->addIncoming(destArray.getAddress(), entry);
-  auto srcVal = IGF.Builder.CreatePHI(srcArray.getType(), 2);
-  srcVal->addIncoming(srcArray.getAddress(), entry);
-  Address dest(destVal, destArray.getAlignment());
-  Address src(srcVal, srcArray.getAlignment());
-
-  auto done = IGF.Builder.CreateICmpEQ(counter,
-                                       llvm::ConstantInt::get(IGM.SizeTy, 0));
-  IGF.Builder.CreateCondBr(done, exit, loop);
-
-  IGF.Builder.emitBlock(loop);
-  emitInitializeElement(IGF, concreteType, type, dest, src);
-
-  auto nextCounter = IGF.Builder.CreateSub(counter,
-                                   llvm::ConstantInt::get(IGM.SizeTy, 1));
-  auto nextDest = type.indexArray(IGF, dest,
-                                  llvm::ConstantInt::get(IGM.SizeTy, 1),
-                                  concreteType);
-  auto nextSrc = type.indexArray(IGF, src,
-                                 llvm::ConstantInt::get(IGM.SizeTy, 1),
-                                 concreteType);
-  auto loopEnd = IGF.Builder.GetInsertBlock();
-  counter->addIncoming(nextCounter, loopEnd);
-  destVal->addIncoming(nextDest.getAddress(), loopEnd);
-  srcVal->addIncoming(nextSrc.getAddress(), loopEnd);
-  IGF.Builder.CreateBr(iter);
-
-  IGF.Builder.emitBlock(exit);
   destArray = IGF.Builder.CreateBitCast(destArray, IGF.IGM.OpaquePtrTy);
   IGF.Builder.CreateRet(destArray.getAddress());
 }
 
 /// Build a value witness that initializes an array back-to-front.
-static void emitInitializeArrayBackToFront(IRGenFunction &IGF,
+static void emitInitializeArrayBackToFrontWitness(IRGenFunction &IGF,
                                            llvm::Function::arg_iterator argv,
                                            CanType abstractType,
                                            SILType concreteType,
                                            const TypeInfo &type,
-                                 void (*emitInitializeElement)(IRGenFunction &,
-                                                               SILType,
-                                                               const TypeInfo &,
-                                                               Address,
-                                                               Address))
-{
-  auto &IGM = IGF.IGM;
-
+                                           IsTake_t take) {
   Address destArray = getArgAs(IGF, argv, type, "dest");
   Address srcArray = getArgAs(IGF, argv, type, "src");
   llvm::Value *count = getArg(argv, "count");
   getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-  auto destEnd = type.indexArray(IGF, destArray, count, concreteType);
-  auto srcEnd = type.indexArray(IGF, destArray, count, concreteType);
+  emitInitializeArrayBackToFront(IGF, type, destArray, srcArray, count,
+                                 concreteType, take);
 
-  auto entry = IGF.Builder.GetInsertBlock();
-  auto iter = IGF.createBasicBlock("iter");
-  auto loop = IGF.createBasicBlock("loop");
-  auto exit = IGF.createBasicBlock("exit");
-  IGF.Builder.CreateBr(iter);
-  IGF.Builder.emitBlock(iter);
-
-  auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
-  counter->addIncoming(count, entry);
-  auto destVal = IGF.Builder.CreatePHI(destEnd.getType(), 2);
-  destVal->addIncoming(destArray.getAddress(), entry);
-  auto srcVal = IGF.Builder.CreatePHI(srcEnd.getType(), 2);
-  srcVal->addIncoming(srcArray.getAddress(), entry);
-  Address dest(destVal, destArray.getAlignment());
-  Address src(srcVal, srcArray.getAlignment());
-
-  auto done = IGF.Builder.CreateICmpEQ(counter,
-                                       llvm::ConstantInt::get(IGM.SizeTy, 0));
-  IGF.Builder.CreateCondBr(done, exit, loop);
-
-  IGF.Builder.emitBlock(loop);
-  auto prevDest = type.indexArray(IGF, dest,
-                                  llvm::ConstantInt::getSigned(IGM.SizeTy, -1),
-                                  concreteType);
-  auto prevSrc = type.indexArray(IGF, src,
-                                 llvm::ConstantInt::getSigned(IGM.SizeTy, -1),
-                                 concreteType);
-
-  emitInitializeElement(IGF, concreteType, type, prevDest, prevSrc);
-
-  auto nextCounter = IGF.Builder.CreateSub(counter,
-                                   llvm::ConstantInt::get(IGM.SizeTy, 1));
-  auto loopEnd = IGF.Builder.GetInsertBlock();
-  counter->addIncoming(nextCounter, loopEnd);
-  destVal->addIncoming(prevDest.getAddress(), loopEnd);
-  srcVal->addIncoming(prevSrc.getAddress(), loopEnd);
-  IGF.Builder.CreateBr(iter);
-
-  IGF.Builder.emitBlock(exit);
   destArray = IGF.Builder.CreateBitCast(destArray, IGF.IGM.OpaquePtrTy);
   IGF.Builder.CreateRet(destArray.getAddress());
 }
@@ -2341,8 +2254,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
 
   case ValueWitness::InitializeArrayWithCopy: {
-    emitInitializeArrayFrontToBack(IGF, argv, abstractType, concreteType,
-                                   type, emitInitializeWithCopy);
+    emitInitializeArrayFrontToBackWitness(IGF, argv, abstractType, concreteType,
+                                          type, IsNotTake);
     return;
   }
 
@@ -2358,14 +2271,14 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
 
   case ValueWitness::InitializeArrayWithTakeFrontToBack: {
-    emitInitializeArrayFrontToBack(IGF, argv, abstractType, concreteType,
-                                   type, emitInitializeWithTake);
+    emitInitializeArrayFrontToBackWitness(IGF, argv, abstractType, concreteType,
+                                          type, IsTake);
     return;
   }
 
   case ValueWitness::InitializeArrayWithTakeBackToFront: {
-    emitInitializeArrayBackToFront(IGF, argv, abstractType, concreteType,
-                                   type, emitInitializeWithTake);
+    emitInitializeArrayBackToFrontWitness(IGF, argv, abstractType, concreteType,
+                                          type, IsTake);
     return;
   }
 

@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
-// REQUIRES: CPU=x86_64
 
 import Swift
 
@@ -21,28 +20,117 @@ struct SomeWeak {
   weak var y: C?
 }
 
-// CHECK: @_TWVV21array_value_witnesses3POD =
-// CHECK-NOT: @_TwXxV21array_value_witnesses3POD
-// CHECK:   @__swift_noop_void_return
-// CHECK-NOT: @_TwCcV21array_value_witnesses3POD
-// CHECK:   @__swift_memcpy_array8_8
-// CHECK-NOT: @_TwTtV21array_value_witnesses3POD
-// CHECK:   @__swift_memmove_array8_8
-// CHECK-NOT: @_TwtTV21array_value_witnesses3POD
-// CHECK:   @__swift_memmove_array8_8
+// CHECK-LABEL: @_TWVV21array_value_witnesses3POD =
+// CHECK-NOT:     @_TwXxV21array_value_witnesses3POD
+// CHECK:         @__swift_noop_void_return
+// CHECK-NOT:     @_TwCcV21array_value_witnesses3POD
+// CHECK-32:      @__swift_memcpy_array4_4
+// CHECK-64:      @__swift_memcpy_array8_8
+// CHECK-NOT:     @_TwTtV21array_value_witnesses3POD
+// CHECK-32:      @__swift_memmove_array4_4
+// CHECK-64:      @__swift_memmove_array8_8
+// CHECK-NOT:     @_TwtTV21array_value_witnesses3POD
+// CHECK-32:      @__swift_memmove_array4_4
+// CHECK-32:      @__swift_memmove_array8_8
 
-// CHECK: @_TWVV21array_value_witnesses14BitwiseTakable =
-// CHECK:   @_TwXxV21array_value_witnesses14BitwiseTakable
-// CHECK:   @_TwCcV21array_value_witnesses14BitwiseTakable
-// CHECK-NOT: @_TwTtV21array_value_witnesses14BitwiseTakable
-// CHECK:   @__swift_memmove_array8_8
-// CHECK-NOT: @_TwtTV21array_value_witnesses14BitwiseTakable
-// CHECK:   @__swift_memmove_array8_8
+// CHECK-LABEL: @_TWVV21array_value_witnesses14BitwiseTakable =
+// CHECK:         @_TwXxV21array_value_witnesses14BitwiseTakable
+// CHECK:         @_TwCcV21array_value_witnesses14BitwiseTakable
+// CHECK-NOT:     @_TwTtV21array_value_witnesses14BitwiseTakable
+// CHECK-32:      @__swift_memmove_array4_4
+// CHECK-64:      @__swift_memmove_array8_8
+// CHECK-NOT:     @_TwtTV21array_value_witnesses14BitwiseTakable
+// CHECK-32:      @__swift_memmove_array4_4
+// CHECK-64:      @__swift_memmove_array8_8
 
-// CHECK: @_TWVV21array_value_witnesses8SomeWeak =
-// CHECK:   @_TwXxV21array_value_witnesses8SomeWeak
-// CHECK:   @_TwCcV21array_value_witnesses8SomeWeak
-// CHECK:   @_TwTtV21array_value_witnesses8SomeWeak
-// CHECK:   @_TwtTV21array_value_witnesses8SomeWeak
+// CHECK-LABEL: @_TWVV21array_value_witnesses8SomeWeak =
+// CHECK:         @_TwXxV21array_value_witnesses8SomeWeak
+// CHECK:         @_TwCcV21array_value_witnesses8SomeWeak
+// CHECK:         @_TwTtV21array_value_witnesses8SomeWeak
+// CHECK:         @_TwtTV21array_value_witnesses8SomeWeak
 
+// CHECK-LABEL: define linkonce_odr hidden void @_TwXxV21array_value_witnesses8SomeWeak
+// CHECK:         (%swift.opaque* [[ARRAY_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {
+// CHECK:         [[BEGIN:%.*]] = bitcast %swift.opaque* [[ARRAY_PTR]] to [[SOMEWEAK:%V21array_value_witnesses8SomeWeak]]*
+// CHECK:         br label %iter
+// CHECK:       iter:
+// CHECK:         [[I:%.*]] = phi [[WORD]] [ [[COUNT]], %entry ], [ [[DEC:%.*]], %loop ]
+// CHECK:         [[CURRENT:%.*]] = phi [[SOMEWEAK]]* [ [[BEGIN]], %entry ], [ [[NEXT:%.*]], %loop ]
+// CHECK:         [[DONE:%.*]] = icmp eq [[WORD]] [[I]], 0
+// CHECK:         br i1 [[DONE]], label %exit, label %loop
+// CHECK:       loop:
+// CHECK:         [[WEAK:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[CURRENT]], i32 0, i32 1
+// CHECK:         call void @swift_weakDestroy(%swift.weak* [[WEAK]])
+// CHECK:         [[DEC]] = sub [[WORD]] [[I]], 1
+// CHECK:         [[NEXT]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[CURRENT]], [[WORD]] 1
+// CHECK:         br label %iter
+// CHECK:       exit:
+// CHECK:         ret
 
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwCcV21array_value_witnesses8SomeWeak
+// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {
+// CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
+// CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*
+// CHECK:         br label %iter
+// CHECK:       iter:
+// CHECK:         [[I:%.*]] = phi [[WORD]] [ [[COUNT]], %entry ], [ [[DEC:%.*]], %loop ]
+// CHECK:         [[DEST_CURRENT:%.*]] = phi [[SOMEWEAK]]* [ [[DEST_BEGIN]], %entry ], [ [[DEST_NEXT:%.*]], %loop ]
+// CHECK:         [[SRC_CURRENT:%.*]] = phi [[SOMEWEAK]]* [ [[SRC_BEGIN]], %entry ], [ [[SRC_NEXT:%.*]], %loop ]
+// CHECK:         [[DONE:%.*]] = icmp eq [[WORD]] [[I]], 0
+// CHECK:         br i1 [[DONE]], label %exit, label %loop
+// CHECK:       loop:
+// CHECK:         [[DEST_WEAK:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[DEST_CURRENT]], i32 0, i32 1
+// CHECK:         [[SRC_WEAK:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[SRC_CURRENT]], i32 0, i32 1
+// CHECK:         call void @swift_weakCopyInit(%swift.weak* [[DEST_WEAK]], %swift.weak* [[SRC_WEAK]])
+// CHECK:         [[DEC]] = sub [[WORD]] [[I]], 1
+// CHECK:         [[DEST_NEXT]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[DEST_CURRENT]], [[WORD]] 1
+// CHECK:         [[SRC_NEXT]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[SRC_CURRENT]], [[WORD]] 1
+// CHECK:         br label %iter
+// CHECK:       exit:
+// CHECK:         ret
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwTtV21array_value_witnesses8SomeWeak
+// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {
+// CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
+// CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*
+// CHECK:         br label %iter
+// CHECK:       iter:
+// CHECK:         [[I:%.*]] = phi [[WORD]] [ [[COUNT]], %entry ], [ [[DEC:%.*]], %loop ]
+// CHECK:         [[DEST_CURRENT:%.*]] = phi [[SOMEWEAK]]* [ [[DEST_BEGIN]], %entry ], [ [[DEST_NEXT:%.*]], %loop ]
+// CHECK:         [[SRC_CURRENT:%.*]] = phi [[SOMEWEAK]]* [ [[SRC_BEGIN]], %entry ], [ [[SRC_NEXT:%.*]], %loop ]
+// CHECK:         [[DONE:%.*]] = icmp eq [[WORD]] [[I]], 0
+// CHECK:         br i1 [[DONE]], label %exit, label %loop
+// CHECK:       loop:
+// CHECK:         [[DEST_WEAK:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[DEST_CURRENT]], i32 0, i32 1
+// CHECK:         [[SRC_WEAK:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[SRC_CURRENT]], i32 0, i32 1
+// CHECK:         call void @swift_weakTakeInit(%swift.weak* [[DEST_WEAK]], %swift.weak* [[SRC_WEAK]])
+// CHECK:         [[DEC]] = sub [[WORD]] [[I]], 1
+// CHECK:         [[DEST_NEXT]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[DEST_CURRENT]], [[WORD]] 1
+// CHECK:         [[SRC_NEXT]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[SRC_CURRENT]], [[WORD]] 1
+// CHECK:         br label %iter
+// CHECK:       exit:
+// CHECK:         ret
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwtTV21array_value_witnesses8SomeWeak
+// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {
+// CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
+// CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*
+// CHECK:         [[DEST_END:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[DEST_BEGIN]], [[WORD]] [[COUNT]]
+// CHECK:         [[SRC_END:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[SRC_BEGIN]], [[WORD]] [[COUNT]]
+// CHECK:         br label %iter
+// CHECK:       iter:
+// CHECK:         [[I:%.*]] = phi [[WORD]] [ [[COUNT]], %entry ], [ [[DEC:%.*]], %loop ]
+// CHECK:         [[DEST_PREV:%.*]] = phi [[SOMEWEAK]]* [ [[DEST_END]], %entry ], [ [[DEST_CURRENT:%.*]], %loop ]
+// CHECK:         [[SRC_PREV:%.*]] = phi [[SOMEWEAK]]* [ [[SRC_END]], %entry ], [ [[SRC_CURRENT:%.*]], %loop ]
+// CHECK:         [[DONE:%.*]] = icmp eq [[WORD]] [[I]], 0
+// CHECK:         br i1 [[DONE]], label %exit, label %loop
+// CHECK:       loop:
+// CHECK:         [[DEST_CURRENT]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[DEST_PREV]], [[WORD]] -1
+// CHECK:         [[SRC_CURRENT]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[SRC_PREV]], [[WORD]] -1
+// CHECK:         [[DEST_WEAK:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[DEST_CURRENT]], i32 0, i32 1
+// CHECK:         [[SRC_WEAK:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[SRC_CURRENT]], i32 0, i32 1
+// CHECK:         call void @swift_weakTakeInit(%swift.weak* [[DEST_WEAK]], %swift.weak* [[SRC_WEAK]])
+// CHECK:         [[DEC]] = sub [[WORD]] [[I]], 1
+// CHECK:         br label %iter
+// CHECK:       exit:
+// CHECK:         ret
