@@ -834,6 +834,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     bool IsLet = Tok.is(tok::kw_let);
     SourceLoc VarLoc = consumeToken();
 
+    SmallVector<PatternBindingEntry, 4> entries;
+    
     // Parse the list of name binding's within a let/var clauses.
     do {
       ParserResult<Pattern> Pattern;
@@ -873,18 +875,9 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         diagnose(Tok, diag::conditional_var_initializer_required);
         Init = new (Context) ErrorExpr(Tok.getLoc());
       }
-    
-      // FIXME: Make one PBD for the entire series of patterns!
-      auto PBD = PatternBindingDecl::create(Context, SourceLoc(),
-                                            StaticSpellingKind::None,
-                                            VarLoc,
-                                            PatternBindingEntry(Pattern.get(),
-                                                                Init),
-                                            /*where*/ nullptr,
-                                            PatternBindingElse::getContextual(),
-                                            /*parent*/CurDeclContext);
-      result.push_back(PBD);
       
+      entries.push_back(PatternBindingEntry(Pattern.get(), Init));
+    
       // Add variable bindings from the pattern to the case scope.
       addPatternVariablesToScope(Pattern.get());
 
@@ -893,15 +886,25 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
     // If there is a where clause on this let/var specification, parse and
     // remember it.
+    Expr *Where = nullptr;
     if (consumeIf(tok::kw_where)) {
       ParserResult<Expr> InitExpr
         = parseExprBasic(diag::expected_expr_conditional_where);
       Status |= InitExpr;
       if (InitExpr.isNull() || InitExpr.hasCodeCompletion())
         return Status;
-      result.push_back(InitExpr.get());
+      Where = InitExpr.get();
     }
 
+    // Finally, create and remember a PatternBindingDecl for the list of
+    // pattern/init pairs and the optional where clause.
+    auto PBD = PatternBindingDecl::create(Context, SourceLoc(),
+                                          StaticSpellingKind::None,
+                                          VarLoc, entries, Where,
+                                          PatternBindingElse::getContextual(),
+                                          /*parent*/CurDeclContext);
+    result.push_back(PBD);
+    
   } while (Tok.is(tok::comma) && peekToken().isAny(tok::kw_let, tok::kw_var) &&
            consumeIf(tok::comma));
 

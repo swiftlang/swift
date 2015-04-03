@@ -2918,8 +2918,15 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    // Check all the pattern/init pairs in the PBD.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
       validatePatternBindingDecl(TC, PBD, i);
+
+    // Type check the where condition, if present.
+    if (Expr *E = PBD->getWhereExpr())
+      if (!TC.typeCheckCondition(E, PBD->getDeclContext()))
+        PBD->setWhereExpr(E);
+
     if (PBD->isInvalid())
       return;
     
@@ -6935,12 +6942,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       }
     }
   }
-}
-
-bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
-                                                     DeclContext *dc) {
-  DeclChecker(*this, false, false).visitPatternBindingDecl(PBD);
-  return PBD->isInvalid();
 }
 
 /// Fix the names in the given function to match those in the given target

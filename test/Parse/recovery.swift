@@ -96,7 +96,7 @@ func missingControllingExprInIf() {
   }
 
   // <rdar://problem/18940198>
-  if { { } } // expected-error{{missing condition in an 'if' statement}} expected-error{{braced block of statements is an unused closure}}
+  if { { } } // expected-error{{missing condition in an 'if' statement}} expected-error{{braced block of statements is an unused closure}} expected-error {{type of expression is ambiguous without more context}}
 }
 
 func missingControllingExprInWhile() {
@@ -118,7 +118,7 @@ func missingControllingExprInWhile() {
   }
 
   // <rdar://problem/18940198>
-  while { { } } // expected-error{{missing condition in a 'while' statement}} expected-error{{braced block of statements is an unused closure}}
+  while { { } } // expected-error{{missing condition in a 'while' statement}} expected-error{{braced block of statements is an unused closure}} expected-error {{type of expression is ambiguous without more context}}
 }
 
 func missingControllingExprInDoWhile() {

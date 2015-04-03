@@ -2245,11 +2245,10 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   Cleanups.emitBranchAndCleanups(sharedDest, S);
 }
 
-
 /// Recursively emit the pieces of a condition in an if/while stmt.
 static void
 emitStmtConditionWithBodyRec(LabeledConditionalStmt *CondStmt,
-                             unsigned CondElement,
+                             unsigned CondElement, unsigned PBDElement,
                              JumpDest SuccessDest, JumpDest CondFailDest,
                              SILGenFunction &gen) {
   StmtCondition Condition = CondStmt->getCond();
@@ -2279,7 +2278,17 @@ emitStmtConditionWithBodyRec(LabeledConditionalStmt *CondStmt,
 
   // In the recursive case, we emit a condition guard, which is either a boolean
   // expression or a refutable pattern binding. Handle boolean conditions first.
-  if (auto *expr = Condition[CondElement].getCondition()) {
+  auto *expr = Condition[CondElement].getCondition();
+  if (expr == 0) {
+    // If this is a binding case, see if we're looking at the 'where' condition.
+    auto *PBD = Condition[CondElement].getBinding();
+    if (PBDElement == PBD->getNumPatternEntries()) {
+      expr = PBD->getWhereExpr();
+      assert(expr && "Not a 'where' or boolean condition?");
+    }
+  }
+  
+  if (expr) {
     // Evaluate the condition as an i1 value (guaranteed by Sema).
     SILValue V;
     {
@@ -2312,7 +2321,7 @@ emitStmtConditionWithBodyRec(LabeledConditionalStmt *CondStmt,
     // Finally, emit the continue block and keep emitting the rest of the
     // condition.
     gen.B.emitBlock(ContBB);
-    return emitStmtConditionWithBodyRec(CondStmt, CondElement+1,
+    return emitStmtConditionWithBodyRec(CondStmt, CondElement+1, 0,
                                         SuccessDest, CondFailDest, gen);
   }
   
@@ -2323,16 +2332,21 @@ emitStmtConditionWithBodyRec(LabeledConditionalStmt *CondStmt,
   // The handler that generates code when the match succeeds.  This
   // simply continues emission of the rest of the condition.
   auto completionHandler = [&](PatternMatchEmission &emission, ClauseRow &row) {
-    emitStmtConditionWithBodyRec(CondStmt, CondElement+1,
-                                 SuccessDest, CondFailDest, gen);
+    // If the next PBDElement refers to another pattern, or to the where clause
+    // of this one, then process it next.
+    if (PBDElement+1 <
+           PBD->getNumPatternEntries() + (PBD->getWhereExpr() != nullptr))
+      emitStmtConditionWithBodyRec(CondStmt, CondElement, PBDElement+1,
+                                   SuccessDest, CondFailDest, gen);
+    else
+      emitStmtConditionWithBodyRec(CondStmt, CondElement+1, 0,
+                                   SuccessDest, CondFailDest, gen);
   };
   
   PatternMatchEmission emission(gen, CondStmt, completionHandler);
   
-  assert(PBD->getNumPatternEntries() == 1 &&
-         "statement conditionals only have a single entry right now");
-  auto *ThePattern = PBD->getPatternList()[0].ThePattern;
-  auto *Init = PBD->getPatternList()[0].Init;
+  auto *ThePattern = PBD->getPatternList()[PBDElement].ThePattern;
+  auto *Init = PBD->getPatternList()[PBDElement].Init;
   
   
   // Emit the initializer value being matched against. Dispatching will consume
@@ -2370,7 +2384,7 @@ emitStmtConditionWithBodyRec(LabeledConditionalStmt *CondStmt,
             if (elt == MatchFailureBB)
               elt = BI->getDestBB();
           }
-
+          
           // Remove the branch to placate eraseBasicBlock()'s
           // assertion that the block being removed is empty.
           BI->eraseFromParent();
@@ -2406,7 +2420,7 @@ void SILGenFunction::emitStmtConditionWithBody(LabeledConditionalStmt *S,
   
   JumpDest SuccessDest(SuccessBB, getCleanupsDepth(), CleanupLocation(S));
   JumpDest FailDest(FailBB, getCleanupsDepth(), CleanupLocation(S));
-  emitStmtConditionWithBodyRec(S, 0, SuccessDest, FailDest, *this);
+  emitStmtConditionWithBodyRec(S, 0, 0, SuccessDest, FailDest, *this);
 }
 
 /// Emit a sequence of catch clauses.

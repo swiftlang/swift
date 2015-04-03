@@ -1459,7 +1459,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     Expr *OrigExpr = nullptr;
 
   public:
-    // Add the appropriate LogicValue constraint.
+    // Add the appropriate BooleanType constraint.
     virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the original expression.
       OrigExpr = expr;
@@ -1475,7 +1475,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
         return false;
       }
 
-      // Otherwise, the result must be a LogicValue.
+      // Otherwise, the result must be a BooleanType.
       auto &tc = cs.getTypeChecker();
       auto logicValueProto = tc.getProtocol(expr->getLoc(),
                                             KnownProtocolKind::BooleanType);
@@ -1485,7 +1485,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
       auto logicValueType = logicValueProto->getDeclaredType();
       
-      // Relate this expr to the the logic value type in the cache, but don't
+      // Relate this expr to the the BooleanType in the cache, but don't
       // create a new conformance. This will help us produce a better
       // diagnostic, if need be.
       auto innerExpr = expr;
@@ -1501,12 +1501,12 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       return false;
     }
 
-    // Convert the result to a logic value.
+    // Convert the result to a Builtin.i1.
     virtual Expr *appliedSolution(constraints::Solution &solution,
                                   Expr *expr) {
       auto &cs = solution.getConstraintSystem();
-      return solution.convertToLogicValue(expr,
-                                          cs.getConstraintLocator(OrigExpr));
+      return solution.convertBooleanTypeToBuiltinI1(expr,
+                                            cs.getConstraintLocator(OrigExpr));
     }
     
   };
@@ -1518,23 +1518,16 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 }
 
 bool TypeChecker::typeCheckCondition(StmtCondition &cond, DeclContext *dc) {
+  bool hadError = false;
   for (auto &elt : cond) {
     if (auto E = elt.getCondition()) {
-      bool r = typeCheckCondition(E, dc);
+      hadError |= typeCheckCondition(E, dc);
       elt.setCondition(E);
-      if (r) return true;
     } else {
       auto PBD = elt.getBinding();
-      //typeCheckDecl(PBD, false);
-      //if (PBD->isInvalid()) {
-        
-      if (typeCheckConditionalPatternBinding(PBD, dc)) {
-        // FIXME: not great for AST fidelity & introduces nulls into the
-        // conditional list.
-        elt = StmtConditionElement();
-        return true;
-      }
-      elt.setBinding(PBD);
+      assert(PBD && "Unknown kind of condition");
+      typeCheckDecl(PBD, false);
+      hadError |= PBD->isInvalid();
     }
   }
   return false;

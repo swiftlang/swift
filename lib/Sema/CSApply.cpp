@@ -2642,8 +2642,8 @@ namespace {
 
       // Convert the condition to a logic value.
       auto cond
-        = solution.convertToLogicValue(expr->getCondExpr(),
-                                       cs.getConstraintLocator(expr));
+        = solution.convertBooleanTypeToBuiltinI1(expr->getCondExpr(),
+                                                 cs.getConstraintLocator(expr));
       if (!cond) {
         cond->setType(ErrorType::get(cs.getASTContext()));
       } else {
@@ -6218,7 +6218,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 }
 
 Expr *
-Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
+Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) const {
   auto &tc = getConstraintSystem().getTypeChecker();
 
   // Special case: already a builtin logic value.

@@ -861,10 +861,6 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckCondition(StmtCondition &cond, DeclContext *dc);
-
-  /// Type-check a pattern binding in an 'if' or 'while' statement condition.
-  bool typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
-                                          DeclContext *dc);
   
   /// \brief Determine the semantics of a checked cast operation.
   ///
