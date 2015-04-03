@@ -491,10 +491,10 @@ private:
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
                                const FailureHandler &failure);
-  void emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
-                       ConsumableManagedValue src,
-                       const SpecializationHandler &handleSpec,
-                       const FailureHandler &failure);
+  void emitIsDispatch(ArrayRef<RowToSpecialize> rows,
+                      ConsumableManagedValue src,
+                      const SpecializationHandler &handleSpec,
+                      const FailureHandler &failure);
   void emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
@@ -1312,7 +1312,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   case PatternKind::Tuple:
     return emitTupleDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::Is:
-    return emitIsaDispatch(rowsToSpecialize, arg, handler, failure);
+    return emitIsDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::NominalType:
     return emitNominalTypeDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::EnumElement:
@@ -1560,10 +1560,10 @@ emitSerialCastOperand(SILGenFunction &SGF, SILLocation loc,
 }
 
 /// Perform specialized dispatch for a sequence of IsPatterns.
-void PatternMatchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
-                                           ConsumableManagedValue src,
+void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
+                                          ConsumableManagedValue src,
                                        const SpecializationHandler &handleCase,
-                                           const FailureHandler &failure) {
+                                          const FailureHandler &failure) {
   // Collect the types to which we're going to cast.
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
@@ -1592,14 +1592,14 @@ void PatternMatchEmission::emitIsaDispatch(ArrayRef<RowToSpecialize> rows,
     specializedRows.resize(specEnd - specBegin);
     for (unsigned i = specBegin; i != specEnd; ++i) {
       auto &specRow = specializedRows[i - specBegin];
-      auto isa = cast<IsPattern>(rows[i].Pattern);
+      auto is = cast<IsPattern>(rows[i].Pattern);
       specRow.RowIndex = rows[i].RowIndex;
-      specRow.Patterns.push_back(isa->getSubPattern());
+      specRow.Patterns.push_back(is->getSubPattern());
       isIrrefutable = (isIrrefutable || rows[i].Irrefutable);
     }
 
     SILLocation loc = rows[specBegin].Pattern;
-    CleanupLocation cleanupLoc = CleanupLocation::getCleanupLocation(loc);
+    auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
 
     // emitCheckedCastBranch's idea of what "success" means is local
     // to the cast.  A cast that leads to a refutable row is not a

@@ -2327,7 +2327,8 @@ namespace {
       }
 
       // Emit the success block.
-      SGF.B.setInsertionPoint(trueBB); {
+      SGF.B.setInsertionPoint(trueBB);
+      {
         FullExpr scope(SGF.Cleanups, CleanupLocation::getCleanupLocation(Loc));
 
         ManagedValue result;
@@ -2346,7 +2347,8 @@ namespace {
       }
 
       // Emit the failure block.
-      SGF.B.setInsertionPoint(falseBB); {
+      SGF.B.setInsertionPoint(falseBB);
+      {
         FullExpr scope(SGF.Cleanups, CleanupLocation::getCleanupLocation(Loc));
 
         // If we're using the scalar strategy, handle the consumption rules.
