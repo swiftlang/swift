@@ -175,9 +175,15 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
       }
       result += ")";
   }
+  
+  if (func->throws()) {
+    result += " throws";
+  }
 
   result += " -> ";
-  _buildNameForMetadata(func->ResultType, TypeSyntaxLevel::Type, result);
+  _buildNameForMetadata(func->ResultType.getPointer(),
+                        TypeSyntaxLevel::Type,
+                        result);
 }
 
 // Build a user-comprehensible name for a type.

@@ -324,8 +324,9 @@ namespace {
         metadata->setKind(Kind);
         metadata->ValueWitnesses = &ValueWitnesses;
         metadata->NumArguments = numArguments;
-        metadata->ResultType = reinterpret_cast<const Metadata *>(
+        metadata->ResultType = FunctionTypeMetadata::Argument::getFromOpaqueValue(
           argsAndResult[numArguments]);
+        metadata->Throws = metadata->ResultType.getFlag();
 
         for (size_t i = 0; i < numArguments; ++i) {
           auto arg = FunctionTypeMetadata::Argument::getFromOpaqueValue(

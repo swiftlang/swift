@@ -26,3 +26,42 @@ println(twice(double, 5))
 println(twice({ $0 + 1 }, 5))
 // CHECK: 3
 println(twice({ x in x - 1 }, 5))
+
+func curry1() {
+
+}
+
+func curry1Throws() throws {
+
+}
+
+func curry2() -> () -> () {
+	return curry1
+}
+
+func curry2Throws() throws -> () -> () {
+	return curry1
+}
+
+func curry3() -> () throws -> () {
+	return curry1Throws
+}
+
+func curry3Throws() throws -> () throws -> () {
+	return curry1Throws
+}
+
+println(curry1.dynamicType)
+// CHECK: () -> ()
+
+println(curry2.dynamicType)
+// CHECK: () -> () -> ()
+
+println(curry2Throws.dynamicType)
+// CHECK: () throws -> () -> ()
+
+println(curry3.dynamicType)
+// CHECK: () -> () throws -> ()
+
+println(curry3Throws.dynamicType)
+// CHECK: () throws -> () throws -> ()

@@ -665,6 +665,23 @@ namespace {
                         "metadata ref for generic function type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
+      
+    llvm::Value *extractAndMarkResultType(CanFunctionType type) {
+      // If the function type throws, set the lower bit of the return type
+      // address, so that we can carry this information over to the function
+      // type metadata.
+      auto metadata = IGF.emitTypeMetadataRef(type->getResult()->
+                                              getCanonicalType());
+      if (type->throws()) {
+        auto metadataInt = IGF.Builder.CreatePtrToInt(metadata,
+                                                      IGF.IGM.SizeTy);
+        auto returnsFlag = llvm::ConstantInt::get(IGF.IGM.SizeTy, 1);
+        auto marked = IGF.Builder.CreateOr(metadataInt, returnsFlag);
+        return IGF.Builder.CreateIntToPtr(marked, metadata->getType());
+      }
+      
+      return metadata;
+    }
 
     llvm::Value *extractAndMarkInOut(CanType type) {
       // If the type is inout, get the metadata for its inner object type
@@ -676,17 +693,18 @@ namespace {
         auto inoutFlag = llvm::ConstantInt::get(IGF.IGM.SizeTy, 1);
         auto marked = IGF.Builder.CreateOr(metadataInt, inoutFlag);
         return IGF.Builder.CreateIntToPtr(marked, IGF.IGM.Int8PtrTy);
-      } else {
-        auto metadata = IGF.emitTypeMetadataRef(type);
-        return IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
       }
+      
+      auto metadata = IGF.emitTypeMetadataRef(type);
+      return IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
     }
 
     llvm::Value *visitFunctionType(CanFunctionType type) {
       if (auto metatype = tryGetLocal(type))
         return metatype;
 
-      auto resultMetadata = IGF.emitTypeMetadataRef(type.getResult());
+      auto resultMetadata = extractAndMarkResultType(type);
+      
       CanTupleType inputTuple = dyn_cast<TupleType>(type.getInput());
 
       size_t numArguments = 1;

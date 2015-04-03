@@ -1494,12 +1494,16 @@ struct StructMetadata : public Metadata {
 /// The structure of function type metadata.
 struct FunctionTypeMetadata : public Metadata {
   using Argument = FlaggedPointer<const Metadata *, 0>;
+  using Result = FlaggedPointer<const Metadata *, 0>;
 
   /// The number of arguments to the function.
-  size_t NumArguments;
+  unsigned NumArguments : 31;
+  
+  /// Whether or not this function type throws.
+  unsigned Throws : 1;
 
   /// The type metadata for the result type.
-  const Metadata *ResultType;
+  Result ResultType;
 
   Argument *getArguments() {
     return reinterpret_cast<Argument *>(this + 1);
@@ -1508,6 +1512,8 @@ struct FunctionTypeMetadata : public Metadata {
   const Argument *getArguments() const {
     return reinterpret_cast<const Argument *>(this + 1);
   }
+  
+  bool throws() const { return Throws; }
 
   static bool classof(const Metadata *metadata) {
     return metadata->getKind() == MetadataKind::Function ||
