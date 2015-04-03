@@ -251,7 +251,7 @@ ClangImporter::create(ASTContext &ctx,
       "-D_ISO646_H_", "-D__ISO646_H",
 
       // Request new APIs from Foundation.
-      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=2",
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=3",
     };
     invocationArgStrs.insert(invocationArgStrs.end(), extraArgs.begin(),
                              extraArgs.end());
