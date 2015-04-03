@@ -351,8 +351,8 @@ extension _ArrayBuffer {
         _precondition(_isNativeNoDTC,
           "inout rules were violated: the array was overwritten")
       }
-      return _native._isValidSubscript(index,
-                                   hoistedIsNativeBuffer: true)
+      return _nativeNoDTC._isValidSubscript(index,
+                                            hoistedIsNativeBuffer: true)
     }
     if (_isClassOrObjCExistential(T.self)) {
       _precondition(!_isNativeNoDTC,
@@ -370,7 +370,7 @@ extension _ArrayBuffer {
   @inline(__always)
   func getElement(i: Int, hoistedIsNativeNoDTCBuffer: Bool) -> T {
     if _fastPath(hoistedIsNativeNoDTCBuffer) {
-      return _native[i]
+      return _nativeNoDTC[i]
     }
     return unsafeBitCast(_getElementSlowPath(i), T.self)
   }
@@ -525,6 +525,13 @@ extension _ArrayBuffer {
     return NativeBuffer(
       _isClassOrObjCExistential(T.self)
       ? _storage.nativeInstance : _storage.nativeInstance_noSpareBits)
+  }
+
+  /// Fast access to the native representation.
+  ///
+  /// Requires:  `_isNativeNoDTC`
+  var _nativeNoDTC: NativeBuffer {
+    return NativeBuffer(_storage.nativeInstance_noSpareBits)
   }
 
   var _nonNative: _NSArrayCoreType {
