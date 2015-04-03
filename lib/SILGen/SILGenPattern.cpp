@@ -1587,7 +1587,6 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
     }
 
     // Build the specialized-rows array.
-    bool isIrrefutable = false;
     SmallVector<SpecializedRow, 4> specializedRows;
     specializedRows.resize(specEnd - specBegin);
     for (unsigned i = specBegin; i != specEnd; ++i) {
@@ -1595,25 +1594,14 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
       auto is = cast<IsPattern>(rows[i].Pattern);
       specRow.RowIndex = rows[i].RowIndex;
       specRow.Patterns.push_back(is->getSubPattern());
-      isIrrefutable = (isIrrefutable || rows[i].Irrefutable);
     }
 
     SILLocation loc = rows[specBegin].Pattern;
     auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
 
-    // emitCheckedCastBranch's idea of what "success" means is local
-    // to the cast.  A cast that leads to a refutable row is not a
-    // global success, and we e.g. can't emit a take from the operand.
-    bool isFinal = (specEnd == numRows);
     CleanupStateRestorationScope forwardingScope(SGF.Cleanups);
-    ConsumableManagedValue castOperand;
-    if (isIrrefutable || (isFinal && operand.isOwned())) {
-      forwardIntoIrrefutableSubtree(forwardingScope, operand);
-      castOperand = operand;
-    } else {
-      castOperand = operand.asBorrowedOperand();
-    }
-
+    ConsumableManagedValue castOperand = operand.asBorrowedOperand();
+    
     // Enter an exitable scope.  On failure, we'll just go on to the next case.
     ExitableFullExpr scope(SGF, cleanupLoc);
     FailureHandler innerFailure = [&](SILLocation loc) {

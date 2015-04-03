@@ -265,13 +265,27 @@ func testAsPatternInIfLet(a : BaseClass?) {
   // CHECK-NEXT: bb0(%0 : $Optional<BaseClass>):
   // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>  // let a
   // CHECK-NEXT:   retain_value %0 : $Optional<BaseClass>
-  // CHECK-NEXT:   switch_enum %0 : $Optional<BaseClass>, case #Optional.Some!enumelt.1: bb1,
-  // CHECK:      bb1(%4 : $BaseClass):
-  // CHECK-NEXT:   checked_cast_br %4 : $BaseClass to $DerivedClass, bb2,
+  // CHECK-NEXT:   switch_enum %0 : $Optional<BaseClass>, case #Optional.Some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
+  
+  // CHECK:      [[OPTPRESENTBB]](%4 : $BaseClass):
+  // CHECK-NEXT:   checked_cast_br %4 : $BaseClass to $DerivedClass, [[ISDERIVEDBB:bb[0-9]+]], [[ISBASEBB:bb[0-9]+]]
 
-  // CHECK:      bb2(%6 : $DerivedClass):
+  // CHECK:      [[ISDERIVEDBB]](%6 : $DerivedClass):
   // CHECK-NEXT:   debug_value %6 : $DerivedClass
-  // CHECK-NEXT:   strong_release %6 : $DerivedClass
+  // CHECK-NEXT:   strong_release %4 : $BaseClass
+  // CHECK-NEXT:   br [[NILBB]]
+  
+  // CHECK: [[ISBASEBB]]:
+  // CHECK-NEXT: br [[ISBASEBBCLEANUP:bb[0-9]+]]
+  
+  // CHECK: [[ISBASEBBCLEANUP]]:
+  // CHECK-NEXT: strong_release %4 : $BaseClass
+  // CHECK-NEXT: br [[NILBB]]
+  
+  // CHECK:      [[NILBB]]:
+  // CHECK-NEXT:   release_value %0 : $Optional<BaseClass>
+  // CHECK-NEXT:   tuple ()
+  // CHECK-NEXT:   return
   if let b as DerivedClass = a {
 
   }

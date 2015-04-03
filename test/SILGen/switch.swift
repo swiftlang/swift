@@ -313,17 +313,24 @@ struct Z : P { func p() {} }
 
 // CHECK-LABEL: sil hidden  @_TF6switch10test_isa_1FT1pPS_1P__T_
 func test_isa_1(#p: P) {
+  // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $P
+  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]]#1 : $*P
   switch p {
-  // CHECK:   checked_cast_addr_br take_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+    // CHECK: [[TMPBUF:%[0-9]+]] = alloc_stack $X
+  // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in [[TMPBUF]]#1 : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
-  // CHECK: [[IS_X]]:
   case is X:
-  // CHECK:   function_ref @_TF6switch1aFT_T_
-  // CHECK:   br [[CONT:bb[0-9]+]]
+  // CHECK: [[IS_X]]:
+  // CHECK-NEXT: load [[TMPBUF]]#1
+  // CHECK-NEXT: dealloc_stack [[TMPBUF]]#0
+  // CHECK-NEXT: destroy_addr [[PTMPBUF]]#1
+  // CHECK-NEXT: dealloc_stack [[PTMPBUF]]#0
     a()
-
+    // CHECK:   function_ref @_TF6switch1aFT_T_
+    // CHECK:   br [[CONT:bb[0-9]+]]
+    
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   checked_cast_addr_br take_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
 // CHECK: [[IS_Y]]:
   case is Y:
@@ -332,7 +339,7 @@ func test_isa_1(#p: P) {
     b()
 
   // CHECK: [[IS_NOT_Y]]:
-  // CHECK:   checked_cast_addr_br take_on_success P in [[P]] : $*P to Z in {{%.*}} : $*Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success P in [[P]] : $*P to Z in {{%.*}} : $*Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
 
   // CHECK: [[IS_Z]]:
   case is Z:
@@ -380,7 +387,7 @@ func test_isa_2(#p: P) {
   // CHECK: [[NOT_CASE2]]:
   // CHECK: [[IS_NOT_Y]]:
 
-  // CHECK:   checked_cast_addr_br take_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[CASE3:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[CASE3:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   case (is X, _):
   // CHECK: [[CASE3]]:
@@ -444,7 +451,7 @@ func test_isa_class_1(let #x: B) {
 
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]]):
   case is D2:
-  // CHECK:   strong_release [[CAST_D2]]
+  // CHECK:   strong_release %0
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
@@ -1057,7 +1064,7 @@ func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
 
   // CHECK: [[IS_A]]([[A:%.*]] : $SubclassTestA):
   case is SubclassTestA:
-  // CHECK:   strong_release [[A]]
+  // CHECK:   strong_release %0
   // CHECK:   function_ref @_TF6switch1bFT_T_
   // CHECK:   br [[CONT]]
     b()
@@ -1082,7 +1089,7 @@ func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
 
   // CHECK: [[IS_B]]([[B:%.*]] : $SubclassTestB):
   case is SubclassTestB:
-  // CHECK:   strong_release [[B]]
+  // CHECK:   strong_release %0
   // CHECK:   function_ref @_TF6switch1dFT_T_
   // CHECK:   br [[CONT]]
     d()
@@ -1123,9 +1130,9 @@ func rdar14826416<T, U>(#t: T, #u: U) {
   }
 }
 // CHECK-LABEL: sil hidden @_TF6switch12rdar14826416U___FT1tQ_1uQ0__T_
-// CHECK:   checked_cast_addr_br take_on_success T in {{%.*}} : $*T to Int in {{%.*}} : $*Int, [[IS_INT:bb[0-9]+]], [[ISNT_INT:bb[0-9]+]]
+// CHECK:   checked_cast_addr_br copy_on_success T in {{%.*}} : $*T to Int in {{%.*}} : $*Int, [[IS_INT:bb[0-9]+]], [[ISNT_INT:bb[0-9]+]]
 // CHECK: [[ISNT_INT]]:
-// CHECK:   checked_cast_addr_br take_on_success T in {{%.*}} : $*T to U in {{%.*}} : $*U, [[ISNT_INT_IS_U:bb[0-9]+]], [[ISNT_INT_ISNT_U:bb[0-9]+]]
+// CHECK:   checked_cast_addr_br copy_on_success T in {{%.*}} : $*T to U in {{%.*}} : $*U, [[ISNT_INT_IS_U:bb[0-9]+]], [[ISNT_INT_ISNT_U:bb[0-9]+]]
 
 // <rdar://problem/14835992>
 class Rdar14835992 {}
