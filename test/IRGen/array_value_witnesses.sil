@@ -31,7 +31,7 @@ struct SomeWeak {
 // CHECK-64:      @__swift_memmove_array8_8
 // CHECK-NOT:     @_TwtTV21array_value_witnesses3POD
 // CHECK-32:      @__swift_memmove_array4_4
-// CHECK-32:      @__swift_memmove_array8_8
+// CHECK-64:      @__swift_memmove_array8_8
 
 // CHECK-LABEL: @_TWVV21array_value_witnesses14BitwiseTakable =
 // CHECK:         @_TwXxV21array_value_witnesses14BitwiseTakable
