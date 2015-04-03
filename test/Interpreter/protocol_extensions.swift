@@ -139,7 +139,7 @@ extension CollectionType where Self.Generator.Element == String {
 // CHECK: x, y, z
 println(["x", "y", "z"].myCommaSeparatedList)
 
-// CHECK: t, u, v
+// CHECK: ,
 println((["t", "u", "v"] as Set).myCommaSeparatedList)
 
 // CHECK: DONE
