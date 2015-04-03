@@ -197,6 +197,47 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
   return _swift_getErrorValue(errorObject, scratch, out);
 }
 
+// @asmname("swift_stdlib_getErrorDomainNSString")
+// public func _stdlib_getErrorDomainNSString<T: _ErrorType>
+//   (x: UnsafePointer<T>) -> AnyObject
+extern "C" NSString *swift_stdlib_getErrorDomainNSString(
+                                                 const OpaqueValue *error,
+                                                 const Metadata *T,
+                                                 const WitnessTable *ErrorType);
+// @asmname("swift_stdlib_getErrorCode")
+// public func _stdlib_getErrorCode<T: _ErrorType>(x: UnsafePointer<T>) -> Int
+extern "C" NSInteger swift_stdlib_getErrorCode(const OpaqueValue *error,
+                                               const Metadata *T,
+                                               const WitnessTable *ErrorType);
+
+/// Take an ErrorType box and turn it into a valid NSError instance.
+static id _swift_becomeNSError_(SwiftError *errorObject) {
+  auto ns = reinterpret_cast<NSError *>(errorObject);
+  // If we already have a domain set, then we've already initialized.
+  if (errorObject->domain)
+    return ns;
+  
+  // Otherwise, calculate the domain and code (TODO: and user info), and
+  // initialize the NSError.
+  auto value = SwiftError::getIndirectValue(&errorObject);
+  auto type = errorObject->getType();
+  auto witness = errorObject->getErrorConformance();
+  
+  NSString *domain = swift_stdlib_getErrorDomainNSString(value, type, witness);
+  NSInteger code = swift_stdlib_getErrorCode(value, type, witness);
+  // TODO: user info?
+  
+  [ns initWithDomain:domain code:code userInfo:nil];
+  return ns;
+}
+
+extern "C" auto *_swift_becomeNSError = _swift_becomeNSError_;
+
+id
+swift::swift_becomeNSError(SwiftError *errorObject) {
+  return _swift_becomeNSError(errorObject);
+}
+
 bool
 swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                     OpaqueValue *src,

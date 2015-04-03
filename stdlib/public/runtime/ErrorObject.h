@@ -28,6 +28,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreFoundation/CFRuntime.h>
+#include <objc/objc.h>
 
 namespace swift {
 
@@ -130,6 +131,9 @@ struct ErrorValueResult {
 extern "C" void swift_getErrorValue(const SwiftError *errorObject,
                                     void **scratch,
                                     ErrorValueResult *out);
+
+/// Initialize an ErrorType box to make it usable as an NSError instance.
+extern "C" id swift_becomeNSError(SwiftError *errorObject);
 
 #if SWIFT_OBJC_INTEROP
 /// Attempt to dynamically cast an NSError instance to a Swift ErrorType
