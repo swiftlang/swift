@@ -120,5 +120,27 @@ extension ExtensibleCollectionType {
 // CHECK: a,b,c
 println(",".myJoin(["a", "b", "c"]))
 
+// Constrained extensions for specific types.
+extension CollectionType where Self.Generator.Element == String {
+  var myCommaSeparatedList: String {
+    if startIndex == endIndex { return "" }
+
+    var result = ""
+    var first = true
+    for x in self {
+      if first { first = false }
+      else { result += ", " }
+      result += x
+    }
+    return result
+  }
+}
+
+// CHECK: x, y, z
+println(["x", "y", "z"].myCommaSeparatedList)
+
+// CHECK: t, u, v
+println((["t", "u", "v"] as Set).myCommaSeparatedList)
+
 // CHECK: DONE
 println("DONE")

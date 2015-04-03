@@ -182,9 +182,30 @@ struct S4b : P4 {
   func reqP4a() -> S4bHelper { return S4bHelper() }
 }
 
-func testP4(s4a: S4a, s4b: S4b) {
+struct S4c : P4 {
+  func reqP4a() -> Int { return 0 }
+}
+
+struct S4d : P4 {
+  func reqP4a() -> Bool { return false }
+}
+
+extension P4 where Self.AssocP4 == Int {
+  func extP4Int() { }
+}
+
+extension P4 where Self.AssocP4 == Bool {
+  func extP4a() -> Bool { return reqP4a() }
+}
+
+func testP4(s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   s4a.extP4a() // expected-error{{cannot invoke 'extP4a' with }}
   s4b.extP4a() // ok
+  s4c.extP4a() // expected-error{{cannot invoke 'extP4a' with no arguments}}
+  s4c.extP4Int() // okay
+  var b1 = s4d.extP4a() // okay, "Bool" version
+  b1 = true // checks type above
+  s4d.extP4Int() // expected-error{{cannot invoke 'extP4Int' with no arguments}}
 }
 
 // ----------------------------------------------------------------------------
