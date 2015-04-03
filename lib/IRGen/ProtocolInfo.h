@@ -166,6 +166,10 @@ public:
                                         ProtocolDecl *protocol,
                                         const ProtocolConformance &conf) const;
 
+  unsigned getNumWitnesses() const {
+    return NumWitnesses;
+  }
+
   unsigned getNumTableEntries() const {
     return NumTableEntries;
   }

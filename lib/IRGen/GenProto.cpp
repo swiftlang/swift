@@ -318,7 +318,9 @@ namespace {
       // witnesses to all its conformances.
       Entries.push_back(
                       WitnessTableEntry::forAssociatedType(ty, getNextIndex()));
-      NumWitnesses += ty->getConformingProtocols(nullptr).size();
+      for (auto *proto : ty->getConformingProtocols(nullptr))
+        if (requiresProtocolWitnessTable(proto))
+          ++NumWitnesses;
     }
 
     unsigned getNumWitnesses() const { return NumWitnesses; }
@@ -2961,6 +2963,9 @@ namespace {
     const ProtocolConformance &Conformance;
     ArrayRef<Substitution> Substitutions;
     ArrayRef<SILWitnessTable::Entry> SILEntries;
+#ifndef NDEBUG
+    const ProtocolInfo &PI;
+#endif
 
     void computeSubstitutionsForType() {
       // FIXME: This is a bit of a hack; the AST doesn't directly encode
@@ -2993,6 +2998,9 @@ namespace {
                IGM.getTypeInfoForUnlowered(SILWT->getConformance()->getType())),
         Conformance(*SILWT->getConformance()),
         SILEntries(SILWT->getEntries())
+#ifndef NDEBUG
+        , PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol()))
+#endif
     {
       computeSubstitutionsForType();
     }
@@ -3000,12 +3008,17 @@ namespace {
     /// A base protocol is witnessed by a pointer to the conformance
     /// of this type to that protocol.
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
+#ifndef NDEBUG
       auto &entry = SILEntries.front();
-      (void)entry;
       assert(entry.getKind() == SILWitnessTable::BaseProtocol
              && "sil witness table does not match protocol");
       assert(entry.getBaseProtocolWitness().Requirement == baseProto
              && "sil witness table does not match protocol");
+      auto piEntry = PI.getWitnessEntry(baseProto);
+      assert(piEntry.getOutOfLineBaseIndex().getValue() == Table.size()
+             && "offset doesn't match ProtocolInfo layout");
+#endif
+      
       SILEntries = SILEntries.slice(1);
 
       // TODO: Use the witness entry instead of falling through here.
@@ -3033,10 +3046,15 @@ namespace {
         return;
       }
 
+#ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
              && "sil witness table does not match protocol");
       assert(entry.getMethodWitness().Requirement.getDecl() == iface
              && "sil witness table does not match protocol");
+      auto piEntry = PI.getWitnessEntry(iface);
+      assert(piEntry.getFunctionIndex().getValue() == Table.size()
+             && "offset doesn't match ProtocolInfo layout");
+#endif
 
       SILFunction *Func = entry.getMethodWitness().Witness;
       llvm::Constant *witness = nullptr;
@@ -3066,12 +3084,16 @@ namespace {
     }
 
     void addAssociatedType(AssociatedTypeDecl *ty) {
+#ifndef NDEBUG
       auto &entry = SILEntries.front();
-      (void)entry;
       assert(entry.getKind() == SILWitnessTable::AssociatedType
              && "sil witness table does not match protocol");
       assert(entry.getAssociatedTypeWitness().Requirement == ty
              && "sil witness table does not match protocol");
+      auto piEntry = PI.getWitnessEntry(ty);
+      assert(piEntry.getAssociatedTypeIndex().getValue() == Table.size()
+             && "offset doesn't match ProtocolInfo layout");
+#endif
 
       SILEntries = SILEntries.slice(1);
 
@@ -3339,6 +3361,10 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   SmallVector<llvm::Constant*, 32> witnesses;
   WitnessTableBuilder(*this, witnesses, wt)
     .visit(wt->getConformance()->getProtocol());
+  
+  assert(getProtocolInfo(wt->getConformance()->getProtocol())
+           .getNumWitnesses() == witnesses.size()
+         && "witness table size doesn't match ProtocolInfo");
 
   // Produce the initializer value.
   auto tableTy = llvm::ArrayType::get(FunctionPtrTy, witnesses.size());
