@@ -191,8 +191,6 @@ bool Parser::parseTopLevel() {
   if (Tok.is(tok::NUM_TOKENS))
     consumeToken();
 
-  CurDeclContext = &SF;
-
   // Parse the body of the file.
   SmallVector<ASTNode, 128> Items;
 

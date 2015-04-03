@@ -267,6 +267,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SF(SF),
     L(Lex.release()),
     SIL(SIL),
+    CurDeclContext(&SF),
     Context(SF.getASTContext()) {
 
   State = PersistentState;

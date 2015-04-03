@@ -532,12 +532,14 @@ struct CodeCompletionCacheImpl {
     std::string ModuleName;
     std::vector<std::string> AccessPath;
     bool ResultsHaveLeadingDot;
+    bool ForTestableLookup;
 
     friend bool operator==(const Key &LHS, const Key &RHS) {
       return LHS.ModuleFilename == RHS.ModuleFilename &&
              LHS.ModuleName == RHS.ModuleName &&
              LHS.AccessPath == RHS.AccessPath &&
-             LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot;
+             LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
+             LHS.ForTestableLookup == RHS.ForTestableLookup;
     }
   };
 
@@ -568,10 +570,10 @@ template<>
 struct DenseMapInfo<swift::ide::CodeCompletionCacheImpl::Key> {
   using KeyTy = swift::ide::CodeCompletionCacheImpl::Key;
   static inline KeyTy getEmptyKey() {
-    return KeyTy{"", "", {}, false};
+    return KeyTy{"", "", {}, false, false};
   }
   static inline KeyTy getTombstoneKey() {
-    return KeyTy{"x", "", {}, false};
+    return KeyTy{"", "", {}, true, false};
   }
   static unsigned getHashValue(const KeyTy &Val) {
     size_t H = 0;
@@ -580,6 +582,7 @@ struct DenseMapInfo<swift::ide::CodeCompletionCacheImpl::Key> {
     for (auto Piece : Val.AccessPath)
       H ^= std::hash<std::string>()(Piece);
     H ^= std::hash<bool>()(Val.ResultsHaveLeadingDot);
+    H ^= std::hash<bool>()(Val.ForTestableLookup);
     return static_cast<unsigned>(H);
   }
   static bool isEqual(const KeyTy &LHS, const KeyTy &RHS) {
@@ -2841,12 +2844,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (Lookup.RequestedCachedResults) {
     // Create helpers for result caching.
     auto &SwiftContext = P.Context;
+    const SourceFile &SF = P.SF;
     auto FillCacheCallback =
-        [&SwiftContext](CodeCompletionCacheImpl &Cache,
-                        const CodeCompletionCacheImpl::Key &K,
-                        const Module *TheModule) {
+        [&SwiftContext, &SF](CodeCompletionCacheImpl &Cache,
+                             const CodeCompletionCacheImpl::Key &K,
+                             const Module *TheModule) {
       auto V = Cache.getResultSinkFor(K);
-      CompletionLookup Lookup(V->Sink, SwiftContext, nullptr);
+      CompletionLookup Lookup(V->Sink, SwiftContext,
+                              K.ForTestableLookup ? &SF : nullptr);
       Lookup.getVisibleDeclsOfModule(TheModule, K.AccessPath,
                                      K.ResultsHaveLeadingDot);
       Cache.storeResults(K, V);
@@ -2880,7 +2885,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (!ModuleFilename.empty()) {
         CodeCompletionCacheImpl::Key K{ModuleFilename,
                                        TheModule->Name.str(),
-                                       AccessPath, Request.NeedLeadingDot};
+                                       AccessPath,
+                                       Request.NeedLeadingDot,
+                                       SF.hasTestableImport(TheModule)};
         std::pair<decltype(ImportsSeen)::iterator, bool>
         Result = ImportsSeen.insert(K);
         if (!Result.second)

@@ -885,6 +885,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                      const DeclContext *CurrDC,
                                      LazyResolver *TypeResolver) {
+  assert(CurrDC);
   ::lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC,
                              LookupState::makeQualified(),
                              DeclVisibilityKind::MemberOfCurrentNominal,

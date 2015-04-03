@@ -27,11 +27,10 @@ import complete_testable_helper
 
 // TOP_LEVEL-ALL: Begin completions
 // TOP_LEVEL-ALL-DAG: Decl[Struct]/OtherModule[complete_testable_helper]: PublicStruct[#PublicStruct#]; name=PublicStruct
-// FIXME-TESTABLE-DAG: Decl[Struct]/OtherModule[complete_testable_helper]: InternalStruct[#InternalStruct#]; name=InternalStruct
+// TOP_LEVEL-TESTABLE-DAG: Decl[Struct]/OtherModule[complete_testable_helper]: InternalStruct[#InternalStruct#]; name=InternalStruct
 // TOP_LEVEL-ALL: End completions
 
 // TOP_LEVEL-NEG-NOT: InternalStruct
-// FIXME: TOP_LEVEL-TESTABLE-NEG-NOT: InternalStruct
 // TOP_LEVEL-ALL-NEG-NOT: PrivateStruct
 
 func test(value: PublicStruct) {
