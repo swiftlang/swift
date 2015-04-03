@@ -35,8 +35,7 @@ tests.test("AnyGenerator") {
 
 let initialCallCounts = [
   "successor": 0, "predecessor": 0,
-  "preincrement": 0, "predecrement": 0,
-  "postincrement": 0, "postdecrement": 0,
+  "_successorInPlace": 0, "_predecessorInPlace": 0,
   "advancedBy": 0, "distanceTo": 0
 ]
 
@@ -60,14 +59,9 @@ struct InstrumentedIndex<I: RandomAccessIndexType> : RandomAccessIndexType {
     return InstrumentedIndex(base.successor())
   }
   
-  mutating func preincrement() {
-    ++callCounts["preincrement"]!
-    ++base
-  }
-  
-  mutating func postincrement() {
-    ++callCounts["postincrement"]!
-    base++
+  mutating func _successorInPlace() {
+    ++callCounts["_successorInPlace"]!
+    base._successorInPlace()
   }
   
   func predecessor() -> InstrumentedIndex {
@@ -75,16 +69,11 @@ struct InstrumentedIndex<I: RandomAccessIndexType> : RandomAccessIndexType {
     return InstrumentedIndex(base.predecessor())
   }
   
-  mutating func predecrement() {
-    ++callCounts["predecrement"]!
-    --base
+  mutating func _predecessorInPlace() {
+    ++callCounts["_predecessorInPlace"]!
+    base._predecessorInPlace()
   }
   
-  mutating func postdecrement() {
-    ++callCounts["postdecrement"]!
-    base--
-  }
-
   func advancedBy(distance: Distance) -> InstrumentedIndex {
     ++callCounts["advancedBy"]!
     return InstrumentedIndex(base.advancedBy(distance))
@@ -94,28 +83,6 @@ struct InstrumentedIndex<I: RandomAccessIndexType> : RandomAccessIndexType {
     ++callCounts["distanceTo"]!
     return base.distanceTo(other.base)
   }
-}
-
-prefix func ++ <I>(inout x: InstrumentedIndex<I>) -> InstrumentedIndex<I> {
-  x.preincrement()
-  return x
-}
-
-postfix func ++ <I>(inout x: InstrumentedIndex<I>) -> InstrumentedIndex<I> {
-  let r = x
-  x.postincrement()
-  return r
-}
-
-prefix func -- <I>(inout x: InstrumentedIndex<I>) -> InstrumentedIndex<I> {
-  x.predecrement()
-  return x
-}
-
-postfix func -- <I>(inout x: InstrumentedIndex<I>) -> InstrumentedIndex<I> {
-  let r = x
-  x.postdecrement()
-  return r
 }
 
 tests.test("Sequence") {
@@ -131,36 +98,29 @@ tests.test("ForwardIndex") {
   var i = AnyForwardIndex(InstrumentedIndex(0))
   i = i.successor()
   expectEqual(1, callCounts["successor"])
-  expectEqual(0, callCounts["preincrement"])
-  expectEqual(0, callCounts["postincrement"])
+  expectEqual(0, callCounts["_successorInPlace"])
   ++i
   expectEqual(1, callCounts["successor"])
-  expectEqual(1, callCounts["preincrement"])
-  expectEqual(0, callCounts["postincrement"])
+  expectEqual(1, callCounts["_successorInPlace"])
   i++
   expectEqual(2, callCounts["successor"])
-  expectEqual(1, callCounts["preincrement"])
-  expectEqual(0, callCounts["postincrement"])
+  expectEqual(1, callCounts["_successorInPlace"])
 }
 
 tests.test("BidirectionalIndex") {
   var i = AnyBidirectionalIndex(InstrumentedIndex(0))
   expectEqual(0, callCounts["predecessor"])
-  expectEqual(0, callCounts["predecrement"])
-  expectEqual(0, callCounts["postdecrement"])
+  expectEqual(0, callCounts["_predecessorInPlace"])
 
   i = i.predecessor()
   expectEqual(1, callCounts["predecessor"])
-  expectEqual(0, callCounts["predecrement"])
-  expectEqual(0, callCounts["postdecrement"])
+  expectEqual(0, callCounts["_predecessorInPlace"])
   --i
   expectEqual(1, callCounts["predecessor"])
-  expectEqual(1, callCounts["predecrement"])
-  expectEqual(0, callCounts["postdecrement"])
+  expectEqual(1, callCounts["_predecessorInPlace"])
   i--
   expectEqual(2, callCounts["predecessor"])
-  expectEqual(1, callCounts["predecrement"])
-  expectEqual(0, callCounts["postdecrement"])
+  expectEqual(1, callCounts["_predecessorInPlace"])
 }
 
 tests.test("ForwardCollection") {
