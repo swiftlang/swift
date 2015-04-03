@@ -71,4 +71,56 @@ tests.test("unsafeUnwrap") {
   unsafeUnwrap(empty)
 }
 
+var NoisyLifeCount = 0
+var NoisyDeathCount = 0
+
+protocol P {}
+
+class Noisy: P {
+  init() { ++NoisyLifeCount }
+  deinit { ++NoisyDeathCount }
+}
+
+struct Large: P {
+  var a, b, c, d: Noisy
+
+  init() {
+    self.a = Noisy()
+    self.b = Noisy()
+    self.c = Noisy()
+    self.d = Noisy()
+  }
+}
+
+struct ContainsP { var p: P }
+
+func exerciseArrayValueWitnesses<T>(value: T) {
+  let buf = UnsafeMutablePointer<T>.alloc(5)
+
+  (buf + 0).initialize(value)
+  (buf + 1).initialize(value)
+  
+  Builtin.copyArray(T.self, (buf + 2)._rawValue, buf._rawValue, 2._builtinWordValue)
+  Builtin.takeArrayBackToFront(T.self, (buf + 1)._rawValue, buf._rawValue, 4._builtinWordValue)
+  Builtin.takeArrayFrontToBack(T.self, buf._rawValue, (buf + 1)._rawValue, 4._builtinWordValue)
+  Builtin.destroyArray(T.self, buf._rawValue, 4._builtinWordValue)
+
+  buf.dealloc(5)
+}
+
+tests.test("array value witnesses") {
+  NoisyLifeCount = 0
+  NoisyDeathCount = 0
+  do {
+    exerciseArrayValueWitnesses(44)
+    exerciseArrayValueWitnesses(Noisy())
+    exerciseArrayValueWitnesses(Noisy() as P)
+    exerciseArrayValueWitnesses(Large())
+    exerciseArrayValueWitnesses(Large() as P)
+    exerciseArrayValueWitnesses(ContainsP(p: Noisy()))
+    exerciseArrayValueWitnesses(ContainsP(p: Large()))
+  }
+  expectEqual(NoisyLifeCount, NoisyDeathCount)
+}
+
 runAllTests()
