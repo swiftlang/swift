@@ -10,6 +10,7 @@ function(_report_sdk prefix)
   message(STATUS "${SWIFT_SDK_${prefix}_NAME} SDK:")
   message(STATUS "  Path: ${SWIFT_SDK_${prefix}_PATH}")
   message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
+  message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
   message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
   message(STATUS "  Library subdir: ${SWIFT_SDK_${prefix}_LIB_SUBDIR}")
   message(STATUS "  Version min name: ${SWIFT_SDK_${prefix}_VERSION_MIN_NAME}")
@@ -49,6 +50,7 @@ endfunction()
 #   SWIFT_SDK_${prefix}_NAME                Display name for the SDK
 #   SWIFT_SDK_${prefix}_PATH                Path to the SDK
 #   SWIFT_SDK_${prefix}_VERSION             SDK version number (e.g., 10.9, 7.0)
+#   SWIFT_SDK_${prefix}_BUILD_NUMBER        SDK build number (e.g., 14A389a)
 #   SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION  Deployment version (e.g., 10.9, 7.0)
 #   SWIFT_SDK_${prefix}_LIB_SUBDIR          Library subdir for this SDK
 #   SWIFT_SDK_${prefix}_VERSION_MIN_NAME    Version min name for this SDK
@@ -90,6 +92,11 @@ macro(configure_sdk_darwin
       OUTPUT_VARIABLE SWIFT-SDK_${prefix}_VERSION
       OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+  execute_process(
+    COMMAND "xcodebuild" "-sdk" "${SWIFT_SDK_${prefix}_PATH}" "-version" "ProductBuildVersion"
+      OUTPUT_VARIABLE SWIFT_SDK_${prefix}_BUILD_NUMBER
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+
   # Set other variables.
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "${deployment_version}")
@@ -117,6 +124,7 @@ macro(configure_sdk_unix
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_PATH "/")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
+  set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${lib_subdir}")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "")
@@ -140,6 +148,7 @@ function(configure_target_variant prefix name sdk build_config lib_subdir)
   set(SWIFT_VARIANT_${prefix}_NAME               ${name})
   set(SWIFT_VARIANT_${prefix}_SDK_PATH           ${SWIFT_SDK_${sdk}_PATH})
   set(SWIFT_VARIANT_${prefix}_VERSION            ${SWIFT_SDK_${sdk}_VERSION})
+  set(SWIFT_VARIANT_${prefix}_BUILD_NUMBER       ${SWIFT_SDK_${sdk}_BUILD_NUMBER})
   set(SWIFT_VARIANT_${prefix}_DEPLOYMENT_VERSION ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
   set(SWIFT_VARIANT_${prefix}_LIB_SUBDIR         "${lib_subdir}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
   set(SWIFT_VARIANT_${prefix}_VERSION_MIN_NAME   ${SWIFT_SDK_${sdk}_VERSION_MIN_NAME})
