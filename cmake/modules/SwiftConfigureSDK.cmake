@@ -89,7 +89,7 @@ macro(configure_sdk_darwin
   # Determine the SDK version we found.
   execute_process(
     COMMAND "defaults" "read" "${SWIFT_SDK_${prefix}_PATH}/SDKSettings.plist" "Version"
-      OUTPUT_VARIABLE SWIFT-SDK_${prefix}_VERSION
+      OUTPUT_VARIABLE SWIFT_SDK_${prefix}_VERSION
       OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   execute_process(
