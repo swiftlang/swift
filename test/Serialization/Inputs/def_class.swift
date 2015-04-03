@@ -52,7 +52,7 @@ public protocol Resettable {
 }
 
 public extension Resettable {
-  func doReset() { self.reset() }
+  final func doReset() { self.reset() }
 }
 
 public class ResettableIntWrapper : Resettable {

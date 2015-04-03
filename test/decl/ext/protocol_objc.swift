@@ -7,7 +7,7 @@
 }
 
 extension OP1 {
-  func extOP1a() -> Bool { return !reqOP1a() }
+  final func extOP1a() -> Bool { return !reqOP1a() }
 }
 
 class OC1 : OP1 {

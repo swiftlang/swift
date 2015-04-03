@@ -2153,7 +2153,7 @@ public:
     return D->getKind() == DeclKind::IfConfig;
   }
 };
-  
+
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
@@ -2374,6 +2374,10 @@ public:
   /// predicates will be false for declarations that either categorically
   /// can't be "static" or are in a context where "static" doesn't make sense.
   bool isStatic() const;
+
+  /// Retrieve the location at which we should insert a new attribute or
+  /// modifier.
+  SourceLoc getAttributeInsertionLoc(bool forModifier) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&

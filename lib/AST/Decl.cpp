@@ -1693,6 +1693,19 @@ void ValueDecl::setInterfaceType(Type type) {
   InterfaceTy = type;
 }
 
+SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
+  if (auto var = dyn_cast<VarDecl>(this)) {
+    if (auto pbd = var->getParentPatternBinding()) {
+      SourceLoc resultLoc = pbd->getAttrs().getStartLoc(forModifier);
+      return resultLoc.isValid() ? resultLoc : pbd->getStartLoc();
+    }
+  }
+
+  SourceLoc resultLoc = getAttrs().getStartLoc(forModifier);
+  return resultLoc.isValid() ? resultLoc : getStartLoc();
+}
+
+
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this)) {
     if (isa<ErrorType>(TAD->getType()->getCanonicalType())) {

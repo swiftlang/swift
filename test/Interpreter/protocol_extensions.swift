@@ -2,7 +2,7 @@
 
 // Extend a protocol with a property.
 extension SequenceType {
-  var myCount: Int {
+  final var myCount: Int {
     var result = 0
     for x in self {
       ++result
@@ -16,13 +16,13 @@ println(["a", "b", "c", "d"].myCount)
 
 // Extend a protocol with a function.
 extension CollectionType {
-  var myIndices: Range<Index> {
+  final var myIndices: Range<Index> {
     return Range(start: startIndex, end: endIndex)
   }
 }
 
 extension CollectionType {
-  func indexMatching(fn: Generator.Element -> Bool) -> Index? {
+  final func indexMatching(fn: Generator.Element -> Bool) -> Index? {
     for i in myIndices {
       if fn(self[i]) { return i }
     }
@@ -36,7 +36,7 @@ println(["a", "b", "c", "d"].indexMatching({$0 == "c"})!)
 // Extend certain instances of a collection (those that have equatable
 // element types) with another algorithm.
 extension CollectionType where Self.Generator.Element : Equatable {
-  func myIndexOf(element: Generator.Element) -> Index? {
+  final func myIndexOf(element: Generator.Element) -> Index? {
     for i in indices(self) {
       if self[i] == element { return i }
     }
@@ -49,7 +49,7 @@ extension CollectionType where Self.Generator.Element : Equatable {
 println(["a", "b", "c", "d", "e"].myIndexOf("d")!)
 
 extension SequenceType {
-  public func myEnumerate() -> EnumerateSequence<Self> { 
+  final public func myEnumerate() -> EnumerateSequence<Self> { 
     return EnumerateSequence(self)
   }
 }
@@ -62,7 +62,7 @@ for (index, element) in ["a", "b", "c"].myEnumerate() {
 }
 
 extension SequenceType {
-  public func myReduce<T>(
+  final public func myReduce<T>(
     initial: T, @noescape combine: (T, Self.Generator.Element) -> T
   ) -> T { 
     var result = initial
@@ -78,7 +78,7 @@ println([1, 2, 3, 4, 5].myReduce(0, combine: +))
 
 
 extension SequenceType {
-  public func myZip<S : SequenceType>(s: S) -> Zip2<Self, S> {
+  final public func myZip<S : SequenceType>(s: S) -> Zip2<Self, S> {
     return Zip2(self, s)
   }
 }
@@ -94,7 +94,7 @@ for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
 extension MutableCollectionType
   where Self.Index: RandomAccessIndexType, Self.Generator.Element : Comparable {
 
-  public mutating func myPartition(range: Range<Index>) -> Index {
+  public final mutating func myPartition(range: Range<Index>) -> Index {
     return Swift.partition(&self, range)
   }
 }
@@ -110,7 +110,7 @@ for i in evenOdd.myIndices {
 println()
 
 extension ExtensibleCollectionType {
-  public func myJoin<S : SequenceType where S.Generator.Element == Self>(
+  public final func myJoin<S : SequenceType where S.Generator.Element == Self>(
     elements: S
   ) -> Self {
     return Swift.join(self, elements)

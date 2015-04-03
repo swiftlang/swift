@@ -701,6 +701,9 @@ ERROR(extension_protocol_inheritance,sema_tcd,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(extension_protocol_type_definition,sema_tcd,none,
       "type %0 cannot be defined within a protocol extension", (DeclName))
+ERROR(extension_protocol_member_nonfinal,sema_tcd,none,
+      "%select{method %1|property %1|subscript|initializer %}0 in protocol "
+      "extension must be marked 'final'", (unsigned, DeclName))
 
 // Protocols
 ERROR(type_does_not_conform,sema_tcd,none,

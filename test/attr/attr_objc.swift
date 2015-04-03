@@ -1742,15 +1742,15 @@ class Load1 {
 // Members of protocol extensions cannot be @objc
 
 extension PlainProtocol {
-  @objc var property: Int { return 5 } // expected-error{{variable in a protocol extension cannot be represented in Objective-C}}
-  @objc subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{subscript in a protocol extension cannot be represented in Objective-C}}
-  @objc func fun() { } // expected-error{{method in a protocol extension cannot be represented in Objective-C}}
+  @objc final var property: Int { return 5 } // expected-error{{variable in a protocol extension cannot be represented in Objective-C}}
+  @objc final subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{subscript in a protocol extension cannot be represented in Objective-C}}
+  @objc final func fun() { } // expected-error{{method in a protocol extension cannot be represented in Objective-C}}
 }
 
 extension Protocol_ObjC1 {
   // Don't infer @objc for extensions of @objc protocols.
 
-  // CHECK: {{^}} var property: Int
-  var property: Int { return 5 }
+  // CHECK: {{^}} final var property: Int
+  final var property: Int { return 5 }
 }
 

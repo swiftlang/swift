@@ -807,8 +807,10 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
     return;
 
   // 'final' only makes sense in the context of a class
-  // declaration.  Reject it on global functions, structs, enums, etc.
-  if (!D->getDeclContext()->isClassOrClassExtensionContext()) {
+  // declaration or a protocol extension.  Reject it on global functions,
+  // structs, enums, etc.
+  if (!D->getDeclContext()->isClassOrClassExtensionContext() &&
+      !D->getDeclContext()->isProtocolExtensionContext()) {
     TC.diagnose(attr->getLocation(), diag::member_cannot_be_final);
     return;
   }
