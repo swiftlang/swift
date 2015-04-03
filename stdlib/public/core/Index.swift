@@ -81,26 +81,26 @@ public func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
 ///
 /// Its requirements are inherited by `ForwardIndexType` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _IncrementableDefaultsType {
+public protocol _Incrementable : Equatable {
   /// Return the next consecutive value in a discrete sequence of
   /// `Self` values
   ///
   /// Requires: `self` has a well-defined successor.
   func successor() -> Self
-}
 
-extension _IncrementableDefaultsType {
-  @inline(__always)
-  public mutating func _successorInPlace() { self = self.successor() }
-}
+  /// Replace `self` with its `successor()` and return the updated
+  /// value of `self`.
+  ///
+  /// Note: models of this protocol need not implement `++`; a default
+  /// implementation is supplied by the Swift standard library.
+  prefix func ++ (inout _: Self) -> Self
 
-/// This protocol is an implementation detail of `ForwardIndexType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `ForwardIndexType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _Incrementable : Equatable, _IncrementableDefaultsType {
-  mutating func _successorInPlace()
+  /// Replace `self` with its `successor()` and return the original
+  /// value of `self`.
+  ///
+  /// Note: models of this protocol need not implement `++`; a default
+  /// implementation is supplied by the Swift standard library.
+  postfix func ++ (inout _: Self) -> Self
 }
 
 //===----------------------------------------------------------------------===//
@@ -137,7 +137,7 @@ public protocol _ForwardIndexType : _Incrementable {
 /// `i`.
 @transparent
 public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
-  i._successorInPlace()
+  i = i.successor()
   return i
 }
 
@@ -146,7 +146,7 @@ public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
 @transparent
 public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
   var ret = i
-  i._successorInPlace()
+  i = i.successor()
   return ret
 }
 
@@ -230,7 +230,7 @@ func _advanceForward<T: _ForwardIndexType>(
 ///
 /// Its requirements are inherited by `BidirectionalIndexType` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _BidirectionalIndexDefaultsType : _ForwardIndexType {
+public protocol _BidirectionalIndexType : _ForwardIndexType {
   /// Return the previous consecutive value in a discrete sequence.
   ///
   /// If `self` has a well-defined successor,
@@ -240,31 +240,32 @@ public protocol _BidirectionalIndexDefaultsType : _ForwardIndexType {
   ///
   /// Requires: `self` has a well-defined predecessor.
   func predecessor() -> Self
-}
 
-extension _BidirectionalIndexDefaultsType {
-  @inline(__always)
-  public mutating func _predecessorInPlace() { self = self.predecessor() }
-}
+  /// Replace `self` with its `predecessor()` and return the updated
+  /// value of `self`.
+  ///
+  /// Note: models of this protocol need not implement `--`; a default
+  /// implementation is supplied by the Swift standard library.
+  prefix func -- (inout _: Self) -> Self
 
-/// This protocol is an implementation detail of `BidirectionalIndexType`; do
-/// not use it directly.
-public protocol _BidirectionalIndexType
-: _ForwardIndexType, _BidirectionalIndexDefaultsType {
-  mutating func _predecessorInPlace()
+  /// Replace `self` with its `predecessor()` and return the original
+  /// value of `self`.
+  ///
+  /// Note: models of this protocol need not implement `--`; a default
+  /// implementation is supplied by the Swift standard library.
+  postfix func -- (inout _: Self) -> Self
 }
 
 /// An *index* that can step backwards via application of its
 /// `predecessor()` method.
 public protocol BidirectionalIndexType 
-  : ForwardIndexType, _BidirectionalIndexType {
-}
+  : ForwardIndexType, _BidirectionalIndexType {}
 
 /// Replace `i` with its `predecessor()` and return the updated value
 /// of `i`.
 @transparent
 public prefix func -- <T: _BidirectionalIndexType> (inout i: T) -> T {
-  i._predecessorInPlace()
+  i = i.predecessor()
   return i
 }
 
@@ -274,7 +275,7 @@ public prefix func -- <T: _BidirectionalIndexType> (inout i: T) -> T {
 @transparent
 public postfix func -- <T: _BidirectionalIndexType> (inout i: T) -> T {
   var ret = i
-  i._predecessorInPlace()
+  i = i.predecessor()
   return ret
 }
 
