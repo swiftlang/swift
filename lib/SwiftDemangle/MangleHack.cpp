@@ -18,10 +18,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Strings.h"
-#include "swift/FunctionNameDemangle/MangleHack.h"
-#include "cassert"
-#include "cstring"
-#include "cstdio"
+#include "swift/SwiftDemangle/MangleHack.h"
+#include <cassert>
+#include <cstring>
+#include <cstdio>
 
 const char *
 _swift_mangleSimpleClass(const char *module, const char *class_) {

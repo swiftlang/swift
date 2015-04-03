@@ -1,4 +1,4 @@
-//===-- FunctionNameDemangle.h - Public demangling interface------*- C -*--===//
+//===--- SwiftDemangle.h - Public demangling interface -----------*- C -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,13 +11,43 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This header declares functions in the libfunctionNameDemangle library,
+/// This header declares functions in the libswiftDemangle library,
 /// which provides external access to Swift's demangler.
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_FUNCTION_NAME_DEMANGLE_H
-#define SWIFT_FUNCTION_NAME_DEMANGLE_H
+#ifndef SWIFT_DEMANGLE_SWIFT_DEMANGLE_H
+#define SWIFT_DEMANGLE_SWIFT_DEMANGLE_H
+
+/// @{
+/// Version constants for libswiftDemangle library.
+
+/// Major version changes when there are ABI or source incompatible changes.
+#define SWIFT_DEMANGLE_VERSION_MAJOR 1
+
+/// Minor version changes when new APIs are added in ABI- and source-compatible
+/// way.
+#define SWIFT_DEMANGLE_VERSION_MINOR 1
+
+/// @}
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/// \brief Demangle Swift function names.
+///
+/// \returns the length of the demangled function name (even if greater than the
+/// size of the output buffer) or 0 if the input is not a Swift-mangled function
+/// name (in which cases \p OutputBuffer is left untouched).
+size_t swift_demangle_getDemangledName(const char *MangledName, char *OutputBuffer,
+                                       size_t Length);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
+
+// Old API.  To be removed when we remove the compatibility symlink.
 
 /// @{
 /// Version constants for libfunctionNameDemangle library.
@@ -50,5 +80,5 @@ size_t fnd_get_demangled_name(const char *MangledName, char *OutputBuffer,
 } // extern "C"
 #endif
 
-#endif // SWIFT_FUNCTION_NAME_DEMANGLE_H
+#endif // SWIFT_DEMANGLE_SWIFT_DEMANGLE_H
 

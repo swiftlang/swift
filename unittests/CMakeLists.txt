@@ -35,10 +35,10 @@ if(SWIFT_BUILD_TOOLS)
   add_subdirectory(Availability)
   add_subdirectory(Basic)
   add_subdirectory(Driver)
-  add_subdirectory(FunctionNameDemangle)
   add_subdirectory(IDE)
   add_subdirectory(Parse)
   add_subdirectory(ReST)
+  add_subdirectory(SwiftDemangle)
 
   if(SWIFT_BUILD_SDK_OVERLAY)
     # Runtime tests depend on symbols in StdlibUnittest.

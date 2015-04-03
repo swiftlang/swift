@@ -1,4 +1,4 @@
-//===-- FunctionNameDemangle.cpp - Public demangling interface-------------===//
+//===--- SwiftDemangle.cpp - Public demangling interface ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,21 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Functions in the libfunctionNameDemangle library, which provides external
-// access to Swift's internal demangling functionality.
+// Functions in the libswiftDemangle library, which provides external
+// access to Swift's demangler.
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/DemangleWrappers.h"
-#include "swift/FunctionNameDemangle/FunctionNameDemangle.h"
+#include "swift/SwiftDemangle/SwiftDemangle.h"
 
 /// \returns true if \p MangledName starts with Swift prefix, "_T".
 static bool isSwiftPrefixed(const char *MangledName) {
   return (MangledName[0] == '_' && MangledName[1] == 'T');
 }
 
-size_t fnd_get_demangled_name(const char *MangledName, char *OutputBuffer,
-                              size_t Length) {
+size_t swift_demangle_getDemangledName(const char *MangledName, char *OutputBuffer,
+                                       size_t Length) {
   assert(MangledName != nullptr && "null input");
   assert(OutputBuffer != nullptr || Length == 0);
 
@@ -42,5 +42,10 @@ size_t fnd_get_demangled_name(const char *MangledName, char *OutputBuffer,
 
   // Copy the result to an output buffer.
   return strlcpy(OutputBuffer, Result.c_str(), Length);
+}
+
+size_t fnd_get_demangled_name(const char *MangledName, char *OutputBuffer,
+                              size_t Length) {
+  return swift_demangle_getDemangledName(MangledName, OutputBuffer, Length);
 }
 

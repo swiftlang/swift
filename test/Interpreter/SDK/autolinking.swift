@@ -22,21 +22,21 @@ import Darwin
 
 #if USE_DIRECTLY
 
-@asmname("fnd_get_demangled_name")
-func fnd_get_demangled_name(
+@asmname("swift_demangle_getDemangledName")
+func swift_demangle_getDemangledName(
   MangledName: UnsafePointer<CChar>,
   OutputBuffer: UnsafeMutablePointer<CChar>,
   Length: Int) -> Int
 
 var outBuf = [CChar]()
-if fnd_get_demangled_name("_", &outBuf, 0) != 0 {
+if swift_demangle_getDemangledName("_", &outBuf, 0) != 0 {
   exit(EXIT_FAILURE)
 }
 
 #else
 
 let RTLD_DEFAULT = UnsafeMutablePointer<Void>(bitPattern: -2)
-if dlsym(RTLD_DEFAULT, "fnd_get_demangled_name") == nil {
+if dlsym(RTLD_DEFAULT, "swift_demangle_getDemangledName") == nil {
   println(String.fromCString(dlerror())!)
   exit(EXIT_FAILURE)
 }
