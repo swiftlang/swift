@@ -228,7 +228,8 @@ namespace {
     void collectCallSitesToInline(SILFunction *Caller,
                                 SmallVectorImpl<ApplyInst *> &CallSitesToInline,
                                   DominanceAnalysis *DA,
-                                  SILLoopAnalysis *LA);
+                                  SILLoopAnalysis *LA,
+                                  bool &Devirtualized);
   public:
     SILPerformanceInliner(int threshold,
                           InlineSelection WhatToInline)
@@ -236,7 +237,7 @@ namespace {
     WhatToInline(WhatToInline) {}
 
     bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA,
-                                 SILLoopAnalysis *LA);
+                                 SILLoopAnalysis *LA, bool &Devirtualized);
   };
 }
 
@@ -753,7 +754,10 @@ static bool isProfitableInColdBlock(ApplyInst *AI) {
 void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
                                 SmallVectorImpl<ApplyInst *> &CallSitesToInline,
                                                      DominanceAnalysis *DA,
-                                                     SILLoopAnalysis *LA) {
+                                                     SILLoopAnalysis *LA,
+                                                     bool &Devirtualized) {
+  Devirtualized = false;
+
   DominanceInfo *DT = DA->get(Caller);
   SILLoopInfo *LI = LA->getLoopInfo(Caller);
 
@@ -773,6 +777,7 @@ void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
         // Devirtualize in an attempt expose more opportunities for
         // inlining.
         if (auto *DirectAI = tryDevirtualizeApply(AI)) {
+          Devirtualized = true;
           AI = DirectAI;
           I = SILBasicBlock::iterator(AI);
         }
@@ -820,15 +825,18 @@ void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
 /// returns True if a function was inlined.
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
                                                     DominanceAnalysis *DA,
-                                                    SILLoopAnalysis *LA) {
-  bool Changed = false;
+                                                    SILLoopAnalysis *LA,
+                                                    bool &Devirtualized) {
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
 
   // First step: collect all the functions we want to inline.  We
   // don't change anything yet so that the dominator information
   // remains valid.
   SmallVector<ApplyInst *, 8> CallSitesToInline;
-  collectCallSitesToInline(Caller, CallSitesToInline, DA, LA);
+  collectCallSitesToInline(Caller, CallSitesToInline, DA, LA, Devirtualized);
+
+  if (CallSitesToInline.empty())
+    return false;
 
   // Second step: do the actual inlining.
   for (auto AI : CallSitesToInline) {
@@ -856,11 +864,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     DA->invalidate(Caller, SILAnalysis::PreserveKind::Nothing);
     LA->invalidate(Caller, SILAnalysis::PreserveKind::Nothing);
     NumFunctionsInlined++;
-    Changed = true;
   }
 
   DEBUG(llvm::dbgs() << "\n");
-  return Changed;
+  return true;
 }
 
 // Find functions in cold blocks which are forced to be inlined.
@@ -916,7 +923,8 @@ public:
     SILPerformanceInliner inliner(getOptions().InlineThreshold,
                                   WhatToInline);
 
-    SmallPtrSet<SILFunction *, 16> Modified;
+    SmallPtrSet<SILFunction *, 16> InlinedInto;
+    SmallPtrSet<SILFunction *, 16> DevirtualizedIn;
 
     // Inline functions bottom up from the leafs.
     for (auto *F : CGA->getOrBuildCallGraph().getBottomUpFunctionOrder()) {
@@ -925,13 +933,21 @@ public:
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
         continue;
 
-      if (inliner.inlineCallsIntoFunction(F, DA, LA))
-        Modified.insert(F);
+      bool Devirtualized;
+      if (inliner.inlineCallsIntoFunction(F, DA, LA, Devirtualized))
+        InlinedInto.insert(F);
+      else if (Devirtualized)
+        DevirtualizedIn.insert(F);
     }
 
-    // Invalidate the functions that were inlined into.
-    for (auto *F : Modified) {
+    // Invalidate all analyses for the functions that were inlined into.
+    for (auto *F : InlinedInto) {
       invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+    }
+
+    // Preserve branches for functions that we only devirtualized in.
+    for (auto *F : DevirtualizedIn) {
+      invalidateAnalysis(F, SILAnalysis::PreserveKind::Branches);
     }
   }
 
