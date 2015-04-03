@@ -148,9 +148,22 @@ ArrayTraps.test("unsafeLength") {
   }
 }
 
+ArrayTraps.test("bounds_with_downcast")
+  .crashOutputMatches(_isDebugAssertConfiguration() ?
+    "fatal error: Array index out of range" : "")
+  .code {
+  let ba: [Base] = [ Derived(), Base() ]
+  let da = ba as! [Derived]
+  expectCrashLater()
+  let x = da[2]
+}
+
 var ArraySemanticOptzns = TestSuite("ArraySemanticOptzns")
 
-class ElementClass {
+class BaseClass {
+}
+
+class ElementClass : BaseClass {
   var val: String
   init(_ x: String) {
     val = x
@@ -172,12 +185,10 @@ class ViolateInoutSafeySwitchToObjcBuffer {
   func runLoop(inout A: [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
-    let isNative = A._getArrayPropertyIsNative()
-    let needsTypeCheck = A._getArrayPropertyNeedsElementTypeCheck()
+    let isNativeNoDTC = A._getArrayPropertyIsNativeNoDTC()
     for i in 0..<A.count {
-      A._checkSubscript(i, hoistedIsNativeBuffer: isNative)
-      A._getElement(i, hoistedIsNativeBuffer: isNative,
-        hoistedNeedsElementTypeCheck: needsTypeCheck)
+      A._checkSubscript(i, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
+      A._getElement(i, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
       accessArrayViaInoutVolation()
     }
   }
@@ -191,7 +202,7 @@ class ViolateInoutSafeySwitchToObjcBuffer {
 
 ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: inout rules were violated: the array was overwritten by an NSArray" : "")
+    "fatal error: inout rules were violated: the array was overwritten" : "")
   .code {
   let v = ViolateInoutSafeySwitchToObjcBuffer()
   expectCrashLater()
@@ -201,25 +212,21 @@ ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
 class ViolateInoutSafeyNeedElementTypeCheck {
   final var anArray : [ElementClass] = []
 
-  let nsArray = NSArray(
-    objects: ElementClass("a"), ElementClass("b"), ElementClass("c"))
-
   @inline(never)
   func accessArrayViaInoutVolation() {
     // Overwrite the array with one that needs an element type check.
-    anArray = _convertNSArrayToArray(nsArray)
+    let ba: [BaseClass] = [ BaseClass(), BaseClass() ]
+    anArray = ba as! [ElementClass]
   }
 
   @inline(never)
   func runLoop(inout A : [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
-    let needsTypeCheck = A._getArrayPropertyNeedsElementTypeCheck()
+    let isNativeNoDTC = A._getArrayPropertyIsNativeNoDTC()
     for i in 0..<A.count {
-      let isNative = A._getArrayPropertyIsNative()
-      A._checkSubscript(i, hoistedIsNativeBuffer: isNative)
-      A._getElement(i, hoistedIsNativeBuffer: isNative,
-        hoistedNeedsElementTypeCheck: needsTypeCheck)
+      A._checkSubscript(i, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
+      A._getElement(i, hoistedIsNativeNoDTCBuffer: isNativeNoDTC)
       accessArrayViaInoutVolation()
     }
   }
@@ -233,7 +240,7 @@ class ViolateInoutSafeyNeedElementTypeCheck {
 
 ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: inout rules were violated: the array was overwritten by an NSArray" : "")
+    "fatal error: inout rules were violated: the array was overwritten" : "")
   .code {
   let v = ViolateInoutSafeyNeedElementTypeCheck()
   expectCrashLater()

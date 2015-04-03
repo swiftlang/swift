@@ -203,7 +203,8 @@ public:
     default:
       return false;
 
-    case ArrayCallKind::kArrayPropsNeedsTypeCheck:
+    case ArrayCallKind::kArrayPropsIsNative:
+    case ArrayCallKind::kArrayPropsIsNativeNoDTC:
     case ArrayCallKind::kCheckSubscript:
     case ArrayCallKind::kCheckIndex:
     case ArrayCallKind::kGetCount:

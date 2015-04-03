@@ -191,8 +191,9 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return _hasNativeBuffer
   }
 
-  var arrayPropertyNeedsElementTypeCheck : Bool {
-    return false
+  /// True, if the array is native and does not need a deferred type check.
+  var arrayPropertyIsNativeNoDTC : Bool {
+    return _hasNativeBuffer
   }
 
   public
@@ -246,8 +247,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
-  func getElement(i: Int, hoistedIsNativeBuffer: Bool,
-                  hoistedNeedsElementTypeCheck: Bool) -> T {
+  func getElement(i: Int, hoistedIsNativeNoDTCBuffer: Bool) -> T {
     _sanityCheck(i >= 0, "negative slice index is out of range")
     _sanityCheck(i < count, "slice index out of range")
    return start[i]
@@ -259,8 +259,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// `position != endIndex`.
   public subscript(position: Int) -> T {
     get {
-      return getElement(position, hoistedIsNativeBuffer: true,
-                        hoistedNeedsElementTypeCheck: false)
+      return getElement(position, hoistedIsNativeNoDTCBuffer: true)
     }
     nonmutating set {
       _sanityCheck(position >= 0, "negative slice index is out of range")
