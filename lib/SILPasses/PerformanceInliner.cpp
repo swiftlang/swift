@@ -862,7 +862,6 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     assert(Success && "Expected inliner to inline this function!");
     AI->eraseFromParent();
     DA->invalidate(Caller, SILAnalysis::PreserveKind::Nothing);
-    LA->invalidate(Caller, SILAnalysis::PreserveKind::Nothing);
     NumFunctionsInlined++;
   }
 
