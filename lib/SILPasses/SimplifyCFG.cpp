@@ -512,11 +512,12 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA,
         // TODO: handle switch_value
         break;
       case ValueKind::CheckedCastBranchInst:
-        HasChangedInCurrentIter |=
-            trySimplifyCheckedCastBr(BB.getTerminator(), DT);
-        // FIXME: This function should preserve the dominator trees but its code
-        // to do so is buggy.
-        DT->recalculate(Fn);
+        if (trySimplifyCheckedCastBr(BB.getTerminator(), DT)) {
+          HasChangedInCurrentIter = true;
+          // FIXME: trySimplifyCheckedCastBr function should preserve the
+          // dominator tree but its code to do so is buggy.
+          DT->recalculate(Fn);
+        }
         break;
       default:
         break;
