@@ -71,8 +71,8 @@ private:
 public:
   /// Create a call graph edge for a call site where we will fill in
   /// the set of potentially called functions later.
-  CallGraphEdge(FullApplySite TheApply, CalleeSetType &KnownCallees, bool Complete,
-                unsigned Ordinal)
+  CallGraphEdge(FullApplySite TheApply, CalleeSetType &KnownCallees,
+                bool Complete, unsigned Ordinal)
     : TheApply(TheApply),
       // FIXME: Do not allocate memory for the singleton callee case.
       CalleeSet(new CalleeSetType, Complete),
@@ -379,7 +379,9 @@ public:
     CG = nullptr;
   }
 
-  virtual void invalidate(SILFunction*, SILAnalysis::PreserveKind K) { invalidate(K); }
+  virtual void invalidate(SILFunction*, SILAnalysis::PreserveKind K) {
+    invalidate(K);
+  }
 
   virtual void verify() const;
 };
