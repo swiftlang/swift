@@ -119,7 +119,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
                                         ReturnDest.getDepth())
          && "emitting epilog in wrong scope");
 
-  auto cleanupLoc = CleanupLocation::getCleanupLocation(TopLevel);
+  auto cleanupLoc = CleanupLocation::get(TopLevel);
   Cleanups.emitCleanupsForReturn(cleanupLoc);
 
   // If the return location is known to be that of an already
@@ -151,7 +151,7 @@ void SILGenFunction::emitEpilog(SILLocation TopLevel, bool AutoGen) {
 
   // Return () if no return value was given.
   if (!returnValue)
-    returnValue = emitEmptyTuple(CleanupLocation::getCleanupLocation(TopLevel));
+    returnValue = emitEmptyTuple(CleanupLocation::get(TopLevel));
 
   B.createReturn(returnLoc, returnValue);
   if (!MainScope)

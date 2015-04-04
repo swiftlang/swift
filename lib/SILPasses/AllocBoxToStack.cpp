@@ -423,7 +423,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
     }
 
   auto &Lowering = ABI->getModule().getTypeLowering(ABI->getElementType());
-  auto Loc = CleanupLocation::getCleanupLocation(ABI->getLoc());
+  auto Loc = CleanupLocation::get(ABI->getLoc());
 
   // For non-trivial types, insert destroys for each final release-like
   // instruction we found that isn't an explicit dealloc_box.

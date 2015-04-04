@@ -281,7 +281,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   if (!maybeReturnValue)
     return;
 
-  auto cleanupLoc = CleanupLocation::getCleanupLocation(ctor);
+  auto cleanupLoc = CleanupLocation::get(ctor);
 
   assert(selfBox && "self should be a mutable box");
 
@@ -399,7 +399,7 @@ static void emitAddressOnlyEnumConstructor(SILGenFunction &gen,
 
   // Apply the tag.
   gen.B.createInjectEnumAddr(Loc, resultSlot, element);
-  gen.Cleanups.emitCleanupsForReturn(CleanupLocation::getCleanupLocation(Loc));
+  gen.Cleanups.emitCleanupsForReturn(CleanupLocation::get(Loc));
   gen.B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
                      gen.emitEmptyTuple(element));
 }
@@ -423,7 +423,7 @@ static void emitLoadableEnumConstructor(SILGenFunction &gen, SILType enumTy,
 
   // Create and return the enum value.
   SILValue result = gen.B.createEnum(Loc, argValue, element, enumTy);
-  gen.Cleanups.emitCleanupsForReturn(CleanupLocation::getCleanupLocation(Loc));
+  gen.Cleanups.emitCleanupsForReturn(CleanupLocation::get(Loc));
   gen.B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc), result);
 }
 
@@ -626,7 +626,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(Type(), CleanupLocation::getCleanupLocation(endOfInitLoc));
+  prepareEpilog(Type(), CleanupLocation::get(endOfInitLoc));
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -837,7 +837,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
   VarLocs[selfDecl] = VarLoc::get(selfArg);
 
-  auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
+  auto cleanupLoc = CleanupLocation::get(loc);
   prepareEpilog(TupleType::getEmpty(getASTContext()), cleanupLoc);
 
   // Emit the initializers.

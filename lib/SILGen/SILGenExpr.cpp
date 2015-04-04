@@ -2669,7 +2669,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   B.emitBlock(isPresentBB);
   {
     // Don't allow cleanups to escape the conditional block.
-    FullExpr presentScope(Cleanups, CleanupLocation::getCleanupLocation(loc));
+    FullExpr presentScope(Cleanups, CleanupLocation::get(loc));
 
     CanType resultValueTy =
       resultTy.getSwiftRValueType().getAnyOptionalObjectType();
@@ -3038,7 +3038,7 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
   // If the subexpression is a monadic optional operation, peephole
   // the emission of the operation.
   if (auto eval = dyn_cast<OptionalEvaluationExpr>(E)) {
-    CleanupLocation cleanupLoc = CleanupLocation::getCleanupLocation(loc);
+    CleanupLocation cleanupLoc = CleanupLocation::get(loc);
     SILBasicBlock *failureBB;
     JumpDest failureDest(cleanupLoc);
 

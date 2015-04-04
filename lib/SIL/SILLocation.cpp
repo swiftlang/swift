@@ -195,7 +195,7 @@ MandatoryInlinedLocation::getMandatoryInlinedLocation(SILLocation L) {
   llvm_unreachable("Cannot construct Inlined loc from the given location.");
 }
 
-CleanupLocation CleanupLocation::getCleanupLocation(SILLocation L) {
+CleanupLocation CleanupLocation::get(SILLocation L) {
   if (Expr *E = L.getAsASTNode<Expr>())
     return CleanupLocation(E, L.getSpecialFlags());
   if (Stmt *S = L.getAsASTNode<Stmt>())

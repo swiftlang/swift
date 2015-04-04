@@ -760,6 +760,8 @@ public:
                                  SILBasicBlock *SuccessBB,
                                  SILBasicBlock *FailBB);
 
+  void emitConditionalPBD(PatternBindingDecl *PBD, SILBasicBlock *FailBB);
+
   void emitSwitchStmt(SwitchStmt *S);
   void emitSwitchFallthrough(FallthroughStmt *S);
 

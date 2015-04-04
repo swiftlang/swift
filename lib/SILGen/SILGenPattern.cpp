@@ -1546,7 +1546,7 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
     }
 
     SILLocation loc = rows[specBegin].Pattern;
-    auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
+    auto cleanupLoc = CleanupLocation::get(loc);
 
     CleanupStateRestorationScope forwardingScope(SGF.Cleanups);
     ConsumableManagedValue castOperand = operand.asBorrowedOperand();
@@ -1694,7 +1694,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     SGF.B.setInsertionPoint(caseBB);
 
     // We're in conditionally-executed code; enter a scope.
-    Scope scope(SGF.Cleanups, CleanupLocation::getCleanupLocation(loc));
+    Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
       
     // Create a BB argument or 'unchecked_take_enum_data_addr'
     // instruction to receive the enum case data if it has any.
@@ -1916,7 +1916,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows,
     SGF.B.setInsertionPoint(caseBB);
 
     // We're in conditionally-executed code; enter a scope.
-    Scope scope(SGF.Cleanups, CleanupLocation::getCleanupLocation(loc));
+    Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
 
     SILType eltTy;
     bool hasElt = false;

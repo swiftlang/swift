@@ -672,7 +672,7 @@ emitValueBufferOperation(SILGenFunction &gen,
   // It's really not safe if we ever need to do writeback for this,
   // but go ahead and satisfy the rules, and bound the cleanups while
   // we're at it.
-  FullExpr fullExpr(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+  FullExpr fullExpr(gen.Cleanups, CleanupLocation::get(loc));
   WritebackScope writebackScope(gen);
 
   LValue bufferLV = gen.emitLValue(args[0], AccessKind::ReadWrite);

@@ -905,7 +905,7 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
                                          &gen.F);
   auto thunkType = gen.F.getLoweredFunctionType();
 
-  FullExpr scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+  FullExpr scope(gen.Cleanups, CleanupLocation::get(loc));
 
   SILValue outerResultAddr;
   if (thunkType->hasIndirectResult()) {
@@ -1527,7 +1527,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   F.setBare(IsBare);
   
   SILLocation loc(witness.getDecl());
-  FullExpr scope(Cleanups, CleanupLocation::getCleanupLocation(loc));
+  FullExpr scope(Cleanups, CleanupLocation::get(loc));
   
   auto thunkTy = F.getLoweredFunctionType();
   

@@ -575,7 +575,7 @@ public:
   CleanupLocation(Pattern *P) : SILLocation(P, CleanupKind) {}
   CleanupLocation(Decl *D) : SILLocation(D, CleanupKind) {}
 
-  static CleanupLocation getCleanupLocation(SILLocation L);
+  static CleanupLocation get(SILLocation L);
 
   /// \brief Returns a location representing a cleanup on the module level.
   static CleanupLocation getModuleCleanupLocation() {

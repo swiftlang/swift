@@ -142,7 +142,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
                                        CanSILFunctionType blockTy,
                                        CanSILBlockStorageType blockStorageTy,
                                        CanSILFunctionType funcTy) {
-  Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+  Scope scope(gen.Cleanups, CleanupLocation::get(loc));
   SILBasicBlock *entry = gen.F.begin();
 
   // Get the captured native function value out of the block.
@@ -378,7 +378,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
                                       CanSILFunctionType blockTy,
                                       CanSILFunctionType funcTy) {
   // Collect the native arguments, which should all be +1.
-  Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+  Scope scope(gen.Cleanups, CleanupLocation::get(loc));
 
   assert(blockTy->getParameters().size()
            == funcTy->getParameters().size()

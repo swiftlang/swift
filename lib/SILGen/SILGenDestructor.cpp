@@ -31,7 +31,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(Type(), CleanupLocation::getCleanupLocation(Loc));
+  prepareEpilog(Type(), CleanupLocation::get(Loc));
 
   emitProfilerIncrement(dd->getBody());
   // Emit the destructor body.
@@ -44,7 +44,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   if (!maybeReturnValue)
     return;
 
-  auto cleanupLoc = CleanupLocation::getCleanupLocation(Loc);
+  auto cleanupLoc = CleanupLocation::get(Loc);
 
   // If we have a superclass, invoke its destructor.
   SILValue resultSelfValue;
@@ -119,7 +119,7 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
 
   SILValue selfValue = emitSelfDecl(cd->getDestructor()->getImplicitSelfDecl());
 
-  auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
+  auto cleanupLoc = CleanupLocation::get(loc);
   prepareEpilog(TupleType::getEmpty(getASTContext()), cleanupLoc);
   emitClassMemberDestruction(selfValue, cd, cleanupLoc);
   B.createReturn(loc, emitEmptyTuple(loc));
@@ -154,7 +154,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(Type(), CleanupLocation::getCleanupLocation(loc));
+  prepareEpilog(Type(), CleanupLocation::get(loc));
 
   // Emit the destructor body.
   emitStmt(dd->getBody());
@@ -166,7 +166,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   if (!maybeReturnValue)
     return;
 
-  auto cleanupLoc = CleanupLocation::getCleanupLocation(loc);
+  auto cleanupLoc = CleanupLocation::get(loc);
 
   // Note: the ivar destroyer is responsible for destroying the
   // instance variables before the object is actually deallocated.

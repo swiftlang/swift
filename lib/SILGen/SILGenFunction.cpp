@@ -865,7 +865,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   overrideLocationForMagicIdentifiers = SourceLoc();
 
   emitProlog({ }, value->getType(), function.getDecl()->getDeclContext());
-  prepareEpilog(value->getType(), CleanupLocation::getCleanupLocation(Loc));
+  prepareEpilog(value->getType(), CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);
 }

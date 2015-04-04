@@ -870,7 +870,7 @@ namespace {
 
       // The writeback block.
       gen.B.setInsertionPoint(writebackBB); {
-        FullExpr scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+        FullExpr scope(gen.Cleanups, CleanupLocation::get(loc));
 
         auto emptyTupleTy =
           SILType::getPrimitiveObjectType(TupleType::getEmpty(ctx));

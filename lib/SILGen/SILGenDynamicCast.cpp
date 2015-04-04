@@ -151,7 +151,7 @@ namespace {
       // Emit the success block.
       SGF.B.setInsertionPoint(trueBB);
       {
-        FullExpr scope(SGF.Cleanups, CleanupLocation::getCleanupLocation(Loc));
+        FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
 
         ManagedValue result;
         if (Strategy == CastStrategy::Address) {
@@ -171,7 +171,7 @@ namespace {
       // Emit the failure block.
       SGF.B.setInsertionPoint(falseBB);
       {
-        FullExpr scope(SGF.Cleanups, CleanupLocation::getCleanupLocation(Loc));
+        FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
 
         // If we're using the scalar strategy, handle the consumption rules.
         if (Strategy != CastStrategy::Address &&
@@ -436,7 +436,7 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   }
 
   // Prepare a jump destination here.
-  ExitableFullExpr scope(SGF, CleanupLocation::getCleanupLocation(loc));
+  ExitableFullExpr scope(SGF, CleanupLocation::get(loc));
 
   SGF.emitCheckedCastBranch(loc, operand,
                             resultObjectType, resultObjectCtx,
@@ -531,7 +531,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
   }
 
   // Prepare a jump destination here.
-  ExitableFullExpr scope(SGF, CleanupLocation::getCleanupLocation(loc));
+  ExitableFullExpr scope(SGF, CleanupLocation::get(loc));
 
   auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
 
