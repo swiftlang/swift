@@ -252,3 +252,32 @@ bb8:                                              // Preds: bb3
   return %39 : $Int32                               // id: %40
 }
 
+// CHECK-LABEL: @switch_enum_dominates_switch_enum_noarg
+// CHECK:      bb0(%0 : $Optional<Builtin.Int32>):
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:   %3 = select_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: %1, case #Optional.Some!enumelt.1: %2
+// CHECK-NEXT:   return %3
+sil @switch_enum_dominates_switch_enum_noarg : $@thin (Optional<Builtin.Int32>) -> Builtin.Int32 {
+bb0(%0 : $Optional<Builtin.Int32>):
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb1, case #Optional.Some!enumelt.1: bb2
+
+bb1:
+  %i1 = integer_literal $Builtin.Int32, 1
+  br bb5(%i1 : $Builtin.Int32)
+
+bb2:
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb3, case #Optional.Some!enumelt.1: bb4
+
+bb3:
+  %i2 = integer_literal $Builtin.Int32, 2
+  br bb5(%i2 : $Builtin.Int32)
+
+bb4:
+  %i3 = integer_literal $Builtin.Int32, 3
+  br bb5(%i3 : $Builtin.Int32)
+
+bb5(%r : $Builtin.Int32):
+  return %r : $Builtin.Int32
+}
+

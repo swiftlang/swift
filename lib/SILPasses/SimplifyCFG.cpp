@@ -39,6 +39,13 @@ STATISTIC(NumDeadArguments,  "Number of unused arguments removed");
 //                             CFG Simplification
 //===----------------------------------------------------------------------===//
 
+/// dominatorBasedSimplify iterates between dominator based simplifation of
+/// terminator branch condition values and cfg simplification. This is the
+/// maximum number of iterations we run. The number is the maximum number of
+/// iterations encountered when compiling the stdlib on April 2 2015.
+///
+static unsigned MaxIterationsOfDominatorBasedSimplify = 10;
+
 namespace {
   class SimplifyCFG {
     SILFunction &Fn;
@@ -128,7 +135,8 @@ namespace {
 
     bool simplifyBlocks();
     bool canonicalizeSwitchEnums();
-    bool dominatorBasedSimplify(DominanceInfo *DT);
+    bool dominatorBasedSimplify(DominanceAnalysis *DA,
+                                PostDominanceAnalysis *PDA);
 
     /// \brief Remove the basic block if it has no predecessors. Returns true
     /// If the block was removed.
@@ -267,6 +275,9 @@ static SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
 ///  - and for method invocation chaining (e.g. x.f3().f4().f5())
 bool
 SimplifyCFG::trySimplifyCheckedCastBr(TermInst *Term, DominanceInfo *DT) {
+  // Ignore unreachable blocks.
+  if (!DT->getNode(Term->getParent()))
+    return false;
 
   SmallVector<SILBasicBlock *, 16> BBs;
   auto Result = tryCheckedCastBrJumpThreading(Term, DT, BBs);
@@ -359,6 +370,10 @@ static void collectUsesUp(SmallVectorImpl<CondUseInfo> &Uses, SILValue Cond,
 /// Replaces uses of a cond_br condition in blocks which are dominated by the
 /// cond_br's successors. Such uses can be replaced with literals.
 static bool propagateCondBrCondition(CondBranchInst *CBR, DominanceInfo *DT) {
+  // Ignore unreachable blocks.
+  if (!DT->getNode(CBR->getParent()))
+    return false;
+
   IntegerLiteralInst *LiteralInsts[2] = { nullptr, nullptr };
   auto Successors = CBR->getSuccessors();
   assert(Successors[0].getBB() == CBR->getTrueBB());
@@ -391,6 +406,10 @@ static bool propagateCondBrCondition(CondBranchInst *CBR, DominanceInfo *DT) {
 /// Optimizes uses of a switch_enum condition in blocks which are dominated by
 /// the switch_enum's successors.
 static bool propagateSwitchEnumCondition(SwitchEnumInst *SWI, DominanceInfo *DT) {
+  // Ignore unreachable blocks.
+  if (!DT->getNode(SWI->getParent()))
+    return false;
+
   auto Successors = SWI->getSuccessors();
   SmallVector<CondUseInfo, 8> Uses;
   SILValue EnumVal = SWI->getOperand();
@@ -459,32 +478,96 @@ static bool propagateSwitchEnumCondition(SwitchEnumInst *SWI, DominanceInfo *DT)
 
 // Simplifications that walk the dominator tree to prove redundancy in
 // conditional branching.
-bool SimplifyCFG::dominatorBasedSimplify(DominanceInfo *DT) {
+bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA,
+                                         PostDominanceAnalysis *PDA) {
   bool Changed = false;
-  for (auto &BB : Fn) {
-    // Any method called from this loop should update
-    // the DT if it changes anything related to dominators.
-    TermInst *Term = BB.getTerminator();
-    switch (Term->getKind()) {
-    case ValueKind::CondBranchInst:
-      Changed |= propagateCondBrCondition(cast<CondBranchInst>(Term), DT);
-      break;
-    case ValueKind::SwitchEnumInst:
-      Changed |= propagateSwitchEnumCondition(cast<SwitchEnumInst>(Term), DT);
-      break;
-    case ValueKind::SwitchValueInst:
-      // TODO: handle switch_value
-      break;
-    case ValueKind::CheckedCastBranchInst:
-      Changed |= trySimplifyCheckedCastBr(BB.getTerminator(), DT);
-      break;
-    default:
-      break;
-    }
-    // Simplify the block argument list.
-    Changed |= simplifyArgs(&BB);
-  }
 
+  // Get the dominator tree.
+  DT = DA->get(&Fn);
+
+  unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
+  bool HasChangedInCurrentIter = false;
+
+  do {
+    HasChangedInCurrentIter = false;
+
+    // Do dominator based simplification of terminator condition. This does not
+    // and MUST NOT change the CFG without updating the dominator tree to
+    // reflect such change.
+    for (auto &BB : Fn) {
+      // Any method called from this loop should update
+      // the DT if it changes anything related to dominators.
+      TermInst *Term = BB.getTerminator();
+      switch (Term->getKind()) {
+      case ValueKind::CondBranchInst:
+        HasChangedInCurrentIter |=
+            propagateCondBrCondition(cast<CondBranchInst>(Term), DT);
+        break;
+      case ValueKind::SwitchEnumInst:
+        HasChangedInCurrentIter |=
+            propagateSwitchEnumCondition(cast<SwitchEnumInst>(Term), DT);
+        break;
+      case ValueKind::SwitchValueInst:
+        // TODO: handle switch_value
+        break;
+      case ValueKind::CheckedCastBranchInst:
+        HasChangedInCurrentIter |=
+            trySimplifyCheckedCastBr(BB.getTerminator(), DT);
+        // FIXME: This function should preserve the dominator trees but its code
+        // to do so is buggy.
+        DT->recalculate(Fn);
+        break;
+      default:
+        break;
+      }
+    }
+
+    // Simplify terminators. This changes the CFG and therefore invalidates the
+    // dom tree.
+    DominanceInfo *InvalidDT = DT;
+    DT = nullptr;
+
+    // Simplify terminators.
+    bool HaveChangedCFG = false;
+    for (auto &BB : Fn) {
+      auto *Term = BB.getTerminator();
+      if (auto *SEI = dyn_cast<SwitchEnumInst>(Term))
+        HaveChangedCFG |= simplifySwitchEnumBlock(SEI);
+      else if (auto *CondBr = dyn_cast<CondBranchInst>(Term))
+        HaveChangedCFG |= simplifyCondBrBlock(CondBr);
+    }
+    HasChangedInCurrentIter |= HaveChangedCFG;
+
+    // Remove unreachable blocks.
+    if (HaveChangedCFG)
+      HasChangedInCurrentIter |= RemoveUnreachable(Fn).run();
+
+    // Recompute the dominator tree if we have changed the CFG so we can used it
+    // in simplifyArgs and the following iteration.
+    DT = InvalidDT;
+    if (HaveChangedCFG)
+      DT->recalculate(Fn);
+
+    // Simplify the block argument list. This is extremely subtle: simplifyArgs
+    // will not change the CFG iff the PDT is null. Really we should move that
+    // one optimization out of simplifyArgs ... I am squinting at you
+    // simplifySwitchEnumToSelectEnum.
+    // simplifyArgs does use the dominator tree, though.
+    PDT = nullptr;
+    for (auto &BB : Fn)
+      HasChangedInCurrentIter |= simplifyArgs(&BB);
+
+    Changed |= HasChangedInCurrentIter;
+  } while (HasChangedInCurrentIter && --MaxIter);
+
+  // Do the simplification that requires both the dom and postdom tree.
+  PDT = PDA->get(&Fn);
+  for (auto &BB : Fn)
+    Changed |= simplifyArgs(&BB);
+
+  // The functions we used to simplify the CFG put things in the worklist. Clear
+  // it here.
+  clearWorklist();
   return Changed;
 }
 
@@ -1667,9 +1750,7 @@ bool SimplifyCFG::run() {
     PDA->invalidate(&Fn, SILAnalysis::PreserveKind::Nothing);
   }
 
-  DT = DA->get(&Fn);
-  PDT = PDA->get(&Fn);
-  Changed |= dominatorBasedSimplify(DT);
+  Changed |= dominatorBasedSimplify(DA, PDA);
   DT = nullptr;
   PDT = nullptr;
 
