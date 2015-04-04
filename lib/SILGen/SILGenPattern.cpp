@@ -29,60 +29,9 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-
 using namespace swift;
 using namespace Lowering;
 
-
-/// "Specialize" a column from an array to be a span of new columns:
-/// essentially, remove it and add the new columns in its place.
-///
-
-/// To allow any parallel data structures to be efficiently updated
-/// in place, if there is exactly one new column, it simply replaces
-/// the existing entry
-template <class T>
-static ArrayRef<T> specializeColumn(ArrayRef<T> input, size_t column,
-                                    ArrayRef<T> newColumns,
-                                    SmallVectorImpl<T> &buffer) {
-  assert(column < input.size());
-
-  // Avoid copying any data if we're replacing the last column with
-  // nothing.
-  if (newColumns.empty()) {
-    if (column + 1 == input.size())
-      return input.slice(0, input.size() - 1);
-  }
-
-  buffer.clear();
-
-  // Any earlier columns stay in place.
-  buffer.append(input.begin(), input.begin() + column);
-
-  // If there are no new columns:
-  if (newColumns.empty()) {
-    // If the removed column was the last in the old array, we'd be done.
-    // But we have an even faster path for this above.
-    assert(input.begin() + column + 1 != input.end());
-
-    // Otherwise, move the last old column to this position.
-    buffer.push_back(input.back());
-    input = input.slice(0, input.size() - 1);
-
-  // Otherwise, put the first new column in the vacated position.
-  } else {
-    buffer.push_back(newColumns[0]);
-    newColumns = newColumns.slice(1);
-  }
-
-  // The rest of the input columns stay in place.
-  buffer.append(input.begin() + column + 1, input.end());
-
-  // Followed by any new columns required.
-  buffer.append(newColumns.begin(), newColumns.end());
-
-  return buffer;
-}
 
 /// Shallow-dump a pattern node one level deep for debug purposes.
 static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
