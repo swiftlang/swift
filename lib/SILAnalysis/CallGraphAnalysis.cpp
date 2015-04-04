@@ -32,7 +32,6 @@ STATISTIC(NumAppliesOfBuiltins, "# of call sites calling builtins");
 CallGraph::CallGraph(SILModule *Mod, bool completeModule) : M(*Mod) {
   // Build the initial call graph by creating a node for each
   // function, and an edge for each direct call to a free function.
-  // TODO: Handle other kinds of applies.
 
   unsigned NodeOrdinal = 0;
   for (auto &F : M)
