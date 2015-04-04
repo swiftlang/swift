@@ -1348,18 +1348,20 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     binding->setInit(entryNumber, init);
   }
 
-  // If the 'else' on this is provided contextually, but the pattern is not
-  // refutable, then we give is special handling: Swift 1.x patterns were
+  // If the 'else' on this is provided contextually, but none of the patterns
+  // are refutable, then we give it special handling: Swift 1.x patterns were
   // written as irrefutable patterns that implicitly destructured an
   // optional.  Detect this case, and produce an error with a fixit that
   // introduces the missing '?' pattern.
   if (binding->getElse().isContextual() && !pattern->isRefutablePattern()) {
-    // Check to verify that the pattern is refutable.  Swift 1.x patterns were
-    // written as irrefutable patterns that implicitly destructured an
-    // optional.  Detect this case, and produce an error with a fixit that
-    // introduces the missing '?' pattern, and recover as if the user wrote
-    // that.
-    if (!pattern->isRefutablePattern()) {
+    // Check to see if any of the patterns are refutable.  This is similar to
+    // checking that a PBD is refutable, except we want to catch where clauses.
+    bool anyRefutable = false;
+    for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
+      if (binding->getPattern(i)->isRefutablePattern())
+        anyRefutable = true;
+    
+    if (!anyRefutable) {
       tc.diagnose(pattern->getStartLoc(),
                   diag::conditional_pattern_bind_not_refutable)
         .fixItInsertAfter(pattern->getEndLoc(), "?");

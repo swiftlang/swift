@@ -71,7 +71,7 @@ if true { if a == 0; {} }   // expected-error {{expected '{' after 'if' conditio
 if a == 0, where b == 0 {}  // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}} expected-error 4{{}} expected-note {{}}
 
 
-if let a = foo() {  // expected-warning {{condition requires a refutable pattern match; did you mean to match an optional?}}{{9-9=?}}
+if let a = foo() {  // expected-warning {{condition requires a refutable pattern; did you mean to match an optional?}}{{9-9=?}}
 }
 
 // rdar://20364082
@@ -81,8 +81,17 @@ if let a : AnyObject = foo() {
 }
 
 // More complex pattern.
-if let (x) = foo() {  // expected-error {{conditional pattern binding must be refutable; did you mean to match an optional?}}{{11-11=?}}
+if let (x) = foo() {  // expected-warning {{condition requires a refutable pattern; did you mean to match an optional?}}{{11-11=?}}
 }
 
+
+// The entire pattern list doesn't need to be refutable, just one part.
+// <rdar://problem/20426834> incorrect refutable pattern match issue
+func testSwift1Upgrades(a : Int?, b : Int) {
+  if let x? = a, y = b { }   // This is ok, it can't be a swift 1 pattern, so it is allowed.
+
+  if let x = a, y = a { }   // expected-warning {{condition requires a refutable pattern; did you mean to match an optional?}}
+  if let x = a, y = a where true { }   // expected-warning {{condition requires a refutable pattern; did you mean to match an optional?}}
+}
 
 

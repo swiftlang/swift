@@ -844,12 +844,11 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       // it now.
       //
       // Swift 1.x supported irrefutable patterns that unwrapped optionals and
-      // allowed type annotations.  We specifically handle the common cases of
-      // "if let x = foo()" and "if let x : AnyObject = foo()" for good QoI and
-      // migration.  These are not valid modern 'if let' sequences: the former
-      // isn't refutable, and the later isn't a valid matching pattern.
+      // allowed type annotations.  We specifically handle the common case of
+      // "if let x : AnyObject = foo()" for good QoI and migration.  This is not
+      // a valid modern 'if let' sequences: it isn't a valid matching pattern.
       //
-      if (Tok.is(tok::identifier) && peekToken().isAny(tok::equal, tok::colon))
+      if (Tok.is(tok::identifier) && peekToken().is(tok::colon))
         Pattern = parseSwift1IfLetPattern(IsLet, VarLoc);
       else
         Pattern = parseMatchingPatternAsLetOrVar(IsLet, VarLoc,
