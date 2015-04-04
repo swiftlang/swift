@@ -341,8 +341,13 @@ void CallGraphNode::dump() {
             });
 
   llvm::errs() << Ordinal;
-  llvm::errs() << (!Edges.empty() && isCallerEdgesComplete() ?
-                   " (all callers known): " : ": ");
+  if (isDead())
+    llvm::errs() << " [dead]: ";
+  else if (isCallerEdgesComplete())
+    llvm::errs() << " (all callers known): ";
+  else
+    llvm::errs() << ": ";
+
   llvm::errs() << getFunction()->getName() << "\n";
   if (Edges.empty())
     return;

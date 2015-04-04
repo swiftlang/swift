@@ -196,6 +196,12 @@ public:
     return CallerEdgesComplete;
   }
 
+  /// Is this call graph node for a function that we can trivially
+  /// know is dead?
+  bool isDead() const {
+    return isCallerEdgesComplete() && getCompleteCallerEdges().empty();
+  }
+
   unsigned getOrdinal() const {
     return Ordinal;
   }
