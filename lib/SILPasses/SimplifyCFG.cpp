@@ -64,9 +64,10 @@ namespace {
     DominanceInfo *DT;
     PostDominanceInfo *PDT;
 
+    bool ShouldVerify;
   public:
-    SimplifyCFG(SILFunction &Fn, SILPassManager *PM) :
-      Fn(Fn), PM(PM) {}
+    SimplifyCFG(SILFunction &Fn, SILPassManager *PM, bool Verify) :
+      Fn(Fn), PM(PM), ShouldVerify(Verify) {}
 
     bool run();
     
@@ -522,6 +523,9 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA,
       }
     }
 
+    if (ShouldVerify)
+      DT->verify();
+
     // Simplify terminators. This changes the CFG and therefore invalidates the
     // dom tree.
     DominanceInfo *InvalidDT = DT;
@@ -557,6 +561,8 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA,
     for (auto &BB : Fn)
       HasChangedInCurrentIter |= simplifyArgs(&BB);
 
+    if (ShouldVerify)
+      DT->verify();
     Changed |= HasChangedInCurrentIter;
   } while (HasChangedInCurrentIter && --MaxIter);
 
@@ -564,6 +570,9 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA,
   PDT = PDA->get(&Fn);
   for (auto &BB : Fn)
     Changed |= simplifyArgs(&BB);
+
+  if (ShouldVerify)
+    DT->verify();
 
   // The functions we used to simplify the CFG put things in the worklist. Clear
   // it here.
@@ -2527,7 +2536,7 @@ class SimplifyCFGPass : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
-    if (SimplifyCFG(*getFunction(), PM).run())
+    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll).run())
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
 
@@ -2575,7 +2584,8 @@ public:
   
   /// The entry point to the transformation.
   void run() override {
-    if (SimplifyCFG(*getFunction(), PM).simplifyBlockArgs())
+    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll)
+            .simplifyBlockArgs())
       invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
   }
   
