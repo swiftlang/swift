@@ -624,6 +624,7 @@ public:
 
   void typeCheckClosureBody(ClosureExpr *closure);
 
+  void typeCheckBraceStmt(BraceStmt *BS, DeclContext *DC);
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,

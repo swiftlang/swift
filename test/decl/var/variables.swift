@@ -84,3 +84,8 @@ func tuplePatternDestructuring(x : Int, y : Int) {
   let (x: g1, a: h1) = (b: x, a: y)  // expected-error {{'(b: Int, a: Int)' is not convertible to '(x: (b: Int, a: Int), a: (b: Int, a: Int))'}}
 }
 
+let optUnwrap? = Optional(1) else {
+  optUnwrap = 42  // expected-error {{cannot assign to 'let' value 'optUnwrap'}}
+}
+
+

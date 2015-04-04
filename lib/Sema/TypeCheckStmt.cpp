@@ -178,7 +178,6 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
 }
 
 namespace {
-/// StmtChecker - This class implements 
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
   TypeChecker &TC;
@@ -1213,6 +1212,10 @@ void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());
   }
+}
+
+void TypeChecker::typeCheckBraceStmt(BraceStmt *BS, DeclContext *DC) {
+  StmtChecker(*this, DC).typeCheckStmt(BS);
 }
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

@@ -2929,6 +2929,10 @@ public:
       if (!TC.typeCheckCondition(E, PBD->getDeclContext()))
         PBD->setWhereExpr(E);
 
+    // Type check the else body, if present.
+    if (auto *Else = PBD->getElse().getExplicitBody())
+      TC.typeCheckBraceStmt(Else, PBD->getDeclContext());
+    
     if (PBD->isInvalid())
       return;
     
