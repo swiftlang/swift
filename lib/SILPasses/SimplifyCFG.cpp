@@ -79,6 +79,11 @@ namespace {
     }
 
   private:
+    void clearWorklist() {
+      WorklistMap.clear();
+      WorklistList.clear();
+    }
+
     /// popWorklist - Return the next basic block to look at, or null if the
     /// worklist is empty.  This handles skipping over null entries in the
     /// worklist.
