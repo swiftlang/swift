@@ -150,7 +150,6 @@ bool SILType::isHeapObjectReferenceType() const {
     return true;
   if (getSwiftRValueType()->isEqual(C.TheUnknownObjectType))
     return true;
-  // TODO: AnyObject type, @objc-only existentials in general
   return false;
 }
 
