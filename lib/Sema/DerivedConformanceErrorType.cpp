@@ -151,11 +151,22 @@ static void deriveBodyErrorType_enum_code(AbstractFunctionDecl *codeDecl) {
     ++code;
   }
   
-  auto selfRef = createSelfDeclRef(codeDecl);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  Stmt *bodyStmt;
+  // If the enum is empty, simply return zero. (It doesn't really matter, since
+  // the enum can't be instantiated regardless.)
+  if (cases.empty()) {
+    static const char zero[] = "0";
+    auto returnExpr = new (C) IntegerLiteralExpr(zero, SourceLoc(),
+                                                 /*implicit*/ true);
+    bodyStmt = new (C) ReturnStmt(SourceLoc(), returnExpr,
+                                  /*implicit*/ true);
+  } else {
+    auto selfRef = createSelfDeclRef(codeDecl);
+    bodyStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
+                                  SourceLoc(), cases, SourceLoc(), C);
+  }
   auto body = BraceStmt::create(C, SourceLoc(),
-                                ASTNode(switchStmt),
+                                ASTNode(bodyStmt),
                                 SourceLoc());
 
   codeDecl->setBody(body);

@@ -28,3 +28,5 @@ enum NotAnError { case A }
 
 let notAnErrorDomain: String = NotAnError.A.domain // expected-error{{'NotAnError' does not have a member named 'domain'}}
 let notAnErrorCode: Int = NotAnError.A.code // expected-error{{'NotAnError' does not have a member named 'code'}}
+
+enum EmptyErrorDomain: _ErrorType {}

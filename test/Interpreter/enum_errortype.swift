@@ -7,6 +7,8 @@ enum ClericalErrorDomain: _ErrorType {
   case AccidentallyErasedTape(fromMinute: Double, toMinute: Double)
 }
 
+enum EmptyErrorDomain: _ErrorType {}
+
 var EnumErrorType = TestSuite("Enum ErrorType derivation")
 
 EnumErrorType.test("default codes") {
