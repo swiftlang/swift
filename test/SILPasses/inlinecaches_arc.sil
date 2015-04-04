@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -inlinecaches | FileCheck %s
+// RUN: %target-sil-opt %s -inlinecaches -sil-sort-output | FileCheck %s
 
 sil_stage canonical
 
@@ -12,19 +12,27 @@ class Foo {
 sil @_TFC4main3Foo4pingfS0_FT_Si : $@cc(method) @thin (@owned Foo) -> Int
 sil @_TFC4main3FoocfMS0_FT_S0_ : $@cc(method) @thin (@owned Foo) -> @owned Foo
 
+// CHECK-LABEL: _TF4main7my_mainFCS_3FooSi
+// CHECK: bb0
+// CHECK-NOT: strong_retain
+// CHECK: checked_cast_br [exact] %0 : $Foo to $Foo
+
+// CHECK: bb1
+// CHECK: strong_retain
+// CHECK: class_method
+// CHECK-NEXT: apply  
+// CHECK: strong_release
+
+// CHECK: bb2
+// CHECK: strong_retain
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: strong_release
+
+// CHECK: bb3
+// CHECK-NOT: strong_release
 sil @_TF4main7my_mainFCS_3FooSi : $@thin (@owned Foo) -> Int {
 bb0(%0 : $Foo):
-  // CHECK-LABLE: _TF4main7my_mainFCS_3FooSi
-  // CHECK-NOT: strong_retain
-  // CHECK: checked_cast_br [exact] %0 : $Foo to $Foo
-
-  // CHECK: strong_retain
-  // CHECK: function_ref
-  // CHECK: apply
-
-  // CHECK: strong_retain
-  // CHECK: class_method
-  // CHECK-NEXT: apply
   debug_value %0 : $Foo  // let x                 // id: %1
   strong_retain %0 : $Foo                         // id: %2
   %3 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> Int , $@cc(method) @thin (@owned Foo) -> Int // user: %4

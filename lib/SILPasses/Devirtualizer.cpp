@@ -159,7 +159,7 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   // Try sinking the retain of the class instance into the diamond. This may
   // allow additional ARC optimizations on the fast path.
   if (It != Entry->begin()) {
-    StrongRetainInst *SRI = dyn_cast<StrongRetainInst>(--It);
+    auto *SRI = dyn_cast<StrongRetainInst>(--It);
     // Try to skip another instruction, in case the class_method came first.
     if (!SRI && It != Entry->begin())
       SRI = dyn_cast<StrongRetainInst>(--It);
@@ -175,6 +175,20 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   // Copy the two apply instructions into the two blocks.
   ApplyInst *IdenAI = CloneApply(AI, IdenBuilder);
   ApplyInst *VirtAI = CloneApply(AI, VirtBuilder);
+
+  // See if Continue has a release on self as the instruction right after the
+  // apply. If it exists, move it into position in the diamond.
+  if (auto *Release =
+          dyn_cast<StrongReleaseInst>(std::next(Continue->begin()))) {
+    if (Release->getOperand() == CMI->getOperand()) {
+      VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand())
+          ->setDebugScope(Release->getDebugScope());
+      IdenBuilder.createStrongRelease(Release->getLoc(),
+                                      DownCastedClassInstance)
+          ->setDebugScope(Release->getDebugScope());
+      Release->eraseFromParent();
+    }
+  }
 
   // Create a PHInode for returning the return value from both apply
   // instructions.
@@ -465,7 +479,7 @@ namespace {
       SmallVector<ApplyInst *, 16> ToSpecialize;
       for (auto &BB : *getFunction()) {
         for (auto II = BB.begin(), IE = BB.end(); II != IE; ++II) {
-          ApplyInst *AI = dyn_cast<ApplyInst>(&*II);
+          auto *AI = dyn_cast<ApplyInst>(&*II);
           if (AI && isa<ClassMethodInst>(AI->getCallee()))
             ToSpecialize.push_back(AI);
         }

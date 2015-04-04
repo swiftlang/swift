@@ -38,13 +38,13 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
   %6 = apply %5(%1, %0) : $@cc(method) @thin (Builtin.Int32, @owned A) -> Builtin.Int32
   // CHECK: checked_cast_br [exact] %0 : $A to $B, bb2, bb3
   // CHECK: bb1
-  // CHECK: strong_release %0 : $A
   strong_release %0 : $A
   // CHECK: return
   return %6 : $Builtin.Int32
   // CHECK: bb2
   // CHECK: [[BPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
   // CHECK: apply [[BPING]]
+  // CHECK: strong_release %5 : $B
   // CHECK: bb3
   // CHECK: checked_cast_br [exact] %0 : $A to $C, bb5, bb6
   // CHECK: bb4
@@ -52,6 +52,7 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
   // CHECK: bb5
   // CHECK: [[CPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
   // CHECK: apply [[CPING]]
+  // CHECK: strong_release %14 : $C
   // CHECK: bb6
   // CHECK: checked_cast_br [exact] %0 : $A to $A, bb8, bb9
   // CHECK: bb7
@@ -59,6 +60,7 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
   // CHECK: bb8
   // CHECK: [[APING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
   // CHECK: apply [[APING]]
+  // CHECK: strong_release %23 : $A
   // CHECK: bb9
   // CHECK: [[PING:%.*]] = class_method %0 : $A, #A.ping!1
   // CHECK: apply [[PING]]
