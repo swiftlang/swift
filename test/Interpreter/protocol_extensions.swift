@@ -139,8 +139,43 @@ extension CollectionType where Self.Generator.Element == String {
 // CHECK: x, y, z
 println(["x", "y", "z"].myCommaSeparatedList)
 
-// CHECK: ,
+// CHECK: {{[tuv], [tuv], [tuv]}}
 println((["t", "u", "v"] as Set).myCommaSeparatedList)
+
+// Existentials
+protocol ExistP1 {
+  func existP1()
+}
+
+extension ExistP1 {
+  final func runExistP1() {
+    println("runExistP1")
+    self.existP1()
+  }
+}
+
+struct ExistP1_Struct : ExistP1 {
+  func existP1() {
+    println("  - ExistP1_Struct")
+  }
+}
+
+class ExistP1_Class : ExistP1 {
+  func existP1() {
+    println("  - ExistP1_Class")
+  }
+}
+
+// CHECK: runExistP1
+// CHECK-NEXT: - ExistP1_Struct
+var existP1: ExistP1 = ExistP1_Struct()
+existP1.runExistP1()
+
+// CHECK: runExistP1
+// CHECK-NEXT: - ExistP1_Class
+existP1 = ExistP1_Class()
+existP1.runExistP1()
+
 
 // CHECK: DONE
 println("DONE")

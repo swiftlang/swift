@@ -178,6 +178,15 @@ Solution ConstraintSystem::finalize(
     solution.OpenedTypes.insert(opened);
   }
 
+  // Remember the opened existential types.
+  for (const auto &openedExistential : OpenedExistentialTypes) {
+    assert(solution.OpenedExistentialTypes.count(openedExistential.first) == 0||
+           solution.OpenedExistentialTypes[openedExistential.first]
+             == openedExistential.second &&
+           "Already recorded");
+    solution.OpenedExistentialTypes.insert(openedExistential);
+  }
+
   return std::move(solution);
 }
 
@@ -227,6 +236,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
     OpenedTypes.push_back(opened);
+  }
+
+  // Register the solution's opened existential types.
+  for (const auto &openedExistential : solution.OpenedExistentialTypes) {
+    OpenedExistentialTypes.push_back(openedExistential);
   }
 
   // Register any fixes produced along this path.
@@ -422,6 +436,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numFixes = cs.Fixes.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
+  numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
@@ -474,6 +489,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);
+
+  // Remove any opened existential types.
+  truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

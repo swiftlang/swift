@@ -2378,7 +2378,10 @@ namespace {
 
     void visitArchetypeType(ArchetypeType *T, StringRef label) {
       printCommon(T, label, "archetype_type");
-      printField("name", T->getFullName());
+      if (T->getOpenedExistentialType())
+        printField("opened_existential_id", T->getOpenedExistentialID());
+      else
+        printField("name", T->getFullName());
       printField("address", static_cast<void *>(T));
       printFlag(T->requiresClass(), "class");
       for (auto proto : T->getConformsTo())

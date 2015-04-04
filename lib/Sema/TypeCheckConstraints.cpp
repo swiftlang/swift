@@ -1865,6 +1865,16 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
     }
   }
 
+  if (!OpenedExistentialTypes.empty()) {
+    out << "\nOpened existential types:\n";
+    for (const auto &openedExistential : OpenedExistentialTypes) {
+      out.indent(2);
+      openedExistential.first->dump(sm, out);
+      out << " opens to " << openedExistential.second->getString();
+      out << "\n";
+    }
+  }
+
   if (!Fixes.empty()) {
     out << "\nFixes:\n";
     for (auto &fix : Fixes) {
@@ -1983,6 +1993,16 @@ void ConstraintSystem::dump(raw_ostream &out) {
                  [&]() {
                    out << ", ";
                  });
+      out << "\n";
+    }
+  }
+
+  if (!OpenedExistentialTypes.empty()) {
+    out << "\nOpened existential types:\n";
+    for (const auto &openedExistential : OpenedExistentialTypes) {
+      out.indent(2);
+      openedExistential.first->dump(&getTypeChecker().Context.SourceMgr, out);
+      out << " opens to " << openedExistential.second->getString();
       out << "\n";
     }
   }

@@ -51,7 +51,7 @@ int UUID::compare(UUID y) const {
   return uuid_compare(Value, y.Value);
 }
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, UUID uuid) {
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os, UUID uuid) {
   llvm::SmallString<UUID::StringBufferSize> buf;
   uuid.toString(buf);
   os << buf;

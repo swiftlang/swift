@@ -1182,6 +1182,17 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                    outerFnType->getExtInfo());
   }
 
+  // If we are looking at a member of an existential that was found in a
+  // protocol extension, open the existential.
+  // FIXME: Extend this to all operations on existentials.
+  if (baseObjTy->isExistentialType() &&
+      value->getDeclContext()->isProtocolExtensionContext()) {
+    ArchetypeType *openedArchetype = ArchetypeType::getOpened(baseObjTy);
+    OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
+                                       openedArchetype });
+    baseObjTy = openedArchetype;
+  }
+
   // Constrain the 'self' object type.
   auto openedFnType = openedType->castTo<FunctionType>();
   Type selfObjTy = openedFnType->getInput()->getRValueInstanceType();

@@ -86,7 +86,7 @@ public:
 #undef COMPARE_UUID
 };
   
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, UUID uuid);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, UUID uuid);
   
 }
 

@@ -864,6 +864,10 @@ public:
   /// The set of opened types for a given locator.
   llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
 
+  /// The opened existential type for a given locator.
+  llvm::SmallDenseMap<ConstraintLocator *, ArchetypeType *>
+    OpenedExistentialTypes;
+
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
   Type simplifyType(TypeChecker &tc, Type type) const;
@@ -1346,6 +1350,11 @@ private:
   SmallVector<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>, 4>
     OpenedTypes;
 
+  /// A mapping from constraint locators to the opened existential archetype
+  /// used for the 'self' of an existential type.
+  SmallVector<std::pair<ConstraintLocator *, ArchetypeType *>, 4>
+    OpenedExistentialTypes;
+
   /// \brief Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs);
@@ -1452,6 +1461,9 @@ public:
 
     /// The length of \c OpenedTypes.
     unsigned numOpenedTypes;
+
+    /// The length of \c OpenedExistentialTypes.
+    unsigned numOpenedExistentialTypes;
 
     /// The previous score.
     Score PreviousScore;

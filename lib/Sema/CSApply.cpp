@@ -469,18 +469,30 @@ namespace {
     /// we have not yet created an \c OpenExistentialExpr.
     llvm::SmallDenseMap<ArchetypeType *, OpenedExistential> OpenedExistentials;
 
+    /// The depth of each currently-opened existential, tied to the
+    /// expression that last updated the depth.
+    llvm::SmallDenseMap<Expr *, std::pair<ArchetypeType *, unsigned>>
+      OpenedExistentialDepth;
+
     /// Open an existential value into a new, opaque value of
     /// archetype type.
     ///
     /// \param base An expression of existential type whose value will
     /// be opened.
     ///
+    /// \param archetype The archetype that describes the opened existential
+    /// type.
+    ///
+    /// \param member The member that is being referenced on the existential
+    /// type.
+    ///
     /// \returns A pair (expr, type) that provides a reference to the value
     /// stored within the expression or its metatype (if the base was a
-    /// metatype) and the new archetype that describes the dynamic type stored
+    /// metatype) and the archetype that describes the dynamic type stored
     /// within the existential.
     std::tuple<Expr *, ArchetypeType *>
-    openExistentialReference(Expr *base) {
+    openExistentialReference(Expr *base, ArchetypeType *archetype,
+                             ValueDecl *member) {
       auto &tc = cs.getTypeChecker();
       base = tc.coerceToRValue(base);
 
@@ -492,11 +504,13 @@ namespace {
       }
       assert(baseTy->isAnyExistentialType() && "Type must be existential");
 
-      // Create the archetype.
-      SmallVector<ProtocolDecl *, 4> protocols;
+      // Create the archetype, if we don't have one already.
       auto &ctx = tc.Context;
-      baseTy->getAnyExistentialTypeProtocols(protocols);
-      auto archetype = ArchetypeType::getOpened(baseTy);
+      if (!archetype) {
+        SmallVector<ProtocolDecl *, 4> protocols;
+        baseTy->getAnyExistentialTypeProtocols(protocols);
+        archetype = ArchetypeType::getOpened(baseTy);
+      }
 
       // Create the opaque opened value. If we started with a
       // metatype, it's a metatype.
@@ -509,7 +523,112 @@ namespace {
       // Record this opened existential.
       OpenedExistentials[archetype] = { base, archetypeVal };
 
+      // Determine the number of applications that need to occur before
+      // we can close this archetype, and record it.
+      if (member) {
+        unsigned depth = 1;
+        if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+          depth = func->getNaturalArgumentCount();
+        }
+
+        bool inserted = OpenedExistentialDepth.insert(
+                          {archetypeVal, {archetype, depth}}).second;
+        (void)inserted;
+        assert(inserted && "already opened an existential here?");
+      }
+
       return std::make_tuple(archetypeVal, archetype);
+    }
+
+    /// Trying to close the active existential, if there is one.
+    bool closeExistential(Expr *&result) {
+      // If there are no opened existentials, we're done.
+      if (OpenedExistentialDepth.empty())
+        return false;
+
+      // Find the key expression that could be associated with an opened
+      // existential.
+      Expr *keyExpr;
+      if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(result)) {
+        keyExpr = dotSyntax->getArg();
+      } else if (auto apply = dyn_cast<ApplyExpr>(result)) {
+        keyExpr = apply->getFn();
+      } else if (auto memberRef = dyn_cast<MemberRefExpr>(result)) {
+        keyExpr = memberRef->getBase();
+      } else if (auto subscriptRef = dyn_cast<SubscriptExpr>(result)) {
+        keyExpr = subscriptRef->getBase();
+      } else {
+        // Cannot close an existential.
+        return false;
+      }
+
+      // FIXME: Look through certain implicit conversions as well?
+      keyExpr = keyExpr->getValueProvidingExpr();
+      auto known = OpenedExistentialDepth.find(keyExpr);
+      if (known == OpenedExistentialDepth.end())
+        return false;
+
+      // Decrease the depth.
+      unsigned newDepth = known->second.second - 1;
+      auto archetype = known->second.first;
+      OpenedExistentialDepth.erase(known);
+      if (newDepth > 0) {
+        // We're not ready to close this existential yet. Replace the previous
+        // result with our current result at the new depth.
+        bool inserted = OpenedExistentialDepth.insert(
+                          {result, {archetype, newDepth}}).second;
+        (void)inserted;
+        assert(inserted && "opened existential depth conflict");
+        return false;
+      }
+
+      // Close out the existential.
+      auto opened = OpenedExistentials.find(archetype);
+      assert(opened != OpenedExistentials.end() && "not opened?");
+
+      // If we had a return type of 'Self', erase it.
+      auto &tc = solution.getConstraintSystem().getTypeChecker();
+      auto resultTy = result->getType();
+      if (resultTy->hasArchetype()) {
+        // Remove the optional, if present.
+        OptionalTypeKind optKind;
+        if (auto optValueTy = resultTy->getAnyOptionalObjectType(optKind)) {
+          resultTy = optValueTy;
+        }
+
+        //   - Drill down to the optional value (if necessary).
+        if (optKind) {
+          result = new (tc.Context) BindOptionalExpr(result,
+                                                     result->getEndLoc(),
+                                                     0, archetype);
+          result->setImplicit(true);
+        }
+
+        //   - Coerce to an existential value.
+        Type existentialTy = archetype->getOpenedExistentialType();
+        result = coerceToType(result, existentialTy, nullptr);
+        if (!result)
+          return result;
+
+        //   - Bind up the result back up as an optional (if necessary).
+        if (optKind) {
+          Type optExistentialTy = OptionalType::get(optKind, existentialTy);
+          result = new (tc.Context) InjectIntoOptionalExpr(result,
+                                                           optExistentialTy);
+          result = new (tc.Context) OptionalEvaluationExpr(result,
+                                                           optExistentialTy);
+        }
+      }
+
+      // Form the open-existential expression.
+      result = new (tc.Context) OpenExistentialExpr(
+                                  opened->second.ExistentialValue,
+                                  opened->second.OpaqueValue,
+                                  result);
+
+      // Remove the opened existential record.
+      OpenedExistentials.erase(opened);
+      return true;
     }
 
     /// Is the given function a constructor of a class or protocol?
@@ -597,16 +716,28 @@ namespace {
                                               /*wantInterfaceType=*/true);
       }
 
+      // If we opened up an existential when referencing this member, update
+      // the base accordingly.
+      auto knownOpened = solution.OpenedExistentialTypes.find(
+                           getConstraintSystem().getConstraintLocator(
+                             memberLocator));
+      if (knownOpened != solution.OpenedExistentialTypes.end()) {
+        std::tie(base, baseTy) = openExistentialReference(base,
+                                                          knownOpened->second,
+                                                          member);
+        containerTy = baseTy;
+      }
       // If this is a method whose result type is dynamic Self, or a
       // construction, replace the result type with the actual object type.
-      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      else if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
             isPolymorphicConstructor(func)) {
           // For a DynamicSelf method on an existential, open up the
           // existential.
           if (func->getExtensionType()->is<ProtocolType>() &&
               baseTy->isAnyExistentialType()) {
-            std::tie(base, baseTy) = openExistentialReference(base);
+            std::tie(base, baseTy) = openExistentialReference(base, nullptr,
+                                                              nullptr);
             containerTy = baseTy;
             openedType = openedType->replaceCovariantResultType(
                            baseTy,
@@ -739,20 +870,22 @@ namespace {
         
         ref->setImplicit(Implicit);
         ref->setType(simplifyType(openedType));
-        
+        closeExistential(ref);
         return ref;
       }
 
       // For types and properties, build member references.
       if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
         assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
-        auto result
+        auto memberRefExpr
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
                                         memberLoc, Implicit, semantics);
-        result->setIsSuper(isSuper);
+        memberRefExpr->setIsSuper(isSuper);
 
         // Skip the synthesized 'self' input type of the opened type.
-        result->setType(simplifyType(openedType));
+        memberRefExpr->setType(simplifyType(openedType));
+        Expr *result = memberRefExpr;
+        closeExistential(result);
         return result;
       }
       
@@ -773,7 +906,10 @@ namespace {
         apply = new (context) ConstructorRefCallExpr(ref, base);
       } else if (!baseIsInstance && member->isInstanceMember()) {
         // Reference to an unbound instance method.
-        return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
+        Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
+                                                              ref);
+        closeExistential(result);
+        return result;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
@@ -1033,6 +1169,19 @@ namespace {
       auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
 
+      // If we opened up an existential when performing the subscript, open
+      // the base accordingly.
+      auto knownOpened = solution.OpenedExistentialTypes.find(
+                           getConstraintSystem().getConstraintLocator(
+                             locator.withPathElement(
+                               ConstraintLocator::SubscriptMember)));
+      if (knownOpened != solution.OpenedExistentialTypes.end()) {
+        std::tie(base, baseTy) = openExistentialReference(base,
+                                                          knownOpened->second,
+                                                          subscript);
+        containerTy = baseTy;
+      }
+
       // Coerce the index argument.
       index = coerceCallArguments(index, indexTy,
                                   locator.withPathElement(
@@ -1104,7 +1253,10 @@ namespace {
                                            semantics);
         subscriptExpr->setType(resultTy);
         subscriptExpr->setIsSuper(isSuper);
-        return subscriptExpr;
+
+        Expr *result = subscriptExpr;
+        closeExistential(result);
+        return result;
       }
 
       Type selfTy = containerTy;
@@ -1124,7 +1276,9 @@ namespace {
                                          isImplicit, semantics);
       subscriptExpr->setType(resultTy);
       subscriptExpr->setIsSuper(isSuper);
-      return subscriptExpr;
+      Expr *result = subscriptExpr;
+      closeExistential(result);
+      return result;
     }
 
     /// \brief Build a new reference to another constructor.
@@ -5060,7 +5214,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     if (auto optValueTy = resultTy->getAnyOptionalObjectType(optKind)) {
       resultTy = optValueTy;
     }
-    if (auto archetypeTy = resultTy->getAs<ArchetypeType>()) {
+
+    // Try closing the existential, if there is one.
+    if (closeExistential(result)) {
+    } else if (auto archetypeTy = resultTy->getAs<ArchetypeType>()) {
       auto opened = OpenedExistentials.find(archetypeTy);
       if (opened != OpenedExistentials.end()) {
         // Erase the archetype to its corresponding existential:
