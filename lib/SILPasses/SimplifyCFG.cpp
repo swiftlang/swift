@@ -404,28 +404,25 @@ static bool propagateSwitchEnumCondition(SwitchEnumInst *SWI, DominanceInfo *DT)
     if (SwitchEnumInst *DomSWI = dyn_cast<SwitchEnumInst>(User)) {
       
       // The SWI successor dominates another switch_enum which share the same
-      // condition.
+      // condition. We know the case so we can just instantantiate the
+      // enum_inst and make the dominated switch_enum use it.
       SILBuilderWithScope<1> Builder(DomSWI);
-      ArrayRef<SILValue> Args = { };
-      auto *Dest = DomSWI->getCaseDestination(EnumElement);
-      if (!Dest->bbarg_empty()) {
-        // The destination block gets the enum data as argument.
-        if (DstBlock->bbarg_empty()) {
-          // Create a new enum data.
-          auto OpndTy = EnumVal->getType(0);
-          auto Ty = OpndTy.getEnumElementType(EnumElement, DomSWI->getModule());
-          auto *UED = Builder.createUncheckedEnumData(
-                        DomSWI->getLoc(), EnumVal, EnumElement, Ty);
-          Args = { SILValue(UED) };
-        } else {
-          // Re-use the enum data argument from the original SWI successor.
-          Args = { DstBlock->getBBArg(0) };
-        }
-      }
-      // Replace the dominated switch_enum with a branch.
-      Builder.createBranch(DomSWI->getLoc(), Dest, Args);
-      DomSWI->eraseFromParent();
-      
+
+      SILValue NewEnum;
+      // Do we have a payload.
+      auto EnumTy = EnumVal->getType(0);
+      if (EnumElement->hasArgumentType()) {
+        auto Ty = EnumTy.getEnumElementType(EnumElement, DomSWI->getModule());
+        SILValue UED(Builder.createUncheckedEnumData(DomSWI->getLoc(), EnumVal,
+                                                     EnumElement, Ty),
+                     0);
+
+        NewEnum = Builder.createEnum(DomSWI->getLoc(), UED, EnumElement, EnumTy);
+      } else
+        NewEnum = Builder.createEnum(DomSWI->getLoc(), SILValue(), EnumElement,
+                                     EnumTy);
+
+      DomSWI->setOperand(0, NewEnum);
       Changed = true;
       continue;
     }

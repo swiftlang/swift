@@ -753,12 +753,12 @@ bb7(%6 : $Builtin.Int64):
   return %6 : $Builtin.Int64
 }
 
-// CHECK-LABEL: @switch_enum_dominates_switch_enum_noarg
-// CHECK:      bb0(%0 : $Optional<Builtin.Int32>):
-// CHECK-NEXT:   %1 = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:   %2 = integer_literal $Builtin.Int32, 3
-// CHECK-NEXT:   %3 = select_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: %1, case #Optional.Some!enumelt.1: %2
-// CHECK-NEXT:   return %3
+// OFFCHECK-LABEL: @switch_enum_dominates_switch_enum_noarg
+// OFFCHECK:      bb0(%0 : $Optional<Builtin.Int32>):
+// OFFCHECK-NEXT:   %1 = integer_literal $Builtin.Int32, 1
+// OFFCHECK-NEXT:   %2 = integer_literal $Builtin.Int32, 3
+// OFFCHECK-NEXT:   %3 = select_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: %1, case #Optional.Some!enumelt.1: %2
+// OFFCHECK-NEXT:   return %3
 sil @switch_enum_dominates_switch_enum_noarg : $@thin (Optional<Builtin.Int32>) -> Builtin.Int32 {
 bb0(%0 : $Optional<Builtin.Int32>):
   switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb1, case #Optional.Some!enumelt.1: bb2
@@ -812,13 +812,13 @@ bb5(%r : $Builtin.Int32):
   return %r : $Builtin.Int32
 }
 
-// CHECK-LABEL: @switch_enum_dominates_switch_enum_arg_reuse
-// CHECK:      bb0(%0 : $Optional<Builtin.Int32>):
-// CHECK-NEXT:   switch_enum %0 {{.*}} case #Optional.Some!enumelt.1: bb2
-// CHECK:      bb2([[A:%[0-9]+]] : $Builtin.Int32):
-// CHECK-NEXT:   br bb3([[A]] : $Builtin.Int32)
-// CHECK:      bb3([[R:%[0-9]+]] : $Builtin.Int32):
-// CHECK-NEXT:   return [[R]]
+// OFFCHECK-LABEL: @switch_enum_dominates_switch_enum_arg_reuse
+// OFFCHECK:      bb0(%0 : $Optional<Builtin.Int32>):
+// OFFCHECK-NEXT:   switch_enum %0 {{.*}} case #Optional.Some!enumelt.1: bb2
+// OFFCHECK:      bb2([[A:%[0-9]+]] : $Builtin.Int32):
+// OFFCHECK-NEXT:   br bb3([[A]] : $Builtin.Int32)
+// OFFCHECK:      bb3([[R:%[0-9]+]] : $Builtin.Int32):
+// OFFCHECK-NEXT:   return [[R]]
 sil @switch_enum_dominates_switch_enum_arg_reuse : $@thin (Optional<Builtin.Int32>) -> Builtin.Int32 {
 bb0(%0 : $Optional<Builtin.Int32>):
   switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.None!enumelt: bb1, case #Optional.Some!enumelt.1: bb2
