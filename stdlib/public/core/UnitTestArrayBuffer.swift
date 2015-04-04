@@ -58,7 +58,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     return true
   }
 
-  var arrayPropertyIsNativeNoDTC : Bool {
+  var arrayPropertyIsNativeNoTypeCheck : Bool {
     return true
   }
 
@@ -149,7 +149,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   }
 
   @inline(__always)
-  func getElement(i: Int, hoistedIsNativeNoDTCBuffer: Bool) -> T {
+  func getElement(i: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) -> T {
     _sanityCheck(_isValidSubscript(i, hoistedIsNativeBuffer: true),
                  "Array index out of range")
     // If the index is in bounds, we can assume we have storage.
@@ -159,7 +159,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   /// Get/set the value of the ith element
   public subscript(i: Int) -> T {
     get {
-      return getElement(i, hoistedIsNativeNoDTCBuffer: true)
+      return getElement(i, hoistedIsNativeNoTypeCheckBuffer: true)
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")

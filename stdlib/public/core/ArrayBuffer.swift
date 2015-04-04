@@ -70,7 +70,7 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
 
   var needsElementTypeCheck: Bool {
     // NSArray's need an element typecheck when the element type isn't AnyObject
-    return !_isNativeNoDTC && !(AnyObject.self is T.Type)
+    return !_isNativeNoTypeCheck && !(AnyObject.self is T.Type)
   }
   
   //===--- private --------------------------------------------------------===//
@@ -93,8 +93,8 @@ extension _ArrayBuffer {
   }
 
   /// True, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeNoDTC : Bool {
-    return _isNativeNoDTC
+  var arrayPropertyIsNativeNoTypeCheck : Bool {
+    return _isNativeNoTypeCheck
   }
 
   /// Return true iff this buffer's storage is uniquely-referenced.
@@ -343,19 +343,20 @@ extension _ArrayBuffer {
   /// Return whether the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
   internal func _isValidSubscript(index : Int,
-                                  hoistedIsNativeNoDTCBuffer : Bool) -> Bool {
+                                  hoistedIsNativeNoTypeCheckBuffer : Bool)
+                                    -> Bool {
     // This is the same function as _isValidSubscript with hoistedIsNativeBuffer,
     // except for the _precondition checks. See the comments there.
-    if _fastPath(hoistedIsNativeNoDTCBuffer) {
+    if _fastPath(hoistedIsNativeNoTypeCheckBuffer) {
       if (_isClassOrObjCExistential(T.self)) {
-        _precondition(_isNativeNoDTC,
+        _precondition(_isNativeNoTypeCheck,
           "inout rules were violated: the array was overwritten")
       }
-      return _nativeNoDTC._isValidSubscript(index,
+      return _nativeNoTypeCheck._isValidSubscript(index,
                                             hoistedIsNativeBuffer: true)
     }
     if (_isClassOrObjCExistential(T.self)) {
-      _precondition(!_isNativeNoDTC,
+      _precondition(!_isNativeNoTypeCheck,
         "inout rules were violated: the array was overwritten")
     }
     return true
@@ -368,9 +369,9 @@ extension _ArrayBuffer {
   }
 
   @inline(__always)
-  func getElement(i: Int, hoistedIsNativeNoDTCBuffer: Bool) -> T {
-    if _fastPath(hoistedIsNativeNoDTCBuffer) {
-      return _nativeNoDTC[i]
+  func getElement(i: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) -> T {
+    if _fastPath(hoistedIsNativeNoTypeCheckBuffer) {
+      return _nativeNoTypeCheck[i]
     }
     return unsafeBitCast(_getElementSlowPath(i), T.self)
   }
@@ -401,7 +402,7 @@ extension _ArrayBuffer {
   public
   subscript(i: Int) -> T {
     get {
-      return getElement(i, hoistedIsNativeNoDTCBuffer:_isNativeNoDTC)
+      return getElement(i, hoistedIsNativeNoTypeCheckBuffer:_isNativeNoTypeCheck)
     }
     
     nonmutating set {
@@ -509,7 +510,7 @@ extension _ArrayBuffer {
   }
 
   /// True, if the array is native and does not need a deferred type check.
-  var _isNativeNoDTC: Bool {
+  var _isNativeNoTypeCheck: Bool {
     if !_isClassOrObjCExistential(T.self) {
       return true
     }
@@ -529,8 +530,8 @@ extension _ArrayBuffer {
 
   /// Fast access to the native representation.
   ///
-  /// Requires:  `_isNativeNoDTC`
-  var _nativeNoDTC: NativeBuffer {
+  /// Requires:  `_isNativeNoTypeCheck`
+  var _nativeNoTypeCheck: NativeBuffer {
     return NativeBuffer(_storage.nativeInstance_noSpareBits)
   }
 
