@@ -6,12 +6,21 @@ add_swift_library(swiftSILGen
   RValue.cpp
   SILGen.cpp
   SILGenApply.cpp
+  SILGenBridging.cpp
   SILGenBuiltin.cpp
+  SILGenConstructor.cpp
   SILGenDecl.cpp
+  SILGenDestructor.cpp
+  SILGenDynamicCast.cpp
+  SILGenEpilog.cpp
   SILGenExpr.cpp
+  SILGenFunction.cpp
+  SILGenGlobalVariable.cpp
   SILGenLValue.cpp
   SILGenPattern.cpp
   SILGenPoly.cpp
   SILGenProfiling.cpp
+  SILGenProlog.cpp
   SILGenStmt.cpp
+  SILGenType.cpp
   LINK_LIBRARIES swiftSIL)

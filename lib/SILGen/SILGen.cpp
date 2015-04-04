@@ -32,27 +32,6 @@ using namespace swift;
 using namespace Lowering;
 
 //===--------------------------------------------------------------------===//
-// SILGenFunction Class implementation
-//===--------------------------------------------------------------------===//
-
-SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
-  : SGM(SGM), F(F),
-    B(createBasicBlock(), &InsertedInstrs),
-    CurrentSILLoc(F.getLocation()),
-    Cleanups(*this)
-{
-}
-
-/// SILGenFunction destructor - called after the entire function's AST has been
-/// visited.  This handles "falling off the end of the function" logic.
-SILGenFunction::~SILGenFunction() {
-  // If the end of the function isn't terminated, we screwed up somewhere.
-  assert(!B.hasValidInsertionPoint() &&
-         "SILGenFunction did not terminate function?!");
-  freeWritebackStack();
-}
-
-//===--------------------------------------------------------------------===//
 // SILGenModule Class implementation
 //===--------------------------------------------------------------------===//
 

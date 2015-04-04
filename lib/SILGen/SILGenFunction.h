@@ -566,6 +566,8 @@ public:
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
 
+  ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var);
+
   /// Generate a lazy global initializer.
   void emitLazyGlobalInitializer(PatternBindingDecl *binding);
   
@@ -589,6 +591,11 @@ public:
   
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
+                               ManagedValue block,
+                               CanSILFunctionType funcTy);
+
+  /// Convert a native function to a block with a thunk.
+  ManagedValue emitFuncToBlock(SILLocation loc,
                                ManagedValue block,
                                CanSILFunctionType funcTy);
   
@@ -658,6 +665,11 @@ public:
                   Type resultType);
   void emitProlog(ArrayRef<Pattern*> paramPatterns,
                   Type resultType, DeclContext *DeclCtx);
+
+  /// Create SILArguments in the entry block that bind all the values
+  /// of the given pattern suitably for being forwarded.
+  void bindParametersForForwarding(Pattern *paramPattern,
+                                   SmallVectorImpl<SILValue> &parameters);
 
   /// \brief Create (but do not emit) the epilog branch, and save the
   /// current cleanups depth as the destination for return statement branches.

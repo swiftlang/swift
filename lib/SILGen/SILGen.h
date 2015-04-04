@@ -92,6 +92,9 @@ public:
   void operator=(SILGenModule const &) = delete;
 
   ASTContext &getASTContext() { return M.getASTContext(); }
+
+  static DeclName getMagicFunctionName(SILDeclRef ref);
+  static DeclName getMagicFunctionName(DeclContext *dc);
   
   /// Returns the type of a constant reference.
   SILType getConstantType(SILDeclRef constant);
