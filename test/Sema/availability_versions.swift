@@ -51,13 +51,13 @@ func functionAvailableOn10_10() {
       // expected-note@-1 {{guard with version check}}
 }
 
-if #os(OSX >= 10.10) {
+if #os(OSX >= 10.10, *) {
   let _: Int = globalAvailableOn10_10
   let _: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
       // expected-note@-1 {{guard with version check}}
 }
 
-if #os(OSX >= 10.10) {
+if #os(OSX >= 10.10, *) {
   let _: Int = globalAvailableOn10_10
   let _: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
       // expected-note@-1 {{guard with version check}}
@@ -70,18 +70,20 @@ if #os(OSX >= 10.10) {
 @availability(OSX, introduced=10.10)
 var globalAvailableOnOSX10_10AndiOS8_0: Int = 10
 
-if #os(OSX >= 10.10, iOS >= 8.0) {
+if #os(OSX >= 10.10, iOS >= 8.0, *) {
   let _: Int = globalAvailableOnOSX10_10AndiOS8_0
 }
 
-if #os(OSX >= 10.10, OSX >= 10.11) {  // expected-error {{conditions for 'OSX' already specified for this query}}
+if #os(OSX >= 10.10, OSX >= 10.11, *) {  // expected-error {{conditions for 'OSX' already specified for this query}}
 }
 
-if #os(iOS >= 9.0) {  // expected-error {{condition required for target platform 'OSX'}}
+if #os(iOS >= 9.0) {  // expected-error {{condition required for target platform 'OSX'}} expected-error {{check must handle potential future platforms with '*'}} {{18-18=, *}}
   let _: Int = globalAvailableOnOSX10_10AndiOS8_0 // expected-error {{'globalAvailableOnOSX10_10AndiOS8_0' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{guard with version check}}
 }
 
+if #os(OSX >= 10.10, iOS >= 9.0) {  // expected-error {{check must handle potential future platforms with '*'}} {{32-32=, *}}
+}
 // Multiple unavailable references in a single statement
 
 let ignored4: (Int, Int) = (globalAvailableOn10_10, globalAvailableOn10_11) // expected-error {{'globalAvailableOn10_10' is only available on OS X 10.10 or newer}}  expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
@@ -103,7 +105,7 @@ let ignored5 = funcAvailableOn10_10 // expected-error {{'funcAvailableOn10_10()'
 funcAvailableOn10_10() // expected-error {{'funcAvailableOn10_10()' is only available on OS X 10.10 or newer}}
     // expected-note@-1 {{guard with version check}}
 
-if #os(OSX >= 10.10) {
+if #os(OSX >= 10.10, *) {
   funcAvailableOn10_10()
 }
 
@@ -311,7 +313,7 @@ class ClassWithUnavailableProperties {
           // expected-note@-1 {{add @availability attribute to enclosing class}}
           // expected-note@-2 {{guard with version check}}
       
-      if #os(OSX >= 10.10) {
+      if #os(OSX >= 10.10, *) {
         let _: Int = availableOn10_10Stored
       }
       
@@ -418,7 +420,7 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
       // expected-note@-1 {{add @availability attribute to enclosing global function}}
       // expected-note@-2 {{guard with version check}}
   
-  if #os(OSX >= 10.10) {
+  if #os(OSX >= 10.10, *) {
     // Setter is allowed on 10.10 and greater
     o.propWithSetterOnlyAvailableOn10_10 = 5
   }
@@ -429,7 +431,7 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
       // expected-note@-1 {{add @availability attribute to enclosing global function}}
       // expected-note@-2 {{guard with version check}}
 
-  if #os(OSX >= 10.10) {
+  if #os(OSX >= 10.10, *) {
     // Getter is allowed on 10.10 and greater
     let _: Int = o.propWithGetterOnlyAvailableOn10_10
   }
@@ -532,7 +534,7 @@ func useEnums() {
       // expected-note@-1 {{add @availability attribute to enclosing global function}}
       // expected-note@-2 {{guard with version check}}
 
-  if #os(OSX >= 10.10) {
+  if #os(OSX >= 10.10, *) {
     let _: CompassPoint = .North
 
     let _: CompassPoint = .West // expected-error {{'West' is only available on OS X 10.11 or newer}}
@@ -541,12 +543,12 @@ func useEnums() {
 
   }
 
-  if #os(OSX >= 10.11) {
+  if #os(OSX >= 10.11, *) {
     let _: CompassPoint = .West
   }
 
   // Pattern matching on an enum element does not require it to be definitely available
-  if #os(OSX >= 10.10) {
+  if #os(OSX >= 10.10, *) {
     let point: CompassPoint = .North
     switch (point) {
       case .North, .South, .East:
@@ -794,7 +796,7 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
         // expected-note@-1 {{add @availability attribute to enclosing class}}
         // expected-note@-2 {{guard with version check}}
     
-    if #os(OSX >= 10.10) {
+    if #os(OSX >= 10.10, *) {
       super.someMethod()
     }
   }
@@ -806,7 +808,7 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
           // expected-note@-1 {{add @availability attribute to enclosing class}}
           // expected-note@-2 {{guard with version check}}
       
-      if #os(OSX >= 10.10) {
+      if #os(OSX >= 10.10, *) {
         let _ = super.someProperty
       }
       
@@ -890,33 +892,44 @@ func useUnavailableExtension() {
 func functionWithDefaultAvailabilityAndUselessCheck() {
 // Default availability reflects minimum deployment: 10.9 and up
 
-  if #os(OSX >= 10.9) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
+  if #os(OSX >= 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
     let _ = globalAvailableOn10_9
   }
   
-  if #os(OSX >= 10.10) { // expected-note {{enclosing scope here}}
+  if #os(OSX >= 10.10, *) { // expected-note {{enclosing scope here}}
     let _ = globalAvailableOn10_10
     
-    if #os(OSX >= 10.10) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+    if #os(OSX >= 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
       let _ = globalAvailableOn10_10 
+    }
+  }
+
+  // We don't want * generate a warn about useless checks; the check may be required on
+  // another platform
+  if #os(iOS >= 8.0, *) {
+  }
+
+  if #os(OSX >= 10.10, *) {
+    // Similarly do not want '*' to generate a warning in a refined TRC.
+    if #os(iOS >= 8.0, *) {
     }
   }
 }
 
 @availability(OSX, introduced=10.10)
 func functionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note 2{{enclosing scope here}}
-  if #os(OSX >= 10.9) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+  if #os(OSX >= 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
     let _ = globalAvailableOn10_9
   }
   
-  if #os(OSX >= 10.10) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+  if #os(OSX >= 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
     let _ = globalAvailableOn10_10 
   }
 }
 
 // #os(...) outside if statement guards
 
-let _ = #os(OSX >= 10.10) // expected-error {{check can only be used as guard of if statement}}
+let _ = #os(OSX >= 10.10, *) // expected-error {{check can only be used as guard of if statement}}
 
 // For the moment, we don't allow #os() in IfExprs.
 (#os(OSX >= 10.10) ? 1 : 0) // expected-error {{check can only be used as guard of if statement}}

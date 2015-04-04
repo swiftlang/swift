@@ -20,10 +20,21 @@
 
 using namespace swift;
 
-// Only allow allocation of VersionConstraintAvailabilitySpec using the
+SourceRange AvailabilitySpec::getSourceRange() const {
+  switch (getKind()) {
+  case AvailabilitySpecKind::VersionConstraint:
+    return cast<VersionConstraintAvailabilitySpec>(this)->getSourceRange();
+
+  case AvailabilitySpecKind::OtherPlatform:
+    return cast<OtherPlatformAvailabilitySpec>(this)->getSourceRange();
+  }
+  llvm_unreachable("bad AvailabilitySpecKind");
+}
+
+// Only allow allocation of AvailabilitySpecs using the
 // allocator in ASTContext.
-void *VersionConstraintAvailabilitySpec::
-operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
+void *AvailabilitySpec::operator new(size_t Bytes, ASTContext &C,
+                                     unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
@@ -45,5 +56,11 @@ void VersionConstraintAvailabilitySpec::print(raw_ostream &OS,
                     << " platform='" << platformString(getPlatform()) << "'"
                     << " comparison='" << getComparisonAsString() << "'"
                     << " version='" << getVersion() << "'"
+                    << ')';
+}
+
+void OtherPlatformAvailabilitySpec::print(raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << '(' << "version_constraint_availability_spec"
+                    << " "
                     << ')';
 }

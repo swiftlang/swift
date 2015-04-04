@@ -1051,17 +1051,33 @@ private:
 
   /// Validate the availability query, emitting diagnostics if necessary.
   void validateAvailabilityQuery(AvailabilityQueryExpr *E) {
-    // Rule out multiple version specs referring to the same platform.
-    // For example, we emit an error for #os(OSX >= 10.10, OSX >= 10.11)
     llvm::SmallSet<PlatformKind, 2> Platforms;
+    bool HasOtherPlatformSpec = false;
     for (auto *Spec : E->getQueries()) {
-      bool Inserted = Platforms.insert(Spec->getPlatform()).second;
+      if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
+        HasOtherPlatformSpec = true;
+        continue;
+      }
+
+      auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
+      bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
       if (!Inserted) {
-        PlatformKind Platform = Spec->getPlatform();
-        AC.Diags.diagnose(Spec->getPlatformLoc(),
+        // Rule out multiple version specs referring to the same platform.
+        // For example, we emit an error for #os(OSX >= 10.10, OSX >= 10.11)
+        PlatformKind Platform = VersionSpec->getPlatform();
+        AC.Diags.diagnose(VersionSpec->getPlatformLoc(),
                           diag::availability_query_repeated_platform,
                           platformString(Platform));
       }
+    }
+
+    if (!HasOtherPlatformSpec) {
+      ArrayRef<AvailabilitySpec *> Queries = E->getQueries();
+      assert(Queries.size() > 0);
+      AvailabilitySpec *LastQuery = Queries[Queries.size() - 1];
+      SourceLoc InsertWildcardLoc = LastQuery->getSourceRange().End;
+      AC.Diags.diagnose(E->getLoc(), diag::availability_query_wildcard_required)
+          .fixItInsertAfter(InsertWildcardLoc, ", *");
     }
   }
 
@@ -1071,7 +1087,7 @@ private:
                                                     IfStmt *IS) {
     TypeRefinementContext *CurTRC = getCurrentTRC();
     
-    VersionConstraintAvailabilitySpec *Spec = bestActiveSpecForQuery(E);
+    AvailabilitySpec *Spec = bestActiveSpecForQuery(E);
     if (!Spec) {
       // We couldn't find an appropriate spec for the current platform,
       // so rather than refining, emit a diagnostic and just use the current
@@ -1082,14 +1098,14 @@ private:
       return CurTRC;
     }
 
-    
     VersionRange range = rangeForSpec(Spec);
     E->setAvailableRange(range);
     
     // If the version range for the current TRC is completely contained in
-    // the range for the spec, then the query can never be false, so the
+    // the range for the spec, then a version query can never be false, so the
     // spec is useless. If so, report this.
-    if (CurTRC->getPotentialVersions().isContainedIn(range)) {
+    if (Spec->getKind() == AvailabilitySpecKind::VersionConstraint &&
+        CurTRC->getPotentialVersions().isContainedIn(range)) {
       DiagnosticEngine &Diags = AC.Diags;
       if (CurTRC->getReason() == TypeRefinementContext::Reason::Root) {
         Diags.diagnose(E->getLoc(),
@@ -1111,26 +1127,42 @@ private:
 
   /// Return the best active spec for the target platform or nullptr if no
   /// such spec exists.
-  VersionConstraintAvailabilitySpec *
-  bestActiveSpecForQuery(AvailabilityQueryExpr *E) {
+  AvailabilitySpec *bestActiveSpecForQuery(AvailabilityQueryExpr *E) {
+    OtherPlatformAvailabilitySpec *FoundOtherSpec = nullptr;
     for (auto *Spec : E->getQueries()) {
+      if (auto *OtherSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
+        FoundOtherSpec = OtherSpec;
+        continue;
+      }
+
+      auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
+      if (!VersionSpec)
+        continue;
+
       // FIXME: This is not quite right: we want to handle AppExtensions
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OSX spec unless there is an explicit
       // OSXApplicationExtension spec.
-      if (isPlatformActive(Spec->getPlatform(), AC.LangOpts)) {
-        return Spec;
+      if (isPlatformActive(VersionSpec->getPlatform(), AC.LangOpts)) {
+        return VersionSpec;
       }
     }
 
-    return nullptr;
+    // If we have reached this point, we found no spec for our target, so
+    // we return the other spec ('*'), if we found it, or nullptr, if not.
+    return FoundOtherSpec;
   }
 
   /// Return the version range for the given availability spec.
-  VersionRange rangeForSpec(VersionConstraintAvailabilitySpec *Spec) {
-    switch (Spec->getComparison()) {
+  VersionRange rangeForSpec(AvailabilitySpec *Spec) {
+    if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
+      return VersionRange::allGTE(AC.LangOpts.getMinPlatformVersion());
+    }
+
+    auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
+    switch (VersionSpec->getComparison()) {
     case VersionComparison::GreaterThanEqual:
-      return VersionRange::allGTE(Spec->getVersion());
+      return VersionRange::allGTE(VersionSpec->getVersion());
     }
   }
   

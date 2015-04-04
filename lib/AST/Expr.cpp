@@ -810,10 +810,10 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
 
 AvailabilityQueryExpr *AvailabilityQueryExpr::create(
     ASTContext &ctx, SourceLoc PoundLoc,
-    ArrayRef<VersionConstraintAvailabilitySpec *> queries,
+    ArrayRef<AvailabilitySpec *> queries,
     SourceLoc RParenLoc) {
   unsigned size = sizeof(AvailabilityQueryExpr) +
-                  queries.size() * sizeof(VersionConstraintAvailabilitySpec *);
+                  queries.size() * sizeof(AvailabilitySpec *);
 
   void *Buffer = ctx.Allocate(size, alignof(AvailabilityQueryExpr));
   return ::new (Buffer) AvailabilityQueryExpr(PoundLoc, queries, RParenLoc);
@@ -832,8 +832,13 @@ SourceLoc AvailabilityQueryExpr::getEndLoc() const {
 void AvailabilityQueryExpr::getPlatformKeywordRanges(
     SmallVectorImpl<CharSourceRange> &PlatformRanges) {
   for (unsigned int i = 0; i < NumQueries; i ++) {
-    auto Loc = (getQueriesBuf()[i])->getPlatformLoc();
-    auto Platform = (getQueriesBuf()[i])->getPlatform();
+    auto *VersionSpec =
+        dyn_cast<VersionConstraintAvailabilitySpec>(getQueriesBuf()[i]);
+    if (!VersionSpec)
+      continue;
+
+    auto Loc = VersionSpec->getPlatformLoc();
+    auto Platform = VersionSpec->getPlatform();
     switch (Platform) {
       case PlatformKind::none:
         break;

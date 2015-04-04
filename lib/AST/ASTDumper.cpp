@@ -1879,7 +1879,14 @@ public:
     printCommon(E, "availability_query_expr");
     for (auto *Query : E->getQueries()) {
       OS << '\n';
-      Query->print(OS, Indent + 2);
+      switch (Query->getKind()) {
+      case AvailabilitySpecKind::VersionConstraint:
+        cast<VersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+      break;
+      case AvailabilitySpecKind::OtherPlatform:
+        cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
+      break;
+      }
     }
     OS << ')';
   }

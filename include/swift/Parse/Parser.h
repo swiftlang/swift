@@ -1178,6 +1178,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing
   
+  ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
   
   /// Parse a version comparison operator. Returns true on error.

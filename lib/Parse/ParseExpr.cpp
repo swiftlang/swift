@@ -923,14 +923,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     
     consumeToken();
     
-    SmallVector<VersionConstraintAvailabilitySpec *, 2> Specs;
+    SmallVector<AvailabilitySpec *, 5> Specs;
     ParserStatus Status = makeParserSuccess();
     
     // Parse a comma-separated list of availability specifications. We don't
     // use parseList() because we want to provide more specific diagnostics
     // disallowing operators in version specs.
     while (true) {
-      auto SpecResult = parseVersionConstraintSpec();
+      auto SpecResult = parseAvailabilitySpec();
       if (auto *Spec = SpecResult.getPtrOrNull()) {
         Specs.push_back(Spec);
       } else {
@@ -2314,9 +2314,25 @@ void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
   }
 }
 
+
+/// Parse availability query specification.
+///
+///  availability-spec:
+///     '*'
+///     version-constraint-spec
+ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
+  if (Tok.isBinaryOperator() && Tok.getText() == "*") {
+    SourceLoc StarLoc = Tok.getLoc();
+    consumeToken();
+
+    return makeParserResult(new (Context) OtherPlatformAvailabilitySpec(StarLoc));
+  }
+  return parseVersionConstraintSpec();
+}
+
 /// Parse version constraint specification.
 ///
-///  target-config-condition:
+///  version-constraint-spec:
 ///     identifier version-comparison version-tuple
 ParserResult<VersionConstraintAvailabilitySpec>
 Parser::parseVersionConstraintSpec() {

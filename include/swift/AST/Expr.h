@@ -35,7 +35,7 @@ namespace llvm {
 namespace swift {
   class ArchetypeType;
   class ASTContext;
-  class VersionConstraintAvailabilitySpec;
+  class AvailabilitySpec;
   class Type;
   class ValueDecl;
   class Decl;
@@ -3617,7 +3617,7 @@ class AvailabilityQueryExpr : public Expr {
   VersionRange AvailableRange;
 
   AvailabilityQueryExpr(SourceLoc PoundLoc,
-                        ArrayRef<VersionConstraintAvailabilitySpec *> queries,
+                        ArrayRef<AvailabilitySpec *> queries,
                         SourceLoc RParenLoc,
                         VersionRange AvailableRange = VersionRange::empty(),
                         Type Ty = Type())
@@ -3625,18 +3625,17 @@ class AvailabilityQueryExpr : public Expr {
         PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()),
         AvailableRange(AvailableRange) {
     memcpy(getQueriesBuf(), queries.data(),
-           queries.size() * sizeof(VersionConstraintAvailabilitySpec *));
+           queries.size() * sizeof(AvailabilitySpec *));
   }
 
 public:
   static AvailabilityQueryExpr *
   create(ASTContext &ctx, SourceLoc PoundLoc,
-         ArrayRef<VersionConstraintAvailabilitySpec *> queries,
+         ArrayRef<AvailabilitySpec *> queries,
          SourceLoc RParenLoc);
 
-  ArrayRef<VersionConstraintAvailabilitySpec *> getQueries() const {
-    return ArrayRef<VersionConstraintAvailabilitySpec *>(getQueriesBuf(),
-                                                         NumQueries);
+  ArrayRef<AvailabilitySpec *> getQueries() const {
+    return ArrayRef<AvailabilitySpec *>(getQueriesBuf(), NumQueries);
   }
 
   SourceLoc getStartLoc() const { return PoundLoc; }
@@ -3654,11 +3653,11 @@ public:
                                 &PlatformRanges);
 
 private:
-  VersionConstraintAvailabilitySpec **getQueriesBuf() {
-    return reinterpret_cast<VersionConstraintAvailabilitySpec **>(this + 1);
+  AvailabilitySpec **getQueriesBuf() {
+    return reinterpret_cast<AvailabilitySpec **>(this + 1);
   }
 
-  VersionConstraintAvailabilitySpec *const *getQueriesBuf() const {
+  AvailabilitySpec *const *getQueriesBuf() const {
     return const_cast<AvailabilityQueryExpr *>(this)->getQueriesBuf();
   }
 };
