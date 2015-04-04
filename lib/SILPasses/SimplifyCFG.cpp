@@ -432,7 +432,9 @@ static bool propagateSwitchEnumCondition(SwitchEnumInst *SWI, DominanceInfo *DT)
       continue;
     }
     if (SelectEnumInst *DomSEI = dyn_cast<SelectEnumInst>(User)) {
-
+      // No point in replacing an unused select_enum.
+      if (DomSEI->use_empty())
+        continue;
       // The SWI successor dominates a select_enum which share the same
       // condition.
       SILValue selected;
