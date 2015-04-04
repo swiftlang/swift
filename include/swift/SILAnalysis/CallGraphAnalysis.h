@@ -25,14 +25,8 @@
 
 namespace swift {
 
-inline bool canHaveIndirectUses(SILFunction *F) {
-  if (swift::isPossiblyUsedExternally(F->getLinkage(),
-                                      F->getModule().isWholeModule()))
-    return true;
-
-  // TODO: main is currently marked as internal so we explicitly check
-  // for functions with this name and keep them around.
-  if (F->getName() == SWIFT_ENTRY_POINT_FUNCTION)
+static inline bool canHaveIndirectUses(SILFunction *F) {
+  if (F->isPossiblyUsedExternally())
     return true;
 
   // ObjC functions are called through the runtime and are therefore alive
@@ -148,10 +142,7 @@ class CallGraphNode {
   /// This is owned by the callgraph itself, not the callgraph node.
   llvm::SmallPtrSet<CallGraphEdge *, 4> CalleeEdges;
 
-  /// Do we know all the potential callers of this function? We initialize this
-  /// to !canHaveIndirectUses(F) optimistically and if we find any use that we
-  /// can not prove does not cause a reference to a function_ref to escape in a
-  /// we set this to false.
+  /// Do we know all the potential callers of this function?
   bool CallerEdgesComplete;
 
 public:
