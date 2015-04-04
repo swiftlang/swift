@@ -16,8 +16,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Mangle.h"
 #include "swift/SIL/FormalLinkage.h"
-#include "clang/AST/Attr.h"
-#include "clang/AST/Decl.h"
 
 using namespace swift;
 using namespace Mangle;
@@ -26,42 +24,21 @@ using namespace Lowering;
 /// Get or create SILGlobalVariable for a given global VarDecl.
 SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
                                                       ForDefinition_t forDef) {
-  // First mangle the global VarDecl.
-  llvm::SmallString<32> mangledName;
-  {
+  // First, get a mangled name for the declaration.
+  llvm::SmallString<32> mangledName; {
     llvm::raw_svector_ostream buffer(mangledName);
-
-    // As a special case, Clang functions and globals don't get mangled at all.
-    // FIXME: When we can import C++, use Clang's mangler.
-    bool specialCase = false;
-    if (auto clangDecl = gDecl->getClangDecl()) {
-      if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
-        if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
-          buffer << '\01' << asmLabel->getLabel();
-        } else {
-          buffer << namedClangDecl->getName();
-        }
-        specialCase = true;
-      }
-    }
-
-    if (!specialCase) {
-      buffer << "_T";
-      Mangler mangler(buffer);
-      mangler.mangleEntity(gDecl, ResilienceExpansion(0), 0);
-    }
+    Mangler mangler(buffer);
+    mangler.mangleGlobalVariableFull(gDecl);
   }
 
   // Check if it is already created, and update linkage if necessary.
-  for (SILGlobalVariable &v : M.getSILGlobals()) {
-    if (v.getName() == mangledName) {
-      // Update the SILLinkage here if this is a definition.
-      if (forDef == ForDefinition) {
-        v.setLinkage(getSILLinkage(getDeclLinkage(gDecl), ForDefinition));
-        v.setDeclaration(false);
-      }
-      return &v;
+  if (auto gv = M.lookUpGlobalVariable(mangledName)) {
+    // Update the SILLinkage here if this is a definition.
+    if (forDef == ForDefinition) {
+      gv->setLinkage(getSILLinkage(getDeclLinkage(gDecl), ForDefinition));
+      gv->setDeclaration(false);
     }
+    return gv;
   }
 
   // Get the linkage for SILGlobalVariable.
@@ -230,10 +207,11 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   });
   assert(varDecl);
 
-  llvm::SmallString<20> onceTokenBuffer;
-  llvm::raw_svector_ostream onceTokenStream(onceTokenBuffer);
-  Mangler tokenMangler(onceTokenStream);
-  tokenMangler.mangleGlobalInit(varDecl, counter, false);
+  llvm::SmallString<20> onceTokenBuffer; {
+    llvm::raw_svector_ostream onceTokenStream(onceTokenBuffer);
+    Mangler tokenMangler(onceTokenStream);
+    tokenMangler.mangleGlobalInit(varDecl, counter, false);
+  }
 
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
   auto onceSILTy
@@ -243,7 +221,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   // Then we can make it fragile.
   auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
                                              makeModuleFragile,
-                                             onceTokenStream.str(), onceSILTy);
+                                             onceTokenBuffer, onceSILTy);
   onceToken->setDeclaration(false);
 
   // Emit the initialization code into a function.

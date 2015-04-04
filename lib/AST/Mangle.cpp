@@ -24,6 +24,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/Punycode.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1517,6 +1518,23 @@ void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern,
     Buffer << 'P';
   mangleDirectness(isIndirect);
   mangleType(ty, ResilienceExpansion::Minimal, 0);
+}
+
+void Mangler::mangleGlobalVariableFull(const VarDecl *decl) {
+  // As a special case, Clang functions and globals don't get mangled at all.
+  // FIXME: When we can import C++, use Clang's mangler.
+  if (auto clangDecl =
+        dyn_cast_or_null<clang::DeclaratorDecl>(decl->getClangDecl())) {
+    if (auto asmLabel = clangDecl->getAttr<clang::AsmLabelAttr>()) {
+      Buffer << '\01' << asmLabel->getLabel();
+    } else {
+      Buffer << clangDecl->getName();
+    }
+    return;
+  }
+
+  Buffer << "_T";
+  mangleEntity(decl, ResilienceExpansion(0), 0);
 }
 
 void Mangler::mangleGlobalInit(const VarDecl *decl, int counter,
