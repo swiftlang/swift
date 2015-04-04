@@ -1901,6 +1901,7 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
 
   if (!DT || !PDT)
     return false;
+  auto &Fn = *BB->getParent();
 
   // Don't know which values should be passed if there is more
   // than one basic block argument.
@@ -2087,6 +2088,10 @@ bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
   B.createBranch(SEI->getLoc(), BB, Args);
   // Remove switch_enum instruction
   SEI->getParent()->getTerminator()->eraseFromParent();
+
+  // We have modified the CFG recompute the (post)dominators.
+  PDT->recalculate(Fn);
+  DT->recalculate(Fn);
 
   return true;
 }
