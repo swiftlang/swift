@@ -12,7 +12,7 @@ func callUnavailableObjC() {
       // expected-note@-2 {{guard with version check}}
   
   
-  if #os(OSX >= 10.10, *) {
+  if #available(OSX >= 10.10, *) {
     let o = NSAvailableOn10_10()
     
     // Properties
@@ -72,7 +72,7 @@ func gettersAndSettersFromObjC(o: NSAvailableOn10_9) {
       // expected-note@-1 {{add @availability attribute to enclosing global function}}
       // expected-note@-2 {{guard with version check}}
 
-  if #os(OSX >= 10.10, *) {
+  if #available(OSX >= 10.10, *) {
     // Properties with unavailable accessors declared before property in Objective-C header
     o.propertyOn10_10WithSetterOn10_11Before = 5 // expected-error {{setter for 'propertyOn10_10WithSetterOn10_11Before' is only available on OS X 10.11 or newer}}
         // expected-note@-1 {{add @availability attribute to enclosing global function}}

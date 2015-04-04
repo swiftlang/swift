@@ -1063,7 +1063,8 @@ private:
       bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
       if (!Inserted) {
         // Rule out multiple version specs referring to the same platform.
-        // For example, we emit an error for #os(OSX >= 10.10, OSX >= 10.11)
+        // For example, we emit an error for
+        /// #available(OSX >= 10.10, OSX >= 10.11, *)
         PlatformKind Platform = VersionSpec->getPlatform();
         AC.Diags.diagnose(VersionSpec->getPlatformLoc(),
                           diag::availability_query_repeated_platform,
@@ -1171,11 +1172,11 @@ private:
     if (!QueryExpr)
       return std::make_pair(true, E);
     
-    // If we have gotten here, it means we encountered #os(...) in a context
-    // other than if #os(...) { }, so we emit an error. We may want to loosen
-    // this restriction in the future (to, e.g., IfExprs) -- but, in general,
-    // we don't want #os() to appear where static analysis cannot easily
-    // determine its effect.
+    // If we have gotten here, it means we encountered #available(...)
+    // in a context other than if #available(...) { }, so we emit an error.
+    // We may want to loosen this restriction in the future (to, e.g., IfExprs)
+    // -- but, in general, we don't want #available() to appear where static
+    // analysis cannot easily determine its effect.
     AC.Diags.diagnose(E->getLoc(),
                       diag::availability_query_outside_if_stmt_guard);
     
@@ -1285,10 +1286,10 @@ bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
     // code) we conservatively climb up the decl context hierarchy to
     // find a valid location, if possible. Because we are climbing DeclContexts
     // we may miss statement or expression level refinement contexts (i.e.,
-    // #os(..)). That is, a reference with an invalid location that is contained
-    // inside a #os() and with no intermediate DeclContext will not be
-    // refined. For now, this is fine -- but if we ever synthesize #os(), this
-    // will be  real problem.
+    // #available(..)). That is, a reference with an invalid location that i
+    // contained inside a #available() and with no intermediate DeclContext will
+    // not be refined. For now, this is fine -- but if we ever synthesize
+    // #available(), this will be a real problem.
     lookupLoc = bestLocationInDeclContextHierarchy(referenceDC);
   }
   
@@ -1659,8 +1660,8 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// three locations for potential fixits.
 ///
 /// \param  FoundVersionCheckNode Returns a node that can be wrapped in a
-/// if #os(...) { ... } version check to fix the unavailable reference, or None
-/// if such such a node cannot be found.
+/// if #available(...) { ... } version check to fix the unavailable reference,
+/// or None if such such a node cannot be found.
 ///
 /// \param FoundMemberLevelDecl Returns memember-level declaration (i.e., the
 ///  child of a type DeclContext) for which an @availability attribute would
@@ -1689,7 +1690,7 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
   // the declaration.
   ASTNode SearchRoot = const_cast<Decl *>(DeclarationToSearch);
 
-  // The node to wrap in if #os(...) { ... } is the innermost node in
+  // The node to wrap in if #available(...) { ... } is the innermost node in
   // SearchRoot that (1) can be guarded with an if statement and (2)
   // contains the ReferenceRange.
   // We make no guarantee that the Fix-It, when applied, will result in
@@ -1806,7 +1807,7 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
       .fixItInsert(InsertLoc, AttrText);
 }
 
-/// Emit a diagnostic note and Fix-It to add an if #os(...) { } guard
+/// Emit a diagnostic note and Fix-It to add an if #available(...) { } guard
 /// that checks for the given version range around the given node.
 static void fixAvailabilityByAddingVersionCheck(
     ASTNode NodeToWrap, const VersionRange &RequiredRange,
@@ -1846,7 +1847,7 @@ static void fixAvailabilityByAddingVersionCheck(
 
     PlatformKind Target = targetPlatform(TC.getLangOpts());
 
-    Out << "if #os(" << platformString(Target)
+    Out << "if #available(" << platformString(Target)
         << " >= " << RequiredRange.getLowerEndpoint().getAsString() << ") {\n";
 
     Out << OriginalIndent << ExtraIndent << GuardedText << "\n";
@@ -1879,7 +1880,7 @@ static void fixAvailability(SourceRange ReferenceRange,
                              NodeToWrapInVersionCheck, FoundMemberDecl,
                              FoundTypeLevelDecl);
 
-  // Suggest wrapping in if #os(...) { ... } if possible.
+  // Suggest wrapping in if #available(...) { ... } if possible.
   if (NodeToWrapInVersionCheck.hasValue()) {
     fixAvailabilityByAddingVersionCheck(NodeToWrapInVersionCheck.getValue(),
                                         RequiredRange, ReferenceRange, TC);

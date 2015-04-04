@@ -83,7 +83,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
-      case tok::pound_os: Kind = SyntaxNodeKind::BuildConfigKeyword; break;
+      case tok::pound_available: Kind =
+          SyntaxNodeKind::BuildConfigKeyword; break;
       case tok::identifier: Kind = SyntaxNodeKind::Identifier; break;
       case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
       case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;

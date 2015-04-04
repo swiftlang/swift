@@ -1476,9 +1476,9 @@ Restart:
       return formToken(tok::pound_line, TokStart);
     }
     
-    if (getSubstring(TokStart + 1, 2).equals("os")) {
-      CurPtr += 2;
-      return formToken(tok::pound_os, TokStart);
+    if (getSubstring(TokStart + 1, 9).equals("available")) {
+      CurPtr += 9;
+      return formToken(tok::pound_available, TokStart);
     }
 
     // Allow a hashbang #! line at the beginning of the file.

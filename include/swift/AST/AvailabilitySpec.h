@@ -104,14 +104,14 @@ public:
 };
 
 /// A wildcard availability specification that guards execution
-/// by checking that  the run-time version is greater than the minimum
+/// by checking that the run-time version is greater than the minimum
 /// deployment target. This specification is designed to ease porting
 /// to new platforms. Because new platforms typically branch from
-/// existing platforms, the wildcard allows a #os() check to do the "right"
-/// (executing the the guarded branch) on the new platform without requiring
-/// a modification to every #os() guard in the program. Note that we still do
-/// compile-time availability checking with '*', so the compiler will still
-/// catch references to potentially unavailable symbols.
+/// existing platforms, the wildcard allows an #available() check to do the
+/// "right" thing (executing the the guarded branch) on the new platform without
+/// requiring a modification to every availablity guard in the program. Note
+/// that we still do compile-time availability checking with '*', so the
+/// compiler will still catch references to potentially unavailable symbols.
 class OtherPlatformAvailabilitySpec : public AvailabilitySpec {
   SourceLoc StarLoc;
 

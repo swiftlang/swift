@@ -3605,7 +3605,8 @@ public:
 };
 
 /// \brief An expression that guards execution based on whether the run-time
-/// configuration supports a given API, e.g., #os(OSX >= 10.9, iOS >= 7.0).
+/// configuration supports a given API, e.g.,
+/// #available(OSX >= 10.9, iOS >= 7.0).
 class AvailabilityQueryExpr : public Expr {
   SourceLoc PoundLoc;
   SourceLoc RParenLoc;
