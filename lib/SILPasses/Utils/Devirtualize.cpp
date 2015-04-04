@@ -26,8 +26,8 @@
 #include "llvm/Support/Casting.h"
 using namespace swift;
 
-STATISTIC(NumClassDevirt, "Number of calls devirtualized");
-STATISTIC(NumWitnessDevirt, "Number of witness_method devirtualized");
+STATISTIC(NumClassDevirt, "Number of class_method applies devirtualized");
+STATISTIC(NumWitnessDevirt, "Number of witness_method applies devirtualized");
 
 //===----------------------------------------------------------------------===//
 //                         Class Method Optimization
