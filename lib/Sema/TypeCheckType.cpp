@@ -105,27 +105,42 @@ Type TypeChecker::getExceptionType(DeclContext *dc, SourceLoc loc) {
   return Type();
 }
 
-Type TypeChecker::getNSObjectType(DeclContext *dc) {
-  if (NSObjectType)
-    return NSObjectType;
+static Type getObjectiveCClassType(TypeChecker &TC,
+                                   Type &cache,
+                                   Identifier ModuleName,
+                                   Identifier TypeName,
+                                   DeclContext *dc) {
+  if (cache)
+    return cache;
+
+  auto &Context = TC.Context;
 
   // FIXME: Does not respect visibility of the module.
-  Module *module = Context.getLoadedModule(
-                     Context.getIdentifier(OBJC_MODULE_NAME));
+  Module *module = Context.getLoadedModule(ModuleName);
   if (!module)
     return nullptr;
 
-  if (auto result = lookupMember(ModuleType::get(module), Context.Id_NSObject,
-                                 dc, /*knownPrivate=*/true)) {
+  if (auto result = TC.lookupMember(ModuleType::get(module), TypeName,
+                                    dc, /*knownPrivate=*/true)) {
     for (auto decl : result) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        NSObjectType = nominal->getDeclaredType();
-        return NSObjectType;
+        cache = nominal->getDeclaredType();
+        return cache;
       }
     }
   }
 
   return nullptr;
+}
+
+Type TypeChecker::getNSObjectType(DeclContext *dc) {
+  return getObjectiveCClassType(*this, NSObjectType, Context.Id_ObjectiveC,
+                                Context.Id_NSObject, dc);
+}
+
+Type TypeChecker::getNSErrorType(DeclContext *dc) {
+  return getObjectiveCClassType(*this, NSObjectType, Context.Id_Foundation,
+                                Context.Id_NSError, dc);
 }
 
 Type 

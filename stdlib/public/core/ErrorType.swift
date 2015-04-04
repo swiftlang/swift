@@ -30,3 +30,7 @@ public func _stdlib_getErrorCode<T: _ErrorType>(x: UnsafePointer<T>) -> Int {
   return x.memory.code
 }
 
+// Known function for the compiler to use to coerce ErrorType instances to
+// NSError.
+@asmname("swift_becomeNSError")
+public func _becomeNSError(e: _ErrorType) -> AnyObject

@@ -55,6 +55,8 @@ FUNC_DECL(ForceBridgeFromObjectiveC,
           "_forceBridgeFromObjectiveC")
 FUNC_DECL(ConditionallyBridgeFromObjectiveC,
           "_conditionallyBridgeFromObjectiveC")
+FUNC_DECL(BecomeNSError,
+          "_becomeNSError")
 
 FUNC_DECL(DidEnterMain, "_didEnterMain")
 FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")

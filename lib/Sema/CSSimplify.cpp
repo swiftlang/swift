@@ -1785,6 +1785,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           allowsBridgingFromObjC(TC, DC, type2)) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeFromObjC);
       }
+      
+      // Bridging from an ErrorType to an Objective-C NSError.
+      auto errorType = TC.Context.getProtocol(KnownProtocolKind::_ErrorType);
+      if (TC.conformsToProtocol(type1, errorType, DC, /*expr*/ true)
+          && type2->isEqual(TC.getNSErrorType(DC))) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::BridgeToNSError);
+      }
     }
 
     // Pointer arguments can be converted from pointer-compatible types.
@@ -4157,6 +4164,16 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     }
 
     return matchTypes(type1, objcClass, TypeMatchKind::Subtype, subFlags,
+                      locator);
+  }
+
+  case ConversionRestrictionKind::BridgeToNSError: {
+    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
+    
+    // The input type must be an ErrorType subtype.
+    auto errorType = TC.Context.getProtocol(KnownProtocolKind::_ErrorType)
+      ->getDeclaredType();
+    return matchTypes(type1, errorType, TypeMatchKind::Subtype, subFlags,
                       locator);
   }
 

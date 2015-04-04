@@ -149,17 +149,13 @@ ErrorTypeTests.test("NSError-to-enum bridging") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
-// TODO: Should use this via language-level 'as NSError' coercion
-@asmname("swift_becomeNSError")
-public func swift_becomeNSError(e: _ErrorType) -> NSError
-
 ErrorTypeTests.test("ErrorType-to-NSError bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   autoreleasepool {
     let e: _ErrorType = NoisyError()
-    let ns = swift_becomeNSError(e)
-    let ns2 = swift_becomeNSError(e)
+    let ns = e as NSError
+    let ns2 = e as NSError
     expectTrue(ns === ns2)
     expectEqual(ns.domain, "NoisyError")
     expectEqual(ns.code, 123)
@@ -167,7 +163,7 @@ ErrorTypeTests.test("ErrorType-to-NSError bridging") {
     let e3: _ErrorType = ns
     expectEqual(e3.domain, "NoisyError")
     expectEqual(e3.code, 123)
-    let ns3 = swift_becomeNSError(e3)
+    let ns3 = e3 as NSError
     expectTrue(ns === ns3)
 
     let nativeNS = NSError(domain: NSCocoaErrorDomain,
@@ -178,7 +174,7 @@ ErrorTypeTests.test("ErrorType-to-NSError bridging") {
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
     let nativeE: _ErrorType = nativeNS
-    let nativeNS2 = swift_becomeNSError(nativeE)
+    let nativeNS2 = nativeE as NSError
     expectTrue(nativeNS === nativeNS2)
     expectEqual(nativeNS2.domain, NSCocoaErrorDomain)
     expectEqual(nativeNS2.code, NSFileNoSuchFileError)

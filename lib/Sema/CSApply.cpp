@@ -4745,6 +4745,30 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       return coerceToType(objcExpr, toType, locator);
     }
+    
+    case ConversionRestrictionKind::BridgeToNSError: {
+      // Tell the ErrorType to become an NSError, using _becomeNSError.
+      auto fn = tc.Context.getBecomeNSError(&tc);
+      if (!fn) {
+        tc.diagnose(expr->getLoc(), diag::missing_nserror_bridging_function);
+        return nullptr;
+      }
+      tc.validateDecl(fn);
+      ConcreteDeclRef fnDeclRef(fn);
+      Expr *fnRef = new (tc.Context) DeclRefExpr(fnDeclRef, expr->getLoc(),
+                                                 /*Implicit=*/true);
+      fnRef->setType(fn->getInterfaceType());
+      Expr *call = new (tc.Context) CallExpr(fnRef, expr,
+                                             /*implicit*/ true);
+      if (tc.typeCheckExpressionShallow(call, dc))
+        return nullptr;
+      
+      // The return type of _becomeNSError is formally 'AnyObject' to avoid
+      // stdlib-to-Foundation dependencies, but it's really NSError.
+      // Abuse CovariantReturnConversionExpr to fix this.
+      
+      return new (tc.Context) CovariantReturnConversionExpr(call, toType);
+    }
 
     case ConversionRestrictionKind::BridgeFromObjC:
       return forceBridgeFromObjectiveC(expr, toType);

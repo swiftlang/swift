@@ -1915,6 +1915,8 @@ ERROR(type_not_bridged,sema_objc,none,
 ERROR(missing_bridging_function,sema_objc,Fatal,
       "missing '%select{_forceBridgeFromObjectiveC|"
       "_conditionallyBridgeFromObjectiveC}0'", (bool))
+ERROR(missing_nserror_bridging_function,sema_objc,none,
+      "missing _bridgeNSError", ())
 
 #define OBJC_DIAG_SELECT "%select{initializer %1|implicit initializer %1|deinitializer|implicit deinitializer|method %1|getter for %1|subscript getter|setter for %1|subscript setter}0"
 

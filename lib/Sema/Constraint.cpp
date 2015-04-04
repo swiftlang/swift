@@ -377,6 +377,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[dictionary-upcast]";
   case ConversionRestrictionKind::SetUpcast:
     return "[set-upcast]";
+  case ConversionRestrictionKind::BridgeToNSError:
+    return "[bridge-to-nserror]";
   case ConversionRestrictionKind::BridgeToObjC:
     return "[bridge-to-objc]";
   case ConversionRestrictionKind::BridgeFromObjC:
