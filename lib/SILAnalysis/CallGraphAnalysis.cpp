@@ -16,6 +16,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include <algorithm>
 #include <utility>
 
@@ -29,6 +30,9 @@ STATISTIC(NumAppliesWithoutEdges,
           "# of call sites without edges");
 STATISTIC(NumAppliesOfBuiltins, "# of call sites calling builtins");
 STATISTIC(NumCallGraphsBuilt, "# of times the call graph is built");
+
+llvm::cl::opt<bool> DumpCallGraph("sil-dump-call-graph",
+                                  llvm::cl::init(false), llvm::cl::Hidden);
 
 CallGraph::CallGraph(SILModule *Mod, bool completeModule) : M(*Mod) {
   // Build the initial call graph by creating a node for each
@@ -45,6 +49,9 @@ CallGraph::CallGraph(SILModule *Mod, bool completeModule) : M(*Mod) {
   for (auto &F : M)
     if (F.isDefinition())
       addEdges(&F);
+
+  if (DumpCallGraph)
+    dump();
 }
 
 CallGraph::~CallGraph() {
@@ -291,6 +298,76 @@ void CallGraph::addEdges(SILFunction *F) {
       }
     }
   }
+}
+
+void CallGraphEdge::dump() {
+#ifndef NDEBUG
+  auto &CalleeSet = getPartialCalleeSet();
+  llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
+  for (auto *Node : CalleeSet)
+    OrderedNodes.push_back(Node);
+
+  std::sort(OrderedNodes.begin(), OrderedNodes.end(),
+            [](CallGraphNode *left, CallGraphNode *right) {
+              return left->getOrdinal() < right->getOrdinal();
+            });
+
+  llvm::errs() << Ordinal;
+  llvm::errs() << (!CalleeSet.empty() && isCalleeSetComplete() ?
+                   " (all callees known): " : ": ");
+  getApply().getInstruction()->dump();
+
+  if (hasSingleCallee()) {
+    llvm::errs() << "Callee: " << OrderedNodes[0]->getFunction()->getName();
+    llvm::errs() << "\n";
+  } else {
+    llvm::errs() << "Callees:\n";
+    for (auto *Callee : OrderedNodes)
+      llvm::errs() << Callee->getFunction()->getName() << "\n";
+  }
+#endif
+}
+
+void CallGraphNode::dump() {
+#ifndef NDEBUG
+  auto &Edges = getCalleeEdges();
+  llvm::SmallVector<CallGraphEdge *, 8> OrderedEdges;
+  for (auto *Edge : Edges)
+    OrderedEdges.push_back(Edge);
+
+  std::sort(OrderedEdges.begin(), OrderedEdges.end(),
+            [](CallGraphEdge *left, CallGraphEdge *right) {
+              return left->getOrdinal() < right->getOrdinal();
+            });
+
+  llvm::errs() << Ordinal;
+  llvm::errs() << (!Edges.empty() && isCallerEdgesComplete() ?
+                   " (all callers known): " : ": ");
+  llvm::errs() << getFunction()->getName() << "\n";
+  if (Edges.empty())
+    return;
+
+  llvm::errs() << "Applies:\n";
+  for (auto *Edge : OrderedEdges)
+    Edge->dump();
+  llvm::errs() << "\n";
+#endif
+}
+
+void CallGraph::dump() {
+#ifndef NDEBUG
+  llvm::errs() << "*** Call Graph ***\n";
+
+  auto const &Funcs = getBottomUpFunctionOrder();
+  for (auto *F : Funcs) {
+    auto *Node = getCallGraphNode(F);
+    if (Node)
+      Node->dump();
+    else
+      llvm::errs() << "!!! Missing node for " << F->getName() << "!!!";
+    llvm::errs() << "\n";
+  }
+#endif
 }
 
 /// Finds SCCs in the call graph. Our call graph has an unconventional

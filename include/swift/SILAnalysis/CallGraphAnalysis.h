@@ -126,6 +126,8 @@ public:
   unsigned getOrdinal() const {
     return Ordinal;
   }
+
+  void dump();
 };
 
 class CallGraphNode {
@@ -197,6 +199,8 @@ public:
   unsigned getOrdinal() const {
     return Ordinal;
   }
+
+  void dump();
 
 private:
   /// Mark a set of callers as known to not be complete.
@@ -328,6 +332,8 @@ public:
   void removeEdgesForApply(FullApplySite AI);
 
   void markCallerEdgesOfCalleesIncomplete(FullApplySite AI);
+
+  void dump();
 
   void verify() const;
 
