@@ -1658,16 +1658,12 @@ ERROR(tuple_pattern_label_mismatch,sema_tcp,none,
       "tuple pattern element label %0 must be %1", (Identifier, Identifier))
 ERROR(enum_element_pattern_member_not_found,sema_tcp,none,
       "enum case '%0' not found in type %1", (StringRef, Type))
-ERROR(bool_pattern_member_not_found,sema_tcp,none,
-      "bool literal '%0' not found in type %1", (StringRef, Type))
 ERROR(enum_element_pattern_not_enum,sema_tcp,none,
       "enum case pattern cannot match values of the non-enum type %0", (Type))
 ERROR(optional_element_pattern_not_valid_type,sema_tcp,none,
       "optional present pattern cannot match values of type %0", (Type))
 ERROR(enum_element_pattern_not_member_of_enum,sema_tcp,none,
       "enum case '%0' is not a member of type %1", (StringRef, Type))
-ERROR(bool_pattern_not_member_of_bool,sema_tcp,none,
-      "boolean literal '%0' is not a member of type %1", (StringRef, Type))
 ERROR(nominal_type_pattern_not_nominal_type,sema_tcp,none,
       "non-nominal type %0 cannot be used with property pattern syntax", (Type))
 ERROR(nominal_type_pattern_type_mismatch,sema_tcp,none,

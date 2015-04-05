@@ -106,7 +106,7 @@ public:
   /// Returns whether this pattern has been type-checked yet.
   bool hasType() const { return !Ty.isNull(); }
 
-  /// If thie pattern has been type-checked, return the type it
+  /// If this pattern has been type-checked, return the type it
   /// matches.
   Type getType() const { assert(hasType()); return Ty; }
 
@@ -684,54 +684,26 @@ public:
 /// case, then the value is extracted. If there is a subpattern, it is then
 /// matched against the associated value for the case.
 class BoolPattern : public Pattern {
-  TypeLoc ParentType;
-  SourceLoc DotLoc;
   SourceLoc NameLoc;
-  Identifier Name;
-  Expr *BoolValue;
-  Pattern /*nullable*/ *SubPattern;
+  bool Value;
 
 public:
-  BoolPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
-                     Identifier Name, Expr *BoolValue,
-                     Pattern *SubPattern, Optional<bool> Implicit = None)
-    : Pattern(PatternKind::Bool),
-      ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-      BoolValue(BoolValue), SubPattern(SubPattern) {
-    if (Implicit.hasValue() ? *Implicit : !ParentType.hasLocation())
-      setImplicit();
+  BoolPattern(SourceLoc NameLoc, bool Value)
+    : Pattern(PatternKind::Bool), NameLoc(NameLoc), Value(Value) {
   }
 
-  bool hasSubPattern() const { return SubPattern; }
-
-  const Pattern *getSubPattern() const {
-    return SubPattern;
-  }
-
-  Pattern *getSubPattern() {
-    return SubPattern;
-  }
-
-  void setSubPattern(Pattern *p) { SubPattern = p; }
-
-  Identifier getName() const { return Name; }
-
-  Expr *getBoolValue() const { return BoolValue; }
-  void setBoolValue(Expr *v) { BoolValue = v; }
+  bool getValue() const { return Value; }
+  void setValue(bool v) { Value = v; }
 
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
   SourceLoc getStartLoc() const {
-    return ParentType.hasLocation() ? ParentType.getSourceRange().Start :
-           DotLoc.isValid()         ? DotLoc
-                                    : NameLoc;
+    return NameLoc;
   }
   SourceLoc getEndLoc() const {
-    return SubPattern ? SubPattern->getSourceRange().End : NameLoc;
+    return NameLoc;
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
-
-  TypeLoc getParentType() const { return ParentType; }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Bool;

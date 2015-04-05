@@ -296,14 +296,9 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     }
     case PatternKind::OptionalSome:
       return checkPattern(cast<OptionalSomePattern>(Pat)->getSubPattern());
-    case PatternKind::Bool: {
-      auto *BP = cast<BoolPattern>(Pat);
-      if (BP->hasSubPattern())
-        checkPattern(BP->getSubPattern());
-      return;
-    }
 
     // Handle non-vars.
+    case PatternKind::Bool:
     case PatternKind::Is:
     case PatternKind::Expr:
     case PatternKind::Any:

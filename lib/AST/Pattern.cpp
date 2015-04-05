@@ -144,6 +144,7 @@ namespace {
 void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
   switch (getKind()) {
   case PatternKind::Any:
+  case PatternKind::Bool:
     return;
 
   case PatternKind::Is:
@@ -179,11 +180,6 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
     cast<OptionalSomePattern>(this)->getSubPattern()->forEachVariable(fn);
     return;
 
-  case PatternKind::Bool:
-    if (auto SP = cast<BoolPattern>(this)->getSubPattern())
-      SP->forEachVariable(fn);
-    return;
-
   case PatternKind::Expr:
     // An ExprPattern only exists before sema has resolved a refutable pattern
     // into a concrete pattern.  We have to use an AST Walker to find the
@@ -203,6 +199,7 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   case PatternKind::Any:
   case PatternKind::Named:
   case PatternKind::Expr:// FIXME: expr nodes are not modeled right in general.
+  case PatternKind::Bool:
     return;
 
   case PatternKind::Is:
@@ -236,12 +233,6 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   case PatternKind::OptionalSome:
     cast<OptionalSomePattern>(this)->getSubPattern()->forEachNode(f);
     return;
-  case PatternKind::Bool: {
-    auto *OP = cast<BoolPattern>(this);
-    if (OP->hasSubPattern())
-      OP->getSubPattern()->forEachNode(f);
-    return;
-  }
   }
 }
 
@@ -443,16 +434,7 @@ Pattern *Pattern::clone(ASTContext &context,
 
   case PatternKind::Bool: {
     auto bp = cast<BoolPattern>(this);
-    Pattern *sub = nullptr;
-    if (bp->hasSubPattern())
-      sub = bp->getSubPattern()->clone(context, options);
-    result = new (context) BoolPattern(bp->getParentType()
-                                         .clone(context),
-                                       bp->getLoc(),
-                                       bp->getNameLoc(),
-                                       bp->getName(),
-                                       bp->getBoolValue(),
-                                       sub);
+    result = new (context) BoolPattern(bp->getNameLoc(), bp->getValue());
     break;
   }
 

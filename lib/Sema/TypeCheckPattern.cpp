@@ -1049,11 +1049,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       // Check if the pattern is a Bool literal
       auto EP = cast<ExprPattern>(P);
       if (auto *BLE = dyn_cast<BooleanLiteralExpr>(EP->getSubExpr())) {
-        Identifier Name =
-            Context.getIdentifier(BLE->getValue() ? "True" : "False");
-        P = new (Context) BoolPattern(TypeLoc::withoutLoc(type), BLE->getLoc(),
-                                      BLE->getLoc(), Name, BLE, nullptr, false);
-        return coercePatternToType(P, dc, type, options, resolver);
+        P = new (Context) BoolPattern(BLE->getLoc(), BLE->getValue());
+        P->setType(type);
+        return false;
       }
     }
 
@@ -1301,77 +1299,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     return false;
   }
 
-  case PatternKind::Bool: {
-    auto *BP = cast<BoolPattern>(P);
-
-    // If the element decl was not resolved,
-    // resolve it now that we have a type.
-    Optional<CheckedCastKind> castKind;
-
-    Type bpTy;
-    if (!BP->getBoolValue()) {
-        diagnose(BP->getLoc(), diag::bool_pattern_member_not_found,
-                 BP->getName().str(), type);
-      bpTy = type;
-    } else {
-      bpTy = BP->getBoolValue()->getType();
-      auto parentTy = BP->getParentType().getType();
-      // If the type matches exactly, use it.
-      if (parentTy->isEqual(type)) {
-        bpTy = type;
-      }
-      // Otherwise, see if we can introduce a cast pattern to get from an
-      // existential pattern type to the bool type.
-      else if (type->isAnyExistentialType()) {
-        auto foundCastKind = typeCheckCheckedCast(type, parentTy, dc,
-                                                  SourceLoc(),
-                                                  SourceRange(), SourceRange(),
-                                                  [](Type) { return false; },
-                                                  /*suppress diags*/ false);
-        // If the cast failed, we can't resolve the pattern.
-        if (foundCastKind < CheckedCastKind::First_Resolved)
-          return true;
-
-        // Otherwise, we can type-check as the bool type, and insert a cast
-        // from the outer pattern type.
-        castKind = foundCastKind;
-        bpTy = parentTy;
-      } else {
-        diagnose(BP->getLoc(),
-                 diag::bool_pattern_not_member_of_bool,
-                 BP->getName().str(), type);
-        return true;
-      }
-    }
-
-    // If there is a subpattern, push the bool type down onto it.
-    if (BP->hasSubPattern()) {
-      Type elementType;
-      elementType = TupleType::getEmpty(Context);
-      Pattern *sub = BP->getSubPattern();
-      if (coercePatternToType(sub, dc, elementType,
-                     subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
-                     resolver))
-        return true;
-      BP->setSubPattern(sub);
-    }
-    BP->setType(bpTy);
-
-    // Ensure that the type of our TypeLoc is fully resolved.
-    BP->getParentType().setType(bpTy, /*validated*/ true);
-
-    // If we needed a cast, wrap the pattern in a cast pattern.
-    if (castKind) {
-      auto isPattern = new (Context) IsPattern(SourceLoc(),
-                                               TypeLoc::withoutLoc(bpTy),
-                                               BP, *castKind,
-                                               /*implicit*/true);
-      isPattern->setType(type);
-      P = isPattern;
-    }
-
+  case PatternKind::Bool:
+    P->setType(type);
     return false;
-  }
+      
   case PatternKind::NominalType: {
     auto NP = cast<NominalTypePattern>(P);
     

@@ -1130,14 +1130,7 @@ Pattern *Traversal::visitOptionalSomePattern(OptionalSomePattern *P) {
 }
 
 Pattern *Traversal::visitBoolPattern(BoolPattern *P) {
-  if (!P->hasSubPattern())
-    return P;
-
-  if (Pattern *newSub = doIt(P->getSubPattern())) {
-    P->setSubPattern(newSub);
-    return P;
-  }
-  return nullptr;
+  return P;
 }
 
 #pragma mark Type representation traversal
