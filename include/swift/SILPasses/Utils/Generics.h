@@ -19,15 +19,17 @@
 
 #include "swift/AST/Mangle.h"
 #include "swift/SIL/Mangle.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/TypeSubstCloner.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {
 
-bool trySpecializeApplyOfGeneric(ApplySite Apply,
-                                 SILFunction **NewFunction =nullptr);
+ApplySite trySpecializeApplyOfGeneric(ApplySite Apply,
+                                      SILFunction **NewFunction,
+                              llvm::SmallVectorImpl<FullApplySite> &NewApplies);
 
 } // end namespace swift
 

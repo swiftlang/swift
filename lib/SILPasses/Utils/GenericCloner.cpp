@@ -18,7 +18,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"

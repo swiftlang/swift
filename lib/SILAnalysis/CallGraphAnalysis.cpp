@@ -156,6 +156,13 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
       return false;
 
     auto *CalleeNode = getCallGraphNode(CalleeFn);
+    // FIXME: Consider whether we should create nodes for these
+    //        initially.
+    if (!CalleeNode) {
+      addCallGraphNode(CalleeFn);
+      CalleeNode = getCallGraphNode(CalleeFn);
+    }
+
     assert(CalleeNode &&
            "Expected to have a call graph node for all functions!");
 

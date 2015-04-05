@@ -756,20 +756,6 @@ static bool isProfitableInColdBlock(ApplyInst *AI) {
   return true;
 }
 
-class FullApplyCollector {
-private:
-  llvm::SmallVector<FullApplySite, 4> Applies;
-public:
-  void collect(SILInstruction *I) {
-    if (FullApplySite::isa(I))
-      Applies.push_back(FullApplySite(I));
-  }
-
-  llvm::SmallVectorImpl<FullApplySite> &getFullApplies() {
-    return Applies;
-  }
-};
-
 void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
                                 SmallVectorImpl<ApplyInst *> &CallSitesToInline,
                                                      DominanceAnalysis *DA,
@@ -893,16 +879,14 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
       Args.push_back(Arg);
     
     FullApplyCollector Collector;
-    std::function<void(SILInstruction *)> Callback =
-      std::bind(&FullApplyCollector::collect, &Collector,
-                std::placeholders::_1);
 
     // Notice that we will skip all of the newly inlined ApplyInsts. That's
     // okay because we will visit them in our next invocation of the inliner.
     TypeSubstitutionMap ContextSubs;
     SILInliner Inliner(*Caller, *Callee,
                        SILInliner::InlineKind::PerformanceInline,
-                       ContextSubs, AI->getSubstitutions(), Callback);
+                       ContextSubs, AI->getSubstitutions(),
+                       Collector.getCallback());
     auto Success = Inliner.inlineFunction(AI, Args);
     (void) Success;
     // We've already determined we should be able to inline this, so

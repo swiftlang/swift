@@ -17,6 +17,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include <functional>
 
 namespace swift {
 class DominanceInfo;
@@ -71,10 +72,6 @@ ApplyInst *findApplyFromDevirtualizedResult(SILInstruction *I);
 /// then delete the apply and the instructions that produce its callee
 /// if possible.
 void replaceDeadApply(FullApplySite Old, SILInstruction *New);
-
-// Rewrite a call, which may previously have been a dynamic dispatch, to a
-// known function reference.
-void replaceWithSpecializedFunction(ApplySite site, SILFunction *NewF);
 
 /// \brief Return true if the substitution map contains a
 /// substitution that is an unbound generic type.
@@ -307,6 +304,26 @@ class CastOptimizer {
   /// This cannot change the control flow.
   SILInstruction *
   optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst);
+};
+
+// Helper class that provides a callback that can be used in
+// inliners/cloners for collecting FullApplySites.
+class FullApplyCollector {
+  llvm::SmallVector<FullApplySite, 4> Applies;
+
+  void collect(SILInstruction *I) {
+    if (FullApplySite::isa(I))
+      Applies.push_back(FullApplySite(I));
+  }
+
+public:
+  std::function<void(SILInstruction *)> getCallback() {
+    return std::bind(&FullApplyCollector::collect, this, std::placeholders::_1);
+  }
+
+  llvm::SmallVectorImpl<FullApplySite> &getFullApplies() {
+    return Applies;
+  }
 };
 
 } // end namespace swift

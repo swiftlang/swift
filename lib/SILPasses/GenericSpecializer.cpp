@@ -28,20 +28,23 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
 using namespace swift;
 
 namespace {
 
 struct GenericSpecializer {
-  GenericSpecializer() {}
+  GenericSpecializer(CallGraph &CG) : CG(CG) {}
 
-  private:
+private:
+  CallGraph &CG;
+
   /// A worklist of functions to specialize.
   std::vector<SILFunction*> Worklist;
 
   bool specializeApplyInstGroup(llvm::SmallVectorImpl<ApplySite> &NewApplies);
 
-  public:
+public:
   /// Collect and specialize calls in a specific order specified by
   /// \p BotUpFuncList.
   bool specialize(const std::vector<SILFunction *> &BotUpFuncList);
@@ -79,19 +82,47 @@ static void collectApplyInst(SILFunction &F,
 
 bool
 GenericSpecializer::specializeApplyInstGroup(
-                                 llvm::SmallVectorImpl<ApplySite> &NewApplies) {
+                                 llvm::SmallVectorImpl<ApplySite> &ApplyGroup) {
   bool Changed = false;
 
   SILFunction *NewFunction;
-  for (auto &AI : NewApplies) {
-    if (trySpecializeApplyOfGeneric(AI, &NewFunction)) {
-      if (NewFunction)
+  llvm::SmallVector<FullApplySite, 4> NewApplies;
+  CallGraphEditor Editor(CG);
+  for (auto AI : ApplyGroup) {
+    // FIXME: Need to add new applies from cloned functions to the call graph!.
+    auto Specialized = trySpecializeApplyOfGeneric(AI, &NewFunction,
+                                                   NewApplies);
+    if (Specialized) {
+      // We need to add a call graph node first if there was a new
+      // function created, so that if we notify the call graph of the
+      // new apply it can look up the node.
+
+      if (NewFunction) {
+        Editor.addCallGraphNode(NewFunction);
         Worklist.push_back(NewFunction);
+      }
+
+      // For full applications, we need to notify the call graph of
+      // the replacement of the old apply with a new one.
+      if (FullApplySite::isa(Specialized.getInstruction()))
+        Editor.replaceApplyWithNew(FullApplySite(AI.getInstruction()),
+                                   FullApplySite(Specialized.getInstruction()));
+
+      // We collect new applies from the cloned function during
+      // cloning, and need to reflect them in the call graph.
+      while (!NewApplies.empty()) {
+        Editor.addEdgesForApply(NewApplies.back());
+        NewApplies.pop_back();
+      }
+
+      AI.getInstruction()->replaceAllUsesWith(Specialized.getInstruction());
+      recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
+
       Changed = true;
     }
   }
   
-  NewApplies.clear();
+  ApplyGroup.clear();
   return Changed;
 }
 
@@ -132,7 +163,7 @@ public:
     // Collect a call-graph bottom-up list of functions and specialize the
     // functions in reverse order.
     auto &CG = CGA->getOrBuildCallGraph();
-    auto GS = GenericSpecializer();
+    auto GS = GenericSpecializer(CG);
 
     // Try to specialize generic calls.
     bool Changed = GS.specialize(CG.getBottomUpFunctionOrder());
@@ -142,8 +173,11 @@ public:
       PM->scheduleAnotherIteration();
 
       // We are creating new functions and modifying calls, but we are
-      // preserving the branches in the existing functions.
+      // preserving the branches in the existing functions, and we are
+      // maintaining the call graph.
+      CGA->lockInvalidation();
       invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
+      CGA->unlockInvalidation();
     }
   }
 

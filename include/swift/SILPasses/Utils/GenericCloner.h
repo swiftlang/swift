@@ -24,30 +24,52 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include <functional>
 
 namespace swift {
 
 class GenericCloner : public TypeSubstCloner<GenericCloner> {
+  std::function<void(SILInstruction *)> Callback;
+
 public:
+  friend class SILCloner<GenericCloner>;
+
   GenericCloner(SILFunction *F,
                 TypeSubstitutionMap &InterfaceSubs,
                 TypeSubstitutionMap &ContextSubs,
                 StringRef NewName,
-                ArrayRef<Substitution> ApplySubs)
+                ArrayRef<Substitution> ApplySubs,
+                std::function<void(SILInstruction *)> Callback)
   : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
-                    ApplySubs) {}
+                    ApplySubs), Callback(Callback) {}
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
   static SILFunction *cloneFunction(SILFunction *F,
                                     TypeSubstitutionMap &InterfaceSubs,
                                     TypeSubstitutionMap &ContextSubs,
-                                    StringRef NewName, ApplySite Caller) {
+                                    StringRef NewName, ApplySite Caller,
+                      std::function<void(SILInstruction *)> Callback =nullptr) {
     // Clone and specialize the function.
     GenericCloner SC(F, InterfaceSubs, ContextSubs, NewName,
-                          Caller.getSubstitutions());
+                     Caller.getSubstitutions(), Callback);
     SC.populateCloned();
     SC.cleanUp(SC.getCloned());
     return SC.getCloned();
+  }
+
+protected:
+  // FIXME: We intentionally call SILClonerWithScopes here to ensure
+  //        the debug scopes are set correctly for cloned
+  //        functions. TypeSubstCloner, SILClonerWithScopes, and
+  //        SILCloner desperately need refactoring and/or combining so
+  //        that the obviously right things are happening for cloning
+  //        vs. inlining.
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    // Call client-supplied callback function.
+    if (Callback)
+      Callback(Cloned);
+
+    SILClonerWithScopes<GenericCloner>::postProcess(Orig, Cloned);
   }
 
 private:

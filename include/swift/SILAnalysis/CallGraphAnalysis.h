@@ -358,6 +358,7 @@ public:
   void replaceApplyWithNew(FullApplySite Old,
                            llvm::SmallVectorImpl<FullApplySite> &NewApplies);
   void addCallGraphNode(SILFunction *F) { CG.addCallGraphNode(F); }
+  void addEdgesForApply(FullApplySite AI) { CG.addEdgesForApply(AI); }
 };
 
 /// The Call Graph Analysis provides information about the call graph.

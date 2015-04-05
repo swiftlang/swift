@@ -18,10 +18,45 @@
 
 using namespace swift;
 
-bool swift::trySpecializeApplyOfGeneric(ApplySite Apply,
-                                        SILFunction **NewFunction) {
+// Create a new apply based on an old one, but with a different
+// function being applied.
+static ApplySite replaceWithSpecializedFunction(ApplySite AI,
+                                                SILFunction *NewF) {
+  SILLocation Loc = AI.getLoc();
+  ArrayRef<Substitution> Subst;
+
+  SmallVector<SILValue, 4> Arguments;
+  for (auto &Op : AI.getArgumentOperands()) {
+    Arguments.push_back(Op.get());
+  }
+
+  SILBuilderWithScope<2> Builder(AI.getInstruction());
+  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
+
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI))
+    return Builder.createTryApply(Loc, FRI, TAI->getSubstCalleeSILType(),
+                                  {}, Arguments, TAI->getNormalBB(),
+                                  TAI->getErrorBB());
+
+  if (isa<ApplyInst>(AI))
+    return Builder.createApply(Loc, FRI, Arguments);
+
+  if (auto *PAI = dyn_cast<PartialApplyInst>(AI))
+      return Builder.createPartialApply(Loc, FRI,
+                                        PAI->getSubstCalleeSILType(),
+                                        {},
+                                        Arguments,
+                                        PAI->getType());
+
+  llvm_unreachable("unhandled kind of apply");
+}
+
+ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
+                                             SILFunction **NewFunction,
+                             llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
   if (NewFunction)
     *NewFunction = nullptr;
+  assert(NewApplies.empty() && "Expected no new applies in vector yet!");
 
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
 
@@ -42,7 +77,7 @@ bool swift::trySpecializeApplyOfGeneric(ApplySite Apply,
   // We do not support partial specialization.
   if (hasUnboundGenericTypes(InterfaceSubs)) {
     DEBUG(llvm::dbgs() << "    Can not specialize with interface subs.\n");
-    return false;
+    return ApplySite();
   }
 
   llvm::SmallString<64> ClonedName;
@@ -71,14 +106,17 @@ bool swift::trySpecializeApplyOfGeneric(ApplySite Apply,
            "Previously specialized function does not match expected type.");
 #endif
   } else {
+    FullApplyCollector Collector;
+
     // Create a new function.
     NewF = GenericCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
-                                        ClonedName, Apply);
+                                        ClonedName, Apply,
+                                        Collector.getCallback());
+    NewApplies = Collector.getFullApplies();
+
     if (NewFunction)
       *NewFunction = NewF;
   }
 
-  // Replace all of the Apply functions with the new function.
-  replaceWithSpecializedFunction(Apply, NewF);
-  return true;
+  return replaceWithSpecializedFunction(Apply, NewF);
 }

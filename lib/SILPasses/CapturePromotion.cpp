@@ -199,6 +199,17 @@ public:
 
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
+protected:
+  // FIXME: We intentionally call SILClonerWithScopes here to ensure
+  //        the debug scopes are set correctly for cloned
+  //        functions. TypeSubstCloner, SILClonerWithScopes, and
+  //        SILCloner desperately need refactoring and/or combining so
+  //        that the obviously right things are happening for cloning
+  //        vs. inlining.
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    SILClonerWithScopes<ClosureCloner>::postProcess(Orig, Cloned);
+  }
+
 private:
   static SILFunction *initCloned(SILFunction *Orig, StringRef ClonedName,
                                  TypeSubstitutionMap &InterfaceSubs,

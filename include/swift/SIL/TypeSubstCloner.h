@@ -34,6 +34,10 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
   typedef SILClonerWithScopes<ImplClass> super;
 
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    llvm_unreachable("Clients need to explicitly call a base class impl!");
+  }
+
 public:
   using SILClonerWithScopes<ImplClass>::asImpl;
   using SILClonerWithScopes<ImplClass>::getBuilder;
