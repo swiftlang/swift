@@ -160,6 +160,10 @@ public:
   DataflowResult visitStrongDecrement(ValueBase *V);
   DataflowResult visitStrongIncrement(ValueBase *V);
   DataflowResult visitStrongEntrance(ValueBase *V);
+
+private:
+  DataflowResult visitStrongEntranceApply(ApplyInst *AI);
+  DataflowResult visitStrongEntranceArgument(SILArgument *Arg);
 };
 
 } // end swift namespace

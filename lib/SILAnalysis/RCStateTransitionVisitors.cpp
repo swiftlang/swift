@@ -56,7 +56,7 @@ BottomUpDataflowRCStateVisitor::visitStrongDecrement(ValueBase *V) {
     return DataflowResult(Op);
 
   BottomUpRefCountState &State = BBState.getBottomUpRefCountState(Op);
-  bool NestingDetected = State.initWithInst(I);
+  bool NestingDetected = State.initWithMutatorInst(I);
 
   // If we are running with 'frozen' owned arg releases, check if we have a
   // frozen use in the side table. If so, this release must be known safe.
@@ -179,7 +179,7 @@ TopDownDataflowRCStateVisitor::visitStrongIncrement(ValueBase *V) {
   // count state and continue...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
   TopDownRefCountState &State = BBState.getTopDownRefCountState(Op);
-  bool NestingDetected = State.initWithInst(I);
+  bool NestingDetected = State.initWithMutatorInst(I);
 
   DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
                      << (State.isKnownSafe() ? "yes" : "no") << "\n");
@@ -190,12 +190,8 @@ TopDownDataflowRCStateVisitor::visitStrongIncrement(ValueBase *V) {
 }
 
 TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongEntrance(ValueBase *V) {
-  auto *Arg = dyn_cast<SILArgument>(V);
-  if (!Arg)
-    return DataflowResult();
-
-  DEBUG(llvm::dbgs() << "VISITING ARGUMENT: " << *Arg);
+TopDownDataflowRCStateVisitor::visitStrongEntranceArgument(SILArgument *Arg) {
+  DEBUG(llvm::dbgs() << "VISITING ENTRANCE ARGUMENT: " << *Arg);
 
   if (!Arg->hasConvention(ParameterConvention::Direct_Owned)) {
     DEBUG(llvm::dbgs() << "    Not owned! Bailing!\n");
@@ -206,6 +202,35 @@ TopDownDataflowRCStateVisitor::visitStrongEntrance(ValueBase *V) {
 
   TopDownRefCountState &State = BBState.getTopDownRefCountState(Arg);
   State.initWithArg(Arg);
+
+  return DataflowResult();
+}
+
+TopDownDataflowRCStateVisitor::DataflowResult
+TopDownDataflowRCStateVisitor::visitStrongEntranceApply(ApplyInst *AI) {
+  DEBUG(llvm::dbgs() << "VISITING ENTRANCE APPLY: " << *AI);
+
+  // We should have checked earlier that AI has an owned result value. To
+  // prevent mistakes, assert that here.
+  assert(AI->hasResultConvention(ResultConvention::Owned) &&
+         "Expected AI to be Owned here");
+
+  // Otherwise, return a dataflow result containing a +1.
+  DEBUG(llvm::dbgs() << "    Initializing state.\n");
+
+  TopDownRefCountState &State = BBState.getTopDownRefCountState(AI);
+  State.initWithEntranceInst(AI);
+
+  return DataflowResult(AI);
+}
+
+TopDownDataflowRCStateVisitor::DataflowResult
+TopDownDataflowRCStateVisitor::visitStrongEntrance(ValueBase *V) {
+  if (auto *Arg = dyn_cast<SILArgument>(V))
+    return visitStrongEntranceArgument(Arg);
+
+  if (auto *AI = dyn_cast<ApplyInst>(V))
+    return visitStrongEntranceApply(AI);
 
   return DataflowResult();
 }

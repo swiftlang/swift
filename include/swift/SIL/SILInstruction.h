@@ -517,6 +517,13 @@ public:
     return SubstCalleeType;
   }
 
+  SILResultInfo getSubstCalleeResultInfo() const {
+    return getSubstCalleeType()->getResult();
+  }
+  bool hasResultConvention(ResultConvention Conv) const {
+    return getSubstCalleeResultInfo().getConvention() == Conv;
+  }
+
   bool isCalleeThin() const {
     auto Rep = getSubstCalleeType()->getRepresentation();
     return Rep == FunctionType::Representation::Thin;

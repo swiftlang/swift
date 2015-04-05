@@ -72,11 +72,12 @@ struct RefCountState {
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithInst(SILInstruction *I) {
+  bool initWithMutatorInst(SILInstruction *I) {
     // Are we already tracking a ref count modification?
     bool Nested = isTrackingRefCount();
 
     Transition = RCStateTransition(I);
+    assert((*Transition).isMutator() && "Expected I to be a mutator!\n");
 
     // Initialize value.
     RCRoot = I->getOperand(0).stripCasts();
@@ -282,11 +283,11 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithInst(SILInstruction *I) {
+  bool initWithMutatorInst(SILInstruction *I) {
     assert((isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) &&
            "strong_release and release_value are only supported.");
 
-    bool NestingDetected = SuperTy::initWithInst(I);
+    bool NestingDetected = SuperTy::initWithMutatorInst(I);
 
     // If we know that there is another decrement on the same pointer that has
     // not been matched up to an increment, then the pointer must have a
@@ -445,11 +446,11 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithInst(SILInstruction *I) {
+  bool initWithMutatorInst(SILInstruction *I) {
     assert((isa<StrongRetainInst>(I) || isa<RetainValueInst>(I)) &&
            "strong_retain and retain_value are only supported.");
 
-    bool NestingDetected = SuperTy::initWithInst(I);
+    bool NestingDetected = SuperTy::initWithMutatorInst(I);
 
     // Set our lattice state to be incremented.
     LatState = LatticeState::Incremented;
@@ -460,7 +461,23 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
   void initWithArg(SILArgument *Arg) {
     LatState = LatticeState::Incremented;
     Transition = RCStateTransition(Arg);
+    assert((*Transition).getKind() == RCStateTransitionKind::StrongEntrance &&
+           "Expected a strong entrance here");
     RCRoot = Arg;
+    KnownSafe = false;
+    InsertPts.clear();
+  }
+
+  /// Initiailize this RefCountState with an instruction which introduces a new
+  /// ref count at +1.
+  void initWithEntranceInst(SILInstruction *I) {
+    assert(I->getNumTypes() == 1 &&
+           "Expected an instruction with one return value");
+    LatState = LatticeState::Incremented;
+    Transition = RCStateTransition(I);
+    assert((*Transition).getKind() == RCStateTransitionKind::StrongEntrance &&
+           "Expected a strong entrance here");
+    RCRoot = I;
     KnownSafe = false;
     InsertPts.clear();
   }

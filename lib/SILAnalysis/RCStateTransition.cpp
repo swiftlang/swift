@@ -61,10 +61,22 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
     return RCStateTransitionKind::Unknown;
   }
 
-  case ValueKind::ApplyInst:
-    if (isAutoreleasePoolCall(cast<SILInstruction>(V)))
+  case ValueKind::ApplyInst: {
+    auto *AI = cast<ApplyInst>(V);
+    if (isAutoreleasePoolCall(AI))
       return RCStateTransitionKind::AutoreleasePoolCall;
-    SWIFT_FALLTHROUGH;
+
+    // If we have an @owned return value. This AI is a strong entrance for its
+    // return value.
+    //
+    // TODO: When we support pairing retains with @owned parameters, we will
+    // need to be able to handle the potential of multiple state transition
+    // kinds.
+    if (AI->hasResultConvention(ResultConvention::Owned))
+      return RCStateTransitionKind::StrongEntrance;
+
+    return RCStateTransitionKind::Unknown;
+  }
   default:
     return RCStateTransitionKind::Unknown;
   }
