@@ -3178,14 +3178,15 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     uint8_t rawCallingConvention;
-    bool autoClosure, thin, noreturn, blockCompatible, noescape;
+    bool autoClosure, thin, noreturn, blockCompatible, noescape, throws;
 
     decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
                                                 rawCallingConvention,
                                                 autoClosure, thin,
                                                 noreturn,
                                                 blockCompatible,
-                                                noescape);
+                                                noescape,
+                                                throws);
     auto callingConvention = getActualCC(rawCallingConvention);
     if (!callingConvention.hasValue()) {
       error();
@@ -3194,7 +3195,7 @@ Type ModuleFile::getType(TypeID TID) {
     
     auto Info = FunctionType::ExtInfo(callingConvention.getValue(),
                                 getFunctionRepresentation(thin, blockCompatible),
-                                noreturn, autoClosure, noescape,/*throws*/false);
+                                noreturn, autoClosure, noescape, throws);
     
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);
@@ -3544,6 +3545,7 @@ Type ModuleFile::getType(TypeID TID) {
     uint8_t rawCallingConvention;
     bool thin;
     bool noreturn = false;
+    bool throws = false;
 
     //todo add noreturn serialization.
     decls_block::PolymorphicFunctionTypeLayout::readRecord(scratch,
@@ -3552,7 +3554,8 @@ Type ModuleFile::getType(TypeID TID) {
                                                            genericContextID,
                                                            rawCallingConvention,
                                                            thin,
-                                                           noreturn);
+                                                           noreturn,
+                                                           throws);
     auto callingConvention = getActualCC(rawCallingConvention);
     if (!callingConvention.hasValue()) {
       error();
@@ -3570,7 +3573,7 @@ Type ModuleFile::getType(TypeID TID) {
     auto Info = PolymorphicFunctionType::ExtInfo(callingConvention.getValue(),
                                                  rep,
                                                  noreturn,
-                                                 /*throws*/false);
+                                                 throws);
 
     typeOrOffset = PolymorphicFunctionType::get(getType(inputID),
                                                 getType(resultID),
@@ -3584,6 +3587,7 @@ Type ModuleFile::getType(TypeID TID) {
     uint8_t rawCallingConvention;
     bool thin;
     bool noreturn = false;
+    bool throws = false;
     ArrayRef<uint64_t> genericParamIDs;
 
     //todo add noreturn serialization.
@@ -3593,6 +3597,7 @@ Type ModuleFile::getType(TypeID TID) {
                                                        rawCallingConvention,
                                                        thin,
                                                        noreturn,
+                                                       throws,
                                                        genericParamIDs);
     auto callingConvention = getActualCC(rawCallingConvention);
     if (!callingConvention.hasValue()) {
@@ -3621,7 +3626,7 @@ Type ModuleFile::getType(TypeID TID) {
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements);
     auto info = GenericFunctionType::ExtInfo(callingConvention.getValue(),
-                                             rep, noreturn,/*throws*/false);
+                                             rep, noreturn, throws);
 
     auto sig = GenericSignature::get(genericParams, requirements);
     typeOrOffset = GenericFunctionType::get(sig,
@@ -3673,7 +3678,6 @@ Type ModuleFile::getType(TypeID TID) {
     SILFunctionType::ExtInfo extInfo(callingConvention.getValue(),
                                      getSILFunctionRepresentation(thin, block),
                                      noreturn);
-
     // Process the result.
     auto interfaceResultConvention
       = getActualResultConvention(rawInterfaceResultConvention);

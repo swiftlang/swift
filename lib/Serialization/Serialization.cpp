@@ -2691,7 +2691,8 @@ void Serializer::writeType(Type ty) {
            fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
            fnTy->isNoReturn(),
            fnTy->getRepresentation() == AnyFunctionType::Representation::Block,
-                                   fnTy->isNoEscape());
+           fnTy->isNoEscape(),
+           fnTy->throws());
     break;
   }
 
@@ -2708,7 +2709,8 @@ void Serializer::writeType(Type ty) {
             dID,
             getRawStableCC(callingConvention),
             fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
-            fnTy->isNoReturn());
+            fnTy->isNoReturn(),
+            fnTy->throws());
     if (!genericContext)
       writeGenericParams(&fnTy->getGenericParams(), DeclTypeAbbrCodes);
     break;
@@ -2727,6 +2729,7 @@ void Serializer::writeType(Type ty) {
             getRawStableCC(callingConvention),
             fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
             fnTy->isNoReturn(),
+            fnTy->throws(),
             genericParams);
     
     // Write requirements.

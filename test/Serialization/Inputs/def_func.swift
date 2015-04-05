@@ -61,3 +61,6 @@ public func differentWrapped<
 public protocol EqualOperator {
   func ==(x: Self, y: Self) -> Bool
 }
+
+public func throws1() throws {}
+public func throws2<T>(t: T) -> T { return t }

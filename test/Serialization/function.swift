@@ -105,6 +105,10 @@ if raw == 5 {
 // SIL: sil @_TF8def_func16testNoReturnAttrFT_T_ : $@thin @noreturn () -> ()
 // SIL: sil @_TF8def_func20testNoReturnAttrPolyU__FT1xQ__T_ : $@thin @noreturn <τ_0_0> (@in τ_0_0) -> ()
 
+try throws1()
+try throws2(1)
+// SIL: sil @_TF8def_func7throws1FzT_T_ : $@thin () -> ()
+// SIL: sil @_TF8def_func7throws2U__FQ_Q_ : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
 
 // LLVM: }
 

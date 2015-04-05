@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 189; // Last change: remove noescape from silfunctiontype
+const uint16_t VERSION_MINOR = 190; // Last change: function 'throws' annotations
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -551,7 +551,8 @@ namespace decls_block {
     BCFixed<1>,  // thin?
     BCFixed<1>,  // noreturn?
     BCFixed<1>,  // block-compatible?
-    BCFixed<1>   // noescape?
+    BCFixed<1>,  // noescape?
+    BCFixed<1>   // throws?
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -644,7 +645,8 @@ namespace decls_block {
     DeclIDField, // decl that owns the generic params
     AbstractCCField, // calling convention
     BCFixed<1>,  // thin?
-    BCFixed<1>   // noreturn?
+    BCFixed<1>,  // noreturn?
+    BCFixed<1>   // throws?
     // Trailed by its generic parameters, if the owning decl ID is 0.
   >;
 
@@ -655,6 +657,7 @@ namespace decls_block {
     AbstractCCField,     // calling convention
     BCFixed<1>,          // thin?
     BCFixed<1>,          // noreturn?
+    BCFixed<1>,          // throws?
     BCArray<TypeIDField> // generic parameters
                          // followed by requirements
   >;
