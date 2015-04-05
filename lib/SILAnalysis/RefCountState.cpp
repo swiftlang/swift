@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-global-arc-opts"
 #include "RefCountState.h"
+#include "RCStateTransition.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -91,6 +92,10 @@ bool BottomUpRefCountState::initWithMutatorInst(SILInstruction *I) {
   // known safe.
   KnownSafe = NestingDetected;
 
+  // If we saw a non arc user that will keep this value alive, set known safe
+  // since we will not move non-arc instructions.
+  KnownSafe |= FoundNonARCUser;
+
   // Set our lattice state to be incremented.
   LatState = LatticeState::Decremented;
 
@@ -139,9 +144,19 @@ handleDecrement(SILInstruction *PotentialDecrement) {
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
 bool
-BottomUpRefCountState::handleUser(SILInstruction *PotentialUser) {
+BottomUpRefCountState::handleUser(SILInstruction *PotentialUser,
+                                  SILValue RCIdentity,
+                                  AliasAnalysis *AA) {
   assert(valueCanBeUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
+
+  // Instructions that we do not recognize (and thus will not move) and that
+  // *must* use RCIdentity, implies we are always known safe as long as meet
+  // over all path constraints are satisfied.
+  if (isRCStateTransitionUnknown(PotentialUser))
+    if (mustUseValue(PotentialUser, RCIdentity, AA))
+      FoundNonARCUser = true;
+
   // Advance the sequence...
   switch (LatState) {
   case LatticeState::Decremented:
@@ -175,9 +190,19 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
 /// lattice state. Return true if we do so and false otherwise.
 bool
 BottomUpRefCountState::
-handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser) {
+handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
+                     SILValue RCIdentity,
+                     AliasAnalysis *AA) {
   assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
+
+  // Instructions that we do not recognize (and thus will not move) and that
+  // *must* use RCIdentity, implies we are always known safe as long as meet
+  // over all path constraints are satisfied.
+  if (isRCStateTransitionUnknown(PotentialGuaranteedUser))
+    if (mustUseValue(PotentialGuaranteedUser, RCIdentity, AA))
+      FoundNonARCUser = true;
+
   // Advance the sequence...
   switch (LatState) {
   // If were decremented, insert the insertion point.
@@ -240,6 +265,7 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
 
   LatState = NewState;
   KnownSafe &= Other.KnownSafe;
+  FoundNonARCUser &= Other.FoundNonARCUser;
 
   // If we're doing a merge on a path that's previously seen a partial merge,
   // conservatively drop the sequence, to avoid doing partial RR elimination. If
@@ -340,7 +366,9 @@ bool TopDownRefCountState::handleDecrement(SILInstruction *PotentialDecrement) {
 
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
-bool TopDownRefCountState::handleUser(SILInstruction *PotentialUser) {
+bool TopDownRefCountState::handleUser(SILInstruction *PotentialUser,
+                                      SILValue RCIdentity,
+                                      AliasAnalysis *AA) {
   assert(valueCanBeUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
 
@@ -375,7 +403,8 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
 /// lattice state. Return true if we do so and false otherwise.
 bool
 TopDownRefCountState::
-handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser) {
+handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
+                     SILValue RCIdentity, AliasAnalysis *AA) {
   assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
   // Advance the sequence...

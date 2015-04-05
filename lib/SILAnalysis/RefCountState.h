@@ -185,7 +185,9 @@ struct RefCountState {
 
     // Otherwise, allow the CRTP substruct to update itself given we have a
     // potential decrement.
-    return asImpl()->handleGuaranteedUser(PotentialGuaranteedUser);
+    return asImpl()->handleGuaranteedUser(PotentialGuaranteedUser,
+                                          getRCRoot(),
+                                          AA);
   }
 
   /// Check if PotentialDecrement can decrement the reference count associated
@@ -234,7 +236,7 @@ struct RefCountState {
     if (!mayUseValue(PotentialUser, getRCRoot(), AA))
       return false;
 
-    return asImpl()->handleUser(PotentialUser);
+    return asImpl()->handleUser(PotentialUser, getRCRoot(), AA);
   }
 
   /// Returns true if the passed in ref count inst matches the ref count inst
@@ -279,6 +281,11 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
   /// Current place in the sequence of the value.
   LatticeState LatState = LatticeState::None;
 
+  /// True if we have seen a NonARCUser of this instruction. This means bottom
+  /// up assuming we have this property as a meet over all paths property, we
+  /// know that all releases we see are known safe.
+  bool FoundNonARCUser = false;
+
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
   bool initWithMutatorInst(SILInstruction *I);
@@ -315,7 +322,8 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleUser(SILInstruction *PotentialUser);
+  bool handleUser(SILInstruction *PotentialUser, SILValue RCIdentity,
+                  AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
@@ -323,7 +331,8 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser);
+  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
+                            SILValue RCIdentity, AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
@@ -393,7 +402,8 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleUser(SILInstruction *PotentialUser);
+  bool handleUser(SILInstruction *PotentialUser,
+                  SILValue RCIdentity, AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
@@ -401,7 +411,8 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser);
+  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
+                            SILValue RCIdentity, AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.

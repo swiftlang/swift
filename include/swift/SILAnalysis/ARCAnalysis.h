@@ -41,9 +41,21 @@ bool mayDecrementRefCount(SILInstruction *User, SILValue Ptr,
 /// \returns True if the user \p User checks the ref count of a pointer.
 bool mayCheckRefCount(SILInstruction *User);
 
-/// \returns True if the user \p User can use the pointer \p Ptr in a manner
-/// that requires \p Ptr to be alive before Inst.
+/// \returns True if the \p User might use the pointer \p Ptr in a manner that
+/// requires \p Ptr to be alive before Inst.
 bool mayUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
+
+/// \returns True if the \p User must use the pointer \p Ptr in a manner that
+/// requires \p Ptr to be alive before Inst.
+bool mustUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
+
+/// Returns true if User must use Ptr in a guaranteed way.
+///
+/// This means that assuming that everything is conservative, we can ignore the
+/// ref count effects of User on Ptr since we will only remove things over
+/// guaranteed parameters if we are known safe in both directions.
+bool mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
+                            AliasAnalysis *AA);
 
 /// \returns True if \p User can never use a value in a way that requires the
 /// value to be alive.

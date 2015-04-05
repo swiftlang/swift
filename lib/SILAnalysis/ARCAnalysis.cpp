@@ -383,6 +383,49 @@ bool swift::mayUseValue(SILInstruction *User, SILValue Ptr,
   return true;
 }
 
+//===----------------------------------------------------------------------===//
+//                             Must Use Analysis
+//===----------------------------------------------------------------------===//
+
+/// Returns true if User must use Ptr.
+///
+/// In terms of ARC this means that if we do not remove User, all releases post
+/// dominated by User are known safe.
+bool swift::mustUseValue(SILInstruction *User, SILValue Ptr,
+                         AliasAnalysis *AA) {
+  // Right now just pattern match applies.
+  auto *AI = dyn_cast<ApplyInst>(User);
+  if (!AI)
+    return false;
+
+  // If any of AI's arguments must alias Ptr, return true.
+  for (SILValue Arg : AI->getArguments())
+    if (AA->isMustAlias(Arg, Ptr))
+      return true;
+  return false;
+}
+
+/// Returns true if User must use Ptr in a guaranteed way.
+///
+/// This means that assuming that everything is conservative, we can ignore the
+/// ref count effects of User on Ptr since we will only remove things over
+/// guaranteed parameters if we are known safe in both directions.
+bool swift::mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
+                                   AliasAnalysis *AA) {
+  // Right now just pattern match applies.
+  auto *AI = dyn_cast<ApplyInst>(User);
+  if (!AI)
+    return false;
+
+  // For now just look for guaranteed self.
+  //
+  // TODO: Expand this to handle *any* guaranteed parameter.
+  if (!AI->hasGuaranteedSelfArgument())
+    return false;
+
+  // Return true if Ptr alias's self.
+  return AA->isMustAlias(AI->getSelfArgument(), Ptr);
+}
 
 //===----------------------------------------------------------------------===//
 // Utility Methods for determining use, decrement of values in a contiguous

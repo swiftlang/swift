@@ -43,8 +43,15 @@ enum class RCStateTransitionKind : uint8_t {
 RCStateTransitionKind getRCStateTransitionKind(ValueBase *V);
 
 /// Define predicates to test for RCStateTransition abstract value kinds.
-#define ABSTRACT_VALUE(Name, Start, End) \
-  bool isRCStateTransition ## Name(RCStateTransitionKind Kind);
+#define ABSTRACT_VALUE(Name, Start, End)                              \
+  bool isRCStateTransition ## Name(RCStateTransitionKind Kind);       \
+  static inline bool isRCStateTransition ## Name(ValueBase *V) {      \
+    return isRCStateTransition ## Name(getRCStateTransitionKind(V));  \
+  }
+#define KIND(Name)                                                      \
+  static inline bool isRCStateTransition ## Name(ValueBase *V) {        \
+    return RCStateTransitionKind::Name == getRCStateTransitionKind(V);  \
+  }
 #include "RCStateTransition.def"
 
 //===----------------------------------------------------------------------===//
