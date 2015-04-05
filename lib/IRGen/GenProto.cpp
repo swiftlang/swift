@@ -3904,8 +3904,7 @@ namespace {
       ASTContext &ctx = D->getASTContext();
       SILFunctionType::ExtInfo extInfo(AbstractCC::Method,
                                        SILFunctionType::Representation::Thin,
-                                       /*noreturn*/ false,
-                                       /*throws*/ false);
+                                       /*noreturn*/ false);
       SILResultInfo result(TupleType::getEmpty(ctx),
                            ResultConvention::Unowned);
       SILParameterInfo param(D->getDeclaredInterfaceType()->getCanonicalType(),

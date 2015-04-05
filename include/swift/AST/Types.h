@@ -2597,15 +2597,12 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |  CC  |representation|isAutoClosure|noReturn|NoEscape|Throws|
-    //   |0 .. 3|    4 .. 5    |      6      |   7    |    8   |   9  |
+    //   |  CC  |representation|noReturn|
+    //   |0 .. 3|    4 .. 5    |   7    |
     //
     enum : uint16_t { CallConvMask       = 0x00F };
     enum : uint16_t { RepresentationMask = 0x030, RepresentationShift = 4 };
-    enum : uint16_t { AutoClosureMask    = 0x040 };
-    enum : uint16_t { NoReturnMask       = 0x080 };
-    enum : uint16_t { NoEscapeMask       = 0x100 };
-    enum : uint16_t { ThrowsMask         = 0x200 };
+    enum : uint16_t { NoReturnMask       = 0x040 };
 
     uint16_t Bits;
 
@@ -2620,19 +2617,10 @@ public:
     }
 
     // Constructor for polymorphic type.
-    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn, bool Throws) {
+    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn) {
       Bits = ((unsigned) CC) |
              ((unsigned) Rep << RepresentationShift) |
-             (IsNoReturn ? NoReturnMask : 0) |
-             (Throws ? ThrowsMask : 0);
-    }
-
-    // Constructor with no defaults.
-    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn,
-            bool IsAutoClosure, bool IsNoEscape, bool Throws)
-      : ExtInfo(CC, Rep, IsNoReturn, Throws) {
-      Bits |= (IsAutoClosure ? AutoClosureMask : 0);
-      Bits |= (IsNoEscape ? NoEscapeMask : 0);
+             (IsNoReturn ? NoReturnMask : 0);
     }
 
     explicit ExtInfo(AbstractCC CC) : Bits(0) {
@@ -2641,9 +2629,6 @@ public:
 
     AbstractCC getCC() const { return AbstractCC(Bits & CallConvMask); }
     bool isNoReturn() const { return Bits & NoReturnMask; }
-    bool isAutoClosure() const { return Bits & AutoClosureMask; }
-    bool isNoEscape() const { return Bits & NoEscapeMask; }
-    bool throws() const { return Bits & ThrowsMask; }
     Representation getRepresentation() const {
       return Representation((Bits & RepresentationMask) >> RepresentationShift);
     }
@@ -2685,24 +2670,6 @@ public:
         return ExtInfo(Bits | NoReturnMask);
       else
         return ExtInfo(Bits & ~NoReturnMask);
-    }
-    ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
-      if (IsAutoClosure)
-        return ExtInfo(Bits | AutoClosureMask);
-      else
-        return ExtInfo(Bits & ~AutoClosureMask);
-    }
-    ExtInfo withNoEscape(bool NoEscape = true) const {
-      if (NoEscape)
-        return ExtInfo(Bits | NoEscapeMask);
-      else
-        return ExtInfo(Bits & ~NoEscapeMask);
-    }
-    ExtInfo withThrows(bool Throws = true) const {
-      if (Throws)
-        return ExtInfo(Bits | ThrowsMask);
-      else
-        return ExtInfo(Bits & ~ThrowsMask);
     }
 
     uint16_t getFuncAttrKey() const {
@@ -2870,13 +2837,7 @@ public:
   bool isNoReturn() const {
     return getExtInfo().isNoReturn();
   }
-  bool isNoEscape() const {
-    return getExtInfo().isNoEscape();
-  }
-  bool throws() const {
-    return getExtInfo().throws();
-  }
-
+  
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                                Module *astModule,
                                                ArrayRef<Substitution> subs);

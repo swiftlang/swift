@@ -572,9 +572,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withCallingConv(extInfo.getCC())
     .withRepresentation(getSILFunctionRepresentation(extInfo.getRepresentation()))
-    .withIsNoReturn(extInfo.isNoReturn())
-    // TODO: map native 'throws' to an error result type.
-    .withThrows(extInfo.throws());
+    .withIsNoReturn(extInfo.isNoReturn());
   
   return SILFunctionType::get(genericSig,
                               silExtInfo, calleeConvention,

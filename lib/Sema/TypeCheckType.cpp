@@ -1338,10 +1338,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                          ? attrs.getAbstractCC()
                                          : AbstractCC::Freestanding,
                                        rep,
-                                       attrs.has(TAK_noreturn),
-                                       /*autoclosure is a decl attr*/false,
-                                       isNoEscape,
-                                       fnRepr->throws());
+                                       attrs.has(TAK_noreturn));
           
       ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     } else {

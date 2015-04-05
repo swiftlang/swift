@@ -2787,7 +2787,7 @@ void Serializer::writeType(Type ty) {
           getRawStableCC(callingConvention),
           fnTy->getRepresentation() == SILFunctionType::Representation::Thin,
           fnTy->getRepresentation() == SILFunctionType::Representation::Block,
-          fnTy->isNoReturn(), fnTy->isNoEscape(),
+          fnTy->isNoReturn(),
           sig ? sig->getGenericParams().size() : 0,
           paramTypes);
     if (sig)

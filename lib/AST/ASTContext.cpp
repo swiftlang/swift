@@ -2666,19 +2666,12 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
   return CanSILBlockStorageType(storageTy);
 }
 
-static bool isValidSILExtInfo(SILFunctionType::ExtInfo ext) {
-  // SIL currently does not use the autoclosure or noescape attributes.
-  // TODO: noescape could be of interest to SIL.
-  return !ext.isNoEscape() && !ext.isAutoClosure();
-}
-
 CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
                                     ExtInfo ext, ParameterConvention callee,
                                     ArrayRef<SILParameterInfo> interfaceParams,
                                     SILResultInfo interfaceResult,
                            Optional<SILResultInfo> interfaceErrorResult,
                                     const ASTContext &ctx) {
-  assert(isValidSILExtInfo(ext) && "contains attributes not supported in SIL");
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, callee,
                            interfaceParams, interfaceResult,

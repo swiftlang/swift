@@ -2427,11 +2427,6 @@ public:
   void printFunctionExtInfo(SILFunctionType::ExtInfo info) {
     if(Options.SkipAttributes)
       return;
-    if (info.isAutoClosure())
-      Printer << "@autoclosure ";
-    else if (info.isNoEscape())    // autoclosure implies noescape.
-      Printer << "@noescape ";
-    
     switch (info.getCC()) {
     case AbstractCC::Freestanding: break;
     case AbstractCC::Method:

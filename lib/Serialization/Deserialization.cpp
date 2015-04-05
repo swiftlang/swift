@@ -3649,21 +3649,20 @@ Type ModuleFile::getType(TypeID TID) {
     uint8_t rawCalleeConvention;
     bool thin, block;
     bool noreturn = false;
-    bool noescape = false;
     unsigned numGenericParams;
     ArrayRef<uint64_t> paramIDs;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
-                                                   interfaceResultID,
-                                                   rawInterfaceResultConvention,
-                                                   interfaceErrorResultID,
-                                           rawInterfaceErrorResultConvention,
-                                                   rawCalleeConvention,
-                                                   rawCallingConvention,
-                                                   thin, block,
-                                                   noreturn, noescape,
-                                                   numGenericParams,
-                                                   paramIDs);
+                                             interfaceResultID,
+                                             rawInterfaceResultConvention,
+                                             interfaceErrorResultID,
+                                             rawInterfaceErrorResultConvention,
+                                             rawCalleeConvention,
+                                             rawCallingConvention,
+                                             thin, block,
+                                             noreturn,
+                                             numGenericParams,
+                                             paramIDs);
 
     // Process the ExtInfo.
     auto callingConvention = getActualCC(rawCallingConvention);
@@ -3673,8 +3672,7 @@ Type ModuleFile::getType(TypeID TID) {
     }
     SILFunctionType::ExtInfo extInfo(callingConvention.getValue(),
                                      getSILFunctionRepresentation(thin, block),
-                                     noreturn, /*autoclosure*/false, noescape,
-                                     /*throws*/false);
+                                     noreturn);
 
     // Process the result.
     auto interfaceResultConvention
