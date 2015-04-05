@@ -20,7 +20,7 @@ let r = lazy(2..<8).map { $0 * 3 }.reverse()
 // CHECK-NEXT: [21, 18, 15, 12, 9, 6]
 println(r.array)
 
-func assertRandomAccess<T: RandomAccessIndexType>(x: T) {}
+func assertRandomAccess<T : RandomAccessIndexType>(x: T) {}
 assertRandomAccess(r.startIndex)
 
 // The global reverse() function produces an Array.

@@ -5,9 +5,9 @@ import CoreFoundation
 // magic allows this to be done as a "toll-free" conversion when an NSError
 // or CFError is used as an ErrorType existential.
 
-extension NSError: _ErrorType {}
+extension NSError : _ErrorType {}
 
-extension CFError: _ErrorType {
+extension CFError : _ErrorType {
   public var domain: String {
     return CFErrorGetDomain(self) as String
   }
@@ -19,7 +19,7 @@ extension CFError: _ErrorType {
 
 /// An internal protocol to represent Swift error enums that map to standard
 /// Cocoa NSError domains.
-public protocol _ObjectiveCBridgeableErrorType: _ErrorType {
+public protocol _ObjectiveCBridgeableErrorType : _ErrorType {
   /// Produce a value of the error type corresponding to the given NSError,
   /// or return nil if it cannot be bridged.
   init?(_bridgedNSError: NSError)
@@ -85,7 +85,7 @@ mappedDomains = {
 EnumName = "_" + domain
 }%
 
-public enum ${EnumName}: _ObjectiveCBridgeableErrorType {
+public enum ${EnumName} : _ObjectiveCBridgeableErrorType {
 %  for code in mappedDomains[domain]:
   case ${code}
 %  end
@@ -123,7 +123,7 @@ public enum ${EnumName}: _ObjectiveCBridgeableErrorType {
 /// left uninitialized, and false is returned.
 @asmname("swift_stdlib_bridgeNSErrorToErrorType")
 public func _stdlib_bridgeNSErrorToErrorType<
-  T: _ObjectiveCBridgeableErrorType
+  T : _ObjectiveCBridgeableErrorType
 >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
   if let bridged? = T(_bridgedNSError: error) {
     out.initialize(bridged)

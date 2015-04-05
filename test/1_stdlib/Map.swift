@@ -56,7 +56,7 @@ class Counter : GeneratorType {
 }
 
 // A SequenceType with value semantics
-struct IntRange: SequenceType {
+struct IntRange : SequenceType {
   func generate() -> Counter {
     return Counter(start, end)
   }

@@ -91,7 +91,7 @@ func nsEncode<CodeUnit>(
 
 // A SinkType that stores the elements written into an Array that can be
 // inspected later.
-class ArraySink<T: IntegerLiteralConvertible> : SinkType {
+class ArraySink<T : IntegerLiteralConvertible> : SinkType {
   init(capacity: Int) {
     storage = Array(count: capacity, repeatedValue: 0)
   }

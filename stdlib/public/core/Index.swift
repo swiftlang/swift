@@ -27,7 +27,7 @@
 /// Otherwise, requires that `end` is reachable from `start` by
 /// incrementation, and executes in O(N), where N is the function's
 /// result.
-public func distance<T: ForwardIndexType>(start: T, end: T) -> T.Distance {
+public func distance<T : ForwardIndexType>(start: T, end: T) -> T.Distance {
   return start~>_distanceTo(end)
 }
 
@@ -35,7 +35,7 @@ public func distance<T: ForwardIndexType>(start: T, end: T) -> T.Distance {
 /// models `RandomAccessIndexType`, executes in O(1).  Otherwise,
 /// executes in O(`abs(n)`).  If `T` does not model
 /// `BidirectionalIndexType`, requires that `n` is non-negative.
-public func advance<T: ForwardIndexType>(start: T, n: T.Distance) -> T {
+public func advance<T : ForwardIndexType>(start: T, n: T.Distance) -> T {
   return start~>_advance(n)
 }
 
@@ -43,7 +43,7 @@ public func advance<T: ForwardIndexType>(start: T, n: T.Distance) -> T {
 /// equals `end`.  If `T` models `RandomAccessIndexType`, executes in
 /// O(1).  Otherwise, executes in O(`abs(n)`).  If `T` does not model
 /// `BidirectionalIndexType`, requires that `n` is non-negative.
-public func advance<T: ForwardIndexType>(start: T, n: T.Distance, end: T) -> T {
+public func advance<T : ForwardIndexType>(start: T, n: T.Distance, end: T) -> T {
   return start~>_advance(n, end)
 }
 
@@ -171,7 +171,7 @@ public protocol ForwardIndexType : _ForwardIndexType {
 
 /// Do not use this operator directly; call distance(start, end) instead
 public
-func ~> <T: _ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
+func ~> <T : _ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
   var p = start
   var count: T.Distance = 0
   let end = rest.1
@@ -184,7 +184,7 @@ func ~> <T: _ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
 
 /// Do not use this operator directly; call advance(start, n) instead
 @transparent
-public func ~> <T: _ForwardIndexType>(
+public func ~> <T : _ForwardIndexType>(
   start: T, rest: (_Advance, T.Distance)
 ) -> T {
   let n = rest.1
@@ -192,7 +192,7 @@ public func ~> <T: _ForwardIndexType>(
 }
 
 internal
-func _advanceForward<T: _ForwardIndexType>(start: T, n: T.Distance) -> T {
+func _advanceForward<T : _ForwardIndexType>(start: T, n: T.Distance) -> T {
   _precondition(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
   var p = start
@@ -204,14 +204,14 @@ func _advanceForward<T: _ForwardIndexType>(start: T, n: T.Distance) -> T {
 
 /// Do not use this operator directly; call advance(start, n, end) instead
 @transparent
-public func ~> <T: _ForwardIndexType>(
+public func ~> <T : _ForwardIndexType>(
   start:T, rest: ( _Advance, (T.Distance, T))
 ) -> T {
   return _advanceForward(start, rest.1.0, rest.1.1)
 }
 
 internal
-func _advanceForward<T: _ForwardIndexType>(
+func _advanceForward<T : _ForwardIndexType>(
   start: T, n: T.Distance, end: T
 ) -> T {
   _precondition(n >= 0,
@@ -263,7 +263,7 @@ public protocol BidirectionalIndexType
 /// Replace `i` with its `predecessor()` and return the updated value
 /// of `i`.
 @transparent
-public prefix func -- <T: _BidirectionalIndexType> (inout i: T) -> T {
+public prefix func -- <T : _BidirectionalIndexType> (inout i: T) -> T {
   i._predecessorInPlace()
   return i
 }
@@ -272,7 +272,7 @@ public prefix func -- <T: _BidirectionalIndexType> (inout i: T) -> T {
 /// Replace `i` with its `predecessor()` and return the original
 /// value of `i`.
 @transparent
-public postfix func -- <T: _BidirectionalIndexType> (inout i: T) -> T {
+public postfix func -- <T : _BidirectionalIndexType> (inout i: T) -> T {
   var ret = i
   i._predecessorInPlace()
   return ret
@@ -282,7 +282,7 @@ public postfix func -- <T: _BidirectionalIndexType> (inout i: T) -> T {
 
 /// Do not use this operator directly; call advance(start, n) instead
 @transparent
-public func ~> <T: _BidirectionalIndexType>(
+public func ~> <T : _BidirectionalIndexType>(
   start:T , rest: (_Advance, T.Distance)
 ) -> T {
   let n = rest.1
@@ -298,7 +298,7 @@ public func ~> <T: _BidirectionalIndexType>(
 
 /// Do not use this operator directly; call advance(start, n, end) instead
 @transparent
-public func ~> <T: _BidirectionalIndexType>(
+public func ~> <T : _BidirectionalIndexType>(
   start:T, rest: (_Advance, (T.Distance, T))
 ) -> T {
   let n = rest.1.0
@@ -362,7 +362,7 @@ public protocol RandomAccessIndexType
 
 /// Do not use this operator directly; call distance(start, end) instead
 @transparent
-public func ~> <T: _RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
+public func ~> <T : _RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
 -> T.Distance {
   let end = rest.1
   return start.distanceTo(end)
@@ -370,7 +370,7 @@ public func ~> <T: _RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
 
 /// Do not use this operator directly; call advance(start, n) instead
 @transparent
-public func ~> <T: _RandomAccessIndexType>(
+public func ~> <T : _RandomAccessIndexType>(
   start:T, rest:(_Advance, (T.Distance))
 ) -> T {
   let n = rest.1
@@ -379,7 +379,7 @@ public func ~> <T: _RandomAccessIndexType>(
 
 /// Do not use this operator directly; call advance(start, n, end) instead
 @transparent
-public func ~> <T: _RandomAccessIndexType>(
+public func ~> <T : _RandomAccessIndexType>(
   start:T, rest:(_Advance, (T.Distance, T))
 ) -> T {
   let n = rest.1.0

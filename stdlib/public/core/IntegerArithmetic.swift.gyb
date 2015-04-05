@@ -53,14 +53,14 @@ public protocol IntegerArithmeticType : _IntegerArithmeticType, Comparable {
 /// ${Action} `lhs` and `rhs`, returning ${result} and trapping in case of
 /// arithmetic overflow (except in -Ounchecked builds).
 @transparent
-public func ${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
+public func ${op} <T : _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return _overflowChecked(T.${name}WithOverflow(lhs, rhs))
 }
 
 % if (op != '/') and (op != '%'):
 /// ${name} `lhs` and `rhs`, silently discarding any overflow.
 @transparent
-public func &${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
+public func &${op} <T : _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return T.${name}WithOverflow(lhs, rhs).0
 }
 % end
@@ -68,7 +68,7 @@ public func &${op} <T: _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
 /// ${name} `lhs` and `rhs` and store the result in `lhs`, trapping in
 /// case of arithmetic overflow (except in -Ounchecked builds).
 @transparent
-public func ${op}= <T: _IntegerArithmeticType>(inout lhs: T, rhs: T) {
+public func ${op}= <T : _IntegerArithmeticType>(inout lhs: T, rhs: T) {
   lhs = lhs ${op} rhs
 }
 % end
@@ -108,7 +108,7 @@ public prefix func - <T : SignedNumberType>(x: T) -> T {
 
 // Unary +
 @transparent
-public prefix func + <T: SignedNumberType>(x: T) -> T {
+public prefix func + <T : SignedNumberType>(x: T) -> T {
   return x
 }
 

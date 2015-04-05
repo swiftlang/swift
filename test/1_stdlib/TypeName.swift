@@ -14,22 +14,22 @@ protocol AssociatedTypes {
   typealias C
 }
 
-class Model: AssociatedTypes {
+class Model : AssociatedTypes {
   typealias A = C
   typealias B = S
   typealias C = E
 }
 
-struct Model2: AssociatedTypes {
+struct Model2 : AssociatedTypes {
   typealias A = C
   typealias B = S
   typealias C = E
 }
 
-class GC<T: AssociatedTypes> {}
-struct GS<T: AssociatedTypes> {}
-enum GE<T: AssociatedTypes> {}
-class GC2<T: AssociatedTypes, U: AssociatedTypes> {}
+class GC<T : AssociatedTypes> {}
+struct GS<T : AssociatedTypes> {}
+enum GE<T : AssociatedTypes> {}
+class GC2<T : AssociatedTypes, U : AssociatedTypes> {}
 
 func printTypeName(t: Any.Type) { println(_typeName(t)) }
 

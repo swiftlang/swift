@@ -214,14 +214,14 @@ let NO = ObjCBool(false)
 // rdar://problem/19418937, so here are some @transparent overloads
 // for ObjCBool
 @transparent
-public func && <T: BooleanType>(
+public func && <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 
 @transparent
-public func || <T: BooleanType>(
+public func || <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue

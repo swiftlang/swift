@@ -348,7 +348,7 @@ public struct ${Self}<T>
   /// nil, passes nil as the argument.  Otherwise, passes the address
   /// of a T which is written into buffer before this method returns
   @transparent public
-  func _withBridgeObject<U: AnyObject, R>(
+  func _withBridgeObject<U : AnyObject, R>(
     inout buffer: U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
   ) -> R {
     return self != nil ? body(&buffer) : body(nil)

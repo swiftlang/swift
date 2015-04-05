@@ -858,7 +858,7 @@ public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
 @semantics("convertFromObjectiveC")
-public func _convertNSSetToSet<T: Hashable>(s: NSSet?) -> Set<T> {
+public func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
   if _slowPath(s == nil) { return [] }
   var result: Set<T>?
   Set._forceBridgeFromObjectiveC(s!, result: &result)

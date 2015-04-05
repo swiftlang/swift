@@ -124,7 +124,7 @@ IntervalTestSuite.test("start/end") {
 }
 
 // Something to test with that distinguishes debugDescription from description
-struct X<T: Comparable> : Comparable, Printable, DebugPrintable {
+struct X<T : Comparable> : Comparable, Printable, DebugPrintable {
   init(_ a: T) {
     self.a = a
   }
@@ -140,11 +140,11 @@ struct X<T: Comparable> : Comparable, Printable, DebugPrintable {
   var a: T
 }
 
-func < <T: Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
+func < <T : Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a < rhs.a
 }
 
-func == <T: Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
+func == <T : Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 

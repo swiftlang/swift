@@ -589,7 +589,7 @@ func _XCTCheckEqualWithAccuracy_CGFloat(value1: CGFloat, value2: CGFloat, accura
     && (abs(value1 - value2) <= accuracy)
 }
 
-public func XCTAssertEqualWithAccuracy<T: FloatingPointType>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqualWithAccuracy<T : FloatingPointType>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.EqualWithAccuracy
   
   // evaluate each expression exactly once
@@ -657,7 +657,7 @@ func _XCTCheckNotEqualWithAccuracy_CGFloat(value1: CGFloat, value2: CGFloat, acc
     || (abs(value1 - value2) > accuracy)
 }
 
-public func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqualWithAccuracy<T : FloatingPointType>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, accuracy: T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqualWithAccuracy
   
   // evaluate each expression exactly once
@@ -710,7 +710,7 @@ public func XCTAssertNotEqualWithAccuracy<T: FloatingPointType>(@autoclosure exp
   }
 }
 
-public func XCTAssertGreaterThan<T: Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertGreaterThan<T : Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.GreaterThan
   
   // evaluate each expression exactly once
@@ -745,7 +745,7 @@ public func XCTAssertGreaterThan<T: Comparable>(@autoclosure expression1: () -> 
   }
 }
 
-public func XCTAssertGreaterThanOrEqual<T: Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
+public func XCTAssertGreaterThanOrEqual<T : Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
 {
   let assertionType = _XCTAssertionType.GreaterThanOrEqual
   
@@ -781,7 +781,7 @@ public func XCTAssertGreaterThanOrEqual<T: Comparable>(@autoclosure expression1:
   }
 }
 
-public func XCTAssertLessThan<T: Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertLessThan<T : Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.LessThan
   
   // evaluate each expression exactly once
@@ -816,7 +816,7 @@ public func XCTAssertLessThan<T: Comparable>(@autoclosure expression1: () -> T, 
   }
 }
 
-public func XCTAssertLessThanOrEqual<T: Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
+public func XCTAssertLessThanOrEqual<T : Comparable>(@autoclosure expression1: () -> T, @autoclosure expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)
 {
   let assertionType = _XCTAssertionType.LessThanOrEqual
   

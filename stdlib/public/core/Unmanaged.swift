@@ -14,7 +14,7 @@
 ///
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
-public struct Unmanaged<T: AnyObject> {
+public struct Unmanaged<T : AnyObject> {
   unowned(unsafe) var _value: T
 
   @transparent 

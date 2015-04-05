@@ -92,7 +92,7 @@ public func getVaList(args: [CVarArgType]) -> CVaListPointer {
   return builder.va_list()
 }
 
-public func _encodeBitsAsWords<T: CVarArgType>(x: T) -> [Word] {
+public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Word] {
   var result = [Word](
     count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
     repeatedValue: 0)

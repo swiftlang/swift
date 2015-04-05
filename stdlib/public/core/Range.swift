@@ -12,7 +12,7 @@
 
 /// A generator over the elements of `Range<T>`
 public struct RangeGenerator<
-  T: ForwardIndexType
+  T : ForwardIndexType
 > : GeneratorType, SequenceType {
   /// The type of element returned by `next()`.
   public typealias Element = T
@@ -75,12 +75,12 @@ public struct RangeGenerator<
 ///
 /// However, subscripting that range still works in a generic context::
 ///
-///   func brackets<T:ForwardIndexType>(x: Range<T>, i: T) -> T {
+///   func brackets<T :ForwardIndexType>(x: Range<T>, i: T) -> T {
 ///     return x[i] // Just forward to subscript
 ///   }
 ///   println(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
 public struct Range<
-  T: ForwardIndexType
+  T : ForwardIndexType
 > : Equatable, CollectionType, Printable, DebugPrintable {
 
   /// Construct a copy of `x`

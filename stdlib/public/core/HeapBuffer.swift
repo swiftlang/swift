@@ -152,7 +152,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     self._storage = Builtin.castToNativeObject(storage)
   }
   
-  init<T: AnyObject>(_ storage: T?) {
+  init<T : AnyObject>(_ storage: T?) {
     self = storage.map { _HeapBuffer($0) } ?? _HeapBuffer()
   }
   

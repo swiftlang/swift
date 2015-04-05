@@ -101,7 +101,7 @@ public func expectEqual<T : Equatable>(
     collectMoreInfo: collectMoreInfo)
 }
 
-public func expectEqual<T: Equatable, U: Equatable>(
+public func expectEqual<T : Equatable, U : Equatable>(
   expected: (T, U), actual: (T, U),
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,

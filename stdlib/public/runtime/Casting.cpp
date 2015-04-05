@@ -2418,7 +2418,7 @@ namespace {
 
 // protocol _ObjectiveCBridgeable {
 struct _ObjectiveCBridgeableWitnessTable {
-  // typealias _ObjectiveCType: class
+  // typealias _ObjectiveCType : class
   const Metadata *ObjectiveCType;
 
   // class func _isBridgedToObjectiveC() -> bool

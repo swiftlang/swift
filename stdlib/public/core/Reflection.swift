@@ -371,7 +371,7 @@ public struct _MagicMirrorData {
   }
 }
 
-struct _OpaqueMirror: MirrorType {
+struct _OpaqueMirror : MirrorType {
   let data: _MagicMirrorData
 
   var value: Any { return data.value }
@@ -386,7 +386,7 @@ struct _OpaqueMirror: MirrorType {
   var disposition: MirrorDisposition { return .Aggregate }
 }
 
-internal struct _TupleMirror: MirrorType {
+internal struct _TupleMirror : MirrorType {
   let data: _MagicMirrorData
 
   var value: Any { return data.value }
@@ -403,7 +403,7 @@ internal struct _TupleMirror: MirrorType {
   var disposition: MirrorDisposition { return .Tuple }
 }
 
-struct _StructMirror: MirrorType {
+struct _StructMirror : MirrorType {
   let data: _MagicMirrorData
 
   var value: Any { return data.value }
@@ -433,7 +433,7 @@ func _getClassChild(Int, _MagicMirrorData) -> (String, MirrorType)
 func _getClassQuickLookObject(data: _MagicMirrorData) -> QuickLookObject?
 #endif
 
-struct _ClassMirror: MirrorType {
+struct _ClassMirror : MirrorType {
   let data: _MagicMirrorData
   
   var value: Any { return data.value }
@@ -460,7 +460,7 @@ struct _ClassMirror: MirrorType {
   var disposition: MirrorDisposition { return .Class }
 }
 
-struct _ClassSuperMirror: MirrorType {
+struct _ClassSuperMirror : MirrorType {
   let data: _MagicMirrorData
   
   var value: Any { return data.value }
@@ -483,7 +483,7 @@ struct _ClassSuperMirror: MirrorType {
   var disposition: MirrorDisposition { return .Class }
 }
 
-struct _MetatypeMirror: MirrorType {
+struct _MetatypeMirror : MirrorType {
   let data: _MagicMirrorData
 
   var value: Any { return data.value }

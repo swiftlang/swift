@@ -25,7 +25,7 @@ RangeTestSuite.test("Range/Equatable") {
 }
 
 // Something to test with that distinguishes debugDescription from description
-struct X<T: ForwardIndexType> : ForwardIndexType, Printable, DebugPrintable {
+struct X<T : ForwardIndexType> : ForwardIndexType, Printable, DebugPrintable {
   init(_ a: T) {
     self.a = a
   }
@@ -45,7 +45,7 @@ struct X<T: ForwardIndexType> : ForwardIndexType, Printable, DebugPrintable {
   var a: T
 }
 
-func == <T: ForwardIndexType>(lhs: X<T>, rhs: X<T>) -> Bool {
+func == <T : ForwardIndexType>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 

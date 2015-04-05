@@ -57,11 +57,11 @@ class Good {
   let y: String = "222"
 }
 
-class Better: Good {
+class Better : Good {
   let z: Double = 333.5
 }
 
-class Best: Better {
+class Best : Better {
   let w: String = "4444"
 }
 
@@ -245,10 +245,10 @@ println("ObjC subclass:")
 dump("woozle wuzzle" as NSString)
 
 // Test a mixed Swift-ObjC hierarchy.
-class NSGood: NSObject {
+class NSGood : NSObject {
   let x: Int = 22
 }
-class NSBetter: NSGood {
+class NSBetter : NSGood {
   let y: String = "333"
 }
 
@@ -415,7 +415,7 @@ switch reflect(MyQLTestClass()).quickLookObject {
 // <rdar://problem/17027510>
 struct Pear<T, U> { let fst: T; let snd: U }
 
-class SubScene: SKScene {
+class SubScene : SKScene {
   let foo = 12_131_415
   let bar = "boom"
   let bas: Pear<Int, [Any?]> = Pear(fst: 219, snd: ["boom", 123, 456.0])
@@ -460,19 +460,19 @@ println(reflect(CGRect(x: 50, y: 60, width: 100, height: 150)).summary)
 
 var CanaryHandle = false
 
-class IsDebugQLO: CanaryBase, Printable {
+class IsDebugQLO : CanaryBase, Printable {
   @objc var description: String {
     return "I'm a QLO"
   }
 }
 
-class HasDebugQLO: CanaryBase {
+class HasDebugQLO : CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
     return IsDebugQLO()
   }
 }
 
-class HasNumberQLO: CanaryBase {
+class HasNumberQLO : CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
     let number = NSNumber(integer: 97210)
     return number
@@ -485,7 +485,7 @@ extension UInt {
   static let OBJC_ASSOCIATION_RETAIN_NONATOMIC: UInt = 1
 }
 
-class HasAttributedQLO: CanaryBase {
+class HasAttributedQLO : CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
     let str = NSAttributedString(string: "attributed string")
     objc_setAssociatedObject(str, &CanaryHandle, CanaryBase(),
@@ -494,7 +494,7 @@ class HasAttributedQLO: CanaryBase {
   }
 }
 
-class HasStringQLO: CanaryBase {
+class HasStringQLO : CanaryBase {
   @objc var debugQuickLookObject: AnyObject {
     let str = NSString(string: "plain string")
     objc_setAssociatedObject(str, &CanaryHandle, CanaryBase(),
@@ -503,7 +503,7 @@ class HasStringQLO: CanaryBase {
   }
 }
 
-func testQLO<T: CanaryBase>(type: T.Type) {
+func testQLO<T : CanaryBase>(type: T.Type) {
   autoreleasepool {
     _ = reflect(type()).quickLookObject
   }

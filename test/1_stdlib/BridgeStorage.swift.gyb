@@ -47,7 +47,7 @@ protocol BridgeStorage {
 extension _BridgeStorage : BridgeStorage {}
 
 
-struct BridgeObject<NativeType: AnyObject, ObjCType: AnyObject>
+struct BridgeObject<NativeType : AnyObject, ObjCType : AnyObject>
   : BridgeStorage {
   
   typealias Native = NativeType

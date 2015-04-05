@@ -195,7 +195,7 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
 ///   `unsafeBitCast` because it's more restrictive, and because
 ///   checking is still performed in debug builds.
 @transparent
-public func unsafeDowncast<T: AnyObject>(x: AnyObject) -> T {
+public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(x))
 }

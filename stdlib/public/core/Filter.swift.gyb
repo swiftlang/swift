@@ -43,7 +43,7 @@ public struct FilterGenerator<
 
 /// The lazy `SequenceType` returned by `filter(c)` where `c` is a
 /// `SequenceType`
-public struct FilterSequenceView<Base: SequenceType> : SequenceType {
+public struct FilterSequenceView<Base : SequenceType> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
@@ -99,7 +99,7 @@ public func == <Base: CollectionType>(
 ///   of the collection before traversing it to read the elements.
 ///   This causes the filter predicate to be called twice for each
 ///   element of the underlying collection, which is surprising.
-public struct FilterCollectionView<Base: CollectionType> : CollectionType {
+public struct FilterCollectionView<Base : CollectionType> : CollectionType {
 
   /// A type that represents a valid position in the collection.
   /// 
@@ -197,7 +197,7 @@ extension ${Self} {
 
 /// Return a lazy CollectionType containing the elements `x` of `source` for
 /// which `includeElement(x)` is `true`
-public func filter<C:CollectionType>(
+public func filter<C : CollectionType>(
   source: C, includeElement: (C.Generator.Element)->Bool
 ) -> FilterCollectionView<C> {
   return FilterCollectionView(_base: source, _include: includeElement)

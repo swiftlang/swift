@@ -12,11 +12,11 @@ protocol OtherProtocol {
   var otherProperty: String { get }
 }
 
-protocol OtherClassProtocol: class {
+protocol OtherClassProtocol : class {
   var otherClassProperty: String { get }
 }
 
-class NoisyError: _ErrorType, OtherProtocol, OtherClassProtocol {
+class NoisyError : _ErrorType, OtherProtocol, OtherClassProtocol {
   init() { ++NoisyErrorLifeCount }
   deinit { ++NoisyErrorDeathCount }
 

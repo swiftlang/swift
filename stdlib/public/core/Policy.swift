@@ -284,15 +284,15 @@ public protocol BitwiseOperationsType {
   static var allZeros: Self { get }
 }
 
-public func |= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
+public func |= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs | rhs
 }
 
-public func &= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
+public func &= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs & rhs
 }
 
-public func ^= <T: BitwiseOperationsType>(inout lhs: T, rhs: T) {
+public func ^= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs ^ rhs
 }
 
@@ -320,7 +320,7 @@ public protocol Hashable : Equatable {
 ///
 /// the following generates better code::
 ///
-///   func f<T: Sink where T.Element == X>(g: T) { ... g.put(a) ...}
+///   func f<T : SinkType where T.Element == X>(g: T) { ... g.put(a) ...}
 public protocol SinkType {
   /// The type of element to be written to this sink.
   typealias Element

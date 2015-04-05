@@ -28,7 +28,7 @@ public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
 
 /// A wrapper for a `${IndexProtocol}` that reverses its
 /// direction of traversal
-public struct ${Index}<I: ${IndexProtocol}> : ${IndexProtocol} {
+public struct ${Index}<I : ${IndexProtocol}> : ${IndexProtocol} {
   var _base: I
 
   init(_ _base: I) { self._base = _base }
@@ -80,7 +80,7 @@ public func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
 /// The lazy `CollectionType` returned by `reverse(c)` where `c` is a
 /// `CollectionType` with an `Index` conforming to `${IndexProtocol}`
 public struct ${View}<
-  T: CollectionType where T.Index: ${IndexProtocol}
+  T : CollectionType where T.Index : ${IndexProtocol}
 > : CollectionType {
   /// A type that represents a valid position in the collection.
   /// 

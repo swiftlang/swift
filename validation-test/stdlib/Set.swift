@@ -80,7 +80,7 @@ func pickRandom<T>(a: [T]) -> T {
   return a[uniformRandom(a.count)]
 }
 
-func isNativeSet<T: Hashable>(s: Set<T>) -> Bool {
+func isNativeSet<T : Hashable>(s: Set<T>) -> Bool {
   switch s._variantStorage {
   case .Native:
     return true
@@ -110,7 +110,7 @@ func getBridgedEmptyNSSet() -> NSSet {
 }
 
 
-func isCocoaSet<T: Hashable>(s: Set<T>) -> Bool {
+func isCocoaSet<T : Hashable>(s: Set<T>) -> Bool {
   return !isNativeSet(s)
 }
 

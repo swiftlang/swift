@@ -4,11 +4,11 @@ import SwiftPrivate
 import StdlibUnittest
 import Foundation
 
-enum SomeError: _ErrorType {
+enum SomeError : _ErrorType {
   case GoneToFail
 }
 
-struct ErrorTypeAsNSErrorRaceTest: RaceTestWithPerTrialDataType {
+struct ErrorTypeAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
   class RaceData {
     let error: _ErrorType
 

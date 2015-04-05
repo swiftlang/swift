@@ -165,7 +165,7 @@ func test_StdlibTypesPrinted() {
     printedIs(optionalString, "Optional(\"meow\")")
   }
   if true {
-    struct Wrapper: Printable {
+    struct Wrapper : Printable {
       var x: Printable? = nil
 
       var description: String {

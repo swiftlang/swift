@@ -12,8 +12,7 @@
 
 /// A sequence that forwards its implementation to an underlying
 /// sequence instance while exposing lazy computations as methods.
-public
-struct LazySequence<S: SequenceType> : SequenceType {
+public struct LazySequence<S : SequenceType> : SequenceType {
   /// Construct an instance with `base` as its underlying sequence
   /// instance.
   public init(_ base: S) {
@@ -43,7 +42,6 @@ public func ~> <S : SequenceType> (
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
-public
-func lazy<S: SequenceType>(s: S) -> LazySequence<S> {
+public func lazy<S : SequenceType>(s: S) -> LazySequence<S> {
   return LazySequence(s)
 }

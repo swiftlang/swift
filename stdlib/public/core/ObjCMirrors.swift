@@ -26,7 +26,7 @@ func _getObjCSummary(data: _MagicMirrorData) -> String {
 }
 
 public // SPI(runtime)
-struct _ObjCMirror: MirrorType {
+struct _ObjCMirror : MirrorType {
   let data: _MagicMirrorData
 
   public var value: Any { return data.objcValue }
@@ -50,7 +50,7 @@ struct _ObjCMirror: MirrorType {
 }
 
 public // SPI(runtime)
-struct _ObjCSuperMirror: MirrorType {
+struct _ObjCSuperMirror : MirrorType {
   let data: _MagicMirrorData
 
   public var value: Any { return data.objcValue }

@@ -53,8 +53,8 @@ public class _AnyGeneratorBase {}
 ///
 /// See also::
 ///
-///   struct AnySequence<S: SequenceType>
-///   func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
+///   struct AnySequence<S : SequenceType>
+///   func anyGenerator<G : GeneratorType>(base: G) -> AnyGenerator<G.Element>
 ///   func anyGenerator<T>(body: ()->T?) -> AnyGenerator<T>
 public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
@@ -160,7 +160,7 @@ internal class _AnyCollectionBoxBase : _AnySequenceBox {
 
 % for Kind in ['Sequence', 'Collection']:
 // FIXME: can't make this a protocol due to <rdar://20209031>
-internal class _${Kind}Box<S: ${Kind}Type>
+internal class _${Kind}Box<S : ${Kind}Type>
   : _Any${Kind}Box${'<S.Generator.Element>'if Kind == 'Collection' else ''} {
   typealias Element = S.Generator.Element
   
@@ -265,7 +265,7 @@ internal protocol _ForwardIndexBoxType : class {
   func successor() -> _ForwardIndexBoxType
   func _successorInPlace()
   func equals(other: _ForwardIndexBoxType) -> Bool
-  func _unbox<T: ForwardIndexType>() -> T?
+  func _unbox<T : ForwardIndexType>() -> T?
   func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
   // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
   func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxType
@@ -313,7 +313,7 @@ internal class _ForwardIndexBox<
     return self.dynamicType(advance(base, numericCast(n), unsafeUnbox(limit)))
   }
 
-  func _unbox<T: ForwardIndexType>() -> T? {
+  func _unbox<T : ForwardIndexType>() -> T? {
     if T.self is BaseIndex.Type {
       _sanityCheck(BaseIndex.self is T.Type)
       // This bit cast is really nothing as we have proven they are

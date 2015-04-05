@@ -41,7 +41,7 @@ let initialCallCounts = [
 
 var callCounts = initialCallCounts
   
-struct InstrumentedIndex<I: RandomAccessIndexType> : RandomAccessIndexType {
+struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
   typealias Distance = I.Distance
 
   var base: I

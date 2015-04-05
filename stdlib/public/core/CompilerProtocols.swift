@@ -133,14 +133,14 @@ internal func _underestimateCount<Args>(args: Args)
 
 // Default implementation of underestimateCount for Sequences.  Do not
 // use this operator directly; call underestimateCount(s) instead
-public func ~> <T: _SequenceType>(s: T,_:(_UnderestimateCount, ())) -> Int {
+public func ~> <T : _SequenceType>(s: T,_:(_UnderestimateCount, ())) -> Int {
   return 0
 }
 
 /// Return an underestimate of the number of elements in the given
 /// sequence, without consuming the sequence.  For Sequences that are
 /// actually Collections, this will return count(x)
-public func underestimateCount<T: SequenceType>(x: T) -> Int {
+public func underestimateCount<T : SequenceType>(x: T) -> Int {
   return x~>_underestimateCount()
 }
 
@@ -149,7 +149,7 @@ internal func _initializeTo<Args>(a: Args) -> (_InitializeTo, Args) {
   return (_InitializeTo(), a)
 }
 
-public func ~> <T: _Sequence_Type>(
+public func ~> <T : _Sequence_Type>(
   source: T, ptr: (_InitializeTo, UnsafeMutablePointer<T.Generator.Element>)) {
   var p = UnsafeMutablePointer<T.Generator.Element>(ptr.1)
   for x in GeneratorSequence(source.generate()) {
@@ -241,25 +241,25 @@ public protocol RawRepresentable {
 ///
 /// Its requirements are inherited by `RawOptionSetType` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _RawOptionSetType: RawRepresentable, Equatable {
-  typealias RawValue: BitwiseOperationsType, Equatable
+public protocol _RawOptionSetType : RawRepresentable, Equatable {
+  typealias RawValue : BitwiseOperationsType, Equatable
   init(rawValue: RawValue)
 }
 
-public func == <T: _RawOptionSetType>(a: T, b: T) -> Bool {
+public func == <T : _RawOptionSetType>(a: T, b: T) -> Bool {
   return a.rawValue == b.rawValue
 }
 
-public func & <T: _RawOptionSetType>(a: T, b: T) -> T {
+public func & <T : _RawOptionSetType>(a: T, b: T) -> T {
   return T(rawValue: a.rawValue & b.rawValue)
 }
-public func | <T: _RawOptionSetType>(a: T, b: T) -> T {
+public func | <T : _RawOptionSetType>(a: T, b: T) -> T {
   return T(rawValue: a.rawValue | b.rawValue)
 }
-public func ^ <T: _RawOptionSetType>(a: T, b: T) -> T {
+public func ^ <T : _RawOptionSetType>(a: T, b: T) -> T {
   return T(rawValue: a.rawValue ^ b.rawValue)
 }
-public prefix func ~ <T: _RawOptionSetType>(a: T) -> T {
+public prefix func ~ <T : _RawOptionSetType>(a: T) -> T {
   return T(rawValue: ~a.rawValue)
 }
 

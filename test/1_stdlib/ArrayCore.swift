@@ -123,7 +123,7 @@ struct MrMcArray<T> : CollectionType, __ArrayType {
   var _buffer: _Buffer
 }
 
-func printSequence<T: SequenceType>(x: T) {
+func printSequence<T : SequenceType>(x: T) {
   print("<")
   var prefix = ""
   for a in x {

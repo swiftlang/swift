@@ -20,7 +20,7 @@
 // Property Lists need to be properly bridged
 //
 
-func _toNSArray<T, U:AnyObject>(a: [T], @noescape f: (T) -> U) -> NSArray {
+func _toNSArray<T, U : AnyObject>(a: [T], @noescape f: (T) -> U) -> NSArray {
   var result = NSMutableArray(capacity: a.count)
   for s in a {
     result.addObject(f(s))

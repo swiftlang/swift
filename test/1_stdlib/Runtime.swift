@@ -1697,7 +1697,7 @@ BitTwiddlingTestSuite.test("_floorLog2") {
   expectEqual(_floorLog2(Int64.max), 62) // 63 minus 1 for sign bit.
 }
 
-class SomeSubclass: SomeClass {}
+class SomeSubclass : SomeClass {}
 
 var ObjCConformsToProtocolTestSuite = TestSuite("ObjCConformsToProtocol")
 

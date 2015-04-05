@@ -20,7 +20,7 @@ public prefix func !<T : BooleanType>(a: T) -> Bool {
 /// If `lhs` is `false`, return it.  Otherwise, evaluate `rhs` and
 /// return its `boolValue`.
 @inline(__always)
-public func && <T: BooleanType, U: BooleanType>(
+public func && <T : BooleanType, U : BooleanType>(
   lhs: T, @autoclosure rhs: () -> U
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
@@ -29,7 +29,7 @@ public func && <T: BooleanType, U: BooleanType>(
 /// If `lhs` is `true`, return it.  Otherwise, evaluate `rhs` and
 /// return its `boolValue`.
 @inline(__always)
-public func || <T: BooleanType, U: BooleanType>(
+public func || <T : BooleanType, U : BooleanType>(
   lhs: T, @autoclosure rhs: () -> U
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue
@@ -39,14 +39,14 @@ public func || <T: BooleanType, U: BooleanType>(
 // rdar://problem/19418937, so here are some @transparent overloads
 // for Bool.  We've done the same for ObjCBool
 @transparent
-public func && <T: BooleanType>(
+public func && <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> Bool
 ) -> Bool {
   return lhs.boolValue ? rhs().boolValue : false
 }
 
 @transparent
-public func || <T: BooleanType>(
+public func || <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> Bool
 ) -> Bool {
   return lhs.boolValue ? true : rhs().boolValue

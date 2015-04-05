@@ -464,7 +464,7 @@ public func == <Value, Element>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T: AnyObject>(inout object: T) -> Bool {
+public func isUniquelyReferencedNonObjC<T : AnyObject>(inout object: T) -> Bool {
   
   // Note: the pointer must be extracted in a separate step or an
   // extra reference will be held during the check below
@@ -474,7 +474,7 @@ public func isUniquelyReferencedNonObjC<T: AnyObject>(inout object: T) -> Bool {
   return result
 }
 
-internal func isUniquelyReferencedOrPinnedNonObjC<T: AnyObject>(inout object: T) -> Bool {
+internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T) -> Bool {
   // Note: the pointer must be extracted in a separate step or an
   // extra reference will be held during the check below
   let o = UnsafePointer<Void>(Builtin.bridgeToRawPointer(object))
@@ -505,7 +505,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T: AnyObject>(inout object: T)
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
-public func isUniquelyReferenced<T: NonObjectiveCBase>(
+public func isUniquelyReferenced<T : NonObjectiveCBase>(
   inout object: T
 ) -> Bool {
   // Note: the pointer must be extracted in a separate step or an
@@ -539,7 +539,7 @@ public func isUniquelyReferenced<T: NonObjectiveCBase>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T: AnyObject>(
+public func isUniquelyReferencedNonObjC<T : AnyObject>(
   inout object: T?
 ) -> Bool {
   

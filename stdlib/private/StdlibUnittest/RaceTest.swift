@@ -68,7 +68,7 @@ public protocol RaceTestWithPerTrialDataType {
   ///
   /// This type should be a class.  (The harness will not pass struct instances
   /// between threads correctly.)
-  typealias RaceData: AnyObject
+  typealias RaceData : AnyObject
 
   /// Type of thread-local data.
   ///

@@ -67,7 +67,7 @@ func < (x: X, y: X) -> Bool {
 
 //===----------------------------------------------------------------------===//
 
-func printSequence<T: SequenceType>(x: T) {
+func printSequence<T : SequenceType>(x: T) {
   print("[")
   var prefix = ""
   for a in x {
@@ -108,7 +108,7 @@ func checkEqual<
 }
 
 func test<
-  T: _ArrayType
+  T : _ArrayType
 where T.Generator.Element == T._Buffer.Element,
           T._Buffer.Element == T.Element,
           T.Element == X,

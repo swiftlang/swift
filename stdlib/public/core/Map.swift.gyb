@@ -46,7 +46,7 @@ public struct MapSequenceGenerator<
 /// `SequenceType` passed through a transform function returning `T`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct MapSequenceView<Base: SequenceType, T> : SequenceType {
+public struct MapSequenceView<Base : SequenceType, T> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
@@ -91,7 +91,7 @@ public func flatMap<S : SequenceType, T>(
 /// `CollectionType` passed through a transform function returning `T`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct MapCollectionView<Base: CollectionType, T> : CollectionType {
+public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.

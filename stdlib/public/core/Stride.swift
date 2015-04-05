@@ -41,11 +41,11 @@ public protocol _Strideable {
 }
 
 /// Compare two Strideables
-public func < <T: _Strideable>(x: T, y: T) -> Bool {
+public func < <T : _Strideable>(x: T, y: T) -> Bool {
   return x.distanceTo(y) > 0
 }
 
-public func == <T: _Strideable>(x: T, y: T) -> Bool {
+public func == <T : _Strideable>(x: T, y: T) -> Bool {
   return x.distanceTo(y) == 0
 }
 
@@ -55,27 +55,27 @@ public func == <T: _Strideable>(x: T, y: T) -> Bool {
 /// See also: `stride(from: to: by:)` and `stride(from: through: by:)`
 public protocol Strideable : Comparable, _Strideable {}
 
-public func + <T: Strideable> (lhs: T, rhs: T.Stride) -> T {
+public func + <T : Strideable> (lhs: T, rhs: T.Stride) -> T {
   return lhs.advancedBy(rhs)
 }
 
-public func + <T: Strideable> (lhs: T.Stride, rhs: T) -> T {
+public func + <T : Strideable> (lhs: T.Stride, rhs: T) -> T {
   return rhs.advancedBy(lhs)
 }
 
-public func - <T: Strideable> (lhs: T, rhs: T.Stride) -> T {
+public func - <T : Strideable> (lhs: T, rhs: T.Stride) -> T {
   return lhs.advancedBy(-rhs)
 }
 
-public func - <T: Strideable> (lhs: T, rhs: T) -> T.Stride {
+public func - <T : Strideable> (lhs: T, rhs: T) -> T.Stride {
   return rhs.distanceTo(lhs)
 }
 
-public func += <T: Strideable> (inout lhs: T, rhs: T.Stride) {
+public func += <T : Strideable> (inout lhs: T, rhs: T.Stride) {
   lhs = lhs.advancedBy(rhs)
 }
 
-public func -= <T: Strideable> (inout lhs: T, rhs: T.Stride) {
+public func -= <T : Strideable> (inout lhs: T, rhs: T.Stride) {
   lhs = lhs.advancedBy(-rhs)
 }
 
@@ -111,7 +111,7 @@ public func -= <T : _UnsignedIntegerType> (inout lhs: T, rhs: T._DisallowMixedSi
 //===----------------------------------------------------------------------===//
 
 /// A GeneratorType for StrideTo<T>
-public struct StrideToGenerator<T: Strideable> : GeneratorType {
+public struct StrideToGenerator<T : Strideable> : GeneratorType {
   var current: T
   let end: T
   let stride: T.Stride
@@ -129,7 +129,7 @@ public struct StrideToGenerator<T: Strideable> : GeneratorType {
 }
 
 /// A `SequenceType` of values formed by striding over a half-open interval
-public struct StrideTo<T: Strideable> : SequenceType {
+public struct StrideTo<T : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
   /// Return a *generator* over the elements of this *sequence*.
@@ -157,13 +157,13 @@ public struct StrideTo<T: Strideable> : SequenceType {
 /// stride + stride`, ... *last*) where *last* is the last value in
 /// the progression that is less than `end`.
 public func stride<
-  T: Strideable
+  T : Strideable
 >(from start: T, to end: T, by stride: T.Stride) -> StrideTo<T> {
   return StrideTo(start: start, end: end, stride: stride)
 }
 
 /// A GeneratorType for StrideThrough<T>
-public struct StrideThroughGenerator<T: Strideable> : GeneratorType {
+public struct StrideThroughGenerator<T : Strideable> : GeneratorType {
   var current: T
   let end: T
   let stride: T.Stride
@@ -189,7 +189,7 @@ public struct StrideThroughGenerator<T: Strideable> : GeneratorType {
 }
 
 /// A `SequenceType` of values formed by striding over a closed interval
-public struct StrideThrough<T: Strideable> : SequenceType {
+public struct StrideThrough<T : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
   /// Return a *generator* over the elements of this *sequence*.
@@ -219,7 +219,7 @@ public struct StrideThrough<T: Strideable> : SequenceType {
 /// .. Note:: There is no guarantee that `end` is an element of the
 ///      sequence.
 public func stride<
-  T: Strideable
+  T : Strideable
 >(from start: T, through end: T, by stride: T.Stride) -> StrideThrough<T> {
   return StrideThrough(start: start, end: end, stride: stride)
 }

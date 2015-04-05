@@ -17,7 +17,7 @@ internal func _count<Args>(a: Args) -> (_Count, Args) {
 
 // Default implementation of count for Collections
 // Do not use this operator directly; call count(x) instead
-public func ~> <T: _CollectionType>(x:T, _:(_Count,()))
+public func ~> <T : _CollectionType>(x:T, _:(_Count,()))
   -> T.Index.Distance
 {
   return distance(x.startIndex, x.endIndex)
@@ -26,12 +26,12 @@ public func ~> <T: _CollectionType>(x:T, _:(_Count,()))
 /// Return the number of elements in x.
 ///
 /// O(1) if T.Index is RandomAccessIndexType; O(N) otherwise.
-public func count <T: _CollectionType>(x: T) -> T.Index.Distance {
+public func count <T : _CollectionType>(x: T) -> T.Index.Distance {
   return x~>_count()
 }
 
 @availability(*, unavailable, renamed="count")
-public func countElements <T: _CollectionType>(x: T) -> T.Index.Distance {
+public func countElements <T : _CollectionType>(x: T) -> T.Index.Distance {
   return count(x)
 }
 
@@ -98,7 +98,7 @@ public protocol CollectionType : _CollectionType, SequenceType {
 
 // Default implementation of underestimateCount for *collections*.  Do not
 // use this operator directly; call `underestimateCount(s)` instead
-public func ~> <T: _CollectionType>(x:T,_:(_UnderestimateCount,())) -> Int {
+public func ~> <T : _CollectionType>(x:T,_:(_UnderestimateCount,())) -> Int {
   return numericCast(x~>_count())
 }
 
@@ -121,7 +121,7 @@ public func ~> <T : protocol<_Sequence_Type, _ArrayType>>(
 
 // Default implementation of `preprocessingPass` for *collections*.  Do not
 // use this operator directly; call `_preprocessingPass(s)` instead
-public func ~> <T: _CollectionType, R>(
+public func ~> <T : _CollectionType, R>(
   s: T, args: (_PreprocessingPass, ( (T)->R ))
 ) -> R? {
   return args.1(s)
@@ -284,7 +284,7 @@ public protocol Sliceable : _Sliceable {
   /// Though it can't currently be enforced by the type system, the
   /// `SubSlice` type in a concrete implementation of `Sliceable`
   /// should also be `Sliceable`.
-  typealias SubSlice: _Sliceable
+  typealias SubSlice : _Sliceable
   
   /// Access the elements delimited by the given half-open range of
   /// indices.

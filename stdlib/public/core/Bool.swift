@@ -50,7 +50,7 @@ extension Bool : BooleanType {
 
   /// Construct an instance representing the same logical value as
   /// `value`
-  public init<T: BooleanType>(_ value: T) {
+  public init<T : BooleanType>(_ value: T) {
     self = value.boolValue
   }
 }

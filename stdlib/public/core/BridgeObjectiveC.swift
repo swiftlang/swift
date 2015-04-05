@@ -17,7 +17,7 @@
 /// or NSDictionary will be the result of calling `_bridgeToObjectiveC`
 /// on each elmeent of the source container.
 public protocol _ObjectiveCBridgeable {
-  typealias _ObjectiveCType: AnyObject
+  typealias _ObjectiveCType : AnyObject
 
   /// Return true iff instances of `Self` can be converted to
   /// Objective-C.  Even if this method returns `true`, A given

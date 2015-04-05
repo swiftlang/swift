@@ -20,13 +20,13 @@ public protocol _ErrorType {
 // Helper functions for the C++ runtime to have easy access to domain and
 // code as Objective-C values.
 @asmname("swift_stdlib_getErrorDomainNSString")
-public func _stdlib_getErrorDomainNSString<T: _ErrorType>(x: UnsafePointer<T>)
+public func _stdlib_getErrorDomainNSString<T : _ErrorType>(x: UnsafePointer<T>)
 -> AnyObject {
   return x.memory.domain._bridgeToObjectiveCImpl()
 }
 
 @asmname("swift_stdlib_getErrorCode")
-public func _stdlib_getErrorCode<T: _ErrorType>(x: UnsafePointer<T>) -> Int {
+public func _stdlib_getErrorCode<T : _ErrorType>(x: UnsafePointer<T>) -> Int {
   return x.memory.code
 }
 

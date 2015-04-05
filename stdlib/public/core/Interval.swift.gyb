@@ -47,7 +47,7 @@ selfDocComment = """
 }%
 
 ${selfDocComment}
-public struct ${Self}<T: Comparable>
+public struct ${Self}<T : Comparable>
   : IntervalType, Equatable, Printable, DebugPrintable, Reflectable {
 
   /// The type of the `Interval`\ 's endpoints
@@ -121,7 +121,7 @@ public struct ${Self}<T: Comparable>
 
 /// Two `${Self}`\ s are equal if their `start` and `end` are
 /// equal
-public func == <T: Comparable> (
+public func == <T : Comparable> (
   lhs: ${Self}<T>, rhs: ${Self}<T>
 ) -> Bool {
   return lhs.start == rhs.start && lhs.end == rhs.end
@@ -153,12 +153,12 @@ public func overlaps<
 }
 
 /// Returns a half-open interval from `start` to `end`
-public func ..< <T: Comparable>(start: T, end: T) -> HalfOpenInterval<T> {
+public func ..< <T : Comparable>(start: T, end: T) -> HalfOpenInterval<T> {
   return HalfOpenInterval(start, end)
 }
 
 /// Returns a closed interval from `start` through `end`
-public func ... <T: Comparable>(start: T, end: T) -> ClosedInterval<T> {
+public func ... <T : Comparable>(start: T, end: T) -> ClosedInterval<T> {
   return ClosedInterval(start, end)
 }
 
@@ -175,7 +175,7 @@ public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
 %                                  introspecteeType='T',\
 %                                  disposition='Struct')
 
-struct _IntervalMirror<T: protocol<IntervalType,Printable>>: MirrorType {
+struct _IntervalMirror<T : protocol<IntervalType,Printable>> : MirrorType {
   ${Boilerplate}
 
   var count: Int { return 2 }

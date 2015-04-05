@@ -60,7 +60,7 @@ public enum Bit : Int, Comparable, RandomAccessIndexType, Reflectable {
   }
 }
 
-internal struct _BitMirror: MirrorType {
+internal struct _BitMirror : MirrorType {
   let _value: Bit
   
   init(_ v: Bit) {
