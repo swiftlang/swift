@@ -192,6 +192,30 @@ public func == (lhs: Observation4UWord, rhs: Observation4UWord) -> Bool {
     lhs.uw4 == rhs.uw4
 }
 
+/// An observation result that consists of three `Word`\ s.
+public struct Observation3Word : Equatable, Printable {
+  public var w1: Word
+  public var w2: Word
+  public var w3: Word
+
+  public init(_ w1: Word, _ w2: Word, _ w3: Word) {
+    self.w1 = w1
+    self.w2 = w2
+    self.w3 = w3
+  }
+
+  public var description: String {
+    return "(\(w1), \(w2), \(w3))"
+  }
+}
+
+public func == (lhs: Observation3Word, rhs: Observation3Word) -> Bool {
+  return
+    lhs.w1 == rhs.w1 &&
+    lhs.w2 == rhs.w2 &&
+    lhs.w3 == rhs.w3
+}
+
 /// An observation result that consists of four `Word`\ s.
 public struct Observation4Word : Equatable, Printable {
   public var w1: Word

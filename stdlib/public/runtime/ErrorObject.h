@@ -29,6 +29,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreFoundation/CFRuntime.h>
 #include <objc/objc.h>
+#include <atomic>
 
 namespace swift {
 
@@ -37,9 +38,11 @@ struct NSErrorLayout {
   // CFError has a CF refcounting header. NSError reserves a word after the
   // 'isa' in order to be layout-compatible.
   CFRuntimeBase base;
-  CFIndex code;
-  CFStringRef domain;
-  CFDictionaryRef userInfo;
+  // The NSError part of the object is lazily initialized, so we need atomic
+  // semantics.
+  std::atomic<CFIndex> code;
+  std::atomic<CFStringRef> domain;
+  std::atomic<CFDictionaryRef> userInfo;
 };
 
 static_assert(sizeof(CFRuntimeBase) == sizeof(void*) * 2,

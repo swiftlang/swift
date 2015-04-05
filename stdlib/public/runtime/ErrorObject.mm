@@ -51,6 +51,40 @@ using namespace swift;
   [super dealloc];
 }
 
+// Override the domain/code/userInfo accessors to follow our idea of NSError's
+// layout. This gives us a buffer in case NSError decides to change its stored
+// property order.
+
+- (NSString*)domain {
+  auto error = (const SwiftError*)self;
+  // The domain string should not be nil; if it is, then this error box hasn't
+  // been initialized yet as an NSError.
+  auto domain = error->domain.load(SWIFT_MEMORY_ORDER_CONSUME);
+  assert(domain
+         && "ErrorType box used as NSError before initialization");
+  // Don't need to .retain.autorelease since it's immutable.
+  return (NSString*)domain;
+}
+
+- (NSInteger)code {
+  auto error = (const SwiftError*)self;
+  return error->code.load(SWIFT_MEMORY_ORDER_CONSUME);
+}
+
+- (NSDictionary*)userInfo {
+  auto error = (const SwiftError*)self;
+  auto userInfo = error->userInfo.load(SWIFT_MEMORY_ORDER_CONSUME);
+  
+  if (userInfo) {
+    // Don't need to .retain.autorelease since it's immutable.
+    return (NSDictionary*)userInfo;
+  } else {
+    // -[NSError userInfo] never returns nil on OSX 10.8 or later.
+    static NSDictionary *emptyDict = @{};
+    return emptyDict;
+  }
+}
+
 @end
 
 /// Allocate a catchable error object.
@@ -214,7 +248,7 @@ extern "C" NSInteger swift_stdlib_getErrorCode(const OpaqueValue *error,
 static id _swift_becomeNSError_(SwiftError *errorObject) {
   auto ns = reinterpret_cast<NSError *>(errorObject);
   // If we already have a domain set, then we've already initialized.
-  if (errorObject->domain)
+  if (errorObject->domain.load(SWIFT_MEMORY_ORDER_CONSUME))
     return ns;
   
   // Otherwise, calculate the domain and code (TODO: and user info), and
@@ -227,7 +261,23 @@ static id _swift_becomeNSError_(SwiftError *errorObject) {
   NSInteger code = swift_stdlib_getErrorCode(value, type, witness);
   // TODO: user info?
   
-  [ns initWithDomain:domain code:code userInfo:nil];
+  // The error code shouldn't change, so we can store it blindly, even if
+  // somebody beat us to it. The store can be relaxed, since we'll do a
+  // store(release) of the domain last thing to publish the initialized
+  // NSError.
+  errorObject->code.store(code, std::memory_order_relaxed);
+
+  // However, we need to cmpxchg in the domain; if somebody beat us to it,
+  // we need to release
+  //
+  // Storing the domain must be the LAST THING we do, since it's
+  // the signal that the NSError has been initialized.
+  CFStringRef expected = nullptr;
+  if (!errorObject->domain.compare_exchange_strong(expected,
+                                                   (CFStringRef)domain,
+                                                   std::memory_order_acq_rel))
+    objc_release(domain);
+  
   return ns;
 }
 

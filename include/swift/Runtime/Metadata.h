@@ -1340,6 +1340,17 @@ struct ObjCClassWrapperMetadata : public Metadata {
   }
 };
 
+// FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
+// a barrier on ARM64, but LLVM doesn't know that. Although 'relaxed'
+// is formally UB by C++11 language rules, we should be OK because neither
+// the processor model nor the optimizer can realistically reorder our uses
+// of 'consume'.
+#if __arm64__
+#  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_relaxed)
+#else
+#  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_consume)
+#endif
+
 /// The structure of metadata for foreign types where the source
 /// language doesn't provide any sort of more interesting metadata for
 /// us to use.
@@ -1390,15 +1401,7 @@ struct ForeignTypeMetadata : public Metadata {
     if (!hasInitializationFunction())
       return asFullMetadata(this)->Unique.load(std::memory_order_relaxed);
 #endif
-#if __arm64__
-    // FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
-    // a barrier on ARM64, but LLVM doesn't know that. Although 'relaxed'
-    // is formally UB by C++11 language rules, we should be OK because neither
-    // the processor model nor the optimizer can realistically reorder this.
-    return asFullMetadata(this)->Unique.load(std::memory_order_relaxed);
-#else
-    return asFullMetadata(this)->Unique.load(std::memory_order_consume);
-#endif
+    return asFullMetadata(this)->Unique.load(SWIFT_MEMORY_ORDER_CONSUME);
   }
   
   void setCachedUniqueMetadata(const ForeignTypeMetadata *unique) const {
