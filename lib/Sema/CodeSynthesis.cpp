@@ -419,7 +419,21 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // property can still be overridden.)
   if (needsDynamicMaterializeForSet(storage))
     materializeForSet->setForcedStaticDispatch(true);
-  
+
+  // Make sure materializeForSet is available enough to access
+  // the storage (and its getters/setters if it has them).
+  SmallVector<const Decl *, 2> asAvailableAs;
+  asAvailableAs.push_back(storage);
+  if (FuncDecl *getter = storage->getGetter()) {
+    asAvailableAs.push_back(getter);
+  }
+  if (FuncDecl *setter = storage->getSetter()) {
+    asAvailableAs.push_back(setter);
+  }
+
+  AvailabilityInference::applyInferredAvailabilityAttrs(materializeForSet,
+                                                        asAvailableAs, ctx);
+
   // If the property came from ObjC, we need to register this as an external
   // definition to be compiled.
   if (storage->hasClangNode())

@@ -4983,6 +4983,92 @@ public:
     return true;
   }
 
+  /// Returns true if the override is safe from an availability perspective
+  /// and false otherwise.
+  static bool safeOverrideForAvailability(TypeChecker &TC, ValueDecl *override,
+                                          ValueDecl *base) {
+    // API availability ranges are contravariant: make sure the version range
+    // of an overriden declaration is fully contained in the range of the
+    // overriding declaration.
+    VersionRange overrideRange = TypeChecker::availableRange(override,
+                                                             TC.Context);
+    VersionRange baseRange = TypeChecker::availableRange(base, TC.Context);
+
+    return baseRange.isContainedIn(overrideRange);
+  }
+
+  /// Returns true if a  diagnostic about an accessor being less available
+  /// than the accessor it overrides would be redundant because we will
+  /// already emit another diagnostic.
+  static bool
+  isRedundantAccessorOverrideAvailabilityDiagnostic(TypeChecker &TC,
+                                                    ValueDecl *override,
+                                                    ValueDecl *base) {
+
+    auto *overrideFn = dyn_cast<FuncDecl>(override);
+    auto *baseFn = dyn_cast<FuncDecl>(base);
+    if (!overrideFn || !baseFn)
+      return false;
+
+    AbstractStorageDecl *overrideASD = overrideFn->getAccessorStorageDecl();
+    AbstractStorageDecl *baseASD = baseFn->getAccessorStorageDecl();
+    if (!overrideASD || !baseASD)
+      return false;
+
+    if (overrideASD->getOverriddenDecl() != baseASD)
+      return false;
+
+    // If we have already emitted a diagnostic about an unsafe override
+    // for the property, don't complain about the accessor.
+    if (!safeOverrideForAvailability(TC, overrideASD, baseASD)) {
+      return true;
+    }
+
+    // Returns true if we will already diagnose a bad override
+    // on the property's accessor of the given kind.
+    auto accessorOverrideAlreadyDiagnosed = [&](AccessorKind kind) {
+      FuncDecl *overrideAccessor = overrideASD->getAccessorFunction(kind);
+      FuncDecl *baseAccessor = baseASD->getAccessorFunction(kind);
+      if (overrideAccessor && baseAccessor &&
+          !safeOverrideForAvailability(TC, overrideAccessor, baseAccessor)) {
+        return true;
+      }
+      return false;
+    };
+
+    // If we have already emitted a diagnostic about an unsafe override
+    // for a getter or a setter, no need to complain about materializeForSet,
+    // which is synthesized to be as available as both the getter and
+    // the setter.
+    if (overrideFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
+      if (accessorOverrideAlreadyDiagnosed(AccessorKind::IsGetter) ||
+          accessorOverrideAlreadyDiagnosed(AccessorKind::IsSetter)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// Diagnose an override for potential availability. Returns true if
+  /// a diagnostic was emitted and false otherwise.
+  static bool diagnoseOverrideForAvailability(TypeChecker &TC,
+                                              ValueDecl *override,
+                                              ValueDecl *base) {
+    if (safeOverrideForAvailability(TC, override, base))
+      return false;
+
+    // Suppress diagnostics about availability overrides for accessors
+    // if they would be redundant with other diagnostics.
+    if (isRedundantAccessorOverrideAvailabilityDiagnostic(TC, override, base))
+      return false;
+
+    TC.diagnose(override, diag::override_less_available, override->getName());
+    TC.diagnose(base, diag::overridden_here);
+
+    return true;
+  }
+
   /// Record that the \c overriding declarations overrides the
   /// \c overridden declaration.
   ///
@@ -5071,18 +5157,8 @@ public:
       TC.diagnose(override, diag::override_unavailable, override->getName());
     }
     
-    // API availability ranges are contravariant: make sure the version range
-    // of an overriden declaration is fully contained in the range of the
-    // overriding declaration.
     if (TC.getLangOpts().EnableExperimentalAvailabilityChecking) {
-      VersionRange overrideRange = TypeChecker::availableRange(override,
-                                                               TC.Context);
-      VersionRange baseRange = TypeChecker::availableRange(base, TC.Context);
-      
-      if (!baseRange.isContainedIn(overrideRange)) {
-        TC.diagnose(override, diag::override_less_available, override->getName());
-        TC.diagnose(base, diag::overridden_here);
-      }
+      diagnoseOverrideForAvailability(TC, override, base);
     }
 
     /// Check attributes associated with the base; some may need to merged with

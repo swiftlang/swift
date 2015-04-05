@@ -1,4 +1,5 @@
 // RUN: %target-parse-verify-swift -enable-experimental-availability-checking
+// RUN: not %target-swift-frontend -parse -enable-experimental-availability-checking %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // REQUIRES: OS=macosx
 
@@ -763,6 +764,16 @@ class SuperWithAlwaysAvailableMembers {
     get { return 9 }
     set(newVal) {}
   }
+
+  var setterShouldAlwaysBeAvailableProperty: Int {
+    get { return 9 }
+    set(newVal) {} // expected-note {{overridden declaration is here}}
+  }
+
+  var getterShouldAlwaysBeAvailableProperty: Int {
+    get { return 9 } // expected-note {{overridden declaration is here}}
+    set(newVal) {}
+  }
 }
 
 class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
@@ -773,6 +784,19 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
   @availability(OSX, introduced=10.10)
   override var shouldAlwaysBeAvailableProperty: Int { // expected-error {{overriding 'shouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     get { return 10 }
+    set(newVal) {}
+  }
+
+  override var setterShouldAlwaysBeAvailableProperty: Int {
+    get { return 9 }
+    @availability(OSX, introduced=10.10)
+    set(newVal) {} // expected-error {{overriding '_' must be as available as declaration it overrides}}
+    // This is a terrible diagnostic. rdar://problem/20427938
+  }
+
+  override var getterShouldAlwaysBeAvailableProperty: Int {
+    @availability(OSX, introduced=10.10)
+    get { return 9 } // expected-error {{overriding '_' must be as available as declaration it overrides}}
     set(newVal) {}
   }
 }

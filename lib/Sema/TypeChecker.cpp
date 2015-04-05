@@ -1226,87 +1226,72 @@ TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   return TRC;
 }
 
-/// Climbs the decl context hierarchy, starting from DC, to attempt to find a
-/// declaration context with a valid source location. Returns the location
-/// of the innermost context with a valid location if one is found, and an
-/// invalid location otherwise.
-static SourceLoc bestLocationInDeclContextHierarchy(const DeclContext *DC) {
-  const DeclContext *Ancestor = DC;
-  while (Ancestor) {
-    SourceLoc Loc;
-    switch (Ancestor->getContextKind()) {
-    case DeclContextKind::AbstractClosureExpr:
-      Loc = cast<AbstractClosureExpr>(Ancestor)->getLoc();
-      break;
-
-    case DeclContextKind::TopLevelCodeDecl:
-      Loc = cast<TopLevelCodeDecl>(Ancestor)->getLoc();
-      break;
-
-    case DeclContextKind::AbstractFunctionDecl:
-      Loc = cast<AbstractFunctionDecl>(Ancestor)->getLoc();
-      break;
-
-    case DeclContextKind::NominalTypeDecl:
-      Loc = cast<NominalTypeDecl>(Ancestor)->getLoc();
-      break;
-
-    case DeclContextKind::ExtensionDecl:
-      Loc = cast<ExtensionDecl>(Ancestor)->getLoc();
-      break;
-
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::Initializer:
-    case DeclContextKind::Module:
-    case DeclContextKind::FileUnit:
-      break;
-    }
-
-    if (Loc.isValid()) {
-      return Loc;
-    }
-    Ancestor = Ancestor->getParent();
-  }
-
-  return SourceLoc();
-}
-
-bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
-                                  const DeclContext *referenceDC,
-                                  VersionRange &OutAvailableRange) {
-  SourceFile *SF = referenceDC->getParentSourceFile();
+/// Returns an over-approximation of the range of operating system versions
+/// that could  the passed-in location location could be executing upon for
+/// the target platform.
+static VersionRange overApproximateOSVersionsAtLocation(SourceLoc loc,
+                                                        const DeclContext *DC,
+                                                        TypeChecker &TC) {
+  SourceFile *SF = DC->getParentSourceFile();
   assert(SF);
 
-  SourceLoc lookupLoc;
-  
-  if (referenceLoc.isValid()) {
-    lookupLoc = referenceLoc;
-  } else {
-    // For expressions without a valid location (this may be synthesized
-    // code) we conservatively climb up the decl context hierarchy to
-    // find a valid location, if possible. Because we are climbing DeclContexts
-    // we may miss statement or expression level refinement contexts (i.e.,
-    // #available(..)). That is, a reference with an invalid location that i
-    // contained inside a #available() and with no intermediate DeclContext will
-    // not be refined. For now, this is fine -- but if we ever synthesize
-    // #available(), this will be a real problem.
-    lookupLoc = bestLocationInDeclContextHierarchy(referenceDC);
+  // If our source location is invalid (this may be synthesized code), climb
+  // the decl context hierarchy until until we find a location that is valid,
+  // collecting availability ranges on the way up.
+  // We will combine the version ranges from these annotations
+  // with the TRC for the valid location to overapproximate the running
+  // OS versions at the original source location.
+  // Because we are climbing DeclContexts we will miss refinement contexts in
+  // synthesized code that are introduced by AST elements that are themselves
+  // not DeclContexts, such as  #available(..) and property declarations.
+  // That is, a reference with an invalid location that is contained
+  // inside a #available() and with no intermediate DeclContext will not be
+  // refined. For now, this is fine -- but if we ever synthesize #available(),
+  // this will be a real problem.
+
+  VersionRange OverApproximateVersionRange = VersionRange::all();
+
+  while (DC && loc.isInvalid()) {
+    const Decl *D = DC->getInnermostDeclarationDeclContext();
+    if (!D)
+      break;
+
+    loc = D->getLoc();
+
+    Optional<VersionRange> Range =
+        TypeChecker::annotatedAvailableRange(D, TC.Context);
+
+    if (Range.hasValue()) {
+      // We're relying on a precise meet here to be over-approximate.
+      // This should really be a constrain operation.
+      OverApproximateVersionRange.meetWith(Range.getValue());
+    }
+
+    DC = D->getDeclContext();
   }
-  
-  TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
+
+  TypeRefinementContext *rootTRC = TC.getOrBuildTypeRefinementContext(SF);
   TypeRefinementContext *TRC;
-  
-  if (lookupLoc.isValid()) {
-    TRC = rootTRC->findMostRefinedSubContext(lookupLoc,
-                                             Context.SourceMgr);
+  if (loc.isValid()) {
+    TRC = rootTRC->findMostRefinedSubContext(loc, TC.Context.SourceMgr);
   } else {
     // If we could not find a valid location, conservatively use the root
     // refinement context.
     TRC = rootTRC;
   }
-  
+
+  // Again, we're relying on a precise meet.
+  OverApproximateVersionRange.meetWith(TRC->getPotentialVersions());
+  return OverApproximateVersionRange;
+}
+
+bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
+                                  const DeclContext *referenceDC,
+                                  VersionRange &OutAvailableRange) {
+
   VersionRange safeRangeUnderApprox = TypeChecker::availableRange(D, Context);
-  VersionRange runningOSOverApprox = TRC->getPotentialVersions();
+  VersionRange runningOSOverApprox = overApproximateOSVersionsAtLocation(
+      referenceLoc, referenceDC, *this);
   
   // The reference is safe if an over-approximation of the running OS
   // versions is fully contained within an under-approximation

@@ -1,5 +1,5 @@
-// RUN: %swift -parse -verify -target x86_64-apple-macosx10.10 -enable-availability-checking-in-implicit-functions %clang-importer-sdk -I %S/Inputs/custom-modules %s
-// RUN: %swift -parse -target x86_64-apple-macosx10.10 -enable-availability-checking-in-implicit-functions %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %swift -parse -verify -target x86_64-apple-macosx10.10 -enable-experimental-availability-checking -enable-availability-checking-in-implicit-functions %clang-importer-sdk -I %S/Inputs/custom-modules %s
+// RUN: %swift -parse -target x86_64-apple-macosx10.10 -enable-experimental-availability-checking -enable-availability-checking-in-implicit-functions %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // REQUIRES: OS=macosx
 
@@ -61,4 +61,19 @@ func callImplicitInitalizerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
 
 @availability(OSX, introduced=10.9, deprecated=10.10)
 class DeprecatedSubClassOfDeprecatedSuperClass : DeprecatedSuperClass {
+}
+
+// Tests synthesis of materializeForSet
+class ClassWithLimitedAvailabilityAccessors {
+  var limitedGetter: Int {
+    @availability(OSX, introduced=10.11)
+    get { return 10 }
+    set(newVal) {}
+  }
+
+  var limitedSetter: Int {
+    get { return 10 }
+    @availability(OSX, introduced=10.11)
+    set(newVal) {}
+  }
 }
