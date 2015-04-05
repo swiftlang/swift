@@ -79,7 +79,7 @@ using namespace swift;
     // Don't need to .retain.autorelease since it's immutable.
     return (NSDictionary*)userInfo;
   } else {
-    // -[NSError userInfo] never returns nil on OSX 10.8 or later.
+    // -[NSError userInfo] never returns nil on OS X 10.8 or later.
     static NSDictionary *emptyDict = @{};
     return emptyDict;
   }
