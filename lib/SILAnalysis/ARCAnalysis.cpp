@@ -111,19 +111,23 @@ static bool canDecrementRefCountsByValueKind(SILInstruction *User) {
   case ValueKind::StrongRetainAutoreleasedInst:
   case ValueKind::StrongRetainUnownedInst:
   case ValueKind::UnownedRetainInst:
+  case ValueKind::RetainValueInst:
   case ValueKind::PartialApplyInst:
   case ValueKind::FixLifetimeInst:
   case ValueKind::CopyBlockInst:
-  case ValueKind::RetainValueInst:
   case ValueKind::CondFailInst:
+  case ValueKind::StrongPinInst:
     return false;
 
-  case ValueKind::CopyAddrInst: {
-    auto *CA = cast<CopyAddrInst>(User);
-    if (CA->isInitializationOfDest() == IsInitialization_t::IsInitialization)
-      return false;
+  case ValueKind::CopyAddrInst:
+    // We only decrement ref counts if we are not initializing dest.
+    return !cast<CopyAddrInst>(User)->isInitializationOfDest();
+
+  case ValueKind::CheckedCastAddrBranchInst: {
+    // If we do not take on success, we do not touch ref counts.
+    auto *CCABI = cast<CheckedCastAddrBranchInst>(User);
+    return shouldTakeOnSuccess(CCABI->getConsumptionKind());
   }
-  SWIFT_FALLTHROUGH;
   default:
     return true;
   }
