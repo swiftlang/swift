@@ -891,6 +891,11 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       break;
 
     TC.typeCheckDecl(SubDecl, /*isFirstPass*/false);
+
+    // Make sure to type check the 'else' in a conditional PatternBinding.
+    if (auto *PBD = dyn_cast<PatternBindingDecl>(SubDecl))
+      if (auto *Else = PBD->getElse().getExplicitBody())
+        typeCheckStmt(Else);
   }
   
   return BS;
@@ -1212,10 +1217,6 @@ void TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   if (body) {
     closure->setBody(body, closure->hasSingleExpressionBody());
   }
-}
-
-void TypeChecker::typeCheckBraceStmt(BraceStmt *BS, DeclContext *DC) {
-  StmtChecker(*this, DC).typeCheckStmt(BS);
 }
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

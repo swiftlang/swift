@@ -2929,9 +2929,8 @@ public:
       if (!TC.typeCheckCondition(E, PBD->getDeclContext()))
         PBD->setWhereExpr(E);
 
-    // Type check the else body, if present.
-    if (auto *Else = PBD->getElse().getExplicitBody())
-      TC.typeCheckBraceStmt(Else, PBD->getDeclContext());
+    // Note: The Else body is type checked when the enclosing BraceStmt is
+    // checked.
     
     if (PBD->isInvalid())
       return;
