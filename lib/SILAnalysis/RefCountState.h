@@ -300,15 +300,11 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
   void clear();
 
   /// Can we gaurantee that the given reference counted value has been modified?
-  bool isRefCountStateModified() const {
-    return LatState == LatticeState::Decremented;
-  }
+  bool isRefCountStateModified() const;
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is decremented.
-  bool valueCanBeDecrementedGivenLatticeState() const {
-    return LatState == LatticeState::MightBeUsed;
-  }
+  bool valueCanBeDecrementedGivenLatticeState() const;
 
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
@@ -316,9 +312,7 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
-  bool valueCanBeUsedGivenLatticeState() const {
-    return LatState == LatticeState::Decremented;
-  }
+  bool valueCanBeUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
@@ -380,15 +374,11 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
   void clear();
 
   /// Can we gaurantee that the given reference counted value has been modified?
-  bool isRefCountStateModified() const {
-    return LatState == LatticeState::Incremented;
-  }
+  bool isRefCountStateModified() const;
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is decremented.
-  bool valueCanBeDecrementedGivenLatticeState() const {
-    return LatState == LatticeState::Incremented;
-  }
+  bool valueCanBeDecrementedGivenLatticeState() const;
 
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
@@ -396,9 +386,7 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
-  bool valueCanBeUsedGivenLatticeState() const {
-    return LatState == LatticeState::MightBeDecremented;
-  }
+  bool valueCanBeUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.

@@ -128,6 +128,32 @@ void BottomUpRefCountState::clear() {
 
 /// If advance the state's sequence appropriately for a decrement. If we do
 /// advance return true. Otherwise return false.
+bool BottomUpRefCountState::isRefCountStateModified() const {
+  switch (LatState) {
+  case LatticeState::Decremented:
+    return true;
+  case LatticeState::None:
+  case LatticeState::MightBeDecremented:
+  case LatticeState::MightBeUsed:
+    return false;
+  }
+}
+
+/// Returns true if given the current lattice state, do we care if the value
+/// we are tracking is decremented.
+bool BottomUpRefCountState::valueCanBeDecrementedGivenLatticeState() const {
+  switch (LatState) {
+  case LatticeState::MightBeUsed:
+    return true;
+  case LatticeState::None:
+  case LatticeState::MightBeDecremented:
+  case LatticeState::Decremented:
+    return false;
+  }
+}
+
+/// If advance the state's sequence appropriately for a decrement. If we do
+/// advance return true. Otherwise return false.
 bool BottomUpRefCountState::
 handleDecrement(SILInstruction *PotentialDecrement) {
   switch (LatState) {
@@ -137,6 +163,19 @@ handleDecrement(SILInstruction *PotentialDecrement) {
   case LatticeState::None:
   case LatticeState::MightBeDecremented:
   case LatticeState::Decremented:
+    return false;
+  }
+}
+
+/// Returns true if given the current lattice state, do we care if the value we
+/// are tracking is used.
+bool BottomUpRefCountState::valueCanBeUsedGivenLatticeState() const {
+  switch (LatState) {
+  case LatticeState::Decremented:
+    return true;
+  case LatticeState::None:
+  case LatticeState::MightBeDecremented:
+  case LatticeState::MightBeUsed:
     return false;
   }
 }
@@ -348,6 +387,31 @@ void TopDownRefCountState::clear() {
   SuperTy::clear();
 }
 
+/// Can we gaurantee that the given reference counted value has been modified?
+bool TopDownRefCountState::isRefCountStateModified() const {
+  switch (LatState) {
+  case LatticeState::Incremented:
+    return true;
+  case LatticeState::None:
+  case LatticeState::MightBeDecremented:
+  case LatticeState::MightBeUsed:
+    return false;
+  }
+}
+
+/// Returns true if given the current lattice state, do we care if the value
+/// we are tracking is decremented.
+bool TopDownRefCountState::valueCanBeDecrementedGivenLatticeState() const {
+  switch (LatState) {
+  case LatticeState::Incremented:
+    return true;
+  case LatticeState::None:
+  case LatticeState::MightBeDecremented:
+  case LatticeState::MightBeUsed:
+    return false;
+  }
+}
+
 /// If advance the state's sequence appropriately for a decrement. If we do
 /// advance return true. Otherwise return false.
 bool TopDownRefCountState::handleDecrement(SILInstruction *PotentialDecrement) {
@@ -358,6 +422,19 @@ bool TopDownRefCountState::handleDecrement(SILInstruction *PotentialDecrement) {
     return true;
   case LatticeState::None:
   case LatticeState::MightBeDecremented:
+  case LatticeState::MightBeUsed:
+    return false;
+  }
+}
+
+/// Returns true if given the current lattice state, do we care if the value
+/// we are tracking is used.
+bool TopDownRefCountState::valueCanBeUsedGivenLatticeState() const {
+  switch (LatState) {
+  case LatticeState::MightBeDecremented:
+    return true;
+  case LatticeState::None:
+  case LatticeState::Incremented:
   case LatticeState::MightBeUsed:
     return false;
   }
