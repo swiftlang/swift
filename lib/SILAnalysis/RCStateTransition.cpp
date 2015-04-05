@@ -84,6 +84,10 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
     // values at +1.
     return RCStateTransitionKind::StrongEntrance;
 
+  case ValueKind::AllocBoxInst:
+    // AllocBox introduce their container result at +1.
+    return RCStateTransitionKind::StrongEntrance;
+
   default:
     return RCStateTransitionKind::Unknown;
   }

@@ -1830,3 +1830,23 @@ bb0(%0 : $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @alloc_box_returns_at_p1 : $@thin () -> () {
+// CHECK: alloc_box
+// CHECK-NOT: strong_retain
+// CHECK: apply
+// CHECK: apply
+// CHECK: strong_release
+// CHECK-NOT: strong_release
+sil @alloc_box_returns_at_p1 : $@thin () -> () {
+bb0:
+  %0 = alloc_box $Builtin.Int1
+  strong_retain %0#0 : $Builtin.NativeObject
+  %3 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %3(%0#0) : $@thin (Builtin.NativeObject) -> ()
+  apply %3(%0#0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0#0 : $Builtin.NativeObject
+  strong_release %0#0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

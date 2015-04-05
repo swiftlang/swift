@@ -374,7 +374,7 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   /// Initiailize this RefCountState with an instruction which introduces a new
   /// ref count at +1.
-  void initWithEntranceInst(SILInstruction *I);
+  void initWithEntranceInst(SILInstruction *I, SILValue RCIdentity);
 
   /// Uninitialize the current state.
   void clear();

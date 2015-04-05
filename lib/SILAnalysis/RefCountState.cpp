@@ -330,14 +330,13 @@ void TopDownRefCountState::initWithArg(SILArgument *Arg) {
 /// Initiailize this RefCountState with an instruction which introduces a new
 /// ref count at +1.
 void
-TopDownRefCountState::initWithEntranceInst(SILInstruction *I) {
-  assert(I->getNumTypes() == 1 &&
-         "Expected an instruction with one return value");
+TopDownRefCountState::initWithEntranceInst(SILInstruction *I,
+                                           SILValue RCIdentity) {
   LatState = LatticeState::Incremented;
   Transition = RCStateTransition(I);
   assert((*Transition).getKind() == RCStateTransitionKind::StrongEntrance &&
          "Expected a strong entrance here");
-  RCRoot = I;
+  RCRoot = RCIdentity;
   KnownSafe = false;
   InsertPts.clear();
 }

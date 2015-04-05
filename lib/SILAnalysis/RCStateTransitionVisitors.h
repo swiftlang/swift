@@ -166,6 +166,7 @@ private:
   DataflowResult visitStrongEntranceArgument(SILArgument *Arg);
   DataflowResult visitStrongEntranceAllocRef(AllocRefInst *ARI);
   DataflowResult visitStrongEntranceAllocRefDynamic(AllocRefDynamicInst *ARI);
+  DataflowResult visitStrongAllocBox(AllocBoxInst *ABI);
 };
 
 } // end swift namespace

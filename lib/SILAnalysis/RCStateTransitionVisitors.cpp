@@ -219,7 +219,7 @@ TopDownDataflowRCStateVisitor::visitStrongEntranceApply(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << "    Initializing state.\n");
 
   TopDownRefCountState &State = BBState.getTopDownRefCountState(AI);
-  State.initWithEntranceInst(AI);
+  State.initWithEntranceInst(AI, AI);
 
   return DataflowResult(AI);
 }
@@ -229,7 +229,7 @@ TopDownDataflowRCStateVisitor::DataflowResult
 TopDownDataflowRCStateVisitor::visitStrongEntranceAllocRef(AllocRefInst *ARI) {
   // Alloc refs always introduce new references at +1.
   TopDownRefCountState &State = BBState.getTopDownRefCountState(ARI);
-  State.initWithEntranceInst(ARI);
+  State.initWithEntranceInst(ARI, ARI);
 
   return DataflowResult(ARI);
 }
@@ -239,9 +239,18 @@ TopDownDataflowRCStateVisitor::
 visitStrongEntranceAllocRefDynamic(AllocRefDynamicInst *ARI) {
   // Alloc ref dynamic always introduce references at +1.
   TopDownRefCountState &State = BBState.getTopDownRefCountState(ARI);
-  State.initWithEntranceInst(ARI);
+  State.initWithEntranceInst(ARI, ARI);
 
   return DataflowResult(ARI);
+}
+
+TopDownDataflowRCStateVisitor::DataflowResult
+TopDownDataflowRCStateVisitor::visitStrongAllocBox(AllocBoxInst *ABI) {
+  // Alloc box introduces a ref count of +1 on its container.
+  SILValue Container = ABI->getContainerResult();
+  TopDownRefCountState &State = BBState.getTopDownRefCountState(Container);
+  State.initWithEntranceInst(ABI, Container);
+  return DataflowResult(Container);
 }
 
 TopDownDataflowRCStateVisitor::DataflowResult
@@ -257,6 +266,9 @@ TopDownDataflowRCStateVisitor::visitStrongEntrance(ValueBase *V) {
 
   if (auto *ARI = dyn_cast<AllocRefDynamicInst>(V))
     return visitStrongEntranceAllocRefDynamic(ARI);
+
+  if (auto *ABI = dyn_cast<AllocBoxInst>(V))
+    return visitStrongAllocBox(ABI);
 
   return DataflowResult();
 }
