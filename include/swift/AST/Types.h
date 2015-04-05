@@ -1900,7 +1900,6 @@ public:
     ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
 
     friend class AnyFunctionType;
-    friend class SILFunctionType;
     
   public:
     // Constructor with all defaults.
@@ -2578,9 +2577,146 @@ typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 /// function parameter and result types.
 class SILFunctionType : public TypeBase, public llvm::FoldingSetNode {
 public:
-  typedef AnyFunctionType::ExtInfo ExtInfo;
-  typedef AnyFunctionType::Representation Representation;
-  
+  /// \brief The representation form of a function.
+  enum class Representation {
+    // A "thick" function that carries a context pointer to reference captured
+    // state. The default.
+    Thick = 0,
+    
+    // A thick function that is represented as an Objective-C block.
+    Block,
+    
+    // A "thin" function that needs no context.
+    Thin,
+  };
+
+  /// \brief A class which abstracts out some details necessary for
+  /// making a call.
+  class ExtInfo {
+    // Feel free to rearrange or add bits, but if you go over 15,
+    // you'll need to adjust both the Bits field below and
+    // BaseType::AnyFunctionTypeBits.
+
+    //   |  CC  |representation|isAutoClosure|noReturn|NoEscape|Throws|
+    //   |0 .. 3|    4 .. 5    |      6      |   7    |    8   |   9  |
+    //
+    enum : uint16_t { CallConvMask       = 0x00F };
+    enum : uint16_t { RepresentationMask = 0x030, RepresentationShift = 4 };
+    enum : uint16_t { AutoClosureMask    = 0x040 };
+    enum : uint16_t { NoReturnMask       = 0x080 };
+    enum : uint16_t { NoEscapeMask       = 0x100 };
+    enum : uint16_t { ThrowsMask         = 0x200 };
+
+    uint16_t Bits;
+
+    ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
+
+    friend class SILFunctionType;
+    
+  public:
+    // Constructor with all defaults.
+    ExtInfo() : Bits(0) {
+      assert(getCC() == AbstractCC::Freestanding);
+    }
+
+    // Constructor for polymorphic type.
+    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn, bool Throws) {
+      Bits = ((unsigned) CC) |
+             ((unsigned) Rep << RepresentationShift) |
+             (IsNoReturn ? NoReturnMask : 0) |
+             (Throws ? ThrowsMask : 0);
+    }
+
+    // Constructor with no defaults.
+    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn,
+            bool IsAutoClosure, bool IsNoEscape, bool Throws)
+      : ExtInfo(CC, Rep, IsNoReturn, Throws) {
+      Bits |= (IsAutoClosure ? AutoClosureMask : 0);
+      Bits |= (IsNoEscape ? NoEscapeMask : 0);
+    }
+
+    explicit ExtInfo(AbstractCC CC) : Bits(0) {
+      Bits = (Bits & ~CallConvMask) | (unsigned) CC;
+    }
+
+    AbstractCC getCC() const { return AbstractCC(Bits & CallConvMask); }
+    bool isNoReturn() const { return Bits & NoReturnMask; }
+    bool isAutoClosure() const { return Bits & AutoClosureMask; }
+    bool isNoEscape() const { return Bits & NoEscapeMask; }
+    bool throws() const { return Bits & ThrowsMask; }
+    Representation getRepresentation() const {
+      return Representation((Bits & RepresentationMask) >> RepresentationShift);
+    }
+
+    bool hasSelfParam() const {
+      switch (getCC()) {
+      case AbstractCC::Freestanding:
+      case AbstractCC::C:
+        return false;
+      case AbstractCC::ObjCMethod:
+      case AbstractCC::Method:
+      case AbstractCC::WitnessMethod:
+        return true;
+      }
+    }
+    
+    /// True if the function representation carries context.
+    bool hasContext() const {
+      switch (getRepresentation()) {
+      case Representation::Thick:
+      case Representation::Block:
+        return true;
+      case Representation::Thin:
+        return false;
+      }
+    }
+    
+    // Note that we don't have setters. That is by design, use
+    // the following with methods instead of mutating these objects.
+    ExtInfo withCallingConv(AbstractCC CC) const {
+      return ExtInfo((Bits & ~CallConvMask) | (unsigned) CC);
+    }
+    ExtInfo withRepresentation(Representation Rep) const {
+      return ExtInfo((Bits & ~RepresentationMask)
+                     | (unsigned)Rep << RepresentationShift);
+    }
+    ExtInfo withIsNoReturn(bool IsNoReturn = true) const {
+      if (IsNoReturn)
+        return ExtInfo(Bits | NoReturnMask);
+      else
+        return ExtInfo(Bits & ~NoReturnMask);
+    }
+    ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
+      if (IsAutoClosure)
+        return ExtInfo(Bits | AutoClosureMask);
+      else
+        return ExtInfo(Bits & ~AutoClosureMask);
+    }
+    ExtInfo withNoEscape(bool NoEscape = true) const {
+      if (NoEscape)
+        return ExtInfo(Bits | NoEscapeMask);
+      else
+        return ExtInfo(Bits & ~NoEscapeMask);
+    }
+    ExtInfo withThrows(bool Throws = true) const {
+      if (Throws)
+        return ExtInfo(Bits | ThrowsMask);
+      else
+        return ExtInfo(Bits & ~ThrowsMask);
+    }
+
+    uint16_t getFuncAttrKey() const {
+      return Bits;
+    }
+
+    bool operator==(ExtInfo Other) const {
+      return Bits == Other.Bits;
+    }
+    bool operator!=(ExtInfo Other) const {
+      return Bits != Other.Bits;
+    }
+  };
+
 private:
   unsigned NumParameters;
 

@@ -3067,6 +3067,18 @@ getFunctionRepresentation(bool thin, bool blockCompatible) {
     return AnyFunctionType::Representation::Thick;
 }
 
+static SILFunctionType::Representation
+getSILFunctionRepresentation(bool thin, bool blockCompatible) {
+  // A type cannot be both thin and block-compatible.
+  assert(!thin || !blockCompatible);
+  if (thin)
+    return SILFunctionType::Representation::Thin;
+  else if (blockCompatible)
+    return SILFunctionType::Representation::Block;
+  else
+    return SILFunctionType::Representation::Thick;
+}
+
 Type ModuleFile::getType(TypeID TID) {
   if (TID == 0)
     return Type();
@@ -3660,7 +3672,7 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
     SILFunctionType::ExtInfo extInfo(callingConvention.getValue(),
-                                     getFunctionRepresentation(thin, block),
+                                     getSILFunctionRepresentation(thin, block),
                                      noreturn, /*autoclosure*/false, noescape,
                                      /*throws*/false);
 

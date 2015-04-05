@@ -408,6 +408,20 @@ enum class ConventionsKind : uint8_t {
   };
 }
 
+/// Map an AST function representation to a SIL representation.
+/// TODO: This should be unnecessary.
+static SILFunctionType::Representation
+getSILFunctionRepresentation(AnyFunctionType::Representation rep) {
+  switch (rep) {
+  case AnyFunctionType::Representation::Block:
+    return SILFunctionType::Representation::Block;
+  case AnyFunctionType::Representation::Thick:
+    return SILFunctionType::Representation::Thick;
+  case AnyFunctionType::Representation::Thin:
+    return SILFunctionType::Representation::Thin;
+  }
+}
+
 /// Create the appropriate SIL function type for the given formal type
 /// and conventions.
 ///
@@ -553,13 +567,17 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     calleeConvention = conventions.getCallee();
 
   // Always strip the auto-closure and no-escape bit.
-  // TODO: The noescape bit could be of interesting to SIL optimizations.
+  // TODO: The noescape bit could be of interest to SIL optimizations.
   //   We should bring it back when we have those optimizations.
-  extInfo = extInfo.withIsAutoClosure(false)
-                   .withNoEscape(false);
-
+  auto silExtInfo = SILFunctionType::ExtInfo()
+    .withCallingConv(extInfo.getCC())
+    .withRepresentation(getSILFunctionRepresentation(extInfo.getRepresentation()))
+    .withIsNoReturn(extInfo.isNoReturn())
+    // TODO: map native 'throws' to an error result type.
+    .withThrows(extInfo.throws());
+  
   return SILFunctionType::get(genericSig,
-                              extInfo, calleeConvention,
+                              silExtInfo, calleeConvention,
                               inputs, result, errorResult,
                               M.getASTContext());
 }
@@ -1343,7 +1361,7 @@ CanSILFunctionType TypeConverter::getConstantFunctionType(SILDeclRef constant,
            && (!substFormalInterfaceType
                || substFormalInterfaceType == cachedInfo.FormalInterfaceType));
     auto extInfo = cachedInfo.SILFnType->getExtInfo()
-      .withRepresentation(FunctionType::Representation::Thin);
+      .withRepresentation(SILFunctionType::Representation::Thin);
     return adjustFunctionType(cachedInfo.SILFnType, extInfo);
   }
 
@@ -1608,9 +1626,12 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
   assert(substLoweredType->getRepresentation()
            == substLoweredInterfaceType->getRepresentation());
 
+  auto rep = getSILFunctionRepresentation(substLoweredType->getRepresentation());
+  auto extInfo = origFnType->getExtInfo().withRepresentation(rep);
+
   // FIXME: Map into archetype context.
   return SILFunctionType::get(genericSig,
-                              substLoweredType->getExtInfo(),
+                              extInfo,
                               origFnType->getCalleeConvention(),
                               substituter.getSubstParams(),
                               substResult,

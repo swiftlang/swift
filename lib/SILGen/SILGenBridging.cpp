@@ -244,9 +244,9 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   auto invokeTy =
     SILFunctionType::get(nullptr,
-                     FunctionType::ExtInfo()
+                     SILFunctionType::ExtInfo()
                        .withCallingConv(AbstractCC::C)
-                       .withRepresentation(FunctionType::Representation::Thin),
+                       .withRepresentation(SILFunctionType::Representation::Thin),
                      ParameterConvention::Direct_Unowned,
                      params,
                      blockTy->getResult(),
@@ -319,10 +319,10 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
   // Bridge native functions to blocks.
   auto bridgedFTy = dyn_cast<SILFunctionType>(loweredBridgedTy);
   if (bridgedFTy
-      && bridgedFTy->getRepresentation() == FunctionType::Representation::Block){
+      && bridgedFTy->getRepresentation() == SILFunctionType::Representation::Block){
     auto nativeFTy = cast<SILFunctionType>(loweredNativeTy);
 
-    if (nativeFTy->getRepresentation() != FunctionType::Representation::Block)
+    if (nativeFTy->getRepresentation() != SILFunctionType::Representation::Block)
       return gen.emitFuncToBlock(loc, v, bridgedFTy);
   }
 
@@ -497,10 +497,10 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
   // Bridge blocks back into native function types.
   auto bridgedFTy = dyn_cast<SILFunctionType>(loweredBridgedTy);
   if (bridgedFTy
-      && bridgedFTy->getRepresentation() == FunctionType::Representation::Block){
+      && bridgedFTy->getRepresentation() == SILFunctionType::Representation::Block){
     auto nativeFTy = cast<SILFunctionType>(loweredNativeTy);
 
-    if (nativeFTy->getRepresentation() != FunctionType::Representation::Block)
+    if (nativeFTy->getRepresentation() != SILFunctionType::Representation::Block)
       return gen.emitBlockToFunc(loc, v, nativeFTy);
   }
 

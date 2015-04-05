@@ -268,7 +268,7 @@ static void emitOnceCall(SILGenFunction &gen, VarDecl *global,
   SILValue onceFuncRef = gen.B.createFunctionRef(global, onceFunc);
   auto onceFuncThickTy
     = adjustFunctionType(onceFunc->getLoweredFunctionType(),
-                         FunctionType::Representation::Thick);
+                         SILFunctionType::Representation::Thick);
   auto onceFuncThickSILTy = SILType::getPrimitiveObjectType(onceFuncThickTy);
   onceFuncRef = gen.B.createThinToThickFunction(global, onceFuncRef,
                                                 onceFuncThickSILTy);

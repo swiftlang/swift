@@ -377,12 +377,12 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
     llvm_unreachable("not an ObjC-compatible function");
   }
   switch (type->getRepresentation()) {
-  case AnyFunctionType::Representation::Block:
+  case SILFunctionType::Representation::Block:
     // OK.
     break;
   
-  case AnyFunctionType::Representation::Thick:
-  case AnyFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::Thick:
+  case SILFunctionType::Representation::Thin:
     // TODO: Thin functions could be mapped to function pointer types.
     llvm_unreachable("not an ObjC-compatible block");
   }

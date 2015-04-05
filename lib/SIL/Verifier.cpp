@@ -840,7 +840,7 @@ public:
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
     require(fnType->getRepresentation()
-              == FunctionType::Representation::Thin,
+              == SILFunctionType::Representation::Thin,
             "function_ref should have a thin function result");
     if (F.isFragile()) {
       SILFunction *RefF = FRI->getReferencedFunction();
@@ -1375,7 +1375,7 @@ public:
     require(protocol,
             "witness_method method must be a protocol method");
 
-    require(methodType->getRepresentation() == FunctionType::Representation::Thin,
+    require(methodType->getRepresentation() == SILFunctionType::Representation::Thin,
             "result of witness_method must be thin function");
 
     require(methodType->getAbstractCC()
@@ -1512,7 +1512,7 @@ public:
             "result type of class_method must match type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of class_method");
-    require(methodType->getRepresentation() == FunctionType::Representation::Thin,
+    require(methodType->getRepresentation() == SILFunctionType::Representation::Thin,
             "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
     require(operandType.isClassOrClassMetatype(),
@@ -1545,7 +1545,7 @@ public:
             "result type of super_method must match type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of super_method");
-    require(methodType->getRepresentation() == FunctionType::Representation::Thin,
+    require(methodType->getRepresentation() == SILFunctionType::Representation::Thin,
             "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
     require(operandType.isClassOrClassMetatype(),
@@ -1879,13 +1879,13 @@ public:
     requireSameFunctionComponents(opFTy, resFTy,
                                   "thin_to_thick_function operand and result");
 
-    require(opFTy->getRepresentation() == FunctionType::Representation::Thin,
+    require(opFTy->getRepresentation() == SILFunctionType::Representation::Thin,
             "operand of thin_to_thick_function must be thin");
-    require(resFTy->getRepresentation() == FunctionType::Representation::Thick,
+    require(resFTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "result of thin_to_thick_function must be thick");
 
     auto adjustedOperandExtInfo = opFTy->getExtInfo().withRepresentation(
-                                           FunctionType::Representation::Thick);
+                                           SILFunctionType::Representation::Thick);
     require(adjustedOperandExtInfo == resFTy->getExtInfo(),
             "operand and result of thin_to_think_function must agree in particulars");
   }
@@ -2120,7 +2120,7 @@ public:
     requireObjectType(BuiltinRawPointerType, CI,
                       "thin_function_to_pointer result");
 
-    require(opTI->getRepresentation() == FunctionType::Representation::Thin,
+    require(opTI->getRepresentation() == SILFunctionType::Representation::Thin,
             "thin_function_to_pointer only works on thin functions");
   }
 
@@ -2130,7 +2130,7 @@ public:
     requireObjectType(BuiltinRawPointerType, CI->getOperand(),
                       "pointer_to_thin_function operand");
 
-    require(resultTI->getRepresentation() == FunctionType::Representation::Thin,
+    require(resultTI->getRepresentation() == SILFunctionType::Representation::Thin,
             "pointer_to_thin_function only works on thin functions");
   }
 
@@ -2513,7 +2513,7 @@ public:
     auto invokeTy
       = IBSHI->getInvokeFunction().getType().getAs<SILFunctionType>();
     require(invokeTy, "invoke function operand must be a function");
-    require(invokeTy->getRepresentation() == FunctionType::Representation::Thin,
+    require(invokeTy->getRepresentation() == SILFunctionType::Representation::Thin,
             "invoke function operand must be a thin function");
     require(invokeTy->getAbstractCC() == AbstractCC::C,
             "invoke function operand must be a cdecl function");
@@ -2530,7 +2530,7 @@ public:
     require(blockTy, "result must be a function");
     require(blockTy->getAbstractCC() == AbstractCC::C,
             "result must be a cdecl block function");
-    require(blockTy->getRepresentation() == FunctionType::Representation::Block,
+    require(blockTy->getRepresentation() == SILFunctionType::Representation::Block,
             "result must be a cdecl block function");
     require(blockTy->getResult() == invokeTy->getResult(),
             "result must have same return type as invoke function");

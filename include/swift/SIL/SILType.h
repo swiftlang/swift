@@ -395,7 +395,7 @@ public:
     auto fTy = dyn_cast<SILFunctionType>(ty);
     if (!fTy)
       return false;
-    return fTy->getRepresentation() == FunctionType::Representation::Block;
+    return fTy->getRepresentation() == SILFunctionType::Representation::Block;
   }
 
   /// Given that this is a nominal type, return the lowered type of

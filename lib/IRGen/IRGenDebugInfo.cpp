@@ -763,7 +763,8 @@ emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
     ScopeLine = 0;
   }
 
-  if (FnTy && FnTy->getRepresentation() == FunctionType::Representation::Block)
+  if (FnTy && FnTy->getRepresentation()
+        == SILFunctionType::Representation::Block)
     Flags |= llvm::DIDescriptor::FlagAppleBlock;
 
   llvm::DISubprogram SP = DBuilder.createFunction(

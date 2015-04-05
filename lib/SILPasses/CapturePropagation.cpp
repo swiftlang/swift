@@ -229,7 +229,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   // return signature.
   CanSILFunctionType NewFTy =
     Lowering::adjustFunctionType(PAI->getType().castTo<SILFunctionType>(),
-                                 FunctionType::Representation::Thin);
+                                 SILFunctionType::Representation::Thin);
   SILFunction *NewF = SILFunction::create(
       *getModule(), SILLinkage::Shared, Name, NewFTy,
       /*contextGenericParams*/ nullptr, OrigF->getLocation(), OrigF->isBare(),

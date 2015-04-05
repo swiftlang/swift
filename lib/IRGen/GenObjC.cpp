@@ -694,7 +694,7 @@ static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
   };
   auto result = SILResultInfo(classType, ResultConvention::Owned);
   auto extInfo = SILFunctionType::ExtInfo(AbstractCC::ObjCMethod,
-                                          FunctionType::Representation::Thin,
+                                          SILFunctionType::Representation::Thin,
                                           /*noreturn*/ false,
                                           /*throws*/ false);
 
@@ -747,7 +747,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   auto &selfTI = IGM.getTypeInfo(selfType);
  
   assert(resultType->getRepresentation()
-           == AnyFunctionType::Representation::Thick);
+           == SILFunctionType::Representation::Thick);
  
   llvm::AttributeSet attrs;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType, attrs);

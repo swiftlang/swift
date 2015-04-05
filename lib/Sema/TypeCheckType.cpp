@@ -1069,8 +1069,8 @@ namespace {
                                   = FunctionType::ExtInfo());
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
-                                FunctionType::ExtInfo extInfo
-                                  = FunctionType::ExtInfo(),
+                                SILFunctionType::ExtInfo extInfo
+                                  = SILFunctionType::ExtInfo(),
                                 ParameterConvention calleeConvention
                                   = DefaultParameterConvention);
     SILParameterInfo resolveSILParameter(TypeRepr *repr,
@@ -1311,25 +1311,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       thin = false;
     }
     
-    FunctionType::Representation rep;
-    if (thin)
-      rep = FunctionType::Representation::Thin;
-    else if (block)
-      rep = FunctionType::Representation::Block;
-    else
-      rep = FunctionType::Representation::Thick;
-
     bool isNoEscape = attrs.has(TAK_noescape);
-
-    // Resolve the function type directly with these attributes.
-    FunctionType::ExtInfo extInfo(attrs.hasCC()
-                                    ? attrs.getAbstractCC()
-                                    : AbstractCC::Freestanding,
-                                  rep,
-                                  attrs.has(TAK_noreturn),
-                                  /*autoclosure is a decl attr*/false,
-                                  isNoEscape,
-                                  fnRepr->throws());
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
     if (attrs.has(TAK_callee_owned)) {
@@ -1343,8 +1325,44 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     if (options & TR_SILType) {
+      SILFunctionType::Representation rep;
+      if (thin)
+        rep = SILFunctionType::Representation::Thin;
+      else if (block)
+        rep = SILFunctionType::Representation::Block;
+      else
+        rep = SILFunctionType::Representation::Thick;
+      
+      // Resolve the function type directly with these attributes.
+      SILFunctionType::ExtInfo extInfo(attrs.hasCC()
+                                         ? attrs.getAbstractCC()
+                                         : AbstractCC::Freestanding,
+                                       rep,
+                                       attrs.has(TAK_noreturn),
+                                       /*autoclosure is a decl attr*/false,
+                                       isNoEscape,
+                                       fnRepr->throws());
+          
       ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     } else {
+      FunctionType::Representation rep;
+      if (thin)
+        rep = FunctionType::Representation::Thin;
+      else if (block)
+        rep = FunctionType::Representation::Block;
+      else
+        rep = FunctionType::Representation::Thick;
+      
+      // Resolve the function type directly with these attributes.
+      FunctionType::ExtInfo extInfo(attrs.hasCC()
+                                      ? attrs.getAbstractCC()
+                                      : AbstractCC::Freestanding,
+                                    rep,
+                                    attrs.has(TAK_noreturn),
+                                    /*autoclosure is a decl attr*/false,
+                                    isNoEscape,
+                                    fnRepr->throws());
+
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
     }
 
@@ -1449,7 +1467,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
-                                          FunctionType::ExtInfo extInfo,
+                                          SILFunctionType::ExtInfo extInfo,
                                           ParameterConvention callee) {
   bool hasError = false;
 

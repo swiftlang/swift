@@ -927,14 +927,14 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     };
 
     // <impl-callee-convention>
-    if (fn->getRepresentation() == AnyFunctionType::Representation::Thin) {
+    if (fn->getRepresentation() == SILFunctionType::Representation::Thin) {
       Buffer << 't';
     } else {
       Buffer << mangleParameterConvention(fn->getCalleeConvention());
     }
 
     // <impl-function-attribute>*
-    if (fn->getRepresentation() == AnyFunctionType::Representation::Block) {
+    if (fn->getRepresentation() == SILFunctionType::Representation::Block) {
       Buffer << "Cb";
     } else {
       switch (fn->getAbstractCC()) {

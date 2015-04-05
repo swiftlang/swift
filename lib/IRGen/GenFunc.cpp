@@ -689,21 +689,21 @@ Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   switch (T->getRepresentation()) {
-  case AnyFunctionType::Representation::Block:
+  case SILFunctionType::Representation::Block:
     return new BlockTypeInfo(CanSILFunctionType(T),
                              IGM.ObjCBlockPtrTy,
                              IGM.getPointerSize(),
                              IGM.getHeapObjectSpareBits(),
                              IGM.getPointerAlignment());
       
-  case AnyFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::Thin:
     return ThinFuncTypeInfo::create(CanSILFunctionType(T),
                                     IGM.FunctionPtrTy,
                                     IGM.getPointerSize(),
                                     IGM.getPointerAlignment(),
                                     IGM.getFunctionPointerSpareBits());
 
-  case AnyFunctionType::Representation::Thick: {
+  case SILFunctionType::Representation::Thick: {
 #ifndef NDEBUG
     // For non-witness methods, 'thick' always indicates a retainable context
     // pointer.
@@ -1481,11 +1481,11 @@ static const FuncSignatureInfo &
 getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   auto &ti = IGM.getTypeInfoForLowered(type);
   switch (type->getRepresentation()) {
-  case AnyFunctionType::Representation::Block:
+  case SILFunctionType::Representation::Block:
     return ti.as<BlockTypeInfo>();
-  case AnyFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::Thin:
     return ti.as<ThinFuncTypeInfo>();
-  case AnyFunctionType::Representation::Thick:
+  case SILFunctionType::Representation::Thick:
     return ti.as<FuncTypeInfo>();
   }
   llvm_unreachable("bad function type representation");

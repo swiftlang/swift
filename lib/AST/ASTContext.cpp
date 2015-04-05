@@ -2666,7 +2666,7 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
   return CanSILBlockStorageType(storageTy);
 }
 
-static bool isValidSILExtInfo(AnyFunctionType::ExtInfo ext) {
+static bool isValidSILExtInfo(SILFunctionType::ExtInfo ext) {
   // SIL currently does not use the autoclosure or noescape attributes.
   // TODO: noescape could be of interest to SIL.
   return !ext.isNoEscape() && !ext.isAutoClosure();

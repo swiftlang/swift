@@ -3824,16 +3824,13 @@ namespace {
         // in the function value. Otherwise, it's provided from the type of the
         // self argument.
         switch (fnType->getRepresentation()) {
-        case AnyFunctionType::Representation::Thin:
+        case SILFunctionType::Representation::Thin:
           Sources.emplace_back(SourceKind::WitnessSelf,
                                InvalidSourceIndex);
           break;
-        case AnyFunctionType::Representation::Thick:
-          Sources.emplace_back(SourceKind::WitnessExtraData,
-                               InvalidSourceIndex);
-          break;
-        case AnyFunctionType::Representation::Block:
-          llvm_unreachable("witnesses cannot be blocks");
+        case SILFunctionType::Representation::Thick:
+        case SILFunctionType::Representation::Block:
+          llvm_unreachable("witnesses cannot have context");
         }
 
         // Testify to generic parameters in the Self type.
@@ -3906,7 +3903,7 @@ namespace {
     static CanSILFunctionType getNotionalFunctionType(NominalTypeDecl *D) {
       ASTContext &ctx = D->getASTContext();
       SILFunctionType::ExtInfo extInfo(AbstractCC::Method,
-                                       FunctionType::Representation::Thin,
+                                       SILFunctionType::Representation::Thin,
                                        /*noreturn*/ false,
                                        /*throws*/ false);
       SILResultInfo result(TupleType::getEmpty(ctx),

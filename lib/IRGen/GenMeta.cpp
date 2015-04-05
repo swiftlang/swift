@@ -1175,16 +1175,16 @@ namespace {
       // or Builtin.UnknownObject for block functions.
       auto &C = type->getASTContext();
       switch (type->getRepresentation()) {
-      case AnyFunctionType::Representation::Thin:
+      case SILFunctionType::Representation::Thin:
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitDirectMetadataRef(C.TheRawPointerType);
-      case AnyFunctionType::Representation::Thick:
+      case SILFunctionType::Representation::Thick:
         // All function types look like () -> ().
         // FIXME: It'd be nice not to have to call through the runtime here.
         return IGF.emitTypeMetadataRef(CanFunctionType::get(C.TheEmptyTupleType,
                                                           C.TheEmptyTupleType));
-      case AnyFunctionType::Representation::Block:
+      case SILFunctionType::Representation::Block:
         // All block types look like Builtin.UnknownObject.
         return emitDirectMetadataRef(C.TheUnknownObjectType);
       }

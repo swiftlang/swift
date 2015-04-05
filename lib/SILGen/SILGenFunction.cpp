@@ -459,8 +459,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                                   MetatypeRepresentation::ObjC);
 
     auto NSStringFromClassType = SILFunctionType::get(nullptr,
-                  AnyFunctionType::ExtInfo()
-                    .withRepresentation(AnyFunctionType::Representation::Thin)
+                  SILFunctionType::ExtInfo()
+                    .withRepresentation(SILFunctionType::Representation::Thin)
                     .withCallingConv(AbstractCC::C),
                   ParameterConvention::Direct_Unowned,
                   SILParameterInfo(anyObjectMetaTy,
@@ -499,8 +499,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       SILParameterInfo(IUOptNSStringTy, ParameterConvention::Direct_Unowned),
     };
     auto UIApplicationMainType = SILFunctionType::get(nullptr,
-                  AnyFunctionType::ExtInfo()
-                    .withRepresentation(AnyFunctionType::Representation::Thin)
+                  SILFunctionType::ExtInfo()
+                    .withRepresentation(SILFunctionType::Representation::Thin)
                     .withCallingConv(AbstractCC::C),
                   ParameterConvention::Direct_Unowned,
                   argTypes,
@@ -546,8 +546,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                        ParameterConvention::Direct_Unowned),
     };
     auto NSApplicationMainType = SILFunctionType::get(nullptr,
-                  AnyFunctionType::ExtInfo()
-                    .withRepresentation(AnyFunctionType::Representation::Thin)
+                  SILFunctionType::ExtInfo()
+                    .withRepresentation(SILFunctionType::Representation::Thin)
                     // Should be C calling convention, but NSApplicationMain
                     // has an overlay to fix the type of argv.
                     .withCallingConv(AbstractCC::Freestanding),

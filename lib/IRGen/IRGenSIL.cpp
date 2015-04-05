@@ -1726,7 +1726,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       
   case LoweredValue::Kind::Explosion: {    
     switch (origCalleeType->getRepresentation()) {
-    case AnyFunctionType::Representation::Block: {
+    case SILFunctionType::Representation::Block: {
       assert(!selfValue && "block function with self?");
 
       // Grab the block pointer and make it the first physical argument.
@@ -1741,8 +1741,8 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       break;
     }
         
-    case AnyFunctionType::Representation::Thin:
-    case AnyFunctionType::Representation::Thick: {
+    case SILFunctionType::Representation::Thin:
+    case SILFunctionType::Representation::Thick: {
       Explosion calleeValues = lv.getExplosion(IGF);
       calleeFn = calleeValues.claimNext();
 
@@ -1945,12 +1945,12 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     auto fnType = v.getType().castTo<SILFunctionType>();
     
     switch (fnType->getRepresentation()) {
-    case AnyFunctionType::Representation::Thin:
+    case SILFunctionType::Representation::Thin:
       break;
-    case AnyFunctionType::Representation::Thick:
+    case SILFunctionType::Representation::Thick:
       context = ex.claimNext();
       break;
-    case AnyFunctionType::Representation::Block:
+    case SILFunctionType::Representation::Block:
       llvm_unreachable("partial application of block not implemented");
     }
     

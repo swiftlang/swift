@@ -473,7 +473,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
                                                     SGM.M, SGM.SwiftModule,
                                                     declRef.getSubstitutions());
     auto closureType = adjustFunctionType(substFnType,
-                                          FunctionType::Representation::Thick);
+                                        SILFunctionType::Representation::Thick);
 
     SILValue spec = B.createPartialApply(loc, result.forward(*this),
                                 SILType::getPrimitiveObjectType(substFnType),
@@ -1094,10 +1094,25 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   
   // Retain the thinness of the original function type.
   auto origRep = original.getType().castTo<SILFunctionType>()->getRepresentation();
-  if (origRep != destTy->getRepresentation())
-    destTy = adjustFunctionType(destTy, origRep);
+  AnyFunctionType::Representation astRep;
+  switch (origRep) {
+  case SILFunctionType::Representation::Thin:
+    astRep = AnyFunctionType::Representation::Thin;
+    break;
+  case SILFunctionType::Representation::Thick:
+    astRep = AnyFunctionType::Representation::Thick;
+    break;
+  case SILFunctionType::Representation::Block:
+    astRep = AnyFunctionType::Representation::Block;
+    break;
+  }
+  if (astRep != destTy->getRepresentation()) {
+    destTy = adjustFunctionType(destTy, astRep);
+  }
 
   SILType resultType = SGF.getLoweredType(destTy);
+  auto resultFTy = resultType.castTo<SILFunctionType>();
+
   ManagedValue result;
   if (resultType == original.getType()) {
     // Don't make a conversion instruction if it's unnecessary.
@@ -1111,26 +1126,25 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // Now, the representation:
   
   if (destRepTy != destTy) {
-    auto resultFTy = resultType.castTo<SILFunctionType>();
     // The only currently possible representation changes are block -> thick and
     // thick -> block.
     switch (destRepTy->getRepresentation()) {
     case AnyFunctionType::Representation::Block:
       switch (resultFTy->getRepresentation()) {
-      case AnyFunctionType::Representation::Thin: {
+      case SILFunctionType::Representation::Thin: {
         // Make thick first.
         auto v = SGF.B.createThinToThickFunction(e, result.getValue(),
           SILType::getPrimitiveObjectType(
-           adjustFunctionType(resultFTy, FunctionType::Representation::Thick)));
+           adjustFunctionType(resultFTy, SILFunctionType::Representation::Thick)));
         result = ManagedValue(v, result.getCleanup());
         SWIFT_FALLTHROUGH;
       }
-      case AnyFunctionType::Representation::Thick:
+      case SILFunctionType::Representation::Thick:
         // Convert to a block.
         result = SGF.emitFuncToBlock(e, result,
                        SGF.getLoweredType(destRepTy).castTo<SILFunctionType>());
         break;
-      case AnyFunctionType::Representation::Block:
+      case SILFunctionType::Representation::Block:
         llvm_unreachable("should not try block-to-block repr change");
       }
       break;
@@ -1138,7 +1152,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
       // FIXME: We'll need to fix up no-throw-to-throw function conversions.
       assert(destRepTy->throws() ||
              (resultFTy->getRepresentation()
-               == FunctionType::Representation::Block)
+               == SILFunctionType::Representation::Block)
              && "only block-to-thick repr changes supported");
       result = SGF.emitBlockToFunc(e, result,
                        SGF.getLoweredType(destRepTy).castTo<SILFunctionType>());

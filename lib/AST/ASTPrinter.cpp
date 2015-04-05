@@ -2424,6 +2424,47 @@ public:
       Printer << "@noreturn ";
   }
 
+  void printFunctionExtInfo(SILFunctionType::ExtInfo info) {
+    if(Options.SkipAttributes)
+      return;
+    if (info.isAutoClosure())
+      Printer << "@autoclosure ";
+    else if (info.isNoEscape())    // autoclosure implies noescape.
+      Printer << "@noescape ";
+    
+    switch (info.getCC()) {
+    case AbstractCC::Freestanding: break;
+    case AbstractCC::Method:
+      Printer << "@cc(method) ";
+      break;
+    case AbstractCC::C:
+      Printer << "@cc(cdecl) ";
+      break;
+    case AbstractCC::ObjCMethod:
+      Printer << "@cc(objc_method) ";
+      break;
+    case AbstractCC::WitnessMethod:
+      Printer << "@cc(witness_method) ";
+      break;
+    }
+
+    if (Options.PrintFunctionRepresentationAttrs) {
+      switch (info.getRepresentation()) {
+      case SILFunctionType::Representation::Thick:
+        break;
+      case SILFunctionType::Representation::Thin:
+        Printer << "@thin ";
+        break;
+      case SILFunctionType::Representation::Block:
+        Printer << "@objc_block ";
+        break;
+      }
+    }
+
+    if (info.isNoReturn())
+      Printer << "@noreturn ";
+  }
+
   void visitFunctionType(FunctionType *T) {
     printFunctionExtInfo(T->getExtInfo());
     printWithParensIfNotSimple(T->getInput());

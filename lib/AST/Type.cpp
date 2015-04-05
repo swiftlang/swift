@@ -1480,7 +1480,7 @@ static bool isBridgeableObjectType(CanType type) {
       == AnyFunctionType::Representation::Block;
   } else if (auto fnType = dyn_cast<SILFunctionType>(type)) {
     return fnType->getRepresentation()
-      == AnyFunctionType::Representation::Block;
+      == SILFunctionType::Representation::Block;
   }
 
   // Class metatypes.

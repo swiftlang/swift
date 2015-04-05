@@ -181,10 +181,10 @@ namespace {
 #define FUNCTION_IMPL(TYPE)                             \
     RetTy visit##TYPE##Type(Can##TYPE##Type type) {     \
       switch (type->getRepresentation()) {              \
-      case AnyFunctionType::Representation::Thick:      \
-      case AnyFunctionType::Representation::Block:      \
+      case TYPE##Type::Representation::Thick:      \
+      case TYPE##Type::Representation::Block:      \
         return asImpl().handleReference(type);          \
-      case AnyFunctionType::Representation::Thin:       \
+      case TYPE##Type::Representation::Thin:       \
         return asImpl().handleTrivial(type);            \
       }                                                 \
       llvm_unreachable("bad function representation");  \

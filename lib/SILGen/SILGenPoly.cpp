@@ -1004,7 +1004,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                       : ParameterConvention::Direct_Unowned});
   
   auto extInfo = expectedType->getExtInfo()
-    .withRepresentation(FunctionType::Representation::Thin);
+    .withRepresentation(SILFunctionType::Representation::Thin);
   
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.

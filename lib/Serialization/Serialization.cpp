@@ -2785,8 +2785,8 @@ void Serializer::writeType(Type ty) {
           stableErrorResultConvention,
           stableCalleeConvention,
           getRawStableCC(callingConvention),
-          fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
-          fnTy->getRepresentation() == AnyFunctionType::Representation::Block,
+          fnTy->getRepresentation() == SILFunctionType::Representation::Thin,
+          fnTy->getRepresentation() == SILFunctionType::Representation::Block,
           fnTy->isNoReturn(), fnTy->isNoEscape(),
           sig ? sig->getGenericParams().size() : 0,
           paramTypes);

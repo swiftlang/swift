@@ -3636,7 +3636,7 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   auto partialApplyTy = SILFunctionType::get(fnTy->getGenericSignature(),
                      fnTy->getExtInfo()
                        .withCallingConv(AbstractCC::Freestanding)
-                       .withRepresentation(FunctionType::Representation::Thick),
+                       .withRepresentation(SILFunctionType::Representation::Thick),
                      ParameterConvention::Direct_Owned,
                      fnTy->getParameters()
                        .slice(0, fnTy->getParameters().size() - 1),
