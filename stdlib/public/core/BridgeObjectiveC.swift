@@ -317,12 +317,6 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     _rawValue = _nilRawPointer
   }
 
-  /// Returns `nil`
-  @availability(*, unavailable, message="use 'nil' literal instead")
-  public static func null() -> AutoreleasingUnsafeMutablePointer {
-    _preconditionFailure("unavailable function can not be called")
-  }
-
   /// Initialize to a null pointer.
   @transparent public
   init() {

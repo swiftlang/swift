@@ -30,11 +30,6 @@ public func count <T : _CollectionType>(x: T) -> T.Index.Distance {
   return x~>_count()
 }
 
-@availability(*, unavailable, renamed="count")
-public func countElements <T : _CollectionType>(x: T) -> T.Index.Distance {
-  return count(x)
-}
-
 /// This protocol is an implementation detail of `CollectionType`; do
 /// not use it directly.
 ///

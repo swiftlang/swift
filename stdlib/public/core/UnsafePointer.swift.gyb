@@ -99,12 +99,6 @@ public struct ${Self}<T>
     self = ${Self}()
   }
 
-  /// Return a `nil` instance.
-  @availability(*, unavailable, message="use 'nil' literal instead")
-  public static func null() -> ${Self} {
-    _preconditionFailure("unavailable function can not be called")
-  }
-
 %  if mutable:
   /// Allocate memory for `num` objects of type `T`.
   ///

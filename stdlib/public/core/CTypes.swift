@@ -118,12 +118,6 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
     self._rawValue = source._rawValue
   }
 
-  /// Returns `nil`
-  @availability(*, unavailable, message="use 'nil' literal instead")
-  public static func null() -> COpaquePointer {
-    _preconditionFailure("unavailable function can not be called")
-  }
-
   /// Determine whether the given pointer is null.
   @transparent
   var _isNull : Bool {
@@ -181,12 +175,6 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
   ///      `unsafeBitCast(value, CFunctionPointer<T>.self)`
   public init(_ value: COpaquePointer) {
     self.value = value
-  }
-
-  /// Returns `nil`
-  @availability(*, unavailable, message="use 'nil' literal instead")
-  public static func null() -> CFunctionPointer {
-    _preconditionFailure("unavailable function can not be called")
   }
 
   /// The hash value.

@@ -87,14 +87,6 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
   return Int8(Builtin.canBeClass(T.self))
 }
 
-@availability(*,unavailable,message="it has been renamed 'unsafeBitCast' and has acquired an explicit target type parameter")
-@transparent
-public func reinterpretCast<T, U>(var x: T) -> U {
-  _precondition(sizeof(T.self) == sizeof(U.self),
-    "can't reinterpretCast values of different sizes")
-  return UnsafeMutablePointer<U>(Builtin.addressof(&x)).memory
-}
-
 /// Returns the the bits of `x`, interpreted as having type `U`.
 ///
 /// .. Caution:: Breaks the guarantees of Swift's type system; use

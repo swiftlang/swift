@@ -17,12 +17,6 @@ typealias _HeapObject = SwiftShims.HeapObject
 func _swift_bufferAllocate(
   bufferType: AnyClass, size: Int, alignMask: Int) -> AnyObject
 
-@availability(*, unavailable, message="Please use ManagedBuffer<Value,Element> instead.")
-public class HeapBufferStorage<Value,Element> {}
-
-@availability(*, unavailable, message="Please use class ManagedBuffer<Value,Element> instead.")
-public struct HeapBuffer<Value,Element> {}
-
 /// A class containing an ivar "value" of type Value, and
 /// containing storage for an array of Element whose size is
 /// determined at create time.
@@ -235,6 +229,3 @@ func == <Value, Element> (
   return lhs._nativeObject == rhs._nativeObject
 }
 
-
-@availability(*, unavailable, message="Please use ManagedBuffer<T,Void> instead")
-public struct OnHeap<T> {}
