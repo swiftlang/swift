@@ -1009,6 +1009,8 @@ void Serializer::writeNormalConformance(
                                        ConcreteDeclRef witness) {
     data.push_back(addDeclRef(req));
     data.push_back(addDeclRef(witness.getDecl()));
+    assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
+           || req->getAttrs().isUnavailable(req->getASTContext()));
     // The substitution records are serialized later.
     data.push_back(witness.getSubstitutions().size());
     ++numValueWitnesses;

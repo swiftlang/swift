@@ -15,33 +15,33 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
 public let NSUTF8StringEncoding: UInt = 8
 
 // NSArray bridging entry points
-func _convertNSArrayToArray<T>(nsarr: NSArray?) -> [T] {
+public func _convertNSArrayToArray<T>(nsarr: NSArray?) -> [T] {
   return [T]()
 }
 
-func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
+public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
   return NSArray()
 }
 
 // NSDictionary bridging entry points
-internal func _convertDictionaryToNSDictionary<Key, Value>(
+public func _convertDictionaryToNSDictionary<Key, Value>(
     d: Dictionary<Key, Value>
 ) -> NSDictionary {
   return NSDictionary()
 }
 
-internal func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
+public func _convertNSDictionaryToDictionary<K: Hashable, V>(
        d: NSDictionary?
      ) -> Dictionary<K, V> {
   return Dictionary<K, V>()
 }
 
 // NSSet bridging entry points
-internal func _convertSetToNSSet<T : Hashable>(s: Set<T>) -> NSSet {
+public func _convertSetToNSSet<T : Hashable>(s: Set<T>) -> NSSet {
   return NSSet()
 }
 
-internal func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
+public func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 

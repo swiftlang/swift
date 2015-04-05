@@ -541,7 +541,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   while (valueCount--) {
     auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
     auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
-    assert(second || first->getAttrs().hasAttribute<OptionalAttr>());
+    assert(second || first->getAttrs().hasAttribute<OptionalAttr>() ||
+           first->getAttrs().isUnavailable(ctx));
 
     unsigned substitutionCount = *rawIDIter++;
 

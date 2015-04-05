@@ -1,9 +1,9 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
-// RUN: %target-swift-frontend -emit-module -emit-objc-header -o %t/Base.swiftmodule %S/Inputs/resolve-cross-language/Base.swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-module -emit-objc-header -o %t %S/Inputs/resolve-cross-language/Base.swift -disable-objc-attr-requires-foundation-module
 // RUN: cp %S/Inputs/resolve-cross-language/Base-module.map %t/module.map
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -I %t -F %S/Inputs/resolve-cross-language %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -parse -I %t -F %S/Inputs/resolve-cross-language %s -verify
 
 // REQUIRES: objc_interop
 

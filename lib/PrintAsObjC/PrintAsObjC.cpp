@@ -153,7 +153,7 @@ private:
        << "@interface " << CD->getName();
     if (Type superTy = CD->getSuperclass())
       os << " : " << superTy->getClassOrBoundGenericClass()->getName();
-    printProtocols(CD->getProtocols());
+    printProtocols(CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(CD->getMembers());
     os << "@end\n";
@@ -163,7 +163,7 @@ private:
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
     os << "@interface " << baseClass->getName()
        << " (SWIFT_EXTENSION(" << ED->getModuleContext()->Name << "))";
-    printProtocols(ED->getProtocols());
+    printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(ED->getMembers());
     os << "@end\n";
@@ -174,7 +174,7 @@ private:
     llvm::SmallString<32> scratch;
     os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
        << "@protocol " << PD->getName();
-    printProtocols(PD->getProtocols());
+    printProtocols(PD->getInheritedProtocols(nullptr));
     os << "\n";
     assert(!protocolMembersOptional && "protocols start required");
     printMembers(PD->getMembers());
@@ -1298,7 +1298,8 @@ public:
       superclass = superTy->getClassOrBoundGenericClass();
       allRequirementsSatisfied &= require(superclass);
     }
-    for (auto proto : CD->getProtocols())
+    for (auto proto : CD->getLocalProtocols(
+                        ConformanceLookupKind::OnlyExplicit))
       if (printer.shouldInclude(proto))
         allRequirementsSatisfied &= require(proto);
 
@@ -1324,7 +1325,7 @@ public:
 
     bool allRequirementsSatisfied = true;
 
-    for (auto proto : PD->getProtocols()) {
+    for (auto proto : PD->getInheritedProtocols(nullptr)) {
       assert(proto->isObjC());
       allRequirementsSatisfied &= require(proto);
     }
@@ -1343,7 +1344,7 @@ public:
 
     const ClassDecl *CD = ED->getExtendedType()->getClassOrBoundGenericClass();
     allRequirementsSatisfied &= require(CD);
-    for (auto proto : ED->getProtocols())
+    for (auto proto : ED->getLocalProtocols())
       if (printer.shouldInclude(proto))
         allRequirementsSatisfied &= require(proto);
 
@@ -1605,8 +1606,8 @@ public:
         return numLHSMembers < numRHSMembers ? Descending : Ascending;
 
       // Or the extension with fewer protocols.
-      auto lhsProtos = cast<ExtensionDecl>(*lhs)->getProtocols();
-      auto rhsProtos = cast<ExtensionDecl>(*rhs)->getProtocols();
+      auto lhsProtos = cast<ExtensionDecl>(*lhs)->getLocalProtocols();
+      auto rhsProtos = cast<ExtensionDecl>(*rhs)->getLocalProtocols();
       if (lhsProtos.size() != rhsProtos.size())
         return lhsProtos.size() < rhsProtos.size() ? Descending : Ascending;
 

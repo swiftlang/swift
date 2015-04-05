@@ -1764,9 +1764,10 @@ void ConformanceLookupTable::lookupConformances(
                      if (entry->isSuperseded())
                        return true;
 
+                     // If we are to filter out this result, do so now.
                      if (lookupKind == ConformanceLookupKind::OnlyExplicit &&
                          entry->getKind() != ConformanceEntryKind::Explicit)
-                       return true;
+                       return false;
 
                      // Record the protocol.
                      if (protocols)
