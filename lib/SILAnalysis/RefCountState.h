@@ -281,47 +281,16 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(SILInstruction *I) {
-    assert((isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) &&
-           "strong_release and release_value are only supported.");
-
-    bool NestingDetected = SuperTy::initWithMutatorInst(I);
-
-    // If we know that there is another decrement on the same pointer that has
-    // not been matched up to an increment, then the pointer must have a
-    // reference count of at least 2 before this decrement. This implies it is
-    // known safe.
-    KnownSafe = NestingDetected;
-
-    // Set our lattice state to be incremented.
-    LatState = LatticeState::Decremented;
-
-    return NestingDetected;
-  }
+  bool initWithMutatorInst(SILInstruction *I);
 
   /// Return true if we *might* remove this instruction.
   ///
   /// This is a conservative query given the information we know, so as we
   /// perform the dataflow it may change value.
-  bool mightRemoveMutators() {
-    if (LatState == LatticeState::None)
-      return false;
-
-    // We will not remove mutators if we have a might be decremented value that
-    // is not known safe.
-    return LatState != LatticeState::MightBeDecremented || isKnownSafe();
-  }
+  bool mightRemoveMutators();
 
   /// Uninitialize the current state.
-  void clear() {
-    // If we can not conservatively prove that the given RefCountState will not
-    // be removed, be conservative and clear the transition state, so we do not
-    // propagate KnownSafety forward.
-    if (mightRemoveMutators())
-      Transition = None;
-    LatState = LatticeState::None;
-    SuperTy::clear();
-  }
+  void clear();
 
   /// Can we gaurantee that the given reference counted value has been modified?
   bool isRefCountStateModified() const {
@@ -336,17 +305,7 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
 
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
-  bool handleDecrement(SILInstruction *PotentialDecrement) {
-    switch (LatState) {
-    case LatticeState::MightBeUsed:
-      LatState = LatticeState::MightBeDecremented;
-      return true;
-    case LatticeState::None:
-    case LatticeState::MightBeDecremented:
-    case LatticeState::Decremented:
-      return false;
-    }
-  }
+  bool handleDecrement(SILInstruction *PotentialDecrement);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
@@ -356,82 +315,19 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleUser(SILInstruction *PotentialUser) {
-    assert(valueCanBeUsedGivenLatticeState() &&
-           "Must be able to be used at this point of the lattice.");
-    // Advance the sequence...
-    switch (LatState) {
-    case LatticeState::Decremented:
-      LatState = LatticeState::MightBeUsed;
-      assert(InsertPts.empty() && "If we are decremented, we should have no "
-                                  "insertion points.");
-      InsertPts.insert(std::next(SILBasicBlock::iterator(PotentialUser)));
-      return true;
-    case LatticeState::MightBeUsed:
-    case LatticeState::MightBeDecremented:
-    case LatticeState::None:
-      return false;
-    }
-  }
+  bool handleUser(SILInstruction *PotentialUser);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
-  bool valueCanBeGuaranteedUsedGivenLatticeState() const {
-    switch (LatState) {
-    case LatticeState::None:
-    case LatticeState::MightBeDecremented:
-      return false;
-    case LatticeState::Decremented:
-    case LatticeState::MightBeUsed:
-      return true;
-    }
-  }
+  bool valueCanBeGuaranteedUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser) {
-    assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
-           "Must be able to be used at this point of the lattice.");
-    // Advance the sequence...
-    switch (LatState) {
-    // If were decremented, insert the insertion point.
-    case LatticeState::Decremented: {
-      assert(InsertPts.empty() && "If we are decremented, we should have no "
-                                  "insertion points.");
-      auto Iter = SILBasicBlock::iterator(PotentialGuaranteedUser);
-      InsertPts.insert(std::next(Iter));
-      LatState = LatticeState::MightBeDecremented;
-      return true;
-    }
-    case LatticeState::MightBeUsed:
-      // If we have a might be used, we already created an insertion point
-      // earlier. Just move to MightBeDecremented.
-      LatState = LatticeState::MightBeDecremented;
-      return true;
-    case LatticeState::MightBeDecremented:
-    case LatticeState::None:
-      return false;
-    }
-  }
+  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
-  bool handleRefCountInstMatch(SILInstruction *RefCountInst) {
-    // Otherwise modify the state appropriately in preparation for removing the
-    // increment, decrement pair.
-    switch (LatState) {
-    case LatticeState::None:
-      return false;
-    case LatticeState::Decremented:
-    case LatticeState::MightBeUsed:
-      // Unset InsertPt so we remove retain release pairs instead of
-      // performing code motion.
-      InsertPts.clear();
-      SWIFT_FALLTHROUGH;
-    case LatticeState::MightBeDecremented:
-      return true;
-    }
-  }
+  bool handleRefCountInstMatch(SILInstruction *RefCountInst);
 
   /// Attempt to merge \p Other into this ref count state. Return true if we
   /// succeed and false otherwise.
@@ -462,48 +358,17 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(SILInstruction *I) {
-    assert((isa<StrongRetainInst>(I) || isa<RetainValueInst>(I)) &&
-           "strong_retain and retain_value are only supported.");
+  bool initWithMutatorInst(SILInstruction *I);
 
-    bool NestingDetected = SuperTy::initWithMutatorInst(I);
-
-    // Set our lattice state to be incremented.
-    LatState = LatticeState::Incremented;
-
-    return NestingDetected;
-  }
-
-  void initWithArg(SILArgument *Arg) {
-    LatState = LatticeState::Incremented;
-    Transition = RCStateTransition(Arg);
-    assert((*Transition).getKind() == RCStateTransitionKind::StrongEntrance &&
-           "Expected a strong entrance here");
-    RCRoot = Arg;
-    KnownSafe = false;
-    InsertPts.clear();
-  }
+  /// Initialize the state given the consumed argument Arg.
+  void initWithArg(SILArgument *Arg);
 
   /// Initiailize this RefCountState with an instruction which introduces a new
   /// ref count at +1.
-  void initWithEntranceInst(SILInstruction *I) {
-    assert(I->getNumTypes() == 1 &&
-           "Expected an instruction with one return value");
-    LatState = LatticeState::Incremented;
-    Transition = RCStateTransition(I);
-    assert((*Transition).getKind() == RCStateTransitionKind::StrongEntrance &&
-           "Expected a strong entrance here");
-    RCRoot = I;
-    KnownSafe = false;
-    InsertPts.clear();
-  }
+  void initWithEntranceInst(SILInstruction *I);
 
   /// Uninitialize the current state.
-  void clear() {
-    Transition = None;
-    LatState = LatticeState::None;
-    SuperTy::clear();
-  }
+  void clear();
 
   /// Can we gaurantee that the given reference counted value has been modified?
   bool isRefCountStateModified() const {
@@ -518,18 +383,7 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
-  bool handleDecrement(SILInstruction *PotentialDecrement) {
-    switch (LatState) {
-    case LatticeState::Incremented:
-      LatState = LatticeState::MightBeDecremented;
-      InsertPts.insert(PotentialDecrement);
-      return true;
-    case LatticeState::None:
-    case LatticeState::MightBeDecremented:
-    case LatticeState::MightBeUsed:
-      return false;
-    }
-  }
+  bool handleDecrement(SILInstruction *PotentialDecrement);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
@@ -539,79 +393,19 @@ struct TopDownRefCountState : RefCountState<TopDownRefCountState> {
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleUser(SILInstruction *PotentialUser) {
-    assert(valueCanBeUsedGivenLatticeState() &&
-           "Must be able to be used at this point of the lattice.");
-
-    // Otherwise advance the sequence...
-    switch (LatState) {
-    case LatticeState::MightBeDecremented:
-      LatState = LatticeState::MightBeUsed;
-      return true;
-    case LatticeState::Incremented:
-    case LatticeState::None:
-    case LatticeState::MightBeUsed:
-      return false;
-    }
-  }
+  bool handleUser(SILInstruction *PotentialUser);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
-  bool valueCanBeGuaranteedUsedGivenLatticeState() const {
-    switch (LatState) {
-    case LatticeState::None:
-    case LatticeState::MightBeUsed:
-      return false;
-    case LatticeState::Incremented:
-    case LatticeState::MightBeDecremented:
-      return true;
-    }
-  }
+  bool valueCanBeGuaranteedUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
-  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser) {
-    assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
-           "Must be able to be used at this point of the lattice.");
-    // Advance the sequence...
-    switch (LatState) {
-    // If were decremented, insert the insertion point.
-    case LatticeState::Incremented: {
-      assert(InsertPts.empty() && "If we are decremented, we should have no "
-                                  "insertion points.");
-      LatState = LatticeState::MightBeUsed;
-      InsertPts.insert(PotentialGuaranteedUser);
-      return true;
-    }
-    case LatticeState::MightBeDecremented:
-      // If we have a might be used, we already created an insertion point
-      // earlier. Just move to MightBeDecremented.
-      LatState = LatticeState::MightBeUsed;
-      return true;
-    case LatticeState::MightBeUsed:
-    case LatticeState::None:
-      return false;
-    }
-  }
+  bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
-  bool handleRefCountInstMatch(SILInstruction *RefCountInst) {
-    // Otherwise modify the state appropriately in preparation for removing the
-    // increment, decrement pair.
-    switch (LatState) {
-    case LatticeState::None:
-      return false;
-    case LatticeState::Incremented:
-    case LatticeState::MightBeDecremented:
-      // Unset InsertPt so we remove retain release pairs instead of performing
-      // code motion.
-      InsertPts.clear();
-      SWIFT_FALLTHROUGH;
-    case LatticeState::MightBeUsed:
-      return true;
-    }
-  }
+  bool handleRefCountInstMatch(SILInstruction *RefCountInst);
 
   /// Attempt to merge \p Other into this ref count state. Return true if we
   /// succeed and false otherwise.
