@@ -94,3 +94,37 @@ printTypeName(IF3.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
 printTypeName(IF4.self) // CHECK-NEXT: (() -> ()) -> ()
 
 printTypeName(IF5.self) // CHECK-NEXT: (inout Swift.Int, protocol<>) -> ()
+
+func curry1() {
+
+}
+
+func curry1Throws() throws {
+
+}
+
+func curry2() -> () -> () {
+	return curry1
+}
+
+func curry2Throws() throws -> () -> () {
+	return curry1
+}
+
+func curry3() -> () throws -> () {
+	return curry1Throws
+}
+
+func curry3Throws() throws -> () throws -> () {
+	return curry1Throws
+}
+
+printTypeName(curry1.dynamicType) // CHECK-NEXT: () -> ()
+
+printTypeName(curry2.dynamicType) // CHECK-NEXT: () -> () -> ()
+
+printTypeName(curry2Throws.dynamicType) // CHECK-NEXT: () throws -> () -> ()
+
+printTypeName(curry3.dynamicType) // CHECK-NEXT: () -> () throws -> ()
+
+printTypeName(curry3Throws.dynamicType) // CHECK-NEXT: () throws -> () throws -> ()
