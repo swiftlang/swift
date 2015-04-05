@@ -68,10 +68,7 @@ public protocol RaceTestWithPerTrialDataType {
   ///
   /// This type should be a class.  (The harness will not pass struct instances
   /// between threads correctly.)
-  typealias RaceData //: AnyObject
-  // FIXME: can not add a class constraint because of:
-  // <rdar://problem/18305834> "AnyObject" superclass on an associated type
-  // causes a runtime crash
+  typealias RaceData: AnyObject
 
   /// Type of thread-local data.
   ///
