@@ -334,13 +334,11 @@ void swift::clearBlockBody(SILBasicBlock *BB) {
     // Grab the last instruction in the BB.
     auto *Inst = &BB->getInstList().back();
 
-    // Replace any non-dead results with SILUndef values.
+    // Replace any non-dead results with SILUndef values and erase the
+    // instruction.
     Inst->replaceAllUsesWithUndef();
-
-    // Pop the instruction off of the back of the basic block.
-    BB->getInstList().pop_back();
+    Inst->eraseFromParent();
   }
-
 }
 
 // Handle the mechanical aspects of removing an unreachable block.

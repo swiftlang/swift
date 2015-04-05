@@ -1688,9 +1688,8 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
     ToRemove.push_back(&*Inst);
 
   for (auto *Inst : ToRemove) {
-    // Replace any non-dead results with SILUndef values
+    // Replace any still-remaining uses with undef and erase.
     Inst->replaceAllUsesWithUndef();
-    // and remove the instruction itself
     eraseInstFromFunction(*Inst);
   }
 
@@ -2158,9 +2157,8 @@ visitUnreachableInst(UnreachableInst *UI) {
     ToRemove.push_back(&*Inst);
 
   for (auto *Inst : ToRemove) {
-    // Replace any non-dead results with SILUndef values
+    // Replace any still-remaining uses with undef values and erase.
     Inst->replaceAllUsesWithUndef();
-    // and remove the instruction itself
     eraseInstFromFunction(*Inst);
   }
 

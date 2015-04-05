@@ -456,8 +456,6 @@ SILCloner<ImplClass>::cleanUp(SILFunction *F) {
       for (auto *Inst : ToRemove) {
         // Replace any non-dead results with SILUndef values
         Inst->replaceAllUsesWithUndef();
-        // and remove the instruction itself
-        assert(Inst->use_empty() && "Cannot erase instruction that is used!");
         Inst->eraseFromParent();
       }
     }
