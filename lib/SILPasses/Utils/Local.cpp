@@ -334,8 +334,7 @@ void swift::clearBlockBody(SILBasicBlock *BB) {
     // Grab the last instruction in the BB.
     auto *Inst = &BB->getInstList().back();
 
-    // Replace any non-dead results with SILUndef values and erase the
-    // instruction.
+    // Replace any still-remaining uses with undef values and erase.
     Inst->replaceAllUsesWithUndef();
     Inst->eraseFromParent();
   }
