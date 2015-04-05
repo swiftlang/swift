@@ -95,8 +95,6 @@ struct RefCountState {
 
   /// Uninitialize the current state.
   void clear() {
-    RCRoot = SILValue();
-    Transition = None;
     KnownSafe = false;
     Partial = false;
     InsertPts.clear();
@@ -301,8 +299,26 @@ struct BottomUpRefCountState : RefCountState<BottomUpRefCountState> {
     return NestingDetected;
   }
 
+  /// Return true if we *might* remove this instruction.
+  ///
+  /// This is a conservative query given the information we know, so as we
+  /// perform the dataflow it may change value.
+  bool mightRemoveMutators() {
+    if (LatState == LatticeState::None)
+      return false;
+
+    // We will not remove mutators if we have a might be decremented value that
+    // is not known safe.
+    return LatState != LatticeState::MightBeDecremented || isKnownSafe();
+  }
+
   /// Uninitialize the current state.
   void clear() {
+    // If we can not conservatively prove that the given RefCountState will not
+    // be removed, be conservative and clear the transition state, so we do not
+    // propagate KnownSafety forward.
+    if (mightRemoveMutators())
+      Transition = None;
     LatState = LatticeState::None;
     SuperTy::clear();
   }

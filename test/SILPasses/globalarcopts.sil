@@ -1724,3 +1724,49 @@ bb0:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @retains_that_are_not_removed_preserves_known_safety : $@thin (@owned Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK: apply
+// CHECK: apply
+// CHECK-NOT: strong_release
+// CHECK: strong_retain
+// CHECK: apply
+// CHECK: apply
+// CHECK: strong_release
+sil @retains_that_are_not_removed_preserves_known_safety : $@thin (@owned Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %2(%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %2(%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  apply %2(%1) : $@thin (Builtin.NativeObject) -> ()
+  apply %2(%1) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $() 
+}
+
+// CHECK-LABEL: sil @retains_that_are_removed_do_not_preserve_known_safety : $@thin (@owned Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK: apply
+// CHECK: apply
+// CHECK: strong_release
+// CHECK-NOT: strong_retain
+// CHECK: apply
+// CHECK-NOT: strong_release
+sil @retains_that_are_removed_do_not_preserve_known_safety : $@thin (@owned Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %2(%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %2(%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  apply %2(%1) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $() 
+}
