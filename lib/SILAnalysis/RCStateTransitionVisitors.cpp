@@ -224,6 +224,26 @@ TopDownDataflowRCStateVisitor::visitStrongEntranceApply(ApplyInst *AI) {
   return DataflowResult(AI);
 }
 
+
+TopDownDataflowRCStateVisitor::DataflowResult
+TopDownDataflowRCStateVisitor::visitStrongEntranceAllocRef(AllocRefInst *ARI) {
+  // Alloc refs always introduce new references at +1.
+  TopDownRefCountState &State = BBState.getTopDownRefCountState(ARI);
+  State.initWithEntranceInst(ARI);
+
+  return DataflowResult(ARI);
+}
+
+TopDownDataflowRCStateVisitor::DataflowResult
+TopDownDataflowRCStateVisitor::
+visitStrongEntranceAllocRefDynamic(AllocRefDynamicInst *ARI) {
+  // Alloc ref dynamic always introduce references at +1.
+  TopDownRefCountState &State = BBState.getTopDownRefCountState(ARI);
+  State.initWithEntranceInst(ARI);
+
+  return DataflowResult(ARI);
+}
+
 TopDownDataflowRCStateVisitor::DataflowResult
 TopDownDataflowRCStateVisitor::visitStrongEntrance(ValueBase *V) {
   if (auto *Arg = dyn_cast<SILArgument>(V))
@@ -231,6 +251,12 @@ TopDownDataflowRCStateVisitor::visitStrongEntrance(ValueBase *V) {
 
   if (auto *AI = dyn_cast<ApplyInst>(V))
     return visitStrongEntranceApply(AI);
+
+  if (auto *ARI = dyn_cast<AllocRefInst>(V))
+    return visitStrongEntranceAllocRef(ARI);
+
+  if (auto *ARI = dyn_cast<AllocRefDynamicInst>(V))
+    return visitStrongEntranceAllocRefDynamic(ARI);
 
   return DataflowResult();
 }

@@ -77,6 +77,13 @@ RCStateTransitionKind swift::getRCStateTransitionKind(ValueBase *V) {
 
     return RCStateTransitionKind::Unknown;
   }
+
+  case ValueKind::AllocRefInst:
+  case ValueKind::AllocRefDynamicInst:
+    // AllocRef* are always allocating new classes so they are introducing new
+    // values at +1.
+    return RCStateTransitionKind::StrongEntrance;
+
   default:
     return RCStateTransitionKind::Unknown;
   }

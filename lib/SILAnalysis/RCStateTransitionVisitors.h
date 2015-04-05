@@ -164,6 +164,8 @@ public:
 private:
   DataflowResult visitStrongEntranceApply(ApplyInst *AI);
   DataflowResult visitStrongEntranceArgument(SILArgument *Arg);
+  DataflowResult visitStrongEntranceAllocRef(AllocRefInst *ARI);
+  DataflowResult visitStrongEntranceAllocRefDynamic(AllocRefDynamicInst *ARI);
 };
 
 } // end swift namespace
