@@ -856,11 +856,8 @@ void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
 // new applies from the inlined function.
 static void removeApply(FullApplySite Apply, CallGraph &CG,
                         llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
-  if (auto *Edge = CG.getCallGraphEdge(Apply))
-    CG.removeEdge(Edge);
-
-  for (auto NewApply : NewApplies)
-    CG.addEdgesForApply(NewApply);
+  CallGraphEditor Editor(CG);
+  Editor.replaceApplyWithNew(Apply, NewApplies);
 
   Apply.getInstruction()->eraseFromParent();
 }

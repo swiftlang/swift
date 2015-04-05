@@ -344,6 +344,16 @@ private:
   void computeBottomUpFunctionOrder();
 };
 
+class CallGraphEditor {
+  CallGraph &CG;
+public:
+  CallGraphEditor(CallGraph &CG) : CG(CG) {}
+
+  void replaceApplyWithNew(FullApplySite Old, FullApplySite New);
+  void replaceApplyWithNew(FullApplySite Old,
+                           llvm::SmallVectorImpl<FullApplySite> &NewApplies);
+};
+
 /// The Call Graph Analysis provides information about the call graph.
 class CallGraphAnalysis : public SILAnalysis {
   SILModule *M;

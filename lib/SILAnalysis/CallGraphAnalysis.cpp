@@ -523,6 +523,23 @@ void CallGraph::verify() const {
 #endif
 }
 
+void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
+                                          FullApplySite New) {
+  if (auto *Edge = CG.getCallGraphEdge(Old))
+    CG.removeEdge(Edge);
+
+  CG.addEdgesForApply(New);
+}
+
+void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
+                             llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
+  if (auto *Edge = CG.getCallGraphEdge(Old))
+    CG.removeEdge(Edge);
+
+  for (auto NewApply : NewApplies)
+    CG.addEdgesForApply(NewApply);
+}
+
 void CallGraphAnalysis::verify() const {
 #ifndef NDEBUG
   // If we don't have a callgraph, return.
