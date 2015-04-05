@@ -171,6 +171,32 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
   }
 }
 
+// Devirtualization of functions with covariant return types produces
+// a result that is not an apply, but takes an apply as an
+// argument. Attempt to dig the apply out from this result.
+ApplyInst *swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
+  if (auto *Apply = dyn_cast<ApplyInst>(I))
+    return Apply;
+
+  if (!I->getNumOperands())
+    return nullptr;
+
+  return dyn_cast<ApplyInst>(I->getOperand(0));
+}
+
+// Replace a dead apply with a new instruction that computes the same
+// value, and delete the old apply.
+void swift::replaceDeadApply(FullApplySite Old, SILInstruction *New) {
+  auto *OldApply = Old.getInstruction();
+  OldApply->replaceAllUsesWith(New);
+
+  auto *CalleeInst = dyn_cast<SILInstruction>(Old.getCallee());
+
+  OldApply->eraseFromParent();
+  if (CalleeInst)
+    recursivelyDeleteTriviallyDeadInstructions(CalleeInst);
+}
+
 void swift::replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF) {
   SILLocation Loc = AI.getLoc();
   ArrayRef<Substitution> Subst;

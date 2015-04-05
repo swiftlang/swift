@@ -65,6 +65,13 @@ bool isInstructionTriviallyDead(SILInstruction *I);
 /// dead when this instruction is removed.
 void eraseUsesOfInstruction(SILInstruction *Inst);
 
+ApplyInst *findApplyFromDevirtualizedResult(SILInstruction *I);
+
+/// Replace an apply with an instruction that produces the same value,
+/// then delete the apply and the instructions that produce its callee
+/// if possible.
+void replaceDeadApply(FullApplySite Old, SILInstruction *New);
+
 // Rewrite a call, which may previously have been a dynamic dispatch, to a
 // known function reference.
 void replaceWithSpecializedFunction(ApplySite site, SILFunction *NewF);

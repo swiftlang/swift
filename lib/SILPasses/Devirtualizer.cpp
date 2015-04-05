@@ -53,7 +53,7 @@ public:
   void run() override {
 
     /// A list of devirtualized calls.
-    llvm::SmallVector<ApplyInst *, 16> DevirtualizedCalls;
+    llvm::SmallVector<SILInstruction *, 16> DevirtualizedCalls;
 
     bool Changed = false;
 
@@ -71,8 +71,10 @@ public:
           if (!AI)
             continue;
 
-          if (ApplyInst *NewAI = tryDevirtualizeApply(AI)) {
-            DevirtualizedCalls.push_back(NewAI);
+          if (auto *NewInst = tryDevirtualizeApply(AI)) {
+            replaceDeadApply(AI, NewInst);
+
+            DevirtualizedCalls.push_back(NewInst);
             Changed |= true;
           }
         }
@@ -206,9 +208,9 @@ static ApplyInst* insertMonomorphicInlineCaches(ApplyInst *AI,
   NumInlineCaches++;
 
   // Devirtualize the apply instruction on the identical path.
-  auto *NewAI = devirtualizeClassMethod(IdenAI, DownCastedClassInstance);
-  assert(NewAI && "Expected to be able to devirtualize apply!");
-  (void) NewAI;
+  auto *NewInst = devirtualizeClassMethod(IdenAI, DownCastedClassInstance);
+  assert(NewInst && "Expected to be able to devirtualize apply!");
+  replaceDeadApply(IdenAI, NewInst);
 
   // Sink class_method instructions down to their single user.
   if (CMI->hasOneUse())
@@ -347,8 +349,12 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     // If there is only one possible alternative for this method,
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
-    if (isDefaultCaseKnown(CHA, AI, CD, Subs))
-      return bool(tryDevirtualizeClassMethod(AI, SubTypeValue));
+    if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
+      auto *NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue);
+      if (NewInst)
+        replaceDeadApply(AI, NewInst);
+      return NewInst;
+    }
 
     DEBUG(llvm::dbgs() << "Inserting monomorphic inline caches for class " <<
           CD->getName() << "\n");
@@ -456,9 +462,9 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // implementation which is not covered by checked_cast_br checks yet.
   // So, it is safe to replace a class_method invocation by
   // a direct call of this remaining implementation.
-  ApplyInst *NewAI = tryDevirtualizeClassMethod(AI, SubTypeValue);
-  assert(NewAI && "Expected to be able to devirtualize apply!");
-  (void) NewAI;
+  auto *NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue);
+  assert(NewInst && "Expected to be able to devirtualize apply!");
+  replaceDeadApply(AI, NewInst);
 
   return true;
 }

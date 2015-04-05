@@ -234,7 +234,7 @@ static SILValue conditionallyCastAddr(SILBuilderWithScope<16> &B,
 /// \p ClassOrMetatype is a class value or metatype value that is the
 ///    self argument of the apply we will devirtualize.
 /// return the new ApplyInst if created one or null.
-ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
+SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
                                           SILValue ClassOrMetatype) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
 
@@ -288,9 +288,6 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
                   Subs, NewArgs);
 
   if (ReturnType == AI->getType()) {
-    AI->replaceAllUsesWith(NewAI);
-    AI->eraseFromParent();
-
     DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
     NumClassDevirt++;
     return NewAI;
@@ -317,7 +314,7 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
          "Only addresses and refs can have their types changed due to "
          "covariant return types or contravariant argument types.");
 
-  SILValue CastedAI = NewAI;
+  SILInstruction *CastedAI = NewAI;
   if (UnwrapOptionalResult) {
     // The devirtualized method returns an optional result.
     // We need to extract the actual result from the optional.
@@ -328,19 +325,13 @@ ApplyInst *swift::devirtualizeClassMethod(ApplyInst *AI,
   } else {
     CastedAI = B.createUncheckedRefCast(AI->getLoc(), NewAI, AI->getType());
   }
-  SILValue(AI).replaceAllUsesWith(CastedAI);
-
-
-  AI->eraseFromParent();
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   NumClassDevirt++;
-  return NewAI;
+  return CastedAI;
 }
 
-/// This is a simplified version of devirtualizeClassMethod, which can
-/// be called without the previously prepared DevirtClassMethodInfo.
-ApplyInst *swift::tryDevirtualizeClassMethod(ApplyInst *AI,
+SILInstruction *swift::tryDevirtualizeClassMethod(ApplyInst *AI,
                                              SILValue ClassInstance) {
   if (!canDevirtualizeClassMethod(AI, ClassInstance.getType()))
     return nullptr;
@@ -408,14 +399,6 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI, SILFunction *F,
   auto *SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
                                   ResultSILType, NewSubstList, Arguments);
 
-  auto *WMI = cast<WitnessMethodInst>(AI->getCallee());
-
-  AI->replaceAllUsesWith(SAI);
-  AI->eraseFromParent();
-
-  if (WMI->use_empty())
-    WMI->eraseFromParent();
-
   NumWitnessDevirt++;
   return SAI;
 }
@@ -480,8 +463,8 @@ static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
 }
 
 /// Attempt to devirtualize the given apply if possible, and return a
-/// new apply in that case, or nullptr otherwise.
-ApplyInst *swift::tryDevirtualizeApply(ApplyInst *AI) {
+/// new instruction in that case, or nullptr otherwise.
+SILInstruction *swift::tryDevirtualizeApply(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI);
 
   // Devirtualize apply instructions that call witness_method instructions:

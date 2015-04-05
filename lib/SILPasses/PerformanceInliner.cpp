@@ -776,10 +776,16 @@ void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
       if (ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
         // Devirtualize in an attempt expose more opportunities for
         // inlining.
-        if (auto *DirectAI = tryDevirtualizeApply(AI)) {
+        if (auto *NewInst = tryDevirtualizeApply(AI)) {
+          replaceDeadApply(AI, NewInst);
+
           Devirtualized = true;
-          AI = DirectAI;
-          I = SILBasicBlock::iterator(AI);
+          I = SILBasicBlock::iterator(NewInst);
+          auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
+          if (!NewAI)
+            continue;
+
+          AI = cast<ApplyInst>(NewAI);
         }
 
         DEBUG(llvm::dbgs() << "    Check:" << *AI);

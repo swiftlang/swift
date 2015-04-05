@@ -31,11 +31,12 @@
 
 namespace swift {
 
-ApplyInst *tryDevirtualizeApply(ApplyInst *AI);
+SILInstruction *tryDevirtualizeApply(ApplyInst *AI);
 bool isClassWithUnboundGenericParameters(SILType C, SILModule &M);
 bool canDevirtualizeClassMethod(ApplyInst *AI, SILType ClassInstanceType);
-ApplyInst *devirtualizeClassMethod(ApplyInst *AI, SILValue ClassInstance);
-ApplyInst *tryDevirtualizeClassMethod(ApplyInst *AI, SILValue ClassInstance);
+SILInstruction *devirtualizeClassMethod(ApplyInst *AI, SILValue ClassInstance);
+SILInstruction *tryDevirtualizeClassMethod(ApplyInst *AI,
+                                           SILValue ClassInstance);
 
 }
 
