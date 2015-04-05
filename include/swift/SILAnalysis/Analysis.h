@@ -103,7 +103,7 @@ namespace swift {
   template<typename AnalysisTy>
   class FunctionAnalysisBase : public SILAnalysis {
   protected:
-    typedef llvm::DenseMap<SILFunction *, AnalysisTy*> StorageTy;
+    typedef llvm::DenseMap<SILFunction *, AnalysisTy *> StorageTy;
 
     /// Maps functions to their analysis provider.
     StorageTy Storage;
@@ -117,7 +117,7 @@ namespace swift {
 
   public:
     /// Returns an analysis provider for a specific function \p F.
-    AnalysisTy* get(SILFunction *F) {
+    AnalysisTy *get(SILFunction *F) {
       auto &it = Storage.FindAndConstruct(F);
       if (!it.second)
         it.second = newFunctionAnalysis(F);
@@ -133,7 +133,7 @@ namespace swift {
       Storage.clear();
     }
 
-    virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
+    virtual void invalidate(SILFunction *F, SILAnalysis::PreserveKind K) {
       if (!shouldInvalidate(K)) return;
 
       auto &it = Storage.FindAndConstruct(F);
