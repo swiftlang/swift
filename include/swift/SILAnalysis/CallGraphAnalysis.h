@@ -262,10 +262,15 @@ class CallGraph {
   /// An allocator used by the callgraph.
   llvm::BumpPtrAllocator Allocator;
 
+  /// Ordinal incremented for each node we add.
+  unsigned NodeOrdinal;
+
   /// Ordinal incremented for each edge we add.
   unsigned EdgeOrdinal;
 
 public:
+  friend class CallGraphEditor;
+
   CallGraph(SILModule *M, bool completeModule);
   ~CallGraph();
 
@@ -335,7 +340,7 @@ public:
   void verify() const;
 
 private:
-  void addCallGraphNode(SILFunction *F, unsigned Ordinal);
+  void addCallGraphNode(SILFunction *F);
   void addEdges(SILFunction *F);
   bool tryGetCalleeSet(SILValue Callee, CallGraphEdge::CalleeSetType &CalleeSet,
                        bool &Complete);
@@ -352,6 +357,7 @@ public:
   void replaceApplyWithNew(FullApplySite Old, FullApplySite New);
   void replaceApplyWithNew(FullApplySite Old,
                            llvm::SmallVectorImpl<FullApplySite> &NewApplies);
+  void addCallGraphNode(SILFunction *F) { CG.addCallGraphNode(F); }
 };
 
 /// The Call Graph Analysis provides information about the call graph.

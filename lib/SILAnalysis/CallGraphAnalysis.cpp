@@ -34,14 +34,12 @@ STATISTIC(NumCallGraphsBuilt, "# of times the call graph is built");
 llvm::cl::opt<bool> DumpCallGraph("sil-dump-call-graph",
                                   llvm::cl::init(false), llvm::cl::Hidden);
 
-CallGraph::CallGraph(SILModule *Mod, bool completeModule) : M(*Mod) {
+CallGraph::CallGraph(SILModule *Mod, bool completeModule)
+  : M(*Mod), NodeOrdinal(0), EdgeOrdinal(0) {
   ++NumCallGraphsBuilt;
 
-  unsigned NodeOrdinal = 0;
   for (auto &F : M)
-    addCallGraphNode(&F, NodeOrdinal++);
-
-  EdgeOrdinal = 0;
+    addCallGraphNode(&F);
 
   for (auto &F : M)
     if (F.isDefinition())
@@ -68,11 +66,12 @@ CallGraph::~CallGraph() {
   }
 }
 
-void CallGraph::addCallGraphNode(SILFunction *F, unsigned NodeOrdinal) {
+void CallGraph::addCallGraphNode(SILFunction *F) {
   // TODO: Compute this from the call graph itself after stripping
   //       unreachable nodes from graph.
   ++NumCallGraphNodes;
-  auto *Node = new (Allocator) CallGraphNode(F, NodeOrdinal);
+
+  auto *Node = new (Allocator) CallGraphNode(F, ++NodeOrdinal);
 
   assert(!FunctionToNodeMap.count(F) &&
          "Added function already has a call graph node!");

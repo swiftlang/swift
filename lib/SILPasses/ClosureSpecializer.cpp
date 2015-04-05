@@ -197,7 +197,7 @@ public:
 
   ApplyInst *getApplyInst() const { return AI; }
 
-  void specializeClosure() const;
+  void specializeClosure(CallGraph &CG) const;
 
   void createName(llvm::SmallString<64> &NewName) const;
 
@@ -244,7 +244,8 @@ public:
 
 /// Update the callsite to pass in the correct arguments.
 static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
-                             SILFunction *NewF) {
+                             SILFunction *NewF,
+                             CallGraph &CG) {
   ApplyInst *AI = CSDesc.getApplyInst();
   SILInstruction *Closure = CSDesc.getClosure();
   SILBuilderWithScope<2> Builder(Closure);
@@ -290,6 +291,10 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext())
     Builder.createReleaseValue(Closure->getLoc(), Closure);
 
+  CallGraphEditor Editor(CG);
+  Editor.addCallGraphNode(NewF);
+  Editor.replaceApplyWithNew(AI, NewAI);
+
   // Replace all uses of the old apply with the new apply.
   AI->replaceAllUsesWith(NewAI);
   // Erase the old apply.
@@ -315,7 +320,7 @@ void CallSiteDescriptor::createName(llvm::SmallString<64> &NewName) const {
   FSSM.mangle();
 }
 
-void CallSiteDescriptor::specializeClosure() const {
+void CallSiteDescriptor::specializeClosure(CallGraph &CG) const {
   llvm::SmallString<64> NewFName;
   createName(NewFName);
   DEBUG(llvm::dbgs() << "    Perform optimizations with new name " << NewFName
@@ -331,7 +336,7 @@ void CallSiteDescriptor::specializeClosure() const {
     NewF = ClosureSpecCloner::cloneFunction(*this, NewFName);
 
   // Rewrite the call
-  rewriteApplyInst(*this, NewF);
+  rewriteApplyInst(*this, NewF, CG);
 }
 
 bool CallSiteDescriptor::isSupportedClosure(const SILInstruction *Closure) {
@@ -576,7 +581,7 @@ public:
   void gatherCallSites(SILFunction *Caller,
                        llvm::SmallVectorImpl<CallSiteDescriptor> &CallSites,
                        llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI);
-  bool specialize(SILFunction *Caller);
+  bool specialize(SILFunction *Caller, CallGraph &CG);
 
   ArrayRef<SILInstruction *> getPropagatedClosures() {
     if (IsPropagatedClosuresUniqued)
@@ -689,7 +694,8 @@ void ClosureSpecializer::gatherCallSites(
   }
 }
 
-bool ClosureSpecializer::specialize(SILFunction *Caller) {
+bool ClosureSpecializer::specialize(SILFunction *Caller,
+                                    CallGraph &CG) {
   DEBUG(llvm::dbgs() << "Optimizing callsites that take closure argument in "
                      << Caller->getName() << '\n');
 
@@ -706,7 +712,7 @@ bool ClosureSpecializer::specialize(SILFunction *Caller) {
     if (MultipleClosureAI.count(CSDesc.getApplyInst()))
       continue;
 
-    CSDesc.specializeClosure();
+    CSDesc.specializeClosure(CG);
     PropagatedClosures.push_back(CSDesc.getClosure());
     Changed = true;
   }
@@ -731,19 +737,24 @@ public:
     ClosureSpecializer C;
 
     // Specialize going bottom-up in the call graph.
-    for (auto *F : CGA->getOrBuildCallGraph().getBottomUpFunctionOrder()) {
+    auto &CG = CGA->getOrBuildCallGraph();
+    for (auto *F : CG.getBottomUpFunctionOrder()) {
       // If F is an external declaration, attempt to link in its definition. If
       // we fail to do so, there is nothing further that we can do.
       if (F->isExternalDeclaration() &&
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
         continue;
 
-      Changed |= C.specialize(F);
+      Changed |= C.specialize(F, CG);
     }
 
-    // Invalidate the call graph.
-    if (Changed)
+    // We maintain the call graph, but delete calls, and introduce new
+    // calls and branches in the cloned functions.
+    if (Changed) {
+      CGA->lockInvalidation();
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      CGA->unlockInvalidation();
+    }
 
     // If for testing purposes we were asked to not eliminate dead closures,
     // return.
