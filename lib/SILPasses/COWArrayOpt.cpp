@@ -1757,7 +1757,8 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SILLoopInfo *LI = LA->getLoopInfo(getFunction());
-    CallGraph *CG = PM->getAnalysis<CallGraphAnalysis>()->getCallGraphOrNull();
+    CallGraphAnalysis *CGA = PM->getAnalysis<CallGraphAnalysis>();
+    CallGraph *CG = CGA->getCallGraphOrNull();
 
     bool HasChanged = false;
 
@@ -1804,7 +1805,9 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     if (HasChanged) {
       // We preserve the dominator tree. Let's invalidate everything else.
       DA->lockInvalidation();
+      CGA->lockInvalidation();
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+      CGA->unlockInvalidation();
       DA->unlockInvalidation();
     }
   }
