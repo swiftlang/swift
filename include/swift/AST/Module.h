@@ -269,8 +269,13 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
+  enum class Flags {
+    TestingEnabled = 1 << 0,
+    FailedToLoad = 1 << 1
+  };
+
   /// The magic __dso_handle variable.
-  llvm::PointerIntPair<VarDecl *, 1, bool> DSOHandleAndTestingEnabled;
+  llvm::PointerIntPair<VarDecl *, 2, OptionSet<Flags>> DSOHandleAndFlags;
 
   Module(Identifier name, ASTContext &ctx);
 public:
@@ -310,11 +315,19 @@ public:
   VarDecl *getDSOHandle();
 
   /// Returns true if this module was or is being compiled for testing.
-  void setTestingEnabled(bool enabled = true) {
-    DSOHandleAndTestingEnabled.setInt(enabled);
-  }
   bool isTestingEnabled() const {
-    return DSOHandleAndTestingEnabled.getInt();
+    return DSOHandleAndFlags.getInt().contains(Flags::TestingEnabled);
+  }
+  void setTestingEnabled(bool enabled = true) {
+    DSOHandleAndFlags.setInt(DSOHandleAndFlags.getInt()|Flags::TestingEnabled);
+  }
+
+  /// Returns true if there was an error trying to load this module.
+  bool failedToLoad() const {
+    return DSOHandleAndFlags.getInt().contains(Flags::FailedToLoad);
+  }
+  void setFailedToLoad(bool failed = true) {
+    DSOHandleAndFlags.setInt(DSOHandleAndFlags.getInt() | Flags::FailedToLoad);
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope

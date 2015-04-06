@@ -395,8 +395,8 @@ DerivedFileUnit &Module::getDerivedFileUnit() const {
 }
 
 VarDecl *Module::getDSOHandle() {
-  if (DSOHandleAndTestingEnabled.getPointer())
-    return DSOHandleAndTestingEnabled.getPointer();
+  if (DSOHandleAndFlags.getPointer())
+    return DSOHandleAndFlags.getPointer();
 
   auto unsafeMutablePtr = Ctx.getUnsafeMutablePointerDecl();
   if (!unsafeMutablePtr)
@@ -418,7 +418,7 @@ VarDecl *Module::getDSOHandle() {
   handleVar->getAttrs().add(
     new (Ctx) AsmnameAttr("__dso_handle", /*Implicit=*/true));
   handleVar->setAccessibility(Accessibility::Internal);
-  DSOHandleAndTestingEnabled.setPointer(handleVar);
+  DSOHandleAndFlags.setPointer(handleVar);
   return handleVar;
 }
 

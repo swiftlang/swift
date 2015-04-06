@@ -1074,8 +1074,21 @@ void ASTContext::loadObjCMethods(
 }
 
 void ASTContext::verifyAllLoadedModules() const {
+#ifndef NDEBUG
   for (auto &loader : Impl.ModuleLoaders)
     loader->verifyAllModules();
+
+  for (auto &topLevelModulePair : LoadedModules) {
+    Module *M = topLevelModulePair.second;
+    bool hasAnyFileUnits = std::any_of(M->getFiles().begin(),
+                                       M->getFiles().end(),
+                                       [](const FileUnit *file) {
+      return !isa<DerivedFileUnit>(file);
+    });
+    if (!hasAnyFileUnits)
+      assert(M->failedToLoad());
+  }
+#endif
 }
 
 ClangModuleLoader *ASTContext::getClangModuleLoader() const {

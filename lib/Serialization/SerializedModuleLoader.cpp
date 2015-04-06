@@ -364,8 +364,11 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto M = Module::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first] = M;
 
-  (void)loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
-                std::move(moduleDocInputBuffer), isFramework);
+  if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
+               std::move(moduleDocInputBuffer), isFramework)) {
+    M->setFailedToLoad();
+  }
+
   return M;
 }
 
