@@ -44,9 +44,12 @@ namespace {
     {}
 
     SILValue getAddressOrNull() const override { return SILValue(); }
-    ArrayRef<InitializationPtr> getSubInitializations() const override {
-      return {};
+
+    void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                             SILLocation loc, SILGenFunction &gen) override {
+      /// This just ignores the provided value.
     }
+
   };
 
 
@@ -63,6 +66,39 @@ namespace {
 
     void finishInitialization(SILGenFunction &gen) override {}
   };
+  
+  /// An Initialization of a tuple pattern, such as "var (a,b)".
+  class TupleInitialization : public Initialization {
+  public:
+    /// The sub-Initializations aggregated by this tuple initialization.
+    /// The TupleInitialization object takes ownership of Initializations pushed
+    /// here.
+    SmallVector<InitializationPtr, 4> subInitializations;
+    
+    TupleInitialization() : Initialization(Initialization::Kind::Tuple) {}
+    
+    SILValue getAddressOrNull() const override {
+      if (subInitializations.size() == 1)
+        return subInitializations[0]->getAddressOrNull();
+        else
+          return SILValue();
+          }
+    
+    ArrayRef<InitializationPtr> getSubInitializations() const {
+      return subInitializations;
+    }
+    
+    void finishInitialization(SILGenFunction &gen) override {
+      for (auto &sub : subInitializations)
+        sub->finishInitialization(gen);
+        }
+    
+    void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                             SILLocation loc, SILGenFunction &gen) override {
+      llvm_unreachable("tuple initialization not destructured?!");
+    }
+    
+  };
 }
 
 bool Initialization::canForwardInBranch() const {
@@ -77,7 +113,7 @@ bool Initialization::canForwardInBranch() const {
     return false;
 
   case Kind::Tuple:
-    for (auto &subinit : getSubInitializations()) {
+    for (auto &subinit : ((TupleInitialization*)this)->getSubInitializations()){
       if (!subinit->canForwardInBranch())
         return false;
     }
@@ -93,7 +129,8 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
   assert(canSplitIntoSubelementAddresses() && "Client shouldn't call this");
   switch (kind) {
   case Kind::Tuple:
-    return getSubInitializations();
+    return ((TupleInitialization*)this)->getSubInitializations();
+      
   case Kind::Ignored:
     // "Destructure" an ignored binding into multiple ignored bindings.
     for (auto fieldType : cast<TupleType>(type)->getElementTypes()) {
@@ -158,10 +195,30 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   }
 }
 
-ArrayRef<InitializationPtr>
-SingleBufferInitialization::getSubInitializations() const {
-  return {};
+SingleBufferInitialization::~SingleBufferInitialization() {
+  // vtable anchor.
 }
+
+void SingleBufferInitialization::
+copyOrInitValueIntoSingleBuffer(ManagedValue explodedElement, bool isInit,
+                                SILValue BufferAddress,
+                                SILLocation loc, SILGenFunction &gen) {
+  if (!isInit) {
+    assert(explodedElement.getValue() != BufferAddress && "copying in place?!");
+    explodedElement.copyInto(gen, BufferAddress, loc);
+    return;
+  }
+  
+  // If we didn't evaluate into the initialization buffer, do so now.
+  if (explodedElement.getValue() != BufferAddress) {
+    explodedElement.forwardInto(gen, loc, BufferAddress);
+  } else {
+    // If we did evaluate into the initialization buffer, disable the
+    // cleanup.
+    explodedElement.forwardCleanup(gen);
+  }
+}
+
 
 void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
   if (Cleanup.isValid())
@@ -169,33 +226,6 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
 };
 
 namespace {
-
-/// An Initialization of a tuple pattern, such as "var (a,b)".
-class TupleInitialization : public Initialization {
-public:
-  /// The sub-Initializations aggregated by this tuple initialization.
-  /// The TupleInitialization object takes ownership of Initializations pushed
-  /// here.
-  SmallVector<InitializationPtr, 4> subInitializations;
-
-  TupleInitialization() : Initialization(Initialization::Kind::Tuple) {}
-
-  SILValue getAddressOrNull() const override {
-    if (subInitializations.size() == 1)
-      return subInitializations[0]->getAddressOrNull();
-    else
-      return SILValue();
-  }
-
-  ArrayRef<InitializationPtr> getSubInitializations() const override {
-    return subInitializations;
-  }
-
-  void finishInitialization(SILGenFunction &gen) override {
-    for (auto &sub : subInitializations)
-      sub->finishInitialization(gen);
-  }
-};
 
 class ReleaseValueCleanup : public Cleanup {
   SILValue v;
@@ -370,11 +400,8 @@ public:
   SILValue getAddressOrNull() const override {
     return address;
   }
-  ArrayRef<InitializationPtr> getSubInitializations() const override {
-    return {};
-  }
 
-  void bindValue(SILValue value, SILGenFunction &gen) override {
+  void bindValue(SILValue value, SILGenFunction &gen) {
     assert(!gen.VarLocs.count(vd) && "Already emitted this vardecl?");
     // If we're binding an address to this let value, then we can use it as an
     // address later.  This happens when binding an address only parameter to
@@ -384,6 +411,29 @@ public:
     gen.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
     emitDebugValue(value, gen);
+  }
+  
+  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                           SILLocation loc, SILGenFunction &gen) override {
+    // If this let value has an address, we can handle it just like a single
+    // buffer value.
+    if (hasAddress())
+      return SingleBufferInitialization::
+           copyOrInitValueIntoSingleBuffer(explodedElement, isInit,
+                                           getAddress(), loc, gen);
+    
+    // Otherwise, we bind the value.
+    if (isInit) {
+      // Disable the rvalue expression cleanup, since the let value
+      // initialization has a cleanup that lives for the entire scope of the
+      // let declaration.
+      bindValue(explodedElement.forward(gen), gen);
+    } else {
+      // Disable the expression cleanup of the copy, since the let value
+      // initialization has a cleanup that lives for the entire scope of the
+      // let declaration.
+      bindValue(explodedElement.copyUnmanaged(gen, loc).forward(gen), gen);
+    }
   }
 
   void finishInitialization(SILGenFunction &gen) override {
@@ -428,14 +478,19 @@ public:
     : Initialization(Initialization::Kind::Translating),
       VarInit(std::move(subInit)) {}
 
-  ArrayRef<InitializationPtr> getSubInitializations() const override { return {}; }
   SILValue getAddressOrNull() const override { return SILValue(); }
 
-  void translateValue(SILGenFunction &gen, SILLocation loc,
-                      ManagedValue value) override {
-    value.forwardInto(gen, loc, VarInit->getAddress());
-  }
 
+  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                           SILLocation loc, SILGenFunction &gen) override {
+    // If this is not an initialization, copy the value before we translateIt,
+    // translation expects a +1 value.
+    if (isInit)
+      explodedElement.forwardInto(gen, loc, VarInit->getAddress());
+    else
+      explodedElement.copyInto(gen, VarInit->getAddress(), loc);
+  }
+  
   void finishInitialization(SILGenFunction &gen) override {
     VarInit->finishInitialization(gen);
   }

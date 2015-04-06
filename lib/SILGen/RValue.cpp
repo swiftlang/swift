@@ -229,179 +229,6 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
   return ImplodeLoadableTupleValue<KIND>(values, gen).visit(tupleType, l);
 }
 
-class CopyIntoTupleValues
-  : public CanTypeVisitor<CopyIntoTupleValues,
-                          /*RetTy=*/ void,
-                          /*Args...=*/ Initialization*>
-{
-public:
-  ArrayRef<ManagedValue> values;
-  SILGenFunction &gen;
-  SILLocation loc;
-
-  CopyIntoTupleValues(ArrayRef<ManagedValue> values, SILGenFunction &gen,
-                        SILLocation l)
-    : values(values), gen(gen), loc(l)
-  {}
-
-  void visitType(CanType t, Initialization *I) {
-    // Pop a value off.
-    ManagedValue orig = values[0];
-    values = values.slice(1);
-
-    switch (I->kind) {
-    case Initialization::Kind::Tuple:
-      llvm_unreachable("tuple initialization not destructured?!");
-
-    case Initialization::Kind::Ignored:
-      // Throw out the value without copying it.
-      return;
-
-    case Initialization::Kind::Translating: {
-      auto copy = orig.copyUnmanaged(gen, loc);
-      I->translateValue(gen, loc, copy);
-      I->finishInitialization(gen);
-      return;
-    }
-
-    case Initialization::Kind::LetValue:
-      // If this is a non-address-only let, just bind the value.
-      if (!I->hasAddress()) {
-        // Disable the expression cleanup of the copy, since the let value
-        // initialization has a cleanup that lives for the entire scope of the
-        // let declaration.
-        I->bindValue(orig.copyUnmanaged(gen, loc).forward(gen), gen);
-        I->finishInitialization(gen);
-        return;
-      }
-      // Otherwise, handle it the same as the singlebuffer case.
-      SWIFT_FALLTHROUGH;
-
-    case Initialization::Kind::SingleBuffer:
-      assert(orig.getValue() != I->getAddress() && "copying in place?!");
-      orig.copyInto(gen, I->getAddress(), loc);
-      I->finishInitialization(gen);
-      return;
-    }
-  }
-
-  void visitTupleType(CanTupleType t, Initialization *I) {
-    // Break up the aggregate initialization if we can.
-    if (I->canSplitIntoSubelementAddresses()) {
-      SmallVector<InitializationPtr, 4> subInitBuf;
-      auto subInits = I->getSubInitializationsForTuple(gen, t, subInitBuf, loc);
-
-      assert(subInits.size() == t->getNumElements() &&
-             "initialization does not match tuple?!");
-
-      for (unsigned i = 0, e = subInits.size(); i < e; ++i)
-        visit(t.getElementType(i), subInits[i].get());
-      return;
-    }
-
-    // Otherwise, process this by turning the values corresponding to the tuple
-    // into a single value (through an implosion) and then binding that value to
-    // our initialization.
-    assert(I->kind == Initialization::Kind::LetValue);
-    SILValue V = implodeTupleValues<ImplodeKind::Copy>(values, gen, t, loc);
-
-    // This will have just used up the first values in the list, pop them off.
-    values = values.slice(getRValueSize(t));
-
-    I->bindValue(V, gen);
-    I->finishInitialization(gen);
-  }
-};
-
-class InitializeTupleValues
-  : public CanTypeVisitor<InitializeTupleValues,
-                          /*RetTy=*/ void,
-                          /*Args...=*/ Initialization*>
-{
-public:
-  ArrayRef<ManagedValue> values;
-  SILGenFunction &gen;
-  SILLocation loc;
-
-  InitializeTupleValues(ArrayRef<ManagedValue> values, SILGenFunction &gen,
-                        SILLocation l)
-    : values(values), gen(gen), loc(l)
-  {}
-
-  void visitType(CanType t, Initialization *I) {
-    // Pop a result off.
-    ManagedValue result = values[0];
-    values = values.slice(1);
-
-    switch (I->kind) {
-    case Initialization::Kind::Tuple:
-      llvm_unreachable("tuple initialization not destructured?!");
-
-    case Initialization::Kind::Ignored:
-      // Throw out the value without storing it.
-      return;
-
-    case Initialization::Kind::Translating:
-      I->translateValue(gen, loc, result);
-      I->finishInitialization(gen);
-      return;
-
-    case Initialization::Kind::LetValue:
-      // If this is a non-address-only let, just bind the value.
-      if (!I->hasAddress()) {
-        // Disable the rvalue expression cleanup, since the let value
-        // initialization has a cleanup that lives for the entire scope of the
-        // let declaration.
-        I->bindValue(result.forward(gen), gen);
-        I->finishInitialization(gen);
-        return;
-      }
-      // Otherwise, handle it the same as the singlebuffer case.
-      SWIFT_FALLTHROUGH;
-
-    case Initialization::Kind::SingleBuffer:
-      // If we didn't evaluate into the initialization buffer, do so now.
-      if (result.getValue() != I->getAddress()) {
-        result.forwardInto(gen, loc, I->getAddress());
-      } else {
-        // If we did evaluate into the initialization buffer, disable the
-        // cleanup.
-        result.forwardCleanup(gen);
-      }
-
-      I->finishInitialization(gen);
-      return;
-    }
-  }
-
-  void visitTupleType(CanTupleType t, Initialization *I) {
-    // Break up the aggregate initialization if we can.
-    if (I->canSplitIntoSubelementAddresses()) {
-      SmallVector<InitializationPtr, 4> subInitBuf;
-      auto subInits = I->getSubInitializationsForTuple(gen, t, subInitBuf, loc);
-
-      assert(subInits.size() == t->getNumElements() &&
-             "initialization does not match tuple?!");
-
-      for (unsigned i = 0, e = subInits.size(); i < e; ++i)
-        visit(t.getElementType(i), subInits[i].get());
-      return;
-    }
-
-    // Otherwise, process this by turning the values corresponding to the tuple
-    // into a single value (through an implosion) and then binding that value to
-    // our initialization.
-    assert(I->kind == Initialization::Kind::LetValue);
-    SILValue V = implodeTupleValues<ImplodeKind::Forward>(values, gen, t, loc);
-
-    // This will have just used up the first values in the list, pop them off.
-    values = values.slice(getRValueSize(t));
-
-    I->bindValue(V, gen);
-    I->finishInitialization(gen);
-  }
-};
-
 class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
                                               /*RetTy*/ RValue>
 {
@@ -450,6 +277,73 @@ public:
 };
 
 } // end anonymous namespace
+
+
+/// Perform a copy or init operation from an array of ManagedValue (from an
+/// RValue) into an initialization. The RValue will have one scalar ManagedValue
+/// for each exploded tuple element in the RValue, so this needs to make the
+/// shape of the initialization match the available elements.  This can be done
+/// one one of two ways:
+///
+///  1) recursively scalarize down the initialization on demand if the type of
+///     the RValue is tuple type and the initialization supports it.
+///  2) implode the corresponding values in the RValue to a scalar value of
+///     tuple type and process them as a unit.
+///
+/// We prefer to use approach #1 since it generates better code.
+///
+template <ImplodeKind KIND>
+static void copyOrInitValuesInto(Initialization *init,
+                                 ArrayRef<ManagedValue> &values, CanType type,
+                                 SILLocation loc, SILGenFunction &gen) {
+  bool isInit;
+  switch (KIND) {
+  case ImplodeKind::Unmanaged: assert(0 && "Not handled by init");
+  case ImplodeKind::Forward: isInit = true; break;
+  case ImplodeKind::Copy: isInit = false; break;
+  }
+  
+  // If the element has non-tuple type, just serve it up to the initialization.
+  auto tupleType = dyn_cast<TupleType>(type);
+  if (!tupleType) {
+    // We take the first value.
+    ManagedValue result = values[0];
+    values = values.slice(1);
+    init->copyOrInitValueInto(result, isInit, loc, gen);
+    init->finishInitialization(gen);
+    return;
+  }
+  
+  
+  // If we can satisfy the tuple type by breaking up the aggregate
+  // initialization, do so.
+  if (init->canSplitIntoSubelementAddresses()) {
+    SmallVector<InitializationPtr, 4> subInitBuf;
+    auto subInits = init->getSubInitializationsForTuple(gen, type,
+                                                        subInitBuf, loc);
+    
+    assert(subInits.size() == tupleType->getNumElements() &&
+           "initialization does not match tuple?!");
+    
+    for (unsigned i = 0, e = subInits.size(); i < e; ++i)
+      copyOrInitValuesInto<KIND>(subInits[i].get(), values,
+                                 tupleType.getElementType(i), loc, gen);
+    return;
+  }
+  
+  // Otherwise, process this by turning the values corresponding to the tuple
+  // into a single value (through an implosion) and then binding that value to
+  // our initialization.
+  SILValue scalar = implodeTupleValues<KIND>(values, gen, type, loc);
+  
+  // This will have just used up the first values in the list, pop them off.
+  values = values.slice(getRValueSize(type));
+  
+  init->copyOrInitValueInto(ManagedValue::forUnmanaged(scalar), isInit, loc,
+                            gen);
+  init->finishInitialization(gen);
+}
+
 
 RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
   : values(values.begin(), values.end()), type(type), elementsToBeAdded(0) {
@@ -540,14 +434,16 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &gen,
 void RValue::forwardInto(SILGenFunction &gen, Initialization *I,
                          SILLocation loc) && {
   assert(isComplete() && "rvalue is not complete");
-  InitializeTupleValues(values, gen, loc).visit(type, I);
+  
+  ArrayRef<ManagedValue> elts = values;
+  copyOrInitValuesInto<ImplodeKind::Forward>(I, elts, type, loc, gen);
 }
 
 void RValue::copyInto(SILGenFunction &gen, Initialization *I,
                       SILLocation loc) const & {
   assert(isComplete() && "rvalue is not complete");
-
-  CopyIntoTupleValues(values, gen, loc).visit(type, I);
+  ArrayRef<ManagedValue> elts = values;
+  copyOrInitValuesInto<ImplodeKind::Copy>(I, elts, type, loc, gen);
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &gen, SILLocation l) && {

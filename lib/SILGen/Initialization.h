@@ -81,17 +81,6 @@ public:
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() const = 0;
   
-  /// Provide a value to this initialization.  Called only on
-  /// initializations with Kind::Translating.
-  virtual void translateValue(SILGenFunction &gen, SILLocation loc,
-                              ManagedValue value) {
-    llvm_unreachable("unexpected translated value in initialization!");
-  }
-
-  virtual void bindValue(SILValue value, SILGenFunction &gen) {
-    llvm_unreachable("can only bind letvalue!");
-  }
-  
   /// Returns true if this initialization represents a single contiguous buffer.
   bool hasAddress() const { return getAddressOrNull().isValid(); }
 
@@ -104,12 +93,6 @@ public:
     return address;
   }
 
-  /// If this initialization represents an aggregation of sub-initializations,
-  /// return the sub-initializations. Once all the sub-initializations have been
-  /// initialized and finalized with finishInitialization, finishInitialization
-  /// must then be called on this aggregate initialization.
-  virtual ArrayRef<InitializationPtr> getSubInitializations() const = 0;
-  
   /// If this initialization represents an aggregation of sub-initializations,
   /// return the sub-initializations. If it represents a single
   /// initialization of tuple type, explode it into initializations for each
@@ -129,6 +112,16 @@ public:
   /// Perform post-initialization bookkeeping for this initialization.
   virtual void finishInitialization(SILGenFunction &gen) {}
 
+  
+  /// When emitting an exploded RValue into an initialization, this method is
+  /// called once per scalar value in the explosion.
+  ///
+  /// If this is an *copy* of the rvalue into this initialization then isInit is
+  /// false.  If it is an *initialization* of the memory in the initialization,
+  /// then isInit is true.
+  virtual void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                                   SILLocation loc, SILGenFunction &gen) = 0;
+
 private:
   Initialization(const Initialization &) = delete;
   Initialization(Initialization &&) = delete;
@@ -136,14 +129,28 @@ private:
   virtual void _anchor();
 };
 
-/// Abstract base class for single-buffer initializations.
+/// Abstract base class for single-buffer initializations.  These are
+/// initializations that have an addressable memory object to be stored into.
 class SingleBufferInitialization : public Initialization {
 public:
   SingleBufferInitialization()
     : Initialization(Initialization::Kind::SingleBuffer)
   {}
   
-  ArrayRef<InitializationPtr> getSubInitializations() const override;
+  virtual ~SingleBufferInitialization();
+  
+  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                           SILLocation loc, SILGenFunction &gen) override {
+    copyOrInitValueIntoSingleBuffer(explodedElement, isInit, getAddress(),
+                                    loc, gen);
+  }
+  
+  /// Emit the exploded element into a buffer at the specified address.
+  static void copyOrInitValueIntoSingleBuffer(ManagedValue explodedElement,
+                                              bool isInit,
+                                              SILValue BufferAddress,
+                                              SILLocation loc,
+                                              SILGenFunction &gen);
 };
 
 /// Abstract base class for single-buffer initializations.
