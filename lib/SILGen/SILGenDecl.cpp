@@ -63,8 +63,6 @@ namespace {
     {}
 
     SILValue getAddressOrNull() const override { return ElementAddr; }
-
-    void finishInitialization(SILGenFunction &gen) override {}
   };
   
   /// An Initialization of a tuple pattern, such as "var (a,b)".
@@ -80,10 +78,10 @@ namespace {
     SILValue getAddressOrNull() const override {
       if (subInitializations.size() == 1)
         return subInitializations[0]->getAddressOrNull();
-        else
-          return SILValue();
-          }
-    
+      else
+        return SILValue();
+    }
+
     ArrayRef<InitializationPtr> getSubInitializations() const {
       return subInitializations;
     }
@@ -91,7 +89,7 @@ namespace {
     void finishInitialization(SILGenFunction &gen) override {
       for (auto &sub : subInitializations)
         sub->finishInitialization(gen);
-        }
+    }
     
     void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
                              SILLocation loc, SILGenFunction &gen) override {
@@ -457,10 +455,6 @@ public:
 
   SILValue getAddressOrNull() const override {
     return address;
-  }
-
-  void finishInitialization(SILGenFunction &gen) override {
-    // Globals don't need to be cleaned up.
   }
 };
 
