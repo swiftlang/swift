@@ -89,7 +89,6 @@ GenericSpecializer::specializeApplyInstGroup(
   llvm::SmallVector<FullApplySite, 4> NewApplies;
   CallGraphEditor Editor(CG);
   for (auto AI : ApplyGroup) {
-    // FIXME: Need to add new applies from cloned functions to the call graph!.
     auto Specialized = trySpecializeApplyOfGeneric(AI, &NewFunction,
                                                    NewApplies);
     if (Specialized) {
