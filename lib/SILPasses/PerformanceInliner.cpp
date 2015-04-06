@@ -756,6 +756,40 @@ static bool isProfitableInColdBlock(ApplyInst *AI) {
   return true;
 }
 
+
+// Attempt to devirtualize, maintaining the call graph if
+// successful. When successful, replaces the old apply with the new
+// one and returns the new one. When unsuccessful returns an empty
+// apply site.
+static FullApplySite devirtualizeMaintainingCallGraph(FullApplySite Apply,
+                                                      CallGraph &CG) {
+  auto *AI = cast<ApplyInst>(Apply.getInstruction());
+
+  auto *NewInst = tryDevirtualizeApply(AI);
+  if (!NewInst)
+    return FullApplySite();
+
+  if (auto *Edge = CG.getCallGraphEdge(AI))
+    CG.removeEdge(Edge);
+
+  replaceDeadApply(AI, NewInst);
+
+  auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
+  // In cases where devirtualization results in having to
+  // insert code to match the result type of the original
+  // function, we need to find the original apply. It's
+  // currently simple enough to always do this, and we'll end
+  // up with a better call graph if we try to maintain the
+  // property that we can always find the apply that resulted
+  // from devirtualizing.
+  assert(NewAI && "Expected to find an apply!");
+
+  CG.addEdgesForApply(NewAI);
+
+  return NewAI;
+}
+
+
 void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
                                 SmallVectorImpl<ApplyInst *> &CallSitesToInline,
                                                      DominanceAnalysis *DA,
@@ -785,28 +819,11 @@ void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
 
       // Devirtualize in an attempt expose more opportunities for
       // inlining.
-      if (auto *NewInst = tryDevirtualizeApply(AI)) {
-        if (auto *Edge = CG.getCallGraphEdge(AI))
-          CG.removeEdge(Edge);
-
-        replaceDeadApply(AI, NewInst);
-
+      if (auto NewApply = devirtualizeMaintainingCallGraph(AI, CG)) {
         Devirtualized = true;
-        I = SILBasicBlock::iterator(NewInst);
 
-        auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
-        // In cases where devirtualization results in having to
-        // insert code to match the result type of the original
-        // function, we need to find the original apply. It's
-        // currently simple enough to always do this, and we'll end
-        // up with a better call graph if we try to maintain the
-        // property that we can always find the apply that resulted
-        // from devirtualizing.
-        assert(NewAI && "Expected to find an apply!");
-
-        CG.addEdgesForApply(NewAI);
-
-        AI = NewAI;
+        AI = cast<ApplyInst>(NewApply.getInstruction());
+        I = SILBasicBlock::iterator(AI);
       }
 
       DEBUG(llvm::dbgs() << "    Check:" << *AI);
