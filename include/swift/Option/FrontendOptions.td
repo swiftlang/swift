@@ -209,6 +209,9 @@ def print_stats : Flag<["-"], "print-stats">,
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 
+def playground_high_performance : Flag<["-"], "playground-high-performance">,
+  HelpText<"Omit instrumentation that has a high runtime performance impact">;
+
 def disable_playground_transform : Flag<["-"], "disable-playground-transform">,
   HelpText<"Disable playground transformation">;
 

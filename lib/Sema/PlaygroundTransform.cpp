@@ -45,6 +45,7 @@ private:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned TmpNameIndex = 0;
+  bool HighPerformance;
 
   struct BracePair {
   public:
@@ -110,6 +111,9 @@ private:
   // all the braces up to its target.
   size_t escapeToTarget(BracePair::TargetKinds TargetKind,
                         ElementVector &Elements, size_t EI) {
+    if (HighPerformance)
+      return EI;
+
     for (const BracePair &BP : BracePairs) {
       if (BP.TargetKind == TargetKind) {
         break;
@@ -151,8 +155,9 @@ private:
   ClosureFinder CF;
 
 public:
-  Instrumenter (ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG) :
-    RNG(RNG), Context(C), TypeCheckDC(DC), CF(*this) { }
+  Instrumenter (ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG,
+                bool HP) :
+    RNG(RNG), Context(C), TypeCheckDC(DC), HighPerformance(HP), CF(*this) { }
     
   Stmt *transformStmt(Stmt *S) { 
     switch (S->getKind()) {
@@ -558,7 +563,7 @@ public:
       }
     }
 
-    if (!TopLevel) {
+    if (!TopLevel && !HighPerformance) {
       Elements.insert(Elements.begin(), buildScopeEntry(BS->getSourceRange()));
       Elements.insert(Elements.end(), buildScopeExit(BS->getSourceRange()));
     }
@@ -579,7 +584,8 @@ public:
   }
 
   // log*() functions return a newly-created log expression to be inserted
-  // after or instead of the expression they're looking at.
+  // after or instead of the expression they're looking at.  Only call this
+  // if the variable has an initializer.
   Expr *logVarDecl(VarDecl *VD) {
     if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
         VD->getNameStr().equals("self")) {
@@ -812,16 +818,20 @@ public:
 
 } // end anonymous namespace
 
-void swift::performPlaygroundTransform(SourceFile &SF) {
+void swift::performPlaygroundTransform(SourceFile &SF,
+                                       bool HighPerformance) {
   class ExpressionFinder : public ASTWalker {
   private:
     std::mt19937_64 RNG;
+    bool HighPerformance;
   public:
+    ExpressionFinder(bool HP) : HighPerformance(HP) { }
+
     virtual bool walkToDeclPre(Decl *D) {
       if (AbstractFunctionDecl *FD = llvm::dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
-            Instrumenter I(FD->getASTContext(), FD, RNG);
+            Instrumenter I(FD->getASTContext(), FD, RNG, HighPerformance);
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
               FD->setBody(NewBody);
@@ -832,7 +842,7 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
       } else if (TopLevelCodeDecl *TLCD = llvm::dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
-            Instrumenter I(((Decl*)TLCD)->getASTContext(), TLCD, RNG);
+            Instrumenter I(((Decl*)TLCD)->getASTContext(), TLCD, RNG, HighPerformance);
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
@@ -845,7 +855,7 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
     }
   };
 
-  ExpressionFinder EF;
+  ExpressionFinder EF(HighPerformance);
   for (Decl* D : SF.Decls) {
     D->walk(EF);
   }

@@ -196,6 +196,10 @@ public:
   /// Indicates whether the playground transformation should be applied.
   bool PlaygroundTransform = false;
 
+  /// Indicates whether the playground transformation should omit
+  /// instrumentation that has a high runtime performance impact.
+  bool PlaygroundHighPerformance = false;
+
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
 

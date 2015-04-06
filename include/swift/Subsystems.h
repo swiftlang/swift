@@ -133,7 +133,10 @@ namespace swift {
 
   /// Once parsing and name-binding are complete, this optionally transforms the
   /// ASTs to add calls to external logging functions.
-  void performPlaygroundTransform(SourceFile &SF);
+  ///
+  /// \param HighPerformance True if the playground transform should omit
+  /// instrumentation that has a high runtime performance impact.
+  void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
   
   /// Flags used to control type checking.
   enum class TypeCheckingFlags : unsigned {

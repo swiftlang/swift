@@ -425,7 +425,7 @@ void CompilerInstance::performSema() {
     } while (!Done);
     
     if (mainIsPrimary && Invocation.getFrontendOptions().PlaygroundTransform)
-      performPlaygroundTransform(MainFile);
+      performPlaygroundTransform(MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
     if (!mainIsPrimary)
       performNameBinding(MainFile);
   }

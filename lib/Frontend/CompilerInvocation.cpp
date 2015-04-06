@@ -112,6 +112,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
   if (Args.hasArg(OPT_disable_playground_transform))
     Opts.PlaygroundTransform = false;
+  Opts.PlaygroundHighPerformance |=
+    Args.hasArg(OPT_playground_high_performance);
 
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
