@@ -742,13 +742,12 @@ static bool isProfitableInColdBlock(SILFunction *Callee) {
     for (SILInstruction &I : Block) {
       auto ICost = instructionInlineCost(I);
       CalleeCost += (unsigned)ICost;
+
+      if (CalleeCost > TrivialFunctionThreshold)
+        return false;
     }
   }
 
-  if (CalleeCost > TrivialFunctionThreshold) {
-    return false;
-  }
-  
   DEBUG(llvm::dbgs() << "        YES: ready to inline into cold block, cost:"
         << CalleeCost << "\n");
   return true;
