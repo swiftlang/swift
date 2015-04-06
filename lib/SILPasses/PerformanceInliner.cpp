@@ -728,9 +728,7 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
 }
 
 /// Return true if inlining this call site into a cold block is profitable.
-static bool isProfitableInColdBlock(ApplyInst *AI) {
-  SILFunction *Callee = getReferencedFunction(AI);
-  
+static bool isProfitableInColdBlock(SILFunction *Callee) {
   if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
 
@@ -936,14 +934,14 @@ void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<ApplyInst *> &
   DominanceOrder domOrder(Root, DT);
   while (SILBasicBlock *block = domOrder.getNext()) {
     for (SILInstruction &I : *block) {
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
-        auto *Callee = getEligibleFunction(AI);
-        if (Callee) {
-          if (isProfitableInColdBlock(AI)) {
-            DEBUG(llvm::dbgs() << "    inline in cold block:" <<  *AI);
-            CallSitesToInline.push_back(AI);
-          }
-        }
+      ApplyInst *AI = dyn_cast<ApplyInst>(&I);
+      if (!AI)
+        continue;
+
+      auto *Callee = getEligibleFunction(AI);
+      if (Callee && isProfitableInColdBlock(Callee)) {
+        DEBUG(llvm::dbgs() << "    inline in cold block:" <<  *AI);
+        CallSitesToInline.push_back(AI);
       }
     }
     domOrder.pushChildren(block);
