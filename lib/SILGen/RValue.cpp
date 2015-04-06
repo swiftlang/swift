@@ -296,12 +296,9 @@ template <ImplodeKind KIND>
 static void copyOrInitValuesInto(Initialization *init,
                                  ArrayRef<ManagedValue> &values, CanType type,
                                  SILLocation loc, SILGenFunction &gen) {
-  bool isInit;
-  switch (KIND) {
-  case ImplodeKind::Unmanaged: assert(0 && "Not handled by init");
-  case ImplodeKind::Forward: isInit = true; break;
-  case ImplodeKind::Copy: isInit = false; break;
-  }
+  static_assert(KIND == ImplodeKind::Forward ||
+                KIND == ImplodeKind::Copy, "Not handled by init");
+  bool isInit = (KIND == ImplodeKind::Forward);
   
   // If the element has non-tuple type, just serve it up to the initialization.
   auto tupleType = dyn_cast<TupleType>(type);
