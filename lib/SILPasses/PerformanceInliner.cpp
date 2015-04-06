@@ -779,40 +779,42 @@ void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
     for (auto I = block->begin(), E = block->end(); I != E; ++I) {
       constTracker.trackInst(&*I);
       
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
-        // Devirtualize in an attempt expose more opportunities for
-        // inlining.
-        if (auto *NewInst = tryDevirtualizeApply(AI)) {
-          if (auto *Edge = CG.getCallGraphEdge(AI))
-            CG.removeEdge(Edge);
+      auto *AI = dyn_cast<ApplyInst>(I);
+      if (!AI)
+        continue;
 
-          replaceDeadApply(AI, NewInst);
+      // Devirtualize in an attempt expose more opportunities for
+      // inlining.
+      if (auto *NewInst = tryDevirtualizeApply(AI)) {
+        if (auto *Edge = CG.getCallGraphEdge(AI))
+          CG.removeEdge(Edge);
 
-          Devirtualized = true;
-          I = SILBasicBlock::iterator(NewInst);
+        replaceDeadApply(AI, NewInst);
 
-          auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
-          // In cases where devirtualization results in having to
-          // insert code to match the result type of the original
-          // function, we need to find the original apply. It's
-          // currently simple enough to always do this, and we'll end
-          // up with a better call graph if we try to maintain the
-          // property that we can always find the apply that resulted
-          // from devirtualizing.
-          assert(NewAI && "Expected to find an apply!");
+        Devirtualized = true;
+        I = SILBasicBlock::iterator(NewInst);
 
-          CG.addEdgesForApply(NewAI);
+        auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
+        // In cases where devirtualization results in having to
+        // insert code to match the result type of the original
+        // function, we need to find the original apply. It's
+        // currently simple enough to always do this, and we'll end
+        // up with a better call graph if we try to maintain the
+        // property that we can always find the apply that resulted
+        // from devirtualizing.
+        assert(NewAI && "Expected to find an apply!");
 
-          AI = NewAI;
-        }
+        CG.addEdgesForApply(NewAI);
 
-        DEBUG(llvm::dbgs() << "    Check:" << *AI);
+        AI = NewAI;
+      }
 
-        auto *Callee = getEligibleFunction(AI);
-        if (Callee) {
-          if (isProfitableToInline(AI, loopDepth, DA, LA, constTracker))
-            InitialCandidates.push_back(AI);
-        }
+      DEBUG(llvm::dbgs() << "    Check:" << *AI);
+
+      auto *Callee = getEligibleFunction(AI);
+      if (Callee) {
+        if (isProfitableToInline(AI, loopDepth, DA, LA, constTracker))
+          InitialCandidates.push_back(AI);
       }
     }
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
