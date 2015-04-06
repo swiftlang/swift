@@ -790,13 +790,20 @@ void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
 
           Devirtualized = true;
           I = SILBasicBlock::iterator(NewInst);
+
           auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
-          if (!NewAI)
-            continue;
+          // In cases where devirtualization results in having to
+          // insert code to match the result type of the original
+          // function, we need to find the original apply. It's
+          // currently simple enough to always do this, and we'll end
+          // up with a better call graph if we try to maintain the
+          // property that we can always find the apply that resulted
+          // from devirtualizing.
+          assert(NewAI && "Expected to find an apply!");
 
           CG.addEdgesForApply(NewAI);
 
-          AI = cast<ApplyInst>(NewAI);
+          AI = NewAI;
         }
 
         DEBUG(llvm::dbgs() << "    Check:" << *AI);
