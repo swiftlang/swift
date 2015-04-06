@@ -2893,13 +2893,11 @@ void SILGenFunction::emitBindOptional(SILLocation loc,
 
   // Check whether the optional has a value.
   SILBasicBlock *hasValueBB = createBasicBlock();
-  SILBasicBlock *hasNoValueBB = createBasicBlock();
   SILValue hasValue = emitDoesOptionalHaveValue(loc, optionalAddr);
-  B.createCondBranch(loc, hasValue, hasValueBB, hasNoValueBB);
 
   // If not, thread out through a bunch of cleanups.
-  B.emitBlock(hasNoValueBB);
-  Cleanups.emitBranchAndCleanups(failureDest, loc);
+  SILBasicBlock *hasNoValueBB = Cleanups.emitBlockForCleanups(failureDest, loc);
+  B.createCondBranch(loc, hasValue, hasValueBB, hasNoValueBB);
 
   // If so, continue.
   B.emitBlock(hasValueBB);

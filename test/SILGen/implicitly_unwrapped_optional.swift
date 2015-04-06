@@ -11,14 +11,10 @@ func foo(var #f: (()->())!) {
 // CHECK-NEXT: [[TEMP_RESULT:%.*]] = init_enum_data_addr [[RESULT]]
 //   Switch out on the lvalue (() -> ())!:
 // CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
-// CHECK-NEXT: cond_br [[T1]], bb2, bb1
-//   If it doesn't have a value, kill all the temporaries and jump to
-//   the first nothing block.
-// CHECK:    bb1:
-// CHECK-NEXT: br bb3
+// CHECK-NEXT: cond_br [[T1]], bb1, bb2
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
-// CHECK:    bb2:
+// CHECK:    bb1:
 // CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[F]]
 // CHECK-NEXT: [[FN0:%.*]] = load [[FN0_ADDR]]
 //   ...unnecessarily reabstract back to () -> ()...
@@ -26,11 +22,11 @@ func foo(var #f: (()->())!) {
 // CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
 //   .... then call it
 // CHECK-NEXT: apply [[FN1]]()
-// CHECK:      br bb4
+// CHECK:      br bb3
 //   (first nothing block)
-// CHECK:    bb3:
+// CHECK:    bb2:
 // CHECK-NEXT: inject_enum_addr [[RESULT]]#1{{.*}}None
-// CHECK-NEXT: br bb4
+// CHECK-NEXT: br bb3
 //   The rest of this is tested in optional.swift
 
 func wrap<T>(#x: T) -> T! { return x }

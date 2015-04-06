@@ -11,14 +11,10 @@ func foo(var f: (()->())?) {
 // CHECK-NEXT: [[TEMP_RESULT:%.*]] = init_enum_data_addr [[RESULT]]
 //   Switch out on the lvalue (() -> ())!:
 // CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
-// CHECK-NEXT: cond_br [[T1]], bb2, bb1
-//   If it doesn't have a value, kill all the temporaries and jump to
-//   the first nothing block.
-// CHECK:    bb1:
-// CHECK-NEXT: br bb3
+// CHECK-NEXT: cond_br [[T1]], bb1, bb2
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
-// CHECK:    bb2:
+// CHECK:    bb1:
 // CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[F]]
 // CHECK-NEXT: [[FN0:%.*]] = load [[FN0_ADDR]]
 //   ...unnecessarily reabstract back to () -> ()...
@@ -26,11 +22,11 @@ func foo(var f: (()->())?) {
 // CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
 //   .... then call it
 // CHECK-NEXT: apply [[FN1]]()
-// CHECK:      br bb4
+// CHECK:      br bb3
 //   (first nothing block)
-// CHECK:    bb3:
+// CHECK:    bb2:
 // CHECK-NEXT: inject_enum_addr [[RESULT]]
-// CHECK-NEXT: br bb4
+// CHECK-NEXT: br bb3
 
 func foo2<T>(var f: (()->T)?) {
   var x = f?()
@@ -43,12 +39,9 @@ func foo2<T>(var f: (()->T)?) {
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[X]]
 //   Check whether 'f' holds a value.
 // CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
-// CHECK-NEXT: cond_br [[T1]], bb2, bb1
-//   If not, leave all the cleanups we needed and jump to the nothing block.
-// CHECK:    bb1:
-// CHECK-NEXT: br bb3
+// CHECK-NEXT: cond_br [[T1]], bb1, bb2
 //   If so, pull out the value...
-// CHECK:    bb2:
+// CHECK:    bb1:
 // CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[F]]#1
 // CHECK-NEXT: [[T0:%.*]] = load [[T1]]
 // CHECK-NEXT: strong_retain
@@ -59,13 +52,13 @@ func foo2<T>(var f: (()->T)?) {
 // CHECK-NEXT: apply [[T1]]([[TEMP_RESULT]])
 //   ...and coerce to T?
 // CHECK-NEXT: inject_enum_addr [[X]]{{.*}}Some
-// CHECK-NEXT: br bb4
+// CHECK-NEXT: br bb3
 //   Nothing block.
-// CHECK:    bb3:
+// CHECK:    bb2:
 // CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
-// CHECK-NEXT: br bb4
+// CHECK-NEXT: br bb3
 //   Continuation block.
-// CHECK:    bb4
+// CHECK:    bb3
 // CHECK-NEXT: strong_release [[X]]#0
 // CHECK-NEXT: strong_release [[F]]#0
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
