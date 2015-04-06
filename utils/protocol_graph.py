@@ -58,7 +58,7 @@ def bodyLines(bodyText):
     return [
         cgi.escape(b.group(0)) for b in
         re.finditer(
-            r'(typealias\s*'+identifier+r'(\s*[:,]\s*'+identifier + ')|' + operator + '.*)',
+            r'(typealias\s*'+identifier+r'(\s*[:,]\s*'+identifier + ')?|' + operator + '.*)',
             bodyText, reFlags)
     ]
 
