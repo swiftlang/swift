@@ -143,7 +143,14 @@ public:
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.
   void emitCleanupsForReturn(CleanupLocation loc);
-  
+
+  /// Emit a new block that jumps to the specified location and runs necessary
+  /// cleanups based on its level.  If there are no cleanups to run, this just
+  /// returns the dest block.
+  SILBasicBlock *emitBlockForCleanups(JumpDest Dest,
+                                      SILLocation BranchLoc,
+                                      ArrayRef<SILValue> Args = {});
+
   /// pushCleanup - Push a new cleanup.
   template<class T, class... A>
   T &pushCleanupInState(CleanupState state,

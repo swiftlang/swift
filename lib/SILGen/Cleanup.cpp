@@ -121,6 +121,24 @@ void CleanupManager::emitCleanupsForReturn(CleanupLocation Loc) {
       cleanup.emit(Gen, Loc);
 }
 
+/// Emit a new block that jumps to the specified location and runs necessary
+/// cleanups based on its level.  If there are no cleanups to run, this just
+/// returns the dest block.
+SILBasicBlock *CleanupManager::emitBlockForCleanups(JumpDest Dest,
+                                                    SILLocation BranchLoc,
+                                                    ArrayRef<SILValue> Args) {
+  // If there are no cleanups to run, just return the Dest block directly.
+  if (!hasAnyActiveCleanups(Dest.getDepth()))
+    return Dest.getBlock();
+
+  // Otherwise, create and emit a new block.
+  auto *NewBB = Gen.createBasicBlock();
+  SavedInsertionPoint IPRAII(Gen, NewBB);
+  emitBranchAndCleanups(Dest, BranchLoc, Args);
+  return NewBB;
+}
+
+
 Cleanup &CleanupManager::initCleanup(Cleanup &cleanup,
                                      size_t allocSize,
                                      CleanupState state) {

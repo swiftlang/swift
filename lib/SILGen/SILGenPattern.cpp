@@ -1855,7 +1855,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
 
   // Extract the i1 from the Bool struct.
-  StructDecl *BoolStruct = dyn_cast<StructDecl>(Context.getBoolDecl());
+  StructDecl *BoolStruct = cast<StructDecl>(Context.getBoolDecl());
   auto Members = BoolStruct->lookupDirect(Context.getIdentifier("value"));
   assert(Members.size() == 1 &&
          "Bool should have only one property with name 'value'");
@@ -2169,22 +2169,8 @@ emitStmtConditionWithBodyRec(LabeledConditionalStmt *CondStmt,
     // Just branch on the condition.  On failure, we unwind any active cleanups,
     // on success we fall through to a new block.
     SILBasicBlock *ContBB = gen.createBasicBlock();
-    SILBasicBlock *FailBB = CondFailDest.getBlock();
-    
-    // If earlier parts of the condition have already emitted cleanups, then
-    // we need to run them on the exit from this boolean condition, and will
-    // need a block to emit the cleanups into.  Otherwise, we can get away with
-    // a direct jump and avoid creating a pointless block.
-    if (gen.Cleanups.hasAnyActiveCleanups(CondFailDest.getDepth()))
-      FailBB = gen.createBasicBlock();
-    
+    auto FailBB = gen.Cleanups.emitBlockForCleanups(CondFailDest, CondStmt);
     gen.B.createCondBranch(expr, V, ContBB, FailBB);
-
-    // Emit cleanups on the failure path if needed.
-    if (FailBB != CondFailDest.getBlock()) {
-      gen.B.emitBlock(FailBB);
-      gen.Cleanups.emitBranchAndCleanups(CondFailDest, CondStmt);
-    }
 
     // Finally, emit the continue block and keep emitting the rest of the
     // condition.
