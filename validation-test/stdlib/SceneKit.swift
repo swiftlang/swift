@@ -25,7 +25,7 @@ SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Int") {
     [
       1,0,0,0,
       2,0,0,0,
-      0x7f,0xff,0xff,0xff,
+      0xff,0xff,0xff,0x7f,
       4,0,0,0,
       5,0,0,0,
       6,0,0,0,
