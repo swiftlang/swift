@@ -364,7 +364,6 @@ public:
 /// The Call Graph Analysis provides information about the call graph.
 class CallGraphAnalysis : public SILAnalysis {
   SILModule *M;
-  std::vector<SILFunction *> BottomUpFunctionOrder;
   CallGraph *CG;
 
 public:
@@ -394,7 +393,6 @@ public:
   virtual void invalidate(SILAnalysis::PreserveKind K) {
     if (K & PreserveKind::Calls) return;
 
-    BottomUpFunctionOrder.clear();
     delete CG;
     CG = nullptr;
   }
