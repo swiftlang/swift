@@ -173,6 +173,22 @@ bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
   return false;
 }
 
+/// Check if a given type conforms to _Error protocol.
+bool swift::isErrorType(Module *M, CanType Ty) {
+  // Retrieve the _ErrorType protocol.
+  auto errorTypeProto =
+      M->Ctx.getProtocol(KnownProtocolKind::_ErrorType);
+
+  if (errorTypeProto) {
+    // Find the conformance of the value type to _BridgedToObjectiveC.
+    // Check whether the type conforms to _BridgedToObjectiveC.
+    auto conformance = M->lookupConformance(Ty, errorTypeProto, nullptr);
+
+    return (conformance.getInt() != ConformanceKind::DoesNotConform);
+  }
+  return false;
+}
+
 /// Try to classify the dynamic-cast relationship between two types.
 DynamicCastFeasibility
 swift::classifyDynamicCast(Module *M,
@@ -353,6 +369,12 @@ swift::classifyDynamicCast(Module *M,
           target,
           /* isSourceTypeExact */ false, isWholeModuleOpts);
     }
+    return DynamicCastFeasibility::MaySucceed;
+  }
+
+  // Check if it is a cast between bridged error types.
+  if (isErrorType(M, source) && isErrorType(M, target)) {
+    // TODO: Cast to NSError succeeds always.
     return DynamicCastFeasibility::MaySucceed;
   }
 
