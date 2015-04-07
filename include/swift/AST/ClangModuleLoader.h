@@ -23,6 +23,8 @@ class Preprocessor;
 namespace swift {
 
 class ClangModuleLoader : public ModuleLoader {
+private:
+  virtual void anchor();
 protected:
   using ModuleLoader::ModuleLoader;
 public:
@@ -33,6 +35,12 @@ public:
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.
   virtual Module *getImportedHeaderModule() const = 0;
+
+  /// Adds a new search path to the Clang CompilerInstance, as if specified with
+  /// -I or -F.
+  ///
+  /// \returns true if there was an error adding the search path.
+  virtual bool addSearchPath(StringRef newSearchPath, bool isFramework) = 0;
 };
 
 } // namespace swift

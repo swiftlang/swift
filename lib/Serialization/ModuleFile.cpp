@@ -1013,16 +1013,10 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     return error(Status::TargetTooNew);
   }
 
-  auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  for (const auto &searchPathPair : SearchPaths)
+    ctx.addSearchPath(searchPathPair.first, searchPathPair.second);
 
-  for (const auto &searchPathPair : SearchPaths) {
-    if (searchPathPair.second) {
-      ctx.SearchPathOpts.FrameworkSearchPaths.push_back(searchPathPair.first);
-    } else {
-      ctx.SearchPathOpts.ImportSearchPaths.push_back(searchPathPair.first);
-    }
-    clangImporter->addSearchPath(searchPathPair.first, searchPathPair.second);
-  }
+  auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
   bool missingDependency = false;
   for (auto &dependency : Dependencies) {

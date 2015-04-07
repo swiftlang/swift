@@ -39,6 +39,7 @@ using namespace swift;
 
 LazyResolver::~LazyResolver() = default;
 void ModuleLoader::anchor() {}
+void ClangModuleLoader::anchor() {}
 
 llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   switch (kind) {
@@ -256,6 +257,8 @@ struct ASTContext::Implementation {
   /// checking unintended Objective-C overrides.
   std::vector<AbstractFunctionDecl *> ObjCMethods;
 
+  llvm::StringMap<uint8_t> SearchPathsSet;
+
   /// \brief The permanent arena.
   Arena Permanent;
 
@@ -362,6 +365,17 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
 #define IDENTIFIER(Id) Id_##Id = getIdentifier(#Id);
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Id_##Name = getIdentifier(IdStr);
 #include "swift/AST/KnownIdentifiers.def"
+
+  enum {
+    ImportSearchPathKind = 1 << 0,
+    FrameworkSearchPathKind = 1 << 1
+  };
+
+  // Record the initial set of search paths.
+  for (StringRef path : SearchPathOpts.ImportSearchPaths)
+    Impl.SearchPathsSet[path] |= ImportSearchPathKind;
+  for (StringRef path : SearchPathOpts.FrameworkSearchPaths)
+    Impl.SearchPathsSet[path] |= FrameworkSearchPathKind;
 }
 
 ASTContext::~ASTContext() {
@@ -1042,6 +1056,22 @@ Type ASTContext::getTypeVariableMemberType(TypeVariableType *baseTypeVar,
                                            AssociatedTypeDecl *assocType) {
   auto &arena = *Impl.CurrentConstraintSolverArena;
   return arena.GetTypeMember(baseTypeVar, assocType);
+}
+
+void ASTContext::addSearchPath(StringRef searchPath, bool isFramework) {
+  auto &loaded = Impl.SearchPathsSet[searchPath];
+  uint8_t loadedFlag = (1 << isFramework);
+  if (loaded & loadedFlag)
+    return;
+  loaded |= loadedFlag;
+
+  if (isFramework)
+    SearchPathOpts.FrameworkSearchPaths.push_back(searchPath);
+  else
+    SearchPathOpts.ImportSearchPaths.push_back(searchPath);
+
+  if (auto *clangLoader = getClangModuleLoader())
+    clangLoader->addSearchPath(searchPath, isFramework);
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,

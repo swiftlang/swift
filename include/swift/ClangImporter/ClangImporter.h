@@ -135,7 +135,7 @@ public:
   /// -I or -F.
   ///
   /// \returns true if there was an error adding the search path.
-  bool addSearchPath(StringRef newSearchPath, bool isFramework);
+  bool addSearchPath(StringRef newSearchPath, bool isFramework) override;
 
   /// Imports an Objective-C header file into the shared imported header module.
   ///

@@ -528,6 +528,11 @@ public:
   Type getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
                                  AssociatedTypeDecl *assocType);
 
+  /// Adds a search path to SearchPathOpts, unless it is already present.
+  ///
+  /// Does any proper bookkeeping to keep all module loaders up to date as well.
+  void addSearchPath(StringRef searchPath, bool isFramework);
+
   /// \brief Adds a module loader to this AST context.
   ///
   /// \param loader The new module loader, which will be added after any

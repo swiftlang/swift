@@ -25,14 +25,20 @@ public:
   std::string SDKPath;
 
   /// Path(s) which should be searched for modules.
+  ///
+  /// Do not add values to this directly. Instead, use
+  /// \c ASTContext::addSearchPath.
   std::vector<std::string> ImportSearchPaths;
 
   /// Path(s) which should be searched for frameworks.
+  ///
+  /// Do not add values to this directly. Instead, use
+  /// \c ASTContext::addSearchPath.
   std::vector<std::string> FrameworkSearchPaths;
 
   /// Path(s) which should be searched for libraries.
   ///
-  /// This is used in immediate modes.
+  /// This is used in immediate modes. It is safe to add paths to this directly.
   std::vector<std::string> LibrarySearchPaths;
 
   /// Path to search for compiler-relative header files.
