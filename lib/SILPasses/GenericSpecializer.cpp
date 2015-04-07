@@ -52,6 +52,7 @@ public:
 
 
 static void addApplyInst(ApplySite AI,
+                         CallGraph &CG,
                          llvm::SmallVectorImpl<ApplySite> &NewApplies) {
   if (!AI || !AI.hasSubstitutions())
     return;
@@ -64,20 +65,25 @@ static void addApplyInst(ApplySite AI,
 
   SILFunction *Callee = FRI->getReferencedFunction();
   auto &M = AI.getInstruction()->getModule();
-  if (Callee->isExternalDeclaration())
+  if (Callee->isExternalDeclaration()) {
     if (!M.linkFunction(Callee, SILModule::LinkingMode::LinkAll))
       return;
+
+    // Add the linked-in function to the call graph.
+    CallGraphEditor(CG).addCallGraphNode(Callee);
+  }
 
   NewApplies.push_back(AI);
 }
 
 static void collectApplyInst(SILFunction &F,
+                             CallGraph &CG,
                              llvm::SmallVectorImpl<ApplySite> &NewApplies) {
   // Scan all of the instructions in this function in search of ApplyInsts.
   for (auto &BB : F)
     for (auto &I : BB)
       if (ApplySite AI = ApplySite::isa(&I))
-        addApplyInst(AI, NewApplies);
+        addApplyInst(AI, CG, NewApplies);
 }
 
 bool
@@ -143,7 +149,7 @@ bool GenericSpecializer::specialize(const llvm::SmallVectorImpl<SILFunction *>
     SILFunction *F = Worklist.back();
     Worklist.pop_back();
 
-    collectApplyInst(*F, NewApplies);
+    collectApplyInst(*F, CG, NewApplies);
     if (!NewApplies.empty())
       Changed |= specializeApplyInstGroup(NewApplies);
 

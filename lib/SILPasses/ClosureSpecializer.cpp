@@ -745,9 +745,12 @@ public:
     for (auto *F : CG.getBottomUpFunctionOrder()) {
       // If F is an external declaration, attempt to link in its definition. If
       // we fail to do so, there is nothing further that we can do.
-      if (F->isExternalDeclaration() &&
-          !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
-        continue;
+      if (F->isExternalDeclaration()) {
+        if (!getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
+          continue;
+
+        CallGraphEditor(CG).addCallGraphNode(F);
+      }
 
       Changed |= C.specialize(F, CG);
     }

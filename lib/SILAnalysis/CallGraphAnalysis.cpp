@@ -38,8 +38,13 @@ CallGraph::CallGraph(SILModule *Mod, bool completeModule)
   : M(*Mod), NodeOrdinal(0), EdgeOrdinal(0) {
   ++NumCallGraphsBuilt;
 
+  // We first need to add nodes for every function we have a body for,
+  // and once that nodes are in, add edges for every apply that
+  // targets one of those functions.
+
   for (auto &F : M)
-    addCallGraphNode(&F);
+    if (F.isDefinition())
+      addCallGraphNode(&F);
 
   for (auto &F : M)
     if (F.isDefinition())
@@ -71,6 +76,9 @@ void CallGraph::addCallGraphNode(SILFunction *F) {
   //       unreachable nodes from graph.
   ++NumCallGraphNodes;
 
+  assert(F->isDefinition() &&
+         "Only definitions can be added to the call graph!");
+
   auto *Node = new (Allocator) CallGraphNode(F, ++NodeOrdinal);
 
   assert(!FunctionToNodeMap.count(F) &&
@@ -80,8 +88,7 @@ void CallGraph::addCallGraphNode(SILFunction *F) {
 
   // TODO: Only add functions clearly visible from outside our
   //       compilation scope as roots.
-  if (F->isDefinition())
-    CallGraphRoots.push_back(Node);
+  CallGraphRoots.push_back(Node);
 }
 
 bool CallGraph::tryGetCalleeSet(SILValue Callee,
@@ -96,10 +103,14 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     SWIFT_FALLTHROUGH;
   case ValueKind::FunctionRefInst: {
     auto *CalleeFn = cast<FunctionRefInst>(Callee)->getReferencedFunction();
-    auto *CalleeNode = getCallGraphNode(CalleeFn);
-    assert(CalleeNode &&
-           "Expected to have a call graph node for all functions!");
+    if (CalleeFn->isExternalDeclaration()) {
+      if (!M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll))
+        return false;
 
+      addCallGraphNode(CalleeFn);
+    }
+
+    auto *CalleeNode = getCallGraphNode(CalleeFn);
     CalleeSet.insert(CalleeNode);
     Complete = true;
     return true;
@@ -155,17 +166,14 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     if (!CalleeFn)
       return false;
 
-    auto *CalleeNode = getCallGraphNode(CalleeFn);
-    // FIXME: Consider whether we should create nodes for these
-    //        initially.
-    if (!CalleeNode) {
+    if (CalleeFn->isExternalDeclaration()) {
+      if (!M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll))
+        return false;
+
       addCallGraphNode(CalleeFn);
-      CalleeNode = getCallGraphNode(CalleeFn);
     }
 
-    assert(CalleeNode &&
-           "Expected to have a call graph node for all functions!");
-
+    auto *CalleeNode = getCallGraphNode(CalleeFn);
     CalleeSet.insert(CalleeNode);
     Complete = true;
     return true;
@@ -244,6 +252,8 @@ void CallGraph::removeEdge(CallGraphEdge *Edge) {
   // Remove the edge from the caller's call graph node.
   auto Apply = Edge->getApply();
   auto *CallerNode = getCallGraphNode(Apply.getFunction());
+  assert(CallerNode &&
+         "Expected call graph node for function with a call graph edge!");
   CallerNode->removeCalleeEdge(Edge);
 
   // Remove the mapping from the apply to this edge.
@@ -285,6 +295,14 @@ void CallGraph::addEdges(SILFunction *F) {
 
       if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
         auto *CalleeFn = FRI->getReferencedFunction();
+
+        if (CalleeFn->isExternalDeclaration()) {
+          if (!M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll))
+            continue;
+
+          addCallGraphNode(CalleeFn);
+        }
+
         if (!CalleeFn->isPossiblyUsedExternally()) {
           bool hasAllApplyUsers = std::none_of(FRI->use_begin(), FRI->use_end(),
             [](const Operand *Op) {
