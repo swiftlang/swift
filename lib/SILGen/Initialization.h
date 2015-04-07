@@ -58,7 +58,10 @@ public:
     Translating,
     /// This Initialization is for a tuple of sub-initializations, which can
     /// be accessed with getSubInitializations().
-    Tuple
+    Tuple,
+    /// This Initialization is for a refutable match, which occurs in refutable
+    /// pattern contexts.
+    Refutable
   };
   
   /// The Kind of initialization.

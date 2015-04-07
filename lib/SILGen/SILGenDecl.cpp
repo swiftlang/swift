@@ -108,6 +108,7 @@ bool Initialization::canForwardInBranch() const {
   // These initializations expect to be activated exactly once.
   case Kind::LetValue:
   case Kind::Translating:
+  case Kind::Refutable:
     return false;
 
   case Kind::Tuple:
@@ -158,6 +159,8 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
     // This could actually be done by collecting translated values, if
     // we introduce new needs for translating initializations.
     llvm_unreachable("cannot destructure a translating initialization");
+  case Kind::Refutable:
+    llvm_unreachable("cannot destructure a refutable initialization");
   }
   llvm_unreachable("bad initialization kind");
 }
@@ -492,15 +495,81 @@ public:
   }
 };
 
+/// Abstract base class for refutable pattern initializations.
+class RefutablePatternInitialization : public Initialization {
+  /// This is the label to jump to if the pattern fails to match.
+  JumpDest failureDest;
+public:
+  RefutablePatternInitialization(JumpDest failureDest)
+  : Initialization(Initialization::Kind::Refutable), failureDest(failureDest) {
+    assert(failureDest.isValid() &&
+           "Refutable patterns can only exist in failable conditions");
+  }
+
+  JumpDest getFailureDest() const { return failureDest; }
+
+  SILValue getAddressOrNull() const override { return SILValue(); }
+
+  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                           SILLocation loc, SILGenFunction &SGF) override = 0;
+
+
+  void bindVariable(SILLocation loc, VarDecl *var, ManagedValue value,
+                    CanType formalValueType, SILGenFunction &SGF) {
+    // Initialize the variable value.
+    InitializationPtr init = SGF.emitInitializationForVarDecl(var, Type());
+    RValue(SGF, loc, formalValueType, value).forwardInto(SGF, init.get(), loc);
+  }
+
+};
+
+class ExprPatternInitialization : public RefutablePatternInitialization {
+  ExprPattern *P;
+public:
+  ExprPatternInitialization(ExprPattern *P, JumpDest patternFailDest)
+    : RefutablePatternInitialization(patternFailDest), P(P) {}
+
+  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                           SILLocation loc, SILGenFunction &SGF) override;
+};
+
+void ExprPatternInitialization::
+copyOrInitValueInto(ManagedValue value, bool isInit,
+                    SILLocation loc, SILGenFunction &SGF) {
+  FullExpr scope(SGF.Cleanups, CleanupLocation(P));
+  bindVariable(P, P->getMatchVar(), value,
+               P->getType()->getCanonicalType(), SGF);
+
+  // Emit the match test.
+  SILValue testBool;
+  {
+    FullExpr scope(SGF.Cleanups, CleanupLocation(P->getMatchExpr()));
+    testBool = SGF.emitRValueAsSingleValue(P->getMatchExpr()).
+       getUnmanagedValue();
+  }
+
+  SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
+  auto falseBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
+  SGF.B.createCondBranch(loc, testBool, contBB, falseBB);
+
+  SGF.B.setInsertionPoint(contBB);
+}
+
+
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
 /// Initialization representing the needed initializations.
 struct InitializationForPattern
   : public PatternVisitor<InitializationForPattern, InitializationPtr>
 {
-  SILGenFunction &Gen;
+  SILGenFunction &SGF;
 
-  InitializationForPattern(SILGenFunction &Gen) : Gen(Gen) {}
+  /// This is the place that should be jumped to if the pattern fails to match.
+  /// This is invalid for irrefutable pattern initializations.
+  JumpDest patternFailDest;
+
+  InitializationForPattern(SILGenFunction &SGF, JumpDest patternFailDest)
+    : SGF(SGF), patternFailDest(patternFailDest) {}
 
   // Paren, Typed, and Var patterns are noops, just look through them.
   InitializationPtr visitParenPattern(ParenPattern *P) {
@@ -529,7 +598,7 @@ struct InitializationForPattern
     }
 
     auto Ty = P->hasType() ? P->getType() : Type();
-    return Gen.emitInitializationForVarDecl(P->getDecl(), Ty);
+    return SGF.emitInitializationForVarDecl(P->getDecl(), Ty);
   }
 
   // Bind a tuple pattern by aggregating the component variables into a
@@ -541,15 +610,24 @@ struct InitializationForPattern
     return InitializationPtr(init);
   }
 
-  // TODO: Handle bindings from 'case' labels and match expressions.
-#define INVALID_PATTERN(Id, Parent) \
-  InitializationPtr visit##Id##Pattern(Id##Pattern *) { \
-    llvm_unreachable("pattern not valid in argument or var binding"); \
+  InitializationPtr visitEnumElementPattern(EnumElementPattern *P) {
+    llvm_unreachable("pattern not valid in argument or var binding");
   }
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
-#include "swift/AST/PatternNodes.def"
-#undef INVALID_PATTERN
+  InitializationPtr visitOptionalSomePattern(OptionalSomePattern *P) {
+    llvm_unreachable("pattern not valid in argument or var binding");
+  }
+  InitializationPtr visitIsPattern(IsPattern *P) {
+    llvm_unreachable("pattern not valid in argument or var binding");
+  }
+  InitializationPtr visitBoolPattern(BoolPattern *P) {
+    llvm_unreachable("pattern not valid in argument or var binding");
+  }
+  InitializationPtr visitExprPattern(ExprPattern *P) {
+    return InitializationPtr(new ExprPatternInitialization(P, patternFailDest));
+  }
+  InitializationPtr visitNominalTypePattern(NominalTypePattern *P) {
+    llvm_unreachable("pattern not valid in argument or var binding");
+  }
 };
 
 } // end anonymous namespace
@@ -610,12 +688,24 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, Type patternType) {
   return Result;
 }
 
-void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
+void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
+  // If this is a conditional PBD, it will have an 'else' block.  Prepare for
+  // its emission.
+  JumpDest elseBB = JumpDest::invalid();
+  if (PBD->isRefutable()) {
+    assert(PBD->getElse().isExplicit() &&
+           "Refutable PatternBinding must have an else block");
+
+    // Create a basic block for the else block we'll jump to.
+    elseBB = JumpDest(createBasicBlock(),
+                      getCleanupsDepth(), CleanupLocation(PBD));
+  }
+
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
-  for (auto entry : D->getPatternList()) {
+  for (auto entry : PBD->getPatternList()) {
     InitializationPtr initialization =
-      InitializationForPattern(*this).visit(entry.ThePattern);
+      InitializationForPattern(*this, elseBB).visit(entry.ThePattern);
 
     // If an initial value expression was specified by the decl, emit it into
     // the initialization. Otherwise, mark it uninitialized for DI to resolve.
@@ -626,11 +716,26 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
       initialization->finishInitialization(*this);
     }
   }
+
+
+  // For our conditional PBD, emit the else block logic.
+  if (elseBB.getBlock()) {  // Emit the else block logic.
+    // Move the insertion point to the throw destination.
+    SavedInsertionPoint savedIP(*this, elseBB.getBlock());
+
+    emitStmt(PBD->getElse().getExplicitBody());
+    if (B.hasValidInsertionPoint()) {
+      // The else block must end in a noreturn call, return, break etc.  It
+      // isn't valid to fall off into the normal flow.  To model this, we emit
+      // an unreachable instruction and then have SIL diagnostic check this.
+      B.createUnreachable(PBD);
+    }
+  }
 }
 
 InitializationPtr
 SILGenFunction::emitPatternBindingInitialization(Pattern *P) {
-  return InitializationForPattern(*this).visit(P);
+  return InitializationForPattern(*this, JumpDest::invalid()).visit(P);
 }
 
 /// Enter a cleanup to deallocate the given location.

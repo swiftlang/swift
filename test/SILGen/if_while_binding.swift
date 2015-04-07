@@ -7,6 +7,11 @@ func a(x: String) {}
 func b(x: String) {}
 func c(x: String) {}
 
+func marker_1() {}
+func marker_2() {}
+func marker_3() {}
+
+
 // CHECK-LABEL: sil hidden @_TF16if_while_binding10if_no_else
 func if_no_else() {
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3fooFT_GSqSS_
@@ -291,4 +296,32 @@ func testAsPatternInIfLet(a : BaseClass?) {
   }
 }
 
+// CHECK-LABEL: sil hidden @_TF16if_while_binding22testLetElseExprPatternFSiT_
+
+func testLetElseExprPattern(a : Int) {
+  marker_1()
+  // CHECK: [[M1:%[0-9]+]] = function_ref @_TF16if_while_binding8marker_1FT_T_ : $@thin () -> ()
+  // CHECK-NEXT: apply [[M1]]() : $@thin () -> ()
+
+  // CHECK: function_ref static Swift.~= infix <A : Swift.Equatable>(A, A) -> Swift.Bool
+  // CHECK: cond_br {{.*}}, bb1, bb2
+  let 4 = a else { marker_2(); return }
+
+  // Fall through case comes first.
+
+  // CHECK: bb1:
+  // CHECK: [[M3:%[0-9]+]] = function_ref @_TF16if_while_binding8marker_3FT_T_ : $@thin () -> ()
+  // CHECK-NEXT: apply [[M3]]() : $@thin () -> ()
+  // CHECK-NEXT: br bb3
+  marker_3()
+
+  // CHECK: bb2:
+  // CHECK: [[M2:%[0-9]+]] = function_ref @_TF16if_while_binding8marker_2FT_T_ : $@thin () -> ()
+  // CHECK-NEXT: apply [[M2]]() : $@thin () -> ()
+  // CHECK-NEXT: br bb3
+
+  // CHECK: bb3:
+  // CHECK-NEXT: tuple ()
+  // CHECK-NEXT: return
+}
 
