@@ -1053,6 +1053,11 @@ MsgPackTestSuite.test("Deserialize/String/str32") {
 }
 
 MsgPackTestSuite.test("Deserialize/Binary/bin8") {
+
+  #if arch(arm64)
+  // FIXME: rdar://20448082 miscompile in MsgPackDecoder.readBinary()
+  #else
+
   //
   // Valid inputs.
   //
@@ -1124,6 +1129,9 @@ MsgPackTestSuite.test("Deserialize/Binary/bin8") {
       expectEqual(0, d.consumedCount)
     }
   }
+
+  // not arm64
+  #endif
 }
 
 MsgPackTestSuite.test("Deserialize/Binary/bin16") {
