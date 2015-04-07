@@ -954,38 +954,12 @@ bool TypeChecker::typeCheckExpression(
   }
 
   // Apply the solution to the expression.
-  auto result = cs.applySolution(solution, expr,
+  auto result = cs.applySolution(solution, expr, convertType, discardedExpr,
                                  listener && listener->suppressDiagnostics());
   if (!result) {
     diagnoseExpr(*this, expr, dc, listener);
     // Failure already diagnosed, above, as part of applying the solution.
     return true;
-  }
-
-  // If we're supposed to convert the expression to some particular type,
-  // do so now.
-  if (convertType) {
-    result = solution.coerceToType(result, convertType,
-                                   cs.getConstraintLocator(expr));
-    if (!result) {
-      diagnoseExpr(*this, expr, dc, listener);
-      return true;
-    }
-  } else if (auto *ioTy = result->getType()->getAs<InOutType>()) {
-    // We explicitly took a reference to the result, but didn't use it.
-    // Complain and emit a Fix-It to zap the '&'.
-    auto addressOf = cast<InOutExpr>(result->getSemanticsProvidingExpr());
-    diagnose(addressOf->getLoc(), diag::reference_non_inout,
-             ioTy->getObjectType())
-      .highlight(addressOf->getSubExpr()->getSourceRange())
-      .fixItRemove(SourceRange(addressOf->getLoc()));
-
-    // Strip the address-of expression.
-    result = addressOf->getSubExpr();
-  } else if (result->getType()->isLValueType() && !discardedExpr) {
-    // We referenced an lvalue. Load it.
-    result = solution.coerceToType(result, result->getType()->getRValueType(),
-                                   cs.getConstraintLocator(expr));
   }
 
   if (getLangOpts().DebugConstraintSolver) {

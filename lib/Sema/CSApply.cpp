@@ -486,13 +486,15 @@ namespace {
     /// \param member The member that is being referenced on the existential
     /// type.
     ///
+    /// \param refType The type of the member reference.
+    ///
     /// \returns A pair (expr, type) that provides a reference to the value
     /// stored within the expression or its metatype (if the base was a
     /// metatype) and the archetype that describes the dynamic type stored
     /// within the existential.
     std::tuple<Expr *, ArchetypeType *>
     openExistentialReference(Expr *base, ArchetypeType *archetype,
-                             ValueDecl *member) {
+                             ValueDecl *member, Type refType) {
       auto &tc = cs.getTypeChecker();
       base = tc.coerceToRValue(base);
 
@@ -524,11 +526,21 @@ namespace {
       OpenedExistentials[archetype] = { base, archetypeVal };
 
       // Determine the number of applications that need to occur before
-      // we can close this archetype, and record it.
+      // we can close this existential, and record it.
       if (member) {
-        unsigned depth = 1;
+        unsigned depth;
         if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+          // For functions, close the existential once the function
+          // has been fully applied.
           depth = func->getNaturalArgumentCount();
+        } else {
+          // For storage, close the existential either when it's
+          // accessed (if it's an rvalue only) or when it is loaded or
+          // stored (if it's an lvalue).
+          assert(isa<AbstractStorageDecl>(member) &&
+                 "unknown member when opening existential");
+          depth = refType->castTo<AnyFunctionType>()->getResult()
+                    ->is<LValueType>() ? 2 : 1;
         }
 
         bool inserted = OpenedExistentialDepth.insert(
@@ -557,6 +569,8 @@ namespace {
         keyExpr = memberRef->getBase();
       } else if (auto subscriptRef = dyn_cast<SubscriptExpr>(result)) {
         keyExpr = subscriptRef->getBase();
+      } else if (auto load = dyn_cast<LoadExpr>(result)) {
+        keyExpr = load->getSubExpr();
       } else {
         // Cannot close an existential.
         return false;
@@ -724,7 +738,8 @@ namespace {
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         std::tie(base, baseTy) = openExistentialReference(base,
                                                           knownOpened->second,
-                                                          member);
+                                                          member,
+                                                          refTy);
         containerTy = baseTy;
       }
       // If this is a method whose result type is dynamic Self, or a
@@ -737,7 +752,8 @@ namespace {
           if (func->getExtensionType()->is<ProtocolType>() &&
               baseTy->isAnyExistentialType()) {
             std::tie(base, baseTy) = openExistentialReference(base, nullptr,
-                                                              nullptr);
+                                                              nullptr,
+                                                              refTy);
             containerTy = baseTy;
             openedType = openedType->replaceCovariantResultType(
                            baseTy,
@@ -1178,7 +1194,8 @@ namespace {
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         std::tie(base, baseTy) = openExistentialReference(base,
                                                           knownOpened->second,
-                                                          subscript);
+                                                          subscript,
+                                                          subscriptTy);
         containerTy = baseTy;
       }
 
@@ -3220,9 +3237,7 @@ namespace {
         return nullptr;
 
       // Convert the source to the simplified destination type.
-      Expr *src = solution.coerceToType(expr->getSrc(),
-                                        destTy,
-                                        srcLocator);
+      Expr *src = coerceToType(expr->getSrc(), destTy, srcLocator);
       if (!src)
         return nullptr;
       
@@ -4620,6 +4635,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Load from the lvalue.
       expr = new (tc.Context) LoadExpr(expr, fromType->getRValueType());
 
+      closeExistential(expr);
+
       // Coerce the result.
       return coerceToType(expr, toType, locator);
     }
@@ -4836,6 +4853,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (performLoad) {
       // Load from the lvalue.
       expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
+
+      closeExistential(expr);
 
       // Coerce the result.
       return coerceToType(expr, toType, locator);
@@ -5674,6 +5693,8 @@ static bool exprNeedsParensAfterAddingAs(DeclContext *DC, Expr *expr,
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
+                                      Type contextualType,
+                                      bool discardedExpr,
                                       bool suppressDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
@@ -6126,7 +6147,37 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   };
 
   ExprRewriter rewriter(*this, solution, suppressDiagnostics);
-  auto result = expr->walk(ExprWalker(rewriter));
+  ExprWalker walker(rewriter);
+
+  // Apply the solution to the expression.
+  auto result = expr->walk(walker);
+  if (!result)
+    return nullptr;
+
+  // If we're supposed to convert the expression to some particular type,
+  // do so now.
+  if (contextualType) {
+    result = rewriter.coerceToType(result, contextualType,
+                                   getConstraintLocator(expr));
+    if (!result)
+      return nullptr;
+  } else if (auto *ioTy = result->getType()->getAs<InOutType>()) {
+    // We explicitly took a reference to the result, but didn't use it.
+    // Complain and emit a Fix-It to zap the '&'.
+    auto addressOf = cast<InOutExpr>(result->getSemanticsProvidingExpr());
+    TC.diagnose(addressOf->getLoc(), diag::reference_non_inout,
+                ioTy->getObjectType())
+      .highlight(addressOf->getSubExpr()->getSourceRange())
+      .fixItRemove(SourceRange(addressOf->getLoc()));
+
+    // Strip the address-of expression.
+    result = addressOf->getSubExpr();
+  } else if (result->getType()->isLValueType() && !discardedExpr) {
+    // We referenced an lvalue. Load it.
+    result = rewriter.coerceToType(result, result->getType()->getRValueType(),
+                                   getConstraintLocator(expr));
+  }
+
   return result;
 }
 

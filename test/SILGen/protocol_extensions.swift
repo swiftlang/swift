@@ -57,17 +57,23 @@ extension P1 {
 
   final subscript (i: Int64) -> Bool {
     get { return true }
-
-    // FIXME: setter
   }
 
   final var prop: Bool {
     get { return true }
-
-    // FIXME: getter
   }
 
   final func returnsSelf() -> Self { return self }
+
+  final var prop2: Bool {
+    get { return true }
+    set { }
+  }
+
+  final subscript (b: Bool) -> Bool {
+    get { return b }
+    set { }
+  }
 }
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions17testExistentials1
@@ -121,4 +127,22 @@ func testExistentials2(p1: P1) {
   var p1a: P1 = p1.returnsSelf()
   // CHECK-NEXT: deinit_existential_addr [[PCOPY]]#1 : $*P1
   // CHECK-NEXT: dealloc_stack [[PCOPY]]#0 : $*@local_storage P1
+}
+
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions23testExistentialsGetters
+// CHECK: bb0([[P:%[0-9]+]] : $*P1):
+func testExistentialsGetters(p1: P1) {
+  // CHECK: [[PCOPY:%[0-9]+]] = alloc_stack $P1
+  // CHECK-NEXT: copy_addr [[P]] to [initialization] [[PCOPY]]#1 : $*P1
+  // CHECK-NEXT: [[POPENED:%[0-9]+]] = open_existential_addr [[PCOPY]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1g5prop2Sb
+  // CHECK-NEXT: [[B:%[0-9]+]] = apply [[FN]]<@opened([[UUID]]) P1>([[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> Bool
+  let b: Bool = p1.prop2
+
+  // CHECK: [[PCOPY:%[0-9]+]] = alloc_stack $P1
+  // CHECK-NEXT: copy_addr [[P]] to [initialization] [[PCOPY]]#1 : $*P1
+  // CHECK-NEXT: [[POPENED:%[0-9]+]] = open_existential_addr [[PCOPY]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1g9subscriptFSbSb
+  // CHECK-NEXT: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @in τ_0_0) -> Bool
+  let b2: Bool = p1[b]
 }
