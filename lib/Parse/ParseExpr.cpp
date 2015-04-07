@@ -1441,9 +1441,9 @@ Expr *Parser::parseExprIdentifier() {
   if (!D) {
     // FIXME: We want this to work: "var x = { x() }", but for now it's better
     // to disallow it than to crash.
-    for (auto activeVar : CurVars) {
+    for (auto activeVar : DisabledVars) {
       if (activeVar->getName() == name) {
-        diagnose(loc, diag::var_init_self_referential);
+        diagnose(loc, DisabledVarReason);
         return new (Context) ErrorExpr(loc);
       }
     }
