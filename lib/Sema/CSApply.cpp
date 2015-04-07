@@ -29,6 +29,32 @@
 using namespace swift;
 using namespace constraints;
 
+/// \brief  Get a substitution corresponding to the type witness.
+/// Inspired by ProtocolConformance::getTypeWitnessByName.
+const Substitution *
+getTypeWitnessByName(ProtocolConformance *conformance,
+                     Identifier name,
+                     LazyResolver *resolver) {
+  // Find the named requirement.
+  AssociatedTypeDecl *assocType = nullptr;
+  auto members = conformance->getProtocol()->lookupDirect(name);
+  for (auto member : members) {
+    assocType = dyn_cast<AssociatedTypeDecl>(member);
+    if (assocType)
+      break;
+  }
+
+  if (!assocType)
+    return nullptr;
+
+  assert(conformance && "Missing conformance information");
+  if (!conformance->hasTypeWitness(assocType, resolver)) {
+    return nullptr;
+  }
+  return &conformance->getTypeWitness(assocType, resolver);
+}
+
+
 /// \brief Retrieve the fixed type for the given type variable.
 Type Solution::getFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
@@ -1440,22 +1466,71 @@ namespace {
     Expr *bridgeFromObjectiveC(Expr *object, Type valueType, bool conditional) {
       auto &tc = cs.getTypeChecker();
 
-      // Retrieve the  bridging operation.
-      auto fn = conditional
-                  ? tc.Context.getConditionallyBridgeFromObjectiveC(&tc)
-                  : tc.Context.getForceBridgeFromObjectiveC(&tc);
+      // Find the _BridgedToObjectiveC protocol.
+      auto bridgedProto
+        = tc.Context.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+
+      // Try to find the conformance of the value type to _BridgedToObjectiveC.
+      ProtocolConformance *conformance = nullptr;
+
+      bool conformsToBridgedToObjectiveC = tc.conformsToProtocol(
+                                                  valueType,
+                                                  bridgedProto,
+                                                  cs.DC,
+                                                  true,
+                                                  &conformance);
+
+      FuncDecl *fn = nullptr;
+
+      if (conformsToBridgedToObjectiveC) {
+        // The conformance to _BridgedToObjectiveC is statically known.
+        // Retrieve the  bridging operation to be used if a static conformance
+        // to _BridgedToObjectiveC can be proven.
+        fn = conditional
+                 ? tc.Context.getKnownConditionallyBridgeFromObjectiveC(&tc)
+                 : tc.Context.getKnownForceBridgeFromObjectiveC(&tc);
+      } else {
+        // Retrieve the  bridging operation to be used if a static conformance
+        // to _BridgedToObjectiveC cannot be proven.
+        fn = conditional ? tc.Context.getConditionallyBridgeFromObjectiveC(&tc)
+                         : tc.Context.getForceBridgeFromObjectiveC(&tc);
+      }
+
       if (!fn) {
         tc.diagnose(object->getLoc(), diag::missing_bridging_function,
                     conditional);
         return nullptr;
       }
+
       tc.validateDecl(fn);
       
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
+      auto Conformances = tc.Context.Allocate<ProtocolConformance *>(conformance?1:0);
+
+      if (conformsToBridgedToObjectiveC)
+        Conformances[0] = conformance;
+
+      SmallVector<Substitution, 2> Subs;
       Substitution sub(fn->getGenericParams()->getAllArchetypes()[0],
-                       valueType, { });
-      ConcreteDeclRef fnSpecRef(tc.Context, fn, sub);
+                       valueType,
+                       Conformances);
+      Subs.push_back(sub);
+
+      // Add substitution for the dependent type T._ObjectiveCType.
+      if (conformsToBridgedToObjectiveC) {
+        const Substitution *DepTypeSubst = getTypeWitnessByName(
+            conformance, tc.Context.getIdentifier("_ObjectiveCType"), nullptr);
+
+        // Create a substitution for the dependent type.
+        Substitution NewDepTypeSubst(fn->getGenericParams()->getAllArchetypes()[1],
+                                     DepTypeSubst->getReplacement(),
+                                     DepTypeSubst->getConformances());
+
+        Subs.push_back(NewDepTypeSubst);
+      }
+
+      ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
       Expr *fnRef = new (tc.Context) DeclRefExpr(fnSpecRef, object->getLoc(),
                                                  /*Implicit=*/true);
       TypeSubstitutionMap subMap;
