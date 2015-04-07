@@ -261,10 +261,8 @@ internal protocol _ForwardIndexBoxType : class {
 }
 
 internal class _ForwardIndexBox<
-  BaseIndex_: ForwardIndexType
+  BaseIndex: ForwardIndexType
 > : _ForwardIndexBoxType {
-  typealias BaseIndex = BaseIndex_
-  
   required init(_ base: BaseIndex) {
     self.base = base
   }
@@ -325,8 +323,8 @@ internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
 }
 
 internal class _BidirectionalIndexBox<
-  BaseIndex__: BidirectionalIndexType
-> : _ForwardIndexBox<BaseIndex__>, _BidirectionalIndexBoxType {
+  BaseIndex: BidirectionalIndexType
+> : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxType {
   required init(_ base: BaseIndex) {
     super.init(base)
   }
@@ -350,8 +348,8 @@ internal class _BidirectionalIndexBox<
 internal protocol _RandomAccessIndexBoxType : _BidirectionalIndexBoxType {}
 
 internal final class _RandomAccessIndexBox<
-  BaseIndex___: RandomAccessIndexType
-> : _BidirectionalIndexBox<BaseIndex___>, _RandomAccessIndexBoxType {
+  BaseIndex: RandomAccessIndexType
+> : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxType {
   required init(_ base: BaseIndex) {
     super.init(base)
   }
