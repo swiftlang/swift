@@ -146,3 +146,21 @@ func testExistentialsGetters(p1: P1) {
   // CHECK-NEXT: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @in τ_0_0) -> Bool
   let b2: Bool = p1[b]
 }
+
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions22testExistentialSetters
+// CHECK: bb0([[P:%[0-9]+]] : $*P1, [[B:%[0-9]+]] : $Bool):
+func testExistentialSetters(var p1: P1, b: Bool) {
+  // CHECK: [[PBOX:%[0-9]+]] = alloc_box $P1
+  // CHECK-NEXT: copy_addr [take] [[P]] to [initialization] [[PBOX]]#1 : $*P1
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[PBOX]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1s5prop2Sb
+  // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
+  // CHECK-NEXT: deinit_existential_addr [[PBOX]]#1 : $*P1
+  p1.prop2 = b
+
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[PBOX]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
+  // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1s9subscriptFSbSb
+  // CHECK: apply [[SUBSETTER]]<@opened([[UUID]]) P1>([[B]], [[B]], [[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, Bool, @inout τ_0_0) -> ()
+  // CHECK-NEXT: deinit_existential_addr [[PBOX]]#1 : $*P1
+  p1[b] = b
+}

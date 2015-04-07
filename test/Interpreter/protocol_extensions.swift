@@ -176,6 +176,64 @@ existP1.runExistP1()
 existP1 = ExistP1_Class()
 existP1.runExistP1()
 
+protocol P {
+  mutating func setValue(b: Bool)
+  func getValue() -> Bool
+}
+
+extension P {
+  final var extValue: Bool {
+    get { return getValue() }
+    set(newValue) { setValue(newValue) }
+  }
+}
+
+extension Bool : P {
+  mutating func setValue(b: Bool) { self = b }
+  func getValue() -> Bool { return self }
+}
+
+class C : P {
+  var theValue: Bool = false
+  func setValue(b: Bool) { theValue = b }
+  func getValue() -> Bool { return theValue }
+}
+
+func toggle(inout value: Bool) {
+  value = !value
+}
+
+var p: P = true
+// CHECK: Bool
+println("Bool")
+
+// CHECK: true
+p.extValue = true
+println(p.extValue)
+
+// CHECK: false
+p.extValue = false
+println(p.extValue)
+
+// CHECK: true
+toggle(&p.extValue)
+println(p.extValue)
+
+// CHECK: C
+println("C")
+p = C()
+
+// CHECK: true
+p.extValue = true
+println(p.extValue)
+
+// CHECK: false
+p.extValue = false
+println(p.extValue)
+
+// CHECK: true
+toggle(&p.extValue)
+println(p.extValue)
 
 // CHECK: DONE
 println("DONE")

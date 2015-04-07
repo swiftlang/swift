@@ -473,6 +473,11 @@ namespace {
       /// depth has been reduced to zero, the existential can be
       /// closed.
       unsigned Depth;
+
+      friend bool operator<(const OpenedExistential &lhs,
+                            const OpenedExistential &rhs) {
+        return lhs.SequenceNumber < rhs.SequenceNumber;
+      }
     };
 
     /// The number of existentials that have been opened, used to
@@ -509,9 +514,18 @@ namespace {
     openExistentialReference(Expr *base, ArchetypeType *archetype,
                              ValueDecl *member, Type refType) {
       auto &tc = cs.getTypeChecker();
-      base = tc.coerceToRValue(base);
 
-      auto baseTy = base->getType()->getRValueType();
+      // Dig out the base type.
+      auto baseTy = base->getType();
+
+      // Look through lvalues.
+      bool isLValue = false;
+      if (auto lvalueTy = baseTy->getAs<LValueType>()) {
+        isLValue = true;
+        baseTy = lvalueTy->getObjectType();
+      }
+
+      // Look through metatypes.
       bool isMetatype = false;
       if (auto metaTy = baseTy->getAs<AnyMetatypeType>()) {
         isMetatype = true;
@@ -527,14 +541,6 @@ namespace {
         archetype = ArchetypeType::getOpened(baseTy);
       }
 
-      // Create the opaque opened value. If we started with a
-      // metatype, it's a metatype.
-      Type opaqueType = archetype;
-      if (isMetatype)
-        opaqueType = MetatypeType::get(archetype);
-      auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(), opaqueType);
-      archetypeVal->setUniquelyReferenced(true);
-
       // Determine the number of applications that need to occur before
       // we can close this existential, and record it.
       unsigned depth;
@@ -542,6 +548,17 @@ namespace {
         // For functions, close the existential once the function
         // has been fully applied.
         depth = func->getNaturalArgumentCount();
+
+        // If the base was an lvalue but it will only be treated as an
+        // rvalue, turn the base into an rvalue now. This results in
+        // better SILGen.
+        if (isLValue &&
+            (!isa<FuncDecl>(func) || !cast<FuncDecl>(func)->isMutating() ||
+             baseTy->isClassExistentialType() ||
+             baseTy->is<ExistentialMetatypeType>())) {
+          base = tc.coerceToRValue(base);
+          isLValue = false;
+        }
       } else {
         // For storage, close the existential either when it's
         // accessed (if it's an rvalue only) or when it is loaded or
@@ -552,6 +569,18 @@ namespace {
                   ->is<LValueType>() ? 2 : 1;
       }
 
+      // Create the opaque opened value. If we started with a
+      // metatype, it's a metatype.
+      Type opaqueType = archetype;
+      if (isMetatype)
+        opaqueType = MetatypeType::get(opaqueType);
+      if (isLValue)
+        opaqueType = LValueType::get(opaqueType);
+
+      auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(), opaqueType);
+      archetypeVal->setUniquelyReferenced(true);
+
+      // Record the opened existential.
       OpenedExistential record{NumOpenedExistentials++, archetype, base,
                                archetypeVal, depth};
       bool inserted = OpenedExistentials.insert({archetypeVal, record}).second;
@@ -1487,10 +1516,6 @@ namespace {
                  bool suppressDiagnostics)
       : cs(cs), dc(cs.DC), solution(solution), 
         SuppressDiagnostics(suppressDiagnostics) { }
-
-    ~ExprRewriter() {
-      finalize();
-    }
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -3308,7 +3333,7 @@ namespace {
       return E;
     }
 
-    void finalize() {
+    void finalize(Expr *&result) {
       // Check that all value type methods were fully applied.
       auto &tc = cs.getTypeChecker();
       for (auto &unapplied : InvalidPartialApplications) {
@@ -3318,11 +3343,22 @@ namespace {
                     kind);
       }
 
-      // We should have complained above if there were any
-      // existentials that haven't been closed yet.
-      assert((OpenedExistentials.empty() || 
-              !InvalidPartialApplications.empty()) &&
-             "Opened existentials have not been closed");
+      // Close out any existentials that are still open.
+      // FIXME: This happens when our close-placement heuristics failed, and
+      // we might be opening up the existential too early.
+      SmallVector<OpenedExistential, 4> remainingOpenedExistentials;
+      for (const auto &opened : OpenedExistentials) {
+        remainingOpenedExistentials.push_back(opened.second);
+      }
+      llvm::array_pod_sort(remainingOpenedExistentials.begin(),
+                           remainingOpenedExistentials.end());
+      for (auto &opened : remainingOpenedExistentials) {
+        result = new (tc.Context) OpenExistentialExpr(
+                                    opened.ExistentialValue,
+                                    opened.OpaqueValue,
+                                    result);
+      }
+      OpenedExistentials.clear();
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {
@@ -6145,6 +6181,9 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                    getConstraintLocator(expr));
   }
 
+  if (result)
+    rewriter.finalize(result);
+
   return result;
 }
 
@@ -6152,7 +6191,10 @@ Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
                                              Expr *expr,
                                              bool suppressDiagnostics) {
   ExprRewriter rewriter(*this, solution, suppressDiagnostics);
-  return rewriter.visit(expr);
+  Expr *result = rewriter.visit(expr);
+  if (result)
+    rewriter.finalize(result);
+  return result;
 }
 
 Expr *Solution::coerceToType(Expr *expr, Type toType,
@@ -6173,6 +6215,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
     }
   }
 
+  rewriter.finalize(result);
   return result;
 }
 
@@ -6295,8 +6338,13 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   // Call the witness.
   ApplyExpr *apply = new (Context) CallExpr(memberRef, arg, /*Implicit=*/true);
-  return rewriter.finishApply(apply, openedType,
-                              cs.getConstraintLocator(arg));
+  Expr *result = rewriter.finishApply(apply, openedType,
+                                      cs.getConstraintLocator(arg));
+  if (!result)
+    return nullptr;
+
+  rewriter.finalize(result);
+  return result;
 }
 
 /// \brief Convert an expression via a builtin protocol.
@@ -6413,6 +6461,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   failed = tc.typeCheckExpressionShallow(expr, cs.DC);
   assert(!failed && "Could not call witness?");
   (void)failed;
+
+  rewriter.finalize(expr);
   return expr;
 }
 
