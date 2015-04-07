@@ -406,6 +406,12 @@ public:
                                    SILFunction::ClassVisibility_t CV =
                                            SILFunction::NotRelevant);
 
+  /// \brief Return the declaration of a function, or create it if it doesn't
+  /// exist..
+  SILFunction *getOrCreateFunction(SILLocation loc,
+                                   SILDeclRef constant,
+                                   ForDefinition_t forDefinition);
+
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
   /// witnesses, if any.

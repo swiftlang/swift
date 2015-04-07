@@ -242,6 +242,103 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   return fn;
 }
 
+static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
+  if (!constant.hasDecl())
+    return SILFunction::NotRelevant;
+
+  // If this decleration is a function which goes into a vtable, then it's
+  // symbol must be as visible as its class. Derived classes even have to put
+  // all less visible methods of the base class into their vtables.
+
+  auto *FD = dyn_cast<AbstractFunctionDecl>(constant.getDecl());
+  if (!FD)
+    return SILFunction::NotRelevant;
+
+  DeclContext *context = FD->getDeclContext();
+
+  // Methods from extensions don't go into vtables (yet).
+  if (context->isExtensionContext())
+    return SILFunction::NotRelevant;
+
+  auto *classType = context->isClassOrClassExtensionContext();
+  if (!classType || classType->isFinal())
+    return SILFunction::NotRelevant;
+
+  if (FD->isFinal() && !FD->getOverriddenDecl())
+    return SILFunction::NotRelevant;
+
+  assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&
+         "class must be as visible as its members");
+
+  switch (classType->getEffectiveAccess()) {
+    case Accessibility::Private:
+      return SILFunction::NotRelevant;
+    case Accessibility::Internal:
+      return SILFunction::InternalClass;
+    case Accessibility::Public:
+      return SILFunction::PublicClass;
+  }
+}
+
+SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
+                                            SILDeclRef constant,
+                                            ForDefinition_t forDefinition) {
+
+  SmallVector<char, 128> buffer;
+  auto name = constant.mangle(buffer);
+  auto constantType = Types.getConstantType(constant).castTo<SILFunctionType>();
+  SILLinkage linkage = constant.getLinkage(forDefinition);
+
+  if (auto fn = lookUpFunction(name)) {
+    assert(fn->getLoweredFunctionType() == constantType);
+    assert(fn->getLinkage() == linkage);
+    return fn;
+  }
+
+  IsTransparent_t IsTrans = constant.isTransparent()?
+                              IsTransparent : IsNotTransparent;
+  IsFragile_t IsFrag = IsNotFragile;
+  if (IsTrans == IsTransparent && (linkage == SILLinkage::Public
+                                   || linkage == SILLinkage::PublicExternal)) {
+    IsFrag = IsFragile;
+  }
+
+  EffectsKind EK = constant.hasEffectsAttribute() ?
+  constant.getEffectsAttribute() : EffectsKind::Unspecified;
+
+  Inline_t inlineStrategy = InlineDefault;
+  if (constant.isNoinline())
+    inlineStrategy = NoInline;
+  else if (constant.isAlwaysInline())
+    inlineStrategy = AlwaysInline;
+
+
+
+  auto *F = SILFunction::create(*this, linkage, name,
+                                constantType, nullptr,
+                                None, IsNotBare, IsTrans, IsFrag, IsNotThunk,
+                                getClassVisibility(constant),
+                                inlineStrategy, EK);
+
+  if (forDefinition == ForDefinition_t::ForDefinition)
+    F->setDebugScope(new (*this) SILDebugScope(loc, *F));
+
+  F->setGlobalInit(constant.isGlobal());
+  if (constant.hasDecl())
+    if (auto SemanticsA =
+        constant.getDecl()->getAttrs().getAttribute<SemanticsAttr>())
+      F->setSemanticsAttr(SemanticsA->Value);
+
+  ValueDecl *VD = nullptr;
+  if (constant.hasDecl())
+    VD = constant.getDecl();
+
+  F->setDeclContext(VD);
+
+  return F;
+}
+
+
 SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   StringRef name,
                                                   CanSILFunctionType type,
