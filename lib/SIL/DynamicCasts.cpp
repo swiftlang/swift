@@ -237,7 +237,7 @@ swift::classifyDynamicCast(Module *M,
         !target.isAnyExistentialType() &&
         !target.getClassOrBoundGenericClass() &&
         !isa<ArchetypeType>(target) &&
-        !isObjectiveCBridgeable(M, target)) {
+        !mayBridgeToObjectiveC(M, target)) {
       assert((target.getEnumOrBoundGenericEnum() ||
               target.getStructOrBoundGenericStruct() ||
               isa<TupleType>(target) ||
@@ -339,6 +339,9 @@ swift::classifyDynamicCast(Module *M,
   }
 
   // FIXME: tuple conversions?
+
+  // FIXME: Be more careful with briding conversions from
+  // NSArray, NSDictionary and NSSet as they may fail?
 
   // Check if there might be a bridging conversion.
   if (source->isBridgeableObjectType() && mayBridgeToObjectiveC(M, target)) {
@@ -755,11 +758,17 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
   assert(src.getType().isAddress());
   assert(dest.getType().isAddress());
 
+  // Casts between the same types can be always handled here.
   // Casts from non-existentials into existentials and
   // vice-versa cannot be improved yet.
+  // Casts between a value type and a class cannot be optimized.
   // Therefore generate a simple unconditional_checked_cast_aadr.
+
+  if (src.getType() != dest.getType())
   if (src.getType().isAnyExistentialType() !=
-      dest.getType().isAnyExistentialType()) {
+      dest.getType().isAnyExistentialType() ||
+      !(src.getType().getClassOrBoundGenericClass() &&
+       dest.getType().getClassOrBoundGenericClass())) {
     // If there is an existing cast with the same arguments,
     // indicate we cannot improve it.
     if (existingCast) {
