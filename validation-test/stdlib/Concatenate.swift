@@ -46,7 +46,7 @@ for (expected, source) in samples {
   ConcatenateTests.test("sequence-\(source)") {
     checkSequence(
       ContiguousArray(expected),
-      _lazyConcatenate(SequenceOf(source)),
+      _lazyConcatenate(AnySequence(source)),
       SourceLocStack().withCurrentLoc())
   }
 }

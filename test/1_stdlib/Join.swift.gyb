@@ -317,50 +317,50 @@ JoinTestSuite.test("OperatorPlus") {
   // ExtensibleCollectionType + SequenceType
   if true {
     var ec: [Int] = []
-    var s = SequenceOf([Int]())
+    var s = AnySequence([Int]())
     var r: [Int] = ec + s
     expectEqual([], r)
   }
   if true {
     var ec: [Int] = []
-    var s = SequenceOf([ 4, 5, 6, 7 ])
+    var s = AnySequence([ 4, 5, 6, 7 ])
     var r: [Int] = ec + s
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
     var ec: [Int] = [ 1, 2, 3 ]
-    var s = SequenceOf([Int]())
+    var s = AnySequence([Int]())
     var r: [Int] = ec + s
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
     var ec: [Int] = [ 1, 2, 3 ]
-    var s = SequenceOf([ 4, 5, 6, 7 ])
+    var s = AnySequence([ 4, 5, 6, 7 ])
     var r: [Int] = ec + s
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
   // SequenceType + ExtensibleCollectionType
   if true {
-    var s = SequenceOf([Int]())
+    var s = AnySequence([Int]())
     var ec: [Int] = []
     var r: [Int] = s + ec
     expectEqual([], r)
   }
   if true {
-    var s = SequenceOf([Int]())
+    var s = AnySequence([Int]())
     var ec: [Int] = [ 4, 5, 6, 7 ]
     var r: [Int] = s + ec
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
-    var s = SequenceOf([ 1, 2, 3 ])
+    var s = AnySequence([ 1, 2, 3 ])
     var ec: [Int] = []
     var r: [Int] = s + ec
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
-    var s = SequenceOf([ 1, 2, 3 ])
+    var s = AnySequence([ 1, 2, 3 ])
     var ec: [Int] = [ 4, 5, 6, 7]
     var r: [Int] = s + ec
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
