@@ -62,12 +62,6 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
            FLoc.isASTNode<ClosureExpr>() ? 1 : 0);
 }
 
-static void diagnoseNonExhaustiveSwitch(const UnreachableInst *UI,
-                                        ASTContext &Context) {
-  SILLocation L = UI->getLoc();
-  assert(L);
-  diagnose(Context, L.getEndSourceLoc(), diag::non_exhaustive_switch);
-}
 
 static void diagnoseUnreachable(const SILInstruction *I,
                                 ASTContext &Context) {
@@ -83,7 +77,6 @@ static void diagnoseUnreachable(const SILInstruction *I,
     // The most common case of getting an unreachable instruction is a
     // missing return statement. In this case, we know that the instruction
     // location will be the enclosing function.
-
     if (L.isASTNode<AbstractFunctionDecl>() || L.isASTNode<ClosureExpr>()) {
       diagnoseMissingReturn(UI, Context);
       return;
@@ -91,7 +84,18 @@ static void diagnoseUnreachable(const SILInstruction *I,
 
     // A non-exhaustive switch would also produce an unreachable instruction.
     if (L.isASTNode<SwitchStmt>()) {
-      diagnoseNonExhaustiveSwitch(UI, Context);
+      diagnose(Context, L.getEndSourceLoc(), diag::non_exhaustive_switch);
+      return;
+    }
+    
+    if (auto *PBD = L.getAsASTNode<PatternBindingDecl>()) {
+      assert(PBD->isRefutable() && PBD->getElse().isExplicit() &&
+             "Not a refutable let/else?");
+      StringRef Kind = "let";
+      if (PBD->getLoc().isValid())
+        Kind = Context.SourceMgr.extractText({PBD->getLoc(), 3});
+      diagnose(Context, PBD->getElse().getExplicitBody()->getRBraceLoc(),
+               diag::letvar_else_must_not_fallthrough, Kind);
       return;
     }
   }
