@@ -86,13 +86,19 @@ func tuplePatternDestructuring(x : Int, y : Int) {
 
 func testLetElse(a : Int?) {
   let optUnwrap? = a else {  // expected-note {{previous definition of 'optUnwrap' is here}}
-    optUnwrap = 42  // expected-error {{cannot assign to 'let' value 'optUnwrap'}}
+    a = 42  // expected-error {{cannot assign to 'let' value 'a'}}
   }
   
   // Check that the let-else vardecl got injected into our scope correctly.
   let optUnwrap = 42  // expected-error {{definition conflicts with previous value}}
   
   let optUnwrap2? = a else { return }
+  
+  // Bound variables are not in scope in an else clause.
+  let x? = a, y = a else {
+    print(x)   // FIXME: Should reject, not in scope.
+    print(y)   // FIXME: Should reject, not in scope.
+  }
 }
 
 
