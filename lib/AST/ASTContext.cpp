@@ -57,6 +57,11 @@ namespace {
   /// An unsatisfied, optional @objc requirement in a protocol conformance.
   typedef std::pair<DeclContext *, AbstractFunctionDecl *>
     ObjCUnsatisfiedOptReq;
+
+  enum class SearchPathKind : uint8_t {
+    Import = 1 << 0,
+    Framework = 1 << 1
+  };
 }
 
 struct ASTContext::Implementation {
@@ -257,7 +262,7 @@ struct ASTContext::Implementation {
   /// checking unintended Objective-C overrides.
   std::vector<AbstractFunctionDecl *> ObjCMethods;
 
-  llvm::StringMap<uint8_t> SearchPathsSet;
+  llvm::StringMap<OptionSet<SearchPathKind>> SearchPathsSet;
 
   /// \brief The permanent arena.
   Arena Permanent;
@@ -366,16 +371,11 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Id_##Name = getIdentifier(IdStr);
 #include "swift/AST/KnownIdentifiers.def"
 
-  enum {
-    ImportSearchPathKind = 1 << 0,
-    FrameworkSearchPathKind = 1 << 1
-  };
-
   // Record the initial set of search paths.
   for (StringRef path : SearchPathOpts.ImportSearchPaths)
-    Impl.SearchPathsSet[path] |= ImportSearchPathKind;
+    Impl.SearchPathsSet[path] |= SearchPathKind::Import;
   for (StringRef path : SearchPathOpts.FrameworkSearchPaths)
-    Impl.SearchPathsSet[path] |= FrameworkSearchPathKind;
+    Impl.SearchPathsSet[path] |= SearchPathKind::Framework;
 }
 
 ASTContext::~ASTContext() {
@@ -1059,11 +1059,11 @@ Type ASTContext::getTypeVariableMemberType(TypeVariableType *baseTypeVar,
 }
 
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework) {
-  auto &loaded = Impl.SearchPathsSet[searchPath];
-  uint8_t loadedFlag = (1 << isFramework);
-  if (loaded & loadedFlag)
+  OptionSet<SearchPathKind> &loaded = Impl.SearchPathsSet[searchPath];
+  auto kind = isFramework ? SearchPathKind::Framework : SearchPathKind::Import;
+  if (loaded.contains(kind))
     return;
-  loaded |= loadedFlag;
+  loaded |= kind;
 
   if (isFramework)
     SearchPathOpts.FrameworkSearchPaths.push_back(searchPath);
