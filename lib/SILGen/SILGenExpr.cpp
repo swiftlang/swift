@@ -3128,9 +3128,14 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
 
 RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E, 
                                                SGFContext C) {
+  Optional<WritebackScope> writebackScope;
+
   // Emit the existential value.
   ManagedValue existentialValue;
   if (E->getExistentialValue()->getType()->is<LValueType>()) {
+    // Create a writeback scope for the access to the existential lvalue.
+    writebackScope.emplace(SGF);
+
     existentialValue = SGF.emitAddressOfLValue(
                          E->getExistentialValue(),
                          SGF.emitLValue(E->getExistentialValue(),

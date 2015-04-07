@@ -164,3 +164,31 @@ func testExistentialSetters(var p1: P1, b: Bool) {
   // CHECK-NEXT: deinit_existential_addr [[PBOX]]#1 : $*P1
   p1[b] = b
 }
+
+struct HasAP1 {
+  var p1: P1
+
+  var someP1: P1 {
+    get { return p1 }
+    set { p1 = newValue }
+  }
+}
+
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions29testLogicalExistentialSetters
+// CHECK: bb0([[HASP1:%[0-9]+]] : $*HasAP1, [[B:%[0-9]+]] : $Bool)
+func testLogicalExistentialSetters(var hasAP1: HasAP1, b: Bool) {
+  // CHECK: [[HASP1_BOX:%[0-9]+]] = alloc_box $HasAP1
+  // CHECK-NEXT: copy_addr [take] [[HASP1]] to [initialization] [[HASP1_BOX]]#1 : $*HasAP1
+  // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $P1
+  // CHECK-NEXT: [[HASP1_COPY:%[0-9]+]] = alloc_stack $HasAP1
+  // CHECK-NEXT: copy_addr [[HASP1_BOX]]#1 to [initialization] [[HASP1_COPY]]#1 : $*HasAP1
+  // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1g6someP1PS_2P1_ : $@cc(method) @thin (@out P1, @in HasAP1) -> ()
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]]#1, %6#1) : $@cc(method) @thin (@out P1, @in HasAP1) -> ()
+  // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr [[P1_COPY]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
+  // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1s5prop2Sb : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
+  // CHECK: apply [[PROP2_SETTER]]<@opened([[UUID]]) P1>([[B]], [[P1_OPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
+  // CHECK: [[SOMEP1_SETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1s6someP1PS_2P1_ : $@cc(method) @thin (@in P1, @inout HasAP1) -> ()
+  // CHECK: apply [[SOMEP1_SETTER]]([[P1_COPY]]#1, [[HASP1_BOX]]#1) : $@cc(method) @thin (@in P1, @inout HasAP1) -> ()
+  // CHECK: deinit_existential_addr [[P1_COPY]]#1 : $*P1
+  hasAP1.someP1.prop2 = b
+}

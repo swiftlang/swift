@@ -235,5 +235,24 @@ println(p.extValue)
 toggle(&p.extValue)
 println(p.extValue)
 
+// Logical lvalues of existential type.
+struct HasP {
+  var _p: P
+  var p: P {
+    get { return _p }
+    set { _p = newValue }
+  }
+}
+
+var hasP = HasP(_p: false)
+
+// CHECK: true
+hasP.p.extValue = true
+println(hasP.p.extValue)
+
+// CHECK: false
+toggle(&hasP.p.extValue)
+println(hasP.p.extValue)
+
 // CHECK: DONE
 println("DONE")
