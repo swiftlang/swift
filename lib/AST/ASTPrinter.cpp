@@ -2951,19 +2951,21 @@ void TypeBase::print(ASTPrinter &Printer, const PrintOptions &PO) const {
 
 void ProtocolConformance::printName(llvm::raw_ostream &os,
                                     const PrintOptions &PO) const {
-  if (PO.PrintForSIL) {
-    if (auto genericSig = getGenericSignature()) {
-      StreamPrinter sPrinter(os);
-      TypePrinter typePrinter(sPrinter, PO);
-      typePrinter.printGenericSignature(genericSig->getGenericParams(),
-                                        genericSig->getRequirements());
+  if (getKind() == ProtocolConformanceKind::Normal) {
+    if (PO.PrintForSIL) {
+      if (auto genericSig = getGenericSignature()) {
+        StreamPrinter sPrinter(os);
+        TypePrinter typePrinter(sPrinter, PO);
+        typePrinter.printGenericSignature(genericSig->getGenericParams(),
+                                          genericSig->getRequirements());
+        os << ' ';
+      }
+    } else if (auto gp = getGenericParams()) {
+      StreamPrinter SPrinter(os);
+      PrintAST Printer(SPrinter, PO);
+      Printer.printGenericParams(gp);
       os << ' ';
     }
-  } else if (auto gp = getGenericParams()) {
-    StreamPrinter SPrinter(os);
-    PrintAST Printer(SPrinter, PO);
-    Printer.printGenericParams(gp);
-    os << ' ';
   }
  
   getType()->print(os, PO);
@@ -2983,14 +2985,14 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
                [&](const Substitution &s) { s.print(os, PO); },
                [&] { os << ", "; });
     os << "> (";
-    spec->getGenericConformance()->printName(os);
+    spec->getGenericConformance()->printName(os, PO);
     os << ")";
     break;
   }
   case ProtocolConformanceKind::Inherited: {
     auto inherited = cast<InheritedProtocolConformance>(this);
     os << "inherit (";
-    inherited->getInheritedConformance()->printName(os);
+    inherited->getInheritedConformance()->printName(os, PO);
     os << ")";
     break;
   }

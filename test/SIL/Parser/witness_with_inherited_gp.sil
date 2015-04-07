@@ -26,7 +26,7 @@ public struct mmEnumerateSequence<
 // CHECK: sil_witness_table <Base where Base : SequenceType, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
 // CHECK:  base_protocol _SequenceType: <Base where Base : SequenceType, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
 // CHECK:  associated_type Generator: mmEnumerateGenerator<Base.Generator>
-// CHECK:  associated_type_protocol (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
+// CHECK:  associated_type_protocol (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base where Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
 sil_witness_table <Base : SequenceType> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
   base_protocol _SequenceType: <Base : SequenceType> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
   associated_type Generator: mmEnumerateGenerator<Base.Generator>
@@ -50,4 +50,4 @@ sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithG
 // CHECK: sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithGP {
 // CHECK: base_protocol _SequenceType: <T> _mmArrayBuffer<T>: _SequenceType module WitnessTableWithGP
 // CHECK: associated_type Generator: IndexingGenerator<_mmArrayBuffer<T>>
-// CHECK: associated_type_protocol (Generator: GeneratorType): IndexingGenerator<_mmArrayBuffer<T>>: specialize <C = _mmArrayBuffer<T>, C.Index = Int, C.Index.Distance = Int, C.Index.Distance.IntegerLiteralType = Int, C.Index._DisabledRangeIndex = Int, C._Element = T> (<C : _CollectionType> IndexingGenerator<C>: GeneratorType module Swift)
+// CHECK: associated_type_protocol (Generator: GeneratorType): IndexingGenerator<_mmArrayBuffer<T>>: specialize <C = _mmArrayBuffer<T>, C.Index = Int, C.Index.Distance = Int, C.Index.Distance.IntegerLiteralType = Int, C.Index._DisabledRangeIndex = Int, C._Element = T> (<C where C : _CollectionType, C.Index : ForwardIndexType, C.Index.Distance : _SignedIntegerType, C.Index.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> IndexingGenerator<C>: GeneratorType module Swift)
