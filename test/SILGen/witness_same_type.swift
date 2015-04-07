@@ -20,8 +20,8 @@ struct Foo: Fooable {
 // rdar://problem/19049566
 // CHECK-LABEL: sil [transparent] [thunk] @_TTWUSs12SequenceType__USs13GeneratorType__GV17witness_same_type14LazySequenceOfQ_Q0__Ss14_Sequence_TypeS1_FS3_8generateUS3__US0____fQPS3_FT_QS4_9Generator
 public struct LazySequenceOf<SS : SequenceType, A where SS.Generator.Element == A> : SequenceType {
-	public func generate() -> AnyGenerator<A> { 
-    var opt: AnyGenerator<A>?
+	public func generate() -> GeneratorOf<A> { 
+    var opt: GeneratorOf<A>?
     return opt!
   }
 	public subscript(i : Int) -> A { 

@@ -2479,7 +2479,7 @@ SetTestSuite.test("⊈.Set.Set") {
 
 SetTestSuite.test("isSubsetOf.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectTrue(Set<Int>().isSubsetOf(s1))
   expectFalse(s1.isSubsetOf(Set<Int>()))
   expectTrue(s1.isSubsetOf(s1))
@@ -2487,7 +2487,7 @@ SetTestSuite.test("isSubsetOf.Set.Sequence") {
 
 SetTestSuite.test("⊆.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectTrue(Set<Int>().isSubsetOf(s1))
   expectFalse(s1 ⊆ Set<Int>())
   expectTrue(s1 ⊆ s1)
@@ -2495,7 +2495,7 @@ SetTestSuite.test("⊆.Set.Sequence") {
 
 SetTestSuite.test("⊈.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectFalse(Set<Int>() ⊈ s1)
   expectTrue(s1 ⊈ Set<Int>())
   expectFalse(s1 ⊈ s1)
@@ -2527,7 +2527,7 @@ SetTestSuite.test("⊄.Set.Set") {
 
 SetTestSuite.test("isStrictSubsetOf.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectTrue(Set<Int>().isStrictSubsetOf(s1))
   expectFalse(s1.isStrictSubsetOf(Set<Int>()))
   expectFalse(s1.isStrictSubsetOf(s1))
@@ -2535,7 +2535,7 @@ SetTestSuite.test("isStrictSubsetOf.Set.Sequence") {
 
 SetTestSuite.test("⊂.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectTrue(Set<Int>() ⊂ s1)
   expectFalse(s1 ⊂ Set<Int>())
   expectFalse(s1 ⊂ s1)
@@ -2543,7 +2543,7 @@ SetTestSuite.test("⊂.Set.Sequence") {
 
 SetTestSuite.test("⊄.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectFalse(Set<Int>() ⊄ s1)
   expectTrue(s1 ⊄ Set<Int>())
   expectTrue(s1 ⊄ s1)
@@ -2581,7 +2581,7 @@ SetTestSuite.test("⊉.Set.Set") {
 
 SetTestSuite.test("isSupersetOf.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectTrue(s1.isSupersetOf(Set<Int>()))
   expectFalse(Set<Int>().isSupersetOf(s1))
   expectTrue(s1.isSupersetOf(s1))
@@ -2591,7 +2591,7 @@ SetTestSuite.test("isSupersetOf.Set.Sequence") {
 
 SetTestSuite.test("⊇.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectTrue(s1 ⊇ Set<Int>())
   expectFalse(Set<Int>() ⊇ s1)
   expectTrue(s1 ⊇ s1)
@@ -2601,7 +2601,7 @@ SetTestSuite.test("⊇.Set.Sequence") {
 
 SetTestSuite.test("⊉.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectFalse(s1 ⊉ Set<Int>())
   expectTrue(Set<Int>() ⊉ s1)
   expectFalse(s1 ⊉ s1)
@@ -2638,7 +2638,7 @@ SetTestSuite.test("⊅.Set.Set") {
 
 SetTestSuite.test("strictSuperset.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectTrue(s1.isStrictSupersetOf(Set<Int>()))
   expectFalse(Set<Int>().isStrictSupersetOf(s1))
   expectFalse(s1.isStrictSupersetOf(s1))
@@ -2647,7 +2647,7 @@ SetTestSuite.test("strictSuperset.Set.Sequence") {
 
 SetTestSuite.test("⊃.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectTrue(s1 ⊃ Set<Int>())
   expectFalse(Set<Int>() ⊃ s1)
   expectFalse(s1 ⊃ s1)
@@ -2656,7 +2656,7 @@ SetTestSuite.test("⊃.Set.Sequence") {
 
 SetTestSuite.test("⊅.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
+  let s2 = SequenceOf([1010, 2020, 3030])
   expectFalse(s1 ⊅ Set<Int>())
   expectTrue(Set<Int>() ⊅ s1)
   expectTrue(s1 ⊅ s1)
@@ -2717,8 +2717,8 @@ SetTestSuite.test("isDisjointWith.Set.Set") {
 
 SetTestSuite.test("isDisjointWith.Set.Sequence") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  let s3 = AnySequence([7070, 8080, 9090])
+  let s2 = SequenceOf([1010, 2020, 3030])
+  let s3 = SequenceOf([7070, 8080, 9090])
   expectTrue(s1.isDisjointWith(s3))
   expectFalse(s1.isDisjointWith(s2))
   expectTrue(Set<Int>().isDisjointWith(s1))
