@@ -319,7 +319,8 @@ func testLetElseExprPattern(a : Int) {
   
   var 4 = a else { return }  // ok
   var 4 = a else { die() }  // ok
-  
+  var 4 = a else { fatalError("baaad") }  // ok
+
   for i in 0...100 {
     var 4 = a else { continue } // ok
   }
