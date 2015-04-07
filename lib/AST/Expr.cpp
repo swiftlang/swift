@@ -802,7 +802,7 @@ TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
 
 
 ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
-  auto type = getOpaqueValue()->getType();
+  auto type = getOpaqueValue()->getType()->getRValueType();
   if (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
   return type->castTo<ArchetypeType>();

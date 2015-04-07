@@ -158,6 +158,7 @@ public:
   LValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
                                     AccessKind accessKind);
   LValue visitDeclRefExpr(DeclRefExpr *e, AccessKind accessKind);
+  LValue visitOpaqueValueExpr(OpaqueValueExpr *e, AccessKind accessKind);
 
   // Nodes that make up components of lvalue paths
   
@@ -1530,6 +1531,22 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e, AccessKind accessKind) {
                                        getSubstFormalRValueType(e),
                                        accessKind,
                                        e->getAccessSemantics());
+}
+
+LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
+                                          AccessKind accessKind) {
+  assert(gen.OpaqueValues.count(e) && "Didn't bind OpaqueValueExpr");
+
+  auto &entry = gen.OpaqueValues[e];
+  assert((!entry.isUniquelyReferenced || !entry.hasBeenConsumed) &&
+         "uniquely-referenced opaque value already consumed");
+  entry.hasBeenConsumed = true;
+
+  SILType type = gen.getLoweredType(getSubstFormalRValueType(e));
+  LValue lv;
+  lv.add<ValueComponent>(ManagedValue::forUnmanaged(entry.value),
+                         getValueTypeData(type, gen.SGM.M));
+  return std::move(lv);
 }
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e,

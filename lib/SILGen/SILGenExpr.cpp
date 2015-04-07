@@ -3115,8 +3115,16 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
 RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E, 
                                                SGFContext C) {
   // Emit the existential value.
-  ManagedValue existentialValue
-    = SGF.emitRValueAsSingleValue(E->getExistentialValue());
+  ManagedValue existentialValue;
+  if (E->getExistentialValue()->getType()->is<LValueType>()) {
+    existentialValue = SGF.emitAddressOfLValue(
+                         E->getExistentialValue(),
+                         SGF.emitLValue(E->getExistentialValue(),
+                                        AccessKind::ReadWrite),
+                         AccessKind::ReadWrite);
+  } else {
+    existentialValue = SGF.emitRValueAsSingleValue(E->getExistentialValue());
+  }
   
   // Open the existential value into the opened archetype value.
   // TODO: Nonunique opened existentials need different memory management for
@@ -3126,13 +3134,14 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
   bool isUnique = E->getOpaqueValue()->isUniquelyReferenced();
   SILValue archetypeValue;
   
+  Type opaqueValueType = E->getOpaqueValue()->getType()->getRValueType();
   switch (existentialValue.getType()
                             .getPreferredExistentialRepresentation(SGF.SGM.M)) {
   case ExistentialRepresentation::Opaque:
     assert(existentialValue.getValue().getType().isAddress());
     archetypeValue = SGF.B.createOpenExistentialAddr(
                        E, existentialValue.forward(SGF),
-                       SGF.getLoweredType(E->getOpaqueValue()->getType()));
+                       SGF.getLoweredType(opaqueValueType));
     // Leave a cleanup to deinit the existential container.
     SGF.Cleanups.pushCleanup<TakeFromExistentialCleanup>(
                                                   existentialValue.getValue());
@@ -3141,19 +3150,19 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
     assert(existentialValue.getValue().getType().isObject());
     archetypeValue = SGF.B.createOpenExistentialMetatype(
                        E, existentialValue.forward(SGF),
-                       SGF.getLoweredType(E->getOpaqueValue()->getType()));
+                       SGF.getLoweredType(opaqueValueType));
     break;
   case ExistentialRepresentation::Class:
     assert(existentialValue.getValue().getType().isObject());
     archetypeValue = SGF.B.createOpenExistentialRef(
                        E, existentialValue.forward(SGF),
-                       SGF.getLoweredType(E->getOpaqueValue()->getType()));
+                       SGF.getLoweredType(opaqueValueType));
     break;
   case ExistentialRepresentation::Boxed:
     assert(existentialValue.getValue().getType().isObject());
     archetypeValue = SGF.B.createOpenExistentialBox(
                        E, existentialValue.forward(SGF),
-                       SGF.getLoweredType(E->getOpaqueValue()->getType()));
+                       SGF.getLoweredType(opaqueValueType));
     // The boxed value can't be assumed to be uniquely referenced.
     isUnique = false;
     break;
