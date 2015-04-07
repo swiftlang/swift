@@ -175,8 +175,6 @@ ERROR(disallowed_init,decl_parsing,none,
       "initial value is not allowed here", ())
 ERROR(var_init_self_referential,expr_parsing,none,
       "variable used within its own initial value", ())
-ERROR(refutable_var_not_bound_in_else,expr_parsing,none,
-      "variable in refutable pattern is not bound in else block", ())
 ERROR(disallowed_enum_element,decl_parsing,none,
       "enum 'case' is not allowed outside of an enum", ())
 ERROR(decl_inner_scope,decl_parsing,none,

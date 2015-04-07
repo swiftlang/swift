@@ -96,8 +96,8 @@ func testLetElse(a : Int?) {
   
   // Bound variables are not in scope in an else clause.
   let x? = a, y = a else {
-    print(x)   // expected-error {{variable in refutable pattern is not bound in else block}}
-    print(y)   // expected-error {{variable in refutable pattern is not bound in else block}}
+    print(x)   // FIXME: Should reject, not in scope.
+    print(y)   // FIXME: Should reject, not in scope.
   }
 }
 

@@ -48,8 +48,6 @@ private:
 public:
   ValueDecl *lookupValueName(Identifier Name);
 
-  Scope *getCurrentScope() const { return CurScope; }
-
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.
   void addToScope(ValueDecl *D, Parser &TheParser);
@@ -146,9 +144,6 @@ public:
   /// \brief Re-enter the specified scope, transferring the ownership of the
   /// scope frame to the new object.
   Scope(Parser *P, SavedScope &&SS);
-
-  ScopeKind getKind() const { return Kind; }
-
   ~Scope() {
     // Active config blocks delegate to the enclosing scope, so there's nothing
     // to pop off.

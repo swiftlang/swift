@@ -3435,26 +3435,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // want.
     Decls.insert(Decls.begin()+NumDeclsInResult, PBD);
   });
-
-  // Push a local scope to parse the bound VarDecl's into.  We need this scope
-  // because we need to pop it before parsing any 'else' clause on the pattern
-  // binding declaration.  Further wrap this up in an Optional because we want
-  // to pop it early, and this is a convenient way to avoid RAII issues.
-  //
-  // After all of the pattern bindings are parsed, and the else is parsed, the
-  // vardecls are reinjected into the previously active scope so that they can
-  // be found by name lookup.
-  defer(([&] {
-    SmallVector<VarDecl *, 4> Vars;
-    for (auto &elt : PBDEntries)
-      elt.ThePattern->collectVariables(Vars);
-
-    for (auto v : Vars)
-      if (v->hasName())
-        getScopeInfo().addToScope(v, *this);
-  }));
-  Optional<Scope> tempScope;
-  tempScope.emplace(this, getScopeInfo().getCurrentScope()->getKind());
   
   do {
     Pattern *pattern;
@@ -3493,13 +3473,12 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       // decl (even though names aren't injected into scope when the initializer
       // is parsed).
       SmallVector<VarDecl *, 4> Vars;
+      Vars.append(CurVars.begin(), CurVars.end());
       pattern->collectVariables(Vars);
       
-      llvm::SaveAndRestore<decltype(DisabledVars)>
-      RestoreCurVars(DisabledVars, Vars);
-
-      llvm::SaveAndRestore<decltype(DisabledVarReason)>
-      RestoreReason(DisabledVarReason, diag::var_init_self_referential);
+      llvm::SaveAndRestore<decltype(CurVars)>
+      RestoreCurVars(CurVars, Vars);
+      
       
       // If we have no local context to parse the initial value into, create one
       // for the PBD we'll eventually create.  This allows us to have reasonable
@@ -3625,28 +3604,11 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       WhereExpr = whereCond.get();
   }
 
-
-  // Now that all of the pattern bindings and where have been parsed, pop the
-  // temporary scope we pushed to handle local name lookup.
-  tempScope.reset();
-
   // Check for an 'else' condition.
   SourceLoc ElseLoc;
   if (consumeIf(tok::kw_else, ElseLoc)) {
-    // Before parsing the body of the else, disable all of the bound variables
-    // so that the 'else' doesn't have access to them.
-    SmallVector<VarDecl *, 4> Vars;
-    for (auto &elt : PBDEntries)
-      elt.ThePattern->collectVariables(Vars);
-    
-    llvm::SaveAndRestore<decltype(DisabledVars)>
-    RestoreCurVars(DisabledVars, Vars);
-    
-    llvm::SaveAndRestore<decltype(DisabledVarReason)>
-    RestoreReason(DisabledVarReason, diag::refutable_var_not_bound_in_else);
-
     ParserResult<BraceStmt> Body =
-       parseBraceItemList(diag::let_else_expected_lbrace);
+      parseBraceItemList(diag::let_else_expected_lbrace);
     if (Body.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
 
@@ -3661,8 +3623,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     } else
       ElseStmt = Body.get();
   }
-
-
+  
+  
   // NOTE: At this point, the DoAtScopeExit object is destroyed and the PBD
   // is added to the program.
   
