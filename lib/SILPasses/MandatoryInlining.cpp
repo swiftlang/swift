@@ -282,15 +282,23 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
 
   SILFunction *CalleeFunction = FRI->getReferencedFunction();
 
-  if (CalleeFunction->getAbstractCC() != AbstractCC::Freestanding &&
-      CalleeFunction->getAbstractCC() != AbstractCC::Method &&
-      CalleeFunction->getAbstractCC() != AbstractCC::WitnessMethod)
+  switch (CalleeFunction->getRepresentation()) {
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
+    break;
+    
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::Block:
     return nullptr;
+  }
 
   // If CalleeFunction is a declaration, see if we can load it. If we fail to
   // load it, bail.
-  if (CalleeFunction->empty() && !AI->getModule().linkFunction(CalleeFunction,
-                                                               Mode))
+  if (CalleeFunction->empty()
+      && !AI->getModule().linkFunction(CalleeFunction, Mode))
     return nullptr;
   return CalleeFunction;
 }
@@ -504,7 +512,7 @@ class MandatoryInlining : public SILModuleTransform {
 
       // ObjC functions are called through the runtime and are therefore alive
       // even if not referenced inside SIL.
-      if (F.getLoweredFunctionType()->getAbstractCC() == AbstractCC::ObjCMethod)
+      if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
         continue;
       
       // Okay, just erase the function from the module.

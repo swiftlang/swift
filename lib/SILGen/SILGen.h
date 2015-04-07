@@ -100,8 +100,9 @@ public:
   SILType getConstantType(SILDeclRef constant);
   
   /// Returns the calling convention for a function.
-  AbstractCC getConstantCC(SILDeclRef constant) {
-    return getConstantType(constant).getAbstractCC();
+  SILFunctionTypeRepresentation getDeclRefRepresentation(SILDeclRef constant) {
+    return getConstantType(constant).getAs<SILFunctionType>()
+      ->getRepresentation();
   }
   
   /// Get the function for a SILDeclRef.

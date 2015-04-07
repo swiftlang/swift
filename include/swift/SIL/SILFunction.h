@@ -244,14 +244,14 @@ public:
   bool isZombie() const { return Zombie; }
 
   /// Returns the calling convention used by this entry point.
-  AbstractCC getAbstractCC() const {
-    return getLoweredFunctionType()->getAbstractCC();
+  SILFunctionTypeRepresentation getRepresentation() const {
+    return getLoweredFunctionType()->getRepresentation();
   }
 
   /// Returns true if this function has a calling convention that has a self
   /// argument.
-  bool hasSelfArgument() const {
-    return getLoweredFunctionType()->hasSelfArgument();
+  bool hasSelfParam() const {
+    return getLoweredFunctionType()->hasSelfParam();
   }
 
   StringRef getName() const { return Name; }

@@ -189,8 +189,9 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
       llvm_unreachable("indirect arguments to blocks not supported");
     }
 
-    args.push_back(gen.emitBridgedToNativeValue(loc, mv, AbstractCC::C,
-                                                funcParam.getType()));
+    args.push_back(gen.emitBridgedToNativeValue(loc, mv,
+                                SILFunctionTypeRepresentation::CFunctionPointer,
+                                funcParam.getType()));
   }
 
   // Call the native function.
@@ -200,7 +201,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
                          funcTy->getSILResult().getSwiftRValueType());
 
   // Bridge the result back to ObjC.
-  result = gen.emitNativeToBridgedValue(loc, result, AbstractCC::C,
+  result = gen.emitNativeToBridgedValue(loc, result,
+                        SILFunctionTypeRepresentation::CFunctionPointer,
                         AbstractionPattern(result.getType().getSwiftRValueType()),
                         result.getType().getSwiftRValueType(),
                         blockTy->getSILResult().getSwiftRValueType());
@@ -245,8 +247,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto invokeTy =
     SILFunctionType::get(nullptr,
                      SILFunctionType::ExtInfo()
-                       .withCallingConv(AbstractCC::C)
-                       .withRepresentation(SILFunctionType::Representation::Thin),
+                       .withRepresentation(SILFunctionType::Representation::
+                                           CFunctionPointer),
                      ParameterConvention::Direct_Unowned,
                      params,
                      blockTy->getResult(),
@@ -355,18 +357,20 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
 
 ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
                                                       ManagedValue v,
-                                                      AbstractCC destCC,
+                                                SILFunctionTypeRepresentation destRep,
                                                 AbstractionPattern origNativeTy,
                                                       CanType substNativeTy,
                                                       CanType loweredBridgedTy){
-  switch (destCC) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+  switch (destRep) {
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     // No additional bridging needed for native functions.
     return v;
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::Block:
     return emitNativeToCBridgedValue(*this, loc, v,
                            SILType::getPrimitiveObjectType(loweredBridgedTy));
   }
@@ -397,10 +401,11 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
            && "nonstandard conventions for native functions not implemented");
     SILValue v = new (gen.SGM.M) SILArgument(entry, param.getSILType());
     auto mv = gen.emitManagedRValueWithCleanup(v, tl);
-    args.push_back(gen.emitNativeToBridgedValue(loc, mv, AbstractCC::C,
-                                        AbstractionPattern(param.getType()),
-                                        param.getType(),
-                                        blockParam.getType()));
+    args.push_back(gen.emitNativeToBridgedValue(loc, mv,
+                              SILFunctionTypeRepresentation::Block,
+                              AbstractionPattern(param.getType()),
+                              param.getType(),
+                              blockParam.getType()));
   }
 
   // Add the block argument.
@@ -415,7 +420,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
   ManagedValue result = gen.emitMonomorphicApply(loc, block, args,
                          funcTy->getSILResult().getSwiftRValueType(),
                          /*transparent*/ false,
-                         /*override CC*/ AbstractCC::C);
+                         /*override CC*/ SILFunctionTypeRepresentation::Block);
 
   // Return the result at +1.
   auto &resultTL = gen.getTypeLowering(funcTy->getSILResult());
@@ -539,18 +544,20 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
 }
 
 ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
-                                                      ManagedValue v,
-                                                      AbstractCC srcCC,
-                                                      CanType nativeTy) {
-  switch (srcCC) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+                                          ManagedValue v,
+                                          SILFunctionTypeRepresentation srcRep,
+                                          CanType nativeTy) {
+  switch (srcRep) {
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     // No additional bridging needed for native functions.
     return v;
 
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::ObjCMethod:
     return emitCBridgedToNativeValue(*this, loc, v, getLoweredType(nativeTy));
   }
   llvm_unreachable("bad CC");

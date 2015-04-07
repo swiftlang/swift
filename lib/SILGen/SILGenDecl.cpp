@@ -947,10 +947,10 @@ static SILValue emitBridgeObjCReturnValue(SILGenFunction &gen,
 
   ManagedValue native = gen.emitManagedRValueWithCleanup(result);
   ManagedValue bridged = gen.emitNativeToBridgedValue(loc, native,
-                                                      AbstractCC::ObjCMethod,
-                                                      origNativeTy,
-                                                      substNativeTy,
-                                                      bridgedTy);
+                                      SILFunctionTypeRepresentation::ObjCMethod,
+                                      origNativeTy,
+                                      substNativeTy,
+                                      bridgedTy);
   return bridged.forward(gen);
 }
 
@@ -1073,7 +1073,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
     ManagedValue native =
       gen.emitBridgedToNativeValue(loc,
                                    bridgedArgs[i],
-                                   AbstractCC::ObjCMethod,
+                                   SILFunctionTypeRepresentation::ObjCMethod,
                                    argTy.getSwiftType());
     SILValue argValue;
 

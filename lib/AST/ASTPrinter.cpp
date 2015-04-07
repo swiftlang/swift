@@ -2391,31 +2391,34 @@ public:
     else if (info.isNoEscape())    // autoclosure implies noescape.
       Printer << "@noescape ";
     
-    switch (info.getCC()) {
-    case AbstractCC::Freestanding: break;
-    case AbstractCC::Method:
-      Printer << "@cc(method) ";
-      break;
-    case AbstractCC::C:
-      Printer << "@cc(cdecl) ";
-      break;
-    case AbstractCC::ObjCMethod:
-      Printer << "@cc(objc_method) ";
-      break;
-    case AbstractCC::WitnessMethod:
-      Printer << "@cc(witness_method) ";
-      break;
-    }
-
     if (Options.PrintFunctionRepresentationAttrs) {
-      switch (info.getRepresentation()) {
-      case AnyFunctionType::Representation::Thick:
+      // TODO: coalesce into a single convention attribute.
+      switch (info.getSILRepresentation()) {
+      case SILFunctionType::Representation::Thick:
         break;
-      case AnyFunctionType::Representation::Thin:
+      case SILFunctionType::Representation::Thin:
+        //Printer << "@convention(thin) ";
         Printer << "@thin ";
         break;
-      case AnyFunctionType::Representation::Block:
+      case SILFunctionType::Representation::Block:
+        //Printer << "@convention(block) ";
         Printer << "@objc_block ";
+        break;
+      case SILFunctionType::Representation::CFunctionPointer:
+        //Printer << "@convention(c) ";
+        Printer << "@cc(cdecl) ";
+        break;
+      case SILFunctionType::Representation::Method:
+        //Printer << "@convention(method) ";
+        Printer << "@cc(method) @thin ";
+        break;
+      case SILFunctionType::Representation::ObjCMethod:
+        //Printer << "@convention(objc_method) ";
+        Printer << "@cc(objc_method) @thin ";
+        break;
+      case SILFunctionType::Representation::WitnessMethod:
+        //Printer << "@convention(witness_method) ";
+        Printer << "@cc(witness_method) @thin ";
         break;
       }
     }
@@ -2427,31 +2430,35 @@ public:
   void printFunctionExtInfo(SILFunctionType::ExtInfo info) {
     if(Options.SkipAttributes)
       return;
-    switch (info.getCC()) {
-    case AbstractCC::Freestanding: break;
-    case AbstractCC::Method:
-      Printer << "@cc(method) ";
-      break;
-    case AbstractCC::C:
-      Printer << "@cc(cdecl) ";
-      break;
-    case AbstractCC::ObjCMethod:
-      Printer << "@cc(objc_method) ";
-      break;
-    case AbstractCC::WitnessMethod:
-      Printer << "@cc(witness_method) ";
-      break;
-    }
 
     if (Options.PrintFunctionRepresentationAttrs) {
+      // TODO: coalesce into a single convention attribute.
       switch (info.getRepresentation()) {
       case SILFunctionType::Representation::Thick:
         break;
       case SILFunctionType::Representation::Thin:
+        //Printer << "@convention(thin) ";
         Printer << "@thin ";
         break;
       case SILFunctionType::Representation::Block:
-        Printer << "@objc_block ";
+        //Printer << "@convention(block) ";
+        Printer << "@cc(cdecl) @objc_block ";
+        break;
+      case SILFunctionType::Representation::CFunctionPointer:
+        //Printer << "@convention(c) ";
+        Printer << "@cc(cdecl) @thin ";
+        break;
+      case SILFunctionType::Representation::Method:
+        //Printer << "@convention(method) ";
+        Printer << "@cc(method) @thin ";
+        break;
+      case SILFunctionType::Representation::ObjCMethod:
+        //Printer << "@convention(objc_method) ";
+        Printer << "@cc(objc_method) @thin ";
+        break;
+      case SILFunctionType::Representation::WitnessMethod:
+        //Printer << "@convention(witness_method) ";
+        Printer << "@cc(witness_method) @thin ";
         break;
       }
     }

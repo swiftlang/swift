@@ -4467,9 +4467,12 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
   // codegen if the original function is a direct reference to a global function
   // or context-free closure or local function.
   // TODO: Also need to account for capture of generic type parameters.
-  if (toType->getExtInfo().getCC() == AbstractCC::C) {
+  if (toType->getRepresentation()
+       == AnyFunctionType::Representation::CFunctionPointer) {
     // Can convert from an ABI-compatible C function pointer.
-    if (fromFnType && fromFnType->getExtInfo().getCC() == AbstractCC::C
+    if (fromFnType
+        && fromFnType->getRepresentation()
+            == AnyFunctionType::Representation::CFunctionPointer
         && areConvertibleTypesABICompatible(fromType->getCanonicalType(),
                                             toType->getCanonicalType()))
       return;

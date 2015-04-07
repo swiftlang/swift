@@ -2052,9 +2052,9 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
   if (storageType.getSwiftRValueType() == gen.SGM.Types.getNSStringType()) {
     auto nsstr = gen.B.createLoad(loc, src);
     auto str = gen.emitBridgedToNativeValue(loc,
-                                            ManagedValue::forUnmanaged(nsstr),
-                                            AbstractCC::C,
-                                            gen.SGM.Types.getStringType());
+                                ManagedValue::forUnmanaged(nsstr),
+                                SILFunctionTypeRepresentation::CFunctionPointer,
+                                gen.SGM.Types.getStringType());
     return str.forward(gen);
   }
 

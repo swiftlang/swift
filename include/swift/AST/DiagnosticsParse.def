@@ -1029,8 +1029,6 @@ ERROR(cc_attribute_expected_lparen,attribute_parsing,none,
       "expected '(' after 'cc' attribute", ())
 ERROR(cc_attribute_expected_name,attribute_parsing,none,
       "expected calling convention name identifier in 'cc' attribute", ())
-ERROR(cc_attribute_unknown_cc_name,attribute_parsing,none,
-      "unknown calling convention name '%0' for 'cc' attribute", (StringRef))
 ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
       "expected ')' after calling convention name for 'cc' attribute", ())
 

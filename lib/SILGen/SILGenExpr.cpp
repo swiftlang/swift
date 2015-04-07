@@ -1075,7 +1075,8 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
 {
   // A "conversion" to a C function pointer is done by referencing the thunk
   // (or original C function) with the C calling convention.
-  if (e->getType()->castTo<AnyFunctionType>()->getAbstractCC() == AbstractCC::C)
+  if (e->getType()->castTo<AnyFunctionType>()->getRepresentation()
+        == AnyFunctionType::Representation::CFunctionPointer)
     return emitCFunctionPointer(SGF, e);
 
   ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
@@ -1098,13 +1099,19 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   AnyFunctionType::Representation astRep;
   switch (origRep) {
   case SILFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::WitnessMethod:
+  case SILFunctionType::Representation::ObjCMethod:
     astRep = AnyFunctionType::Representation::Thin;
     break;
   case SILFunctionType::Representation::Thick:
-    astRep = AnyFunctionType::Representation::Thick;
+    astRep = AnyFunctionType::Representation::Swift;
     break;
   case SILFunctionType::Representation::Block:
     astRep = AnyFunctionType::Representation::Block;
+    break;
+  case SILFunctionType::Representation::CFunctionPointer:
+    astRep = AnyFunctionType::Representation::CFunctionPointer;
     break;
   }
   if (astRep != destTy->getRepresentation()) {
@@ -1147,9 +1154,15 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
         break;
       case SILFunctionType::Representation::Block:
         llvm_unreachable("should not try block-to-block repr change");
+      case SILFunctionType::Representation::CFunctionPointer:
+        llvm_unreachable("c function pointer conversion not handled here");
+      case SILFunctionType::Representation::Method:
+      case SILFunctionType::Representation::ObjCMethod:
+      case SILFunctionType::Representation::WitnessMethod:
+        llvm_unreachable("should not do function conversion to method rep");
       }
       break;
-    case AnyFunctionType::Representation::Thick: {
+    case AnyFunctionType::Representation::Swift: {
       // FIXME: We'll need to fix up no-throw-to-throw function conversions.
       assert(destRepTy->throws() ||
              (resultFTy->getRepresentation()
@@ -1160,6 +1173,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
       break;
     }
     case AnyFunctionType::Representation::Thin:
+    case AnyFunctionType::Representation::CFunctionPointer:
       llvm_unreachable("not supported by sema");
     }
   }

@@ -1101,11 +1101,26 @@ emitGeneralizeFunctionWithThunk(SILGenFunction &gen,
                      origFormalType, substFormalType, expectedTL);
 }
 
+static bool representationChangeRequiresThunk(
+                                            SILFunctionTypeRepresentation from,
+                                            SILFunctionTypeRepresentation to) {
+  // No representation change, no thunk necessary.
+  if (from == to)
+    return false;
+  // Thin-to-thick is a trivial change.
+  if (from == SILFunctionTypeRepresentation::Thin
+      && to == SILFunctionTypeRepresentation::Thick)
+    return false;
+  
+  // Conservatively assume other representation changes get thunked.
+  return true;
+}
+
 ManagedValue
 SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
-                                             ManagedValue fn,
-                                             AbstractionPattern origFormalType,
-                                             CanAnyFunctionType substFormalType) {
+                                           ManagedValue fn,
+                                           AbstractionPattern origFormalType,
+                                           CanAnyFunctionType substFormalType) {
   assert(fn.getType().isObject() &&
          "expected input to emitGeneralizedValue to be loaded");
 
@@ -1125,8 +1140,9 @@ SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
   if (fnType->getResult() != expectedFnType->getResult() ||
       fnType->getParameters() != expectedFnType->getParameters() ||
       (fnType->getExtInfo().hasContext() &&
-       fnType->getCalleeConvention() != expectedFnType->getCalleeConvention()) ||
-      fnType->getAbstractCC() != expectedFnType->getAbstractCC()) {
+       fnType->getCalleeConvention() != expectedFnType->getCalleeConvention())||
+      representationChangeRequiresThunk(fnType->getRepresentation(),
+                                        expectedFnType->getRepresentation())) {
     assert(expectedFnType->getExtInfo().hasContext()
            && "conversion thunk will not be thin!");
     return emitGeneralizeFunctionWithThunk(*this, loc, fn,

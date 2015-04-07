@@ -693,8 +693,7 @@ static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
                      ParameterConvention::Direct_Unowned)
   };
   auto result = SILResultInfo(classType, ResultConvention::Owned);
-  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::ObjCMethod,
-                                          SILFunctionType::Representation::Thin,
+  auto extInfo = SILFunctionType::ExtInfo(SILFunctionType::Representation::ObjCMethod,
                                           /*noreturn*/ false);
 
   return SILFunctionType::get(nullptr, extInfo,
@@ -1423,8 +1422,9 @@ bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
     case FunctionType::Representation::Thin:
       // We can't bridge thin types at all.
       return false;
-    case FunctionType::Representation::Thick:
+    case FunctionType::Representation::Swift:
     case FunctionType::Representation::Block:
+    case FunctionType::Representation::CFunctionPointer:
       return true;
     }
   
@@ -1450,8 +1450,9 @@ bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
     case FunctionType::Representation::Thin:
       // We can't bridge thin types at all.
       return false;
-    case FunctionType::Representation::Thick:
+    case FunctionType::Representation::Swift:
     case FunctionType::Representation::Block:
+    case FunctionType::Representation::CFunctionPointer:
       return true;
     }
   

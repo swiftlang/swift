@@ -31,11 +31,8 @@
 #endif
 
 // Type attributes
-TYPE_ATTR(cc)
+//TYPE_ATTR(convention)
 TYPE_ATTR(noreturn)
-TYPE_ATTR(objc_block)
-TYPE_ATTR(thin)
-TYPE_ATTR(thick)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -58,6 +55,12 @@ TYPE_ATTR(callee_guaranteed)
 TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 TYPE_ATTR(deallocating)
+TYPE_ATTR(cc)
+
+// Deprecated type attributes
+TYPE_ATTR(objc_block)
+TYPE_ATTR(thin)
+TYPE_ATTR(thick)
 
 // Schema for DECL_ATTR:
 //

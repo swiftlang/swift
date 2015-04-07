@@ -2933,20 +2933,6 @@ bool AbstractStorageDecl::hasObjCGetterAndSetter() const {
   if (!isObjC())
     return false;
 
-  // Don't expose objc properties for variables with thin function type.
-  // We can't bridge them.
-  if (isa<VarDecl>(this)) {
-    if (auto ft = getType()->getAs<AnyFunctionType>()) {
-      switch (ft->getRepresentation()) {
-      case AnyFunctionType::Representation::Thick:
-      case AnyFunctionType::Representation::Block:
-        return true;
-      case AnyFunctionType::Representation::Thin:
-        return false;
-      }
-    }
-  }
-
   return true;
 }
 

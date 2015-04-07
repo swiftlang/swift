@@ -68,7 +68,7 @@ protected:
 
     // ObjC functions are called through the runtime and are therefore alive
     // even if not referenced inside SIL.
-    if (F->getLoweredFunctionType()->getAbstractCC() == AbstractCC::ObjCMethod)
+    if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
       return true;
 
     return false;

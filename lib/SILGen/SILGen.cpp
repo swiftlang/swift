@@ -159,8 +159,7 @@ GET_BRIDGING_FN(FOUNDATION_MODULE_NAME,
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
   auto extInfo = SILFunctionType::ExtInfo()
-    .withRepresentation(SILFunctionType::Representation::Thin)
-    .withCallingConv(AbstractCC::C);
+    .withRepresentation(SILFunctionType::Representation::CFunctionPointer);
 
   auto findStdlibDecl = [&](StringRef name) -> ValueDecl* {
     if (!getASTContext().getStdlibModule())

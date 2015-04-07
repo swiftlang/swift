@@ -941,12 +941,14 @@ private:
                          Optional<OptionalTypeKind> optionalKind) {
     switch (FT->getRepresentation()) {
     case AnyFunctionType::Representation::Thin:
-      llvm_unreachable("can't handle thin functions yet");
+      llvm_unreachable("can't represent thin functions in ObjC");
     // Native Swift function types bridge to block types.
-    case AnyFunctionType::Representation::Thick:
+    case AnyFunctionType::Representation::Swift:
     case AnyFunctionType::Representation::Block:
       printFunctionType(FT, '^', optionalKind);
       break;
+    case AnyFunctionType::Representation::CFunctionPointer:
+      printFunctionType(FT, '*', optionalKind);
     }
   }
 

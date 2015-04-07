@@ -74,7 +74,7 @@ static SILFunction *getDestructor(AllocationInst* AI) {
 
     // If the destructor has an objc_method calling convention, we can not
     // analyze it since it could be swapped out from under us at runtime.
-    if (Fn->getAbstractCC() == AbstractCC::ObjCMethod) {
+    if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
       DEBUG(llvm::dbgs() << "        Found objective-c destructor. Can't "
             "analyze!\n");
       return nullptr;

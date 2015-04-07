@@ -99,8 +99,6 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
 
-  enum class AbstractCC : unsigned char;
-  
 namespace irgen {
   class Address;
   class ClangTypeConverter;

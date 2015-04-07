@@ -27,15 +27,15 @@ namespace llvm {
 
 namespace swift {
   class ValueDecl;
-  enum class AbstractCC : unsigned char;
+  enum class SILFunctionTypeRepresentation : uint8_t;
 
 namespace irgen {
   class IRGenModule;
 
-AbstractCC getAbstractCC(ValueDecl *fn);
-
-/// Expand an abstract calling convention into a physical convention.
-llvm::CallingConv::ID expandAbstractCC(IRGenModule &IGM, AbstractCC convention);
+/// Expand an abstract SIL function type representation into a physical
+/// convention.
+llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
+                                     SILFunctionTypeRepresentation convention);
 
 } // end namespace irgen
 } // end namespace swift

@@ -49,13 +49,13 @@ const ParameterConvention DefaultThickCalleeConvention =
 CanAnyFunctionType adjustFunctionType(CanAnyFunctionType type,
                                       AnyFunctionType::ExtInfo extInfo);
 
-/// Change the given function type's representation and CC.
+/// Change the given function type's representation.
 inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
-                                          AbstractCC cc,
-                                          AnyFunctionType::Representation rep) {
-  auto extInfo = t->getExtInfo().withRepresentation(rep).withCallingConv(cc);
-  return adjustFunctionType(t, extInfo);
+                                          SILFunctionType::Representation rep) {
+  auto extInfo = t->getExtInfo().withSILRepresentation(rep);
+  return adjustFunctionType(t, extInfo);  
 }
+
 /// Change the given function type's representation.
 inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
                                           AnyFunctionType::Representation rep) {
@@ -550,17 +550,18 @@ public:
   }
 
   /// Get the calling convention used by witnesses of a protocol.
-  static AbstractCC getProtocolWitnessCC(ProtocolDecl *P) {
+  static SILFunctionTypeRepresentation
+  getProtocolWitnessRepresentation(ProtocolDecl *P) {
     // ObjC protocols use the objc method convention.
     if (P->isObjC())
-      return AbstractCC::ObjCMethod;
+      return SILFunctionTypeRepresentation::ObjCMethod;
 
     // Native protocols use the witness calling convention.
-    return AbstractCC::WitnessMethod;
+    return SILFunctionTypeRepresentation::WitnessMethod;
   }
   
   /// Get the calling convention used to call a declaration.
-  AbstractCC getAbstractCC(SILDeclRef c);
+  SILFunctionTypeRepresentation getDeclRefRepresentation(SILDeclRef c);
   
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
@@ -675,17 +676,6 @@ public:
     return getConstantInfo(constant).SILFnType;
   }
 
-  /// Returns the SILFunctionType for the given declaration, applying
-  /// substitutions to match the given type.
-  ///
-  ///
-  /// \param substFormalType - a valid substitution of the
-  ///   still-curried type of the function.
-  CanSILFunctionType getConstantFunctionType(SILDeclRef constant,
-                                   CanAnyFunctionType substFormalType,
-                                   CanAnyFunctionType substFormalInterfaceType,
-                                   AnyFunctionType::Representation rep);
-
   /// Substitute the given function type so that it implements the
   /// given substituted type.
   CanSILFunctionType substFunctionType(CanSILFunctionType origFnType,
@@ -718,7 +708,7 @@ public:
 
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.
-  Type getLoweredBridgedType(Type t, AbstractCC cc,
+  Type getLoweredBridgedType(Type t, SILFunctionTypeRepresentation rep,
                              const clang::Type *clangTy,
                              BridgedTypePurpose forResult);
 

@@ -21,25 +21,26 @@
 #include "swift/AST/Type.h"
 
 namespace swift {
-  enum class AbstractCC : unsigned char;
+  enum class SILFunctionTypeRepresentation : uint8_t;
 
 namespace irgen {
 
 /// The formal type of a function.
 class FormalType {
   CanType Ty;
-  AbstractCC CC;
+  SILFunctionTypeRepresentation Rep;
   unsigned NaturalUncurry;
 
 public:
-  FormalType(CanType type, AbstractCC cc, unsigned naturalUncurry)
-    : Ty(type), CC(cc), NaturalUncurry(naturalUncurry) {}
+  FormalType(CanType type, SILFunctionTypeRepresentation rep,
+             unsigned naturalUncurry)
+    : Ty(type), Rep(rep), NaturalUncurry(naturalUncurry) {}
 
   /// Return the natural, unsubstituted type of this function.
   CanType getType() const { return Ty; }
 
   /// Return the abstract calling convention of this function.
-  AbstractCC getAbstractCC() const { return CC; }
+  SILFunctionTypeRepresentation getRepresentation() const { return Rep; }
 
   /// Return the natural uncurry level of this function.
   unsigned getNaturalUncurryLevel() const { return NaturalUncurry; }

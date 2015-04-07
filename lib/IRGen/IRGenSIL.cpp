@@ -70,16 +70,16 @@ class LoweredValue;
 class StaticFunction {
   /// The function reference.
   llvm::Function *function;
-  /// The function's native calling convention.
-  AbstractCC cc;
+  /// The function's native representation.
+  SILFunctionTypeRepresentation rep;
   
 public:
-  StaticFunction(llvm::Function *function, AbstractCC cc)
-    : function(function), cc(cc)
+  StaticFunction(llvm::Function *function, SILFunctionTypeRepresentation rep)
+    : function(function), rep(rep)
   {}
   
   llvm::Function *getFunction() const { return function; }
-  AbstractCC getAbstractCC() const { return cc; }
+  SILFunctionTypeRepresentation getRepresentation() const { return rep; }
   
   llvm::Value *getExplosionValue(IRGenFunction &IGF) const;
 };
@@ -314,11 +314,11 @@ public:
   /// Create a new StaticFunction corresponding to the given SIL value.
   void setLoweredStaticFunction(SILValue v,
                                 llvm::Function *f,
-                                AbstractCC cc) {
+                                SILFunctionTypeRepresentation rep) {
     assert(v.getType().isObject() && "function for address value?!");
     assert(v.getType().is<SILFunctionType>() &&
            "function for non-function value?!");
-    setLoweredValue(v, StaticFunction{f, cc});
+    setLoweredValue(v, StaticFunction{f, rep});
   }
 
   /// Create a new Objective-C method corresponding to the given SIL value.
@@ -982,7 +982,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
 
   // The witness method CC passes Self as a final argument.
   WitnessMetadata witnessMetadata;
-  if (funcTy->getAbstractCC() == AbstractCC::WitnessMethod) {
+  if (funcTy->getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod) {
     collectTrailingWitnessMetadata(IGF, *IGF.CurSILFn, allParamValues,
                                    witnessMetadata);
   }
@@ -994,7 +994,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
 
   // The 'self' argument might be in the context position, which is
   // now the end of the parameter list.  Bind it now.
-  if (funcTy->hasSelfArgument() &&
+  if (funcTy->hasSelfParam() &&
       isSelfContextParameter(funcTy->getSelfParameter())) {
     SILArgument *selfParam = params.back();
     params = params.drop_back();
@@ -1006,7 +1006,8 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   // Even if we don't have a 'self', if we have an error result, we
   // should have a placeholder argument here.
   } else if (funcTy->hasErrorResult() ||
-             funcTy->hasThickRepresentation()) {
+           funcTy->getRepresentation() == SILFunctionTypeRepresentation::Thick)
+  {
     llvm::Value *contextPtr = allParamValues.takeLast(); (void) contextPtr;
     assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
   }
@@ -1049,7 +1050,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
   auto clangResultTy = IGF.IGM.getClangType(resultInfo.getSILType());
   unsigned nextArgTyIdx = 0;
 
-  if (IGF.CurSILFn->getAbstractCC() == AbstractCC::ObjCMethod) {
+  if (IGF.CurSILFn->getRepresentation() ==
+        SILFunctionTypeRepresentation::ObjCMethod) {
     // First include the self argument and _cmd arguments as types to
     // be considered for ABI type selection purposes.
     SILArgument *selfArg = args.back();
@@ -1211,7 +1213,9 @@ void IRGenSILFunction::emitSILFunction() {
   // FIXME: Or if this is a witness. DebugInfo doesn't have an interface to
   // correctly handle the generic parameters of a witness, which can come from
   // both the requirement and witness contexts.
-  if (IGM.DebugInfo && CurSILFn->getAbstractCC() != AbstractCC::WitnessMethod) {
+  if (IGM.DebugInfo &&
+      CurSILFn->getRepresentation()
+        != SILFunctionTypeRepresentation::WitnessMethod) {
     IGM.DebugInfo->emitFunction(*CurSILFn, CurFn);
   }
 
@@ -1234,14 +1238,11 @@ void IRGenSILFunction::emitSILFunction() {
   Explosion params = collectParameters();
   auto funcTy = CurSILFn->getLoweredFunctionType();
 
-  switch (CurSILFn->getAbstractCC()) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+  switch (funcTy->getLanguage()) {
+  case SILFunctionLanguage::Swift:
     emitEntryPointArgumentsNativeCC(*this, entry->first, params);
     break;
-  case AbstractCC::ObjCMethod:
-  case AbstractCC::C:
+  case SILFunctionLanguage::C:
     emitEntryPointArgumentsCOrObjC(*this, entry->first, params, funcTy);
     break;
   }
@@ -1521,7 +1522,7 @@ void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
   // convention as a StaticFunction so we can avoid bitcasting or thunking if
   // we don't need to.
   setLoweredStaticFunction(SILValue(i, 0), fnptr,
-                           i->getReferencedFunction()->getAbstractCC());
+                           i->getReferencedFunction()->getRepresentation());
 }
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
@@ -1740,13 +1741,18 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       calleeData = nullptr;
       break;
     }
-        
+    
     case SILFunctionType::Representation::Thin:
+    case SILFunctionType::Representation::CFunctionPointer:
+    case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::Thick: {
       Explosion calleeValues = lv.getExplosion(IGF);
       calleeFn = calleeValues.claimNext();
 
-      if (origCalleeType->hasThickRepresentation()) {
+      if (origCalleeType->getRepresentation()
+            == SILFunctionType::Representation::Thick) {
         assert(!selfValue);
         calleeData = calleeValues.claimNext();
       } else {
@@ -1816,7 +1822,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
   // Extract 'self' if it needs to be passed as the context parameter.
   llvm::Value *selfValue = nullptr;
-  if (origCalleeType->hasSelfArgument() &&
+  if (origCalleeType->hasSelfParam() &&
       isSelfContextParameter(origCalleeType->getSelfParameter())) {
     SILValue selfArg = args.back();
     args = args.drop_back();
@@ -1922,18 +1928,20 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     llvm_unreachable("objc method partial application shouldn't get here");
 
   case LoweredValue::Kind::StaticFunction:
-    switch (lv.getStaticFunction().getAbstractCC()) {
-    case AbstractCC::C:
-    case AbstractCC::ObjCMethod:
+    switch (lv.getStaticFunction().getRepresentation()) {
+    case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::Block:
+    case SILFunctionTypeRepresentation::ObjCMethod:
       assert(false && "partial_apply of foreign functions not implemented");
       break;
         
-    case AbstractCC::WitnessMethod:
+    case SILFunctionTypeRepresentation::WitnessMethod:
       assert(false && "partial_apply of witness functions not implemented");
       break;
       
-    case AbstractCC::Freestanding:
-    case AbstractCC::Method:
+    case SILFunctionTypeRepresentation::Thick:
+    case SILFunctionTypeRepresentation::Thin:
+    case SILFunctionTypeRepresentation::Method:
       break;
     }
     return std::make_tuple(lv.getStaticFunction().getFunction(),
@@ -1946,6 +1954,10 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     
     switch (fnType->getRepresentation()) {
     case SILFunctionType::Representation::Thin:
+    case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::CFunctionPointer:
       break;
     case SILFunctionType::Representation::Thick:
       context = ex.claimNext();

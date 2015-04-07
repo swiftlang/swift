@@ -460,8 +460,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
 
     auto NSStringFromClassType = SILFunctionType::get(nullptr,
                   SILFunctionType::ExtInfo()
-                    .withRepresentation(SILFunctionType::Representation::Thin)
-                    .withCallingConv(AbstractCC::C),
+                    .withRepresentation(SILFunctionType::Representation::
+                                        CFunctionPointer),
                   ParameterConvention::Direct_Unowned,
                   SILParameterInfo(anyObjectMetaTy,
                                    ParameterConvention::Direct_Unowned),
@@ -500,8 +500,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     };
     auto UIApplicationMainType = SILFunctionType::get(nullptr,
                   SILFunctionType::ExtInfo()
-                    .withRepresentation(SILFunctionType::Representation::Thin)
-                    .withCallingConv(AbstractCC::C),
+                    .withRepresentation(SILFunctionType::Representation::
+                                        CFunctionPointer),
                   ParameterConvention::Direct_Unowned,
                   argTypes,
                   SILResultInfo(argc.getType().getSwiftRValueType(),
@@ -547,10 +547,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     };
     auto NSApplicationMainType = SILFunctionType::get(nullptr,
                   SILFunctionType::ExtInfo()
-                    .withRepresentation(SILFunctionType::Representation::Thin)
                     // Should be C calling convention, but NSApplicationMain
                     // has an overlay to fix the type of argv.
-                    .withCallingConv(AbstractCC::Freestanding),
+                    .withRepresentation(SILFunctionType::Representation::Thin),
                   ParameterConvention::Direct_Unowned,
                   argTypes,
                   SILResultInfo(argc.getType().getSwiftRValueType(),
@@ -674,7 +673,8 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
   // If the fully-uncurried reference is to a generic method, look up the
   // witness.
   if (fullyAppliedMethod &&
-      constantInfo.SILFnType->getAbstractCC() == AbstractCC::WitnessMethod) {
+      constantInfo.SILFnType->getRepresentation()
+        == SILFunctionTypeRepresentation::WitnessMethod) {
     auto thisType = curriedSubs[0].getReplacement()->getCanonicalType();
     assert(isa<ArchetypeType>(thisType) && "no archetype for witness?!");
     SILValue OpenedExistential;
@@ -754,7 +754,8 @@ getThunkedForeignFunctionRef(SILGenFunction &gen,
 
   // Produce a class_method when thunking ObjC methods.
   auto foreignTy = gen.SGM.getConstantType(foreign);
-  if (foreignTy.castTo<SILFunctionType>()->getAbstractCC() == AbstractCC::ObjCMethod) {
+  if (foreignTy.castTo<SILFunctionType>()->getRepresentation()
+        == SILFunctionTypeRepresentation::ObjCMethod) {
     SILValue thisArg = args.back().getValue();
 
     return gen.B.createClassMethod(loc, thisArg, foreign,
@@ -837,10 +838,11 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
       auto origArg = originalFnTy->getParameters()[i].getSILType();
 
-      managedArgs.push_back(emitNativeToBridgedValue(fd, mv, AbstractCC::C,
-                                          AbstractionPattern(mv.getSwiftType()),
-                                                 mv.getSwiftType(),
-                                                 origArg.getSwiftRValueType()));
+      managedArgs.push_back(emitNativeToBridgedValue(fd, mv,
+                                SILFunctionTypeRepresentation::CFunctionPointer,
+                                AbstractionPattern(mv.getSwiftType()),
+                                mv.getSwiftType(),
+                                origArg.getSwiftRValueType()));
     }
 
     // Call the original.

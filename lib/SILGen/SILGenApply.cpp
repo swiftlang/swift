@@ -76,7 +76,6 @@ static CanAnyFunctionType getDynamicMethodFormalType(SILGenModule &SGM,
     selfTy = proto.getType().getSwiftType();
   }
   auto extInfo = FunctionType::ExtInfo()
-                   .withCallingConv(SGM.getConstantCC(methodName))
                    .withRepresentation(FunctionType::Representation::Thin);
 
   return CanFunctionType::get(selfTy, memberType->getCanonicalType(),
@@ -386,12 +385,7 @@ private:
     auto substSelfType =
       buildSubstSelfType(polyFormalType.getInput(), protocolSelfType, ctx);
 
-    // Existential witnesses are always "thick" with the polymorphic info,
-    // unless @objc.
-    auto rep = name.isForeign
-      ? FunctionType::Representation::Thin
-      : FunctionType::Representation::Thick;
-    auto extInfo = FunctionType::ExtInfo(AbstractCC::Method, rep,
+    auto extInfo = FunctionType::ExtInfo(FunctionType::Representation::Thin,
                                          /*noreturn*/ false,
                                          /*throws*/ polyFormalType->throws());
 
@@ -1590,14 +1584,16 @@ static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
 }
 #endif
 
-static bool isNative(AbstractCC cc) {
-  switch (cc) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
+static bool isNative(SILFunctionTypeRepresentation rep) {
+  switch (rep) {
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::Block:
     return false;
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     return true;
   }
   llvm_unreachable("bad CC");
@@ -1605,11 +1601,11 @@ static bool isNative(AbstractCC cc) {
 
 /// Given two SIL types which are representations of the same type,
 /// check whether they have an abstraction difference.
-static bool hasAbstractionDifference(AbstractCC cc,
+static bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
                                      SILType type1, SILType type2) {
   CanType ct1 = type1.getSwiftRValueType();
   CanType ct2 = type2.getSwiftRValueType();
-  assert(!isNative(cc) || areOnlyAbstractionDifferent(ct1, ct2));
+  assert(!isNative(rep) || areOnlyAbstractionDifferent(ct1, ct2));
   (void)ct1;
   (void)ct2;
 
@@ -1693,19 +1689,19 @@ static SILValue emitRawApply(SILGenFunction &gen,
 /// result does need to be turned back into something matching a
 /// formal type.
 ManagedValue SILGenFunction::emitApply(
-                              SILLocation loc,
-                              ManagedValue fn,
-                              ArrayRef<Substitution> subs,
-                              ArrayRef<ManagedValue> args,
-                              CanSILFunctionType substFnType,
-                              AbstractionPattern origResultType,
-                              CanType substResultType,
-                              bool transparent,
-                              Optional<AbstractCC> overrideCC,
-                              SGFContext evalContext) {
+                            SILLocation loc,
+                            ManagedValue fn,
+                            ArrayRef<Substitution> subs,
+                            ArrayRef<ManagedValue> args,
+                            CanSILFunctionType substFnType,
+                            AbstractionPattern origResultType,
+                            CanType substResultType,
+                            bool transparent,
+                            Optional<SILFunctionTypeRepresentation> overrideRep,
+                            SGFContext evalContext) {
   auto &formalResultTL = getTypeLowering(substResultType);
   auto loweredFormalResultType = formalResultTL.getLoweredType();
-  AbstractCC cc = overrideCC ? *overrideCC : substFnType->getAbstractCC();
+  auto rep = overrideRep ? *overrideRep : substFnType->getRepresentation();
 
   SILType actualResultType = substFnType->getSemanticResultSILType();
 
@@ -1714,7 +1710,7 @@ ManagedValue SILGenFunction::emitApply(
   // the actual result type we got back.  Note that this will also
   // include bridging differences.
   bool hasAbsDiffs =
-    hasAbstractionDifference(cc, loweredFormalResultType,
+    hasAbstractionDifference(rep, loweredFormalResultType,
                              actualResultType);
 
   // Prepare a result address if necessary.
@@ -1876,7 +1872,7 @@ ManagedValue SILGenFunction::emitApply(
   }
 
   // Convert the result to a native value.
-  return emitBridgedToNativeValue(loc, managedScalar, cc,
+  return emitBridgedToNativeValue(loc, managedScalar, rep,
                                   substResultType);
 }
 
@@ -1885,12 +1881,12 @@ ManagedValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
                                                   ArrayRef<ManagedValue> args,
                                                   CanType resultType,
                                                   bool transparent,
-                                              Optional<AbstractCC> overrideCC) {
+                           Optional<SILFunctionTypeRepresentation> overrideRep){
   auto fnType = fn.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
   return emitApply(loc, fn, {}, args, fnType,
                    AbstractionPattern(resultType), resultType,
-                   transparent, overrideCC, SGFContext());
+                   transparent, overrideRep, SGFContext());
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
@@ -2081,7 +2077,7 @@ namespace {
 
   class ArgEmitter {
     SILGenFunction &SGF;
-    AbstractCC CC;
+    SILFunctionTypeRepresentation Rep;
     ArrayRef<SILParameterInfo> ParamInfos;
     SmallVectorImpl<ManagedValue> &Args;
 
@@ -2091,12 +2087,12 @@ namespace {
 
     Optional<ArgSpecialDestArray> SpecialDests;
   public:
-    ArgEmitter(SILGenFunction &SGF, AbstractCC cc,
+    ArgEmitter(SILGenFunction &SGF, SILFunctionTypeRepresentation Rep,
                ArrayRef<SILParameterInfo> paramInfos,
                SmallVectorImpl<ManagedValue> &args,
                SmallVectorImpl<InOutArgument> &inoutArgs,
                Optional<ArgSpecialDestArray> specialDests = None)
-      : SGF(SGF), CC(cc), ParamInfos(paramInfos),
+      : SGF(SGF), Rep(Rep), ParamInfos(paramInfos),
         Args(args), InOutArguments(inoutArgs), SpecialDests(specialDests) {
       assert(!specialDests || specialDests->size() == paramInfos.size());
     }
@@ -2327,7 +2323,7 @@ namespace {
         }
       }();
 
-      if (hasAbstractionDifference(CC, loweredSubstParamType,
+      if (hasAbstractionDifference(Rep, loweredSubstParamType,
                                    loweredSubstArgType)) {
         lv.addSubstToOrigComponent(origType, loweredSubstParamType);
       }
@@ -2357,11 +2353,11 @@ namespace {
                     AbstractionPattern origParamType,
                     SILParameterInfo param, SGFContext ctxt) {
       auto value = std::move(arg).getScalarValue();
-      if (isNative(CC)) {
+      if (isNative(Rep)) {
         value = SGF.emitSubstToOrigValue(loc, value, origParamType,
                                          arg.getType(), ctxt);
       } else {
-        value = SGF.emitNativeToBridgedValue(loc, value, CC,
+        value = SGF.emitNativeToBridgedValue(loc, value, Rep,
                                              origParamType,
                                              arg.getType(), param.getType());
       }
@@ -2580,7 +2576,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
   // Emit the inner expression.
   SmallVector<ManagedValue, 8> innerArgs;
   SmallVector<InOutArgument, 2> innerInOutArgs;
-  ArgEmitter(SGF, CC, innerParams, innerArgs, innerInOutArgs,
+  ArgEmitter(SGF, Rep, innerParams, innerArgs, innerInOutArgs,
              (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
                                 : Optional<ArgSpecialDestArray>()))
     .emit(ArgumentSource(inner), innerOrigParamType);
@@ -2741,11 +2737,11 @@ namespace {
   /// A structure for conveniently claiming sets of uncurried parameters.
   struct ParamLowering {
     ArrayRef<SILParameterInfo> Params;
-    AbstractCC CC;
+    SILFunctionTypeRepresentation Rep;
 
     ParamLowering(CanSILFunctionType fnType) :
       Params(fnType->getParametersWithoutIndirectResult()),
-      CC(fnType->getAbstractCC()) {}
+      Rep(fnType->getRepresentation()) {}
 
     ArrayRef<SILParameterInfo>
     claimParams(AbstractionPattern origParamType, CanType substParamType) {
@@ -2801,7 +2797,7 @@ namespace {
               SmallVectorImpl<InOutArgument> &inoutArgs) && {
       auto params = lowering.claimParams(origParamType, getSubstArgType());
 
-      ArgEmitter emitter(gen, lowering.CC, params, args, inoutArgs);
+      ArgEmitter emitter(gen, lowering.Rep, params, args, inoutArgs);
       emitter.emit(std::move(ArgValue), origParamType);
     }
 
@@ -3104,7 +3100,8 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   bool transparent;
   std::tie(mv, substFnType, transparent) = callee.getAtUncurryLevel(*this, 0);
 
-  assert(substFnType->getAbstractCC() == AbstractCC::Freestanding);
+  assert(substFnType->getExtInfo().getLanguage()
+           == SILFunctionLanguage::Swift);
 
   return emitApply(loc, mv, subs, args, substFnType,
                    AbstractionPattern(origFormalType.getResult()),
@@ -3635,7 +3632,6 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   
   auto partialApplyTy = SILFunctionType::get(fnTy->getGenericSignature(),
                      fnTy->getExtInfo()
-                       .withCallingConv(AbstractCC::Freestanding)
                        .withRepresentation(SILFunctionType::Representation::Thick),
                      ParameterConvention::Direct_Owned,
                      fnTy->getParameters()

@@ -721,7 +721,7 @@ namespace {
           case 3: return IGF.IGM.getGetThinFunctionMetadata3Fn();
           default: return IGF.IGM.getGetThinFunctionMetadataFn();
           }
-        case AnyFunctionType::Representation::Thick:
+        case AnyFunctionType::Representation::Swift:
           switch (numArguments) {
           case 1: return IGF.IGM.getGetFunctionMetadata1Fn();
           case 2: return IGF.IGM.getGetFunctionMetadata2Fn();
@@ -735,6 +735,8 @@ namespace {
           case 3: return IGF.IGM.getGetBlockMetadata3Fn();
           default: return IGF.IGM.getGetBlockMetadataFn();
           }
+        case AnyFunctionType::Representation::CFunctionPointer:
+          llvm_unreachable("todo: metadata for C function pointers");
         }
         llvm_unreachable("bad function representation");
       }();
@@ -1176,6 +1178,10 @@ namespace {
       auto &C = type->getASTContext();
       switch (type->getRepresentation()) {
       case SILFunctionType::Representation::Thin:
+      case SILFunctionType::Representation::Method:
+      case SILFunctionType::Representation::WitnessMethod:
+      case SILFunctionType::Representation::ObjCMethod:
+      case SILFunctionType::Representation::CFunctionPointer:
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitDirectMetadataRef(C.TheRawPointerType);
@@ -3741,7 +3747,7 @@ AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
   ResilienceExpansion bestExplosion = ResilienceExpansion::Minimal;
   unsigned naturalUncurry = method->getNaturalArgumentCount() - 1;
 
-  return AbstractCallee(AbstractCC::Method, bestExplosion,
+  return AbstractCallee(SILFunctionTypeRepresentation::Method, bestExplosion,
                         naturalUncurry, naturalUncurry, ExtraData::None);
 }
 

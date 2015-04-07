@@ -2984,20 +2984,44 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   return declOrOffset;
 }
 
-/// Translate from the Serialization calling convention enum values to the AST
+/// Translate from the Serialization function type repr enum values to the AST
 /// strongly-typed enum.
 ///
 /// The former is guaranteed to be stable, but may not reflect this version of
 /// the AST.
-static Optional<swift::AbstractCC> getActualCC(uint8_t cc) {
-  switch (cc) {
+static Optional<swift::FunctionType::Representation>
+getActualFunctionTypeRepresentation(uint8_t rep) {
+  switch (rep) {
 #define CASE(THE_CC) \
-  case serialization::AbstractCC::THE_CC: \
-    return swift::AbstractCC::THE_CC;
-  CASE(C)
-  CASE(ObjCMethod)
-  CASE(Freestanding)
+  case (uint8_t)serialization::FunctionTypeRepresentation::THE_CC: \
+    return swift::FunctionType::Representation::THE_CC;
+  CASE(Swift)
+  CASE(Block)
+  CASE(Thin)
+  CASE(CFunctionPointer)
+#undef CASE
+  default:
+    return None;
+  }
+}
+
+/// Translate from the Serialization function type repr enum values to the AST
+/// strongly-typed enum.
+///
+/// The former is guaranteed to be stable, but may not reflect this version of
+/// the AST.
+static Optional<swift::SILFunctionType::Representation>
+getActualSILFunctionTypeRepresentation(uint8_t rep) {
+  switch (rep) {
+#define CASE(THE_CC) \
+  case (uint8_t)serialization::SILFunctionTypeRepresentation::THE_CC: \
+    return swift::SILFunctionType::Representation::THE_CC;
+  CASE(Thick)
+  CASE(Block)
+  CASE(Thin)
+  CASE(CFunctionPointer)
   CASE(Method)
+  CASE(ObjCMethod)
   CASE(WitnessMethod)
 #undef CASE
   default:
@@ -3053,30 +3077,6 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
 #undef CASE
   }
   return None;
-}
-
-static AnyFunctionType::Representation
-getFunctionRepresentation(bool thin, bool blockCompatible) {
-  // A type cannot be both thin and block-compatible.
-  assert(!thin || !blockCompatible);
-  if (thin)
-    return AnyFunctionType::Representation::Thin;
-  else if (blockCompatible)
-    return AnyFunctionType::Representation::Block;
-  else
-    return AnyFunctionType::Representation::Thick;
-}
-
-static SILFunctionType::Representation
-getSILFunctionRepresentation(bool thin, bool blockCompatible) {
-  // A type cannot be both thin and block-compatible.
-  assert(!thin || !blockCompatible);
-  if (thin)
-    return SILFunctionType::Representation::Thin;
-  else if (blockCompatible)
-    return SILFunctionType::Representation::Block;
-  else
-    return SILFunctionType::Representation::Thick;
 }
 
 Type ModuleFile::getType(TypeID TID) {
@@ -3177,25 +3177,23 @@ Type ModuleFile::getType(TypeID TID) {
   case decls_block::FUNCTION_TYPE: {
     TypeID inputID;
     TypeID resultID;
-    uint8_t rawCallingConvention;
-    bool autoClosure, thin, noreturn, blockCompatible, noescape, throws;
+    uint8_t rawRepresentation;
+    bool autoClosure, noreturn, noescape, throws;
 
     decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
-                                                rawCallingConvention,
-                                                autoClosure, thin,
+                                                rawRepresentation,
+                                                autoClosure,
                                                 noreturn,
-                                                blockCompatible,
                                                 noescape,
                                                 throws);
-    auto callingConvention = getActualCC(rawCallingConvention);
-    if (!callingConvention.hasValue()) {
+    auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
+    if (!representation.hasValue()) {
       error();
       return nullptr;
     }
     
-    auto Info = FunctionType::ExtInfo(callingConvention.getValue(),
-                                getFunctionRepresentation(thin, blockCompatible),
-                                noreturn, autoClosure, noescape, throws);
+    auto Info = FunctionType::ExtInfo(*representation,
+                               noreturn, autoClosure, noescape, throws);
     
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);
@@ -3542,8 +3540,7 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID inputID;
     TypeID resultID;
     DeclID genericContextID;
-    uint8_t rawCallingConvention;
-    bool thin;
+    uint8_t rawRep;
     bool noreturn = false;
     bool throws = false;
 
@@ -3552,26 +3549,20 @@ Type ModuleFile::getType(TypeID TID) {
                                                            inputID,
                                                            resultID,
                                                            genericContextID,
-                                                           rawCallingConvention,
-                                                           thin,
+                                                           rawRep,
                                                            noreturn,
                                                            throws);
-    auto callingConvention = getActualCC(rawCallingConvention);
-    if (!callingConvention.hasValue()) {
-      error();
-      return nullptr;
-    }
-
     GenericParamList *paramList =
       maybeGetOrReadGenericParams(genericContextID, FileContext, DeclTypeCursor);
     assert(paramList && "missing generic params for polymorphic function");
     
-    auto rep = thin
-      ? AnyFunctionType::Representation::Thin
-      : AnyFunctionType::Representation::Thick;
+    auto rep = getActualFunctionTypeRepresentation(rawRep);
+    if (!rep.hasValue()) {
+      error();
+      return nullptr;
+    }
     
-    auto Info = PolymorphicFunctionType::ExtInfo(callingConvention.getValue(),
-                                                 rep,
+    auto Info = PolymorphicFunctionType::ExtInfo(*rep,
                                                  noreturn,
                                                  throws);
 
@@ -3584,8 +3575,7 @@ Type ModuleFile::getType(TypeID TID) {
   case decls_block::GENERIC_FUNCTION_TYPE: {
     TypeID inputID;
     TypeID resultID;
-    uint8_t rawCallingConvention;
-    bool thin;
+    uint8_t rawRep;
     bool noreturn = false;
     bool throws = false;
     ArrayRef<uint64_t> genericParamIDs;
@@ -3594,13 +3584,12 @@ Type ModuleFile::getType(TypeID TID) {
     decls_block::GenericFunctionTypeLayout::readRecord(scratch,
                                                        inputID,
                                                        resultID,
-                                                       rawCallingConvention,
-                                                       thin,
+                                                       rawRep,
                                                        noreturn,
                                                        throws,
                                                        genericParamIDs);
-    auto callingConvention = getActualCC(rawCallingConvention);
-    if (!callingConvention.hasValue()) {
+    auto rep = getActualFunctionTypeRepresentation(rawRep);
+    if (!rep.hasValue()) {
       error();
       return nullptr;
     }
@@ -3618,15 +3607,10 @@ Type ModuleFile::getType(TypeID TID) {
       genericParams.push_back(param);
     }
     
-    auto rep = thin
-      ? AnyFunctionType::Representation::Thin
-      : AnyFunctionType::Representation::Thick;
-    
     // Read the generic requirements.
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements);
-    auto info = GenericFunctionType::ExtInfo(callingConvention.getValue(),
-                                             rep, noreturn, throws);
+    auto info = GenericFunctionType::ExtInfo(*rep, noreturn, throws);
 
     auto sig = GenericSignature::get(genericParams, requirements);
     typeOrOffset = GenericFunctionType::get(sig,
@@ -3650,9 +3634,8 @@ Type ModuleFile::getType(TypeID TID) {
     uint8_t rawInterfaceResultConvention;
     TypeID interfaceErrorResultID;
     uint8_t rawInterfaceErrorResultConvention;
-    uint8_t rawCallingConvention;
     uint8_t rawCalleeConvention;
-    bool thin, block;
+    uint8_t rawRepresentation;
     bool noreturn = false;
     unsigned numGenericParams;
     ArrayRef<uint64_t> paramIDs;
@@ -3663,21 +3646,19 @@ Type ModuleFile::getType(TypeID TID) {
                                              interfaceErrorResultID,
                                              rawInterfaceErrorResultConvention,
                                              rawCalleeConvention,
-                                             rawCallingConvention,
-                                             thin, block,
+                                             rawRepresentation,
                                              noreturn,
                                              numGenericParams,
                                              paramIDs);
 
     // Process the ExtInfo.
-    auto callingConvention = getActualCC(rawCallingConvention);
-    if (!callingConvention.hasValue()) {
+    auto representation
+      = getActualSILFunctionTypeRepresentation(rawRepresentation);
+    if (!representation.hasValue()) {
       error();
       return nullptr;
     }
-    SILFunctionType::ExtInfo extInfo(callingConvention.getValue(),
-                                     getSILFunctionRepresentation(thin, block),
-                                     noreturn);
+    SILFunctionType::ExtInfo extInfo(*representation, noreturn);
     // Process the result.
     auto interfaceResultConvention
       = getActualResultConvention(rawInterfaceResultConvention);

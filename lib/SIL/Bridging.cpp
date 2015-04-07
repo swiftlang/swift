@@ -36,7 +36,7 @@ SILType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
 }
 
 static CanType getBridgedInputType(TypeConverter &tc,
-                                   AbstractCC cc,
+                                   SILFunctionTypeRepresentation rep,
                                    CanType input,
                                    const clang::Decl *clangDecl) {
 
@@ -65,7 +65,7 @@ static CanType getBridgedInputType(TypeConverter &tc,
 
       auto clangInputTy = getClangParamType(i);
 
-      Type bridged = tc.getLoweredBridgedType(elt.getType(), cc, clangInputTy,
+      Type bridged = tc.getLoweredBridgedType(elt.getType(), rep, clangInputTy,
                                               TypeConverter::ForArgument);
       if (!bridged) {
         tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
@@ -89,7 +89,7 @@ static CanType getBridgedInputType(TypeConverter &tc,
   }
 
   auto clangInputTy = getClangParamType(0);
-  auto loweredBridgedType = tc.getLoweredBridgedType(input, cc, clangInputTy,
+  auto loweredBridgedType = tc.getLoweredBridgedType(input, rep, clangInputTy,
                                                     TypeConverter::ForArgument);
 
   if (!loweredBridgedType) {
@@ -104,7 +104,7 @@ static CanType getBridgedInputType(TypeConverter &tc,
 
 /// Bridge a result type.
 static CanType getBridgedResultType(TypeConverter &tc,
-                                    AbstractCC cc,
+                                    SILFunctionTypeRepresentation rep,
                                     CanType result,
                                     const clang::Decl *clangDecl) {
   const clang::Type *clangResultTy = nullptr;
@@ -116,7 +116,7 @@ static CanType getBridgedResultType(TypeConverter &tc,
     }
   }
 
-  auto loweredType = tc.getLoweredBridgedType(result, cc, clangResultTy,
+  auto loweredType = tc.getLoweredBridgedType(result, rep, clangResultTy,
                                               TypeConverter::ForResult);
 
   if (!loweredType) {
@@ -134,21 +134,6 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
                                             CanAnyFunctionType t,
                                             AnyFunctionType::ExtInfo extInfo,
                                             const clang::Decl *decl) {
-  // C functions are always thin.
-  // FIXME: Should have an AST-level Representation enumeration for
-  // "C function pointer".
-  AbstractCC effectiveCC = t->getAbstractCC();
-  if (effectiveCC == AbstractCC::C
-      && t->getRepresentation() != FunctionType::Representation::Block) {
-    extInfo = extInfo.withRepresentation(FunctionType::Representation::Thin);
-  }
-  
-  // Blocks are always cdecl.
-  if (t->getRepresentation() == FunctionType::Representation::Block) {
-    effectiveCC = AbstractCC::C;
-    extInfo = extInfo.withCallingConv(AbstractCC::C);
-  }
-
   // Pull out the generic signature.
   CanGenericSignature genericSig;
   if (auto gft = dyn_cast<GenericFunctionType>(t)) {
@@ -184,20 +169,22 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
     }
   };
 
-  switch (effectiveCC) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+  switch (auto rep = t->getExtInfo().getSILRepresentation()) {
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     // No bridging needed for native functions.
     if (t->getExtInfo() == extInfo && !innerGenericParams)
       return t;
     return rebuild(t.getInput(), t.getResult());
 
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::ObjCMethod:
     // FIXME: Should consider the originating Clang types of e.g. blocks.
-    return rebuild(getBridgedInputType(tc, effectiveCC, t.getInput(), decl),
-                   getBridgedResultType(tc, effectiveCC, t.getResult(), decl));
+    return rebuild(getBridgedInputType(tc, rep, t.getInput(), decl),
+                   getBridgedResultType(tc, rep, t.getResult(), decl));
   }
   llvm_unreachable("bad calling convention");
 }
@@ -216,9 +203,9 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
   if (uncurryLevel == 0)
     return getBridgedFunctionType(*this, t, extInfo, clangDecl);
 
-  AbstractCC cc = extInfo.getCC();
+  SILFunctionTypeRepresentation rep = extInfo.getSILRepresentation();
   assert(!extInfo.isAutoClosure() && "autoclosures cannot be curried");
-  assert(extInfo.getRepresentation() != FunctionType::Representation::Block
+  assert(rep != SILFunctionType::Representation::Block
          && "objc blocks cannot be curried");
 
   // The uncurried input types.
@@ -252,22 +239,24 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
   CanType resultType = t.getResult();
 
   // Bridge input and result types.
-  switch (cc) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+  switch (rep) {
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     // Native functions don't need bridging.
     break;
 
-  case AbstractCC::C:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Block:
     for (auto &input : inputs)
       input = input.getWithType(
-               getBridgedInputType(*this, cc, CanType(input.getType()),
+               getBridgedInputType(*this, rep, CanType(input.getType()),
                                    clangDecl));
-    resultType = getBridgedResultType(*this, cc, resultType,
+    resultType = getBridgedResultType(*this, rep, resultType,
                                       clangDecl);
     break;
-  case AbstractCC::ObjCMethod: {
+  case SILFunctionTypeRepresentation::ObjCMethod: {
     // The "self" parameter should not get bridged unless it's a metatype.
     unsigned skip = 1;
     if (inputs.front().getType()->is<AnyMetatypeType>())
@@ -275,9 +264,9 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
 
     for (auto &input : make_range(inputs.begin() + skip, inputs.end()))
       input = input.getWithType(
-                getBridgedInputType(*this, cc, CanType(input.getType()),
+                getBridgedInputType(*this, rep, CanType(input.getType()),
                                     clangDecl));
-    resultType = getBridgedResultType(*this, cc, resultType, clangDecl);
+    resultType = getBridgedResultType(*this, rep, resultType, clangDecl);
     break;
   }
   }
@@ -304,17 +293,20 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
   }
 }
 
-Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc,
+Type TypeConverter::getLoweredBridgedType(Type t,
+                                          SILFunctionTypeRepresentation rep,
                                           const clang::Type *clangTy,
                                           BridgedTypePurpose purpose) {
-  switch (cc) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+  switch (rep) {
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     // No bridging needed for native CCs.
     return t;
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::Block:
     // Map native types back to bridged types.
 
     // Look through optional types.
@@ -367,22 +359,21 @@ Type TypeConverter::getLoweredCBridgedType(Type t,
   }
   
   if (auto funTy = t->getAs<FunctionType>()) {
-    switch (funTy->getRepresentation()) {
-    case AnyFunctionType::Representation::Block:
-      // Functions that are already represented as blocks don't need bridging.
+    switch (funTy->getExtInfo().getSILRepresentation()) {
+    // Functions that are already represented as blocks or C function pointers
+    // don't need bridging.
+    case SILFunctionType::Representation::Block:
+    case SILFunctionType::Representation::CFunctionPointer:
+    case SILFunctionType::Representation::Thin:
+    case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::WitnessMethod:
       return t;
-    case AnyFunctionType::Representation::Thin:
-      // TODO: Bridge thin functions to C function pointers?
-      return t;
-    case AnyFunctionType::Representation::Thick:
-      // C function pointers don't bridge.
-      // TODO: A proper representation for C function pointers.
-      if (funTy->getAbstractCC() == AbstractCC::C)
-        return funTy;
+    case SILFunctionType::Representation::Thick:
       // Thick functions (TODO: conditionally) get bridged to blocks.
       return FunctionType::get(funTy->getInput(), funTy->getResult(),
-                               funTy->getExtInfo().withRepresentation(
-                                        FunctionType::Representation::Block));
+                               funTy->getExtInfo().withSILRepresentation(
+                                       SILFunctionType::Representation::Block));
     }
   }
 

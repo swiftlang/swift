@@ -1344,6 +1344,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     if (options & TR_SILType) {
+      // TODO: Coalesce the representation attributes into a single 'convention'
+      // attribute.
       SILFunctionType::Representation rep;
       if (thin)
         rep = SILFunctionType::Representation::Thin;
@@ -1352,11 +1354,32 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       else
         rep = SILFunctionType::Representation::Thick;
       
+      if (attrs.hasCC()) {
+        if (attrs.getAbstractCC() == "cdecl") {
+          if (rep == SILFunctionType::Representation::Thin)
+            rep = SILFunctionType::Representation::CFunctionPointer;
+          else if (rep == SILFunctionType::Representation::Block)
+            /* OK */;
+          else
+            TC.diagnose(attrs.getLoc(TAK_cc),
+                        diag::unsupported_cc_representation_combo);
+        } else if (attrs.getAbstractCC() == "method"
+                   && rep == SILFunctionType::Representation::Thin) {
+          rep = SILFunctionType::Representation::Method;
+        } else if (attrs.getAbstractCC() == "objc_method"
+                  && rep == SILFunctionType::Representation::Thin) {
+          rep = SILFunctionType::Representation::ObjCMethod;
+        } else if (attrs.getAbstractCC() == "witness_method"
+                  && rep == SILFunctionType::Representation::Thin) {
+          rep = SILFunctionType::Representation::WitnessMethod;
+        } else {
+          TC.diagnose(attrs.getLoc(TAK_cc),
+                      diag::unsupported_cc_representation_combo);
+        }
+      }
+      
       // Resolve the function type directly with these attributes.
-      SILFunctionType::ExtInfo extInfo(attrs.hasCC()
-                                         ? attrs.getAbstractCC()
-                                         : AbstractCC::Freestanding,
-                                       rep,
+      SILFunctionType::ExtInfo extInfo(rep,
                                        attrs.has(TAK_noreturn));
           
       ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
@@ -1366,14 +1389,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         rep = FunctionType::Representation::Thin;
       else if (block)
         rep = FunctionType::Representation::Block;
+      else if (attrs.hasCC() && attrs.getAbstractCC() == "cdecl")
+        rep = FunctionType::Representation::CFunctionPointer;
       else
-        rep = FunctionType::Representation::Thick;
+        rep = FunctionType::Representation::Swift;
       
       // Resolve the function type directly with these attributes.
-      FunctionType::ExtInfo extInfo(attrs.hasCC()
-                                      ? attrs.getAbstractCC()
-                                      : AbstractCC::Freestanding,
-                                    rep,
+      FunctionType::ExtInfo extInfo(rep,
                                     attrs.has(TAK_noreturn),
                                     /*autoclosure is a decl attr*/false,
                                     isNoEscape,
@@ -1465,16 +1487,18 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   }
 
   auto fnTy = FunctionType::get(inputTy, outputTy, extInfo);
-  // If the type is @objc_block, it must be representable in ObjC.
+  // If the type is a block or C function pointer, it must be representable in
+  // ObjC.
   switch (extInfo.getRepresentation()) {
   case AnyFunctionType::Representation::Block:
+  case AnyFunctionType::Representation::CFunctionPointer:
     if (!TC.isRepresentableInObjC(DC, fnTy)) {
       TC.diagnose(repr->getStartLoc(), diag::objc_block_invalid);
     }
     break;
 
   case AnyFunctionType::Representation::Thin:
-  case AnyFunctionType::Representation::Thick:
+  case AnyFunctionType::Representation::Swift:
     break;
   }
   
@@ -2590,11 +2614,10 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   if (auto FT = T->getAs<FunctionType>()) {
     switch (FT->getRepresentation()) {
     case AnyFunctionType::Representation::Thin:
-      // TODO: Could be representable if we know the function is cdecl (or
-      // we can statically produce a cdecl thunk for it).
       return false;
-    case AnyFunctionType::Representation::Thick:
+    case AnyFunctionType::Representation::Swift:
     case AnyFunctionType::Representation::Block:
+    case AnyFunctionType::Representation::CFunctionPointer:
       break;
     }
     

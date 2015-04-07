@@ -438,9 +438,9 @@ FunctionAnalyzer::createOptimizedSILFunctionType() {
   auto InterfaceErrorResult = FTy->getOptionalErrorResult();
   auto ExtInfo = FTy->getExtInfo();
 
-  // Change the calling convention to freestanding if we have modified self.
+  // Don't use a method representation if we modified self.
   if (HaveModifiedSelfArgument)
-    ExtInfo = ExtInfo.withCallingConv(AbstractCC::Freestanding);
+    ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   return SILFunctionType::get(FTy->getGenericSignature(),
                               ExtInfo,
@@ -734,14 +734,16 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static bool isSpecializableCC(AbstractCC CC) {
-  switch (CC) {
-  case AbstractCC::Method:
-  case AbstractCC::Freestanding:
-  case AbstractCC::C:
+static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
+  switch (Rep) {
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
     return true;
-  case AbstractCC::WitnessMethod:
-  case AbstractCC::ObjCMethod:
+  case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::Block:
     return false;
   }
 }
@@ -772,7 +774,7 @@ static bool canSpecializeFunction(SILFunction &F) {
     return false;
 
   // Make sure F has a linkage that we can optimize.
-  if (!isSpecializableCC(F.getAbstractCC()))
+  if (!isSpecializableRepresentation(F.getRepresentation()))
     return false;
 
   return true;

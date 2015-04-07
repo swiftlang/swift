@@ -58,8 +58,10 @@ AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
 
   if (auto clangDecl = var->getClangDecl()) {
     auto clangType = getClangType(clangDecl);
-    swiftType = getLoweredBridgedType(swiftType, AbstractCC::C, clangType,
-                                      TypeConverter::ForMemory)
+    swiftType = getLoweredBridgedType(swiftType,
+                              SILFunctionTypeRepresentation::CFunctionPointer,
+                              clangType,
+                              TypeConverter::ForMemory)
       ->getCanonicalType();
     return AbstractionPattern(swiftType, clangType);
   } else {

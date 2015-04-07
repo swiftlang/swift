@@ -49,6 +49,8 @@ class SILArgument;
 class SILDebugScope;
 class SILModule;
 
+enum class SILFunctionTypeRepresentation : uint8_t;
+
 namespace irgen {
 
 class IRGenFunction;
@@ -151,10 +153,12 @@ public:
   /// Emit debug info for the given function.
   /// \param DS The parent scope of the function.
   /// \param Fn The IR representation of the function.
-  /// \param CC The calling convention of the function.
+  /// \param Rep The calling convention of the function.
   /// \param Ty The signature of the function.
   llvm::DIDescriptor emitFunction(SILModule &SILMod, SILDebugScope *DS,
-                                  llvm::Function *Fn, AbstractCC CC, SILType Ty,
+                                  llvm::Function *Fn,
+                                  SILFunctionTypeRepresentation Rep,
+                                  SILType Ty,
                                   DeclContext *DeclCtx = nullptr);
 
   /// Emit debug info for a given SIL function.

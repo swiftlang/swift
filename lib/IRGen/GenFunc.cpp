@@ -174,18 +174,20 @@ static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
 
 /// Expand the requirements of the given abstract calling convention
 /// into a "physical" calling convention.
-llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
-                                              AbstractCC convention) {
+llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
+                                    SILFunctionTypeRepresentation convention) {
   switch (convention) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::Block:
     return llvm::CallingConv::C;
 
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     //   TODO: maybe add 'inreg' to the first non-result argument.
     SWIFT_FALLTHROUGH;
-  case AbstractCC::Freestanding:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Thick:
     return getFreestandingConvention(IGM);
   }
   llvm_unreachable("bad calling convention!");
@@ -697,6 +699,10 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
                              IGM.getPointerAlignment());
       
   case SILFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::WitnessMethod:
+  case SILFunctionType::Representation::ObjCMethod:
+  case SILFunctionType::Representation::CFunctionPointer:
     return ThinFuncTypeInfo::create(CanSILFunctionType(T),
                                     IGM.FunctionPtrTy,
                                     IGM.getPointerSize(),
@@ -704,28 +710,6 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
                                     IGM.getFunctionPointerSpareBits());
 
   case SILFunctionType::Representation::Thick: {
-#ifndef NDEBUG
-    // For non-witness methods, 'thick' always indicates a retainable context
-    // pointer.
-    switch (T->getAbstractCC()) {
-    case AbstractCC::Freestanding:
-    case AbstractCC::Method:
-      break;
-
-    case AbstractCC::WitnessMethod:
-      // TODO: This should fall into the "retainable" bucket, but we
-      // historically abused thick witness methods for other purposes.
-      // Fail here as a safety against miscompiling code that tries to
-      // work the old way.
-      llvm_unreachable("thick witness method not supported");
-
-    case AbstractCC::C:
-    case AbstractCC::ObjCMethod:
-      llvm_unreachable("thick foreign functions should be lowered to a "
-                       "block type");
-    }
-#endif
-
     SpareBitVector spareBits;
     spareBits.append(IGM.getFunctionPointerSpareBits());
     spareBits.append(IGM.getHeapObjectSpareBits());
@@ -828,14 +812,11 @@ llvm::Type *SignatureExpansion::expandResult() {
       return IGM.VoidTy;
 
   ExplosionSchema schema = IGM.getSchema(resultType);
-  switch (FnType->getAbstractCC()) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
+  switch (FnType->getLanguage()) {
+  case SILFunctionLanguage::C:
     llvm_unreachable("Expanding C/ObjC parameters in the wrong place!");
     break;
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod: {
+  case SILFunctionLanguage::Swift: {
     if (schema.requiresIndirectResult(IGM))
       return addIndirectResult();
     return schema.getScalarResultType(IGM);
@@ -1181,8 +1162,7 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
 /// Expand the result and parameter types to the appropriate LLVM IR
 /// types for C and Objective-C signatures.
 llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
-  assert(FnType->getAbstractCC() == AbstractCC::ObjCMethod ||
-         FnType->getAbstractCC() == AbstractCC::C);
+  assert(FnType->getLanguage() == SILFunctionLanguage::C);
 
   // Convert the SIL result type to a Clang type.
   auto resultTy = FnType->getResult().getSILType();
@@ -1195,7 +1175,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
   SmallVector<clang::CanQualType,4> paramTys;
   auto const &clangCtx = IGM.getClangASTContext();
 
-  if (FnType->getAbstractCC() == AbstractCC::ObjCMethod) {
+  if (FnType->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod){
     // ObjC methods take their 'self' argument first, followed by an
     // implicit _cmd argument.
     auto &self = params.back();
@@ -1236,7 +1216,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
     addIndirectResult();
 
   // Blocks are passed into themselves as their first (non-sret) argument.
-  if (FnType->hasBlockRepresentation())
+  if (FnType->getRepresentation() == SILFunctionTypeRepresentation::Block)
     ParamIRTypes.push_back(IGM.ObjCBlockPtrTy);
 
   for (auto i : indices(paramTys)) {
@@ -1320,15 +1300,12 @@ void SignatureExpansion::expand(SILParameterInfo param) {
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Deallocating:
 
-    switch (FnType->getAbstractCC()) {
-    case AbstractCC::C:
-    case AbstractCC::ObjCMethod: {
+    switch (FnType->getLanguage()) {
+    case SILFunctionLanguage::C: {
       llvm_unreachable("Unexpected C/ObjC method in parameter expansion!");
       return;
     }
-    case AbstractCC::Freestanding:
-    case AbstractCC::Method:
-    case AbstractCC::WitnessMethod: {
+    case SILFunctionLanguage::Swift: {
       auto schema = IGM.getSchema(param.getSILType());
       schema.addToArgTypes(IGM, ParamIRTypes);
       return;
@@ -1372,14 +1349,14 @@ bool irgen::isSelfContextParameter(SILParameterInfo param) {
 /// Expand the abstract parameters of a SIL function type into the
 /// physical parameters of an LLVM function type.
 void SignatureExpansion::expandParameters() {
-  assert(!FnType->hasBlockRepresentation()
+  assert(FnType->getRepresentation() != SILFunctionTypeRepresentation::Block
          && "block with non-C calling conv?!");
 
   // First, the formal parameters.  But 'self' is treated as the
   // context if it has pointer representation.
   auto params = FnType->getParameters();
   bool hasSelfContext = false;
-  if (FnType->hasSelfArgument() &&
+  if (FnType->hasSelfParam() &&
       isSelfContextParameter(FnType->getSelfParameter())) {
     hasSelfContext = true;
     params = params.drop_back();
@@ -1409,6 +1386,10 @@ void SignatureExpansion::expandParameters() {
         llvm_unreachable("adding block parameter in Swift CC expansion?");
 
       // Always leave space for a context argument if we have an error result.
+      case SILFunctionType::Representation::CFunctionPointer:
+      case SILFunctionType::Representation::Method:
+      case SILFunctionType::Representation::WitnessMethod:
+      case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::Thin:
         return FnType->hasErrorResult();
 
@@ -1434,7 +1415,8 @@ void SignatureExpansion::expandParameters() {
   }
 
   // Witness methods have some extra parameter types.
-  if (FnType->getAbstractCC() == AbstractCC::WitnessMethod) {
+  if (FnType->getRepresentation() ==
+        SILFunctionTypeRepresentation::WitnessMethod) {
     expandTrailingWitnessSignature(IGM, FnType, ParamIRTypes);
   }
 }
@@ -1443,16 +1425,13 @@ void SignatureExpansion::expandParameters() {
 /// physical parameter types of an LLVM function and return the result
 /// type.
 llvm::Type *SignatureExpansion::expandSignatureTypes() {
-  switch (FnType->getAbstractCC()) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod: {
+  switch (FnType->getLanguage()) {
+  case SILFunctionLanguage::Swift: {
     llvm::Type *resultType = expandResult();
     expandParameters();
     return resultType;
   }
-  case AbstractCC::ObjCMethod:
-  case AbstractCC::C:
+  case SILFunctionLanguage::C:
     return expandExternalSignatureTypes();
   }
   llvm_unreachable("bad abstract calling convention");
@@ -1484,6 +1463,10 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   case SILFunctionType::Representation::Block:
     return ti.as<BlockTypeInfo>();
   case SILFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::CFunctionPointer:
+  case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::WitnessMethod:
+  case SILFunctionType::Representation::ObjCMethod:
     return ti.as<ThinFuncTypeInfo>();
   case SILFunctionType::Representation::Thick:
     return ti.as<FuncTypeInfo>();
@@ -1498,26 +1481,6 @@ IRGenModule::getFunctionType(CanSILFunctionType type,
   Signature sig = sigInfo.getSignature(*this);
   attrs = sig.getAttributes();
   return sig.getType();
-}
-
-static bool isClassMethod(ValueDecl *vd) {
-  if (!vd->getDeclContext())
-    return false;
-  if (!vd->getDeclContext()->getDeclaredTypeInContext())
-    return false;
-  return vd->getDeclContext()->getDeclaredTypeInContext()
-  ->getClassOrBoundGenericClass();
-}
-
-AbstractCC irgen::getAbstractCC(ValueDecl *fn) {
-  if (fn->isInstanceMember())
-    return AbstractCC::Method;
-  if (fn->hasClangNode()) {
-    if (isClassMethod(fn))
-      return AbstractCC::ObjCMethod;
-    return AbstractCC::C;
-  }
-  return AbstractCC::Freestanding;
 }
 
 /// Return this function pointer, bitcasted to an i8*.
@@ -2258,7 +2221,7 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
 
   // Determine the calling convention.
   // FIXME: collect attributes in the CallEmission.
-  auto cc = expandAbstractCC(IGF.IGM, getCallee().getAbstractCC());
+  auto cc = expandCallingConv(IGF.IGM, getCallee().getRepresentation());
 
   // Make the call and clear the arguments array.
   auto fnPtr = getCallee().getFunctionPointer();
@@ -2507,7 +2470,8 @@ void CallEmission::setFromCallee() {
 
   auto fnType = CurCallee.getOrigFunctionType();
 
-  if (fnType->getAbstractCC() == AbstractCC::WitnessMethod) {
+  if (fnType->getRepresentation()
+        == SILFunctionTypeRepresentation::WitnessMethod) {
     unsigned n = getTrailingWitnessSignatureLength(IGF.IGM, fnType);
     while (n--) {
       Args[--LastArgWritten] = nullptr;
@@ -2540,8 +2504,8 @@ void CallEmission::setFromCallee() {
   // (Note that we're emitting backwards, so this correctly goes
   // *before* the error pointer.)
   if (contextPtr) {
-    assert(!fnType->hasBlockRepresentation() &&
-           "block function should not claimed to have data pointer");
+    assert(fnType->getRepresentation() != SILFunctionTypeRepresentation::Block
+           && "block function should not claimed to have data pointer");
     assert(LastArgWritten > 0);
     Args[--LastArgWritten] = contextPtr;
   }
@@ -2746,7 +2710,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
   // Objective-C methods take two implicit first parameters, 'self'
   // and '_cmd'.
-  if (callee.getAbstractCC() == AbstractCC::ObjCMethod) {
+  if (callee.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     auto &self = params.back();
     auto clangTy = IGF.IGM.getClangType(self.getSILType());
     paramTys.push_back(clangTy);
@@ -2754,7 +2718,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     params = params.slice(0, params.size() - 1);
 
   // Blocks take an implicit first parameter of block-context type.
-  } else if (fnType->hasBlockRepresentation()) {
+  } else if (callee.getRepresentation() == SILFunctionTypeRepresentation::Block) {
     paramTys.push_back(clangCtx.VoidPtrTy);
   }
 
@@ -2787,14 +2751,15 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   };
 
   // Handle the ObjC prefix.
-  if (callee.getAbstractCC() == AbstractCC::ObjCMethod) {
+  if (callee.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     // The first two parameters are pointers, and we make some
     // simplifying assumptions.
     claimNextDirect();
     claimNextDirect();
 
   // Or the block prefix.
-  } else if (fnType->hasBlockRepresentation()) {
+  } else if (fnType->getRepresentation()
+                == SILFunctionTypeRepresentation::Block) {
     claimNextDirect();
   }
   
@@ -2861,26 +2826,26 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 void CallEmission::setArgs(Explosion &arg, WitnessMetadata *witnessMetadata) {
   // Convert arguments to a representation appropriate to the calling
   // convention.
-  switch (getCallee().getAbstractCC()) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod: {
+  switch (getCallee().getRepresentation()) {
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::Block: {
     Explosion externalized;
     externalizeArguments(IGF, getCallee(), arg, externalized, Attrs);
     arg = std::move(externalized);
     break;
   }
 
-  case AbstractCC::WitnessMethod:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     // This is basically duplicating emitTrailingWitnessArguments.
     assert(witnessMetadata);
     assert(witnessMetadata->SelfMetadata);
     Args.back() = witnessMetadata->SelfMetadata;
     SWIFT_FALLTHROUGH;
 
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-    assert(!CurCallee.getOrigFunctionType()->hasBlockRepresentation()
-           && "block with non-C calling convention?!");
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Thick:
     // Nothing to do.
     break;
   }
@@ -3263,8 +3228,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   // There's still a placeholder to claim if the target type is thick
   // or there's an error result.
-  } else if (outType->hasThickRepresentation() ||
-             outType->hasErrorResult()) {
+  } else if (outType->getRepresentation()==SILFunctionTypeRepresentation::Thick
+             || outType->hasErrorResult()) {
     llvm::Value *contextPtr = origParams.claimNext(); (void)contextPtr;
     assert(contextPtr->getType() == IGM.RefCountedPtrTy);
   }
@@ -3384,7 +3349,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // In either case, it's the last thing in 'args'.
   llvm::Value *fnContext = nullptr;
   if (calleeHasContext ||
-      (origType->hasSelfArgument() &&
+      (origType->hasSelfParam() &&
        isSelfContextParameter(origType->getSelfParameter()))) {
     fnContext = args.takeLast();
   }

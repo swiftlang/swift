@@ -203,14 +203,14 @@ enum class ConventionsKind : uint8_t {
     }
 
     void visitSelfType(AbstractionPattern origType, CanType substType,
-                       AbstractCC CC) {
+                       SILFunctionTypeRepresentation rep) {
       auto &substTL =
         M.Types.getTypeLowering(origType, substType);
       ParameterConvention convention;
       if (origType.getAs<InOutType>()) {
         convention = ParameterConvention::Indirect_Inout;
       } else if (isPassedIndirectly(origType, substType, substTL)) {
-        if (CC == AbstractCC::WitnessMethod)
+        if (rep == SILFunctionTypeRepresentation::WitnessMethod)
           convention = ParameterConvention::Indirect_In_Guaranteed;
         else
           convention = Convs.getIndirectSelfParameter(origType);
@@ -235,7 +235,7 @@ enum class ConventionsKind : uint8_t {
       // If we don't have a tuple type, then we have a one element argument.
       if (!origType.isTuple()) {
         if (hasSelfParam) {
-          visitSelfType(origType, substType, extInfo.getCC());
+          visitSelfType(origType, substType, extInfo.getSILRepresentation());
           return;
         }
         
@@ -263,7 +263,7 @@ enum class ConventionsKind : uint8_t {
       // Otherwise, process the self parameter.
       visitSelfType(origType.getTupleElementType(numNonSelfParams),
                     substTupleType.getElementType(numNonSelfParams),
-                    extInfo.getCC());
+                    extInfo.getSILRepresentation());
     }
 
   private:
@@ -408,20 +408,6 @@ enum class ConventionsKind : uint8_t {
   };
 }
 
-/// Map an AST function representation to a SIL representation.
-/// TODO: This should be unnecessary.
-static SILFunctionType::Representation
-getSILFunctionRepresentation(AnyFunctionType::Representation rep) {
-  switch (rep) {
-  case AnyFunctionType::Representation::Block:
-    return SILFunctionType::Representation::Block;
-  case AnyFunctionType::Representation::Thick:
-    return SILFunctionType::Representation::Thick;
-  case AnyFunctionType::Representation::Thin:
-    return SILFunctionType::Representation::Thin;
-  }
-}
-
 /// Create the appropriate SIL function type for the given formal type
 /// and conventions.
 ///
@@ -468,8 +454,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // Per above, only honor the most general abstraction pattern for thick
   // or polymorphic functions.
   if (origType.isOpaque() &&
-      substFnOldType->getRepresentation()
-        != AnyFunctionType::Representation::Thick &&
+      substFnOldType->getExtInfo().getSILRepresentation()
+        != SILFunctionType::Representation::Thick &&
       isa<FunctionType>(substFnOldType)) {
     origType = AbstractionPattern(substFnOldType);
   }
@@ -570,8 +556,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // TODO: The noescape bit could be of interest to SIL optimizations.
   //   We should bring it back when we have those optimizations.
   auto silExtInfo = SILFunctionType::ExtInfo()
-    .withCallingConv(extInfo.getCC())
-    .withRepresentation(getSILFunctionRepresentation(extInfo.getRepresentation()))
+    .withRepresentation(extInfo.getSILRepresentation())
     .withIsNoReturn(extInfo.isNoReturn());
   
   return SILFunctionType::get(genericSig,
@@ -592,7 +577,7 @@ struct DeallocatorConventions : Conventions {
 
   ParameterConvention getIndirectParameter(unsigned index,
                              const AbstractionPattern &type) const override {
-    llvm_unreachable("Dealloactors do not have indirect parameters");
+    llvm_unreachable("Deallocators do not have indirect parameters");
   }
 
   ParameterConvention getDirectParameter(unsigned index,
@@ -739,19 +724,17 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                                            CanAnyFunctionType substInterfaceType,
                                            AnyFunctionType::ExtInfo extInfo,
                                            SILDeclRef::Kind kind) {
-  switch (extInfo.getRepresentation()) {
-  case AnyFunctionType::Representation::Block:
+  switch (extInfo.getSILRepresentation()) {
+  case SILFunctionType::Representation::Block:
+  case SILFunctionType::Representation::CFunctionPointer:
     return getSILFunctionType(M, origType, substType, substInterfaceType,
                               extInfo, DefaultBlockConventions());
 
-  case AnyFunctionType::Representation::Thin:
-  case AnyFunctionType::Representation::Thick: {
-    // TODO: Proper representation for C function pointer types.
-    if (extInfo.getCC() == AbstractCC::C)
-      return getSILFunctionType(M, origType, substType, substInterfaceType,
-                                extInfo, DefaultBlockConventions());
-    
-  
+  case SILFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::ObjCMethod:
+  case SILFunctionType::Representation::Thick:
+  case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::WitnessMethod: {
     bool enableGuaranteedSelf = M.getOptions().EnableGuaranteedSelf;
     switch (kind) {
     case SILDeclRef::Kind::Initializer:
@@ -1238,12 +1221,13 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
                                   CanAnyFunctionType origLoweredType,
                                   CanAnyFunctionType origLoweredInterfaceType,
                                   CanAnyFunctionType substFormalType,
-                                  CanAnyFunctionType substInterfaceType,
-                                  AnyFunctionType::Representation rep) {
-  assert(origLoweredType->getRepresentation()
-           == FunctionType::Representation::Thin);
+                                  CanAnyFunctionType substInterfaceType) {
+  assert(origLoweredType->getExtInfo().getSILRepresentation()
+           != SILFunctionTypeRepresentation::Thick
+         && origLoweredType->getExtInfo().getSILRepresentation()
+             != SILFunctionTypeRepresentation::Block);
 
-  auto extInfo = origLoweredType->getExtInfo().withRepresentation(rep);
+  auto extInfo = origLoweredType->getExtInfo();
 
   CanAnyFunctionType substLoweredType;
   CanAnyFunctionType substLoweredInterfaceType;
@@ -1302,10 +1286,11 @@ static bool isClassOrProtocolMethod(ValueDecl *vd) {
     || contextType->isClassExistentialType();
 }
 
-AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
+SILFunctionTypeRepresentation
+TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   // Currying thunks always have freestanding CC.
   if (c.isCurried)
-    return AbstractCC::Freestanding;
+    return SILFunctionTypeRepresentation::Thin;
 
   // If this is a foreign thunk, it always has the foreign calling convention.
   if (c.isForeign)
@@ -1313,19 +1298,19 @@ AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
       (isClassOrProtocolMethod(c.getDecl()) ||
        c.kind == SILDeclRef::Kind::IVarInitializer ||
        c.kind == SILDeclRef::Kind::IVarDestroyer)
-      ? AbstractCC::ObjCMethod
-      : AbstractCC::C;
+      ? SILFunctionTypeRepresentation::ObjCMethod
+      : SILFunctionTypeRepresentation::CFunctionPointer;
 
   // Anonymous functions currently always have Freestanding CC.
   if (!c.hasDecl())
-    return AbstractCC::Freestanding;
+    return SILFunctionTypeRepresentation::Thin;
 
   // FIXME: Assert that there is a native entry point
   // available. There's no great way to do this.
 
   // Protocol witnesses are called using the witness calling convention.
   if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext()))
-    return getProtocolWitnessCC(proto);
+    return getProtocolWitnessRepresentation(proto);
 
   switch (c.kind) {
     case SILDeclRef::Kind::Func:
@@ -1336,39 +1321,17 @@ AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::GlobalGetter:
       if (c.getDecl()->isInstanceMember())
-        return AbstractCC::Method;
-      return AbstractCC::Freestanding;
+        return SILFunctionTypeRepresentation::Method;
+      return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::DefaultArgGenerator:
-      return AbstractCC::Freestanding;
+      return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Initializer:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
-      return AbstractCC::Method;
+      return SILFunctionTypeRepresentation::Method;
   }
-}
-
-CanSILFunctionType TypeConverter::getConstantFunctionType(SILDeclRef constant,
-                                   CanAnyFunctionType substFormalType,
-                                   CanAnyFunctionType substFormalInterfaceType,
-                                   AnyFunctionType::Representation rep) {
-  auto cachedInfo = getConstantInfo(constant);
-  if (!substFormalType || substFormalType == cachedInfo.FormalType) {
-    assert(bool(substFormalType) == bool(substFormalInterfaceType)
-           && (!substFormalInterfaceType
-               || substFormalInterfaceType == cachedInfo.FormalInterfaceType));
-    auto extInfo = cachedInfo.SILFnType->getExtInfo()
-      .withRepresentation(SILFunctionType::Representation::Thin);
-    return adjustFunctionType(cachedInfo.SILFnType, extInfo);
-  }
-
-  return getUncachedSILFunctionTypeForConstant(M, constant,
-                                               cachedInfo.LoweredType,
-                                               cachedInfo.LoweredInterfaceType,
-                                               substFormalType,
-                                               substFormalInterfaceType,
-                                               rep);
 }
 
 SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
@@ -1385,12 +1348,10 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   std::tie(contextGenerics, innerGenerics)
     = getConstantContextGenericParams(constant, /*withCaptures*/true);
 
-  // The formal type is just that with the right CC and thin-ness.
-  AbstractCC cc = getAbstractCC(constant);
-  formalType = adjustFunctionType(formalType, cc,
-                                  AnyFunctionType::Representation::Thin);
-  formalInterfaceType = adjustFunctionType(formalInterfaceType, cc,
-                                         AnyFunctionType::Representation::Thin);
+  // The formal type is just that with the right representation.
+  auto rep = getDeclRefRepresentation(constant);
+  formalType = adjustFunctionType(formalType, rep);
+  formalInterfaceType = adjustFunctionType(formalInterfaceType, rep);
   // The lowered type is the formal type, but uncurried and with
   // parameters automatically turned into their bridged equivalents.
   auto loweredType =
@@ -1404,8 +1365,7 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
     getUncachedSILFunctionTypeForConstant(M, constant, loweredType,
                                           loweredInterfaceType,
                                           CanAnyFunctionType(),
-                                          CanAnyFunctionType(),
-                                          FunctionType::Representation::Thin);
+                                          CanAnyFunctionType());
 
   DEBUG(llvm::dbgs() << "lowering type for constant ";
         constant.print(llvm::dbgs());
@@ -1621,10 +1581,10 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
   // Allow the substituted type to add thick-ness, but not remove it.
   assert(!origFnType->getExtInfo().hasContext()
            || substLoweredType->getExtInfo().hasContext());
-  assert(substLoweredType->getRepresentation()
-           == substLoweredInterfaceType->getRepresentation());
+  assert(substLoweredType->getExtInfo().getSILRepresentation()
+           == substLoweredInterfaceType->getExtInfo().getSILRepresentation());
 
-  auto rep = getSILFunctionRepresentation(substLoweredType->getRepresentation());
+  auto rep = substLoweredType->getExtInfo().getSILRepresentation();
   auto extInfo = origFnType->getExtInfo().withRepresentation(rep);
 
   // FIXME: Map into archetype context.

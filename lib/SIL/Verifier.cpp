@@ -202,9 +202,6 @@ public:
     };
     
     // The calling convention and function representation can't be changed.
-    _require(type1->getAbstractCC() == type2->getAbstractCC(), what,
-             complain("Different calling conventions"));
-    
     _require(type1->getRepresentation() == type2->getRepresentation(), what,
              complain("Different function representations"));
 
@@ -630,8 +627,8 @@ public:
     // callee.
     auto substTy = checkApplySubstitutions(site.getSubstitutions(),
                                            site.getCallee().getType());
-    require(site.getOrigCalleeType()->getAbstractCC() ==
-            site.getSubstCalleeType()->getAbstractCC(),
+    require(site.getOrigCalleeType()->getRepresentation() ==
+            site.getSubstCalleeType()->getRepresentation(),
             "calling convention difference between types");
 
     require(!site.getSubstCalleeType()->isPolymorphic(),
@@ -839,9 +836,8 @@ public:
   void checkFunctionRefInst(FunctionRefInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
-    require(fnType->getRepresentation()
-              == SILFunctionType::Representation::Thin,
-            "function_ref should have a thin function result");
+    require(!fnType->getExtInfo().hasContext(),
+            "function_ref should have a context-free function result");
     if (F.isFragile()) {
       SILFunction *RefF = FRI->getReferencedFunction();
       require(RefF->isFragile()
@@ -1375,12 +1371,9 @@ public:
     require(protocol,
             "witness_method method must be a protocol method");
 
-    require(methodType->getRepresentation() == SILFunctionType::Representation::Thin,
-            "result of witness_method must be thin function");
-
-    require(methodType->getAbstractCC()
-              == F.getModule().Types.getProtocolWitnessCC(protocol),
-            "result of witness_method must have correct @cc for protocol");
+    require(methodType->getRepresentation()
+              == F.getModule().Types.getProtocolWitnessRepresentation(protocol),
+            "result of witness_method must have correct representation for protocol");
 
     require(methodType->isPolymorphic(),
             "result of witness_method must be polymorphic");
@@ -1512,8 +1505,8 @@ public:
             "result type of class_method must match type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of class_method");
-    require(methodType->getRepresentation() == SILFunctionType::Representation::Thin,
-            "result method must be of a thin function type");
+    require(!methodType->getExtInfo().hasContext(),
+            "result method must be of a context-free function type");
     SILType operandType = CMI->getOperand().getType();
     require(operandType.isClassOrClassMetatype(),
             "operand must be of a class type");
@@ -1545,8 +1538,8 @@ public:
             "result type of super_method must match type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of super_method");
-    require(methodType->getRepresentation() == SILFunctionType::Representation::Thin,
-            "result method must be of a thin function type");
+    require(!methodType->getExtInfo().hasContext(),
+            "result method must be of a context-free function type");
     SILType operandType = CMI->getOperand().getType();
     require(operandType.isClassOrClassMetatype(),
             "operand must be of a class type");
@@ -2513,10 +2506,9 @@ public:
     auto invokeTy
       = IBSHI->getInvokeFunction().getType().getAs<SILFunctionType>();
     require(invokeTy, "invoke function operand must be a function");
-    require(invokeTy->getRepresentation() == SILFunctionType::Representation::Thin,
-            "invoke function operand must be a thin function");
-    require(invokeTy->getAbstractCC() == AbstractCC::C,
-            "invoke function operand must be a cdecl function");
+    require(invokeTy->getRepresentation()
+              == SILFunctionType::Representation::CFunctionPointer,
+            "invoke function operand must be a c function");
     require(invokeTy->getParameters().size() >= 1,
             "invoke function must take at least one parameter");
     auto storageParam = invokeTy->getParameters()[0];
@@ -2528,8 +2520,6 @@ public:
     require(IBSHI->getType().isObject(), "result must be a value");
     auto blockTy = IBSHI->getType().getAs<SILFunctionType>();
     require(blockTy, "result must be a function");
-    require(blockTy->getAbstractCC() == AbstractCC::C,
-            "result must be a cdecl block function");
     require(blockTy->getRepresentation() == SILFunctionType::Representation::Block,
             "result must be a cdecl block function");
     require(blockTy->getResult() == invokeTy->getResult(),
@@ -2652,7 +2642,7 @@ public:
     // Make sure that if FTy's calling convention implies that it must have a
     // self parameter, it is not empty if we do not have canonical sil.
     if (F.getModule().getStage() == SILStage::Raw &&
-        FTy->hasSelfArgument()) {
+        FTy->hasSelfParam()) {
       require(!FTy->getParameters().empty(),
               "Functions with a calling convention with self parameter must "
               "have at least one argument for self.");

@@ -29,7 +29,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto params = FTI->getParameters();
   auto newParams = params.slice(0, params.size() - argCount);
 
-  auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
+  auto extInfo = SILFunctionType::ExtInfo(
                                         SILFunctionType::Representation::Thick,
                                         /*noreturn*/ FTI->isNoReturn());
   

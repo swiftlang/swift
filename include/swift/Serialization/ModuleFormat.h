@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 190; // Last change: function 'throws' annotations
+const uint16_t VERSION_MINOR = 191; // Last change: consolidate function type representations
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -107,14 +107,28 @@ using StaticSpellingKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
-enum AbstractCC : uint8_t {
-  C = 0,
+enum class FunctionTypeRepresentation : uint8_t {
+  Swift = 0,
+  Block,
+  Thin,
+  CFunctionPointer,
+};
+using FunctionTypeRepresentationField = BCFixed<4>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class SILFunctionTypeRepresentation : uint8_t {
+  Thick = 0,
+  Block,
+  Thin,
+  CFunctionPointer,
+  
+  FirstSIL = 8,
+  Method = FirstSIL,
   ObjCMethod,
-  Freestanding,
-  Method,
   WitnessMethod,
 };
-using AbstractCCField = BCFixed<3>;
+using SILFunctionTypeRepresentationField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -546,11 +560,9 @@ namespace decls_block {
     FUNCTION_TYPE,
     TypeIDField, // input
     TypeIDField, // output
-    AbstractCCField, // calling convention
+    FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // auto-closure?
-    BCFixed<1>,  // thin?
     BCFixed<1>,  // noreturn?
-    BCFixed<1>,  // block-compatible?
     BCFixed<1>,  // noescape?
     BCFixed<1>   // throws?
   >;
@@ -643,8 +655,7 @@ namespace decls_block {
     TypeIDField, // input
     TypeIDField, // output
     DeclIDField, // decl that owns the generic params
-    AbstractCCField, // calling convention
-    BCFixed<1>,  // thin?
+    FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // noreturn?
     BCFixed<1>   // throws?
     // Trailed by its generic parameters, if the owning decl ID is 0.
@@ -654,8 +665,7 @@ namespace decls_block {
     GENERIC_FUNCTION_TYPE,
     TypeIDField,         // input
     TypeIDField,         // output
-    AbstractCCField,     // calling convention
-    BCFixed<1>,          // thin?
+    FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // noreturn?
     BCFixed<1>,          // throws?
     BCArray<TypeIDField> // generic parameters
@@ -669,9 +679,7 @@ namespace decls_block {
     TypeIDField,           // interface error result type
     ResultConventionField, // interface error result convention
     ParameterConventionField, // callee convention
-    AbstractCCField,       // calling convention
-    BCFixed<1>,            // thin?
-    BCFixed<1>,            // block?
+    SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // noreturn?
     BCFixed<30>,           // number of generic parameters
     BCArray<TypeIDField>   // parameter types and conventions, alternating

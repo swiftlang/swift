@@ -325,10 +325,10 @@ namespace {
       if (pointeeQualType->isFunctionType()) {
         if (Impl.SwiftContext.LangOpts.EnableCFunctionPointers) {
           auto funcTy = pointeeType->castTo<FunctionType>();
-          // TODO: Proper spelling for C function pointers
           return {
             FunctionType::get(funcTy->getInput(), funcTy->getResult(),
-                           funcTy->getExtInfo().withCallingConv(AbstractCC::C)),
+              funcTy->getExtInfo().withRepresentation(
+                            AnyFunctionType::Representation::CFunctionPointer)),
             ImportHint::CFunctionPointer
           };
         }
@@ -865,7 +865,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       !isa<NameAliasType>(importedType.getPointer())) {
     auto fTy = importedType->castTo<FunctionType>();
     FunctionType::ExtInfo einfo =
-      fTy->getExtInfo().withRepresentation(FunctionType::Representation::Thick);
+      fTy->getExtInfo().withRepresentation(FunctionType::Representation::Swift);
     importedType = FunctionType::get(fTy->getInput(), fTy->getResult(), einfo);
   }
 

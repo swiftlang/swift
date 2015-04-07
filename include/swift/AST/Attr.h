@@ -182,8 +182,6 @@ enum class Resilience : unsigned char {
 };
 
   
-enum class AbstractCC : unsigned char;
-
 enum DeclAttrKind : unsigned {
 #define DECL_ATTR(_, NAME, ...) DAK_##NAME,
 #include "swift/AST/Attr.def"
@@ -206,7 +204,8 @@ public:
   /// AtLoc - This is the location of the first '@' in the attribute specifier.
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
-  Optional<AbstractCC> cc = None;
+  // TODO: Replace "cc" attribute with proper convention attribute.
+  Optional<StringRef> cc = None;
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
@@ -251,7 +250,7 @@ public:
   }
   
   bool hasCC() const { return cc.hasValue(); }
-  AbstractCC getAbstractCC() const { return *cc; }
+  StringRef getAbstractCC() const { return *cc; }
   
   bool hasOwnership() const { return getOwnership() != Ownership::Strong; }
   Ownership getOwnership() const {

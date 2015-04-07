@@ -40,8 +40,10 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
 
   assert(AI.getFunction() && AI.getFunction() == &F &&
          "Inliner called on apply instruction in wrong function?");
-  assert(((CalleeFunction->getAbstractCC() != AbstractCC::ObjCMethod &&
-           CalleeFunction->getAbstractCC() != AbstractCC::C) ||
+  assert(((CalleeFunction->getRepresentation()
+             != SILFunctionTypeRepresentation::ObjCMethod &&
+           CalleeFunction->getRepresentation()
+             != SILFunctionTypeRepresentation::CFunctionPointer) ||
           IKind == InlineKind::PerformanceInline) &&
          "Cannot inline Objective-C methods or C functions in mandatory "
          "inlining");

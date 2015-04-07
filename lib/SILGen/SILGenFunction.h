@@ -1008,7 +1008,7 @@ public:
   /// to or returned as the result of a function with the given calling
   /// convention.
   ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
-                                        AbstractCC destCC,
+                                        SILFunctionTypeRepresentation destRep,
                                         AbstractionPattern origNativeTy,
                                         CanType substNativeTy,
                                         CanType bridgedTy);
@@ -1016,7 +1016,7 @@ public:
   /// Convert a value received as the result or argument of a function with
   /// the given calling convention to a native Swift value of the given type.
   ManagedValue emitBridgedToNativeValue(SILLocation loc, ManagedValue v,
-                                        AbstractCC srcCC,
+                                        SILFunctionTypeRepresentation srcRep,
                                         CanType nativeTy);
 
   /// Emit the control flow for an optional 'bind' operation, branching to the
@@ -1043,7 +1043,7 @@ public:
                          AbstractionPattern origResultType,
                          CanType substResultType,
                          bool transparent,
-                         Optional<AbstractCC> overrideCC,
+                         Optional<SILFunctionTypeRepresentation> overrideRep,
                          SGFContext evalContext);
 
   ManagedValue emitApplyOfDefaultArgGenerator(SILLocation loc,
@@ -1059,7 +1059,7 @@ public:
                                     ArrayRef<ManagedValue> args,
                                     CanType resultType,
                                     bool transparent = false,
-                                    Optional<AbstractCC> overrideCC = None);
+                    Optional<SILFunctionTypeRepresentation> overrideRep = None);
 
   ManagedValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                            FuncDecl *fn,

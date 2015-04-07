@@ -3686,22 +3686,24 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
 /// True if a function's signature in LLVM carries polymorphic parameters.
 /// Generic functions and protocol witnesses carry polymorphic parameters.
 bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
-  switch (ty->getAbstractCC()) {
-  case AbstractCC::C:
+  switch (ty->getRepresentation()) {
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Block:
     // Should never be polymorphic.
     assert(!ty->isPolymorphic() && "polymorphic C function?!");
     return false;
-  case AbstractCC::ObjCMethod:
+  case SILFunctionTypeRepresentation::ObjCMethod:
     // An ObjC witness_method reference will notionally have polymorphic type
     // <Self: P> (...) -> (...), but there are no polymorphic parameters that
     // can't be solved from the usual ObjC metadata.
     return false;
 
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Method:
     return ty->isPolymorphic();
 
-  case AbstractCC::WitnessMethod:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     // Always carries polymorphic parameters for the Self type.
     return true;
   }
@@ -3819,19 +3821,12 @@ namespace {
       // from the Self argument. We also *cannot* consider other arguments;
       // doing so would potentially make the signature incompatible with other
       // witnesses for the same method.
-      if (fnType->getAbstractCC() == AbstractCC::WitnessMethod) {
-        // If the type is thick, the metadata is derived from the extra data
-        // in the function value. Otherwise, it's provided from the type of the
+      if (fnType->getRepresentation()
+            == SILFunctionTypeRepresentation::WitnessMethod) {
+        // The metadata for a witness is provided from the type of the
         // self argument.
-        switch (fnType->getRepresentation()) {
-        case SILFunctionType::Representation::Thin:
-          Sources.emplace_back(SourceKind::WitnessSelf,
-                               InvalidSourceIndex);
-          break;
-        case SILFunctionType::Representation::Thick:
-        case SILFunctionType::Representation::Block:
-          llvm_unreachable("witnesses cannot have context");
-        }
+        Sources.emplace_back(SourceKind::WitnessSelf,
+                             InvalidSourceIndex);
 
         // Testify to generic parameters in the Self type.
         CanType selfTy = fnType->getSelfParameter().getType();
@@ -3860,7 +3855,7 @@ namespace {
       unsigned selfIndex = ~0U;
 
       // Consider 'self' first.
-      if (fnType->hasSelfArgument()) {
+      if (fnType->hasSelfParam()) {
         selfIndex = params.size() - 1;
         considerParameter(params[selfIndex], selfIndex, true);
       }
@@ -3902,8 +3897,7 @@ namespace {
   private:
     static CanSILFunctionType getNotionalFunctionType(NominalTypeDecl *D) {
       ASTContext &ctx = D->getASTContext();
-      SILFunctionType::ExtInfo extInfo(AbstractCC::Method,
-                                       SILFunctionType::Representation::Thin,
+      SILFunctionType::ExtInfo extInfo(SILFunctionType::Representation::Method,
                                        /*noreturn*/ false);
       SILResultInfo result(TupleType::getEmpty(ctx),
                            ResultConvention::Unowned);
@@ -4353,8 +4347,8 @@ void irgen::collectTrailingWitnessMetadata(IRGenFunction &IGF,
                                            SILFunction &fn,
                                            Explosion &params,
                                            WitnessMetadata &witnessMetadata) {
-  assert(fn.getLoweredFunctionType()->getAbstractCC()
-           == AbstractCC::WitnessMethod);
+  assert(fn.getLoweredFunctionType()->getRepresentation()
+           == SILFunctionTypeRepresentation::WitnessMethod);
 
   llvm::Value *metatype = params.takeLast();
   assert(metatype->getType() == IGF.IGM.TypeMetadataPtrTy &&
@@ -4908,7 +4902,8 @@ void irgen::expandPolymorphicSignature(IRGenModule &IGM,
 void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
                                            CanSILFunctionType polyFn,
                                            SmallVectorImpl<llvm::Type*> &out) {
-  assert(polyFn->getAbstractCC() == AbstractCC::WitnessMethod);
+  assert(polyFn->getRepresentation()
+          == SILFunctionTypeRepresentation::WitnessMethod);
 
   assert(getTrailingWitnessSignatureLength(IGM, polyFn) == 1);
 

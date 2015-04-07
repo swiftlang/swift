@@ -1789,6 +1789,8 @@ ERROR(sil_function_multiple_results,type_parsing,PointsToFirstBadToken,
       "SIL function types cannot have multiple results", ())
 ERROR(sil_function_multiple_error_results,type_parsing,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
+ERROR(unsupported_cc_representation_combo,type_parsing,none,
+      "cc unsupported with this sil representation", ())
 
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,type_parsing,none,

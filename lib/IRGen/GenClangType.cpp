@@ -364,26 +364,20 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
 clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   auto &clangCtx = getClangASTContext();
 
-  // We can only lower block types with an ObjC-compatible calling convention.
-  switch (type->getAbstractCC()) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    // OK.
-    break;
-      
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
-    llvm_unreachable("not an ObjC-compatible function");
-  }
   switch (type->getRepresentation()) {
   case SILFunctionType::Representation::Block:
     // OK.
     break;
   
+  case SILFunctionType::Representation::CFunctionPointer:
+    // TODO
+    llvm_unreachable("GenClangType for C function pointers not implemented");
+  
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Thin:
-    // TODO: Thin functions could be mapped to function pointer types.
+  case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::ObjCMethod:
+  case SILFunctionType::Representation::WitnessMethod:
     llvm_unreachable("not an ObjC-compatible block");
   }
   

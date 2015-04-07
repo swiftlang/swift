@@ -2382,15 +2382,31 @@ void Serializer::writeDecl(const Decl *D) {
 #define SIMPLE_CASE(TYPENAME, VALUE) \
   case swift::TYPENAME::VALUE: return uint8_t(serialization::TYPENAME::VALUE);
 
-/// Translate from the AST calling convention enum to the Serialization enum
+/// Translate from the AST function representation enum to the Serialization enum
 /// values, which are guaranteed to be stable.
-static uint8_t getRawStableCC(swift::AbstractCC cc) {
+static uint8_t getRawStableFunctionTypeRepresentation(
+                                       swift::FunctionType::Representation cc) {
   switch (cc) {
-  SIMPLE_CASE(AbstractCC, C)
-  SIMPLE_CASE(AbstractCC, ObjCMethod)
-  SIMPLE_CASE(AbstractCC, Freestanding)
-  SIMPLE_CASE(AbstractCC, Method)
-  SIMPLE_CASE(AbstractCC, WitnessMethod)
+  SIMPLE_CASE(FunctionTypeRepresentation, Swift)
+  SIMPLE_CASE(FunctionTypeRepresentation, Block)
+  SIMPLE_CASE(FunctionTypeRepresentation, Thin)
+  SIMPLE_CASE(FunctionTypeRepresentation, CFunctionPointer)
+  }
+  llvm_unreachable("bad calling convention");
+}
+
+/// Translate from the AST function representation enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableSILFunctionTypeRepresentation(
+                                    swift::SILFunctionType::Representation cc) {
+  switch (cc) {
+  SIMPLE_CASE(SILFunctionTypeRepresentation, Thick)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, Block)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, Thin)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, CFunctionPointer)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, Method)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, ObjCMethod)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, WitnessMethod)
   }
   llvm_unreachable("bad calling convention");
 }
@@ -2686,11 +2702,9 @@ void Serializer::writeType(Type ty) {
     FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
            addTypeRef(fnTy->getInput()),
            addTypeRef(fnTy->getResult()),
-           getRawStableCC(fnTy->getAbstractCC()),
+           getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
            fnTy->isAutoClosure(),
-           fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
            fnTy->isNoReturn(),
-           fnTy->getRepresentation() == AnyFunctionType::Representation::Block,
            fnTy->isNoEscape(),
            fnTy->throws());
     break;
@@ -2699,7 +2713,6 @@ void Serializer::writeType(Type ty) {
   case TypeKind::PolymorphicFunction: {
     auto fnTy = cast<PolymorphicFunctionType>(ty.getPointer());
     const Decl *genericContext = getGenericContext(&fnTy->getGenericParams());
-    auto callingConvention = fnTy->getAbstractCC();
     DeclID dID = genericContext ? addDeclRef(genericContext) : DeclID(0);
 
     unsigned abbrCode = DeclTypeAbbrCodes[PolymorphicFunctionTypeLayout::Code];
@@ -2707,8 +2720,7 @@ void Serializer::writeType(Type ty) {
             addTypeRef(fnTy->getInput()),
             addTypeRef(fnTy->getResult()),
             dID,
-            getRawStableCC(callingConvention),
-            fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
+            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
             fnTy->isNoReturn(),
             fnTy->throws());
     if (!genericContext)
@@ -2719,15 +2731,13 @@ void Serializer::writeType(Type ty) {
   case TypeKind::GenericFunction: {
     auto fnTy = cast<GenericFunctionType>(ty.getPointer());
     unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
-    auto callingConvention = fnTy->getAbstractCC();
     SmallVector<TypeID, 4> genericParams;
     for (auto param : fnTy->getGenericParams())
       genericParams.push_back(addTypeRef(param));
     GenericFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
             addTypeRef(fnTy->getInput()),
             addTypeRef(fnTy->getResult()),
-            getRawStableCC(callingConvention),
-            fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
+            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
             fnTy->isNoReturn(),
             fnTy->throws(),
             genericParams);
@@ -2749,7 +2759,10 @@ void Serializer::writeType(Type ty) {
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(ty.getPointer());
 
-    auto callingConvention = fnTy->getAbstractCC();
+    auto representation = fnTy->getRepresentation();
+    auto stableRepresentation =
+      getRawStableSILFunctionTypeRepresentation(representation);
+    
     auto interfaceResult = fnTy->getResult();
     TypeID interfaceResultTyID = addTypeRef(interfaceResult.getType());
     auto stableInterfaceResultConvention =
@@ -2787,9 +2800,7 @@ void Serializer::writeType(Type ty) {
           errorResultTyID,
           stableErrorResultConvention,
           stableCalleeConvention,
-          getRawStableCC(callingConvention),
-          fnTy->getRepresentation() == SILFunctionType::Representation::Thin,
-          fnTy->getRepresentation() == SILFunctionType::Representation::Block,
+          stableRepresentation,
           fnTy->isNoReturn(),
           sig ? sig->getGenericParams().size() : 0,
           paramTypes);

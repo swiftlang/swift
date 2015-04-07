@@ -1407,7 +1407,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
                                                attrs);
   
-  auto cc = expandAbstractCC(*this, f->getAbstractCC());
+  auto cc = expandCallingConv(*this, f->getRepresentation());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   if (f->getInlineStrategy() == NoInline) {

@@ -1243,19 +1243,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     // Don't validate the CC in just-checking mode.
     if (justChecking) return false;
     
-    if (!name.empty()) {
-      Attributes.cc = llvm::StringSwitch<Optional<AbstractCC>>(name)
-        .Case("freestanding", AbstractCC::Freestanding)
-        .Case("method", AbstractCC::Method)
-        .Case("cdecl", AbstractCC::C)
-        .Case("objc_method", AbstractCC::ObjCMethod)
-        .Case("witness_method", AbstractCC::WitnessMethod)
-        .Default(None);
-      if (!Attributes.cc) {
-        diagnose(nameLoc, diag::cc_attribute_unknown_cc_name, name);
-        Attributes.clearAttribute(attr);
-      }
-    }
+    if (!name.empty())
+      Attributes.cc = name;
     return false;
   }
   }

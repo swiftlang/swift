@@ -45,7 +45,7 @@ namespace irgen {
     unsigned Data : 2;
 
     /// The abstract calling convention.
-    unsigned Convention : 2;
+    unsigned Convention : 4;
 
     /// The min uncurrying level available for the function.
     unsigned MinUncurryLevel : 2;
@@ -54,20 +54,22 @@ namespace irgen {
     unsigned MaxUncurryLevel : 9;
 
   public:
-    AbstractCallee(AbstractCC convention, ResilienceExpansion level,
+    AbstractCallee(SILFunctionTypeRepresentation convention,
+                   ResilienceExpansion level,
                    unsigned minUncurry, unsigned maxUncurry, ExtraData data)
       : ExplosionLevel(unsigned(level)), Data(unsigned(data)),
         Convention(unsigned(convention)),
         MinUncurryLevel(minUncurry), MaxUncurryLevel(maxUncurry) {}
 
     static AbstractCallee forIndirect() {
-      return AbstractCallee(AbstractCC::Freestanding, ResilienceExpansion::Minimal,
+      return AbstractCallee(SILFunctionTypeRepresentation::Thin,
+                            ResilienceExpansion::Minimal,
                             /*min uncurry*/ 0, /*max uncurry*/ 0,
                             ExtraData::Retainable);
     }
 
-    AbstractCC getAbstractCC() const {
-      return AbstractCC(Convention);
+    SILFunctionTypeRepresentation getRepresentation() const {
+      return SILFunctionTypeRepresentation(Convention);
     }
 
     /// Returns the best explosion level at which we can emit this
@@ -149,7 +151,9 @@ namespace irgen {
       return result;
     }
     
-    AbstractCC getAbstractCC() const { return OrigFnType->getAbstractCC(); }
+    SILFunctionTypeRepresentation getRepresentation() const {
+      return OrigFnType->getRepresentation();
+    }
 
     CanSILFunctionType getOrigFunctionType() const { return OrigFnType; }
     CanSILFunctionType getSubstFunctionType() const { return SubstFnType; }

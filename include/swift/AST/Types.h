@@ -1813,42 +1813,102 @@ BEGIN_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
   }
 END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 
-/// A high-level calling convention.
-enum class AbstractCC : unsigned char {
-  /// The calling convention used for calling a normal function.
-  Freestanding = 0,
+/// A language-level calling convention.
+enum class SILFunctionLanguage : unsigned char {
+  /// A variation of the Swift calling convention.
+  Swift = 0,
 
-  /// The C freestanding calling convention.
+  /// A variation of the C calling convention.
   C,
-  
-  /// The ObjC method calling convention.
-  ObjCMethod,
+};
 
-  /// The calling convention used for calling an instance method.
-  Method,
+/// The representation form of a function.
+enum class FunctionTypeRepresentation : uint8_t {
+  /// A "thick" function that carries a context pointer to reference captured
+  /// state. The default native function representation.
+  Swift = 0,
   
-  /// The calling convention used for calling opaque protocol witnesses.
-  /// Note that methods of class-constrained protocols use the normal
-  /// Method cc.
+  /// A thick function that is represented as an Objective-C block.
+  Block,
+  
+  /// A "thin" function that needs no context.
+  Thin,
+  
+  /// A C function pointer, which is thin and also uses the C calling
+  /// convention.
+  CFunctionPointer,
+  
+  /// The value of the greatest AST function representation.
+  Last = CFunctionPointer,
+};
+
+/// The representation form of a SIL function.
+///
+/// This is a superset of FunctionTypeRepresentation. The common representations
+/// must share an enum value.
+enum class SILFunctionTypeRepresentation : uint8_t {
+  /// A freestanding thick function.
+  Thick = uint8_t(FunctionTypeRepresentation::Swift),
+  
+  /// A thick function that is represented as an Objective-C block.
+  Block = uint8_t(FunctionTypeRepresentation::Block),
+  
+  /// A freestanding thin function that needs no context.
+  Thin = uint8_t(FunctionTypeRepresentation::Thin),
+  
+  /// A C function pointer, which is thin and also uses the C calling
+  /// convention.
+  CFunctionPointer = uint8_t(FunctionTypeRepresentation::CFunctionPointer),
+  
+  /// The value of the greatest AST function representation.
+  LastAST = CFunctionPointer,
+
+  /// The value of the least SIL-only function representation.
+  FirstSIL = 8,
+  
+  /// A Swift instance method.
+  Method = FirstSIL,
+  
+  /// An Objective-C method.
+  ObjCMethod,
+  
+  /// A Swift protocol witness.
   WitnessMethod,
-  
-  Last_AbstractCC = WitnessMethod,
 };
 
 /// Can this calling convention result in a function being called indirectly
 /// through the runtime.
-inline bool canBeCalledIndirectly(AbstractCC cc) {
-  switch (cc) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::C:
+inline bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
+  switch (rep) {
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Block:
     return false;
-  case AbstractCC::ObjCMethod:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
     return true;
   }
 }
-  
+
+/// Map a SIL function representation to the base language calling convention
+/// it uses.
+inline SILFunctionLanguage
+getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
+  switch (rep) {
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Block:
+    return SILFunctionLanguage::C;
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::WitnessMethod:
+    return SILFunctionLanguage::Swift;
+  }
+}
+
 /// AnyFunctionType - A function type has a single input and result, but
 /// these types may be tuples, for example:
 ///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
@@ -1865,18 +1925,7 @@ class AnyFunctionType : public TypeBase {
   const Type Output;
 
 public:
-  /// \brief The representation form of a function.
-  enum class Representation {
-    // A "thick" function that carries a context pointer to reference captured
-    // state. The default.
-    Thick = 0,
-    
-    // A thick function that is represented as an Objective-C block.
-    Block,
-    
-    // A "thin" function that needs no context.
-    Thin,
-  };
+  using Representation = FunctionTypeRepresentation;
   
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
@@ -1885,15 +1934,14 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |  CC  |representation|isAutoClosure|noReturn|NoEscape|Throws|
-    //   |0 .. 3|    4 .. 5    |      6      |   7    |    8   |   9  |
+    //   |representation|isAutoClosure|noReturn|noEscape|throws|
+    //   |    0 .. 3    |      4      |   5    |    6   |   7  |
     //
-    enum : uint16_t { CallConvMask       = 0x00F };
-    enum : uint16_t { RepresentationMask = 0x030, RepresentationShift = 4 };
-    enum : uint16_t { AutoClosureMask    = 0x040 };
-    enum : uint16_t { NoReturnMask       = 0x080 };
-    enum : uint16_t { NoEscapeMask       = 0x100 };
-    enum : uint16_t { ThrowsMask         = 0x200 };
+    enum : uint16_t { RepresentationMask = 0x00F };
+    enum : uint16_t { AutoClosureMask    = 0x010 };
+    enum : uint16_t { NoReturnMask       = 0x020 };
+    enum : uint16_t { NoEscapeMask       = 0x040 };
+    enum : uint16_t { ThrowsMask         = 0x080 };
 
     uint16_t Bits;
 
@@ -1904,69 +1952,69 @@ public:
   public:
     // Constructor with all defaults.
     ExtInfo() : Bits(0) {
-      assert(getCC() == AbstractCC::Freestanding);
+      assert(getRepresentation() == Representation::Swift);
     }
 
     // Constructor for polymorphic type.
-    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn, bool Throws) {
-      Bits = ((unsigned) CC) |
-             ((unsigned) Rep << RepresentationShift) |
+    ExtInfo(Representation Rep, bool IsNoReturn, bool Throws) {
+      Bits = ((unsigned) Rep) |
              (IsNoReturn ? NoReturnMask : 0) |
              (Throws ? ThrowsMask : 0);
     }
 
     // Constructor with no defaults.
-    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn,
+    ExtInfo(Representation Rep, bool IsNoReturn,
             bool IsAutoClosure, bool IsNoEscape, bool Throws)
-      : ExtInfo(CC, Rep, IsNoReturn, Throws) {
+      : ExtInfo(Rep, IsNoReturn, Throws) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
     }
 
-    explicit ExtInfo(AbstractCC CC) : Bits(0) {
-      Bits = (Bits & ~CallConvMask) | (unsigned) CC;
-    }
-
-    AbstractCC getCC() const { return AbstractCC(Bits & CallConvMask); }
     bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
     Representation getRepresentation() const {
-      return Representation((Bits & RepresentationMask) >> RepresentationShift);
+      unsigned rawRep = Bits & RepresentationMask;
+      assert(rawRep <= unsigned(Representation::Last)
+             && "unexpected SIL representation");
+      return Representation(rawRep);
     }
 
     bool hasSelfParam() const {
-      switch (getCC()) {
-      case AbstractCC::Freestanding:
-      case AbstractCC::C:
+      switch (getSILRepresentation()) {
+      case SILFunctionTypeRepresentation::Thick:
+      case SILFunctionTypeRepresentation::Block:
+      case SILFunctionTypeRepresentation::Thin:
+      case SILFunctionTypeRepresentation::CFunctionPointer:
         return false;
-      case AbstractCC::ObjCMethod:
-      case AbstractCC::Method:
-      case AbstractCC::WitnessMethod:
+      case SILFunctionTypeRepresentation::ObjCMethod:
+      case SILFunctionTypeRepresentation::Method:
+      case SILFunctionTypeRepresentation::WitnessMethod:
         return true;
       }
     }
-    
+
     /// True if the function representation carries context.
     bool hasContext() const {
-      switch (getRepresentation()) {
-      case Representation::Thick:
-      case Representation::Block:
+      switch (getSILRepresentation()) {
+      case SILFunctionTypeRepresentation::Thick:
+      case SILFunctionTypeRepresentation::Block:
         return true;
-      case Representation::Thin:
+      case SILFunctionTypeRepresentation::Thin:
+      case SILFunctionTypeRepresentation::Method:
+      case SILFunctionTypeRepresentation::ObjCMethod:
+      case SILFunctionTypeRepresentation::WitnessMethod:
+      case SILFunctionTypeRepresentation::CFunctionPointer:
         return false;
       }
     }
     
     // Note that we don't have setters. That is by design, use
     // the following with methods instead of mutating these objects.
-    ExtInfo withCallingConv(AbstractCC CC) const {
-      return ExtInfo((Bits & ~CallConvMask) | (unsigned) CC);
-    }
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
-                     | (unsigned)Rep << RepresentationShift);
+                     | (unsigned)Rep);
     }
     ExtInfo withIsNoReturn(bool IsNoReturn = true) const {
       if (IsNoReturn)
@@ -1996,6 +2044,21 @@ public:
     uint16_t getFuncAttrKey() const {
       return Bits;
     }
+    
+    /// Put a SIL representation in the ExtInfo.
+    ///
+    /// SIL type lowering transiently generates AST function types with SIL
+    /// representations. However, they shouldn't persist in the AST, and
+    /// don't need to be parsed, printed, or serialized.
+    ExtInfo withSILRepresentation(SILFunctionTypeRepresentation Rep) const {
+      return ExtInfo((Bits & ~RepresentationMask)
+                     | (unsigned)Rep);
+    }
+    
+    SILFunctionTypeRepresentation getSILRepresentation() const {
+      unsigned rawRep = Bits & RepresentationMask;
+      return SILFunctionTypeRepresentation(rawRep);
+    }
 
     bool operator==(ExtInfo Other) const {
       return Bits == Other.Bits;
@@ -2022,11 +2085,6 @@ public:
     return ExtInfo(AnyFunctionTypeBits.ExtInfo);
   }
 
-  /// \brief Returns the calling conventions of the function.
-  AbstractCC getAbstractCC() const {
-    return getExtInfo().getCC();
-  }
-  
   /// \brief Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
@@ -2577,18 +2635,8 @@ typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 /// function parameter and result types.
 class SILFunctionType : public TypeBase, public llvm::FoldingSetNode {
 public:
-  /// \brief The representation form of a function.
-  enum class Representation {
-    // A "thick" function that carries a context pointer to reference captured
-    // state. The default.
-    Thick = 0,
-    
-    // A thick function that is represented as an Objective-C block.
-    Block,
-    
-    // A "thin" function that needs no context.
-    Thin,
-  };
+  using Language = SILFunctionLanguage;
+  using Representation = SILFunctionTypeRepresentation;
 
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
@@ -2597,12 +2645,11 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |  CC  |representation|noReturn|
-    //   |0 .. 3|    4 .. 5    |   7    |
+    //   |representation|noReturn|
+    //   |    0 .. 3    |   7    |
     //
-    enum : uint16_t { CallConvMask       = 0x00F };
-    enum : uint16_t { RepresentationMask = 0x030, RepresentationShift = 4 };
-    enum : uint16_t { NoReturnMask       = 0x040 };
+    enum : uint16_t { RepresentationMask = 0x00F };
+    enum : uint16_t { NoReturnMask       = 0x010 };
 
     uint16_t Bits;
 
@@ -2612,35 +2659,32 @@ public:
     
   public:
     // Constructor with all defaults.
-    ExtInfo() : Bits(0) {
-      assert(getCC() == AbstractCC::Freestanding);
-    }
+    ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn) {
-      Bits = ((unsigned) CC) |
-             ((unsigned) Rep << RepresentationShift) |
+    ExtInfo(Representation Rep, bool IsNoReturn) {
+      Bits = ((unsigned) Rep) |
              (IsNoReturn ? NoReturnMask : 0);
     }
 
-    explicit ExtInfo(AbstractCC CC) : Bits(0) {
-      Bits = (Bits & ~CallConvMask) | (unsigned) CC;
-    }
-
-    AbstractCC getCC() const { return AbstractCC(Bits & CallConvMask); }
     bool isNoReturn() const { return Bits & NoReturnMask; }
     Representation getRepresentation() const {
-      return Representation((Bits & RepresentationMask) >> RepresentationShift);
+      return Representation(Bits & RepresentationMask);
+    }
+    Language getLanguage() const {
+      return getSILFunctionLanguage(getRepresentation());
     }
 
     bool hasSelfParam() const {
-      switch (getCC()) {
-      case AbstractCC::Freestanding:
-      case AbstractCC::C:
+      switch (getRepresentation()) {
+      case Representation::Thick:
+      case Representation::Block:
+      case Representation::Thin:
+      case Representation::CFunctionPointer:
         return false;
-      case AbstractCC::ObjCMethod:
-      case AbstractCC::Method:
-      case AbstractCC::WitnessMethod:
+      case Representation::ObjCMethod:
+      case Representation::Method:
+      case Representation::WitnessMethod:
         return true;
       }
     }
@@ -2652,18 +2696,19 @@ public:
       case Representation::Block:
         return true;
       case Representation::Thin:
+      case Representation::CFunctionPointer:
+      case Representation::ObjCMethod:
+      case Representation::Method:
+      case Representation::WitnessMethod:
         return false;
       }
     }
     
     // Note that we don't have setters. That is by design, use
     // the following with methods instead of mutating these objects.
-    ExtInfo withCallingConv(AbstractCC CC) const {
-      return ExtInfo((Bits & ~CallConvMask) | (unsigned) CC);
-    }
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
-                     | (unsigned)Rep << RepresentationShift);
+                     | (unsigned)Rep);
     }
     ExtInfo withIsNoReturn(bool IsNoReturn = true) const {
       if (IsNoReturn)
@@ -2801,22 +2846,13 @@ public:
 
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
 
-  /// \brief Returns the calling conventions of the function.
-  AbstractCC getAbstractCC() const {
-    return getExtInfo().getCC();
+  /// \brief Returns the language-level calling convention of the function.
+  Language getLanguage() const {
+    return getExtInfo().getLanguage();
   }
 
-
-  bool hasSelfArgument() const {
-    switch (getAbstractCC()) {
-    case AbstractCC::ObjCMethod:
-    case AbstractCC::Method:
-    case AbstractCC::WitnessMethod:
-      return true;
-    case AbstractCC::Freestanding:
-    case AbstractCC::C:
-      return false;
-    }
+  bool hasSelfParam() const {
+    return getExtInfo().hasSelfParam();
   }
 
   /// \brief Get the representation of the function type.
@@ -2824,16 +2860,6 @@ public:
     return getExtInfo().getRepresentation();
   }
 
-  bool hasThickRepresentation() const {
-    return getRepresentation() == Representation::Thick;
-  }
-  bool hasThinRepresentation() const {
-    return getRepresentation() == Representation::Thin;
-  }
-  bool hasBlockRepresentation() const {
-    return getRepresentation() == Representation::Block;
-  }
-  
   bool isNoReturn() const {
     return getExtInfo().isNoReturn();
   }

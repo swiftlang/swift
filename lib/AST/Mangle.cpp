@@ -927,24 +927,34 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     };
 
     // <impl-callee-convention>
-    if (fn->getRepresentation() == SILFunctionType::Representation::Thin) {
+    if (!fn->getExtInfo().hasContext()) {
       Buffer << 't';
     } else {
       Buffer << mangleParameterConvention(fn->getCalleeConvention());
     }
 
     // <impl-function-attribute>*
-    if (fn->getRepresentation() == SILFunctionType::Representation::Block) {
+    switch (fn->getRepresentation()) {
+    case SILFunctionTypeRepresentation::Block:
       Buffer << "Cb";
-    } else {
-      switch (fn->getAbstractCC()) {
-      case AbstractCC::Freestanding: break;
-      case AbstractCC::C: Buffer << "Cc"; break;
-      case AbstractCC::ObjCMethod: Buffer << "CO"; break;
-      case AbstractCC::Method: Buffer << "Cm"; break;
-      case AbstractCC::WitnessMethod: Buffer << "Cw"; break;
-      }
+      break;
+    case SILFunctionTypeRepresentation::Thick:
+    case SILFunctionTypeRepresentation::Thin:
+      break;
+    case SILFunctionTypeRepresentation::CFunctionPointer:
+      Buffer << "Cc";
+      break;
+    case SILFunctionTypeRepresentation::ObjCMethod:
+      Buffer << "CO";
+      break;
+    case SILFunctionTypeRepresentation::Method:
+      Buffer << "Cm";
+      break;
+    case SILFunctionTypeRepresentation::WitnessMethod:
+      Buffer << "Cw";
+      break;
     }
+    
     if (fn->isNoReturn()) Buffer << 'N';
     if (fn->isPolymorphic()) {
       Buffer << 'G';
@@ -1285,14 +1295,14 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
   case AnyFunctionType::Representation::Thin:
     Buffer << "Xf";
     break;
-  case AnyFunctionType::Representation::Thick:
+  case AnyFunctionType::Representation::Swift:
     if (fn->isAutoClosure())
       Buffer << 'K';
-    // FIXME: proper representation for C function types
-    else if (fn->getAbstractCC() == AbstractCC::C)
-      Buffer << 'c';
     else
       Buffer << (uncurryLevel > 0 ? 'f' : 'F');
+    break;
+  case AnyFunctionType::Representation::CFunctionPointer:
+    Buffer << 'c';
     break;
   }
   

@@ -219,13 +219,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   if (Attrs.has(TAK_thin))         Printer << "@thin ";
   if (Attrs.has(TAK_thick))        Printer << "@thick ";
   if (Attrs.cc.hasValue()) {
-    switch (Attrs.cc.getValue()) {
-    case AbstractCC::C:             Printer << "@cc(cdecl)"; break;
-    case AbstractCC::ObjCMethod:    Printer << "@cc(objc_method)"; break;
-    case AbstractCC::Freestanding:  Printer << "@cc(freestanding)"; break;
-    case AbstractCC::Method:        Printer << "@cc(method)"; break;
-    case AbstractCC::WitnessMethod: Printer << "@cc(witness_method)"; break;
-    }
+    Printer << "@cc(" << Attrs.cc.getValue() << ")";
   }
 }
 

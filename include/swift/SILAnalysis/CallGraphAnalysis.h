@@ -30,7 +30,7 @@ static inline bool canHaveIndirectUses(SILFunction *F) {
 
   // ObjC functions are called through the runtime and are therefore alive
   // even if not referenced inside SIL.
-  if (canBeCalledIndirectly(F->getLoweredFunctionType()->getAbstractCC()))
+  if (canBeCalledIndirectly(F->getLoweredFunctionType()->getRepresentation()))
     return true;
 
   return false;

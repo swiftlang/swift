@@ -667,7 +667,7 @@ public:
   }
 
   bool hasSelfArgument() const {
-    return getSubstCalleeType()->hasSelfArgument();
+    return getSubstCalleeType()->hasSelfParam();
   }
 
   bool hasGuaranteedSelfArgument() const {
@@ -3769,7 +3769,17 @@ public:
   }
 
   bool isCalleeThin() const {
-    return getSubstCalleeType()->hasThinRepresentation();
+    switch (getSubstCalleeType()->getRepresentation()) {
+    case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::Thin:
+    case SILFunctionTypeRepresentation::Method:
+    case SILFunctionTypeRepresentation::ObjCMethod:
+    case SILFunctionTypeRepresentation::WitnessMethod:
+      return true;
+    case SILFunctionTypeRepresentation::Block:
+    case SILFunctionTypeRepresentation::Thick:
+      return false;
+    }
   }
 
   /// True if this application has generic substitutions.

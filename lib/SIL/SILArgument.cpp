@@ -227,6 +227,6 @@ bool SILArgument::isSelf() const {
 
   // Return true if we are the last argument of our BB and that our parent
   // function has a call signature with self.
-  return getFunction()->hasSelfArgument() &&
+  return getFunction()->hasSelfParam() &&
          getParent()->getBBArgs().back() == this;
 }

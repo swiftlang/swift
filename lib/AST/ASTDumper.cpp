@@ -2460,37 +2460,32 @@ namespace {
                                     StringRef name) {
       printCommon(T, label, name);
 
-      switch (T->getAbstractCC()) {
-      case AbstractCC::C:
-        printField("calling_convention", "C");
+      switch (T->getExtInfo().getSILRepresentation()) {
+      case SILFunctionType::Representation::Thick:
         break;
 
-      case AbstractCC::Freestanding:
-        break;
-
-      case AbstractCC::Method:
-        printField("calling_convention", "method");
-        break;
-
-      case AbstractCC::ObjCMethod:
-        printField("calling_convention", "Objective-CC");
-        break;
-
-      case AbstractCC::WitnessMethod:
-        printField("calling_convention", "witness");
-        break;
-      }
-
-      switch (T->getRepresentation()) {
-      case AnyFunctionType::Representation::Block:
+      case SILFunctionType::Representation::Block:
         printField("representation", "block");
         break;
 
-      case AnyFunctionType::Representation::Thick:
+      case SILFunctionType::Representation::CFunctionPointer:
+        printField("representation", "c");
         break;
 
-      case AnyFunctionType::Representation::Thin:
+      case SILFunctionType::Representation::Thin:
         printField("representation", "thin");
+        break;
+
+      case SILFunctionType::Representation::Method:
+        printField("representation", "method");
+        break;
+        
+      case SILFunctionType::Representation::ObjCMethod:
+        printField("representation", "objc_method");
+        break;
+        
+      case SILFunctionType::Representation::WitnessMethod:
+        printField("representation", "witness_method");
         break;
       }
 
