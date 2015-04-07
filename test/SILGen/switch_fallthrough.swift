@@ -111,7 +111,6 @@ func test4() {
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], {{bb[0-9]+}}
   case var a where runced():
   // CHECK: [[CASE1]]:
-  // CHECK:   release [[A]]
   // CHECK:   br [[CASE2:bb[0-9]+]]
     fallthrough
   case _ where funged():
@@ -124,8 +123,6 @@ func test4() {
   // CHECK:   cond_br {{%.*}}, [[CASE4:bb[0-9]+]],
   case (var b, var c) where ansed():
   // CHECK: [[CASE4]]:
-  // CHECK:   release [[C]]#0
-  // CHECK:   release [[B]]#0
   // CHECK:   br [[CASE5:bb[0-9]+]]
     fallthrough
   case _:

@@ -370,13 +370,15 @@ public:
         address = gen.B.createMarkUninitializedVar(vd, address);
       DestroyCleanup = gen.enterDormantTemporaryCleanup(address, lowering);
       gen.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
-    } else {
+    } else if (!lowering.isTrivial()) {
       // Push a cleanup to destroy the let declaration.  This has to be
       // inactive until the variable is initialized: if control flow exits the
       // before the value is bound, we don't want to destroy the value.
       gen.Cleanups.pushCleanupInState<DestroyLocalVariable>(
                                                     CleanupState::Dormant, vd);
       DestroyCleanup = gen.Cleanups.getTopCleanup();
+    } else {
+      DestroyCleanup = CleanupHandle::invalid();
     }
   }
 
