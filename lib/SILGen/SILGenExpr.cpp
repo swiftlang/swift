@@ -856,6 +856,7 @@ static SILValue getAddressForInPlaceInitialization(Initialization *I) {
     break;
   case Initialization::Kind::Translating:
   case Initialization::Kind::Ignored:
+  case Initialization::Kind::Refutable:
     break;
     
   case Initialization::Kind::Tuple:
