@@ -1571,6 +1571,10 @@ namespace {
       : cs(cs), dc(cs.DC), solution(solution), 
         SuppressDiagnostics(suppressDiagnostics) { }
 
+    ~ExprRewriter() {
+      finalize();
+    }
+
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
     /// \brief Simplify the expression type and return the expression.
@@ -3387,7 +3391,8 @@ namespace {
       return E;
     }
 
-    void finalize(Expr *&result) {
+  private:
+    void finalize() {
       // Check that all value type methods were fully applied.
       auto &tc = cs.getTypeChecker();
       for (auto &unapplied : InvalidPartialApplications) {
@@ -4718,8 +4723,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Load from the lvalue.
       expr = new (tc.Context) LoadExpr(expr, fromType->getRValueType());
 
-      closeExistential(expr);
-
       // Coerce the result.
       return coerceToType(expr, toType, locator);
     }
@@ -4936,8 +4939,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (performLoad) {
       // Load from the lvalue.
       expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
-
-      closeExistential(expr);
 
       // Coerce the result.
       return coerceToType(expr, toType, locator);
@@ -6225,9 +6226,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                    getConstraintLocator(expr));
   }
 
-  if (result)
-    rewriter.finalize(result);
-
   return result;
 }
 
@@ -6235,10 +6233,7 @@ Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
                                              Expr *expr,
                                              bool suppressDiagnostics) {
   ExprRewriter rewriter(*this, solution, suppressDiagnostics);
-  Expr *result = rewriter.visit(expr);
-  if (result)
-    rewriter.finalize(result);
-  return result;
+  return rewriter.visit(expr);
 }
 
 Expr *Solution::coerceToType(Expr *expr, Type toType,
@@ -6259,7 +6254,6 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
     }
   }
 
-  rewriter.finalize(result);
   return result;
 }
 
@@ -6382,13 +6376,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   // Call the witness.
   ApplyExpr *apply = new (Context) CallExpr(memberRef, arg, /*Implicit=*/true);
-  Expr *result = rewriter.finishApply(apply, openedType,
-                                      cs.getConstraintLocator(arg));
-  if (!result)
-    return nullptr;
-
-  rewriter.finalize(result);
-  return result;
+  return rewriter.finishApply(apply, openedType, cs.getConstraintLocator(arg));
 }
 
 /// \brief Convert an expression via a builtin protocol.
@@ -6506,7 +6494,6 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   assert(!failed && "Could not call witness?");
   (void)failed;
 
-  rewriter.finalize(expr);
   return expr;
 }
 
