@@ -136,8 +136,8 @@ public struct Character :
   }
 
   internal static func _makeSmallUTF8Generator(var u8: UInt64)
-    -> GeneratorOf<UTF8.CodeUnit> {
-    return GeneratorOf<UTF8.CodeUnit> {
+    -> AnyGenerator<UTF8.CodeUnit> {
+    return anyGenerator {
       let result = UInt8(truncatingBitPattern: u8)
       if result == 0xFF {
         return nil
