@@ -318,11 +318,6 @@ public:
   /// following the substituted abstraction pattern.
   void addOrigToSubstComponent(SILType loweredResultType);
 
-  /// Add an "open existential" component.  That is, given that this
-  /// l-value currently refers to an opaque existential, make it refer
-  /// to the given opened archetype.
-  void addOpenOpaqueExistentialComponent(CanArchetypeType archetype);
-
   typedef std::vector<std::unique_ptr<PathComponent>>::iterator iterator;
   typedef std::vector<std::unique_ptr<PathComponent>>::const_iterator
     const_iterator;

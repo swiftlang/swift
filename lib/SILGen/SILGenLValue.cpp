@@ -472,36 +472,6 @@ namespace {
     }
   };
 
-  /// A physical path component which projects out an opened archetype
-  /// from an existential.
-  class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
-    static LValueTypeData getOpenedArchetypeTypeData(CanArchetypeType type) {
-      return {
-        AbstractionPattern::getOpaque(), type,
-        SILType::getPrimitiveObjectType(type)
-      };
-    }
-  public:
-    OpenOpaqueExistentialComponent(CanArchetypeType openedArchetype)
-      : PhysicalPathComponent(getOpenedArchetypeTypeData(openedArchetype),
-                              OpenedExistentialKind) {}
-    
-    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
-                        AccessKind accessKind) && override {
-      assert(base.getType().isExistentialType() &&
-             "base for open existential component must be an existential");
-      auto addr = gen.B.createOpenExistentialAddr(loc, base.getLValueAddress(),
-                                           getTypeOfRValue().getAddressType());
-      gen.setArchetypeOpeningSite(cast<ArchetypeType>(getSubstFormalType()),
-                                  addr);
-      return ManagedValue::forLValue(addr);
-    }
-
-    void print(raw_ostream &OS) const override {
-      OS << "OpenOpaqueExistentialComponent(" << getSubstFormalType() << ")\n";
-    }
-  };
-
   /// A physical path component which returns a literal address.
   class ValueComponent : public PhysicalPathComponent {
     ManagedValue Value;
@@ -1364,12 +1334,6 @@ void LValue::addSubstToOrigComponent(AbstractionPattern origType,
   }
 
   add<SubstToOrigComponent>(origType, getSubstFormalType(), loweredSubstType);
-}
-
-void LValue::addOpenOpaqueExistentialComponent(CanArchetypeType archetype) {
-  assert(archetype->getOpenedExistentialType());
-  assert(archetype->getOpenedExistentialType()->isEqual(getSubstFormalType()));
-  add<OpenOpaqueExistentialComponent>(archetype);
 }
 
 LValue SILGenFunction::emitLValue(Expr *e, AccessKind accessKind) {
