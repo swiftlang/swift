@@ -143,6 +143,19 @@ public func _forceBridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
   return result!
 }
 
+/// Convert `x` from its Objective-C representation to its Swift
+/// representation.
+///
+/// - `T` should conform to `_ObjectiveCBridgeable`.
+/// - `x` should be of type T._ObjectiveCType or one of its subclasses.
+/// - returns the result of `T._forceBridgeFromObjectiveC(x)`.
+@asmname("_knownForceBridgeFromObjectiveC")
+public func _knownForceBridgeFromObjectiveC<T:_ObjectiveCBridgeable>(x: T._ObjectiveCType, _: T.Type) -> T {
+  var result: T?
+  T._forceBridgeFromObjectiveC(x, result: &result)
+  return result!
+}
+
 /// Attempt to convert `x` from its Objective-C representation to its Swift
 /// representation.
 ///
@@ -169,6 +182,23 @@ public func _conditionallyBridgeFromObjectiveC<T>(
   _bridgeNonVerbatimFromObjectiveCConditional(x, T.self, &result)
   return result
 }
+
+/// Attempt to convert `x` from its Objective-C representation to its Swift
+/// representation.
+///
+/// - `T` should conform to `_ObjectiveCBridgeable`.
+/// - `x` should be of type T._ObjectiveCType or one of its subclasses.
+/// - returns the result of `T._conditionallyBridgeFromObjectiveC(x)`.
+@asmname("_knownConditionallyBridgeFromObjectiveC")
+public func _knownConditionallyBridgeFromObjectiveC<T:_ObjectiveCBridgeable>(
+  x: T._ObjectiveCType,
+  _: T.Type
+) -> T? {
+  var result: T?
+  T._conditionallyBridgeFromObjectiveC (x, result: &result)
+  return result
+}
+
 
 @asmname("swift_bridgeNonVerbatimFromObjectiveC")
 func _bridgeNonVerbatimFromObjectiveC<T>(

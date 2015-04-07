@@ -58,6 +58,11 @@ FUNC_DECL(ConditionallyBridgeFromObjectiveC,
 FUNC_DECL(BecomeNSError,
           "_becomeNSError")
 
+FUNC_DECL(KnownForceBridgeFromObjectiveC,
+          "_knownForceBridgeFromObjectiveC")
+FUNC_DECL(KnownConditionallyBridgeFromObjectiveC,
+          "_knownConditionallyBridgeFromObjectiveC")
+
 FUNC_DECL(DidEnterMain, "_didEnterMain")
 FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 
