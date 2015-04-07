@@ -1979,6 +1979,12 @@ ERROR(availability_decl_unavailable_rename, sema_avail, none,
 ERROR(availability_decl_unavailable_msg, sema_avail, none,
   "%0 is unavailable: %1", (DeclName, StringRef))
 
+ERROR(availability_decl_unavailable_in_swift, sema_avail, none,
+  "%0 is unavailable in Swift", (DeclName))
+
+ERROR(availability_decl_unavailable_in_swift_msg, sema_avail, none,
+  "%0 is unavailable in Swift: %1", (DeclName, StringRef))
+
 NOTE(availability_marked_unavailable, sema_avail, none,
   "%0 has been explicitly marked unavailable here", (DeclName))
 

@@ -72,3 +72,15 @@ __attribute__((unavailable("middle")))
 __attribute__((unavailable("last")))
 @protocol UnavailProto3
 @end
+
+
+void NSSwiftOldUnavailableFunction() __attribute__((annotate("swift1_unavailable")));
+void NSSwiftNewUnavailableFunction() __attribute__((availability(swift, unavailable)));
+void NSSwiftNewUnavailableFunction2() __attribute__((availability(swift, unavailable, message="")));
+void NSSwiftNewUnavailableFunctionPremium() __attribute__((availability(swift, unavailable, message="You didn't want to use it anyway.")));
+
+struct NSSwiftUnavailableStruct {
+  int secrets;
+} __attribute__((availability(swift, unavailable)));
+
+void unavailableWithOS() __attribute__((availability(ios, deprecated=8.0))) __attribute__((availability(swift, unavailable))) __attribute__((availability(macosx, deprecated=10.10))) ;

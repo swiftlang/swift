@@ -55,7 +55,7 @@ mergeIntoInferredVersion(const Optional<clang::VersionTuple> &Version,
 /// the attribute requires.
 static void mergeWithInferredAvailability(const AvailabilityAttr *Attr,
                                           InferredAvailability &Inferred) {
-  Inferred.ExplicitlyUnavailable |= Attr->IsUnvailable;
+  Inferred.ExplicitlyUnavailable |= Attr->isUnconditionallyUnavailable();
 
   // The merge of two introduction versions is the maximum of the two versions.
   mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max);

@@ -5142,8 +5142,8 @@ void ClangImporter::Implementation::importAttributes(
     //
     if (auto unavailable_annot = dyn_cast<clang::AnnotateAttr>(*AI))
       if (unavailable_annot->getAnnotation() == "swift1_unavailable") {
-        auto attr =
-          AvailabilityAttr::createUnavailableAttr(C, "Not available in Swift");
+        auto attr = AvailabilityAttr::createUnavailableAttr(
+            C, "", "", AvailabilityAttr::UnavailabilityKind::InSwift);
         MappedDecl->getAttrs().add(attr);
         IsUnavailable = true;
         continue;
@@ -5171,9 +5171,20 @@ void ClangImporter::Implementation::importAttributes(
     // __attribute__((availability))
     //
     if (auto avail = dyn_cast<clang::AvailabilityAttr>(*AI)) {
+      StringRef Platform = avail->getPlatform()->getName();
+
+      // Is this our special "availability(swift, unavailable)" attribute?
+      if (Platform == "swift") {
+        auto attr = AvailabilityAttr::createUnavailableAttr(
+            C, avail->getMessage(), /*renamed*/"",
+            AvailabilityAttr::UnavailabilityKind::InSwift);
+        MappedDecl->getAttrs().add(attr);
+        IsUnavailable = true;
+        continue;
+      }
+
       // Does this availability attribute map to the platform we are
       // currently targeting?
-      StringRef Platform = avail->getPlatform()->getName();
       if (!PlatformAvailabilityFilter ||
           !PlatformAvailabilityFilter(Platform))
         continue;

@@ -20,10 +20,6 @@ extern NSUInteger SomeCrazyAppExtensionForbiddenAPI(void)
   __attribute__((availability(macosx_app_extension,unavailable,message="Not available in App Extensions")))
   __attribute__((availability(ios_app_extension,unavailable,message="Not available in App Extensions")));
 
-#define NS_SWIFT_UNAVAILABLE __attribute__((annotate("swift1_unavailable")))
-
-NS_SWIFT_UNAVAILABLE void NSSwiftUnavailableFunction();
-
 __attribute__((availability(macosx,introduced=10.10)))
 @interface NSAvailableOn10_10 : NSObject
 - (instancetype)init;

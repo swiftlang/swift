@@ -44,7 +44,12 @@ func test_unavailable_app_extension() {
 }
 
 func test_swift_unavailable() {
-  NSSwiftUnavailableFunction() // expected-error {{Not available in Swift}}
+  NSSwiftOldUnavailableFunction() // expected-error {{'NSSwiftOldUnavailableFunction()' is unavailable in Swift}}
+  NSSwiftNewUnavailableFunction() // expected-error {{'NSSwiftNewUnavailableFunction()' is unavailable in Swift}}
+  NSSwiftNewUnavailableFunction2() // expected-error {{'NSSwiftNewUnavailableFunction2()' is unavailable in Swift}}
+  NSSwiftNewUnavailableFunctionPremium() // expected-error {{'NSSwiftNewUnavailableFunctionPremium()' is unavailable in Swift: You didn't want to use it anyway.}}
+
+  let x: NSSwiftUnavailableStruct? = nil // expected-error {{'NSSwiftUnavailableStruct' is unavailable in Swift}}
 }
 
 func test_CFReleaseRetainAutorelease(x : CFTypeRef, color : CGColorRef ) {

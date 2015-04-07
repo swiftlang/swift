@@ -214,16 +214,25 @@ void DeclAttribute::print(ASTPrinter &Printer,
     Printer << "@availability(";
     auto Attr = cast<AvailabilityAttr>(this);
     Printer << Attr->platformString();
-    if (Attr->IsUnvailable)
+
+    if (Attr->isUnconditionallyUnavailable())
       Printer << ", unavailable";
+
     if (Attr->Introduced)
       Printer << ", introduced=" << Attr->Introduced.getValue().getAsString();
     if (Attr->Deprecated)
       Printer << ", deprecated=" << Attr->Deprecated.getValue().getAsString();
     if (Attr->Obsoleted)
       Printer << ", obsoleted=" << Attr->Obsoleted.getValue().getAsString();
+
+    // If there's no message, but this is specifically an imported
+    // "unavailable in Swift" attribute, synthesize a message to look good in
+    // the generated interface.
     if (!Attr->Message.empty())
       Printer << ", message=\"" << Attr->Message << "\"";
+    else if (Attr->Unavailable == AvailabilityAttr::UnavailabilityKind::InSwift)
+      Printer << ", message=\"Not available in Swift\"";
+
     Printer << ")";
     break;
   }
@@ -454,14 +463,17 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
   return new (context) ObjCAttr(getName(), isNameImplicit());
 }
 
-AvailabilityAttr *AvailabilityAttr::createUnavailableAttr(ASTContext &C,
-                                                          StringRef Message,
-                                                          StringRef Rename) {
+AvailabilityAttr *
+AvailabilityAttr::createUnavailableAttr(ASTContext &C,
+                                        StringRef Message,
+                                        StringRef Rename,
+                                        UnavailabilityKind Reason) {
+  assert(Reason != UnavailabilityKind::None);
   clang::VersionTuple NoVersion;
   return new (C) AvailabilityAttr(
     SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
     NoVersion, NoVersion, NoVersion,
-    /* isUnavailable */ true,
+    /* isUnavailable */ Reason,
     /* isImplicit */ false);
 }
 
@@ -472,7 +484,7 @@ bool AvailabilityAttr::isActivePlatform(const ASTContext &ctx) const {
 MinVersionComparison AvailabilityAttr::getMinVersionAvailability(
                        clang::VersionTuple minVersion) const {
   // Unconditionally unavailable.
-  if (IsUnvailable)
+  if (isUnconditionallyUnavailable())
     return MinVersionComparison::Unavailable;
 
   // If this entity was obsoleted before or at the minimum platform version,

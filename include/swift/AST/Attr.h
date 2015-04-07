@@ -646,6 +646,11 @@ enum class MinVersionComparison {
 /// Defines the @availability attribute.
 class AvailabilityAttr : public DeclAttribute {
 public:
+  enum class UnavailabilityKind {
+    None,
+    Normal,
+    InSwift
+  };
 
 #define INIT_VER_TUPLE(X)\
   X(X.empty() ? Optional<clang::VersionTuple>() : X)
@@ -656,21 +661,32 @@ public:
                    const clang::VersionTuple &Introduced,
                    const clang::VersionTuple &Deprecated,
                    const clang::VersionTuple &Obsoleted,
-                   bool IsUnavailable,
+                   UnavailabilityKind Unavailable,
                    bool Implicit)
     : DeclAttribute(DAK_Availability, AtLoc, Range, Implicit),
-      Platform(Platform),
       Message(Message), Rename(Rename),
-      IsUnvailable(IsUnavailable),
       INIT_VER_TUPLE(Introduced),
       INIT_VER_TUPLE(Deprecated),
-      INIT_VER_TUPLE(Obsoleted)
+      INIT_VER_TUPLE(Obsoleted),
+      Unavailable(Unavailable),
+      Platform(Platform)
   {}
 
 #undef INIT_VER_TUPLE
 
-  /// The platform of the availability.
-  const PlatformKind Platform;
+  AvailabilityAttr(SourceLoc AtLoc, SourceRange Range,
+                   PlatformKind Platform,
+                   StringRef Message, StringRef Rename,
+                   const clang::VersionTuple &Introduced,
+                   const clang::VersionTuple &Deprecated,
+                   const clang::VersionTuple &Obsoleted,
+                   bool IsUnvailable,
+                   bool Implicit)
+    : AvailabilityAttr(AtLoc, Range, Platform, Message, Rename, Introduced,
+                       Deprecated, Obsoleted,
+                       IsUnvailable ? UnavailabilityKind::Normal
+                                    : UnavailabilityKind::None,
+                       Implicit) {}
 
   /// The optional message.
   const StringRef Message;
@@ -678,9 +694,6 @@ public:
   /// An optional replacement string to emit in a fixit.  This allows simple
   /// declaration renames to be applied by Xcode.
   const StringRef Rename;
-
-  /// Indicates if the declaration is unconditionally unavailable.
-  const bool IsUnvailable;
 
   /// Indicates when the symbol was introduced.
   const Optional<clang::VersionTuple> Introduced;
@@ -691,6 +704,17 @@ public:
   /// Indicates when the symbol was obsoleted.
   const Optional<clang::VersionTuple> Obsoleted;
 
+  /// Indicates if the declaration is unconditionally unavailable, and why.
+  const UnavailabilityKind Unavailable;
+
+  /// The platform of the availability.
+  const PlatformKind Platform;
+
+  /// Returns true if the declaration is unconditionally unavailable for any
+  /// reason.
+  bool isUnconditionallyUnavailable() const {
+    return Unavailable != UnavailabilityKind::None;
+  }
 
   /// Determine if a given declaration should be considered unavailable given
   /// the current settings.
@@ -723,9 +747,9 @@ public:
                          clang::VersionTuple minVersion) const;
 
   /// Create an AvailabilityAttr that indicates 'unavailable' for all platforms.
-  static AvailabilityAttr *createUnavailableAttr(ASTContext &C,
-                                                 StringRef Message,
-                                                 StringRef Rename = "");
+  static AvailabilityAttr *
+  createUnavailableAttr(ASTContext &C, StringRef Message, StringRef Rename = "",
+                        UnavailabilityKind Reason = UnavailabilityKind::Normal);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Availability;

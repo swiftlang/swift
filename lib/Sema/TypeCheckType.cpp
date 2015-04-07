@@ -918,23 +918,42 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   return type;
 }
 
+// FIXME: Merge this with diagAvailability in MiscDiagnostics.cpp.
 static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                                       SourceLoc Loc, DeclContext *DC,
                                       TypeChecker &TC) {
 
   if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
     if (auto Attr = AvailabilityAttr::isUnavailable(TypeDecl)) {
-      if (!Attr->Rename.empty()) {
-        TC.diagnose(Loc, diag::availability_decl_unavailable_rename,
-                    CI->getIdentifier(),
-                    Attr->Rename).fixItReplace(Loc, Attr->Rename);
-      } else if (Attr->Message.empty()) {
-        TC.diagnose(Loc, diag::availability_decl_unavailable,
-                    CI->getIdentifier()).highlight(SourceRange(Loc, Loc));
-      } else {
-        TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                    CI->getIdentifier(),
-                    Attr->Message).highlight(SourceRange(Loc, Loc));
+      switch (Attr->Unavailable) {
+      case AvailabilityAttr::UnavailabilityKind::None:
+      case AvailabilityAttr::UnavailabilityKind::Normal:
+        if (!Attr->Rename.empty()) {
+          TC.diagnose(Loc, diag::availability_decl_unavailable_rename,
+                      CI->getIdentifier(), Attr->Rename)
+            .fixItReplace(Loc, Attr->Rename);
+        } else if (Attr->Message.empty()) {
+          TC.diagnose(Loc, diag::availability_decl_unavailable,
+                      CI->getIdentifier())
+            .highlight(Loc);
+        } else {
+          TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
+                      CI->getIdentifier(), Attr->Message)
+            .highlight(Loc);
+        }
+        break;
+
+      case AvailabilityAttr::UnavailabilityKind::InSwift:
+        if (Attr->Message.empty()) {
+          TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift,
+                      CI->getIdentifier())
+            .highlight(Loc);
+        } else {
+          TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg,
+                      CI->getIdentifier(), Attr->Message)
+            .highlight(Loc);
+        }
+        break;
       }
 
       auto DLoc = TypeDecl->getLoc();

@@ -494,17 +494,33 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   if (auto Attr = AvailabilityAttr::isUnavailable(D)) {
     auto Name = D->getFullName();
 
-    if (!Attr->Rename.empty()) {
-      TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
-                  Attr->Rename)
-        .fixItReplace(R, Attr->Rename);
-    } else if (Attr->Message.empty()) {
-      TC.diagnose(Loc, diag::availability_decl_unavailable, Name)
-        .highlight(R);
-    } else {
-      TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                  Name, Attr->Message)
-        .highlight(SourceRange(Loc, Loc));
+    switch (Attr->Unavailable) {
+    case AvailabilityAttr::UnavailabilityKind::None:
+    case AvailabilityAttr::UnavailabilityKind::Normal:
+      if (!Attr->Rename.empty()) {
+        TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
+                    Attr->Rename)
+          .fixItReplace(R, Attr->Rename);
+      } else if (Attr->Message.empty()) {
+        TC.diagnose(Loc, diag::availability_decl_unavailable, Name)
+          .highlight(R);
+      } else {
+        TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
+                    Name, Attr->Message)
+          .highlight(R);
+      }
+      break;
+
+    case AvailabilityAttr::UnavailabilityKind::InSwift:
+      if (Attr->Message.empty()) {
+        TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift, Name)
+          .highlight(R);
+      } else {
+        TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg,
+                    Name, Attr->Message)
+          .highlight(R);
+      }
+      break;
     }
 
     auto MinVersion = TC.Context.LangOpts.getMinPlatformVersion();
