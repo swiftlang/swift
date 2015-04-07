@@ -339,6 +339,9 @@ public:
   AbstractionPattern getOrigFormalType() const {
     return getTypeData().OrigFormalType;
   }
+
+  void dump() const;
+  void print(raw_ostream &OS) const;
 };
   
 /// RAII object to enable writebacks for logical lvalues evaluated within the

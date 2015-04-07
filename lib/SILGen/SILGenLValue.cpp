@@ -1336,6 +1336,16 @@ void LValue::addSubstToOrigComponent(AbstractionPattern origType,
   add<SubstToOrigComponent>(origType, getSubstFormalType(), loweredSubstType);
 }
 
+void LValue::dump() const {
+  print(llvm::errs());
+}
+
+void LValue::print(raw_ostream &OS) const {
+  for (const auto &component : *this) {
+    component->print(OS);
+  }
+}
+
 LValue SILGenFunction::emitLValue(Expr *e, AccessKind accessKind) {
   LValue r = SILGenLValue(*this).visit(e, accessKind);
   // If the final component is physical with an abstraction change, introduce a
