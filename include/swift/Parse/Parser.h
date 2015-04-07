@@ -82,7 +82,11 @@ public:
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
-  std::pair<const DeclContext *, ArrayRef<VarDecl *>> CurVars;
+  
+  /// CurVars is the list of variables in a PatternBinding when parsing the
+  /// corresponding initializer expression.
+  ArrayRef<VarDecl *> CurVars;
+  
   llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
   enum {
     /// InVarOrLetPattern has this value when not parsing a pattern.

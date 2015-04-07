@@ -3473,11 +3473,11 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       // decl (even though names aren't injected into scope when the initializer
       // is parsed).
       SmallVector<VarDecl *, 4> Vars;
-      Vars.append(CurVars.second.begin(), CurVars.second.end());
+      Vars.append(CurVars.begin(), CurVars.end());
       pattern->collectVariables(Vars);
       
       llvm::SaveAndRestore<decltype(CurVars)>
-      RestoreCurVars(CurVars, {CurDeclContext, Vars});
+      RestoreCurVars(CurVars, Vars);
       
       
       // If we have no local context to parse the initial value into, create one
