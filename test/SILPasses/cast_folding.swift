@@ -751,10 +751,15 @@ public func callForGenericCC(c: CC) {
   callFoo(c)
 }
 
-// Check that compiler understands that this cast always succeeds
+// Check that compiler understands that this cast always succeeds.
+// Since it is can be statically proven that NSString is bridgeable to String,
+// _forceBridgeFromObjectiveC from String should be invoked instead of
+// a more general, but less effective swift_bridgeNonVerbatimFromObjectiveC, which
+// also performs conformance checks at runtime.
 // CHECK-LABEL: sil [noinline] @_TF12cast_folding30testBridgedCastFromObjCtoSwiftFCSo8NSStringSS
 // CHECK-NOT: cast
-// CHECK: function_ref @swift_bridgeNonVerbatimFromObjectiveC
+// CHECK: witness_method $String, #_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
+// CHECK: metatype $@thick String.Type
 // CHECK: apply
 // CHECK: return
 @inline(never)
@@ -784,6 +789,16 @@ public func testMayBeBridgedCastFromObjCtoSwift(o: AnyObject) -> Int {
   return o as! Int
 } 
 
+// Check that this cast does not get eliminated, because
+// the compiler does not statically know if this object
+// is NSNumber can can be converted into Int.
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding41testConditionalBridgedCastFromObjCtoSwiftFPSs9AnyObject_GSqSS_
+// CHECK: unconditional_checked_cast_addr
+// CHECK: return
+@inline(never)
+public func testConditionalBridgedCastFromObjCtoSwift(o: AnyObject) -> String? {
+  return o as? String
+} 
 
 public func castObjCToSwift<T>(t: T) -> Int {
   return t as! Int

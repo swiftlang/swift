@@ -18,11 +18,13 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
+#include "swift/Strings.h"
 #include <deque>
 
 using namespace swift;
@@ -728,6 +730,376 @@ void LifetimeTracker::computeLifetime() {
 //                    Casts Optimization and Simplification
 //===----------------------------------------------------------------------===//
 
+/// \brief  Get a substitution corresponding to the type witness.
+/// Inspired by ProtocolConformance::getTypeWitnessByName.
+static const Substitution *
+getTypeWitnessByName(ProtocolConformance *conformance,
+                     Identifier name,
+                     LazyResolver *resolver) {
+  // Find the named requirement.
+  AssociatedTypeDecl *assocType = nullptr;
+  auto members = conformance->getProtocol()->lookupDirect(name);
+  for (auto member : members) {
+    assocType = dyn_cast<AssociatedTypeDecl>(member);
+    if (assocType)
+      break;
+  }
+
+  if (!assocType)
+    return nullptr;
+
+  assert(conformance && "Missing conformance information");
+  if (!conformance->hasTypeWitness(assocType, resolver)) {
+    return nullptr;
+  }
+  return &conformance->getTypeWitness(assocType, resolver);
+}
+
+/// Check if is a bridging cast, i.e. one of the sides is
+/// a bridged type.
+static bool isBridgingCast(CanType SourceType, CanType TargetType) {
+  // Bridging casts cannot be further simplified.
+  auto TargetIsBridgeable = TargetType->isBridgeableObjectType();
+  auto SourceIsBridgeable = SourceType->isBridgeableObjectType();
+
+  if (TargetIsBridgeable != SourceIsBridgeable)
+    return true;
+
+  return false;
+}
+
+/// If target is a Swift type bridging to an ObjC type,
+/// return the ObjC type it bridges to.
+/// If target is an ObjC type, return this type.
+static Type getCastFromObjC(SILModule &M, CanType source, CanType target) {
+  Optional<Type> BridgedTy = M.getASTContext().getBridgedToObjC(
+      M.getSwiftModule(),
+      /*inExpression*/ false, target, nullptr);
+  if (!BridgedTy.hasValue() || !BridgedTy.getValue())
+    return Type();
+  return BridgedTy.getValue();
+}
+
+/// Create a call of _forceBridgeFromObjectiveC or
+/// _knownConditionallyBridgeFromObjectiveC  which converts an an ObjC instance
+/// into a corresponding Swift type, conforming to  _ObjectiveCBridgeable.
+SILInstruction *
+CastOptimizer::
+optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
+                     bool isConditional,
+                     SILValue Src,
+                     SILValue Dest,
+                     CanType Source,
+                     CanType Target,
+                     Type BridgedSourceTy,
+                     Type BridgedTargetTy,
+                     SILBasicBlock *SuccessBB,
+                     SILBasicBlock *FailureBB) {
+  auto &M = Inst->getModule();
+  auto Loc = Inst->getLoc();
+
+  CanType CanBridgedTy(BridgedTargetTy);
+  SILType SILBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
+
+  SILBuilderWithScope<1> Builder(Inst);
+  SILValue SrcOp;
+  SILInstruction *NewI = nullptr;
+
+  assert(Src.getType().isAddress() && "Source should have an address type");
+  assert(Dest.getType().isAddress() && "Source should have an address type");
+
+  if (SILBridgedTy != Src.getType()) {
+    // Check if we can simplify a cast into:
+    // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
+    // - then convert _ObjectiveCBridgeable._ObjectiveCType to
+    // a Swift type using _forceBridgeFromObjectiveC.
+
+    // Generate a load for the source argument.
+    auto *Load = Builder.createLoad(Loc, Src);
+    // Try to convert the source into the expected ObjC type first.
+    // TODO: If type of the source and the expected ObjC type are
+    // equal, there is no need to generate the conversion.
+    if (isConditional) {
+      SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
+      CastSuccessBB->createBBArg(SILBridgedTy);
+      NewI = Builder.createCheckedCastBranch(Loc, false, SILValue(Load, 0),
+                                             SILBridgedTy, CastSuccessBB,
+                                             FailureBB);
+      Builder.setInsertionPoint(CastSuccessBB);
+      SrcOp = SILValue(CastSuccessBB->getBBArg(0), 0);
+    } else {
+      NewI = Builder.createUnconditionalCheckedCast(Loc, SILValue(Load, 0),
+                                                    SILBridgedTy);
+      SrcOp = SILValue(NewI, 0);
+    }
+  } else {
+    SrcOp = Src;
+  }
+
+  // Now emit the a cast from the casted ObjC object into a target type.
+  // This is done by means of calling _forceBridgeFromObjectiveC or
+  // _knownConditionallyBridgeFromObjectiveC from the Target type.
+  // Lookup the required function in the Target type.
+
+  // Lookup the _ObjectiveCBridgeable protocol.
+  auto BridgedProto =
+      M.getASTContext().getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+  auto Conf =
+      M.getSwiftModule()->lookupConformance(Target, BridgedProto, nullptr);
+  assert(Conf.getInt() == ConformanceKind::Conforms &&
+         "_ObjectiveCBridgeable conformance should exist");
+
+  auto *Conformance = Conf.getPointer();
+
+  // The conformance to _BridgedToObjectiveC is statically known.
+  // Retrieve the  bridging operation to be used if a static conformance
+  // to _BridgedToObjectiveC can be proven.
+  FuncDecl *BridgeFuncDecl =
+      isConditional
+          ? M.getASTContext().getKnownConditionallyBridgeFromObjectiveC(nullptr)
+          : M.getASTContext().getKnownForceBridgeFromObjectiveC(nullptr);
+
+  assert(BridgeFuncDecl && "_forceBridgeFromObjectiveC should exist");
+  StringRef BridgeFuncName = isConditional
+                                 ? "_knownConditionallyBridgeFromObjectiveC"
+                                 : "_knownForceBridgeFromObjectiveC";
+
+  SILDeclRef FuncDeclRef(BridgeFuncDecl, SILDeclRef::Kind::Func);
+
+  // Lookup a function from the stdlib.
+  SILFunction *BridgedFunc = M.lookUpFunction(BridgeFuncName);
+  if (!BridgedFunc) {
+    // If function is not found, try to link it.
+    M.linkFunction(FuncDeclRef);
+    BridgedFunc = M.lookUpFunction(BridgeFuncName);
+  }
+
+  assert(BridgedFunc && "Bridging function was not found");
+
+  auto *FuncRef = Builder.createFunctionRef(Loc, BridgedFunc);
+
+  auto MetaTy = MetatypeType::get(Target, MetatypeRepresentation::Thick);
+  auto SILMetaTy = M.Types.getTypeLowering(MetaTy, 0).getLoweredType();
+  auto *MetaTyVal = Builder.createMetatype(Loc, SILMetaTy);
+  SmallVector<SILValue, 1> Args;
+
+  auto PolyFuncTy = BridgeFuncDecl->getType()->getAs<PolymorphicFunctionType>();
+  ArrayRef<ArchetypeType *> Archetypes =
+      PolyFuncTy->getGenericParams().getAllArchetypes();
+
+  // Add substitutions
+  SmallVector<Substitution, 2> Subs;
+  auto Conformances = M.getASTContext().Allocate<ProtocolConformance *>(1);
+  Conformances[0] = Conformance;
+  Subs.push_back(Substitution(Archetypes[0], Target, Conformances));
+  const Substitution *DepTypeSubst = getTypeWitnessByName(
+      Conformance, M.getASTContext().getIdentifier("_ObjectiveCType"), nullptr);
+  Subs.push_back(Substitution(Archetypes[1], DepTypeSubst->getReplacement(),
+                              DepTypeSubst->getConformances()));
+  auto SILFnTy = FuncRef->getType();
+  SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
+  SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
+
+  // Temporary to hold the intermediate result.
+  AllocStackInst *Tmp = nullptr;
+  CanType OptionalTy;
+  OptionalTypeKind OTK;
+  SILValue InOutOptionalParam;
+  if (isConditional) {
+    // Create a temporary
+    OptionalTy = OptionalType::get(Dest.getType().getSwiftRValueType())
+                     ->getImplementationType()
+                     .getCanonicalTypeOrNull();
+    OptionalTy.getAnyOptionalObjectType(OTK);
+    Tmp = Builder.createAllocStack(Loc,
+                                   SILType::getPrimitiveObjectType(OptionalTy));
+    InOutOptionalParam = SILValue(Tmp, 1);
+  } else {
+    InOutOptionalParam = Dest;
+  }
+
+  Args.push_back(InOutOptionalParam);
+  Args.push_back(SrcOp);
+  Args.push_back(SILValue(MetaTyVal, 0));
+
+  auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args);
+  if (isConditional) {
+    // Copy the temporary into Dest.
+    // Load from the optional
+    auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl(OTK);
+    bool isNotAddressOnly = !InOutOptionalParam.getType().isTrivial(M) &&
+                            !InOutOptionalParam.getType().isAddressOnly(M);
+    auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
+                                                        SomeDecl);
+    auto LoadFromOptional = Builder.createLoad(Loc, SILValue(Addr, 0));
+    if (isNotAddressOnly)
+      Builder.createRetainValue(Loc, LoadFromOptional);
+    // Store into Dest
+    Builder.createStore(Loc, LoadFromOptional, Dest);
+    if (isNotAddressOnly)
+      Builder.createReleaseValue(Loc, LoadFromOptional);
+    Builder.createDeallocStack(Loc, SILValue(Tmp, 0));
+    SmallVector<SILValue, 1> SuccessBBArgs;
+    Builder.createBranch(Loc, SuccessBB, SuccessBBArgs);
+  }
+
+  EraseInstAction(Inst);
+  return (NewI) ? NewI : AI;
+}
+
+/// Create a call of _bridgeToObjectiveC which converts an _ObjectiveCBridgeable
+/// instance into a bridged ObjC type.
+SILInstruction *
+CastOptimizer::
+optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
+                     bool isConditional,
+                     SILValue Src,
+                     SILValue Dest,
+                     CanType Source,
+                     CanType Target,
+                     Type BridgedSourceTy,
+                     Type BridgedTargetTy,
+                     SILBasicBlock *SuccessBB,
+                     SILBasicBlock *FailureBB) {
+
+  auto &M = Inst->getModule();
+  auto Loc = Inst->getLoc();
+
+  // Find the _BridgedToObjectiveC protocol.
+  auto BridgedProto =
+      M.getASTContext().getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+
+  auto Conf =
+      M.getSwiftModule()->lookupConformance(Source, BridgedProto, nullptr);
+
+  assert(Conf.getInt() == ConformanceKind::Conforms &&
+         "_ObjectiveCBridgeable conformance should exist");
+
+  // Generate code to invoke _bridgeToObjectiveC
+  SILBuilderWithScope<1> Builder(Inst);
+
+  auto Members = Source.getNominalOrBoundGenericNominal()->lookupDirect(
+      M.getASTContext().Id_bridgeToObjectiveC);
+  assert(Members.size() == 1 &&
+         "There should be exactly one implementation of _bridgeToObjectiveC");
+  auto BridgeFuncDecl = Members.front();
+  auto BridgeFuncDeclRef = SILDeclRef(BridgeFuncDecl);
+  Module *Mod = M.getASTContext().getLoadedModule(
+      M.getASTContext().getIdentifier(FOUNDATION_MODULE_NAME));
+  assert(Mod && "Foundation module should be present");
+  SmallVector<ValueDecl *, 2> Results;
+  Mod->lookupMember(Results, Source.getNominalOrBoundGenericNominal(),
+                    M.getASTContext().Id_bridgeToObjectiveC, Identifier());
+  ArrayRef<ValueDecl *> ResultsRef(Results);
+  assert(ResultsRef.size() == 1 && "There should be only one declaration of _bridgeToObjectiveC");
+
+  auto MemberDeclRef = SILDeclRef(Results.front());
+  auto *BridgeFunc = M.getOrCreateFunction(Loc, MemberDeclRef, ForDefinition_t::NotForDefinition);
+  assert(BridgeFunc && "Implementation of _bridgeToObjectiveC could not be found");
+
+  auto SILFnTy = SILType::getPrimitiveObjectType(
+      M.Types.getConstantFunctionType(BridgeFuncDeclRef));
+  ArrayRef<Substitution> Subs;
+  if (Source.getNominalOrBoundGenericNominal()->getGenericSignature()) {
+    // Get substitutions, if source is a bound generic type.
+    Subs = Source->castTo<BoundGenericType>()->getSubstitutions(
+        M.getSwiftModule(), nullptr);
+  }
+
+  SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
+  SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
+
+  auto FnRef = Builder.createFunctionRef(Loc, BridgeFunc);
+  if (Src.getType().isAddress()) {
+    // Create load
+    Src = SILValue(Builder.createLoad(Loc, Src), 0);
+  }
+
+  // Generate a code to invoke the briding function.
+  auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src);
+
+  SILInstruction *NewI = NewAI;
+
+  if (Dest) {
+    // If it is addr cast then store the result.
+    NewI = Builder.createStore(Loc, SILValue(NewAI, 0), Dest);
+    // Insert a retain if required
+    if (Dest.getType().isAddress()) {
+      NewI = Builder.createStrongRetain(Loc, NewAI);
+    }
+    EraseInstAction(Inst);
+  }
+
+  return NewI;
+}
+
+/// Make use of the fact that some of these casts cannot fail.
+/// For example, if the ObjC type is exactly the expected
+/// _ObjectiveCType type, then it would always succeed for
+/// NSString, NSNumber, etc.
+/// Casts from NSArray, NSDictionary and NSSet may fail.
+///
+/// If ObjC class is not exactly _ObjectiveCType, then
+/// its conversion to a required _ObjectiveCType may fail.
+SILInstruction *
+CastOptimizer::
+optimizeBridgedCasts(SILInstruction *Inst,
+                     bool isConditional,
+                     SILValue Src,
+                     SILValue Dest,
+                     CanType source,
+                     CanType target,
+                     SILBasicBlock *SuccessBB,
+                     SILBasicBlock *FailureBB) {
+
+  auto &M = Inst->getModule();
+
+  // To apply the bridged optimizations, we should
+  // ensure that types are not existential,
+  // and that one of the types is a class and another
+  // one is a struct.
+  if (source.isAnyExistentialType() ||
+      target.isAnyExistentialType() ||
+      (source.getClassOrBoundGenericClass() &&
+       !target.getStructOrBoundGenericStruct()) ||
+      (target.getClassOrBoundGenericClass() &&
+       !source.getStructOrBoundGenericStruct()))
+    return nullptr;
+
+  auto BridgedTargetTy = getCastFromObjC(M, source, target);
+  if (!BridgedTargetTy)
+    return nullptr;
+
+  auto BridgedSourceTy = getCastFromObjC(M, target, source);
+
+  CanType CanBridgedTargetTy(BridgedTargetTy);
+  CanType CanBridgedSourceTy(BridgedSourceTy);
+
+  if (CanBridgedSourceTy == source && CanBridgedTargetTy == target) {
+    assert("Both source and target type are ObjC types");
+  }
+
+  if (CanBridgedSourceTy != source && CanBridgedTargetTy != target) {
+    assert("Both source and target type are Swift types");
+  }
+
+  if (CanBridgedSourceTy || CanBridgedTargetTy) {
+    // Check what kind of conversion it is? ObjC->Swift or Swift-ObjC?
+    if (CanBridgedTargetTy != target) {
+      // This is an ObjC to Swift cast.
+      return optimizeBridgedObjCToSwiftCast(Inst, isConditional, Src, Dest, source,
+          target, BridgedSourceTy, BridgedTargetTy, SuccessBB, FailureBB);
+    } else {
+      // This is a Swift to ObjC cast
+      return optimizeBridgedSwiftToObjCCast(Inst, isConditional, Src, Dest, source,
+          target, BridgedSourceTy, BridgedTargetTy, SuccessBB, FailureBB);
+    }
+  }
+
+  llvm_unreachable("Unknown kind of bridging");
+}
+
+
 SILInstruction *
 CastOptimizer::
 simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
@@ -756,8 +1128,9 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
                           isSourceTypeExact,
                           Mod.isWholeModule());
 
-  if (Feasibility == DynamicCastFeasibility::MaySucceed)
+  if (Feasibility == DynamicCastFeasibility::MaySucceed) {
     return nullptr;
+  }
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     if (shouldDestroyOnFailure(Inst->getConsumptionKind())) {
@@ -784,18 +1157,42 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
     break;
   }
 
+  auto *BB = Inst->getParent();
+
   if (!ResultNotUsed) {
-    if (!emitSuccessfulIndirectUnconditionalCast(
+    SILInstruction *BridgedI = nullptr;
+
+    // To apply the bridged optimizations, we should
+    // ensure that types are not existential,
+    // and that not both types are classes.
+    BridgedI = optimizeBridgedCasts(Inst, true, Src, Dest, SourceType,
+                                       TargetType, SuccessBB, FailureBB);
+
+
+    if (!BridgedI) {
+      if (!emitSuccessfulIndirectUnconditionalCast(
             Builder, Mod.getSwiftModule(), Loc, Inst->getConsumptionKind(), Src,
             SourceType, Dest, TargetType, Inst))
-      // No optimization was possible.
-      return nullptr;
+        // No optimization was possible.
+        return nullptr;
+      EraseInstAction(Inst);
+    }
+    SILInstruction *NewI = &BB->getInstList().back();
+    if (!isa<TermInst>(NewI)) {
+      //Builder.setInsertionPoint(BB->getInstList().end());
+      NewI = BranchInst::create(Loc, SuccessBB, *BB->getParent());
+      BB->getInstList().insert(BB->end(), NewI);
+    }
+    WillSucceedAction();
+    return NewI;
+  } else {
+    // Result is not used.
+    EraseInstAction(Inst);
+    auto *NewI = BranchInst::create(Loc, SuccessBB, *BB->getParent());
+    BB->getInstList().insert(BB->end(), NewI);
+    WillSucceedAction();
+    return NewI;
   }
-
-  auto *NewI = Builder.createBranch(Loc, SuccessBB);
-  EraseInstAction(Inst);
-  WillSucceedAction();
-  return NewI;
 }
 
 SILInstruction *
@@ -833,6 +1230,8 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   auto LoweredSourceType = Inst->getOperand().getType();
   auto LoweredTargetType = Inst->getCastType();
+  auto SourceType = LoweredSourceType.getSwiftRValueType();
+  auto TargetType = LoweredTargetType.getSwiftRValueType();
   auto Loc = Inst->getLoc();
   auto *SuccessBB = Inst->getSuccessBB();
   auto *FailureBB = Inst->getFailureBB();
@@ -843,12 +1242,13 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(),
-                          LoweredSourceType.getSwiftRValueType(),
-                          LoweredTargetType.getSwiftRValueType(),
+                          SourceType,
+                          TargetType,
                           isSourceTypeExact);
 
-  if (Feasibility == DynamicCastFeasibility::MaySucceed)
+  if (Feasibility == DynamicCastFeasibility::MaySucceed) {
     return nullptr;
+  }
 
   SILBuilderWithScope<1> Builder(Inst);
 
@@ -861,19 +1261,26 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   // Casting will succeed.
 
-
   // Replace by unconditional_cast, followed by a branch.
   // The unconditional_cast can be skipped, if the result of a cast
   // is not used afterwards.
-  SmallVector<SILValue, 1> Args;
   bool ResultNotUsed = SuccessBB->getBBArg(0)->use_empty();
   SILValue CastedValue;
   if (Op.getType() != LoweredTargetType) {
     if (!ResultNotUsed) {
-      CastedValue = emitSuccessfulScalarUnconditionalCast(
+      auto Src = Inst->getOperand();
+      auto Dest = SILValue();
+      // To apply the bridged casts optimizations.
+      auto BridgedI = optimizeBridgedCasts(Inst, false, Src, Dest, SourceType,
+          TargetType, nullptr, nullptr);
+
+      if (BridgedI) {
+        CastedValue = SILValue(BridgedI, 0);
+      }
+      else
+        CastedValue = emitSuccessfulScalarUnconditionalCast(
           Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
-          LoweredSourceType.getSwiftRValueType(),
-          LoweredTargetType.getSwiftRValueType(), Inst);
+          SourceType, TargetType, Inst);
       if (!CastedValue)
         CastedValue =
             Builder.createUnconditionalCheckedCast(Loc, Op, LoweredTargetType);
@@ -885,8 +1292,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     CastedValue = Op;
   }
 
-  Args.push_back(CastedValue);
-  auto *NewI = Builder.createBranch(Loc, SuccessBB, Args);
+  auto *NewI = Builder.createBranch(Loc, SuccessBB, CastedValue);
   EraseInstAction(Inst);
   WillSucceedAction();
   return NewI;
@@ -1132,6 +1538,10 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
                           LoweredTargetType.getSwiftRValueType(),
                           isSourceTypeExact);
 
+  if (Feasibility == DynamicCastFeasibility::MaySucceed) {
+    return nullptr;
+  }
+
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
@@ -1141,11 +1551,28 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
     EraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
     Builder.createUnreachable(ArtificialUnreachableLocation());
+    WillFailAction();
     return Trap;
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
     SILBuilderWithScope<1> Builder(Inst);
+
+    // Try to apply the bridged casts optimizations
+    auto SourceType = LoweredSourceType.getSwiftRValueType();
+    auto TargetType = LoweredTargetType.getSwiftRValueType();
+    auto Src = Inst->getOperand();
+    auto NewI = optimizeBridgedCasts(Inst, false, Src, SILValue(), SourceType,
+        TargetType, nullptr, nullptr);
+    if (NewI) {
+      ReplaceInstUsesAction(Inst, NewI);
+      EraseInstAction(Inst);
+      WillSucceedAction();
+      return NewI;
+    }
+
+    if (isBridgingCast(SourceType, TargetType))
+      return nullptr;
 
     auto Result = emitSuccessfulScalarUnconditionalCast(Builder,
                       Mod.getSwiftModule(), Loc, Op,
@@ -1161,11 +1588,13 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
 
     ReplaceInstUsesAction(Inst, Result.getDef());
     EraseInstAction(Inst);
+    WillSucceedAction();
     return dyn_cast<SILInstruction>(Result.getDef());
   }
 
   return nullptr;
 }
+
 
 SILInstruction *
 CastOptimizer::
@@ -1183,8 +1612,9 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
   auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(), SourceType,
                                          TargetType, isSourceTypeExact);
 
-  if (Feasibility == DynamicCastFeasibility::MaySucceed)
+  if (Feasibility == DynamicCastFeasibility::MaySucceed) {
     return nullptr;
+  }
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     // Remove the cast and insert a trap, followed by an
@@ -1194,7 +1624,7 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     // mem2reg's invariants get unhappy if we don't try to
     // initialize a loadable result.
     auto DestType = Dest.getType();
-    auto &resultTL = Builder.getModule().Types.getTypeLowering(DestType);
+    auto &resultTL = Mod.Types.getTypeLowering(DestType);
     if (!resultTL.isAddressOnly()) {
       auto undef = SILValue(SILUndef::get(DestType.getObjectType(),
                                           Builder.getModule()));
@@ -1208,15 +1638,31 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
-    if (!Src.getType().isExistentialType() &&
-        Dest.getType().isExistentialType())
+
+    bool ResultNotUsed = isa<AllocStackInst>(Dest.getDef());
+    for (auto Use : Dest.getUses()) {
+      auto *User = Use->getUser();
+      if (isa<DeallocStackInst>(User) || User == Inst)
+        continue;
+      ResultNotUsed = false;
+      break;
+    }
+
+    if (ResultNotUsed) {
+      EraseInstAction(Inst);
+      WillSucceedAction();
       return nullptr;
+    }
 
-    // Bridging casts cannot be further simplified.
-    auto TargetIsBridgeable = TargetType->isBridgeableObjectType();
-    auto SourceIsBridgeable = SourceType->isBridgeableObjectType();
+    // Try to apply the bridged casts optimizations
+    auto NewI = optimizeBridgedCasts(Inst, false, Src, Dest, SourceType,
+                                         TargetType, nullptr, nullptr);
+    if (NewI) {
+        WillSucceedAction();
+        return nullptr;
+    }
 
-    if (TargetIsBridgeable != SourceIsBridgeable)
+    if (isBridgingCast(SourceType, TargetType))
       return nullptr;
 
     SILBuilderWithScope<1> Builder(Inst);

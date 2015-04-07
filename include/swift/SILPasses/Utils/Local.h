@@ -269,7 +269,35 @@ class CastOptimizer {
   // that a cast will fail.
   std::function<void ()> WillFailAction;
 
-  public:
+  /// Optimize a cast from a bridged ObjC type into
+  /// a corresponding Swift type implementing _ObjectiveCBridgeable.
+  SILInstruction *
+  optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
+      bool isConditional,
+      SILValue Src,
+      SILValue Dest,
+      CanType Source,
+      CanType Target,
+      Type BridgedSourceTy,
+      Type BridgedTargetTy,
+      SILBasicBlock *SuccessBB,
+      SILBasicBlock *FailureBB);
+
+  /// Optimize a cast from   a Swift type implementing _ObjectiveCBridgeable
+  /// into a bridged ObjC type.
+  SILInstruction *
+  optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
+      bool isConditional,
+      SILValue Src,
+      SILValue Dest,
+      CanType Source,
+      CanType Target,
+      Type BridgedSourceTy,
+      Type BridgedTargetTy,
+      SILBasicBlock *SuccessBB,
+      SILBasicBlock *FailureBB);
+
+public:
   CastOptimizer(std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction,
                 std::function<void (SILInstruction *)> EraseAction = [](SILInstruction*){},
                 std::function<void ()> WillSucceedAction = [](){},
@@ -304,6 +332,19 @@ class CastOptimizer {
   /// This cannot change the control flow.
   SILInstruction *
   optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst);
+
+  /// Check if is is a bridged cast and optimize it.
+  /// May change the control flow.
+  SILInstruction *
+  optimizeBridgedCasts(SILInstruction *Inst,
+      bool isConditional,
+      SILValue Src,
+      SILValue Dest,
+      CanType Source,
+      CanType Target,
+      SILBasicBlock *SuccessBB,
+      SILBasicBlock *FailureBB);
+
 };
 
 // Helper class that provides a callback that can be used in
