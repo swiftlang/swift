@@ -21,7 +21,6 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Allocator.h"
-#include <vector>
 
 namespace swift {
 
@@ -257,7 +256,7 @@ class CallGraph {
   llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
 
   /// A vector of functions in bottom up function order.
-  std::vector<SILFunction *> BottomUpFunctionOrder;
+  llvm::SmallVector<SILFunction *, 32> BottomUpFunctionOrder;
 
   /// An allocator used by the callgraph.
   llvm::BumpPtrAllocator Allocator;
@@ -310,14 +309,14 @@ public:
   // Functions for getting bottom-up lists of SCCs or functions in the
   // call graph.
 
-  ArrayRef<CallGraphSCC *> getBottomUpSCCOrder() {
+  const llvm::SmallVectorImpl<CallGraphSCC *> &getBottomUpSCCOrder() {
     if (BottomUpSCCOrder.empty())
       computeBottomUpSCCOrder();
 
     return BottomUpSCCOrder;
   }
 
-  ArrayRef<SILFunction *> getBottomUpFunctionOrder() {
+  const llvm::SmallVectorImpl<SILFunction *> &getBottomUpFunctionOrder() {
     if (BottomUpFunctionOrder.empty())
       computeBottomUpFunctionOrder();
 

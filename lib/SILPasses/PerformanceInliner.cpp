@@ -981,8 +981,10 @@ public:
     SmallPtrSet<SILFunction *, 16> DevirtualizedIn;
 
     auto &CG = CGA->getOrBuildCallGraph();
+    auto &BottomUpFunctions = CG.getBottomUpFunctionOrder();
+
     // Inline functions bottom up from the leafs.
-    for (auto *F : CG.getBottomUpFunctionOrder()) {
+    for (auto *F : BottomUpFunctions) {
       // If F is empty, attempt to link it. Skip it if we fail to do so.
       if (F->empty() &&
           !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
