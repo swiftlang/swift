@@ -111,6 +111,7 @@ set(SWIFTLIB_SOURCES
   CollectionMirrors.swift.gyb
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
+  Mirror.swift
   Process.swift
   SliceBuffer.swift
   VarArgs.swift

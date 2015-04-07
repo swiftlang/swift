@@ -9,7 +9,6 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-import Swift
 
 #if _runtime(_ObjC)
 // FIXME: ExistentialCollection needs to be supported before this will work

@@ -20,7 +20,6 @@
 
 // XFAIL: linux
 
-import SwiftExperimental
 import StdlibUnittest
 
 var mirrors = TestSuite("Mirrors")
