@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 public protocol P1 {
-  func reqP1a() 
+  func reqP1a()
 }
 
 extension P1 {
@@ -27,6 +27,27 @@ extension P1 {
 }
 
 // ----------------------------------------------------------------------------
+// Using protocol extension members with concrete types
+// ----------------------------------------------------------------------------
+class C : P1 {
+  func reqP1a() { }
+}
+
+class D : C { }
+
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions5testDFCS_1DT_ : $@thin (@owned D) -> () {
+// CHECK-NEXT: bb0([[D:%[0-9]+]] : $D):
+func testD(d: D) {
+  // CHECK: [[D2:%[0-9]+]] = alloc_box $D
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P111returnsSelfUS0___fQPS0_FT_S1_
+  // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
+  // CHECK: store [[D]] to [[DCOPY]]#1 : $*D
+  // CHECK: [[RESULT:%[0-9]+]] = alloc_stack $D
+  // CHECK: apply [[FN]]<D>([[RESULT]]#1, [[DCOPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in τ_0_0) -> ()
+  var d2: D = d.returnsSelf()
+}
+
+// ----------------------------------------------------------------------------
 // Using protocol extension members with existentials
 // ----------------------------------------------------------------------------
 extension P1 {
@@ -45,6 +66,8 @@ extension P1 {
 
     // FIXME: getter
   }
+
+  final func returnsSelf() -> Self { return self }
 }
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions17testExistentials1
@@ -83,4 +106,19 @@ func testExistentials1(p1: P1, b: Bool, i: Int64) {
   // CHECK-NEXT: store{{.*}} : $*Bool                     // id: %35
   // CHECK-NEXT: deinit_existential_addr [[PCOPY]]#1 : $*P1
   var b3 = p1.prop
+}
+
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions17testExistentials2
+// CHECK: bb0([[P:%[0-9]+]] : $*P1):
+func testExistentials2(p1: P1) {
+  // CHECK: [[P1A:%[0-9]+]] = alloc_box $P1
+  // CHECK: [[PCOPY:%[0-9]+]] = alloc_stack $P1
+  // CHECK-NEXT: copy_addr [[P]] to [initialization] [[PCOPY]]#1 : $*P1
+  // CHECK-NEXT: [[POPENED:%[0-9]+]] = open_existential_addr [[PCOPY]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
+  // CHECK-NEXT: [[P1AINIT:%[0-9]+]] = init_existential_addr [[P1A]]#1 : $*P1, $@opened([[UUID2:".*"]]) P1
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P111returnsSelfUS0___fQPS0_FT_S1_
+  // CHECK-NEXT: apply [[FN]]<@opened([[UUID]]) P1>([[P1AINIT]], [[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in τ_0_0) -> ()
+  var p1a: P1 = p1.returnsSelf()
+  // CHECK-NEXT: deinit_existential_addr [[PCOPY]]#1 : $*P1
+  // CHECK-NEXT: dealloc_stack [[PCOPY]]#0 : $*@local_storage P1
 }
