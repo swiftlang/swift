@@ -292,7 +292,6 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     Builder.createReleaseValue(Closure->getLoc(), Closure);
 
   CallGraphEditor Editor(CG);
-  Editor.addCallGraphNode(NewF);
   Editor.replaceApplyWithNew(AI, NewAI);
 
   // Replace all uses of the old apply with the new apply.
@@ -332,8 +331,13 @@ void CallSiteDescriptor::specializeClosure(CallGraph &CG) const {
 
   // If not, create a specialized version of ApplyCallee calling the closure
   // directly.
-  if (!NewF)
+  if (!NewF) {
     NewF = ClosureSpecCloner::cloneFunction(*this, NewFName);
+
+    // Update the call graph with the newly created function.
+    CallGraphEditor Editor(CG);
+    Editor.addCallGraphNode(NewF);
+  }
 
   // Rewrite the call
   rewriteApplyInst(*this, NewF, CG);
