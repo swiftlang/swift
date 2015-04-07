@@ -56,7 +56,7 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
   }
 }
 
-extension Optional : DebugPrintable {
+extension Optional : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     switch self {

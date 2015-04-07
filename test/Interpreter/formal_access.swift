@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-class C: Printable {
+class C: CustomStringConvertible {
   var value: Int
   init(_ v: Int) { value = v }
 

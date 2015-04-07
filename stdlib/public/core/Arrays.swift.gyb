@@ -707,7 +707,7 @@ extension ${Self} : Reflectable {
   }
 }
 
-extension ${Self} : Printable, DebugPrintable {
+extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
   func _makeDescription(#isDebug: Bool) -> String {
     var result = "["
     var first = true

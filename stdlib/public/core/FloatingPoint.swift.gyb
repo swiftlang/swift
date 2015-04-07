@@ -194,7 +194,7 @@ public struct ${Self} {
   init(_ value: ${Self}) { self = value }
 }
 
-extension ${Self} : Printable {
+extension ${Self} : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
     return _float${bits}ToString(self)

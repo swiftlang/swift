@@ -12,7 +12,7 @@
 
 extension String {
   /// A collection of UTF-16 code units that encodes a `String` value.
-  public struct UTF16View : Sliceable, Reflectable, Printable, DebugPrintable {
+  public struct UTF16View : Sliceable, Reflectable, CustomStringConvertible, CustomDebugStringConvertible {
     public struct Index {
       // Foundation needs access to these fields so it can expose
       // random access

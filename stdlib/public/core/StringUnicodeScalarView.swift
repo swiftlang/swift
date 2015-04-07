@@ -29,7 +29,7 @@ extension String {
   /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_ that
   /// encode a `String` .
   public struct UnicodeScalarView : Sliceable, SequenceType, Reflectable,
-    Printable, DebugPrintable, CollectionType {
+    CustomStringConvertible, CustomDebugStringConvertible, CollectionType {
     init(_ _core: _StringCore) {
       self._core = _core
     }

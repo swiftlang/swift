@@ -48,7 +48,7 @@ selfDocComment = """
 
 ${selfDocComment}
 public struct ${Self}<T : Comparable>
-  : IntervalType, Equatable, Printable, DebugPrintable, Reflectable {
+  : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, Reflectable {
 
   /// The type of the `Interval`\ 's endpoints
   public typealias Bound = T
@@ -85,7 +85,7 @@ public struct ${Self}<T : Comparable>
   
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "${Self}(\(toDebugString(start))${rangeOperator}\(toDebugString(end)))"
+    return "${Self}(\(String(reflecting: start))${rangeOperator}\(String(reflecting: end)))"
   }
   
   /// Returns `true` iff the `Interval` contains `x`
@@ -175,7 +175,7 @@ public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
 %                                  introspecteeType='T',\
 %                                  disposition='Struct')
 
-struct _IntervalMirror<T : protocol<IntervalType,Printable>> : MirrorType {
+struct _IntervalMirror<T : protocol<IntervalType,CustomStringConvertible>> : MirrorType {
   ${Boilerplate}
 
   var count: Int { return 2 }

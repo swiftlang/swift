@@ -460,7 +460,7 @@ println(reflect(CGRect(x: 50, y: 60, width: 100, height: 150)).summary)
 
 var CanaryHandle = false
 
-class IsDebugQLO : CanaryBase, Printable {
+class IsDebugQLO : CanaryBase, CustomStringConvertible {
   @objc var description: String {
     return "I'm a QLO"
   }

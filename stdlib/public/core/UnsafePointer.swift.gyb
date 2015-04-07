@@ -405,7 +405,7 @@ public struct ${Self}<T>
   }
 }
 
-extension ${Self} : DebugPrintable {
+extension ${Self} : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)

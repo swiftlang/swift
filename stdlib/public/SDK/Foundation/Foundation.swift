@@ -75,7 +75,7 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
-extension NSObject : Printable {}
+extension NSObject : CustomStringConvertible {}
 
 //===----------------------------------------------------------------------===//
 // Strings

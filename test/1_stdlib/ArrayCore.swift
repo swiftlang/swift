@@ -20,7 +20,7 @@ import Swift
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-final class Tracked : ForwardIndexType, Printable {
+final class Tracked : ForwardIndexType, CustomStringConvertible {
   required init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber

@@ -25,7 +25,7 @@ RangeTestSuite.test("Range/Equatable") {
 }
 
 // Something to test with that distinguishes debugDescription from description
-struct X<T : ForwardIndexType> : ForwardIndexType, Printable, DebugPrintable {
+struct X<T : ForwardIndexType> : ForwardIndexType, CustomStringConvertible, CustomDebugStringConvertible {
   init(_ a: T) {
     self.a = a
   }
@@ -35,11 +35,11 @@ struct X<T : ForwardIndexType> : ForwardIndexType, Printable, DebugPrintable {
   }
 
   var description: String {
-    return toString(a)
+    return String(a)
   }
 
   var debugDescription: String {
-    return "X(\(toDebugString(a)))"
+    return "X(\(String(reflecting: a)))"
   }
 
   var a: T
@@ -50,12 +50,12 @@ func == <T : ForwardIndexType>(lhs: X<T>, rhs: X<T>) -> Bool {
 }
 
 RangeTestSuite.test("Printing") {
-  expectEqual("0..<10", toString(X(0)..<X(10)))
-  expectEqual("Range(X(0)..<X(10))", toDebugString(Range(X(0)..<X(10))))
+  expectEqual("0..<10", String(X(0)..<X(10)))
+  expectEqual("Range(X(0)..<X(10))", String(reflecting: Range(X(0)..<X(10))))
 
   // No separate representation for closed Ranges yet
-  expectEqual("10..<42", toString(X(10)...X(41)))
-  expectEqual("Range(X(10)..<X(42))", toDebugString(Range(X(10)...X(41))))
+  expectEqual("10..<42", String(X(10)...X(41)))
+  expectEqual("Range(X(10)..<X(42))", String(reflecting: Range(X(10)...X(41))))
 }
 
 RangeTestSuite.test("Pattern matching") {

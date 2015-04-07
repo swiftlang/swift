@@ -146,7 +146,7 @@ internal func _signalToString(signal: Int) -> String {
   }
 }
 
-public enum ProcessTerminationStatus : Printable {
+public enum ProcessTerminationStatus : CustomStringConvertible {
   case Exit(Int)
   case Signal(Int)
 

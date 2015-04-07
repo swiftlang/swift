@@ -322,7 +322,7 @@ extension PlaygroundQuickLook {
   /// its `customPlaygroundQuickLook` method.  Otherwise, returns
   /// a `PlaygroundQuickLook` synthesized for `instance` by the
   /// language.  Note: in some cases the result may be
-  /// `.Text(toDebugString(instance))`.
+  /// `.Text(String(reflecting: instance))`.
   ///
   /// Note: If the dynamic type of `instance` has value semantics,
   /// subsequent mutations of `instance` will not observable in
@@ -337,7 +337,7 @@ extension PlaygroundQuickLook {
         self = q
       }
       else {
-        self = .Text(toDebugString(instance))
+        self = .Text(String(reflecting: instance))
       }
     }
   }
@@ -431,26 +431,6 @@ extension DictionaryLiteral : CollectionType {
 }
 #endif
 
-// This typealias implies renaming "Printable" to
-// "CustomStringConvertible".
-//
-// protocol CustomStringConvertible {
-//   var description: String
-// }
-typealias CustomStringConvertible = Printable
-
-// This typealias implies renaming "DebugPrintable" to
-// "CustomDebugStringConvertible".
-//
-// protocol CustomDebugStringConvertible {
-//   var debugDescription: String
-// }
-typealias CustomDebugStringConvertible = DebugPrintable
-
-// With the addition of the following APIs, we will retire the
-// toString and toDebugString functions that do the same thing.  Swift
-// is standardizing on using initializers for things that feel like
-// "type conversions."
 extension String {  
   /// Initialize `self` with the textual representation of `instance`.
   ///
@@ -465,7 +445,8 @@ extension String {
   ///
   /// See Also: `String.init<T>(reflecting: T)`
   public init<T>(_ instance: T) {
-    self = toString(instance)
+    self.init()
+    print(instance, &self)
   }
 
   /// Initialize `self` with a detailed textual representation of
@@ -485,6 +466,7 @@ extension String {
   ///
   /// See Also: `String.init<T>(T)`
   public init<T>(reflecting instance: T) {
-    self = toDebugString(instance)
+    self.init()
+    debugPrint(instance, &self)
   }
 }

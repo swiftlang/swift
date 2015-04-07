@@ -97,7 +97,7 @@ class BridgedObjC : Base, Barable {
 var bridgeFromOperationCount = 0
 var bridgeToOperationCount = 0
 
-struct BridgedSwift : Printable, _ObjectiveCBridgeable {
+struct BridgedSwift : CustomStringConvertible, _ObjectiveCBridgeable {
   static func _getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }

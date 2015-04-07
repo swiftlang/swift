@@ -208,7 +208,7 @@ public struct UnicodeScalar :
   }
 }
 
-extension UnicodeScalar : Printable, DebugPrintable {
+extension UnicodeScalar : CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
     return "\"\(escape(asASCII: false))\""

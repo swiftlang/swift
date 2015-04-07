@@ -14,7 +14,7 @@ extension NSDecimal {
   }
 }
 
-enum NSDecimalResult: StringLiteralConvertible, Equatable, Printable {
+enum NSDecimalResult: StringLiteralConvertible, Equatable, CustomStringConvertible {
   case Some(NSDecimal)
   case Error(NSCalculationError)
   

@@ -17,7 +17,7 @@ var tests = TestSuite("ExistentialCollection")
 
 tests.test("AnyGenerator") {
   func countStrings() -> AnyGenerator<String> {
-    let lazyStrings = lazy(0..<5).map { toString($0) }
+    let lazyStrings = lazy(0..<5).map { String($0) }
     
     // This is a really complicated type of no interest to our
     // clients.

@@ -25,7 +25,7 @@ import StdlibUnittest
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-final class X : ForwardIndexType, Comparable, Printable, 
+final class X : ForwardIndexType, Comparable, CustomStringConvertible, 
                 IntegerLiteralConvertible 
 {
   required init(_ value: Int) {

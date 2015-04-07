@@ -24,11 +24,11 @@ import StdlibUnittest
 
 var mirrors = TestSuite("Mirrors")
 
-extension Mirror: Printable {
+extension Mirror: CustomStringConvertible {
   public var description: String {
     let nil_ = "nil"
     return "[" + ", ".join(
-      lazy(children).map { "\($0.0 ?? nil_): \(toDebugString($0.1))" }
+      lazy(children).map { "\($0.0 ?? nil_): \(String(reflecting: $0.1))" }
     ) + "]"
   }
 }
@@ -103,7 +103,7 @@ mirrors.test("BidirectionalStructure") {
 }
 
 mirrors.test("LabeledStructure") {
-  struct Zee : CustomReflectable, Printable {
+  struct Zee : CustomReflectable, CustomStringConvertible {
     func customMirror() -> Mirror {
       return Mirror(children: ["bark": 1, "bite": 0])
     }
@@ -217,13 +217,13 @@ mirrors.test("PlaygroundQuickLook") {
   }
 
   // With no Legacy Mirror QuickLook support, we fall back to
-  // toDebugString().
+  // String(reflecting: ).
   struct X {}
   switch PlaygroundQuickLook(reflecting: X()) {
   case .Text(let text) where text.hasSuffix(".(X #1)"): break;
   default: expectTrue(false)
   }
-  struct Y : DebugPrintable {
+  struct Y : CustomDebugStringConvertible {
     var debugDescription: String { return "Why?" }
   }
   switch PlaygroundQuickLook(reflecting: Y()) {

@@ -343,7 +343,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   }
 }
 
-extension AutoreleasingUnsafeMutablePointer : DebugPrintable {
+extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)

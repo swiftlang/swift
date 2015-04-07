@@ -36,35 +36,53 @@ public protocol Streamable {
 /// This textual representation is used when values are written to an
 /// *output stream*, for example, by `print` and `println`.
 ///
-/// In order to generate a textual representation for an instance of any
-/// type (which might or might not conform to `Printable`), use `toString`.
-public protocol Printable {
+/// Note: `String(instance)` will work for an `instance` of *any*
+/// type, returning its `description` if the `instance` happens to be
+/// `CustomStringConvertible`.  Using `CustomStringConvertible` as a
+/// generic constraint, or accessing a conforming type's `description`
+/// directly, is therefore discouraged.
+///
+/// See Also: `String.init<T>(T)`, `CustomDebugStringConvertible`
+public protocol CustomStringConvertible {
   /// A textual representation of `self`.
   var description: String { get }
 }
 
-/// A type with a customized textual representation for debugging
-/// purposes.
+/// A type with a customized textual representation suitable for
+/// debugging purposes.
 ///
 /// This textual representation is used when values are written to an
 /// *output stream* by `debugPrint` and `debugPrintln`, and is
-/// typically more verbose than the text provided by a `Printable`\ 's
-/// `description` property.
+/// typically more verbose than the text provided by a
+/// `CustomStringConvertible`\ 's `description` property.
 ///
-/// In order to generate a textual representation for an instance of any
-/// type (which might or might not conform to `DebugPrintable`), use
-/// `toDebugString`.
-public protocol DebugPrintable {
+/// Note: `String(reflecting: instance)` will work for an `instance`
+/// of *any* type, returning its `debugDescription` if the `instance`
+/// happens to be `CustomDebugStringConvertible`.  Using
+/// `CustomDebugStringConvertible` as a generic constraint, or
+/// accessing a conforming type's `debugDescription` directly, is
+/// therefore discouraged.
+///
+/// See Also: `String.init<T>(reflecting: T)`,
+/// `CustomStringConvertible`
+public protocol CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   var debugDescription: String { get }
 }
+
+// FIXME: disabled due to <rdar://20450682>
+// @availability(*, unavailable, renamed="CustomDebugStringConvertible")
+// public protocol DebugPrintable {}
+// @availability(*, unavailable, renamed="CustomStringConvertible")
+// public protocol Printable {}
 
 //===----------------------------------------------------------------------===//
 // `print`
 //===----------------------------------------------------------------------===//
 
-/// Do our best to print a value that can not be printed directly, using one of
-/// its conformances to `Streamable`, `Printable` or `DebugPrintable`.
+/// Do our best to print a value that can not be printed directly,
+/// using one of its conformances to `Streamable`,
+/// `CustomStringConvertible` or `CustomDebugStringConvertible`.
 func _adHocPrint<T, TargetStream : OutputStreamType>(
     value: T, inout target: TargetStream
 ) {
@@ -97,7 +115,7 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
 ///
 /// The textual representation is obtained from the `value` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
-/// `Printable`, `DebugPrintable`.
+/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
@@ -110,12 +128,12 @@ public func print<T, TargetStream : OutputStreamType>(
     return
   }
 
-  if var printableObject? = value as? Printable {
+  if var printableObject? = value as? CustomStringConvertible {
     printableObject.description.writeTo(&target)
     return
   }
 
-  if let debugPrintableObject? = value as? DebugPrintable {
+  if let debugPrintableObject? = value as? CustomDebugStringConvertible {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
@@ -128,7 +146,7 @@ public func print<T, TargetStream : OutputStreamType>(
 ///
 /// The textual representation is obtained from the `value` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
-/// `Printable`, `DebugPrintable`.
+/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
@@ -144,7 +162,7 @@ public func println<T, TargetStream : OutputStreamType>(
 ///
 /// The textual representation is obtained from the `value` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
-/// `Printable`, `DebugPrintable`.
+/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
@@ -160,7 +178,7 @@ public func print<T>(value: T) {
 ///
 /// The textual representation is obtained from the `value` using its protocol
 /// conformances, in the following order of preference: `Streamable`,
-/// `Printable`, `DebugPrintable`.
+/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
@@ -180,18 +198,19 @@ public func println() {
   stdoutStream.write("\n")
 }
 
-/// Returns the result of `print`\ 'ing `x` into a `String`
-@inline(never)
+@availability(*, unavailable, renamed="String")
 public func toString<T>(x: T) -> String {
-  var result = ""
-  print(x, &result)
-  return result
+  fatalError("unreachable")
+}
+
+internal func _toString<T>(x: T) -> String {
+  return String(x)
 }
 
 /// Returns the result of `print`\ 'ing `x` into a `String`
 ///
-/// Exactly the same as `toString`, but annotated 'readonly' to allow the optimizer
-/// to remove calls where results are unused.
+/// Exactly the same as `String`, but annotated 'readonly' to allow
+/// the optimizer to remove calls where results are unused.
 ///
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
@@ -203,15 +222,13 @@ func _toStringReadOnlyStreamable<T : Streamable>(x: T) -> String {
 }
 
 @inline(never) @effects(readonly)
-func _toStringReadOnlyPrintable<T : Printable>(x: T) -> String {
+func _toStringReadOnlyPrintable<T : CustomStringConvertible>(x: T) -> String {
   return x.description
 }
 
-/// Returns the result of `debugPrint`\ 'ing `x` into a `String`
+@availability(*, unavailable, renamed="String(reflecting:)")
 public func toDebugString<T>(x: T) -> String {
-  var result = ""
-  debugPrint(x, &result)
-  return result
+  fatalError("unavailable")
 }
 
 //===----------------------------------------------------------------------===//
@@ -221,8 +238,10 @@ public func toDebugString<T>(x: T) -> String {
 /// Write to `target` the textual representation of `x` most suitable
 /// for debugging.
 ///
-/// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
-/// * Otherwise, if `T` conforms to `Printable`, write `x.description`
+/// * If `T` conforms to `CustomDebugStringConvertible`, write
+///   `x.debugDescription`
+/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write
+///   `x.description`
 /// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///
@@ -231,12 +250,12 @@ public func toDebugString<T>(x: T) -> String {
 public func debugPrint<T, TargetStream : OutputStreamType>(
     value: T, inout target: TargetStream
 ) {
-  if let debugPrintableObject? = value as? DebugPrintable {
+  if let debugPrintableObject? = value as? CustomDebugStringConvertible {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
 
-  if var printableObject? = value as? Printable {
+  if var printableObject? = value as? CustomStringConvertible {
     printableObject.description.writeTo(&target)
     return
   }
@@ -252,8 +271,8 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 /// Write to `target` the textual representation of `x` most suitable
 /// for debugging, followed by a newline.
 ///
-/// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
-/// * Otherwise, if `T` conforms to `Printable`, write `x.description`
+/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
+/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
 /// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///
@@ -269,8 +288,8 @@ public func debugPrintln<T, TargetStream : OutputStreamType>(
 /// Write to the console the textual representation of `x` most suitable
 /// for debugging.
 ///
-/// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
-/// * Otherwise, if `T` conforms to `Printable`, write `x.description`
+/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
+/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
 /// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///
@@ -284,8 +303,8 @@ public func debugPrint<T>(x: T) {
 /// Write to the console the textual representation of `x` most suitable
 /// for debugging, followed by a newline.
 ///
-/// * If `T` conforms to `DebugPrintable`, write `x.debugDescription`
-/// * Otherwise, if `T` conforms to `Printable`, write `x.description`
+/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
+/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
 /// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///

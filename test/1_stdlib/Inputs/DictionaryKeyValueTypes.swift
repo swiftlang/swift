@@ -62,7 +62,7 @@ var _keySerial = _stdlib_AtomicInt(0)
 
 // A wrapper class that can help us track allocations and find issues with
 // object lifetime.
-class TestKeyTy : Equatable, Hashable, Printable {
+class TestKeyTy : Equatable, Hashable, CustomStringConvertible {
   class var objectCount: Int {
     get {
       return _keyCount.load()
@@ -111,7 +111,7 @@ func == (lhs: TestKeyTy, rhs: TestKeyTy) -> Bool {
 var _valueCount = _stdlib_AtomicInt(0)
 var _valueSerial = _stdlib_AtomicInt(0)
 
-class TestValueTy : Printable {
+class TestValueTy : CustomStringConvertible {
   class var objectCount: Int {
     get {
       return _valueCount.load()
@@ -145,7 +145,7 @@ class TestValueTy : Printable {
 var _equatableValueCount = _stdlib_AtomicInt(0)
 var _equatableValueSerial = _stdlib_AtomicInt(0)
 
-class TestEquatableValueTy : Equatable, Printable {
+class TestEquatableValueTy : Equatable, CustomStringConvertible {
   class var objectCount: Int {
     get {
       return _equatableValueCount.load()
@@ -329,7 +329,7 @@ var _bridgedKeySerial = _stdlib_AtomicInt(0)
 var _bridgedKeyBridgeOperations = _stdlib_AtomicInt(0)
 
 struct TestBridgedKeyTy
-  : Equatable, Hashable, Printable, _ObjectiveCBridgeable {
+  : Equatable, Hashable, CustomStringConvertible, _ObjectiveCBridgeable {
   static var bridgeOperations: Int {
     get {
       return _bridgedKeyBridgeOperations.load()
@@ -399,7 +399,7 @@ func == (lhs: TestBridgedKeyTy, rhs: TestKeyTy) -> Bool {
 var _bridgedValueSerial = _stdlib_AtomicInt(0)
 var _bridgedValueBridgeOperations = _stdlib_AtomicInt(0)
 
-struct TestBridgedValueTy : Printable, _ObjectiveCBridgeable {
+struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
   static var bridgeOperations: Int {
     get {
       return _bridgedValueBridgeOperations.load()
@@ -456,7 +456,7 @@ var _bridgedEquatableValueSerial = _stdlib_AtomicInt(0)
 var _bridgedEquatableValueBridgeOperations = _stdlib_AtomicInt(0)
 
 struct TestBridgedEquatableValueTy
-  : Equatable, Printable, _ObjectiveCBridgeable {
+  : Equatable, CustomStringConvertible, _ObjectiveCBridgeable {
 
   static var bridgeOperations: Int {
     get {
@@ -743,7 +743,7 @@ func slurpFastEnumerationFromObjC<
   }
 }
 
-struct ExpectedArrayElement : Comparable, Printable {
+struct ExpectedArrayElement : Comparable, CustomStringConvertible {
   var value: Int
   var valueIdentity: UWord
 
@@ -878,7 +878,7 @@ func checkArrayEnumeratorPartialFastEnumerationFromSwift(
     convertValue)
 }
 
-struct ExpectedSetElement : Comparable, Printable {
+struct ExpectedSetElement : Comparable, CustomStringConvertible {
   var value: Int
   var valueIdentity: UWord
 
@@ -1094,7 +1094,7 @@ func slurpFastEnumerationFromObjC<
   }
 }
 
-struct ExpectedDictionaryElement : Comparable, Printable {
+struct ExpectedDictionaryElement : Comparable, CustomStringConvertible {
   var key: Int
   var value: Int
   var keyIdentity: UWord

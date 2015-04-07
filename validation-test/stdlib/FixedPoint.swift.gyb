@@ -370,14 +370,14 @@ BoolTestSuite.test("BooleanType") {
   }
 }
 
-BoolTestSuite.test("Printable") {
+BoolTestSuite.test("CustomStringConvertible") {
   if true {
     let v: Bool = false
-    expectEqual("false", toString(v))
+    expectEqual("false", String(v))
   }
   if true {
     let v: Bool = true
-    expectEqual("true", toString(v))
+    expectEqual("true", String(v))
   }
 }
 

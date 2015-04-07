@@ -54,7 +54,7 @@ public typealias UIntMax = ${UIntMax}
 public protocol _IntegerType
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
-    Printable,
+    CustomStringConvertible,
     Hashable,
     IntegerArithmeticType,
     BitwiseOperationsType,
@@ -327,7 +327,7 @@ extension ${Self} : Hashable {
   }
 }
 
-extension ${Self} : Printable {
+extension ${Self} : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
 % if signed:

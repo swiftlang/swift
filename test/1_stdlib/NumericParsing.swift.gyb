@@ -125,7 +125,7 @@ tests.test("${Self}/Basics") {
 % if Self != 'Float80': # Inf/NaN are not defined for Float80
   expectEqual(.infinity, ${Self}("Inf"))
   expectEqual(-(.infinity), ${Self}("-Inf"))
-  expectEqual(toString(${Self}.NaN), toString(${Self}("NaN")!))
+  expectEqual(String(${Self}.NaN), String(${Self}("NaN")!))
 % end
   
   expectEqual(-0.0, ${Self}("-0"))
@@ -137,12 +137,12 @@ tests.test("${Self}/Basics") {
   // Check that we can round-trip the string representation of 2^100,
   // which requires an exponent to express...
   let large = reduce(Repeat(count: 10, repeatedValue: 1024 as ${Self}), 1, *)
-  let largeText = toString(large)
-  expectEqual(largeText, toString(${Self}(largeText)!))
+  let largeText = String(large)
+  expectEqual(largeText, String(${Self}(largeText)!))
   
   // ...ditto for its inverse.
-  let smallText = toString(1 / large)
-  expectEqual(smallText, toString(${Self}(smallText)!))
+  let smallText = String(1 / large)
+  expectEqual(smallText, String(${Self}(smallText)!))
   
   // Cases that should fail to parse
   expectEmpty(${Self}(""))       // EMPTY

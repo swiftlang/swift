@@ -76,12 +76,12 @@ public enum ImplicitlyUnwrappedOptional<T>
   }
 }
 
-extension ImplicitlyUnwrappedOptional : Printable {
+extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
     switch self {
     case .Some(let value):
-      return toString(value)
+      return String(value)
     case .None:
       return "nil"
     }

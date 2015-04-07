@@ -279,7 +279,7 @@ public func expectType<T>(_: T.Type, inout x: T) {}
 public func isSequenceType<X : SequenceType>(x: X) -> X { return x }
 public func expectIsBooleanType<X : BooleanType>(inout x: X) -> X { return x }
 
-public struct AssertionResult : Printable, BooleanType {
+public struct AssertionResult : CustomStringConvertible, BooleanType {
   init(isPass: Bool) {
     self._isPass = isPass
   }
@@ -944,7 +944,7 @@ func _stdlib_getSystemVersionPlistProperty(propertyName: String) -> String? {
 }
 #endif
 
-public enum OSVersion : Printable {
+public enum OSVersion : CustomStringConvertible {
   case OSX(major: Int, minor: Int, bugFix: Int)
   case iOS(major: Int, minor: Int, bugFix: Int)
   case iOSSimulator
@@ -1016,7 +1016,7 @@ func _getRunningOSVersion() -> OSVersion {
   return _overrideOSVersion ?? _runningOSVersion
 }
 
-public enum TestRunPredicate : Printable {
+public enum TestRunPredicate : CustomStringConvertible {
   case Custom(() -> Bool, reason: String)
 
   case OSXAny(/*reason:*/ String)
@@ -1292,7 +1292,7 @@ public enum ExpectedComparisonResult {
   }
 }
 
-extension ExpectedComparisonResult : Printable {
+extension ExpectedComparisonResult : CustomStringConvertible {
   public var description: String {
     switch self {
     case .LT:
@@ -1722,7 +1722,7 @@ public func expectPrinted<T>(
   #expectedOneOf: _UnitTestArray<String>, object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  let actual = toString(object)
+  let actual = String(object)
   if !contains(expectedOneOf, actual) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
@@ -1743,7 +1743,7 @@ public func expectDebugPrinted<T>(
   #expectedOneOf: _UnitTestArray<String>, object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  let actual = toDebugString(object)
+  let actual = String(reflecting: object)
   if !contains(expectedOneOf, actual) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")

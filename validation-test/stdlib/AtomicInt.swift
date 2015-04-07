@@ -132,10 +132,10 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2, 10, 20,  0, 40),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink.put(.PassInteresting(toString(observation)))
+        sink.put(.PassInteresting(String(observation)))
 
       default:
-        sink.put(.FailureInteresting(toString(observation)))
+        sink.put(.FailureInteresting(String(observation)))
       }
     }
   }
@@ -202,10 +202,10 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink.put(.PassInteresting(toString(observation)))
+        sink.put(.PassInteresting(String(observation)))
 
       default:
-        sink.put(.FailureInteresting(toString(observation)))
+        sink.put(.FailureInteresting(String(observation)))
       }
     }
   }
@@ -288,10 +288,10 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink.put(.PassInteresting(toString(observation)))
+        sink.put(.PassInteresting(String(observation)))
 
       default:
-        sink.put(.FailureInteresting(toString(observation)))
+        sink.put(.FailureInteresting(String(observation)))
       }
     }
   }
@@ -414,10 +414,10 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
            Observation(2, 10, 20,  0,  0, 100, 200, 999, 999),
            Observation(2, 10, 20, 30,  0, 100, 200, 300, 999),
            Observation(2, 10, 20, 30, 40, 100, 200, 300, 400):
-        sink.put(.PassInteresting(toString(observation)))
+        sink.put(.PassInteresting(String(observation)))
 
       default:
-        sink.put(.FailureInteresting(toString(observation)))
+        sink.put(.FailureInteresting(String(observation)))
       }
     }
   }
@@ -514,7 +514,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
         // Lost race, value destroyed.
         ++lostRace
       default:
-        sink.put(.FailureInteresting(toString(observation)))
+        sink.put(.FailureInteresting(String(observation)))
       }
     }
     if wonRace != 1 {

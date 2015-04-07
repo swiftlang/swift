@@ -34,8 +34,8 @@ public struct StaticString
     UnicodeScalarLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
     StringLiteralConvertible,
-    Printable,
-    DebugPrintable,
+    CustomStringConvertible,
+    CustomDebugStringConvertible,
     Reflectable {
 
   /// Either a pointer to the start of UTF-8 data, or an integer representation

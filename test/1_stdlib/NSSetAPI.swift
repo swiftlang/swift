@@ -32,8 +32,8 @@ NSSetAPI.test("ArrayLiteralConvertible") {
   expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
 }
 
-NSSetAPI.test("Printable") {
-  let result = toString(NSSet(objects:"a", "b", "c", "42"))
+NSSetAPI.test("CustomStringConvertible") {
+  let result = String(NSSet(objects:"a", "b", "c", "42"))
   let expect = "{(\n    b,\n    42,\n    c,\n    a\n)}"
   expectEqual(expect, result)
 }
@@ -55,8 +55,8 @@ NSOrderedSetAPI.test("ArrayLiteralConvertible") {
   expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
 }
 
-NSOrderedSetAPI.test("Printable") {
-  let result = toString(NSOrderedSet(objects:"a", "b", "c", "42"))
+NSOrderedSetAPI.test("CustomStringConvertible") {
+  let result = String(NSOrderedSet(objects:"a", "b", "c", "42"))
   let expect = "{(\n    a,\n    b,\n    c,\n    42\n)}"
   expectEqual(expect, result)
 }

@@ -136,7 +136,7 @@ FoundationTestSuite.test("NSDictionary") {
 
 FoundationTestSuite.test("NSRange") {
   let nsRange = NSRange(1..<5)
-  expectEqual("{1, 4}", toString(NSStringFromRange(nsRange)))
+  expectEqual("{1, 4}", String(NSStringFromRange(nsRange)))
 }
 
 //===----------------------------------------------------------------------===//
@@ -190,7 +190,7 @@ FoundationTestSuite.test("rdar://17584531") {
   // Type checker used to be confused by this.
   var dict: NSDictionary = [ "status": 200, "people": [ [ "id": 255, "name": [ "first": "John", "last": "Appleseed" ] ] ] ]
   var dict2 = dict["people"]?[0] as! NSDictionary
-  expectEqual("Optional(255)", toString(dict2["id"]))
+  expectEqual("Optional(255)", String(dict2["id"]))
 }
 
 func staticAssertType<T>(_: T.Type, inout value: T) {}

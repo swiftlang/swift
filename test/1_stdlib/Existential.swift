@@ -6,7 +6,7 @@ func pipe<T>(input: SequenceOf<T>, output: SinkOf<T>) {
   }
 }
 
-struct Print<T : Printable> : SinkType {
+struct Print<T : CustomStringConvertible> : SinkType {
   func put(x: T) {
     print(x)
     print("/")
@@ -15,7 +15,7 @@ struct Print<T : Printable> : SinkType {
 
 var z = [ 1, 2, 3 ]
 
-func printArray<T : Printable>(x: [T]) {
+func printArray<T : CustomStringConvertible>(x: [T]) {
   pipe(SequenceOf(x), SinkOf(Print<T>()))
   println()
 }

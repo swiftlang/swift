@@ -66,7 +66,7 @@ extension AnyGenerator : SequenceType {
 /// Example::
 ///
 ///   func countStrings() -> AnyGenerator<String> {
-///     let lazyStrings = lazy(0..<10).map { toString($0) }
+///     let lazyStrings = lazy(0..<10).map { String($0) }
 ///
 ///     // This is a really complicated type of no interest to our
 ///     // clients.

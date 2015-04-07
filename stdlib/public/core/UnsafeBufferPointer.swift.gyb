@@ -94,7 +94,7 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
   var _position, _end: Unsafe${Mutable}Pointer<T>
 }
 
-extension Unsafe${Mutable}BufferPointer : DebugPrintable {
+extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"

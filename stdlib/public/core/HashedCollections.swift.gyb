@@ -714,7 +714,7 @@ public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
   }
 }
 
-extension Set: Printable, DebugPrintable {
+extension Set: CustomStringConvertible, CustomDebugStringConvertible {
   private func makeDescription(#isDebug: Bool) -> String {
     var result = isDebug ? "Set([" : "["
     var first = true
@@ -1240,7 +1240,7 @@ public func != <Key : Equatable, Value : Equatable>(
   return !(lhs == rhs)
 }
 
-extension Dictionary : Printable, DebugPrintable {
+extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
   internal func _makeDescription(#isDebug: Bool) -> String {
     if count == 0 {
       return "[:]"
@@ -1596,7 +1596,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> {
 
 public // @testable
 struct _Native${Self}Storage<${TypeParametersDecl}> :
-  _HashStorageType, Printable {
+  _HashStorageType, CustomStringConvertible {
   internal typealias Owner = _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias StorageImpl = _Native${Self}StorageImpl<${TypeParameters}>
   internal typealias Element = _${Self}Element<${TypeParameters}>

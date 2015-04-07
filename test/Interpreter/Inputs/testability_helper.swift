@@ -1,6 +1,6 @@
 // Things in this file are deliberately internal. The test harness uses @testable import.
 
-internal class Base : Printable {
+internal class Base : CustomStringConvertible {
   let id: Int
 
   init(_ id: Int) {

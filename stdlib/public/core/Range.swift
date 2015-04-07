@@ -81,7 +81,8 @@ public struct RangeGenerator<
 ///   println(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
 public struct Range<
   T : ForwardIndexType
-> : Equatable, CollectionType, Printable, DebugPrintable {
+> : Equatable, CollectionType,
+    CustomStringConvertible, CustomDebugStringConvertible {
 
   /// Construct a copy of `x`
   public init(_ x: Range) {
@@ -179,7 +180,7 @@ public struct Range<
   
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "Range(\(toDebugString(startIndex))..<\(toDebugString(endIndex)))"
+    return "Range(\(String(reflecting: startIndex))..<\(String(reflecting: endIndex)))"
   }
   
   

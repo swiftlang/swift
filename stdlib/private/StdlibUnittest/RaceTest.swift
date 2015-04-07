@@ -101,7 +101,7 @@ public protocol RaceTestWithPerTrialDataType {
 ///
 /// Case payloads can carry test-specific data.  Results will be grouped
 /// according to it.
-public enum RaceTestObservationEvaluation : Equatable, Printable {
+public enum RaceTestObservationEvaluation : Equatable, CustomStringConvertible {
   /// Normal 'pass'.
   case Pass
 
@@ -146,7 +146,7 @@ public func == (
 }
 
 /// An observation result that consists of one `UWord`.
-public struct Observation1UWord : Equatable, Printable {
+public struct Observation1UWord : Equatable, CustomStringConvertible {
   public var uw1: UWord
 
   public init(_ uw1: UWord) {
@@ -163,7 +163,7 @@ public func == (lhs: Observation1UWord, rhs: Observation1UWord) -> Bool {
 }
 
 /// An observation result that consists of four `UWord`\ s.
-public struct Observation4UWord : Equatable, Printable {
+public struct Observation4UWord : Equatable, CustomStringConvertible {
   public var uw1: UWord
   public var uw2: UWord
   public var uw3: UWord
@@ -190,7 +190,7 @@ public func == (lhs: Observation4UWord, rhs: Observation4UWord) -> Bool {
 }
 
 /// An observation result that consists of three `Word`\ s.
-public struct Observation3Word : Equatable, Printable {
+public struct Observation3Word : Equatable, CustomStringConvertible {
   public var w1: Word
   public var w2: Word
   public var w3: Word
@@ -214,7 +214,7 @@ public func == (lhs: Observation3Word, rhs: Observation3Word) -> Bool {
 }
 
 /// An observation result that consists of four `Word`\ s.
-public struct Observation4Word : Equatable, Printable {
+public struct Observation4Word : Equatable, CustomStringConvertible {
   public var w1: Word
   public var w2: Word
   public var w3: Word
@@ -241,7 +241,7 @@ public func == (lhs: Observation4Word, rhs: Observation4Word) -> Bool {
 }
 
 /// An observation result that consists of five `Word`\ s.
-public struct Observation5Word : Equatable, Printable {
+public struct Observation5Word : Equatable, CustomStringConvertible {
   public var w1: Word
   public var w2: Word
   public var w3: Word
@@ -271,7 +271,7 @@ public func == (lhs: Observation5Word, rhs: Observation5Word) -> Bool {
 }
 
 /// An observation result that consists of nine `Word`\ s.
-public struct Observation9Word : Equatable, Printable {
+public struct Observation9Word : Equatable, CustomStringConvertible {
   public var w1: Word
   public var w2: Word
   public var w3: Word
@@ -329,7 +329,7 @@ public func evaluateObservationsAllEqual<T : Equatable>(observations: _UnitTestA
   return .Pass
 }
 
-struct _RaceTestAggregatedEvaluations : Printable {
+struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
   var passCount: Int = 0
   var passInterestingCount = [String: Int]()
   var failureCount: Int = 0

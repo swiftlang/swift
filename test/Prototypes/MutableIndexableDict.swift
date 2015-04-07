@@ -483,7 +483,7 @@ println("deleting that key makes them equal again: \(d1 == d0)")
 
 // ---------
 
-class X : Printable {
+class X : CustomStringConvertible {
    var constructed : Bool
    var id = 0
 

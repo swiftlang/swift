@@ -14,29 +14,29 @@ import Swift
 // CHECK: return
 sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@thin (@in Int, @inout _Stdout) -> () {
 bb0(%0 : $*Int, %1 : $*_Stdout):
-  %2 = alloc_stack $Printable
-  %3 = alloc_stack $Optional<Printable>
-  %4 = init_enum_data_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  %2 = alloc_stack $CustomStringConvertible
+  %3 = alloc_stack $Optional<CustomStringConvertible>
+  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $Int
   %6 = load %0 : $*Int
   store %6 to %5#1 : $*Int
-  unconditional_checked_cast_addr take_always Int in %5#1 : $*Int to Printable in %4 : $*Printable
-  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  unconditional_checked_cast_addr take_always Int in %5#1 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   dealloc_stack %5#0 : $*@local_storage Int
   %11 = integer_literal $Builtin.Int1, -1
   %12 = integer_literal $Builtin.Int1, 0
-  %13 = select_enum_addr %3#1 : $*Optional<Printable>, case #Optional.Some!enumelt.1: %11, case #Optional.None!enumelt: %12 : $Builtin.Int1
+  %13 = select_enum_addr %3#1 : $*Optional<CustomStringConvertible>, case #Optional.Some!enumelt.1: %11, case #Optional.None!enumelt: %12 : $Builtin.Int1
   cond_br %13, bb2, bb1
 
 bb1:
   %15 = tuple ()
-  dealloc_stack %3#0 : $*@local_storage Optional<Printable>
-  dealloc_stack %2#0 : $*@local_storage Printable
+  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
+  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
   return %15 : $()
 
 bb2:
-  %19 = unchecked_take_enum_data_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
-  copy_addr [take] %19 to [initialization] %2#1 : $*Printable
+  %19 = unchecked_take_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  copy_addr [take] %19 to [initialization] %2#1 : $*CustomStringConvertible
   br bb1
 }
 
@@ -47,34 +47,34 @@ bb2:
 // CHECK: store
 // CHECK-NOT: checked_cast_addr_br
 // CHECK-NOT: bb1
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<Printable>, #Optional.Some!enumelt.1
+// CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
 // CHECK: dealloc_stack
 // CHECK: return
 sil @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@thin (@in Int, @inout _Stdout) -> () {
 bb0(%0 : $*Int, %1 : $*_Stdout):
-  %2 = alloc_stack $Printable
-  %3 = alloc_stack $Optional<Printable>
-  %4 = init_enum_data_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  %2 = alloc_stack $CustomStringConvertible
+  %3 = alloc_stack $Optional<CustomStringConvertible>
+  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $Int
   %6 = load %0 : $*Int
   store %6 to %5#1 : $*Int
-  checked_cast_addr_br take_always Int in %5#1 : $*Int to Printable in %4 : $*Printable, bb1, bb22
+  checked_cast_addr_br take_always Int in %5#1 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
 
 bb1:
-  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   br bb2
 
 bb2:
   dealloc_stack %5#0 : $*@local_storage Int
-  dealloc_stack %3#0 : $*@local_storage Optional<Printable>
+  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
   %26 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage Printable
+  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
   return %26 : $()
 
 bb22:
-  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.None!enumelt
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
   br bb2
 }
 
@@ -101,36 +101,36 @@ private class D : C {
 //
 // CHECK-LABEL: sil @convert_checked_cast_addr_br_with_internal_type : $@thin (@in A, @inout _Stdout) -> ()
 // CHECK: checked_cast_addr_br
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<Printable>, #Optional.Some!enumelt.1
+// CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
 // CHECK: dealloc_stack
 // CHECK: return
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<Printable>, #Optional.None!enumelt
+// CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
 // CHECK: }
 sil @convert_checked_cast_addr_br_with_internal_type : $@thin (@in A, @inout _Stdout) -> () {
 bb0(%0 : $*A, %1 : $*_Stdout):
-  %2 = alloc_stack $Printable
-  %3 = alloc_stack $Optional<Printable>
-  %4 = init_enum_data_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  %2 = alloc_stack $CustomStringConvertible
+  %3 = alloc_stack $Optional<CustomStringConvertible>
+  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $A
   %6 = load %0 : $*A
   store %6 to %5#1 : $*A
-  checked_cast_addr_br take_always A in %5#1 : $*A to Printable in %4 : $*Printable, bb1, bb22
+  checked_cast_addr_br take_always A in %5#1 : $*A to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
 
 bb1:
-  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   br bb2
 
 bb2:
   dealloc_stack %5#0 : $*@local_storage A
-  dealloc_stack %3#0 : $*@local_storage Optional<Printable>
+  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
   %26 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage Printable
+  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
   return %26 : $()
 
 bb22:
-  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.None!enumelt
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
   br bb2
 }
 
@@ -143,34 +143,34 @@ bb22:
 // CHECK: store
 // CHECK-NOT: checked_cast_addr_br
 // CHECK-NOT: bb1
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<Printable>, #Optional.None!enumelt
+// CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
 // CHECK: dealloc_stack
 // CHECK: return
 sil @convert_checked_cast_addr_br_with_private_type : $@thin (@in B, @inout _Stdout) -> () {
 bb0(%0 : $*B, %1 : $*_Stdout):
-  %2 = alloc_stack $Printable
-  %3 = alloc_stack $Optional<Printable>
-  %4 = init_enum_data_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  %2 = alloc_stack $CustomStringConvertible
+  %3 = alloc_stack $Optional<CustomStringConvertible>
+  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $B
   %6 = load %0 : $*B
   store %6 to %5#1 : $*B
-  checked_cast_addr_br take_always B in %5#1 : $*B to Printable in %4 : $*Printable, bb1, bb22
+  checked_cast_addr_br take_always B in %5#1 : $*B to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
 
 bb1:
-  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   br bb2
 
 bb2:
   dealloc_stack %5#0 : $*@local_storage B
-  dealloc_stack %3#0 : $*@local_storage Optional<Printable>
+  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
   %26 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage Printable
+  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
   return %26 : $()
 
 bb22:
-  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.None!enumelt
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
   br bb2
 }
 
@@ -181,35 +181,35 @@ bb22:
 //
 // CHECK-LABEL: sil @convert_checked_cast_addr_br_with_non_private_superclass : $@thin (@in D, @inout _Stdout) -> ()
 // CHECK: checked_cast_addr_br
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<Printable>, #Optional.Some!enumelt.1
+// CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
 // CHECK: dealloc_stack
 // CHECK: return
-// CHECK: inject_enum_addr %{{.*}} : $*Optional<Printable>, #Optional.None!enumelt
+// CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
 // CHECK: }
 sil @convert_checked_cast_addr_br_with_non_private_superclass : $@thin (@in D, @inout _Stdout) -> () {
 bb0(%0 : $*D, %1 : $*_Stdout):
-  %2 = alloc_stack $Printable
-  %3 = alloc_stack $Optional<Printable>
-  %4 = init_enum_data_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  %2 = alloc_stack $CustomStringConvertible
+  %3 = alloc_stack $Optional<CustomStringConvertible>
+  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   %5 = alloc_stack $D
   %6 = load %0 : $*D
   store %6 to %5#1 : $*D
-  checked_cast_addr_br take_always D in %5#1 : $*D to Printable in %4 : $*Printable, bb1, bb22
+  checked_cast_addr_br take_always D in %5#1 : $*D to CustomStringConvertible in %4 : $*CustomStringConvertible, bb1, bb22
 
 bb1:
-  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.Some!enumelt.1
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
   br bb2
 
 bb2:
   dealloc_stack %5#0 : $*@local_storage D
-  dealloc_stack %3#0 : $*@local_storage Optional<Printable>
+  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
   %26 = tuple ()
-  dealloc_stack %2#0 : $*@local_storage Printable
+  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
   return %26 : $()
 
 bb22:
-  inject_enum_addr %3#1 : $*Optional<Printable>, #Optional.None!enumelt
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
   br bb2
 }

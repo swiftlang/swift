@@ -12,7 +12,7 @@
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-public final class LifetimeTracked : ForwardIndexType, Printable {
+public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
   public init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber

@@ -45,7 +45,7 @@ SuppDataBytesOffset = 12817
 import SwiftShims
 
 public // @testable
-enum _GraphemeClusterBreakPropertyValue : Int, Printable {
+enum _GraphemeClusterBreakPropertyValue : Int, CustomStringConvertible {
   case Other = 0
   case CR = 1
   case LF = 2

@@ -278,7 +278,7 @@ public struct Character :
   internal var _representation: Representation
 }
 
-extension Character : DebugPrintable {
+extension Character : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return String(self).debugDescription

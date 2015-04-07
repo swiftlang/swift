@@ -366,7 +366,7 @@ Runtime.test("isBridgedVerbatimToObjectiveC") {
 // The protocol should be defined in the standard library, otherwise the cast
 // does not work.
 typealias P1 = BooleanType
-typealias P2 = Printable
+typealias P2 = CustomStringConvertible
 protocol Q1 {}
 
 // A small struct that can be stored inline in an opaque buffer.
@@ -388,7 +388,7 @@ struct Struct2ConformsToP1<T : BooleanType> : BooleanType, Q1 {
 }
 
 // A large struct that can not be stored inline in an opaque buffer.
-struct Struct3ConformsToP2 : Printable, Q1 {
+struct Struct3ConformsToP2 : CustomStringConvertible, Q1 {
   var a: UInt64 = 10
   var b: UInt64 = 20
   var c: UInt64 = 30
@@ -407,7 +407,7 @@ struct Struct3ConformsToP2 : Printable, Q1 {
 }
 
 // A large struct that can not be stored inline in an opaque buffer.
-struct Struct4ConformsToP2<T : Printable> : Printable, Q1 {
+struct Struct4ConformsToP2<T : CustomStringConvertible> : CustomStringConvertible, Q1 {
   var value: T
   var e: UInt64 = 50
   var f: UInt64 = 60

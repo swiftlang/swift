@@ -127,7 +127,7 @@ public struct OptionSet<
   }
 }
 
-extension OptionSet : DebugPrintable {
+extension OptionSet : CustomDebugStringConvertible {
   public var debugDescription: String {
     return "OptionSet(rawValue: 0b\(String(rawValue, radix: 2)))"
   }

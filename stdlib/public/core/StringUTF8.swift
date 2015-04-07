@@ -83,8 +83,8 @@ extension _StringCore {
 
 extension String {
   /// A collection of UTF-8 code units that encodes a `String` value.
-  public struct UTF8View : CollectionType, Reflectable, Printable,
-    DebugPrintable {
+  public struct UTF8View : CollectionType, Reflectable, CustomStringConvertible,
+    CustomDebugStringConvertible {
     internal let _core: _StringCore
     internal let _startIndex: Index
     internal let _endIndex: Index

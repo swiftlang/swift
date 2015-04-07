@@ -9,7 +9,7 @@ import StdlibUnittest
 var FoundationPrinting = TestSuite("FoundationPrinting")
 
 FoundationPrinting.test("OverlayTypesHaveDescription") {
-  func hasDescription(_: Printable) {}
+  func hasDescription(_: CustomStringConvertible) {}
 
   var a: ObjCBool = true
   hasDescription(a)

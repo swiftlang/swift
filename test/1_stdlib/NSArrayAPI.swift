@@ -20,8 +20,8 @@ NSArrayAPI.test("mixed types with AnyObject") {
   }
 }
 
-NSArrayAPI.test("Printable") {
-  let result = toString(NSArray(objects:"A", "B", "C", "D"))
+NSArrayAPI.test("CustomStringConvertible") {
+  let result = String(NSArray(objects:"A", "B", "C", "D"))
   let expect = "(\n    A,\n    B,\n    C,\n    D\n)"
   expectEqual(expect, result)
 }
@@ -36,8 +36,8 @@ NSArrayAPI.test("copy construction") {
 
 var NSMutableArrayAPI = TestSuite("NSMutableArrayAPI")
 
-NSMutableArrayAPI.test("Printable") {
-  let result = toString(NSMutableArray(objects:"A", "B", "C", "D"))
+NSMutableArrayAPI.test("CustomStringConvertible") {
+  let result = String(NSMutableArray(objects:"A", "B", "C", "D"))
   let expect = "(\n    A,\n    B,\n    C,\n    D\n)"
   expectEqual(expect, result)
 }

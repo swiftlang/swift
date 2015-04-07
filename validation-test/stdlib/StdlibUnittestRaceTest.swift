@@ -53,11 +53,11 @@ struct RaceTest1 : RaceTestWithPerTrialDataType {
       case Observation(0x1):
         sink.put(.Pass)
       case Observation(0x2):
-        sink.put(.PassInteresting(toString(observation)))
+        sink.put(.PassInteresting(String(observation)))
       case Observation(0xffff):
         sink.put(.Failure)
       case Observation(0xfffe):
-        sink.put(.FailureInteresting(toString(observation)))
+        sink.put(.FailureInteresting(String(observation)))
       default:
         fatalError("should not happen")
       }

@@ -148,7 +148,7 @@ extension CGFloat : Reflectable {
   }
 }
 
-@transparent extension CGFloat : Printable {
+@transparent extension CGFloat : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
     return native.description

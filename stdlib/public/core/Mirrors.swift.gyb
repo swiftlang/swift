@@ -39,7 +39,7 @@ for self_ty in all_integer_types(word_bits):
 extension ${Type[0]} : Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
-    return _LeafMirror(self, toString, { .Some(${Type[1]}(${Type[2]})) })
+    return _LeafMirror(self, _toString, { .Some(${Type[1]}(${Type[2]})) })
   }
 }
 % end

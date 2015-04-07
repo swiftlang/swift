@@ -124,17 +124,17 @@ IntervalTestSuite.test("start/end") {
 }
 
 // Something to test with that distinguishes debugDescription from description
-struct X<T : Comparable> : Comparable, Printable, DebugPrintable {
+struct X<T : Comparable> : Comparable, CustomStringConvertible, CustomDebugStringConvertible {
   init(_ a: T) {
     self.a = a
   }
 
   var description: String {
-    return toString(a)
+    return String(a)
   }
 
   var debugDescription: String {
-    return "X(\(toDebugString(a)))"
+    return "X(\(String(reflecting: a)))"
   }
   
   var a: T
@@ -148,16 +148,16 @@ func == <T : Comparable>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 
-IntervalTestSuite.test("Printable/DebugPrintable") {
-  expectEqual("0.0..<0.1", toString(X(0.0)..<X(0.1)))
-  expectEqual("0.0...0.1", toString(X(0.0)...X(0.1)))
+IntervalTestSuite.test("CustomStringConvertible/CustomDebugStringConvertible") {
+  expectEqual("0.0..<0.1", String(X(0.0)..<X(0.1)))
+  expectEqual("0.0...0.1", String(X(0.0)...X(0.1)))
   
   expectEqual(
     "HalfOpenInterval(X(0.0)..<X(0.1))",
-    toDebugString(HalfOpenInterval(X(0.0)..<X(0.1))))
+    String(reflecting: HalfOpenInterval(X(0.0)..<X(0.1))))
   expectEqual(
     "ClosedInterval(X(0.0)...X(0.1))",
-    toDebugString(ClosedInterval(X(0.0)...X(0.1))))
+    String(reflecting: ClosedInterval(X(0.0)...X(0.1))))
 }
 
 IntervalTestSuite.test("rdar12016900") {

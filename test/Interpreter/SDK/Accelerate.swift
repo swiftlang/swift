@@ -5,7 +5,7 @@
 
 import Accelerate
 
-extension vU1024: IntegerLiteralConvertible, Printable, Equatable {
+extension vU1024: IntegerLiteralConvertible, CustomStringConvertible, Equatable {
   public init(var integerLiteral: Int) {
     self.init()
     memcpy(&self, &integerLiteral, sizeof(Int.self))

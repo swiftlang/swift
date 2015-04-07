@@ -18,7 +18,7 @@ if arg == "env" {
 }
 
 func stdlibTypesHaveDescription() {
-  func hasDescription(_: Printable) {}
+  func hasDescription(_: CustomStringConvertible) {}
 
   hasDescription(Int(42))
   hasDescription(UInt(42))
@@ -60,7 +60,7 @@ func printedIs<T>(
     object: T, expected1: String, expected2: String? = nil,
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  var actual = toString(object)
+  var actual = String(object)
   var match = expected1 == actual
   if !match && expected2 != nil {
     match = expected2! == actual
@@ -165,8 +165,8 @@ func test_StdlibTypesPrinted() {
     printedIs(optionalString, "Optional(\"meow\")")
   }
   if true {
-    struct Wrapper : Printable {
-      var x: Printable? = nil
+    struct Wrapper : CustomStringConvertible {
+      var x: CustomStringConvertible? = nil
 
       var description: String {
         return "Wrapper(" + x.debugDescription + ")"
@@ -487,7 +487,7 @@ test_PointerPrinting()
 
 protocol ProtocolUnrelatedToPrinting {}
 
-struct StructPrintable : Printable, ProtocolUnrelatedToPrinting {
+struct StructPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
   let x: Int
 
   init(_ x: Int) {
@@ -499,7 +499,7 @@ struct StructPrintable : Printable, ProtocolUnrelatedToPrinting {
   }
 }
 
-struct LargeStructPrintable : Printable, ProtocolUnrelatedToPrinting {
+struct LargeStructPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
   let a: Int
   let b: Int
   let c: Int
@@ -517,7 +517,7 @@ struct LargeStructPrintable : Printable, ProtocolUnrelatedToPrinting {
   }
 }
 
-struct StructDebugPrintable : DebugPrintable {
+struct StructDebugPrintable : CustomDebugStringConvertible {
   let x: Int
 
   init(_ x: Int) {
@@ -529,7 +529,7 @@ struct StructDebugPrintable : DebugPrintable {
   }
 }
 
-struct StructVeryPrintable : Printable, DebugPrintable, ProtocolUnrelatedToPrinting {
+struct StructVeryPrintable : CustomStringConvertible, CustomDebugStringConvertible, ProtocolUnrelatedToPrinting {
   let x: Int
 
   init(_ x: Int) {
@@ -553,7 +553,7 @@ struct WithoutDescription {
   }
 }
 
-class ClassPrintable : Printable, ProtocolUnrelatedToPrinting {
+class ClassPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
   let x: Int
 
   init(_ x: Int) {
@@ -565,7 +565,7 @@ class ClassPrintable : Printable, ProtocolUnrelatedToPrinting {
   }
 }
 
-class ClassVeryPrintable : Printable, DebugPrintable, ProtocolUnrelatedToPrinting {
+class ClassVeryPrintable : CustomStringConvertible, CustomDebugStringConvertible, ProtocolUnrelatedToPrinting {
   let x: Int
 
   init(_ x: Int) {
@@ -591,7 +591,7 @@ func test_ObjectPrinting() {
     printedIs(s, "►1◀︎")
   }
   if true {
-    let s: Printable = StructPrintable(1)
+    let s: CustomStringConvertible = StructPrintable(1)
     printedIs(s, "►1◀︎")
   }
   if true {
@@ -608,7 +608,7 @@ func test_ObjectPrinting() {
     printedIs(s, "<10 20 30 40>")
   }
   if true {
-    let s: Printable = LargeStructPrintable(10, 20, 30, 40)
+    let s: CustomStringConvertible = LargeStructPrintable(10, 20, 30, 40)
     printedIs(s, "<10 20 30 40>")
   }
   if true {
@@ -625,11 +625,11 @@ func test_ObjectPrinting() {
     printedIs(s, "<description: 1>")
   }
   if true {
-    let s: Printable = StructVeryPrintable(1)
+    let s: CustomStringConvertible = StructVeryPrintable(1)
     printedIs(s, "<description: 1>")
   }
   if true {
-    let s: DebugPrintable = StructVeryPrintable(1)
+    let s: CustomDebugStringConvertible = StructVeryPrintable(1)
     printedIs(s, "<description: 1>")
   }
   if true {
@@ -646,7 +646,7 @@ func test_ObjectPrinting() {
     printedIs(c, "►1◀︎")
   }
   if true {
-    let c: Printable = ClassPrintable(1)
+    let c: CustomStringConvertible = ClassPrintable(1)
     printedIs(c, "►1◀︎")
   }
   if true {
@@ -663,11 +663,11 @@ func test_ObjectPrinting() {
     printedIs(c, "<description: 1>")
   }
   if true {
-    let c: Printable = ClassVeryPrintable(1)
+    let c: CustomStringConvertible = ClassVeryPrintable(1)
     printedIs(c, "<description: 1>")
   }
   if true {
-    let c: DebugPrintable = ClassVeryPrintable(1)
+    let c: CustomDebugStringConvertible = ClassVeryPrintable(1)
     printedIs(c, "<description: 1>")
   }
   if true {
@@ -878,7 +878,7 @@ struct MyString : StringLiteralConvertible, StringInterpolationConvertible {
   }
 
   init<T>(stringInterpolationSegment expr: T) {
-    self.init(str: "<segment " + toString(expr) + ">")
+    self.init(str: "<segment " + String(expr) + ">")
   }
 }
 

@@ -12,7 +12,7 @@ func log(value: Any, line: Int = __LINE__) {
 
 log(Base(1)) // CHECK: {{^}}[[@LINE]]: instance 1{{$}}
 log(Base(2).description) // CHECK: {{^}}[[@LINE]]: instance 2{{$}}
-log((Base(3) as Printable).description) // CHECK: {{^}}[[@LINE]]: instance 3{{$}}
+log((Base(3) as CustomStringConvertible).description) // CHECK: {{^}}[[@LINE]]: instance 3{{$}}
 
 class Sub : Base {
   override var description: String {

@@ -42,36 +42,36 @@ protocol Bogus : Int {} // expected-error{{inheritance from non-protocol type 'I
 // Explicit conformance checks (successful).
 protocol Any { }
 
-protocol Printable { func print() } // expected-note{{protocol requires function 'print()' with type '() -> ()'}} expected-note{{protocol requires}} expected-note{{protocol requires}} expected-note{{protocol requires}}
+protocol CustomStringConvertible { func print() } // expected-note{{protocol requires function 'print()' with type '() -> ()'}} expected-note{{protocol requires}} expected-note{{protocol requires}} expected-note{{protocol requires}}
 
 struct TestFormat { }
-protocol FormattedPrintable : Printable {
+protocol FormattedPrintable : CustomStringConvertible {
   func print(#format: TestFormat)
 }
 
-struct X0 : Any, Printable {
+struct X0 : Any, CustomStringConvertible {
   func print() {}
 }
 
-class X1 : Any, Printable {
+class X1 : Any, CustomStringConvertible {
   func print() {}
 }
 
 enum X2 : Any { }
 
-extension X2 : Printable {
+extension X2 : CustomStringConvertible {
   func print() {}
 }
 
 // Explicit conformance checks (unsuccessful)
 
-struct NotPrintableS : Any, Printable {} // expected-error{{type 'NotPrintableS' does not conform to protocol 'Printable'}}
+struct NotPrintableS : Any, CustomStringConvertible {} // expected-error{{type 'NotPrintableS' does not conform to protocol 'CustomStringConvertible'}}
 
-class NotPrintableC : Printable, Any {} // expected-error{{type 'NotPrintableC' does not conform to protocol 'Printable'}}
+class NotPrintableC : CustomStringConvertible, Any {} // expected-error{{type 'NotPrintableC' does not conform to protocol 'CustomStringConvertible'}}
 
-enum NotPrintableO : Any, Printable {} // expected-error{{type 'NotPrintableO' does not conform to protocol 'Printable'}}
+enum NotPrintableO : Any, CustomStringConvertible {} // expected-error{{type 'NotPrintableO' does not conform to protocol 'CustomStringConvertible'}}
 
-struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'NotFormattedPrintable' does not conform to protocol 'Printable'}}
+struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'NotFormattedPrintable' does not conform to protocol 'CustomStringConvertible'}}
   func print(#format: TestFormat) {} // expected-note{{candidate has non-matching type '(format: TestFormat) -> ()'}}
 }
 

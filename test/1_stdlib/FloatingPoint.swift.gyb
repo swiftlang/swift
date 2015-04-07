@@ -9,7 +9,7 @@ import StdlibUnittest
 
 #if arch(i386) || arch(x86_64)
 
-struct Float80Bits : Equatable, Printable {
+struct Float80Bits : Equatable, CustomStringConvertible {
   var signAndExponent: UInt16
   var significand: UInt64
 

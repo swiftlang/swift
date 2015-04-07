@@ -48,7 +48,7 @@ extension String : StringInterpolationConvertible {
   /// Create an instance containing `expr`\ 's `print` representation
   public
   init<T>(stringInterpolationSegment expr: T) {
-    self = toString(expr)
+    self = String(expr)
   }
 
 % for Type in StreamableTypes:
