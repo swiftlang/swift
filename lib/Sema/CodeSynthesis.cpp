@@ -1799,9 +1799,10 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   NominalTypeDecl *container = containerTy->getAnyNominal();
   assert(container && "extension of non-nominal type?");
 
-  //   - in non-ObjC protocols
+  //   - in non-ObjC protocols, but not protocol extensions.
   if (auto protocol = dyn_cast<ProtocolDecl>(container)) {
     if (protocol->isObjC()) return;
+    if (storage->getDeclContext()->isProtocolExtensionContext()) return;
 
   //   - in classes when the storage decl is not final and does
   //     not override a decl that requires a materializeForSet
