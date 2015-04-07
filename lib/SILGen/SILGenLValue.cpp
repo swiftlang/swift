@@ -145,6 +145,11 @@ static LValueTypeData getStorageTypeData(SILGenFunction &gen,
 class LLVM_LIBRARY_VISIBILITY SILGenLValue
   : public Lowering::ExprVisitor<SILGenLValue, LValue, AccessKind>
 {
+  /// A mapping from opaque value expressions to the open-existential
+  /// expression that determines them.
+  llvm::SmallDenseMap<OpaqueValueExpr *, OpenExistentialExpr *>
+    openedExistentials;
+
 public:
   SILGenFunction &gen;
   SILGenLValue(SILGenFunction &gen) : gen(gen) {}
@@ -167,7 +172,9 @@ public:
   LValue visitTupleElementExpr(TupleElementExpr *e, AccessKind accessKind);
   LValue visitForceValueExpr(ForceValueExpr *e, AccessKind accessKind);
   LValue visitBindOptionalExpr(BindOptionalExpr *e, AccessKind accessKind);
-  
+  LValue visitOpenExistentialExpr(OpenExistentialExpr *e,
+                                  AccessKind accessKind);
+
   // Expressions that wrap lvalues
   
   LValue visitInOutExpr(InOutExpr *e, AccessKind accessKind);
@@ -469,6 +476,53 @@ namespace {
 
     void print(raw_ostream &OS) const override {
       OS << "ForceOptionalObjectComponent()\n";
+    }
+  };
+
+  /// A cleanup that deinitializes an opaque existential container
+  /// after its value is taken.
+  class TakeFromExistentialCleanup: public Cleanup {
+    SILValue existentialAddr;
+  public:
+    TakeFromExistentialCleanup(SILValue existentialAddr)
+    : existentialAddr(existentialAddr) {}
+
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      gen.B.createDeinitExistentialAddr(l, existentialAddr);
+    }
+  };
+
+  /// A physical path component which projects out an opened archetype
+  /// from an existential.
+  class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
+    static LValueTypeData getOpenedArchetypeTypeData(CanArchetypeType type) {
+      return {
+        AbstractionPattern::getOpaque(), type,
+        SILType::getPrimitiveObjectType(type)
+      };
+    }
+  public:
+    OpenOpaqueExistentialComponent(CanArchetypeType openedArchetype)
+      : PhysicalPathComponent(getOpenedArchetypeTypeData(openedArchetype),
+                              OpenedExistentialKind) {}
+
+    ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                        AccessKind accessKind) && override {
+      assert(base.getType().isExistentialType() &&
+             "base for open existential component must be an existential");
+      auto addr = gen.B.createOpenExistentialAddr(loc, base.getLValueAddress(),
+                                           getTypeOfRValue().getAddressType());
+
+      // Leave a cleanup to deinit the existential container.
+      gen.Cleanups.pushCleanup<TakeFromExistentialCleanup>(base.getValue());
+
+      gen.setArchetypeOpeningSite(cast<ArchetypeType>(getSubstFormalType()),
+                                  addr);
+      return ManagedValue::forLValue(addr);
+    }
+
+    void print(raw_ostream &OS) const override {
+      OS << "OpenOpaqueExistentialComponent(" << getSubstFormalType() << ")\n";
     }
   };
 
@@ -1509,6 +1563,27 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e, AccessKind accessKind) {
 
 LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
                                           AccessKind accessKind) {
+  // Handle an opaque lvalue that refers to an opened existential.
+  auto known = openedExistentials.find(e);
+  if (known != openedExistentials.end()) {
+    // Dig the open-existential expression out of the list.
+    OpenExistentialExpr *opened = known->second;
+    openedExistentials.erase(known);
+
+    // Do formal evaluation of the underlying existential lvalue.
+    LValue existentialLV = visitRec(opened->getExistentialValue(), accessKind);
+
+    ManagedValue existentialAddr
+      = gen.emitAddressOfLValue(e, std::move(existentialLV), accessKind);
+
+    // Open up the existential.
+    LValue lv;
+    lv.add<ValueComponent>(existentialAddr, existentialLV.getTypeData());
+    lv.add<OpenOpaqueExistentialComponent>(
+      cast<ArchetypeType>(opened->getOpenedArchetype()->getCanonicalType()));
+    return std::move(lv);
+  }
+
   assert(gen.OpaqueValues.count(e) && "Didn't bind OpaqueValueExpr");
 
   auto &entry = gen.OpaqueValues[e];
@@ -1680,6 +1755,23 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
 
   lv.add<TupleElementComponent>(index, typeData);
   return lv;
+}
+
+LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
+                                              AccessKind accessKind) {
+  // Record the fact that we're opening this existential. The actual
+  // opening operation will occur when we see the OpaqueValueExpr.
+  bool inserted = openedExistentials.insert({e->getOpaqueValue(), e}).second;
+  (void)inserted;
+  assert(inserted && "already have this opened existential?");
+
+  // Visit the subexpression.
+  LValue lv = visitRec(e->getSubExpr(), accessKind);
+
+  // Sanity check that we did see the OpaqueValueExpr.
+  assert(openedExistentials.count(e->getOpaqueValue()) == 0 &&
+         "opened existential not removed?");
+  return std::move(lv);
 }
 
 static LValueTypeData

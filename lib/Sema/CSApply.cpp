@@ -530,15 +530,13 @@ namespace {
     /// \param member The member that is being referenced on the existential
     /// type.
     ///
-    /// \param refType The type of the member reference.
-    ///
     /// \returns A pair (expr, type) that provides a reference to the value
     /// stored within the expression or its metatype (if the base was a
     /// metatype) and the archetype that describes the dynamic type stored
     /// within the existential.
     std::tuple<Expr *, ArchetypeType *>
     openExistentialReference(Expr *base, ArchetypeType *archetype,
-                             ValueDecl *member, Type refType) {
+                             ValueDecl *member) {
       auto &tc = cs.getTypeChecker();
 
       // Dig out the base type.
@@ -591,8 +589,7 @@ namespace {
         // stored (if it's an lvalue).
         assert(isa<AbstractStorageDecl>(member) &&
                "unknown member when opening existential");
-        depth = refType->castTo<AnyFunctionType>()->getResult()
-                  ->is<LValueType>() ? 2 : 1;
+        depth = 1;
       }
 
       // Create the opaque opened value. If we started with a
@@ -642,6 +639,8 @@ namespace {
 
       // FIXME: Look through certain implicit conversions as well?
       keyExpr = keyExpr->getValueProvidingExpr();
+      if (auto inout = dyn_cast<InOutExpr>(keyExpr))
+        keyExpr = inout->getSubExpr()->getValueProvidingExpr();
       auto known = OpenedExistentials.find(keyExpr);
       if (known == OpenedExistentials.end())
         return false;
@@ -796,8 +795,7 @@ namespace {
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         std::tie(base, baseTy) = openExistentialReference(base,
                                                           knownOpened->second,
-                                                          member,
-                                                          refTy);
+                                                          member);
         containerTy = baseTy;
       }
       // If this is a method whose result type is dynamic Self, or a
@@ -810,8 +808,7 @@ namespace {
           if (func->getExtensionType()->is<ProtocolType>() &&
               baseTy->isAnyExistentialType()) {
             std::tie(base, baseTy) = openExistentialReference(base, nullptr,
-                                                              member,
-                                                              refTy);
+                                                              member);
             containerTy = baseTy;
             openedType = openedType->replaceCovariantResultType(
                            baseTy,
@@ -1252,8 +1249,7 @@ namespace {
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         std::tie(base, baseTy) = openExistentialReference(base,
                                                           knownOpened->second,
-                                                          subscript,
-                                                          subscriptTy);
+                                                          subscript);
         containerTy = baseTy;
       }
 
@@ -3418,22 +3414,9 @@ namespace {
                     kind);
       }
 
-      // Close out any existentials that are still open.
-      // FIXME: This happens when our close-placement heuristics failed, and
-      // we might be opening up the existential too early.
-      SmallVector<OpenedExistential, 4> remainingOpenedExistentials;
-      for (const auto &opened : OpenedExistentials) {
-        remainingOpenedExistentials.push_back(opened.second);
-      }
-      llvm::array_pod_sort(remainingOpenedExistentials.begin(),
-                           remainingOpenedExistentials.end());
-      for (auto &opened : remainingOpenedExistentials) {
-        result = new (tc.Context) OpenExistentialExpr(
-                                    opened.ExistentialValue,
-                                    opened.OpaqueValue,
-                                    result);
-      }
-      OpenedExistentials.clear();
+      assert((OpenedExistentials.empty() ||
+              !InvalidPartialApplications.empty()) &&
+             "Opened existentials haven't been closed?");
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {

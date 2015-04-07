@@ -670,6 +670,15 @@ struct ASTNodeBase {};
       verifyCheckedAlwaysBase(D);
     }
 
+    void verifyChecked(OpenExistentialExpr *E) {
+      Type resultType = E->getType();
+      Type existentialValueType = E->getExistentialValue()->getType();
+      checkSameLValueness(
+        resultType, existentialValueType,
+        "opened existential type and underlying existential value");
+      verifyCheckedBase(E);
+    }
+
     void verifyChecked(ThrowExpr *E) {
       checkSameType(E->getSubExpr()->getType(),
                     checkExceptionTypeExists("throw expression"),

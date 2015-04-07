@@ -3128,23 +3128,10 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
 
 RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E, 
                                                SGFContext C) {
-  Optional<WritebackScope> writebackScope;
-
   // Emit the existential value.
-  ManagedValue existentialValue;
-  if (E->getExistentialValue()->getType()->is<LValueType>()) {
-    // Create a writeback scope for the access to the existential lvalue.
-    writebackScope.emplace(SGF);
+  ManagedValue existentialValue
+    = SGF.emitRValueAsSingleValue(E->getExistentialValue());
 
-    existentialValue = SGF.emitAddressOfLValue(
-                         E->getExistentialValue(),
-                         SGF.emitLValue(E->getExistentialValue(),
-                                        AccessKind::ReadWrite),
-                         AccessKind::ReadWrite);
-  } else {
-    existentialValue = SGF.emitRValueAsSingleValue(E->getExistentialValue());
-  }
-  
   // Open the existential value into the opened archetype value.
   // TODO: Nonunique opened existentials need different memory management for
   // the opened value than what's implemented below.
@@ -3192,10 +3179,11 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
                               archetypeValue);
   
   // Register the opaque value for the projected existential.
-  SILGenFunction::OpaqueValueRAII opaqueValueRAII(SGF, E->getOpaqueValue(), 
-                                              archetypeValue,
-                                              /*destroy=*/false,
-                                              /*uniquely referenced=*/isUnique);
+  SILGenFunction::OpaqueValueRAII opaqueValueRAII(
+                                    SGF, E->getOpaqueValue(),
+                                    archetypeValue,
+                                    /*destroy=*/false,
+                                    /*uniquely referenced=*/isUnique);
 
   return visit(E->getSubExpr(), C);
 }
