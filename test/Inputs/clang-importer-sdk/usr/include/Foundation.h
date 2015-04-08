@@ -20,6 +20,9 @@ extern NSUInteger SomeCrazyAppExtensionForbiddenAPI(void)
   __attribute__((availability(macosx_app_extension,unavailable,message="Not available in App Extensions")))
   __attribute__((availability(ios_app_extension,unavailable,message="Not available in App Extensions")));
 
+extern NSString *const globalStringAvailableOn10_10 __attribute__((availability(macosx,introduced=10.10)));
+extern NSString *const globalStringAvailableOn10_11 __attribute__((availability(macosx,introduced=10.11)));
+
 __attribute__((availability(macosx,introduced=10.10)))
 @interface NSAvailableOn10_10 : NSObject
 - (instancetype)init;
@@ -29,6 +32,8 @@ __attribute__((availability(macosx,introduced=10.10)))
 
 - (void)methodAvailableOn10_11 __attribute__((availability(macosx,introduced=10.11)));
 @end
+
+extern NSAvailableOn10_10 *const globalClassInstanceAvailableOn10_10 __attribute__((availability(macosx,introduced=10.10)));
 
 __attribute__((availability(macosx,introduced=10.10)))
 @protocol NSProtocolAvailableOn10_10

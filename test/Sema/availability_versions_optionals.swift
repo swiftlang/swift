@@ -1,22 +1,7 @@
-// RUN: %target-parse-verify-swift -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional
+// RUN: %swift -target x86_64-apple-macosx10.9 -parse -primary-file %s %S/Inputs/availability_versions_optionals_other.swift -verify -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
-
-@availability(OSX, introduced=10.9)
-var globalAvailableOn10_9: Int = 9
-
-@availability(OSX, introduced=10.10)
-var globalAvailableOn10_10: Int = 10
-
-@availability(OSX, introduced=10.11)
-var globalAvailableOn10_11: Int = 11
-
-@availability(OSX, introduced=10.10)
-var globalOptionalAvailableOn10_10: Int? = 10
-
-@availability(OSX, introduced=10.10)
-var globalIUOptionalAvailableOn10_10: Int! = 10
 
 func referencesToGlobalVariables() {
   // Potentially unavailable symbols should have optional type

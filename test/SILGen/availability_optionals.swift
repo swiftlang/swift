@@ -1,19 +1,15 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional -primary-file %s %S/Inputs/availability_optionals_other.swift | FileCheck %s
 
 // REQUIRES: OS=macosx
-
-@availability(OSX, introduced=10.9)
-var globalAvailableOn10_9: Int = 9
-
-@availability(OSX, introduced=10.10)
-var globalAvailableOn10_10: Int = 10
 
 // CHECK-LABEL: sil hidden @_TF22availability_optionals34referenceToAvailableGlobalVariableFT_T_
 func referenceToAvailableGlobalVariable() {
   // A definitely available global variable gets loaded as usual.
   let _ = globalAvailableOn10_9
-  
-  // CHECK: [[GLOBAL_ADDR:%.*]] = global_addr @_Tv22availability_optionals21globalAvailableOn10_9Si : $*Int
+
+  // CHECK: [[GLOBAL_ADDRESSOR:%.*]] = function_ref @_TF22availability_optionalsau21globalAvailableOn10_9Si : $@thin () -> Builtin.RawPointer
+  // CHECK: [[GLOBAL_POINTER:%.*]] = apply [[GLOBAL_ADDRESSOR]]() : $@thin () -> Builtin.RawPointer
+  // CHECK: [[GLOBAL_ADDR:%.*]] = pointer_to_address [[GLOBAL_POINTER]] : $Builtin.RawPointer to $*Int
   // CHECK: [[LOADED_VAL:%.*]] = load [[GLOBAL_ADDR]] : $*Int
 }
 
@@ -23,7 +19,6 @@ func referenceToPotentiallyUnavailableGlobalVariable() {
   let _ = globalAvailableOn10_10
  
   // Check the required availability.
-  // CHECK: [[GLOBAL_ADDR:%.*]] = global_addr @_Tv22availability_optionals22globalAvailableOn10_10Si : $*Int
   // CHECK: [[OPT_ADDR:%.*]] = alloc_stack $Optional<Int> 
   // CHECK: [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
   // CHECK: [[MINOR:%.*]] = integer_literal $Builtin.Word, 10
@@ -34,8 +29,11 @@ func referenceToPotentiallyUnavailableGlobalVariable() {
   
   // Load and inject the value when available.
   // CHECK: [[AVAILABLE]]:
-  // CHECK: [[GLOBAL_VAL:%.*]] = load [[GLOBAL_ADDR]] : $*Int
   // CHECK: [[DATA_ADDR:%.*]] = init_enum_data_addr [[OPT_ADDR]]#1 : $*Optional<Int>, #Optional.Some!enumelt.1
+  // CHECK: [[GLOBAL_ADDRESSOR:%.*]] = function_ref @_TF22availability_optionalsau22globalAvailableOn10_10Si : $@thin () -> Builtin.RawPointer
+  // CHECK: [[GLOBAL_POINTER:%.*]] = apply [[GLOBAL_ADDRESSOR]]() : $@thin () -> Builtin.RawPointer
+  // CHECK: [[GLOBAL_ADDR:%.*]] = pointer_to_address [[GLOBAL_POINTER]] : $Builtin.RawPointer to $*Int
+  // CHECK: [[GLOBAL_VAL:%.*]] = load [[GLOBAL_ADDR]] : $*Int
   // CHECK: store [[GLOBAL_VAL]] to [[DATA_ADDR]] : $*Int
   // CHECK: inject_enum_addr [[OPT_ADDR]]#1 : $*Optional<Int>, #Optional.Some!enumelt.1
   // CHECK: br [[CONT:bb[0-9]+]]

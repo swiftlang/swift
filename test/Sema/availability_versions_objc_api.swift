@@ -97,3 +97,24 @@ func gettersAndSettersFromObjC(o: NSAvailableOn10_9) {
         // expected-note@-2 {{guard with version check}}
   }
 }
+
+// Globals from Objective-C
+
+func useGlobalsFromObjectiveC() {
+  let _ = globalStringAvailableOn10_10 // expected-error {{'globalStringAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 {{add @availability attribute to enclosing global function}}
+      // expected-note@-2 {{guard with version check}}
+
+  let _ = globalStringAvailableOn10_11 // expected-error {{'globalStringAvailableOn10_11' is only available on OS X 10.11 or newer}}
+      // expected-note@-1 {{add @availability attribute to enclosing global function}}
+      // expected-note@-2 {{guard with version check}}
+
+  let _ = globalClassInstanceAvailableOn10_10 // expected-error {{'globalClassInstanceAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 {{add @availability attribute to enclosing global function}}
+      // expected-note@-2 {{guard with version check}}
+
+  if #available(OSX >= 10.10, *) {
+    let _ = globalStringAvailableOn10_10
+    let _: NSAvailableOn10_10 = globalClassInstanceAvailableOn10_10
+  }
+}

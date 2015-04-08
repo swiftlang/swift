@@ -753,6 +753,18 @@ void AttributeChecker::visitAvailabilityAttr(AvailabilityAttr *attr) {
   if (!attr->isActivePlatform(TC.Context) || !attr->Introduced.hasValue())
     return;
 
+  SourceLoc attrLoc = attr->getLocation();
+
+  DeclContext *DC = D->getDeclContext();
+  // Do not permit potential availability of script-mode global variables;
+  // their initializer expression is not lazily evaluated, so this would
+  // not be safe.
+  if (isa<VarDecl>(D) && DC->isModuleScopeContext() &&
+      DC->getParentSourceFile()->isScriptMode()) {
+    TC.diagnose(attrLoc, diag::availability_global_script_no_potential);
+    return;
+  }
+
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such

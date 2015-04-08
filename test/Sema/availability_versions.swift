@@ -4,32 +4,32 @@
 // REQUIRES: OS=macosx
 
 @availability(OSX, introduced=10.9)
-var globalAvailableOn10_9: Int = 9
+func globalFuncAvailableOn10_9() -> Int { return 9 }
 
 @availability(OSX, introduced=10.10)
-var globalAvailableOn10_10: Int = 10
+func globalFuncAvailableOn10_10() -> Int { return 10 }
 
 @availability(OSX, introduced=10.11)
-var globalAvailableOn10_11: Int = 11
+func globalFuncAvailableOn10_11() -> Int { return 11 }
 
 // Top level should reflect the minimum deployment target.
-let ignored1: Int = globalAvailableOn10_9
+let ignored1: Int = globalFuncAvailableOn10_9()
 
-let ignored2: Int = globalAvailableOn10_10 // expected-error {{'globalAvailableOn10_10' is only available on OS X 10.10 or newer}}
+let ignored2: Int = globalFuncAvailableOn10_10() // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
     // expected-note@-1 {{guard with version check}}
 
-let ignored3: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
+let ignored3: Int = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
     // expected-note@-1 {{guard with version check}}
 
 // Functions without annotations should reflect the minimum deployment target.
 func functionWithoutAvailability() {
-	let _: Int = globalAvailableOn10_9
-	
-	let _: Int = globalAvailableOn10_10 // expected-error {{'globalAvailableOn10_10' is only available on OS X 10.10 or newer}}
+  let _: Int = globalFuncAvailableOn10_9()
+
+  let _: Int = globalFuncAvailableOn10_10() // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{add @availability attribute to enclosing global function}}
       // expected-note@-2 {{guard with version check}}
 
-	let _: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
+  let _: Int = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
       // expected-note@-1 {{add @availability attribute to enclosing global function}}
       // expected-note@-2 {{guard with version check}}
 }
@@ -37,49 +37,59 @@ func functionWithoutAvailability() {
 // Functions with annotations should refine their bodies.
 @availability(OSX, introduced=10.10)
 func functionAvailableOn10_10() {
-	let _: Int = globalAvailableOn10_9
- 	let _: Int = globalAvailableOn10_10
- 	
- 	// Nested functions should get their own refinement context.
- 	@availability(OSX, introduced=10.11)
- 	func innerFunctionAvailableOn10_11() {
- 		let _: Int = globalAvailableOn10_9
- 		let _: Int = globalAvailableOn10_10
- 		let _: Int = globalAvailableOn10_11
- 	}
- 	
- 	let _: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
+  let _: Int = globalFuncAvailableOn10_9()
+  let _: Int = globalFuncAvailableOn10_10()
+
+  // Nested functions should get their own refinement context.
+  @availability(OSX, introduced=10.11)
+  func innerFunctionAvailableOn10_11() {
+    let _: Int = globalFuncAvailableOn10_9()
+    let _: Int = globalFuncAvailableOn10_10()
+    let _: Int = globalFuncAvailableOn10_11()
+  }
+
+  let _: Int = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
+      // expected-note@-1 {{guard with version check}}
+}
+
+// Don't allow script-mode globals to marked potentially unavailable. Their
+// initializers are eagerly executed.
+@availability(OSX, introduced=10.10) // expected-error {{global variable cannot be marked potentially unavailable with 'introduced=' in script mode}}
+var potentiallyUnavailableGlobalInScriptMode: Int = globalFuncAvailableOn10_10()
+
+// Still allow other availability annotations on script-mode globals
+@availability(OSX, deprecated=10.10)
+var deprecatedGlobalInScriptMode: Int = 5
+
+if #available(OSX >= 10.10, *) {
+  let _: Int = globalFuncAvailableOn10_10()
+  let _: Int = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
       // expected-note@-1 {{guard with version check}}
 }
 
 if #available(OSX >= 10.10, *) {
-  let _: Int = globalAvailableOn10_10
-  let _: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
-      // expected-note@-1 {{guard with version check}}
-}
-
-if #available(OSX >= 10.10, *) {
-  let _: Int = globalAvailableOn10_10
-  let _: Int = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
+  let _: Int = globalFuncAvailableOn10_10()
+  let _: Int = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
       // expected-note@-1 {{guard with version check}}
 } else {
-  let _: Int = globalAvailableOn10_9
-  let _: Int = globalAvailableOn10_10 // expected-error {{'globalAvailableOn10_10' is only available on OS X 10.10 or newer}}
+  let _: Int = globalFuncAvailableOn10_9()
+  let _: Int = globalFuncAvailableOn10_10() // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{guard with version check}}
 }
 
 @availability(OSX, introduced=10.10)
-var globalAvailableOnOSX10_10AndiOS8_0: Int = 10
+@availability(iOS, introduced=8.0)
+func globalFuncAvailableOnOSX10_10AndiOS8_0() -> Int { return 10 }
 
 if #available(OSX >= 10.10, iOS >= 8.0, *) {
-  let _: Int = globalAvailableOnOSX10_10AndiOS8_0
+  let _: Int = globalFuncAvailableOnOSX10_10AndiOS8_0()
 }
 
 if #available(OSX >= 10.10, OSX >= 10.11, *) {  // expected-error {{conditions for 'OSX' already specified for this query}}
 }
 
 if #available(iOS >= 9.0) {  // expected-error {{condition required for target platform 'OSX'}} expected-error {{check must handle potential future platforms with '*'}} {{25-25=, *}}
-  let _: Int = globalAvailableOnOSX10_10AndiOS8_0 // expected-error {{'globalAvailableOnOSX10_10AndiOS8_0' is only available on OS X 10.10 or newer}}
+  let _: Int = globalFuncAvailableOnOSX10_10AndiOS8_0() // expected-error {{'globalFuncAvailableOnOSX10_10AndiOS8_0()' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{guard with version check}}
 }
 
@@ -87,28 +97,17 @@ if #available(OSX >= 10.10, iOS >= 9.0) {  // expected-error {{check must handle
 }
 // Multiple unavailable references in a single statement
 
-let ignored4: (Int, Int) = (globalAvailableOn10_10, globalAvailableOn10_11) // expected-error {{'globalAvailableOn10_10' is only available on OS X 10.10 or newer}}  expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
+let ignored4: (Int, Int) = (globalFuncAvailableOn10_10(), globalFuncAvailableOn10_11()) // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}  expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
     // expected-note@-1 2{{guard with version check}}
 
-// Global functions
 
-@availability(OSX, introduced=10.9)
-func funcAvailableOn10_9() {}
+globalFuncAvailableOn10_9()
 
-@availability(OSX, introduced=10.10)
-func funcAvailableOn10_10() {}
-
-funcAvailableOn10_9()
-
-let ignored5 = funcAvailableOn10_10 // expected-error {{'funcAvailableOn10_10()' is only available on OS X 10.10 or newer}}
+let ignored5 = globalFuncAvailableOn10_10 // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
     // expected-note@-1 {{guard with version check}}
 
-funcAvailableOn10_10() // expected-error {{'funcAvailableOn10_10()' is only available on OS X 10.10 or newer}}
+globalFuncAvailableOn10_10() // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
     // expected-note@-1 {{guard with version check}}
-
-if #available(OSX >= 10.10, *) {
-  funcAvailableOn10_10()
-}
 
 // Overloaded global functions
 @availability(OSX, introduced=10.9)
@@ -337,7 +336,7 @@ class ClassWithUnavailableProperties {
   
   var propWithSetterOnlyAvailableOn10_10 : Int {
     get {
-      funcAvailableOn10_10() // expected-error {{'funcAvailableOn10_10()' is only available on OS X 10.10 or newer}}
+      globalFuncAvailableOn10_10() // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
           // expected-note@-1 {{add @availability attribute to enclosing class}}
           // expected-note@-2 {{add @availability attribute to enclosing var}}
           // expected-note@-3 {{guard with version check}}
@@ -345,18 +344,18 @@ class ClassWithUnavailableProperties {
     }
     @availability(OSX, introduced=10.10)
     set(newVal) {
-    funcAvailableOn10_10()
+    globalFuncAvailableOn10_10()
     }
   }
   
   var propWithGetterOnlyAvailableOn10_10 : Int {
     @availability(OSX, introduced=10.10)
     get {
-      funcAvailableOn10_10()
+      globalFuncAvailableOn10_10()
       return 0
     }
     set(newVal) {
-      funcAvailableOn10_10() // expected-error {{'funcAvailableOn10_10()' is only available on OS X 10.10 or newer}}
+      globalFuncAvailableOn10_10() // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
           // expected-note@-1 {{add @availability attribute to enclosing class}}
           // expected-note@-2 {{add @availability attribute to enclosing var}}
           // expected-note@-3 {{guard with version check}}
@@ -864,8 +863,8 @@ extension ClassAvailableOn10_10 { } // expected-error {{'ClassAvailableOn10_10' 
 @availability(OSX, introduced=10.10)
 extension ClassAvailableOn10_10 {
   func m() {
-    let _ = globalAvailableOn10_10
-    let _ = globalAvailableOn10_11 // expected-error {{'globalAvailableOn10_11' is only available on OS X 10.11 or newer}}
+    let _ = globalFuncAvailableOn10_10()
+    let _ = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
       // expected-note@-1 {{add @availability attribute to enclosing instance method}}
       // expected-note@-2 {{guard with version check}}
   }
@@ -917,14 +916,14 @@ func functionWithDefaultAvailabilityAndUselessCheck() {
 // Default availability reflects minimum deployment: 10.9 and up
 
   if #available(OSX >= 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
-    let _ = globalAvailableOn10_9
+    let _ = globalFuncAvailableOn10_9()
   }
   
   if #available(OSX >= 10.10, *) { // expected-note {{enclosing scope here}}
-    let _ = globalAvailableOn10_10
+    let _ = globalFuncAvailableOn10_10()
     
     if #available(OSX >= 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
-      let _ = globalAvailableOn10_10 
+      let _ = globalFuncAvailableOn10_10()
     }
   }
 
@@ -943,11 +942,11 @@ func functionWithDefaultAvailabilityAndUselessCheck() {
 @availability(OSX, introduced=10.10)
 func functionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note 2{{enclosing scope here}}
   if #available(OSX >= 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
-    let _ = globalAvailableOn10_9
+    let _ = globalFuncAvailableOn10_9()
   }
   
   if #available(OSX >= 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
-    let _ = globalAvailableOn10_10 
+    let _ = globalFuncAvailableOn10_10()
   }
 }
 
@@ -1057,12 +1056,12 @@ class ClassForFixit {
       // expected-note@-3 {{add @availability attribute to enclosing class}} {{1-1=@availability(OSX, introduced=10.10)\n}}
 
   func fixitForRefInGuardOfIf() {
-    if (globalAvailableOn10_10 > 1066) {
+    if (globalFuncAvailableOn10_10() > 1066) {
       let _ = 5
       let _ = 6
     }
-        // expected-error@-4 {{'globalAvailableOn10_10' is only available on OS X 10.10 or newer}}
-        // expected-note@-5 {{guard with version check}} {{5-6=if #available(OSX >= 10.10) {\n        if (globalAvailableOn10_10 > 1066) {\n          let _ = 5\n          let _ = 6\n        }\n    } else {\n        // Fallback on earlier versions\n    }}}
+        // expected-error@-4 {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
+        // expected-note@-5 {{guard with version check}} {{5-6=if #available(OSX >= 10.10) {\n        if (globalFuncAvailableOn10_10() > 1066) {\n          let _ = 5\n          let _ = 6\n        }\n    } else {\n        // Fallback on earlier versions\n    }}}
         // expected-note@-6 {{add @availability attribute to enclosing instance method}} {{3-3=@availability(OSX, introduced=10.10)\n  }}
         // expected-note@-7 {{add @availability attribute to enclosing class}} {{1-1=@availability(OSX, introduced=10.10)\n}}
   }
