@@ -83,8 +83,7 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
 
 extension _ArrayBuffer {
   /// Adopt the storage of source
-  public
-  init(_ source: NativeBuffer) {
+  public init(_ source: NativeBuffer) {
     _storage = _ArrayBridgeStorage(native: source._storage)
   }
 
@@ -129,8 +128,7 @@ extension _ArrayBuffer {
   /// _ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns nil
-  public
-  mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
+  public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
     if _fastPath(isUniquelyReferenced()) {
@@ -142,13 +140,11 @@ extension _ArrayBuffer {
     return nil
   }
 
-  public
-  mutating func isMutableAndUniquelyReferenced() -> Bool {
+  public mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
   
-  public
-  mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
+  public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return isUniquelyReferencedOrPinned()
   }
 
@@ -167,10 +163,9 @@ extension _ArrayBuffer {
   ///
   /// Requires: this buffer is backed by a uniquely-referenced
   /// _ContiguousArrayBuffer
-  public
-  mutating func replace<C: CollectionType where C.Generator.Element == Element>(
-    #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
-  ) {
+  public mutating func replace<
+      C: CollectionType where C.Generator.Element == Element
+  >(#subRange: Range<Int>, with newCount: Int, elementsOf newValues: C) {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
   }
 
@@ -213,9 +208,9 @@ extension _ArrayBuffer {
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
   @inline(never) // The copy loop blocks retain release matching.
-  public
-  func _uninitializedCopy(subRange: Range<Int>, target: UnsafeMutablePointer<T>)
-         -> UnsafeMutablePointer<T> {
+  public func _uninitializedCopy(
+    subRange: Range<Int>, target: UnsafeMutablePointer<T>
+  ) -> UnsafeMutablePointer<T> {
     _typeCheck(subRange)
     if _fastPath(_isNative) {
       return _native._uninitializedCopy(subRange, target: target)
@@ -243,8 +238,7 @@ extension _ArrayBuffer {
   
   /// Return a _SliceBuffer containing the given subRange of values
   /// from this buffer.
-  public
-  subscript(subRange: Range<Int>) -> _SliceBuffer<T> {
+  public subscript(subRange: Range<Int>) -> _SliceBuffer<T> {
     _typeCheck(subRange)
     
     if _fastPath(_isNative) {
@@ -284,8 +278,7 @@ extension _ArrayBuffer {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  public
-  var baseAddress: UnsafeMutablePointer<T> {
+  public var baseAddress: UnsafeMutablePointer<T> {
     if (_fastPath(_isNative)) {
       return _native.baseAddress
     }
@@ -293,8 +286,7 @@ extension _ArrayBuffer {
   }
   
   /// How many elements the buffer stores
-  public
-  var count: Int {
+  public var count: Int {
     @inline(__always)
     get {
       return _fastPath(_isNative) ? _native.count : _nonNative.count
@@ -363,8 +355,7 @@ extension _ArrayBuffer {
   }
 
   /// How many elements the buffer can store without reallocation
-  public
-  var capacity: Int {
+  public var capacity: Int {
     return _fastPath(_isNative) ? _native.capacity : _nonNative.count
   }
 
@@ -399,8 +390,7 @@ extension _ArrayBuffer {
   }
 
   /// Get/set the value of the ith element
-  public
-  subscript(i: Int) -> T {
+  public subscript(i: Int) -> T {
     get {
       return getElement(i, hoistedIsNativeNoTypeCheckBuffer:_isNativeNoTypeCheck)
     }
@@ -420,8 +410,7 @@ extension _ArrayBuffer {
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
-  public
-  func withUnsafeBufferPointer<R>(
+  public func withUnsafeBufferPointer<R>(
     @noescape body: (UnsafeBufferPointer<Element>) -> R
   ) -> R {
     if _fastPath(_isNative) {
@@ -435,8 +424,7 @@ extension _ArrayBuffer {
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.  Requires: such
   /// contiguous storage exists or the buffer is empty
-  public
-  mutating func withUnsafeMutableBufferPointer<R>(
+  public mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (UnsafeMutableBufferPointer<T>) -> R
   ) -> R {
     _sanityCheck(
@@ -450,16 +438,14 @@ extension _ArrayBuffer {
   }
   
   /// An object that keeps the elements stored in this buffer alive
-  public
-  var owner: AnyObject {
+  public var owner: AnyObject {
     return _fastPath(_isNative) ? _native._storage : _nonNative
   }
   
   /// An object that keeps the elements stored in this buffer alive
   ///
   /// Requires: this buffer is backed by a _ContiguousArrayBuffer
-  public
-  var nativeOwner: AnyObject {
+  public var nativeOwner: AnyObject {
     _sanityCheck(_isNative, "Expect a native array")
     return _native._storage
   }
@@ -480,8 +466,7 @@ extension _ArrayBuffer {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public
-  var startIndex: Int {
+  public var startIndex: Int {
     return 0
   }
 
