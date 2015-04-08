@@ -455,6 +455,15 @@ extension _ArrayBuffer {
     return _fastPath(_isNative) ? _native._storage : _nonNative
   }
   
+  /// An object that keeps the elements stored in this buffer alive
+  ///
+  /// Requires: this buffer is backed by a _ContiguousArrayBuffer
+  public
+  var nativeOwner: AnyObject {
+    _sanityCheck(_isNative, "Expect a native array")
+    return _native._storage
+  }
+
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
