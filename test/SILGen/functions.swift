@@ -537,6 +537,19 @@ func noinline_callee() {}
 @inline(__always)
 func always_inline_callee() {}
 
+protocol AlwaysInline {
+  func alwaysInlined()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFV9functions19AlwaysInlinedMember13alwaysInlinedfS0_FT_T_ : $@cc(method) @thin (AlwaysInlinedMember) -> () {
+
+// protocol witness for functions.AlwaysInline.alwaysInlined <A : functions.AlwaysInline>(functions.AlwaysInline.Self)() -> () in conformance functions.AlwaysInlinedMember : functions.AlwaysInline in functions
+// CHECK-LABEL: sil hidden [transparent] [thunk] [always_inline] @_TTWV9functions19AlwaysInlinedMemberS_12AlwaysInlineS_FS1_13alwaysInlinedUS1___fQPS1_FT_T_ : $@cc(witness_method) @thin (@in_guaranteed AlwaysInlinedMember) -> () {
+struct AlwaysInlinedMember : AlwaysInline {
+  @inline(__always)
+  func alwaysInlined() {}
+}
+
 // CHECK-LABEL: sil hidden [semantics "foo"] @_TF9functions9semanticsFT_T_ : $@thin () -> ()
 @semantics("foo")
 func semantics() {}

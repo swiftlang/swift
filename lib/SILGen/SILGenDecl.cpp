@@ -1671,14 +1671,26 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       = reqtParams->cloneWithOuterParameters(getASTContext(), outerParams);
   }
 
+  // If the thunked-to function is set to be always inlined, do the
+  // same with the witness, on the theory that the user wants all
+  // calls removed if possible, e.g. when we're able to devirtualize
+  // the witness method call. Otherwise, use the default inlining
+  // setting on the theory that forcing inlining off should only
+  // effect the user's function, not otherwise invisible thunks.
+  Inline_t InlineStrategy = InlineDefault;
+  if (witness.isAlwaysInline())
+    InlineStrategy = AlwaysInline;
+
   auto *f = SILFunction::create(M, linkage, nameBuffer,
-                witnessSILType.castTo<SILFunctionType>(),
-                witnessContextParams,
-                SILLocation(witness.getDecl()),
-                IsNotBare,
-                IsTransparent,
-                makeModuleFragile ? IsFragile : IsNotFragile,
-                IsThunk);
+                                witnessSILType.castTo<SILFunctionType>(),
+                                witnessContextParams,
+                                SILLocation(witness.getDecl()),
+                                IsNotBare,
+                                IsTransparent,
+                                makeModuleFragile ? IsFragile : IsNotFragile,
+                                IsThunk,
+                                SILFunction::NotRelevant,
+                                InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witness.getDecl()), *f));
