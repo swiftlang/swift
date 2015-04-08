@@ -9,6 +9,8 @@ import Builtin
 class C {}
 sil_vtable C {}
 
+@objc protocol ObjC {}
+
 // X86_64-LABEL: define void @retain_release_bridge_object
 // X86_64:         call [[BRIDGE:%swift.bridge\*]] @swift_bridgeObjectRetain
 // X86_64:         call void @swift_bridgeObjectRelease
@@ -29,14 +31,14 @@ entry(%c : $C, %w : $Builtin.Word):
   return %b : $Builtin.BridgeObject
 }
 
-// X86_64-LABEL: define { %C13bridge_object1C*, i64 } @convert_from_bridge_object
+// X86_64-LABEL: define { %objc_object*, i64 } @convert_from_bridge_object
 // X86_64:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE]] %0 to i64
 // --                                                     0x8000_0000_0000_0001
 // X86_64:         [[TAGBITS:%.*]] = and i64 [[BOBITS]], -9223372036854775807
 // X86_64:         [[TAGGED:%.*]] = icmp eq i64 [[TAGBITS]], 0
 // X86_64:         br i1 [[TAGGED]], label %not-tagged-pointer, label %tagged-pointer
 // X86_64:       tagged-pointer:
-// X86_64:         [[TAGGED_RESULT:%.*]] = bitcast [[BRIDGE]] %0 to [[C]]
+// X86_64:         [[TAGGED_RESULT:%.*]] = bitcast [[BRIDGE]] %0 to [[C:%objc_object\*]]
 // X86_64:         br label %tagged-cont
 // X86_64:       not-tagged-pointer:
 // --                                                     0x00ff_ffff_ffff_fff8
@@ -46,14 +48,14 @@ entry(%c : $C, %w : $Builtin.Word):
 // X86_64:      tagged-cont:
 // X86_64:         phi [[C]] [ [[TAGGED_RESULT]], %tagged-pointer ], [ [[MASKED_RESULT]], %not-tagged-pointer ]
 
-// ARM64-LABEL: define { %C13bridge_object1C*, i64 } @convert_from_bridge_object
+// ARM64-LABEL: define { %objc_object*, i64 } @convert_from_bridge_object
 // ARM64:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE:%swift.bridge\*]] %0 to i64
 // --                                                     0x8000_0000_0000_0000
 // ARM64:         [[TAGBITS:%.*]] = and i64 [[BOBITS]], -9223372036854775808
 // ARM64:         [[TAGGED:%.*]] = icmp eq i64 [[TAGBITS]], 0
 // ARM64:         br i1 [[TAGGED]], label %not-tagged-pointer, label %tagged-pointer
 // ARM64:       tagged-pointer:
-// ARM64:         [[TAGGED_RESULT:%.*]] = bitcast [[BRIDGE]] %0 to [[C:%C13bridge_object1C\*]]
+// ARM64:         [[TAGGED_RESULT:%.*]] = bitcast [[BRIDGE]] %0 to [[C:%objc_object\*]]
 // ARM64:         br label %tagged-cont
 // ARM64:       not-tagged-pointer:
 // --                                                     0x00ff_ffff_ffff_fff8
@@ -63,14 +65,25 @@ entry(%c : $C, %w : $Builtin.Word):
 // ARM64:      tagged-cont:
 // ARM64:         phi [[C]] [ [[TAGGED_RESULT]], %tagged-pointer ], [ [[MASKED_RESULT]], %not-tagged-pointer ]
 
-// ARMV7-LABEL: define { %C13bridge_object1C*, i32 } @convert_from_bridge_object
+// ARMV7-LABEL: define { %objc_object*, i32 } @convert_from_bridge_object
 // ARMV7:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE:%swift.bridge\*]] %0 to i32
 // ARMV7:         [[MASKED_BITS:%.*]] = and i32 [[BOBITS]], -4
-// ARMV7:         inttoptr i32 [[MASKED_BITS]] to [[C:%C13bridge_object1C\*]]
-sil @convert_from_bridge_object : $Builtin.BridgeObject -> (C, Builtin.Word) {
+// ARMV7:         inttoptr i32 [[MASKED_BITS]] to [[C:%objc_object\*]]
+sil @convert_from_bridge_object : $Builtin.BridgeObject -> (ObjC, Builtin.Word) {
+entry(%b : $Builtin.BridgeObject):
+  %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $ObjC
+  %w = bridge_object_to_word %b : $Builtin.BridgeObject to $Builtin.Word
+  %t = tuple (%c : $ObjC, %w : $Builtin.Word)
+  return %t : $(ObjC, Builtin.Word)
+}
+
+// X86_64-LABEL: define %C13bridge_object1C* @convert_from_native_bridge_object
+// X86_64:         [[BOBITS:%.*]] = ptrtoint %swift.bridge* %0 to i64
+// X86_64:         [[MASKED_BITS:%.*]] = and i64 [[BOBITS]], 72057594037927928
+// X86_64:         [[RESULT:%.*]] = inttoptr i64 [[MASKED_BITS]] to [[C:%C13bridge_object1C\*]]
+// X86_64:         ret %C13bridge_object1C* [[RESULT]]
+sil @convert_from_native_bridge_object : $Builtin.BridgeObject -> C {
 entry(%b : $Builtin.BridgeObject):
   %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $C
-  %w = bridge_object_to_word %b : $Builtin.BridgeObject to $Builtin.Word
-  %t = tuple (%c : $C, %w : $Builtin.Word)
-  return %t : $(C, Builtin.Word)
+  return %c : $C
 }

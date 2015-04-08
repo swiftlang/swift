@@ -3581,7 +3581,10 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
     *notTagged = nullptr;
   llvm::Value *taggedRef = nullptr;
   llvm::Value *boBits = nullptr;
-  if (IGM.TargetInfo.hasObjCTaggedPointers()) {
+  
+  ClassDecl *Cl = i->getType().getClassOrBoundGenericClass();
+  if (IGM.TargetInfo.hasObjCTaggedPointers() &&
+      (!Cl || !isKnownNotTaggedPointer(IGM, Cl))) {
     boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);
     APInt maskValue = IGM.TargetInfo.ObjCPointerReservedBits.asAPInt();
     llvm::Value *mask = llvm::ConstantInt::get(IGM.getLLVMContext(), maskValue);

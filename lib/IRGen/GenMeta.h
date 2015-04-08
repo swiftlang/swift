@@ -47,6 +47,11 @@ namespace irgen {
   /// Is the given class known to have Swift-compatible metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass);
 
+  inline bool isKnownNotTaggedPointer(IRGenModule &IGM, ClassDecl *theClass) {
+    // For now, assume any class type defined in Clang might be tagged.
+    return hasKnownSwiftMetadata(IGM, theClass);
+  }
+
   /// Is the given class-like type known to have Swift-compatible
   /// metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, CanType theType);

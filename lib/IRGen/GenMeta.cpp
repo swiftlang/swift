@@ -3600,11 +3600,6 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
   }
 }
 
-static bool isKnownNotTaggedPointer(IRGenModule &IGM, ClassDecl *theClass) {
-  // For now, assume any class type defined in Clang might be tagged.
-  return hasKnownSwiftMetadata(IGM, theClass);
-}
-
 /// Given an object of class type, produce the heap metadata reference
 /// as an %objc_class*.
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
