@@ -941,29 +941,30 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
                                           EllipsisLoc.isValid(), EllipsisLoc));
 }
 
-/// Parse a pattern with an optional type annotation.
+/// Parse an optional type annotation on a pattern.
 ///
-///  typed-pattern ::= mattching-pattern (':' type)?
+///  pattern-type-annotation ::= (':' type)?
 ///
-ParserResult<Pattern> Parser::parseTypedMatchingPattern() {
-  auto result = parseMatchingPattern(/*isExprBasic*/true);
-  
-  // Now parse an optional type annotation.
-  if (consumeIf(tok::colon)) {
-    if (result.isNull())  // Recover by creating AnyPattern.
-      result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
-    
-    ParserResult<TypeRepr> Ty = parseType();
-    if (Ty.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Pattern>();
-    if (Ty.isNull())
-      Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
-    
-    result = makeParserResult(result,
-                            new (Context) TypedPattern(result.get(), Ty.get()));
-  }
-  
-  return result;
+ParserResult<Pattern> Parser::
+parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
+
+  // Parse an optional type annotation.
+  if (!consumeIf(tok::colon))
+    return result;
+
+  Pattern *P;
+  if (result.isNull())  // Recover by creating AnyPattern.
+    P = new (Context) AnyPattern(Tok.getLoc());
+  else
+    P = result.get();
+
+  ParserResult<TypeRepr> Ty = parseType();
+  if (Ty.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Pattern>();
+  if (Ty.isNull())
+    Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
+
+  return makeParserResult(new (Context) TypedPattern(P, Ty.get()));
 }
 
 

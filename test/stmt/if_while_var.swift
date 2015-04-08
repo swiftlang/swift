@@ -59,6 +59,10 @@ if 1 != 2, let x? = opt, y? = opt where x != y,
    let a? = opt, var b? = opt {
 }
 
+// <rdar://problem/20457938> typed pattern is not allowed on if/let condition
+if 1 != 2, let x? : Int? = opt {}
+
+
 // Test error recovery.
 // <rdar://problem/19939746> Improve error recovery for malformed if statements
 if 1 != 2, {  // expected-error {{expected 'let' or 'var' in conditional}}

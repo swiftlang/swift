@@ -850,9 +850,11 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       //
       if (Tok.is(tok::identifier) && peekToken().is(tok::colon))
         Pattern = parseSwift1IfLetPattern(IsLet, VarLoc);
-      else
+      else {
         Pattern = parseMatchingPatternAsLetOrVar(IsLet, VarLoc,
                                                  /*isExprBasic*/ true);
+        Pattern = parseOptionalPatternTypeAnnotation(Pattern);
+      }
       Status |= Pattern;
       
       if (Pattern.isNull() || Pattern.hasCodeCompletion())

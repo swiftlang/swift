@@ -3452,7 +3452,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
-      auto patternRes = parseTypedMatchingPattern();
+      auto patternRes = parseMatchingPattern(/*isExprBasic*/true);
+      patternRes = parseOptionalPatternTypeAnnotation(patternRes);
 
       if (patternRes.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
