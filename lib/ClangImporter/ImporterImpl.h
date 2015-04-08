@@ -74,6 +74,9 @@ enum class ConstantConvertKind {
   Coerce,
   /// \brief Construct the given type from the constant value.
   Construction,
+  /// \brief Construct the given type from the constant value, using an
+  /// optional initializer.
+  ConstructionWithUnwrap,
   /// \brief Perform an unchecked downcast to the given type.
   Downcast
 };

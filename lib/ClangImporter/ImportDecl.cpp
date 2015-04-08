@@ -1624,9 +1624,9 @@ namespace {
       llvm::APSInt rawValue = decl->getInitVal();
       
       // Did we already import an enum constant for this enum with the
-      // same value?
+      // same value? If so, import it as a standalone constant.
       if (!Impl.EnumConstantValues.insert({clangEnum, rawValue}).second)
-        return nullptr;
+        return importOptionConstant(decl, clangEnum, theEnum);
 
       if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType()
           && rawValue.slt(0)) {
@@ -1660,19 +1660,23 @@ namespace {
     }
     
     /// Import an NS_OPTIONS constant as a static property of a Swift struct.
+    ///
+    /// This is also used to import enum case aliases.
     Decl *importOptionConstant(const clang::EnumConstantDecl *decl,
                                const clang::EnumDecl *clangEnum,
-                               StructDecl *theStruct) {
+                               NominalTypeDecl *theStruct) {
       auto name = getEnumConstantName(decl, clangEnum);
       if (name.empty())
         return nullptr;
       
       // Create the constant.
+      auto convertKind = ConstantConvertKind::Construction;
+      if (isa<EnumDecl>(theStruct))
+        convertKind = ConstantConvertKind::ConstructionWithUnwrap;
       Decl *CD = Impl.createConstant(name, theStruct,
                                      theStruct->getDeclaredTypeInContext(),
                                      clang::APValue(decl->getInitVal()),
-                                     ConstantConvertKind::Construction,
-                                     /*isStatic*/ true, decl);
+                                     convertKind, /*isStatic*/ true, decl);
       Impl.importAttributes(decl, CD);
       return CD;
     }
@@ -1986,8 +1990,7 @@ namespace {
           enumeratorDecl = Impl.importDecl(*ec);
           break;
         case EnumKind::Options:
-          enumeratorDecl = importOptionConstant(*ec, decl,
-                                                cast<StructDecl>(result));
+          enumeratorDecl = importOptionConstant(*ec, decl, result);
           break;
         case EnumKind::Enum:
           enumeratorDecl = importEnumCase(*ec, decl, cast<EnumDecl>(result));
@@ -1996,8 +1999,11 @@ namespace {
         if (!enumeratorDecl)
           continue;
 
-        if (addEnumeratorsAsMembers)
+        if (addEnumeratorsAsMembers) {
           result->addMember(enumeratorDecl);
+          if (auto *var = dyn_cast<VarDecl>(enumeratorDecl))
+            result->addMember(var->getGetter());
+        }
       }
 
       // Add the type decl to ExternalDefinitions so that we can type-check
@@ -5703,12 +5709,16 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   case ConstantConvertKind::None:
     break;
 
-  case ConstantConvertKind::Construction: {
+  case ConstantConvertKind::Construction:
+  case ConstantConvertKind::ConstructionWithUnwrap: {
     auto typeRef = TypeExpr::createImplicit(type, context);
-    expr = new (context) ParenExpr(SourceLoc(), expr, SourceLoc(), /*Implicit=*/true);
+    expr = new (context) ParenExpr(SourceLoc(), expr, SourceLoc(),
+                                   /*Implicit=*/true);
     expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
+    if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
+      expr = new (context) ForceValueExpr(expr, SourceLoc());
     break;
-   }
+  }
 
   case ConstantConvertKind::Coerce:
     break;

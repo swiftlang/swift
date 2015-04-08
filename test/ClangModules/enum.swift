@@ -57,13 +57,12 @@ let objcABI: objc_abi = .v2
 let underscoreSuffix: ALL_CAPS_ENUM = .ENUM_CASE_ONE
 let underscoreSuffix2: ALL_CAPS_ENUM2 = .CASE_TWO
 
-#if !IRGEN
-var alias1 = NSAliasesEnum.BySameValue // expected-error{{}}
-var alias2 = NSAliasesEnum.ByEquivalentValue // expected-error{{}}
-var alias3 = NSAliasesEnum.ByName // expected-error{{}}
-
+var alias1 = NSAliasesEnum.BySameValue
+var alias2 = NSAliasesEnum.ByEquivalentValue
+var alias3 = NSAliasesEnum.ByName
 var aliasOriginal = NSAliasesEnum.Original
 
+#if !IRGEN
 var qualifiedName = NSRuncingMode.Mince
 var topLevelCaseName = NSRuncingMince // expected-error{{}}
 #endif
