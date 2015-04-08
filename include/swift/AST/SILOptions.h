@@ -28,9 +28,6 @@ public:
   /// Controls the aggressiveness of the performance inliner.
   int InlineThreshold = -1;
 
-  /// Controls the aggressiveness of devirtualization. 0=disabled.
-  unsigned DevirtThreshold = 0;
-
   /// The number of threads for multi-threaded code generation.
   int NumThreads = 0;
   

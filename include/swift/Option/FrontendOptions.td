@@ -222,10 +222,6 @@ def sil_inline_threshold : Separate<["-"], "sil-inline-threshold">,
   MetaVarName<"<50>">,
   HelpText<"Controls the aggressiveness of performance inlining">;
 
-def sil_devirt_threshold : Separate<["-"], "sil-devirt-threshold">,
-  MetaVarName<"<0>">,
-  HelpText<"Controls the aggressiveness of devirtualization">;
-
 def sil_link_all : Flag<["-"], "sil-link-all">,
   HelpText<"Link all SIL functions">;
 

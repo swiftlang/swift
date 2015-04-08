@@ -268,10 +268,6 @@ static llvm::cl::opt<int>
 SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(-1));
 
-static llvm::cl::opt<unsigned>
-SILDevirtThreshold("sil-devirt-threshold", llvm::cl::Hidden,
-                   llvm::cl::init(0));
-
 static llvm::cl::opt<bool>
 EnableSILVerifyAll("enable-sil-verify-all",
                    llvm::cl::Hidden,
@@ -399,7 +395,6 @@ int main(int argc, char **argv) {
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
-  SILOpts.DevirtThreshold = SILDevirtThreshold;
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.PrintAll = EnableSILPrintAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
