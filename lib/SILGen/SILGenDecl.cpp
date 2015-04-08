@@ -611,22 +611,23 @@ struct InitializationForPattern
   }
 
   InitializationPtr visitEnumElementPattern(EnumElementPattern *P) {
-    llvm_unreachable("pattern not valid in argument or var binding");
+    llvm_unreachable("enum element pattern not supported in let/else yet");
   }
   InitializationPtr visitOptionalSomePattern(OptionalSomePattern *P) {
-    llvm_unreachable("pattern not valid in argument or var binding");
+    llvm_unreachable("x? pattern not supported in let/else yet");
   }
   InitializationPtr visitIsPattern(IsPattern *P) {
-    llvm_unreachable("pattern not valid in argument or var binding");
+    llvm_unreachable("'as' and 'is' pattern not supported in let/else yet");
   }
   InitializationPtr visitBoolPattern(BoolPattern *P) {
-    llvm_unreachable("pattern not valid in argument or var binding");
+    llvm_unreachable("bools not supported in let/else yet");
   }
   InitializationPtr visitExprPattern(ExprPattern *P) {
     return InitializationPtr(new ExprPatternInitialization(P, patternFailDest));
   }
   InitializationPtr visitNominalTypePattern(NominalTypePattern *P) {
-    llvm_unreachable("pattern not valid in argument or var binding");
+    P->dump();
+    llvm_unreachable("pattern not supported in let/else yet");
   }
 };
 
