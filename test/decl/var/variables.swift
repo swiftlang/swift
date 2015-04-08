@@ -101,4 +101,12 @@ func testLetElse(a : Int?) {
   }
 }
 
-
+class RejectRefutableProperties {
+  let x? = Optional(1)           // expected-error {{refutable pattern match can fail; add an else {} to handle this condition}}
+  let y? = Optional(1) else { }  // expected-error {{refutable 'let/else' bindings are only allowed in executable code}}
+  let z = 42 else { }            // expected-error {{'else' condition is unreachable, variable binding always succeeds}}
+}
+extension RejectRefutableProperties {
+  // expected-error@+1 {{refutable 'let/else' bindings are only allowed in executable code}}
+  let a? = Optional(1) else { }  // expected-error {{extensions may not contain stored properties}}
+}

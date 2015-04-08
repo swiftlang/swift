@@ -2934,7 +2934,7 @@ public:
     
     if (PBD->isInvalid())
       return;
-    
+
     if (!IsFirstPass && !PBD->isInitializerChecked()) {
       bool HadError = false;
       for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
@@ -3046,6 +3046,15 @@ public:
           return;
         }
       });
+    }
+
+    // Conditional pattern bindings can only exist in executable contexts, they
+    // cannot be (e.g.) properties.
+    if ((PBD->isRefutable() || PBD->getElse().isExplicit()) &&
+        !PBD->getDeclContext()->isLocalContext()) {
+      TC.diagnose(PBD->getLoc(),
+                  diag::refutable_patternbinding_executable_context);
+      PBD->setInvalid();
     }
 
     if (!IsFirstPass)

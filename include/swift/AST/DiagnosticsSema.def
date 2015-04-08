@@ -607,6 +607,8 @@ ERROR(unimplemented_type_var,decl_parsing,none,
       (unsigned, StaticSpellingKind, unsigned))
 ERROR(observingprop_requires_initializer,decl_parsing,none,
       "non-member observing properties require an initializer", ())
+ERROR(refutable_patternbinding_executable_context,decl_parsing,none,
+      "refutable 'let/else' bindings are only allowed in executable code", ())
 ERROR(global_requires_initializer,decl_parsing,none,
       "global '%select{var|let}0' declaration requires an initializer expression"
       "%select{ or getter/setter specifier}0", (bool))
