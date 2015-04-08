@@ -325,3 +325,50 @@ func testLetElseExprPattern(a : Int) {
   // CHECK-NEXT: return
 }
 
+
+@noreturn
+func abort() { abort() }
+
+// CHECK-LABEL: sil hidden @_TF16if_while_binding20testLetElseOptional1FGSqSi_Si
+// CHECK-NEXT: bb0(%0 : $Optional<Int>):
+// CHECK-NEXT:   debug_value %0 : $Optional<Int>  // let a
+// CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, default bb2
+func testLetElseOptional1(a : Int?) -> Int {
+
+// CHECK: bb1(%3 : $Int):
+// CHECK-NEXT:   debug_value %3 : $Int  // let t
+// CHECK-NEXT:   return %3 : $Int
+  let t? = a else { abort() }
+
+// CHECK:  bb2:
+// CHECK-NEXT:    // function_ref if_while_binding.abort () -> ()
+// CHECK-NEXT:    %6 = function_ref @_TF16if_while_binding5abortFT_T_
+// CHECK-NEXT:    %7 = apply %6() : $@thin @noreturn () -> ()
+// CHECK-NEXT:    unreachable
+return t
+}
+
+// CHECK-LABEL: sil hidden @_TF16if_while_binding20testLetElseOptional2FGSqSS_SS
+// CHECK-NEXT: bb0(%0 : $Optional<String>):
+// CHECK-NEXT:   debug_value %0 : $Optional<String>  // let a
+// CHECK-NEXT:   retain_value %0 : $Optional<String>
+// CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb2, default bb1
+func testLetElseOptional2(a : String?) -> String {
+// CHECK:      bb1:
+// CHECK-NEXT:   release_value %0 : $Optional<String>
+// CHECK-NEXT:   br bb3
+  let t? = a else { abort() }
+
+// CHECK:  bb2(%6 : $String):
+// CHECK-NEXT:   debug_value %6 : $String  // let t
+// CHECK-NEXT:   release_value %0 : $Optional<String>
+// CHECK-NEXT:   return %6 : $String
+
+// CHECK:        bb3:
+// CHECK-NEXT:   // function_ref if_while_binding.abort () -> ()
+// CHECK-NEXT:   %10 = function_ref @_TF16if_while_binding5abortFT_T_
+// CHECK-NEXT:   %11 = apply %10()
+// CHECK-NEXT:   unreachable
+  return t
+}
+
