@@ -50,9 +50,6 @@ swift_install_in_component(compiler
 swift_install_in_component(compiler
     FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
     DESTINATION "bin")
-swift_install_in_component(compiler
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-update"
-    DESTINATION "bin")
 
 if(SWIFT_HOST_VARIANT STREQUAL "LINUX")
 # No need for this on other platforms.
