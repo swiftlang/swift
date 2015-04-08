@@ -1,4 +1,4 @@
-//===--- update-main.cpp - Swift code updating ----------------------------===//
+//===--- fixit_main.cpp - Get Swift compiler fixits ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,7 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// This tool updates swift code to be able to build with a newer swift compiler.
+// This tool turns Swift compiler fixits into file edits.
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticsFrontend.h"
