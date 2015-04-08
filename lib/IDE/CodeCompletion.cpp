@@ -1103,6 +1103,7 @@ public:
       : Sink(Sink), Ctx(Ctx),
         TypeResolver(createLazyResolver(Ctx)),
         CurrDeclContext(CurrDeclContext) {
+
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
       CurrentMethod = CurrDeclContext->getInnermostMethodContext();
@@ -1388,9 +1389,25 @@ public:
     addPatternFromTypeImpl(Builder, T, Identifier(), true, /*isVarArg*/false);
   }
 
+  static bool hasInterestingDefaultValues(const AnyFunctionType *AFT) {
+    if (auto *TT = dyn_cast<TupleType>(AFT->getInput().getPointer())) {
+      for (const TupleTypeElt &EltT : TT->getElements()) {
+        switch (EltT.getDefaultArgKind()) {
+        case DefaultArgumentKind::Normal:
+        case DefaultArgumentKind::Inherited: // FIXME: include this?
+          return true;
+        default:
+          break;
+        }
+      }
+    }
+    return false;
+  }
+
   void addParamPatternFromFunction(CodeCompletionResultBuilder &Builder,
                                    const AnyFunctionType *AFT,
-                                   const AbstractFunctionDecl *AFD) {
+                                   const AbstractFunctionDecl *AFD,
+                                   bool includeDefaultArgs = true) {
 
     const TuplePattern *BodyTuple = nullptr;
     if (AFD) {
@@ -1413,9 +1430,13 @@ public:
         const auto &TupleElt = TT->getElement(i);
         switch (TupleElt.getDefaultArgKind()) {
         case DefaultArgumentKind::None:
+          break;
+
         case DefaultArgumentKind::Normal:
         case DefaultArgumentKind::Inherited:
-          break;
+          if (includeDefaultArgs)
+            break;
+          continue;
 
         case DefaultArgumentKind::File:
         case DefaultArgumentKind::Line:
@@ -1462,19 +1483,26 @@ public:
   void addFunctionCallPattern(const AnyFunctionType *AFT,
                               const AbstractFunctionDecl *AFD = nullptr) {
     foundFunction(AFT);
-    CodeCompletionResultBuilder Builder(
-      Sink,
-      CodeCompletionResult::ResultKind::Pattern,
-      SemanticContextKind::ExpressionSpecific);
-    if (!HaveLParen)
-      Builder.addLeftParen();
-    else
-      Builder.addAnnotatedLeftParen();
 
-    addParamPatternFromFunction(Builder, AFT, AFD);
+    // Add the pattern, possibly including any default arguments.
+    auto addPattern = [&](bool includeDefaultArgs = true) {
+      CodeCompletionResultBuilder Builder(
+          Sink, CodeCompletionResult::ResultKind::Pattern,
+          SemanticContextKind::ExpressionSpecific);
+      if (!HaveLParen)
+        Builder.addLeftParen();
+      else
+        Builder.addAnnotatedLeftParen();
 
-    Builder.addRightParen();
-    addTypeAnnotation(Builder, AFT->getResult());
+      addParamPatternFromFunction(Builder, AFT, AFD, includeDefaultArgs);
+
+      Builder.addRightParen();
+      addTypeAnnotation(Builder, AFT->getResult());
+    };
+
+    if (hasInterestingDefaultValues(AFT))
+      addPattern(/*includeDefaultArgs*/ false);
+    addPattern();
   }
 
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
@@ -1511,107 +1539,125 @@ public:
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
 
-    CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(FD, Reason));
-    Builder.setAssociatedDecl(FD);
-    addLeadingDot(Builder);
-    Builder.addTextChunk(Name);
-    if (IsDynamicLookup)
-      Builder.addDynamicLookupMethodCallTail();
-    else if (FD->getAttrs().hasAttribute<OptionalAttr>())
-      Builder.addOptionalMethodCallTail();
-
-    llvm::SmallString<32> TypeStr;
-
     unsigned FirstIndex = 0;
     if (!IsImplicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
       FirstIndex = 1;
     Type FunctionType = getTypeOfMember(FD);
 
-    if (FunctionType->is<ErrorType>()) {
-      llvm::raw_svector_ostream OS(TypeStr);
-      FunctionType.print(OS);
-      Builder.addTypeAnnotation(OS.str());
-      return;
-    }
-
-    if (FirstIndex != 0)
+    if (FirstIndex != 0 && !FunctionType->is<ErrorType>())
       FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
 
-    Type FirstInputType = FunctionType->castTo<AnyFunctionType>()->getInput();
+    // Add the method, possibly including any default arguments.
+    auto addMethodImpl = [&](bool includeDefaultArgs = true) {
+      CodeCompletionResultBuilder Builder(
+          Sink, CodeCompletionResult::ResultKind::Declaration,
+          getSemanticContext(FD, Reason));
+      Builder.setAssociatedDecl(FD);
+      addLeadingDot(Builder);
+      Builder.addTextChunk(Name);
+      if (IsDynamicLookup)
+        Builder.addDynamicLookupMethodCallTail();
+      else if (FD->getAttrs().hasAttribute<OptionalAttr>())
+        Builder.addOptionalMethodCallTail();
 
-    if (IsImplicitlyCurriedInstanceMethod) {
-      if (auto PT = dyn_cast<ParenType>(FirstInputType.getPointer()))
-        FirstInputType = PT->getUnderlyingType();
+      llvm::SmallString<32> TypeStr;
 
-      Builder.addLeftParen();
-      Builder.addCallParameter(Ctx.Id_self, FirstInputType, /*IsVarArg*/false);
-      Builder.addRightParen();
-    } else {
-      Builder.addLeftParen();
-      addParamPatternFromFunction(Builder,
-                                  FunctionType->castTo<AnyFunctionType>(), FD);
-      Builder.addRightParen();
-    }
-
-    FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
-
-    // Build type annotation.
-    {
-      llvm::raw_svector_ostream OS(TypeStr);
-      for (unsigned i = FirstIndex + 1, e = FD->getBodyParamPatterns().size();
-           i != e; ++i) {
-        FunctionType->castTo<AnyFunctionType>()->getInput()->print(OS);
-        FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
-        OS << " -> ";
+      if (FunctionType->is<ErrorType>()) {
+        llvm::raw_svector_ostream OS(TypeStr);
+        FunctionType.print(OS);
+        Builder.addTypeAnnotation(OS.str());
+        return;
       }
-      // What's left is the result type.
-      Type ResultType = FunctionType;
-      if (ResultType->isVoid())
-        OS << "Void";
-      else
-        ResultType.print(OS);
-    }
-    Builder.addTypeAnnotation(TypeStr);
 
-    // TODO: skip arguments with default parameters?
+      Type FirstInputType = FunctionType->castTo<AnyFunctionType>()->getInput();
+
+      if (IsImplicitlyCurriedInstanceMethod) {
+        if (auto PT = dyn_cast<ParenType>(FirstInputType.getPointer()))
+          FirstInputType = PT->getUnderlyingType();
+
+        Builder.addLeftParen();
+        Builder.addCallParameter(Ctx.Id_self, FirstInputType,
+                                 /*IsVarArg*/ false);
+        Builder.addRightParen();
+      } else {
+        Builder.addLeftParen();
+        addParamPatternFromFunction(Builder,
+                                    FunctionType->castTo<AnyFunctionType>(), FD,
+                                    includeDefaultArgs);
+        Builder.addRightParen();
+      }
+
+      Type ResultType = FunctionType->castTo<AnyFunctionType>()->getResult();
+
+      // Build type annotation.
+      {
+        llvm::raw_svector_ostream OS(TypeStr);
+        for (unsigned i = FirstIndex + 1, e = FD->getBodyParamPatterns().size();
+             i != e; ++i) {
+          ResultType->castTo<AnyFunctionType>()->getInput()->print(OS);
+          ResultType = ResultType->castTo<AnyFunctionType>()->getResult();
+          OS << " -> ";
+        }
+        // What's left is the result type.
+        if (ResultType->isVoid())
+          OS << "Void";
+        else
+          ResultType.print(OS);
+      }
+      Builder.addTypeAnnotation(TypeStr);
+    };
+
+    if (!FunctionType->is<ErrorType>() &&
+        hasInterestingDefaultValues(FunctionType->castTo<AnyFunctionType>())) {
+      addMethodImpl(/*includeDefaultArgs*/ false);
+    }
+    addMethodImpl();
   }
 
   void addConstructorCall(const ConstructorDecl *CD,
                           DeclVisibilityKind Reason) {
     foundFunction(CD);
-    CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(CD, Reason));
-    Builder.setAssociatedDecl(CD);
-     if (IsSuperRefExpr) {
-      assert(isa<ConstructorDecl>(CurrDeclContext) &&
-             "can call super.init only inside a constructor");
-      addLeadingDot(Builder);
-      Builder.addTextChunk("init");
-    }
-
     Type MemberType = getTypeOfMember(CD);
-    if (MemberType->is<ErrorType>()) {
-      addTypeAnnotation(Builder, MemberType);
-      return;
-    }
+    AnyFunctionType *ConstructorType = nullptr;
+    if (!MemberType->is<ErrorType>())
+      ConstructorType = MemberType->castTo<AnyFunctionType>()
+                            ->getResult()
+                            ->castTo<AnyFunctionType>();
 
-    if (!HaveLParen)
-      Builder.addLeftParen();
-    else
-      Builder.addAnnotatedLeftParen();
+    // Add the constructor, possibly including any default arguments.
+    auto addConstructorImpl = [&](bool includeDefaultArgs = true) {
+      CodeCompletionResultBuilder Builder(
+          Sink, CodeCompletionResult::ResultKind::Declaration,
+          getSemanticContext(CD, Reason));
+      Builder.setAssociatedDecl(CD);
+      if (IsSuperRefExpr) {
+        assert(isa<ConstructorDecl>(CurrDeclContext) &&
+               "can call super.init only inside a constructor");
+        addLeadingDot(Builder);
+        Builder.addTextChunk("init");
+      }
 
-    Type ConstructorType = MemberType->castTo<AnyFunctionType>()->getResult();
-    addParamPatternFromFunction(
-        Builder, ConstructorType->castTo<AnyFunctionType>(), CD);
+      if (MemberType->is<ErrorType>()) {
+        addTypeAnnotation(Builder, MemberType);
+        return;
+      }
+      assert(ConstructorType);
 
-    Builder.addRightParen();
-    addTypeAnnotation(
-        Builder, ConstructorType->castTo<AnyFunctionType>()->getResult());
+      if (!HaveLParen)
+        Builder.addLeftParen();
+      else
+        Builder.addAnnotatedLeftParen();
+
+      addParamPatternFromFunction(Builder, ConstructorType, CD,
+                                  includeDefaultArgs);
+
+      Builder.addRightParen();
+      addTypeAnnotation(Builder, ConstructorType->getResult());
+    };
+
+    if (ConstructorType && hasInterestingDefaultValues(ConstructorType))
+      addConstructorImpl(/*includeDefaultArgs*/ false);
+    addConstructorImpl();
   }
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
