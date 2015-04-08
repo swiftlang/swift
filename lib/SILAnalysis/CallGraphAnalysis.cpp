@@ -103,14 +103,13 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     SWIFT_FALLTHROUGH;
   case ValueKind::FunctionRefInst: {
     auto *CalleeFn = cast<FunctionRefInst>(Callee)->getReferencedFunction();
-    if (CalleeFn->isExternalDeclaration()) {
-      if (!M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll))
+    if (CalleeFn->isExternalDeclaration())
+      if (!M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
+                          CallGraphLinkerEditor(*this).getCallback()))
         return false;
 
-      addCallGraphNode(CalleeFn);
-    }
-
     auto *CalleeNode = getCallGraphNode(CalleeFn);
+    assert(CalleeNode && "Expected call graph node for function definition!");
     CalleeSet.insert(CalleeNode);
     Complete = true;
     return true;
@@ -166,14 +165,13 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     if (!CalleeFn)
       return false;
 
-    if (CalleeFn->isExternalDeclaration()) {
-      if (!M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll))
+    if (CalleeFn->isExternalDeclaration())
+      if (!M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
+                          CallGraphLinkerEditor(*this).getCallback()))
         return false;
 
-      addCallGraphNode(CalleeFn);
-    }
-
     auto *CalleeNode = getCallGraphNode(CalleeFn);
+    assert(CalleeNode && "Expected call graph node for function definition!");
     CalleeSet.insert(CalleeNode);
     Complete = true;
     return true;
@@ -296,12 +294,10 @@ void CallGraph::addEdges(SILFunction *F) {
       if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
         auto *CalleeFn = FRI->getReferencedFunction();
 
-        if (CalleeFn->isExternalDeclaration()) {
-          if (!M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll))
+        if (CalleeFn->isExternalDeclaration())
+          if (!M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
+                              CallGraphLinkerEditor(*this).getCallback()))
             continue;
-
-          addCallGraphNode(CalleeFn);
-        }
 
         if (!CalleeFn->isPossiblyUsedExternally()) {
           bool hasAllApplyUsers = std::none_of(FRI->use_begin(), FRI->use_end(),
@@ -313,6 +309,8 @@ void CallGraph::addEdges(SILFunction *F) {
           // as being incomplete.
           if (!hasAllApplyUsers) {
             auto *CalleeNode = getCallGraphNode(CalleeFn);
+            assert(CalleeNode &&
+                   "Expected call graph node for function definition!");
             CalleeNode->markCallerEdgesIncomplete();
           }
         }

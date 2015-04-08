@@ -37,6 +37,7 @@
 #include "llvm/ADT/ilist.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
+#include <functional>
 
 namespace swift {
   class AnyFunctionType;
@@ -368,14 +369,16 @@ public:
   ///
   /// \return false if the linking failed.
   bool linkFunction(SILFunction *Fun,
-                    LinkingMode LinkAll=LinkingMode::LinkNormal);
+                    LinkingMode LinkAll=LinkingMode::LinkNormal,
+                    std::function<void(SILFunction *)> Callback =nullptr);
 
   /// Attempt to link a function by declaration. Returns true if linking
   /// succeeded, false otherwise.
   ///
   /// \return false if the linking failed.
   bool linkFunction(SILDeclRef Decl,
-                    LinkingMode LinkAll=LinkingMode::LinkNormal);
+                    LinkingMode LinkAll=LinkingMode::LinkNormal,
+                    std::function<void(SILFunction *)> Callback =nullptr);
 
   /// Link in all Witness Tables in the module.
   void linkAllWitnessTables();

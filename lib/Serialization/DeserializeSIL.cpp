@@ -23,6 +23,7 @@
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
@@ -32,6 +33,10 @@ using namespace swift::serialization::sil_block;
 using namespace llvm::support;
 
 STATISTIC(NumDeserializedFunc, "Number of deserialized SIL functions");
+
+llvm::cl::opt<std::string>
+BreakOnLookUp("break-on-lookup", llvm::cl::init(""), llvm::cl::Hidden,
+              llvm::cl::desc("break when deserializing this function"));
 
 static Optional<StringLiteralInst::Encoding>
 fromStableStringEncoding(unsigned value) {
@@ -1711,6 +1716,9 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   if (iter == FuncTable->end())
     return nullptr;
 
+  if (BreakOnLookUp == name)
+    __builtin_debugtrap();
+
   auto Func = readSILFunction(*iter, InFunc, name, /*declarationOnly*/ false);
   if (Func) {
     DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
@@ -1727,6 +1735,9 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name) {
   auto iter = FuncTable->find(name);
   if (iter == FuncTable->end())
     return nullptr;
+
+  if (BreakOnLookUp == name)
+    __builtin_debugtrap();
 
   auto Func = readSILFunction(*iter, nullptr, name, /*declarationOnly*/ false);
   if (Func)

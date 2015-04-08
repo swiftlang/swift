@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include <functional>
 using namespace swift;
 using namespace Lowering;
 
@@ -447,14 +448,16 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
   return lookUpFunction(name);
 }
 
-bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
+bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode,
+                             std::function<void(SILFunction *)> Callback) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode,
-                          ExternalSource).processFunction(Fun);
+                          ExternalSource, Callback).processFunction(Fun);
 }
 
-bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode) {
+bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode,
+                             std::function<void(SILFunction *)> Callback) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode,
-                          ExternalSource).processDeclRef(Decl);
+                          ExternalSource, Callback).processDeclRef(Decl);
 }
 
 void SILModule::linkAllWitnessTables() {

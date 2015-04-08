@@ -18,6 +18,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include <functional>
 
 namespace swift {
 
@@ -44,12 +45,18 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
   /// The current linking mode.
   LinkingMode Mode;
 
+  /// The callback which is called each time a new function body is
+  /// deserialized.
+  std::function<void(SILFunction *)> Callback;
+
 public:
   SILLinkerVisitor(SILModule &M, SerializedSILLoader *L,
                    SILModule::LinkingMode LinkingMode,
-                   SILExternalSource *E = nullptr)
+                   SILExternalSource *E = nullptr,
+                   std::function<void(SILFunction *)> Callback =nullptr)
       : Mod(M), Loader(L), ExternalSource(E), Worklist(),
-        FunctionDeserializationWorklist(), Mode(LinkingMode) {}
+        FunctionDeserializationWorklist(), Mode(LinkingMode),
+        Callback(Callback) {}
 
   /// Process F, recursively deserializing any thing F may reference.
   bool processFunction(SILFunction *F);

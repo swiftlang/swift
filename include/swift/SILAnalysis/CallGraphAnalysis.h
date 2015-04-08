@@ -360,6 +360,22 @@ public:
   void addEdgesForApply(FullApplySite AI) { CG.addEdgesForApply(AI); }
 };
 
+class CallGraphLinkerEditor {
+  CallGraph &CG;
+
+  void callback(SILFunction *F) {
+    CallGraphEditor(CG).addCallGraphNode(F);
+  }
+
+public:
+  CallGraphLinkerEditor(CallGraph &CG) : CG(CG) {}
+
+  std::function<void(SILFunction *)> getCallback() {
+    return std::bind(&CallGraphLinkerEditor::callback, this,
+                     std::placeholders::_1);
+  }
+};
+
 /// The Call Graph Analysis provides information about the call graph.
 class CallGraphAnalysis : public SILAnalysis {
   SILModule *M;

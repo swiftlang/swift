@@ -18,6 +18,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include <functional>
 
 using namespace swift;
 using namespace Lowering;
@@ -53,8 +54,12 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
 
   // If F is a declaration, first deserialize it.
   auto *NewFn = F->isExternalDeclaration() ? Loader->lookupSILFunction(F) : F;
-  if (!NewFn || NewFn->empty())
+  if (!NewFn || NewFn->isExternalDeclaration())
     return false;
+
+  // Notify client of new deserialized function.
+  if (Callback)
+    Callback(NewFn);
 
   ++NumFuncLinked;
 
@@ -76,12 +81,16 @@ bool SILLinkerVisitor::processDeclRef(SILDeclRef Decl) {
       isAvailableExternally(Decl.getLinkage(ForDefinition_t::NotForDefinition))
           ? Loader->lookupSILFunction(Decl)
           : nullptr;
-  if (!NewFn || NewFn->empty())
+  if (!NewFn || NewFn->isExternalDeclaration())
     return false;
 
   if (!shouldImportFunction(NewFn)) {
     return false;
   }
+
+  // Notify client of new deserialized function.
+  if (Callback)
+    Callback(NewFn);
 
   ++NumFuncLinked;
 
@@ -322,10 +331,18 @@ bool SILLinkerVisitor::process() {
               continue;
 
             // The ExternalSource may wish to rewrite non-empty bodies.
-            if (!F->empty() && ExternalSource) {
+            if (!F->isExternalDeclaration() && ExternalSource) {
               if (auto *NewFn = ExternalSource->lookupSILFunction(F)) {
+                if (NewFn->isExternalDeclaration())
+                  continue;
+
                 NewFn->verify();
                 Worklist.push_back(NewFn);
+
+                // Notify client of new deserialized function.
+                if (Callback)
+                  Callback(NewFn);
+
                 ++NumFuncLinked;
                 Result = true;
                 continue;
@@ -334,11 +351,19 @@ bool SILLinkerVisitor::process() {
 
             F->setBare(IsBare);
 
-            if (F->empty()) {
+            if (F->isExternalDeclaration()) {
               if (auto *NewFn = Loader->lookupSILFunction(F)) {
+                if (NewFn->isExternalDeclaration())
+                  continue;
+
                 NewFn->verify();
                 Worklist.push_back(NewFn);
                 Result = true;
+
+                // Notify client of new deserialized function.
+                if (Callback)
+                  Callback(NewFn);
+
                 ++NumFuncLinked;
               }
             }

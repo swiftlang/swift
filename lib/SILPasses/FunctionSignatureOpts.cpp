@@ -819,6 +819,8 @@ public:
       CallGraphNode *FNode = CG.getCallGraphNode(&F);
 
       // If we don't have any call graph information for F, skip F.
+      // FIXME: Update call graph during function signature
+      //        optimization, and change this to an assert.
       if (!FNode)
         continue;
 
