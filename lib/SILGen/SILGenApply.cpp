@@ -1664,8 +1664,26 @@ static SILValue emitRawApply(SILGenFunction &gen,
 
   auto resultType = substFnType->getResult().getSILType();
   auto calleeType = SILType::getPrimitiveObjectType(substFnType);
-  SILValue result = gen.B.createApply(loc, fnValue, calleeType,
-                                      resultType, subs, argValues);
+
+  // If we don't have an error result, we can make a simple 'apply'.
+  SILValue result;
+  if (!substFnType->hasErrorResult()) {
+    result = gen.B.createApply(loc, fnValue, calleeType,
+                               resultType, subs, argValues);
+
+  // Otherwise, we need to create a try_apply.
+  // TODO: other error patterns.
+  } else {
+    SILBasicBlock *normalBB = gen.createBasicBlock();
+    result = normalBB->createBBArg(resultType);
+
+    SILBasicBlock *errorBB =
+      gen.getTryApplyErrorDest(loc, substFnType->getErrorResult());
+
+    gen.B.createTryApply(loc, fnValue, calleeType, subs, argValues,
+                         normalBB, errorBB);
+    gen.B.emitBlock(normalBB);
+  }
 
   // Given any guaranteed arguments that are not being passed at +0, insert the
   // decrement here instead of at the end of scope. Guaranteed just means that

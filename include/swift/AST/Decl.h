@@ -4744,6 +4744,9 @@ public:
   /// Resolved during type checking
   void setIsOverridden() { AbstractFunctionDeclBits.Overridden = true; }
 
+  /// Whether the function body is 'throws'.
+  bool isBodyThrowing() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
            D->getKind() <= DeclKind::Last_AbstractFunctionDecl;

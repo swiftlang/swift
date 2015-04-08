@@ -677,9 +677,10 @@ public:
   /// \param returnType  If non-null, the epilog block will be created with an
   ///                    argument of this type to receive the return value for
   ///                    the function.
+  /// \param isThrowing  If true, create an error epilog block.
   /// \param L           The SILLocation which should be accosocated with
   ///                    cleanup instructions.
-  void prepareEpilog(Type returnType, CleanupLocation L);
+  void prepareEpilog(Type returnType, bool isThrowing, CleanupLocation L);
   
   /// \brief Branch to and emit the epilog basic block. This will fuse
   /// the epilog to the current basic block if the epilog bb has no predecessor.
@@ -705,6 +706,14 @@ public:
   ///        AbstractClosureExpr.
   /// \param IsAutoGen Flags if the prolog is auto-generated.
   void emitEpilog(SILLocation TopLevelLoc, bool IsAutoGen = false);
+
+  /// \brief Emit the rethrow basic block, leaving the insertion point there.
+  /// \returns None if there is no rethrow block or it is unreachable
+  Optional<std::pair<SILValue, SILLocation>>
+    emitRethrowBB(SILLocation topLevelLoc);
+
+  /// \brief Emits the standard rethrow epilog using a Swift error result.
+  void emitRethrowEpilog(SILLocation topLevelLoc);
   
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
@@ -1067,6 +1076,9 @@ public:
                                            ArrayRef<ManagedValue> args,
                                            SGFContext ctx);
 
+  SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
+                                      SILResultInfo exnResult);
+
   /// Emit a dynamic member reference.
   RValue emitDynamicMemberRefExpr(DynamicMemberRefExpr *e, SGFContext c);
 
@@ -1302,7 +1314,11 @@ public:
   SavedInsertionPoint &operator=(const SavedInsertionPoint &) = delete;
 
   ~SavedInsertionPoint() {
-    SGF.B.setInsertionPoint(SavedIP);
+    if (SavedIP) {
+      SGF.B.setInsertionPoint(SavedIP);
+    } else {
+      SGF.B.clearInsertionPoint();
+    }
     SGF.CurFunctionSection = SavedSection;
   }
 };

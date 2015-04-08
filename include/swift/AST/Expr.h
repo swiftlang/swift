@@ -2716,6 +2716,9 @@ public:
   /// \brief Retrieve the result type of this closure.
   Type getResultType() const;
 
+  /// \brief Return whether this closure is throwing when fully applied.
+  bool isBodyThrowing() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 

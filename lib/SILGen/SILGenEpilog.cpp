@@ -18,7 +18,8 @@
 using namespace swift;
 using namespace Lowering;
 
-void SILGenFunction::prepareEpilog(Type resultType, CleanupLocation CleanupL) {
+void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
+                                   CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
 
   // If we have a non-null, non-void, non-address-only return type, receive the
@@ -30,6 +31,13 @@ void SILGenFunction::prepareEpilog(Type resultType, CleanupLocation CleanupL) {
       new (F.getModule()) SILArgument(epilogBB, resultTI.getLoweredType());
   }
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
+
+  if (isThrowing) {
+    auto exnType = SILType::getExceptionType(getASTContext());
+    SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
+    new (F.getModule()) SILArgument(rethrowBB, exnType);
+    ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), CleanupL);
+  }
 }
 
 std::pair<Optional<SILValue>, SILLocation>
@@ -154,8 +162,69 @@ void SILGenFunction::emitEpilog(SILLocation TopLevel, bool AutoGen) {
     returnValue = emitEmptyTuple(CleanupLocation::get(TopLevel));
 
   B.createReturn(returnLoc, returnValue);
+
   if (!MainScope)
     MainScope = F.getDebugScope();
   setDebugScopeForInsertedInstrs(MainScope);
 }
 
+Optional<std::pair<SILValue, SILLocation>>
+SILGenFunction::emitRethrowBB(SILLocation topLevel) {
+  assert(!B.hasValidInsertionPoint());
+
+  // If we don't have a rethrow destination, we're done.
+  if (!ThrowDest.isValid()) {
+    return None;
+  }
+
+  // If the rethrow destination isn't used, we're done.
+  SILBasicBlock *rethrowBB = ThrowDest.getBlock();
+  if (rethrowBB->pred_empty()) {
+    ThrowDest = JumpDest::invalid();
+    eraseBasicBlock(rethrowBB);
+    return None;
+  }
+
+  SILLocation throwLoc = topLevel;
+  SILValue exn = rethrowBB->bbarg_begin()[0];
+  bool reposition = true;
+
+  // If the rethrow destination has a single branch predecessor,
+  // consider emitting the rethrow into it.
+  SILBasicBlock *predBB = *rethrowBB->pred_begin();
+  if (std::next(rethrowBB->pred_begin()) == rethrowBB->pred_end()) {
+    if (auto branch = dyn_cast<BranchInst>(predBB->getTerminator())) {
+      assert(branch->getArgs().size() == 1);
+
+      // Save the location and operand information from the branch,
+      // then destroy it.
+      throwLoc = branch->getLoc();
+      exn = branch->getArgs()[0];
+      predBB->getInstList().erase(branch);
+
+      // Erase the rethrow block.
+      eraseBasicBlock(rethrowBB);
+      rethrowBB = predBB;
+      reposition = false;
+    }
+  }
+
+  // Reposition the rethrow block to the end of the postmatter section
+  // unless we're emitting into a single predecessor.
+  if (reposition) {
+    B.moveBlockTo(rethrowBB, F.end());
+  }
+
+  B.setInsertionPoint(rethrowBB);
+  Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation());
+
+  ThrowDest = JumpDest::invalid();
+  return std::make_pair(exn, throwLoc);
+}
+
+void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
+  auto exnAndThrowLoc = emitRethrowBB(topLevel);
+  if (exnAndThrowLoc) {
+    B.createThrow(exnAndThrowLoc->second, exnAndThrowLoc->first);
+  }
+}

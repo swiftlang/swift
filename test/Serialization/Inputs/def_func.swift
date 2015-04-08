@@ -63,4 +63,4 @@ public protocol EqualOperator {
 }
 
 public func throws1() throws {}
-public func throws2<T>(t: T) -> T { return t }
+public func throws2<T>(t: T) throws -> T { return t }

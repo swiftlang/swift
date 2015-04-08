@@ -234,8 +234,8 @@ public:
                                ArrayRef<SILValue> args,
                                SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB) {
-    return insert(TryApplyInst::create(loc, fn, substFnTy, subs, args,
-                                       normalBB, errorBB, F));
+    return insertTerminator(TryApplyInst::create(loc, fn, substFnTy, subs, args,
+                                                 normalBB, errorBB, F));
   }
 
 

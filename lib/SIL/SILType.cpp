@@ -19,6 +19,17 @@
 using namespace swift;
 using namespace swift::Lowering;
 
+SILType SILType::getExceptionType(const ASTContext &C) {
+  CanType exnType;
+  if (auto exn = C.getExceptionTypeDecl()) {
+    exnType = exn->getDeclaredType()->getCanonicalType();
+  } else {
+    // Use Builtin.NativeObject just as a stand-in.
+    exnType = C.TheNativeObjectType;
+  }
+  return SILType::getPrimitiveObjectType(exnType);
+}
+
 SILType SILType::getNativeObjectType(const ASTContext &C) {
   return SILType(CanType(C.TheNativeObjectType), SILValueCategory::Object);
 }

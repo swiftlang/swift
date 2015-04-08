@@ -83,6 +83,9 @@ ERROR(unsupported_recursive_type,sil_gen,none,
 ERROR(unhandled_throw,sil_gen,none,
       "error is not handled and enclosing function is not marked "
       "with 'throws'", ())
+ERROR(unhandled_throw_from_apply,sil_gen,none,
+      "call can throw, but error is not handled and enclosing function "
+      "is not marked with 'throws'", ())
 ERROR(nonexhaustive_catch,sil_gen,none,
       "'catch' patterns must be exhaustive in function not marked "
       "with 'throws'", ())

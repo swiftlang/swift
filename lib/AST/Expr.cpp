@@ -668,6 +668,13 @@ Type AbstractClosureExpr::getResultType() const {
   return getType()->castTo<FunctionType>()->getResult();
 }
 
+bool AbstractClosureExpr::isBodyThrowing() const {
+  if (getType()->is<ErrorType>())
+    return false;
+
+  return getType()->castTo<FunctionType>()->getExtInfo().throws();
+}
+
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
   if (auto closure = dyn_cast<ClosureExpr>(this))
     return closure->hasSingleExpressionBody();

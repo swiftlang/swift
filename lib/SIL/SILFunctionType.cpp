@@ -534,8 +534,15 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     result = SILResultInfo(loweredResultType, convention);
   }
 
-  // TODO: map native 'throws' to an error result type.
+  // Map native 'throws' to an error result type.
+  // TODO: handle imported conventions.
   Optional<SILResultInfo> errorResult;
+  if (substFnInterfaceType->getExtInfo().throws()) {
+    SILType exnType = SILType::getExceptionType(M.getASTContext());
+    assert(exnType.isObject());
+    errorResult = SILResultInfo(exnType.getSwiftRValueType(),
+                                ResultConvention::Owned);
+  }
 
   // Destructure the input tuple type.
   if (!origType.isOpaque()) {

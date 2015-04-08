@@ -46,6 +46,11 @@ SILGenFunction::~SILGenFunction() {
   // If the end of the function isn't terminated, we screwed up somewhere.
   assert(!B.hasValidInsertionPoint() &&
          "SILGenFunction did not terminate function?!");
+
+  // If we didn't clean up the rethrow destination, we screwed up somewhere.
+  assert(!ThrowDest.isValid() &&
+         "SILGenFunction did not emit throw destination");
+
   freeWritebackStack();
 }
 
@@ -399,19 +404,21 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
   Type resultTy = fd->getResultType();
   emitProlog(fd, fd->getBodyParamPatterns(), resultTy);
-  prepareEpilog(resultTy, CleanupLocation(fd));
+  prepareEpilog(resultTy, fd->isBodyThrowing(), CleanupLocation(fd));
 
   emitProfilerIncrement(fd->getBody());
   emitStmt(fd->getBody());
 
   emitEpilog(fd);
+  emitRethrowEpilog(fd);
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
 
   emitProlog(ace, ace->getParams(), ace->getResultType());
-  prepareEpilog(ace->getResultType(), CleanupLocation(ace));
+  prepareEpilog(ace->getResultType(), ace->isBodyThrowing(),
+                CleanupLocation(ace));
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitProfilerIncrement(ce);
     emitStmt(ce->getBody());
@@ -424,6 +431,7 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
                    autoclosure->getSingleExpressionBody());
   }
   emitEpilog(ace);
+  emitRethrowEpilog(ace);
 }
 
 void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
@@ -867,7 +875,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   overrideLocationForMagicIdentifiers = SourceLoc();
 
   emitProlog({ }, value->getType(), function.getDecl()->getDeclContext());
-  prepareEpilog(value->getType(), CleanupLocation::get(Loc));
+  prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);
 }

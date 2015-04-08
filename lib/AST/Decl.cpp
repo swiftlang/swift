@@ -3467,6 +3467,21 @@ Type FuncDecl::getResultType() const {
   return resultTy;
 }
 
+bool AbstractFunctionDecl::isBodyThrowing() const {
+  if (!hasType())
+    return false;
+
+  Type type = getType();
+  if (type->is<ErrorType>())
+    return false;
+
+  auto fnTy = type->castTo<AnyFunctionType>();
+  for (unsigned i = 1, e = getNaturalArgumentCount(); i != e; ++i)
+    fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+
+  return fnTy->getExtInfo().throws();
+}
+
 bool FuncDecl::isUnaryOperator() const {
   if (!isOperator())
     return false;

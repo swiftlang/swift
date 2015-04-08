@@ -18,6 +18,7 @@
 #include "swift/AST/AST.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -220,7 +221,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  prepareEpilog(Type(), CleanupLocation(ctor));
+  prepareEpilog(Type(), ctor->isBodyThrowing(), CleanupLocation(ctor));
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -276,6 +277,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(ctor);
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(ctor);
+
+  // Don't finish without emitting the rethrow epilog.
+  defer([&]{ emitRethrowEpilog(ctor); });
 
   // Return 'self' in the epilog.
   if (!maybeReturnValue)
@@ -626,7 +630,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(Type(), CleanupLocation::get(endOfInitLoc));
+  prepareEpilog(Type(), ctor->isBodyThrowing(),
+                CleanupLocation::get(endOfInitLoc));
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -688,6 +693,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(ctor);
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(ctor);
+
+  // Don't finish without emitting the rethrow epilog.
+  defer([&]{ emitRethrowEpilog(ctor); });
 
   if (!maybeReturnValue)
     return;
@@ -838,7 +846,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   VarLocs[selfDecl] = VarLoc::get(selfArg);
 
   auto cleanupLoc = CleanupLocation::get(loc);
-  prepareEpilog(TupleType::getEmpty(getASTContext()), cleanupLoc);
+  prepareEpilog(TupleType::getEmpty(getASTContext()), false, cleanupLoc);
 
   // Emit the initializers.
   emitMemberInitializers(cd->getDestructor()->getImplicitSelfDecl(), cd);

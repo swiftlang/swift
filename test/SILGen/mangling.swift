@@ -162,25 +162,25 @@ func curry1() {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@thin () -> Int
+// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@thin () -> (Int, @error _ErrorType)
 func bar() throws -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@thin () -> () 
+// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@thin () -> @error _ErrorType
 func curry1Throws() throws {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@thin () -> @owned @callee_owned () -> ()
+// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@thin () -> (@owned @callee_owned () -> (), @error _ErrorType)
 func curry2Throws() throws -> () -> () {
   return curry1
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@thin () -> @owned @callee_owned () -> ()
+// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@thin () -> @owned @callee_owned () -> @error _ErrorType
 func curry3() -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@thin () -> @owned @callee_owned () -> ()
+// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@thin () -> (@owned @callee_owned () -> @error _ErrorType, @error _ErrorType)
 func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }

@@ -725,6 +725,32 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
   SGF.Cleanups.emitBranchAndCleanups(SGF.FailDest, S);
 }
 
+/// Return a basic block suitable to be the destination block of a
+/// try_apply instruction.  The block is implicitly emitted and filled in.
+SILBasicBlock *
+SILGenFunction::getTryApplyErrorDest(SILLocation loc,
+                                     SILResultInfo exnResult) {
+  assert(exnResult.getConvention() == ResultConvention::Owned);
+
+  // For now, don't try to re-use destination blocks for multiple
+  // failure sites.
+  SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
+  SILValue exn = destBB->createBBArg(exnResult.getSILType());
+
+  assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
+  SavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
+
+  if (ThrowDest.isValid()) {
+    FullExpr scope(Cleanups, CleanupLocation::get(loc));
+    emitThrow(loc, emitManagedRValueWithCleanup(exn));
+  } else {
+    SGM.diagnose(loc, diag::unhandled_throw_from_apply);
+    B.createUnreachable(loc);
+  }
+
+  return destBB;
+}
+
 void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV) {
   assert(ThrowDest.isValid() &&
          "calling emitThrow with invalid throw destination!");

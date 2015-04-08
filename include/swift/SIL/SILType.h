@@ -487,7 +487,10 @@ public:
                                      const ASTContext &C);
   /// Get the builtin word type as a SILType;
   static SILType getBuiltinWordType(const ASTContext &C);
-  
+
+  /// Get the standard exception type.
+  static SILType getExceptionType(const ASTContext &C);
+
   //
   // Utilities for treating SILType as a pointer-like type.
   //
