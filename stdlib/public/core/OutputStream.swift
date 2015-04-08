@@ -70,11 +70,10 @@ public protocol CustomDebugStringConvertible {
   var debugDescription: String { get }
 }
 
-// FIXME: disabled due to <rdar://20450682>
 // @availability(*, unavailable, renamed="CustomDebugStringConvertible")
-// public protocol DebugPrintable {}
+typealias DebugPrintable = CustomDebugStringConvertible
 // @availability(*, unavailable, renamed="CustomStringConvertible")
-// public protocol Printable {}
+typealias Printable = CustomStringConvertible
 
 //===----------------------------------------------------------------------===//
 // `print`
@@ -198,13 +197,12 @@ public func println() {
   stdoutStream.write("\n")
 }
 
-@availability(*, unavailable, renamed="String")
+/// Returns the result of `print`\ 'ing `x` into a `String`
+@inline(never)
 public func toString<T>(x: T) -> String {
-  fatalError("unreachable")
-}
-
-internal func _toString<T>(x: T) -> String {
-  return String(x)
+  var result = ""
+  print(x, &result)
+  return result
 }
 
 /// Returns the result of `print`\ 'ing `x` into a `String`
@@ -226,9 +224,11 @@ func _toStringReadOnlyPrintable<T : CustomStringConvertible>(x: T) -> String {
   return x.description
 }
 
-@availability(*, unavailable, renamed="String(reflecting:)")
+/// Returns the result of `debugPrint`\ 'ing `x` into a `String`
 public func toDebugString<T>(x: T) -> String {
-  fatalError("unavailable")
+  var result = ""
+  debugPrint(x, &result)
+  return result
 }
 
 //===----------------------------------------------------------------------===//

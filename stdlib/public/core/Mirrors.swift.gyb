@@ -35,6 +35,10 @@ for self_ty in all_integer_types(word_bits):
 
 }%
 
+internal func _toString<T>(x: T) -> String {
+  return String(x)
+}
+
 % for Type in Types:
 extension ${Type[0]} : Reflectable {
   /// Returns a mirror that reflects `self`.
