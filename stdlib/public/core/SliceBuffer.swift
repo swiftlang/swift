@@ -60,6 +60,11 @@ struct _SliceBuffer<T> : _ArrayBufferType {
       owner as? _ContiguousArrayStorageBase ?? _emptyArrayStorage)
   }
 
+  public var nativeOwner: AnyObject {
+    _sanityCheck(_hasNativeBuffer, "Expect a native array")
+    return owner
+  }
+
   /// Replace the given subRange with the first newCount elements of
   /// the given collection.
   ///

@@ -271,6 +271,10 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     return _storage ?? _emptyArrayStorage
   }
 
+  public var nativeOwner: AnyObject {
+    return owner
+  }
+
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.

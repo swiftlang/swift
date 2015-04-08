@@ -307,6 +307,12 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
     return _buffer.capacity
   }
 
+  // Requires: the array has a native buffer
+  @semantics("array.owner")
+  func _getOwner() -> Builtin.NativeObject {
+    return Builtin.castToNativeObject(_buffer.nativeOwner)
+  }
+
   // Don't inline copyBuffer - this would inline the copy loop into the current
   // path preventing retains/releases to be matched accross that region.
   @inline(never)
@@ -354,19 +360,6 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
     _precondition(_buffer._isValidSubscript(index,
           hoistedIsNativeNoTypeCheckBuffer: hoistedIsNativeNoTypeCheckBuffer),
           "${Self} index out of range")
-  }
-
-  // Requires: the array has a native buffer
-  @semantics("array.owner")
-  func _getOwner() -> Builtin.NativeObject {
-    return Builtin.castToNativeObject(_buffer.nativeOwner)
-  }
-%else:
-
-  // Requires: the array has a native buffer
-  @semantics("array.owner")
-  func _getOwner() -> Builtin.NativeObject {
-    return Builtin.castToNativeObject(_buffer.owner)
   }
 %end
 

@@ -430,6 +430,11 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return _storage
   }
 
+  /// An object that keeps the elements stored in this buffer alive
+  public var nativeOwner: AnyObject {
+    return _storage
+  }
+
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
