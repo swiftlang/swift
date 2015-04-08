@@ -110,7 +110,6 @@ public struct Range<
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = T
-  public typealias ArraySlice = Range<T>
   public typealias _Element = T
   
   /// Access the element at `position`.
