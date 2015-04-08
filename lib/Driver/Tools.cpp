@@ -230,6 +230,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   case OutputInfo::Mode::REPL:
     FrontendModeOption = "-repl";
     break;
+  case OutputInfo::Mode::FixCode:
   case OutputInfo::Mode::UpdateCode:
     // Make sure that adding '-update-code' will permit accepting all arguments
     // '-c' accepts.
@@ -247,6 +248,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   // Add input arguments.
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::FixCode:
   case OutputInfo::Mode::UpdateCode: {
     if (isa<BackendJobAction>(JA)) {
       assert(Inputs->size() == 1 && "The Swift backend expects one input!");
@@ -314,6 +316,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::FixCode:
   case OutputInfo::Mode::UpdateCode:
     break;
   case OutputInfo::Mode::Immediate:
