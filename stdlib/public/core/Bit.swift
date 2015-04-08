@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  Used to index SequenceOfOne<T>
+//  Used to index CollectionOfOne<T>
 //
 //===----------------------------------------------------------------------===//
 
 /// A `RandomAccessIndexType` that has two possible values.  Used as
-/// the `Index` type for `SequenceOfOne<T>`.
+/// the `Index` type for `CollectionOfOne<T>`.
 public enum Bit : Int, Comparable, RandomAccessIndexType, Reflectable {
   case Zero = 0, One = 1
 
