@@ -108,7 +108,7 @@ private:
 
 } // anonymous namespace
 
-int update_main(ArrayRef<const char *> Args, const char *Argv0, void *MainAddr){
+int fixit_main(ArrayRef<const char *> Args, const char *Argv0, void *MainAddr){
   CompilerInstance Instance;
   PrintingDiagnosticConsumer PDC;
   Instance.addDiagnosticConsumer(&PDC);

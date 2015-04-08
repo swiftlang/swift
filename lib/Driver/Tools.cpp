@@ -156,6 +156,10 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     SmallString<128> SwiftUpdatePath = llvm::sys::path::parent_path(Exec);
     llvm::sys::path::append(SwiftUpdatePath, "swift-update");
     Exec = Args.MakeArgString(SwiftUpdatePath.str());
+  } else if (OI.CompilerMode == OutputInfo::Mode::FixCode) {
+    SmallString<128> SwiftFixPath = llvm::sys::path::parent_path(Exec);
+    llvm::sys::path::append(SwiftFixPath, "swift-fixit");
+    Exec = Args.MakeArgString(SwiftFixPath.str());
   } else {
     // Invoke ourselves in -frontend mode.
     Arguments.push_back("-frontend");

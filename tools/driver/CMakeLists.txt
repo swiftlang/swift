@@ -21,6 +21,10 @@ add_custom_command(TARGET swift POST_BUILD
     WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
 add_custom_command(TARGET swift POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-fixit"
+    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+add_custom_command(TARGET swift POST_BUILD
     COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-autolink-extract"
     WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
@@ -49,6 +53,9 @@ swift_install_in_component(compiler
     RUNTIME DESTINATION "bin")
 swift_install_in_component(compiler
     FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
+    DESTINATION "bin")
+swift_install_in_component(compiler
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-fixit"
     DESTINATION "bin")
 
 if(SWIFT_HOST_VARIANT STREQUAL "LINUX")

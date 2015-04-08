@@ -68,6 +68,9 @@ public:
 
     /// Invoke swift-update with the compiler frontend options.
     UpdateCode,
+
+    /// Invoke swift-fixit with the compiler frontend options.
+    FixCode,
   };
 
   /// The mode in which the driver should invoke the frontend.
@@ -118,7 +121,7 @@ public:
   enum class DriverKind {
     Interactive,     // swift
     Batch,           // swiftc
-    UpdateCode,      // swift-update
+    FixCode,         // swift-fixit
     AutolinkExtract, // swift-autolink-extract
   };
 

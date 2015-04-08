@@ -93,7 +93,8 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   llvm::StringSwitch<Optional<DriverKind>>(DriverName)
   .Case("swift", DriverKind::Interactive)
   .Case("swiftc", DriverKind::Batch)
-  .Case("swift-update", DriverKind::UpdateCode)
+  .Case("swift-fixit", DriverKind::FixCode)
+  .Case("swift-update", DriverKind::FixCode) // FIXME: remove once fully transitioned.
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
   .Default(None);
   
@@ -1027,6 +1028,7 @@ void Driver::buildActions(const ToolChain &TC,
   ActionList CompileActions;
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::FixCode:
   case OutputInfo::Mode::UpdateCode: {
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
@@ -1831,7 +1833,7 @@ void Driver::printHelp(bool ShowHidden) const {
     ExcludedFlagsBitmask |= options::NoInteractiveOption;
     break;
   case DriverKind::Batch:
-  case DriverKind::UpdateCode:
+  case DriverKind::FixCode:
   case DriverKind::AutolinkExtract:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
