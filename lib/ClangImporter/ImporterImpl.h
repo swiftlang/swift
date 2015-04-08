@@ -451,9 +451,31 @@ public:
 
   /// \brief Keep track of enum constant name prefixes in enums.
   llvm::DenseMap<const clang::EnumDecl *, StringRef> EnumConstantNamePrefixes;
-  
+
+private:
+  class EnumConstantDenseSetInfo {
+  public:
+    using PairTy = std::pair<const clang::EnumDecl *, llvm::APSInt>;
+    using PointerInfo = llvm::DenseMapInfo<const clang::EnumDecl *>;
+    static inline PairTy getEmptyKey() {
+      return {PointerInfo::getEmptyKey(), llvm::APSInt(/*bitwidth=*/1)};
+    }
+    static inline PairTy getTombstoneKey() {
+      return {PointerInfo::getTombstoneKey(), llvm::APSInt(/*bitwidth=*/1)};
+    }
+    static unsigned getHashValue(const PairTy &pair) {
+      return llvm::combineHashValue(PointerInfo::getHashValue(pair.first),
+                                    llvm::hash_value(pair.second));
+    }
+    static bool isEqual(const PairTy &lhs, const PairTy &rhs) {
+      return lhs == rhs;
+    }
+  };
+
+public:
   /// \brief Keep track of enum constant values that have been imported.
-  std::set<std::pair<const clang::EnumDecl *, llvm::APSInt>>
+  llvm::DenseSet<std::pair<const clang::EnumDecl *, llvm::APSInt>,
+                 EnumConstantDenseSetInfo>
     EnumConstantValues;
 
   /// \brief Keep track of initializer declarations that correspond to

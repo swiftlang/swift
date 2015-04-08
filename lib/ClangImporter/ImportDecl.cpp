@@ -1623,13 +1623,11 @@ namespace {
       bool negative = false;
       llvm::APSInt rawValue = decl->getInitVal();
       
-      // Check that we didn't already import an enum constant for this enum
-      // with the same value. Swift enums don't currently support aliases.
-      if (Impl.EnumConstantValues.count({clangEnum, rawValue}))
+      // Did we already import an enum constant for this enum with the
+      // same value?
+      if (!Impl.EnumConstantValues.insert({clangEnum, rawValue}).second)
         return nullptr;
-      
-      Impl.EnumConstantValues.insert({clangEnum, rawValue});
-      
+
       if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType()
           && rawValue.slt(0)) {
         rawValue = -rawValue;
