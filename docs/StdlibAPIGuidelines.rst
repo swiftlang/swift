@@ -39,7 +39,7 @@ guidelines.
   we add a preposition to the end of a function name if the 
   role of the first argument would otherwise be unclear:
 
-  ..parsed-literal::
+  .. parsed-literal::
 
     // origin of measurement is aPosition
     aPosition.distance\ **To**\ (otherPosition)
