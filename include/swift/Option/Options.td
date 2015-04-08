@@ -331,6 +331,10 @@ def update_code : Flag<["-"], "update-code">,
   HelpText<"Update Swift code">, ModeOpt,
   Flags<[HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
+def fixit_code : Flag<["-"], "fixit-code">,
+  HelpText<"Get compiler fixits as code edits">, ModeOpt,
+  Flags<[HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
 // No Output Modes
 def parse : Flag<["-"], "parse">,
   HelpText<"Parse input file(s)">, ModeOpt,

@@ -38,6 +38,9 @@
 // RUN: %swiftc_driver -driver-print-jobs -update-code -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
 // RUN: FileCheck -check-prefix UPDATE-CODE %s < %t.upd.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -fixit-code -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
+// RUN: FileCheck -check-prefix FIXIT-CODE %s < %t.upd.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -whole-module-optimization -incremental %s 2>&1 > %t.wmo-inc.txt
 // RUN: FileCheck %s < %t.wmo-inc.txt
 // RUN: FileCheck -check-prefix NO-REFERENCE-DEPENDENCIES %s < %t.wmo-inc.txt
@@ -97,6 +100,10 @@
 // UPDATE-CODE: bin/swift-update
 // UPDATE-CODE: -c{{ }}
 // UPDATE-CODE: -o {{.+}}.remap
+
+// FIXIT-CODE: bin/swift-fixit
+// FIXIT-CODE: -c{{ }}
+// FIXIT-CODE: -o {{.+}}.remap
 
 
 // NO-REFERENCE-DEPENDENCIES: bin/swift

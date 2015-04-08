@@ -674,6 +674,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.CompilerMode = OutputInfo::Mode::UpdateCode;
     OI.CompilerOutputType = types::TY_Remapping;
     OI.LinkAction = LinkKind::None;
+  } else if (Args.hasArg(options::OPT_fixit_code)) {
+    OI.CompilerMode = OutputInfo::Mode::FixCode;
+    OI.CompilerOutputType = types::TY_Remapping;
+    OI.LinkAction = LinkKind::None;
   } else {
     diagnoseOutputModeArg(Diags, OutputModeArg, !Inputs.empty(), Args,
                           driverKind == DriverKind::Interactive, Name);
