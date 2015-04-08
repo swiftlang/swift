@@ -83,9 +83,12 @@ public:
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   
-  /// CurVars is the list of variables in a PatternBinding when parsing the
-  /// corresponding initializer expression.
-  ArrayRef<VarDecl *> CurVars;
+  /// DisabledVars is a list of variables for whom local name lookup is
+  /// disabled.  This is used when parsing a PatternBindingDecl to reject self
+  /// uses and to disable uses of the bound variables in a let/else block.  The
+  /// diagnostic to emit is stored in DisabledVarReason.
+  ArrayRef<VarDecl *> DisabledVars;
+  Diag<> DisabledVarReason;
   
   llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
   enum {
