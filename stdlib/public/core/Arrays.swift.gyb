@@ -287,7 +287,7 @@ public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _D
   @semantics("array.props.isNative")
   public // @testable
   func _getArrayPropertyIsNative() -> Bool {
-   return _buffer.arrayPropertyIsNativeNoTypeCheck
+   return _buffer.arrayPropertyIsNative
   }
 
   /// Returns true if the array is native and does not need a deferred type
