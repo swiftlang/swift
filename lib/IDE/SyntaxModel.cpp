@@ -382,7 +382,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
 }
 
 Expr *ModelASTWalker::walkToExprPost(Expr *E) {
-  if (!SubStructureStack.empty() &&
+  while (!SubStructureStack.empty() &&
       SubStructureStack.back().ASTNode.getAsExpr() == E)
     popStructureNode();
 
@@ -551,7 +551,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
 }
 
 Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
-  if (!SubStructureStack.empty() &&
+  while (!SubStructureStack.empty() &&
       SubStructureStack.back().ASTNode.getAsStmt() == S)
     popStructureNode();
 
@@ -748,7 +748,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 }
 
 bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
-  if (!SubStructureStack.empty() &&
+  while (!SubStructureStack.empty() &&
       SubStructureStack.back().ASTNode.getAsDecl() == D)
     popStructureNode();
 

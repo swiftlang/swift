@@ -120,3 +120,12 @@ func <#test1#> () {
 
 // CHECK: <gvar>let <name>myArray</name> = <array>[<elem-expr><#item1#></elem-expr>, <elem-expr><#item2#></elem-expr>]</array></gvar>
 let myArray = [<#item1#>, <#item2#>]
+
+// CHECK: <ffunc>func <name>test1()</name> {
+// CHECK:   <call><name>dispatch_async</name>(<param><call><name>dispatch_get_main_queue</name>()</call></param>, <param><brace>{}</brace></param>)</call>
+// CHECK:   <call><name>dispatch_async</name>(<param><call><name>dispatch_get_main_queue</name>()</call></param>) <param><brace>{}</brace></param></call>
+// CHECK: }</ffunc>
+func test1() {
+  dispatch_async(dispatch_get_main_queue(), {})
+  dispatch_async(dispatch_get_main_queue()) {}
+}
