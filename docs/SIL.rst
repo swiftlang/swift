@@ -814,11 +814,12 @@ follows::
   #example.foo!1 : $@thin ((y:B), (x:A)) -> (z:C) -> D
   #example.foo!2 : $@thin ((z:C), (y:B), (x:A)) -> D
 
-The deepest uncurry level is referred to as the **natural uncurry level**.
-Note that the uncurried argument clauses are composed right-to-left, as
-specified in the `calling convention`_. For uncurry levels less than the
-uncurry level, the entry point itself is ``@thin`` but returns a thick
-function value carrying the partially applied arguments for its context.
+The deepest uncurry level is referred to as the **natural uncurry level**. In
+this specific example, the reference at the natural uncurry level is
+``#example.foo!2``.  Note that the uncurried argument clauses are composed
+right-to-left, as specified in the `calling convention`_. For uncurry levels
+less than the uncurry level, the entry point itself is ``@thin`` but returns a
+thick function value carrying the partially applied arguments for its context.
 
 `Dynamic dispatch`_ instructions such as ``class method`` require their method
 declaration reference to be uncurried to at least uncurry level 1 (which applies
