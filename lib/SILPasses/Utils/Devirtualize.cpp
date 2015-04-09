@@ -77,6 +77,10 @@ bool swift::isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
         return true;
     }
   }
+
+  if (C.hasArchetype())
+    return true;
+
   return false;
 }
 
