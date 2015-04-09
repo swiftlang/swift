@@ -551,7 +551,28 @@ extension ${Self} : _ArrayType {
   /// Complexity: amortized ${O1}
   @semantics("array.mutate_unknown")
   public mutating func append(newElement: T) {
-    _arrayAppend(&_buffer, newElement)
+    // Checking for the isNative fast-path in the outermost if-statement helps
+    // the optimizer to eliminate subsequent isNative checks, e.g. when
+    // accessing _buffer.count.
+    if _fastPath(_buffer.arrayPropertyIsNative) {
+      let oldCount = _buffer.count
+      if _buffer.requestUniqueMutableBackingBuffer(oldCount + 1) != nil {
+        _buffer.count = oldCount + 1
+        (_buffer.baseAddress + oldCount).initialize(newElement)
+        return
+      }
+    }
+    _arrayAppendSlowPath(&_buffer, initializePointer: _InitializePointer(newElement))
+  }
+
+  @inline(never)
+  func _arrayAppendSlowPath<_Buffer: _ArrayBufferType>(
+    inout buffer: _Buffer, initializePointer: _InitializePointer<_Buffer.Element>
+  ) {
+    let oldCount = buffer.count
+    var newBuffer = Optional(_forceCreateUniqueMutableBuffer(&buffer, oldCount + 1, oldCount + 1))
+    _arrayOutOfPlaceUpdate(
+      &buffer, &newBuffer, oldCount, 1, initializePointer)
   }
 
   /// Append the elements of `newElements` to `self`.
