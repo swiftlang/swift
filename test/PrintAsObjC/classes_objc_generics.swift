@@ -6,15 +6,15 @@
 // RUN: mkdir %t
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend -sdk %S/../Inputs/objc-generics-sdk -I %t -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/ObjectiveC.swift
-// RUN:  %target-swift-frontend -sdk %S/../Inputs/objc-generics-sdk -I %t -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/CoreGraphics.swift
-// RUN:  %target-swift-frontend -sdk %S/../Inputs/objc-generics-sdk -I %t -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/Foundation.swift
-// RUN:  %target-swift-frontend -sdk %S/../Inputs/objc-generics-sdk -I %t -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/AppKit.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/CoreGraphics.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/Foundation.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/AppKit.swift
 // FIXME: END -enable-source-import hackaround
 
 
-// RUN: %target-swift-frontend -sdk %S/../Inputs/objc-generics-sdk -I %t -emit-module -o %t  %s
-// RUN: %target-swift-frontend -sdk %S/../Inputs/objc-generics-sdk -I %t -parse-as-library %t/classes_objc_generics.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -parse-as-library %t/classes_objc_generics.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h
 // RUN: FileCheck %s < %t/classes.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang-objc-generics %t/classes.h
