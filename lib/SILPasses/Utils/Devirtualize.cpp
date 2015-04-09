@@ -41,8 +41,9 @@ bool isConstructor(SILValue S) {
 
 /// Return bound generic type for the unbound type Superclass,
 /// which is a superclass of a bound generic type BoundDerived
-/// (Base may be also the same as BoundDerived).
-static CanBoundGenericType bindSuperclass(CanType Superclass,
+/// (Base may be also the same as BoundDerived or may be
+/// non-generic at all).
+static CanType bindSuperclass(CanType Superclass,
                                           SILType BoundDerived) {
   assert(BoundDerived && "Expected non-null type!");
 
@@ -55,7 +56,7 @@ static CanBoundGenericType bindSuperclass(CanType Superclass,
     CanType UnboundSuperclass = Decl->getDeclaredType()->getCanonicalType();
     // Check if we found a superclass we are looking for.
     if (UnboundSuperclass == Superclass)
-      return cast<BoundGenericType>(BoundSuperclass.getSwiftRValueType());
+      return BoundSuperclass.getSwiftRValueType();
 
     // Get the superclass of current one
     BoundSuperclass = BoundSuperclass.getSuperclass(nullptr);
@@ -84,9 +85,12 @@ bool swift::isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
   return false;
 }
 
+// Start with the substitutions from the apply.
+// Try to propagate them to find out the real substitutions required
+// to invoke the method.
 static ArrayRef<Substitution>
-getSubstitutionsForSuperclass(SILModule &M, CanSILFunctionType GenCalleeType,
-                              SILType ClassInstanceType, ApplyInst *AI) {
+getSubstitutionsForCalleee(SILModule &M, CanSILFunctionType GenCalleeType,
+                           SILType ClassInstanceType, ApplyInst *AI) {
   // *NOTE*:
   // Apply instruction substitutions are for the Member from a protocol or
   // class B, where this member was first defined, before it got overridden by
@@ -122,6 +126,8 @@ getSubstitutionsForSuperclass(SILModule &M, CanSILFunctionType GenCalleeType,
   SILType FSelfSubstType;
   Module *Module = M.getSwiftModule();
 
+  ArrayRef<Substitution> ClassSubs;
+
   if (GenCalleeType->isPolymorphic()) {
     // Declaration of the class F belongs to.
     if (auto *FSelfTypeDecl = FSelfClass.getNominalOrBoundGenericNominal()) {
@@ -141,12 +147,58 @@ getSubstitutionsForSuperclass(SILModule &M, CanSILFunctionType GenCalleeType,
       if (isa<BoundGenericType>(ClassInstanceType.getSwiftRValueType())) {
         auto BoundBaseType = bindSuperclass(FSelfGenericType,
                                             ClassInstanceType);
-        return BoundBaseType->getSubstitutions(Module, nullptr);
+        if (auto BoundTy = BoundBaseType->getAs<BoundGenericType>()) {
+          ClassSubs = BoundTy->getSubstitutions(Module, nullptr);
+        }
       }
     }
   }
 
-  return AI->getSubstitutions();
+  if (ClassSubs.empty())
+    return AI->getSubstitutions();
+
+  auto AISubs = AI->getSubstitutions();
+
+  CanSILFunctionType AIGenCalleeType =
+      AI->getCallee().getType().castTo<SILFunctionType>();
+
+  CanType AISelfClass = AIGenCalleeType->getSelfParameter().getType();
+
+  unsigned NextMethodParamIdx = 0;
+  unsigned NumMethodParams = 0;
+  if (AIGenCalleeType->isPolymorphic()) {
+    NextMethodParamIdx = 0;
+    // Generic parameters of the method start after generic parameters
+    // of the instance class.
+    if (auto AISelfClassSig =
+            AISelfClass.getClassBound()->getGenericSignature()) {
+      NextMethodParamIdx = AISelfClassSig->getGenericParams().size();
+    }
+    NumMethodParams = AISubs.size() - NextMethodParamIdx;
+  }
+
+  unsigned NumSubs = ClassSubs.size() + NumMethodParams;
+
+  if (ClassSubs.size() == NumSubs)
+    return ClassSubs;
+
+  // Mix class subs with method specific subs from the AI substitutions.
+
+  // Assumptions: AI substitutions contain first the substitutions for
+  // a class of the method being invoked and then the substitutions
+  // for a method being invoked.
+  auto Subs = M.getASTContext().Allocate<Substitution>(NumSubs);
+
+  unsigned i = 0;
+  for (auto &S : ClassSubs) {
+    Subs[i++] = S;
+  }
+
+  for (; i < NumSubs; ++i, ++NextMethodParamIdx) {
+    Subs[i] = AISubs[NextMethodParamIdx];
+  }
+
+  return Subs;
 }
 
 static SILFunction *getTargetClassMethod(SILModule &M,
@@ -199,8 +251,8 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
-  auto Subs = getSubstitutionsForSuperclass(Mod, GenCalleeType,
-                                            ClassOrMetatypeType, AI);
+  auto Subs = getSubstitutionsForCalleee(Mod, GenCalleeType,
+                                         ClassOrMetatypeType, AI);
 
   // For polymorphic functions, bail if the number of substitutions is
   // not the same as the number of expected generic parameters.
@@ -249,8 +301,8 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
-  auto Subs = getSubstitutionsForSuperclass(Mod, GenCalleeType,
-                                            ClassOrMetatypeType, AI);
+  auto Subs = getSubstitutionsForCalleee(Mod, GenCalleeType,
+                                         ClassOrMetatypeType, AI);
   auto SubstCalleeType =
     GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
 
