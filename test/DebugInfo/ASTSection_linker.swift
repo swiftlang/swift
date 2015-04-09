@@ -7,11 +7,11 @@
 // RUN: %swift-ide-test -test-CompilerInvocation-from-module -source-filename=%t/ASTSection.swiftmodule
 
 // Test the inline section mechanism.
-// RUN: ld %t/ASTSection.o -sectcreate __SWIFT __ast %t/ASTSection.swiftmodule -o %t/ASTSection.dylib -L%platform-module-dir -dylib -lSystem
+// RUN: %target-ld %t/ASTSection.o -sectcreate __SWIFT __ast %t/ASTSection.swiftmodule -o %t/ASTSection.dylib -dylib -lSystem
 // RUN: %lldb-moduleimport-test %t/ASTSection.dylib | FileCheck %s
 
 // Test the symbol table entry.
-// RUN: ld %t/ASTSection.o -add_ast_path %t/ASTSection.swiftmodule -o %t/ASTSection.dylib -L%platform-module-dir -dylib -lSystem
+// RUN: %target-ld %t/ASTSection.o -add_ast_path %t/ASTSection.swiftmodule -o %t/ASTSection.dylib -dylib -lSystem
 // RUN: %lldb-moduleimport-test %t/ASTSection.dylib | FileCheck %s
 
 // REQUIRES: OS=macosx
