@@ -523,9 +523,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitOpenExistentialExpr(OpenExistentialExpr *E) {
+    Expr *existential = doIt(E->getExistentialValue());
+    if (!existential) return nullptr;
+
     Expr *sub = doIt(E->getSubExpr());
     if (!sub) return nullptr;
 
+    E->setExistentialValue(existential);
     E->setSubExpr(sub);
     return E;
   }

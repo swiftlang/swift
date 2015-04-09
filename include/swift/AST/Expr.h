@@ -1994,6 +1994,9 @@ public:
   /// Retrieve the existential value that is being opened.
   Expr *getExistentialValue() const { return ExistentialValue; }
 
+  /// Set the existential value that is being opened.
+  void setExistentialValue(Expr *expr) { ExistentialValue = expr; }
+
   /// Retrieve the opaque value representing the value (of archetype
   /// type) stored in the existential.
   OpaqueValueExpr *getOpaqueValue() const { return OpaqueValue; }
