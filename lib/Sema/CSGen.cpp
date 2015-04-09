@@ -90,7 +90,10 @@ namespace {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       
       // Store top-level binary exprs for further analysis.
-      if (dyn_cast<BinaryExpr>(expr)) {
+      if (dyn_cast<BinaryExpr>(expr) ||
+          
+          // Literal exprs are contextually typed, so store them off as well.
+          dyn_cast<LiteralExpr>(expr)) {
         LinkedExprs.push_back(expr);
         return {false, expr};
       }

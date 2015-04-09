@@ -1814,14 +1814,14 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
   
   std::string overloadName;
   
-  if (overloadConstraint) {
-    overloadName = overloadConstraint->getOverloadChoice().
-    getDecl()->getName().str();
-  } else if (auto declRefExpr = dyn_cast<DeclRefExpr>(applyExpr->getFn())) {
+  if (auto declRefExpr = dyn_cast<DeclRefExpr>(applyExpr->getFn())) {
     overloadName = declRefExpr->getDecl()->getNameStr();
   } else if (auto overloadedDRE =
              dyn_cast<OverloadedDeclRefExpr>(applyExpr->getFn())) {
     overloadName = overloadedDRE->getDecls()[0]->getNameStr();
+  } else if (overloadConstraint) {
+    overloadName = overloadConstraint->getOverloadChoice().
+    getDecl()->getName().str();
   } else {
     llvm_unreachable("unrecognized unop function kind");
   }
