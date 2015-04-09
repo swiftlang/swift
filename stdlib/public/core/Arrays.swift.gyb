@@ -1035,32 +1035,6 @@ where C.Generator.Element == T
 % end
 
 //===--- generic helpers --------------------------------------------------===//
-/// Ensure there's a _ContiguousArrayBuffer capable of storing
-/// max(newCount, minimumCapacity) elements, with count set to
-/// newCount.
-///
-/// If source has sufficient capacity, returns nil.  Otherwise,
-/// returns a new buffer.
-///
-/// NOTE: does not initialize or destroy any elements.  In general,
-/// the buffer that satisfies the capacity request now has a count
-/// that does not match its number of initialized elements, and that
-/// needs to be corrected before the buffer can go back into circulation.
-func _createUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
-  inout source: _Buffer, newCount: Int, minimumCapacity: Int = 0)
--> _ContiguousArrayBuffer<_Buffer.Element>? {
-
-  _sanityCheck(newCount >= 0)
-  
-  let requiredCapacity = max(newCount, minimumCapacity)
-  
-  if let b? = source.requestUniqueMutableBackingBuffer(requiredCapacity) {
-    source.count = newCount
-    return nil
-  }
-  
-  return _forceCreateUniqueMutableBuffer(&source, newCount, requiredCapacity)
-}
 
 @inline(never)
 func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
@@ -1166,20 +1140,6 @@ struct _InitializePointer<T> : _PointerFunctionType {
   var newValue: T
 }
 
-func _arrayAppend<_Buffer: _ArrayBufferType>(
-  inout buffer: _Buffer, newValue: _Buffer.Element
-) {
-  let oldCount = buffer.count
-  var newBuffer = _createUniqueMutableBuffer(&buffer, oldCount + 1)
-  if _fastPath(newBuffer == nil) {
-    (buffer.baseAddress + oldCount).initialize(newValue)
-  }
-  else {
-    _arrayOutOfPlaceUpdate(
-      &buffer, &newBuffer, oldCount, 1, _InitializePointer(newValue))
-  }
-}
-
 struct _IgnorePointer<T> : _PointerFunctionType {
   func call(_:UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 0)
@@ -1189,12 +1149,17 @@ struct _IgnorePointer<T> : _PointerFunctionType {
 func _arrayReserve<_Buffer: _ArrayBufferType>(
   inout buffer: _Buffer, minimumCapacity: Int
 ) {
-  let oldCount = buffer.count
-  var newBuffer = _createUniqueMutableBuffer(
-    &buffer, oldCount, minimumCapacity: minimumCapacity)
-  if _slowPath(newBuffer != nil){
-    _arrayOutOfPlaceUpdate(&buffer, &newBuffer, oldCount, 0, _IgnorePointer())
+  let count = buffer.count
+  let requiredCapacity = max(count, minimumCapacity)
+  
+  if _fastPath(
+      buffer.requestUniqueMutableBackingBuffer(requiredCapacity) != nil) {
+    return
   }
+ 
+  var newBuffer = Optional(_forceCreateUniqueMutableBuffer(&buffer, count,
+                                                           requiredCapacity))
+  _arrayOutOfPlaceUpdate(&buffer, &newBuffer, count, 0, _IgnorePointer())
 }
 
 public func _extractOrCopyToNativeArrayBuffer<
@@ -1225,10 +1190,9 @@ func _arrayAppendSequence<
   }
 
   // This will force uniqueness
-  _arrayAppend(&buffer, nextItem!)
   var count = buffer.count
-  nextItem = stream.next()
-  while nextItem != nil {
+  _arrayReserve(&buffer, count + 1)
+  while true {
     let capacity = buffer.capacity
     let base = buffer.baseAddress
     
@@ -1237,9 +1201,10 @@ func _arrayAppendSequence<
       nextItem = stream.next()
     }
     buffer.count = count
-    if nextItem != nil {
-      _arrayReserve(&buffer, _growArrayCapacity(capacity))
+    if nextItem == nil {
+      return
     }
+    _arrayReserve(&buffer, _growArrayCapacity(capacity))
   }
 }
 
