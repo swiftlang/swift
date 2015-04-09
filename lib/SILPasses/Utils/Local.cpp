@@ -733,11 +733,10 @@ void LifetimeTracker::computeLifetime() {
 /// \brief  Get a substitution corresponding to the type witness.
 /// Inspired by ProtocolConformance::getTypeWitnessByName.
 static const Substitution *
-getTypeWitnessByName(ProtocolConformance *conformance,
-                     Identifier name,
-                     LazyResolver *resolver) {
+getTypeWitnessByName(ProtocolConformance *conformance, Identifier name) {
   // Find the named requirement.
   AssociatedTypeDecl *assocType = nullptr;
+  assert(conformance && "Missing conformance information");
   auto members = conformance->getProtocol()->lookupDirect(name);
   for (auto member : members) {
     assocType = dyn_cast<AssociatedTypeDecl>(member);
@@ -748,11 +747,10 @@ getTypeWitnessByName(ProtocolConformance *conformance,
   if (!assocType)
     return nullptr;
 
-  assert(conformance && "Missing conformance information");
-  if (!conformance->hasTypeWitness(assocType, resolver)) {
+  if (!conformance->hasTypeWitness(assocType, nullptr)) {
     return nullptr;
   }
-  return &conformance->getTypeWitness(assocType, resolver);
+  return &conformance->getTypeWitness(assocType, nullptr);
 }
 
 /// Check if is a bridging cast, i.e. one of the sides is
@@ -893,7 +891,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   Conformances[0] = Conformance;
   Subs.push_back(Substitution(Archetypes[0], Target, Conformances));
   const Substitution *DepTypeSubst = getTypeWitnessByName(
-      Conformance, M.getASTContext().getIdentifier("_ObjectiveCType"), nullptr);
+      Conformance, M.getASTContext().getIdentifier("_ObjectiveCType"));
   Subs.push_back(Substitution(Archetypes[1], DepTypeSubst->getReplacement(),
                               DepTypeSubst->getConformances()));
   auto SILFnTy = FuncRef->getType();
