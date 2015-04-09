@@ -293,6 +293,14 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == constantType);
     assert(fn->getLinkage() == linkage);
+    if (forDefinition) {
+      // In all the cases where getConstantLinkage returns something
+      // different for ForDefinition, it returns an available-externally
+      // linkage.
+      if (isAvailableExternally(fn->getLinkage())) {
+        fn->setLinkage(constant.getLinkage(ForDefinition));
+      }
+    }
     return fn;
   }
 
