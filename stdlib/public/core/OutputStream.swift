@@ -71,9 +71,9 @@ public protocol CustomDebugStringConvertible {
 }
 
 // @availability(*, unavailable, renamed="CustomDebugStringConvertible")
-typealias DebugPrintable = CustomDebugStringConvertible
+public typealias DebugPrintable = CustomDebugStringConvertible
 // @availability(*, unavailable, renamed="CustomStringConvertible")
-typealias Printable = CustomStringConvertible
+public typealias Printable = CustomStringConvertible
 
 //===----------------------------------------------------------------------===//
 // `print`
