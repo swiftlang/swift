@@ -858,19 +858,12 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
           : M.getASTContext().getKnownForceBridgeFromObjectiveC(nullptr);
 
   assert(BridgeFuncDecl && "_forceBridgeFromObjectiveC should exist");
-  StringRef BridgeFuncName = isConditional
-                                 ? "_knownConditionallyBridgeFromObjectiveC"
-                                 : "_knownForceBridgeFromObjectiveC";
 
   SILDeclRef FuncDeclRef(BridgeFuncDecl, SILDeclRef::Kind::Func);
 
   // Lookup a function from the stdlib.
-  SILFunction *BridgedFunc = M.lookUpFunction(BridgeFuncName);
-  if (!BridgedFunc) {
-    // If function is not found, try to link it.
-    M.linkFunction(FuncDeclRef);
-    BridgedFunc = M.lookUpFunction(BridgeFuncName);
-  }
+  SILFunction *BridgedFunc = M.getOrCreateFunction(
+      Loc, FuncDeclRef, ForDefinition_t::NotForDefinition);
 
   assert(BridgedFunc && "Bridging function was not found");
 
