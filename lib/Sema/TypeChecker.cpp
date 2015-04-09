@@ -1921,21 +1921,8 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
                   Reason.getRequiredOSVersionRange(), *this);
 }
 
-bool TypeChecker::isInsideImplicitFunction(const DeclContext *DC) {
-  do {
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(DC);
-    if (AFD && AFD->isImplicit()) {
-      return true;
-    }
-
-    DC = DC->getParent();
-  } while (DC);
-
-  return false;
-}
-
 const AvailabilityAttr *TypeChecker::getDeprecated(const Decl *D) {
-  if (auto *Attr = D->getAttrs().getDeprecated(Context))
+  if (auto *Attr = D->getAttrs().getDeprecated(D->getASTContext()))
     return Attr;
 
   // Treat extensions methods as deprecated if their extension
@@ -1948,36 +1935,35 @@ const AvailabilityAttr *TypeChecker::getDeprecated(const Decl *D) {
   return nullptr;
 }
 
-/// Returns true if the reference is lexically contained in a declaration
-/// that is deprecated on all deployment targets.
-static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
-                                          const DeclContext *ReferenceDC,
-                                          TypeChecker &TC) {
+/// Returns true if some declaration lexically enclosing the reference
+/// matches the passed in predicate and false otherwise.
+static bool someEnclosingDeclMatches(SourceRange ReferenceRange,
+                                     const DeclContext *ReferenceDC,
+                                     TypeChecker &TC,
+                                     std::function<bool(const Decl *)> Pred) {
   ASTContext &Ctx = TC.Context;
 
   // Climb the DeclContext hierarchy to see if any of the containing
-  // declarations are deprecated on on all deployment targets.
+  // declarations matches the predicate.
   const DeclContext *DC = ReferenceDC;
   do {
     auto *D = DC->getInnermostDeclarationDeclContext();
     if (!D)
       break;
 
-    if (D->getAttrs().getDeprecated(Ctx)) {
+    if (Pred(D)) {
       return true;
     }
 
     // If we are in an accessor, check to see if the associated
-    // property is deprecated.
+    // property is matches the predicate.
     auto *FD = dyn_cast<FuncDecl>(D);
-    if (FD && FD->isAccessor() &&
-        TC.getDeprecated(FD->getAccessorStorageDecl())) {
+    if (FD && FD->isAccessor() && Pred(FD->getAccessorStorageDecl())) {
       return true;
     }
 
     DC = DC->getParent();
   } while (DC);
-
 
   // Search the AST starting from our innermost declaration context to see if
   // if the reference is inside a property declaration but not inside an
@@ -1991,8 +1977,12 @@ static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
   if (!ReferenceDC->isTypeContext() && !ReferenceDC->isModuleScopeContext())
     return false;
 
+  // Don't search for a containing declaration if we don't have a source range.
+  if (ReferenceRange.isInvalid())
+    return false;
+
   const Decl *DeclToSearch =
-    findContainingDeclaration(ReferenceRange, ReferenceDC, Ctx.SourceMgr);
+      findContainingDeclaration(ReferenceRange, ReferenceDC, Ctx.SourceMgr);
 
   // We may not be able to find a declaration to search if the ReferenceRange
   // is invalid (i.e., we are in synthesized code).
@@ -2011,12 +2001,36 @@ static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
   if (FoundDeclarationNode.hasValue()) {
     const Decl *D = FoundDeclarationNode.getValue().get<Decl *>();
     D = abstractSyntaxDeclForAvailabilityAttribute(D);
-    if (TC.getDeprecated(D)) {
+    if (Pred(D)) {
       return true;
     }
   }
 
   return false;
+}
+
+bool TypeChecker::isInsideImplicitFunction(SourceRange ReferenceRange,
+                                           const DeclContext *DC) {
+  std::function<bool(const Decl *)> IsInsideImplicitFunc = [](const Decl *D) {
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(D);
+    return AFD && AFD->isImplicit();
+  };
+
+  return someEnclosingDeclMatches(ReferenceRange, DC, *this,
+                                  IsInsideImplicitFunc);
+}
+
+/// Returns true if the reference is lexically contained in a declaration
+/// that is deprecated on all deployment targets.
+static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
+                                          const DeclContext *ReferenceDC,
+                                          TypeChecker &TC) {
+  std::function<bool(const Decl *)> IsDeprecated = [](const Decl *D) {
+    return D->getAttrs().getDeprecated(D->getASTContext());
+  };
+
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, TC,
+                                  IsDeprecated);
 }
 
 void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
@@ -2035,7 +2049,7 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
   // a deprecated API element. rdar://problem/20024980 tracks these
   // special-case diagnostics.
   if (!getLangOpts().EnableAvailabilityCheckingInImplicitFunctions &&
-      isInsideImplicitFunction(ReferenceDC)) {
+      isInsideImplicitFunction(ReferenceRange, ReferenceDC)) {
       return;
   }
 

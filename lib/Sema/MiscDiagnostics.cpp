@@ -487,7 +487,7 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   // to an unavailable default constructor of a super class).
   // We need to handle these properly. rdar://problem/20024980 tracks this.
   if (!TC.getLangOpts().EnableAvailabilityCheckingInImplicitFunctions &&
-      TypeChecker::isInsideImplicitFunction(DC)) {
+      TC.isInsideImplicitFunction(R, DC)) {
     return false;
   }
 
@@ -549,7 +549,7 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   }
 
   // Diagnose for deprecation
-  if (const AvailabilityAttr *Attr = TC.getDeprecated(D)) {
+  if (const AvailabilityAttr *Attr = TypeChecker::getDeprecated(D)) {
     TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
   }
   

@@ -963,7 +963,7 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
       return true;
     }
 
-    if (auto *Attr = TC.getDeprecated(TypeDecl)) {
+    if (auto *Attr = TypeChecker::getDeprecated(TypeDecl)) {
       TC.diagnoseDeprecated(CI->getSourceRange(), DC, Attr,
                             CI->getIdentifier());
     }

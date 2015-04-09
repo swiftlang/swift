@@ -1331,13 +1331,14 @@ public:
       const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
       bool ForInout);
 
-  /// Returns true if the declaration context or any of its parents is an
+  /// Returns true if the reference or any of its parents is an
   /// implicit function.
-  static bool isInsideImplicitFunction(const DeclContext *DC);
+  bool isInsideImplicitFunction(SourceRange ReferenceRange,
+                                const DeclContext *DC);
 
   /// Returns the availability attribute indicating deprecation if the
   /// declaration is deprecated or null otherwise.
-  const AvailabilityAttr *getDeprecated(const Decl *D);
+  static const AvailabilityAttr *getDeprecated(const Decl *D);
 
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
   void diagnoseDeprecated(SourceRange SourceRange,
