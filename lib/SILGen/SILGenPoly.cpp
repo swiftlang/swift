@@ -86,7 +86,7 @@
 // There is one major risk with (3): naively implemented, a single
 // function value which undergoes many coercions could build up a
 // linear number of re-abstraction thunks.  However, this can be
-// solved dynamically by applying thunks with a runtime functon that
+// solved dynamically by applying thunks with a runtime function that
 // can recognize and bypass its own previous handiwork.
 //
 // There is one major exception to what sub-expressions in a type
