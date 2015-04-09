@@ -1574,8 +1574,8 @@ static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
 }
 
 /// Walk the DeclContext hierarchy starting from D to find a declaration
-/// at the member level (i.e., declared in a type context) on which to provide an
-/// @availability() Fix-It.
+/// at the member level (i.e., declared in a type context) on which to provide
+/// an @availability() Fix-It.
 static const Decl *ancestorMemberLevelDeclForAvailabilityFixit(const Decl *D) {
   while (D) {
     D = relatedDeclForAvailabilityFixit(D);
@@ -1877,7 +1877,8 @@ static void fixAvailability(SourceRange ReferenceRange,
   }
 
   if (FoundTypeLevelDecl) {
-    fixAvailabilityForDecl(ReferenceRange, FoundTypeLevelDecl, RequiredRange, TC);
+    fixAvailabilityForDecl(ReferenceRange, FoundTypeLevelDecl, RequiredRange,
+                           TC);
   }
 }
 
@@ -1996,7 +1997,7 @@ static bool someEnclosingDeclMatches(SourceRange ReferenceRange,
 
   Optional<ASTNode> FoundDeclarationNode =
       findInnermostAncestor(ReferenceRange, Ctx.SourceMgr,
-                          const_cast<Decl *>(DeclToSearch), IsDeclaration);
+                            const_cast<Decl *>(DeclToSearch), IsDeclaration);
 
   if (FoundDeclarationNode.hasValue()) {
     const Decl *D = FoundDeclarationNode.getValue().get<Decl *>();
@@ -2050,7 +2051,7 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
   // special-case diagnostics.
   if (!getLangOpts().EnableAvailabilityCheckingInImplicitFunctions &&
       isInsideImplicitFunction(ReferenceRange, ReferenceDC)) {
-      return;
+    return;
   }
 
   // We match the behavior of clang to not report deprecation warnigs
@@ -2064,13 +2065,14 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
   clang::VersionTuple DeprecatedVersion = Attr->Deprecated.getValue();
 
   if (Attr->Message.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name, Platform,
-             DeprecatedVersion).highlight(Attr->getRange());
+    diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
+             Platform, DeprecatedVersion).highlight(Attr->getRange());
     return;
   }
 
-  diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name, Platform,
-           DeprecatedVersion, Attr->Message).highlight(Attr->getRange());
+  diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
+           Platform, DeprecatedVersion,
+           Attr->Message).highlight(Attr->getRange());
 }
 
 // checkForForbiddenPrefix is for testing purposes.
