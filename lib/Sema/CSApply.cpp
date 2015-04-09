@@ -659,9 +659,12 @@ namespace {
       }
 
       // If we had a return type of 'Self', erase it.
-      auto &tc = solution.getConstraintSystem().getTypeChecker();
+      ConstraintSystem &cs = solution.getConstraintSystem();
+      auto &tc = cs.getTypeChecker();
       auto resultTy = result->getType();
-      if (resultTy->hasArchetype()) {
+      if (resultTy->hasOpenedExistential(record.Archetype)) {
+        // Erase the opened existential.
+
         // Remove the optional, if present.
         OptionalTypeKind optKind;
         if (auto optValueTy = resultTy->getAnyOptionalObjectType(optKind)) {
@@ -673,23 +676,34 @@ namespace {
           result = new (tc.Context) BindOptionalExpr(result,
                                                      result->getEndLoc(),
                                                      0,
-                                                     record.Archetype);
+                                                     resultTy);
           result->setImplicit(true);
         }
 
-        //   - Coerce to an existential value.
-        Type existentialTy = record.Archetype->getOpenedExistentialType();
-        result = coerceToType(result, existentialTy, nullptr);
-        if (!result)
-          return result;
+        Type erasedTy;
+        if (resultTy->isEqual(record.Archetype)) {
+          //   - Coerce to an existential value.
+          erasedTy = record.Archetype->getOpenedExistentialType();
+          result = coerceToType(result, erasedTy, nullptr);
+          if (!result)
+            return result;
+        } else {
+          //   - Perform a covariant function coercion.
+          erasedTy = resultTy->eraseOpenedExistential(
+                       cs.DC->getParentModule(),
+                       record.Archetype);
+          result = new (tc.Context) CovariantFunctionConversionExpr(
+                                      result,
+                                      erasedTy);
+        }
 
         //   - Bind up the result back up as an optional (if necessary).
         if (optKind) {
-          Type optExistentialTy = OptionalType::get(optKind, existentialTy);
+          Type optErasedTy = OptionalType::get(optKind, erasedTy);
           result = new (tc.Context) InjectIntoOptionalExpr(result,
-                                                           optExistentialTy);
+                                                           optErasedTy);
           result = new (tc.Context) OptionalEvaluationExpr(result,
-                                                           optExistentialTy);
+                                                           optErasedTy);
         }
       }
 
@@ -5346,17 +5360,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     assert(!apply->getType()->is<PolymorphicFunctionType>() &&
            "Polymorphic function type slipped through");
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
-
-    // If the result is an archetype from an opened existential, erase
-    // the existential and create the OpenExistentialExpr.
-    // FIXME: This is a localized form of a much more general rule for
-    // placement of open existential expressions. It only works for 
-    // DynamicSelf.
-    OptionalTypeKind optKind;
-    auto resultTy = result->getType();
-    if (auto optValueTy = resultTy->getAnyOptionalObjectType(optKind)) {
-      resultTy = optValueTy;
-    }
 
     // Try closing the existential, if there is one.
     closeExistential(result);
