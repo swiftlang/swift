@@ -48,7 +48,7 @@ extension ${Self} {
   /// Returns the result of calling the POSIX function
   /// `strto${cFuncSuffix2[bits]}_l` using the "C" locale, unless
   /// `text` contains non-ASCII text or whitespace, or is not
-  /// completely consumed by the call. Otherwise, rerturns `nil`.
+  /// completely consumed by the call. Otherwise, returns `nil`.
   ///
   /// See the `strto${cFuncSuffix2[bits]} (3)` man page for details of
   /// the exact format accepted.
