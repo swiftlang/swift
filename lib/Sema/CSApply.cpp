@@ -537,6 +537,8 @@ namespace {
     std::tuple<Expr *, ArchetypeType *>
     openExistentialReference(Expr *base, ArchetypeType *archetype,
                              ValueDecl *member) {
+      assert(archetype && "archetype not already opened?");
+
       auto &tc = cs.getTypeChecker();
 
       // Dig out the base type.
@@ -556,14 +558,6 @@ namespace {
         baseTy = metaTy->getInstanceType();
       }
       assert(baseTy->isAnyExistentialType() && "Type must be existential");
-
-      // Create the archetype, if we don't have one already.
-      auto &ctx = tc.Context;
-      if (!archetype) {
-        SmallVector<ProtocolDecl *, 4> protocols;
-        baseTy->getAnyExistentialTypeProtocols(protocols);
-        archetype = ArchetypeType::getOpened(baseTy);
-      }
 
       // Determine the number of applications that need to occur before
       // we can close this existential, and record it.
@@ -600,6 +594,7 @@ namespace {
       if (isLValue)
         opaqueType = LValueType::get(opaqueType);
 
+      ASTContext &ctx = tc.Context;
       auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(), opaqueType);
       archetypeVal->setUniquelyReferenced(true);
 
@@ -806,60 +801,38 @@ namespace {
       auto knownOpened = solution.OpenedExistentialTypes.find(
                            getConstraintSystem().getConstraintLocator(
                              memberLocator));
+      bool openedExistential = false;
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         std::tie(base, baseTy) = openExistentialReference(base,
                                                           knownOpened->second,
                                                           member);
         containerTy = baseTy;
+        openedExistential = true;
       }
+
       // If this is a method whose result type is dynamic Self, or a
       // construction, replace the result type with the actual object type.
-      else if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
             isPolymorphicConstructor(func)) {
-          // For a DynamicSelf method on an existential, open up the
-          // existential.
-          if (func->getExtensionType()->is<ProtocolType>() &&
-              baseTy->isAnyExistentialType()) {
-            std::tie(base, baseTy) = openExistentialReference(base, nullptr,
-                                                              member);
-            containerTy = baseTy;
-            openedType = openedType->replaceCovariantResultType(
-                           baseTy,
-                           func->getNumParamPatterns()-1);
-
-            // The member reference is a specialized declaration
-            // reference that replaces the Self of the protocol with
-            // the existential type; change it to refer to the opened
-            // archetype type.
-            // FIXME: We should do this before we create the
-            // specialized declaration reference, but that requires
-            // redundant hasDynamicSelf checking.
-            auto oldSubstitutions = memberRef.getSubstitutions();
-            SmallVector<Substitution, 4> newSubstitutions(
-                                           oldSubstitutions.begin(),
-                                           oldSubstitutions.end());
-            auto &selfSubst = newSubstitutions.front();
-            assert(selfSubst.getArchetype()->getSelfProtocol() &&
-                   "Not the Self archetype for a protocol?");
-            unsigned numConformances = selfSubst.getConformances().size();
-            auto newConformances
-              = context.Allocate<ProtocolConformance *>(numConformances);
-            std::fill(newConformances.begin(), newConformances.end(), nullptr);
-            selfSubst = {
-              selfSubst.getArchetype(),
-              baseTy,
-              newConformances,
-            };
-            memberRef = ConcreteDeclRef(context, memberRef.getDecl(),
-                                        newSubstitutions);
-          }
-
-          refTy = refTy->replaceCovariantResultType(containerTy,
-                                                  func->getNumParamPatterns());
+          refTy = refTy->replaceCovariantResultType(
+                    containerTy,
+                    func->getNumParamPatterns());
           dynamicSelfFnType = refTy->replaceCovariantResultType(
                                 baseTy,
                                 func->getNumParamPatterns());
+
+          if (openedExistential) {
+            // Replace the covariant result type in the opened type.
+            OptionalTypeKind optKind;
+            if (auto optObject = openedType->getAnyOptionalObjectType(optKind))
+              openedType = optObject;
+            openedType = openedType->replaceCovariantResultType(
+                           baseTy,
+                           func->getNumParamPatterns()-1);
+            if (optKind != OptionalTypeKind::OTK_None)
+              openedType = OptionalType::get(optKind, openedType);
+          }
 
           // If the type after replacing DynamicSelf with the provided base
           // type is no different, we don't need to perform a conversion here.
