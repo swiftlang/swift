@@ -3166,8 +3166,10 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
     break;
   case ExistentialRepresentation::Boxed:
     assert(existentialValue.getValue().getType().isObject());
+    // NB: Don't forward the cleanup, because consuming a boxed value won't
+    // consume the box reference.
     archetypeValue = SGF.B.createOpenExistentialBox(
-                       E, existentialValue.forward(SGF),
+                       E, existentialValue.getValue(),
                        SGF.getLoweredType(opaqueValueType));
     // The boxed value can't be assumed to be uniquely referenced.
     isUnique = false;
@@ -3202,9 +3204,10 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(entry.value));
   }
 
-  // Retain the value.
+  // Otherwise, copy the value.
   entry.hasBeenConsumed = true;
-  return RValue(SGF, E, SGF.emitManagedRetain(E, entry.value));
+  return RValue(SGF, E,
+                ManagedValue::forUnmanaged(entry.value).copyUnmanaged(SGF, E));
 }
 
 ProtocolDecl *SILGenFunction::getPointerProtocol() {

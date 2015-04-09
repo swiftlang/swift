@@ -55,3 +55,27 @@ func test_property(x: _ErrorType) -> String {
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[VALUE]])
 // CHECK:         strong_release %0
 // CHECK:         return [[RESULT]]
+
+extension _ErrorType {
+  final func extensionMethod() { }
+}
+
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_extension_methodFPSs10_ErrorType_T_
+func test_extension_method(error: _ErrorType) {
+  // -- TODO: could avoid an r/r here by guaranteeing the box, even if
+  //          the value inside is still wanted at +1
+  // CHECK: strong_retain %0
+  // CHECK: [[VALUE:%.*]] = open_existential_box %0
+  // CHECK: [[METHOD:%.*]] = function_ref
+  // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
+  // CHECK: apply [[METHOD]]<{{.*}}>([[COPY]]#1)
+  // CHECK-NOT: destroy_addr [[COPY]]
+  // CHECK-NOT: destroy_addr [[VALUE]]
+  // CHECK: dealloc_stack [[COPY]]#0
+  // CHECK-NOT: destroy_addr [[VALUE]]
+  // -- release the guarantee (TODO: redundant; see above)
+  // CHECK: strong_release %0
+  // -- release the owned argument
+  // CHECK: strong_release %0
+  error.extensionMethod()
+}
