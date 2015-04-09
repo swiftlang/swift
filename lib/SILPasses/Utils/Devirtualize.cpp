@@ -89,8 +89,8 @@ bool swift::isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
 // Try to propagate them to find out the real substitutions required
 // to invoke the method.
 static ArrayRef<Substitution>
-getSubstitutionsForCalleee(SILModule &M, CanSILFunctionType GenCalleeType,
-                           SILType ClassInstanceType, ApplyInst *AI) {
+getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
+                          SILType ClassInstanceType, ApplyInst *AI) {
   // *NOTE*:
   // Apply instruction substitutions are for the Member from a protocol or
   // class B, where this member was first defined, before it got overridden by
@@ -251,8 +251,8 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
-  auto Subs = getSubstitutionsForCalleee(Mod, GenCalleeType,
-                                         ClassOrMetatypeType, AI);
+  auto Subs = getSubstitutionsForCallee(Mod, GenCalleeType,
+                                        ClassOrMetatypeType, AI);
 
   // For polymorphic functions, bail if the number of substitutions is
   // not the same as the number of expected generic parameters.
@@ -301,8 +301,8 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
-  auto Subs = getSubstitutionsForCalleee(Mod, GenCalleeType,
-                                         ClassOrMetatypeType, AI);
+  auto Subs = getSubstitutionsForCallee(Mod, GenCalleeType,
+                                        ClassOrMetatypeType, AI);
   auto SubstCalleeType =
     GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
 
