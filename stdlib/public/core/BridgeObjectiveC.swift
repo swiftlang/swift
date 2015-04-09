@@ -145,8 +145,8 @@ public func _forceBridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
-@asmname("_knownForceBridgeFromObjectiveC")
-public func _knownForceBridgeFromObjectiveC<T:_ObjectiveCBridgeable>(x: T._ObjectiveCType, _: T.Type) -> T {
+@asmname("_forceBridgeFromObjectiveC_bridgeable")
+public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(x: T._ObjectiveCType, _: T.Type) -> T {
   var result: T?
   T._forceBridgeFromObjectiveC(x, result: &result)
   return result!
@@ -181,8 +181,8 @@ public func _conditionallyBridgeFromObjectiveC<T>(
 
 /// Attempt to convert `x` from its Objective-C representation to its Swift
 /// representation.
-@asmname("_knownConditionallyBridgeFromObjectiveC")
-public func _knownConditionallyBridgeFromObjectiveC<T:_ObjectiveCBridgeable>(
+@asmname("_conditionallyBridgeFromObjectiveC_bridgeable")
+public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
   x: T._ObjectiveCType,
   _: T.Type
 ) -> T? {

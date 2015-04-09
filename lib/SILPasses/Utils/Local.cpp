@@ -778,9 +778,10 @@ static Type getCastFromObjC(SILModule &M, CanType source, CanType target) {
   return BridgedTy.getValue();
 }
 
-/// Create a call of _forceBridgeFromObjectiveC or
-/// _knownConditionallyBridgeFromObjectiveC  which converts an an ObjC instance
-/// into a corresponding Swift type, conforming to  _ObjectiveCBridgeable.
+/// Create a call of _forceBridgeFromObjectiveC_bridgeable or
+/// _conditionallyBridgeFromObjectiveC_bridgeable  which converts an an ObjC
+/// instance into a corresponding Swift type, conforming to
+/// _ObjectiveCBridgeable.
 SILInstruction *
 CastOptimizer::
 optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
@@ -836,7 +837,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   // Now emit the a cast from the casted ObjC object into a target type.
   // This is done by means of calling _forceBridgeFromObjectiveC or
-  // _knownConditionallyBridgeFromObjectiveC from the Target type.
+  // _conditionallyBridgeFromObjectiveC_birdgeable from the Target type.
   // Lookup the required function in the Target type.
 
   // Lookup the _ObjectiveCBridgeable protocol.
@@ -854,8 +855,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   // to _BridgedToObjectiveC can be proven.
   FuncDecl *BridgeFuncDecl =
       isConditional
-          ? M.getASTContext().getKnownConditionallyBridgeFromObjectiveC(nullptr)
-          : M.getASTContext().getKnownForceBridgeFromObjectiveC(nullptr);
+          ? M.getASTContext().getConditionallyBridgeFromObjectiveCBridgeable(nullptr)
+          : M.getASTContext().getForceBridgeFromObjectiveCBridgeable(nullptr);
 
   assert(BridgeFuncDecl && "_forceBridgeFromObjectiveC should exist");
 

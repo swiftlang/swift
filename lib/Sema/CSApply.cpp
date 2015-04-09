@@ -1483,8 +1483,8 @@ namespace {
         // Retrieve the  bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC can be proven.
         fn = conditional
-                 ? tc.Context.getKnownConditionallyBridgeFromObjectiveC(&tc)
-                 : tc.Context.getKnownForceBridgeFromObjectiveC(&tc);
+                 ? tc.Context.getConditionallyBridgeFromObjectiveCBridgeable(&tc)
+                 : tc.Context.getForceBridgeFromObjectiveCBridgeable(&tc);
       } else {
         // Retrieve the  bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC cannot be proven.
