@@ -92,6 +92,9 @@ guidelines.
 Additional Conventions
 ======================
 
+Points in this section place additional constraints on the standard
+library, but are compatible with the Cocoa guidelines.
+
 * We document the complexity of operations using big-O notation.
 
 * Properties are O(1) to read and write.
