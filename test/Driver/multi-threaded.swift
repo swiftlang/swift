@@ -1,11 +1,11 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %swiftc_driver -driver-print-jobs -module-name=test -wmo -num-threads 4 %S/Inputs/main.swift %s -emit-module -o test.swiftmodule | FileCheck -check-prefix=MODULE %s
+// RUN: %target-swiftc_driver -driver-print-jobs -module-name=test -wmo -num-threads 4 %S/Inputs/main.swift %s -emit-module -o test.swiftmodule | FileCheck -check-prefix=MODULE %s
 // RUN: echo "{\"%s\": {\"assembly\": \"/build/multi-threaded.s\"}, \"%S/Inputs/main.swift\": {\"assembly\": \"/build/main.s\"}}" > %t/ofms.json
-// RUN: %swiftc_driver -driver-print-jobs -module-name=test -wmo -num-threads 4 %S/Inputs/main.swift %s -output-file-map %t/ofms.json -S | FileCheck -check-prefix=ASSEMBLY %s
-// RUN: %swiftc_driver -driver-print-jobs -module-name=test -wmo -num-threads 4 %S/Inputs/main.swift %s -c | FileCheck -check-prefix=OBJECT %s
+// RUN: %target-swiftc_driver -driver-print-jobs -module-name=test -wmo -num-threads 4 %S/Inputs/main.swift %s -output-file-map %t/ofms.json -S | FileCheck -check-prefix=ASSEMBLY %s
+// RUN: %target-swiftc_driver -driver-print-jobs -module-name=test -wmo -num-threads 4 %S/Inputs/main.swift %s -c | FileCheck -check-prefix=OBJECT %s
 // RUN: env TMPDIR=/tmp %swiftc_driver -driver-print-jobs -module-name=test -wmo -num-threads 4 %S/Inputs/main.swift %s -o a.out | FileCheck -check-prefix=EXEC %s
 // RUN: echo "{\"%s\": {\"object\": \"%t/multi-threaded.o\"}, \"%S/Inputs/main.swift\": {\"object\": \"%t/main.o\"}}" > %t/ofmo.json
-// RUN: %swiftc_driver -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s  -emit-dependencies -output-file-map %t/ofmo.json -c
+// RUN: %target-swiftc_driver -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s  -emit-dependencies -output-file-map %t/ofmo.json -c
 // RUN: cat %t/*.d | FileCheck -check-prefix=DEPENDENCIES %s
 
 // MODULE: -frontend
