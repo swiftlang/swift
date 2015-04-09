@@ -15,8 +15,6 @@
 
 // UNSUPPORTED: OS=linux-gnu
 
-// REQUIRES: ld-add_ast_path
-
 // Test ASTSection_linker.swift builds this code 
 // with separate compile and link steps.
 

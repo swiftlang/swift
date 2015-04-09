@@ -1,4 +1,5 @@
-// REQUIRES: ld-add_ast_path
+// REQUIRES: objc_interop
+// FIXME: actually, this test requires Mach-O.
 
 // RUN: rm -rf %t && mkdir -p %t/tmp/ && touch %t/tmp/dummy
 // RUN: env TMPDIR=%t/tmp/ %target-swiftc_driver -emit-executable %s -o %t/main

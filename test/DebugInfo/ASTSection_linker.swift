@@ -15,7 +15,6 @@
 // RUN: %lldb-moduleimport-test %t/ASTSection.dylib | FileCheck %s
 
 // REQUIRES: OS=macosx
-// REQUIRES: ld-add_ast_path
 
 // CHECK: Loaded module ASTSection from
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
