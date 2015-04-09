@@ -402,7 +402,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   is_sdk_requested(TVOS swift_build_tvos)
   if(swift_build_tvos AND ${swift_can_crosscompile_stdlib})
-    configure_sdk_darwin(TVOS "tvOS" "9.0" appletvos tvos tvos "armv7;arm64" TRUE)
+    configure_sdk_darwin(TVOS "tvOS" "9.0" appletvos tvos tvos "arm64" TRUE)
     configure_target_variant(TVOS-DA "tvOS Debug+Asserts"   TVOS DA "Debug+Asserts")
     configure_target_variant(TVOS-RA "tvOS Release+Asserts" TVOS RA "Release+Asserts")
     configure_target_variant(TVOS-R  "tvOS Release"         TVOS R "Release")
