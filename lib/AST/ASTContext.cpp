@@ -2584,7 +2584,7 @@ GenericFunctionType::get(GenericSignature *sig,
   // always materializable.
   checkFunctionRecursiveProperties(input, output);
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 5,
+  static_assert(RecursiveTypeProperties::BitWidth == 6,
                 "revisit this if you add new recursive type properties");
 
   auto result = new (mem) GenericFunctionType(sig, input, output, info,
@@ -2739,7 +2739,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 5,
+  static_assert(RecursiveTypeProperties::BitWidth == 6,
                 "revisit this if you add new recursive type properties");
   if (!genericSig) {
     // Nongeneric SIL functions are dependent if they have dependent argument

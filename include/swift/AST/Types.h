@@ -76,7 +76,7 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 5 };
+  enum { BitWidth = 6 };
 
   /// A single property.
   ///
@@ -99,6 +99,9 @@ public:
     /// This type expression contains an LValueType and can be loaded to convert
     /// to an rvalue.
     IsLValue = 0x10,
+
+    /// This type expression contains an opened existential ArchetypeType.
+    HasOpenedExistential = 0x20,
   };
 
 private:
@@ -132,6 +135,10 @@ public:
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
   
+  /// Does a type with these properties structurally contain an
+  /// archetype?
+  bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
+
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator+(Property lhs, Property rhs) {
     return RecursiveTypeProperties(lhs | rhs);
@@ -364,6 +371,29 @@ public:
   bool hasArchetype() const {
     return getRecursiveProperties().hasArchetype();
   }
+
+  /// Determine whether the type involves an opened existential archetype.
+  bool hasOpenedExistential() const {
+    return getRecursiveProperties().hasOpenedExistential();
+  }
+
+  /// Determine whether the type involves the given opend existential
+  /// archetype.
+  bool hasOpenedExistential(ArchetypeType *opened);
+
+  /// Determine whether the type is an opened existential type.
+  ///
+  /// To determine whether there is an opened existential type
+  /// anywhere in the type, use \c hasOpenedExistential.
+  bool isOpenedExistential();
+
+  /// Retrieve the set of opened existential archetypes that occur
+  /// within this type.
+  void getOpenedExistentials(SmallVectorImpl<ArchetypeType *> &opened);
+
+  /// Erase the given opened existential type by replacing it with its
+  /// existential type throughout the given type.
+  Type eraseOpenedExistential(Module *module, ArchetypeType *opened);
 
   /// \brief Compute and return the set of type variables that occur within this
   /// type.
@@ -3486,7 +3516,9 @@ private:
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, bool isRecursive = false)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties::HasArchetype),
+                        RecursiveTypeProperties(
+                          RecursiveTypeProperties::HasArchetype |
+                          RecursiveTypeProperties::HasOpenedExistential)),
       ConformsTo(ConformsTo), Superclass(Superclass),
       ParentOrOpened(Existential.getPointer()),
       isRecursive(isRecursive) { }
@@ -3898,6 +3930,16 @@ inline bool TypeBase::isClassExistentialType() {
     return pt->requiresClass();
   if (auto pct = dyn_cast<ProtocolCompositionType>(T))
     return pct->requiresClass();
+  return false;
+}
+
+inline bool TypeBase::isOpenedExistential() {
+  if (!hasOpenedExistential())
+    return false;
+
+  CanType T = getCanonicalType();
+  if (auto archetype = dyn_cast<ArchetypeType>(T))
+    return !archetype->getOpenedExistentialType().isNull();
   return false;
 }
 

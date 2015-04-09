@@ -388,6 +388,53 @@ bool TypeBase::isUnspecializedGeneric() {
   llvm_unreachable("bad TypeKind");
 }
 
+bool TypeBase::hasOpenedExistential(ArchetypeType *opened) {
+  assert(opened->getOpenedExistentialType() &&
+         "not an opened existential type");
+
+  if (!hasOpenedExistential())
+    return false;
+
+  return getCanonicalType().findIf([&](Type type) -> bool {
+    return opened == dyn_cast<ArchetypeType>(type.getPointer());
+  });
+}
+
+void TypeBase::getOpenedExistentials(
+       SmallVectorImpl<ArchetypeType *> &opened) {
+  if (!hasOpenedExistential())
+    return;
+
+  SmallPtrSet<ArchetypeType *, 4> known;
+  getCanonicalType().findIf([&](Type type) -> bool {
+    auto archetype = dyn_cast<ArchetypeType>(type.getPointer());
+    if (!archetype)
+      return false;
+
+    if (!archetype->getOpenedExistentialType())
+      return false;
+
+    if (known.insert(archetype).second)
+      opened.push_back(archetype);
+
+    return false;
+  });
+}
+
+Type TypeBase::eraseOpenedExistential(Module *module,
+                                      ArchetypeType *opened) {
+  assert(opened->getOpenedExistentialType() &&
+         "Not an opened existential type?");
+
+  if (!hasOpenedExistential())
+    return Type(this);
+
+  TypeSubstitutionMap substitutions;
+  substitutions[opened] = opened->getOpenedExistentialType();
+  return Type(this).subst(module, substitutions, false,
+                          getASTContext().getLazyResolver());
+}
+
 void
 TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
