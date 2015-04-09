@@ -20,8 +20,6 @@
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | FileCheck -check-prefix DEBUG %s
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -g %s | FileCheck -check-prefix DEBUG_LINUX %s
-
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.10 %s | FileCheck -check-prefix NO_ARCLITE %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios8.0 %s | FileCheck -check-prefix NO_ARCLITE %s
 
@@ -128,13 +126,6 @@
 // DEBUG-NEXT: bin/dsymutil
 // DEBUG: linker
 // DEBUG: -o linker.dSYM
-
-// DEBUG_LINUX: bin/swift
-// DEBUG_LINUX-NEXT: bin/swift-autolink-extract
-// DEBUG_LINUX-NEXT: bin/swift
-// DEBUG_LINUX-NEXT: bin/clang++{{"? }}
-// DEBUG_LINUX: -o linker
-// DEBUG_LINUX-NOT: dsymutil
 
 // NO_ARCLITE: bin/ld{{"? }}
 // NO_ARCLITE-NOT: arclite
