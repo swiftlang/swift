@@ -26,18 +26,37 @@ Differences
 Points in this section clash in one way or other with the Cocoa
 guidelines.
 
-* **Arguments to unary functions**, methods, and initializers
-  typically don't get a label, nor are they typically referenced by the
-  suffix of a function or method name::
+The First Parameter
+-------------------
 
-    alligators.insert(fred)
+* The first parameter to a function, method, or initializer typically
+  does not have an argument label:
+  
+  .. parsed-literal::
 
-    if alligators.contains(george) { 
+    alligators.insert(fred)           // yes
+    if alligators.contains(george) {  // yes
       return
     }
 
-  we add a preposition to the end of a function name if the 
-  role of the first argument would otherwise be unclear:
+    alligators.insert(**element:** fred)           // no
+    if alligators.contains(**element:** george) {  // no
+      return
+    }
+
+* Typically, no suffix is added to a function or method's base name in
+  order to serve the same purpose as a label:
+
+  .. parsed-literal::
+
+    alligators.insert\ **Element**\ (fred)           // no
+    if alligators.contains\ **Element**\ (george) {  // no
+      return
+    }
+
+
+* A preposition is added to the end of a function name if the role of
+  the first parameter would otherwise be unclear:
 
   .. parsed-literal::
 
@@ -47,18 +66,22 @@ guidelines.
     // we're not "indexing x"
     if let position = aSet.index\ **Of**\ (x) { ... } 
 
-* Labels are used on initial arguments to denote special cases:
+* Argument labels are used on first parameters to denote special
+  cases:
   
   .. parsed-literal::
 
     // Normal case: result has same value as argument (traps on overflow)
     Int(aUInt)                           
 
-    // Reinterprets all bits, so the meaning of the result is different
+    // Special: interprets the sign bit as a high bit, changes value
     Int(**bitPattern**: aUInt)               
 
-    // Reinterprets bits that fit, losing information in some cases.
+    // Special: keeps only the bits that fit, losing information
     Int32(**truncatingBitPattern**: anInt64) 
+
+Subsequent Parameters
+---------------------
 
 * Argument labels are chosen to clarify the *role* of an argument,
   rather than its type:
@@ -69,25 +92,29 @@ guidelines.
 
     p.initializeFrom(q, **count:** n)
   
-* Second and later arguments are labeled except in cases where there's
-  no way to distinguish the arguments' roles::
+* Second and later parameters are always labeled except in cases where
+  there's no useful distinction of roles::
 
     swap(&a, &b)                                                    // OK
 
     let topOfPicture = min(topOfSquare, topOfTriangle, topOfCircle) // OK
+
+Other Differences
+-----------------
     
 * We don't use namespace prefixes such as “`NS`”, relying instead on
   the language's own facilities.
 
-* Names of types, protocols and enum cases are UpperCamelCase.
-  Everything else is lowerCamelCase. When an initialism appears,
-  it is **uniformly upper- or lower-cased to fit the pattern**:
+* Names of types, protocols and enum cases are `UpperCamelCase`.
+  Everything else is `lowerCamelCase`. When an initialism appears, it
+  is **uniformly upper- or lower-cased to fit the pattern**:
 
   .. parsed-literal::
 
      let v: String.\ **UTF**\ 16View = s.\ **utf**\ 16
 
-* Protocol names end in `Type`, `able`, or `ible`.  Other type names do not.
+* Protocol names end in `Type`, `able`, or `ible`.  Other type names
+  do not.
 
 Additional Conventions
 ======================
@@ -100,9 +127,17 @@ library, but are compatible with the Cocoa guidelines.
 * Properties are O(1) to read and write.
 
 * We prefer methods and properties to free functions.  Free functions
-  are used when there's no obvious `self` (e.g. `min(x, y, z)`), when
-  the function is an unconstrained generic (e.g. `swap(&a, &b)`), or
-  when function syntax is part of the domain notation (e.g. `sin(x)`).
+  are used when there's no obvious `self` ::
+
+    min(x, y, z)
+
+  when the function is an unconstrained generic ::
+
+    print(x)
+
+  and when function syntax is part of the domain notation ::
+
+    -sin(x)
 
 * Type conversions use initialization syntax whenever possible, with
   the source of the conversion being the first argument::
@@ -111,14 +146,10 @@ library, but are compatible with the Cocoa guidelines.
     let s1 = String(anInt, radix: 2)  // yes
     let s1 = anInt.toString()         // no
 
-  The exception is when the type conversion is part of a protocol,
-  because Swift doesn't allow a protocol to put requirements on
-  other types::
+  The exception is when the type conversion is part of a protocol::
 
     protocol IntConvertible {
-      func toInt() -> Int      // OK, or
-      var asInt: Int {get}     // OK, or
-      var intValue: Int {get}  // OK
+      func toInt() -> Int // OK
     }
 
 * Even unlabelled parameter names should be meaningful as they'll be
@@ -140,7 +171,7 @@ library, but are compatible with the Cocoa guidelines.
   
   .. parsed-literal::
 
-     struct Array<**Element**> { // *not* Array<**T**>
+     struct Dictionary<**Key**, **Value**> { // *not* Dictionary<**K**, **V**>
 
 Acceptable Short or Non-Descriptive Names
 -----------------------------------------
@@ -152,10 +183,13 @@ Acceptable Short or Non-Descriptive Names
     func swap<**T**>(inout lhs: T, inout rhs: T)
 
 * `lhs` and `rhs` are acceptable names for binary operator or
-  symmetric binary function arguments.
+  symmetric binary function parameters:
 
-* `self_` is an acceptable name for unary operator arguments or the
-  first argument of binary assignment operators.
+  .. parsed-literal::
+
+    func + (**lhs**: Int, **rhs**: Int) -> Int
+
+    func swap<T>(inout **lhs**: T, inout **rhs**: T)
 
 * `body` is an acceptable name for a trailing closure argument when
   the resulting construct is supposed to act like a language extension
