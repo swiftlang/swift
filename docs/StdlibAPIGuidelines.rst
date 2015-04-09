@@ -205,8 +205,8 @@ Prefixes and Suffixes
 * `Any` is used as a prefix to denote “type erasure,”
   e.g. `AnySequence<T>` wraps any sequence with element type `T`,
   conforms to `SequenceType` itself, and forwards all operations to the
-  wrapped sequence.  The specific type of the wrapped sequence is
-  erased.
+  wrapped sequence.  When handling the wrapper, the specific type of 
+  the wrapped sequence is fully hidden.
 
 * `Custom` is used as a prefix for special protocols that will always
   be dynamically checked for at runtime and don't make good generic
