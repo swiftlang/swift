@@ -47,12 +47,14 @@ set(SWIFTLIB_ESSENTIAL
   FixedPoint.swift.gyb
   FloatingPoint.swift.gyb
   FloatingPointOperations.swift.gyb
+  FloatingPointParsing.swift.gyb
   HashedCollections.swift.gyb
   Hashing.swift
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift
   Index.swift
   IntegerArithmetic.swift.gyb
+  IntegerParsing.swift.gyb
   Interval.swift.gyb
   Join.swift
   LazyCollection.swift.gyb
@@ -75,9 +77,9 @@ set(SWIFTLIB_ESSENTIAL
   Repeat.swift
   Reverse.swift.gyb
   Runtime.swift.gyb
-  Sort.swift.gyb
   ShadowProtocols.swift
   Shims.swift
+  Sort.swift.gyb
   StaticString.swift
   Stride.swift
   StrideMirrors.swift.gyb
