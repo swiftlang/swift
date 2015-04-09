@@ -119,6 +119,9 @@
                     "word_to_bridge_object" "ref_to_bridge_object"
                     )
                   'words) . font-lock-keyword-face)
+   ;; Value Buffer
+   `(,(regexp-opt '("alloc_value_buffer" "dealloc_value_buffer"
+                    "project_value_buffer") 'words) . font-lock-keyword-face)
    ;; Checked Conversions
    `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr")
 		  'words) . font-lock-keyword-face)
