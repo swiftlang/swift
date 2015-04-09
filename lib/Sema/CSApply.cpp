@@ -481,6 +481,10 @@ namespace {
 
     /// Describes an opened existential that has not yet been closed.
     struct OpenedExistential {
+      /// The sequence number, which is used for ordering the opened
+      /// existentials.
+      unsigned SequenceNumber;
+
       /// The archetype describing this opened existential.
       ArchetypeType *Archetype;
 
@@ -495,7 +499,19 @@ namespace {
       /// depth has been reduced to zero, the existential can be
       /// closed.
       unsigned Depth;
+
+      friend bool operator<(const OpenedExistential &lhs,
+                            const OpenedExistential &rhs) {
+        return lhs.SequenceNumber < rhs.SequenceNumber;
+      }
     };
+
+    /// The number of existentials that have been opened, used to
+    /// determine sequence numbers.
+    ///
+    /// For the number of currently-open existentials, use \c
+    /// OpenedExistentials.size().
+    unsigned NumOpenedExistentials = 0;
 
     /// A mapping from "key" expressions to the opened existential
     /// whose depth will be reduced once that key expression has been
@@ -588,7 +604,8 @@ namespace {
       archetypeVal->setUniquelyReferenced(true);
 
       // Record the opened existential.
-      OpenedExistential record{archetype, base, archetypeVal, depth};
+      OpenedExistential record{NumOpenedExistentials++, archetype, base,
+                               archetypeVal, depth};
       bool inserted = OpenedExistentials.insert({archetypeVal, record}).second;
       (void)inserted;
       assert(inserted && "already opened an existential here?");
