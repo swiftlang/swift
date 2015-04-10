@@ -2450,6 +2450,11 @@ void ClangImporter::loadObjCMethods(
   if (Impl.ActiveSelectors.count({selector, isInstanceMethod}))
     return;
 
+  const auto *objcClass =
+      dyn_cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
+  if (!objcClass)
+    return;
+
   // Collect the set of visible Objective-C methods with this selector.
   clang::Selector clangSelector = Impl.exportSelector(selector);
   SmallVector<clang::ObjCMethodDecl *, 4> objcMethods;
@@ -2462,11 +2467,7 @@ void ClangImporter::loadObjCMethods(
   for (auto objcMethod : objcMethods) {
     // Find the owner of this method and determine whether it is the class
     // we're looking for.
-    auto owningDC = Impl.importDeclContextOf(objcMethod);
-    if (!owningDC)
-      continue;
-
-    if (owningDC->isClassOrClassExtensionContext() != classDecl)
+    if (objcMethod->getClassInterface() != objcClass)
       continue;
 
     if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
