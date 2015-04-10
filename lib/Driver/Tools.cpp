@@ -407,8 +407,14 @@ Job *MergeModule::constructJob(const JobAction &JA,
 
   const char *Exec = getToolChain().getDriver().getSwiftProgramPath().c_str();
 
-  // Invoke ourself in -frontend mode.
-  Arguments.push_back("-frontend");
+  if (OI.CompilerMode == OutputInfo::Mode::UpdateCode) {
+    SmallString<128> SwiftUpdatePath = llvm::sys::path::parent_path(Exec);
+    llvm::sys::path::append(SwiftUpdatePath, "swift-update");
+    Exec = Args.MakeArgString(SwiftUpdatePath.str());
+  } else {
+    // Invoke ourselves in -frontend mode.
+    Arguments.push_back("-frontend");
+  }
 
   // We just want to emit a module, so pass -emit-module without any other
   // mode options.

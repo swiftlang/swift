@@ -100,6 +100,9 @@
 // UPDATE-CODE: bin/swift-update
 // UPDATE-CODE: -c{{ }}
 // UPDATE-CODE: -o {{.+}}.remap
+// UPDATE-CODE: bin/swift-update
+// UPDATE-CODE: -emit-module{{ }}
+// UPDATE-CODE: -o {{.+}}.mod
 
 // FIXIT-CODE: bin/swift
 // FIXIT-CODE: -c{{ }}
