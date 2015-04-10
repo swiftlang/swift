@@ -300,11 +300,22 @@ class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer
 // Properties
 
 class ClassWithUnavailableProperties {
+
+  @availability(OSX, introduced=10.9) // expected-error {{stored properties cannot be marked potentially unavailable with 'introduced='}} expected-note {{make lazy property}} {{5-5=lazy }}
+    var nonLazyAvailableOn10_9Stored: Int = 9 // Non-standard indentation here is intentional to make sure Fix-It in the test above is getting the right line
+
+  @availability(OSX, introduced=10.10) // expected-error {{stored properties cannot be marked potentially unavailable with 'introduced='}} expected-note {{make lazy property}}
+  var nonLazyAvailableOn10_10Stored : Int = 10
+
+  // We don't expect a Fix-It to add a lazy attribute below because let does not support lazy (for now).
+  @availability(OSX, introduced=10.10) // expected-error {{stored properties cannot be marked potentially unavailable with 'introduced='}}
+  let nonLazyLetAvailableOn10_10Stored : Int = 10
+
   @availability(OSX, introduced=10.9)
-  var availableOn10_9Stored: Int = 9
+  lazy var availableOn10_9Stored: Int = 9
   
   @availability(OSX, introduced=10.10)
-  var availableOn10_10Stored : Int = 10
+  lazy var availableOn10_10Stored : Int = 10
 
   @availability(OSX, introduced=10.9)
   var availableOn10_9Computed: Int {
@@ -389,6 +400,19 @@ class ClassWithUnavailableProperties {
     set(newVal) {
     }
   }
+}
+
+@availability(OSX, introduced=10.10)
+class ClassWithReferencesInInitializers {
+  var propWithInitializer10_10: Int = globalFuncAvailableOn10_10()
+
+  var propWithInitializer10_11: Int = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
+      // expected-note@-1 {{add @availability attribute to enclosing var}}
+
+  lazy var lazyPropWithInitializer10_10: Int = globalFuncAvailableOn10_10()
+
+  lazy var lazyPropWithInitializer10_11: Int = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
+      // expected-note@-1 {{add @availability attribute to enclosing var}}
 }
 
 func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
@@ -701,11 +725,20 @@ class ClassWithDeclarationsOfUnavailableClasses {
       // expected-note@-2 {{add @availability attribute to enclosing var}}
   
   @availability(OSX, introduced=10.10)
-  var unavailablePropertyOfUnavailableType: ClassAvailableOn10_10
+  lazy var unavailablePropertyOfUnavailableType: ClassAvailableOn10_10 = ClassAvailableOn10_10()
   
   @availability(OSX, introduced=10.10)
-  var unavailablePropertyOfUnavailableTypeWithInitializer: ClassAvailableOn10_10 = ClassAvailableOn10_10() 
+  lazy var unavailablePropertyOfOptionalUnavailableType: ClassAvailableOn10_10? = nil
+
+  @availability(OSX, introduced=10.10)
+  lazy var unavailablePropertyOfUnavailableTypeWithInitializer: ClassAvailableOn10_10 = ClassAvailableOn10_10()
   
+  @availability(OSX, introduced=10.10)
+  static var unavailableStaticPropertyOfUnavailableType: ClassAvailableOn10_10 = ClassAvailableOn10_10()
+
+  @availability(OSX, introduced=10.10)
+  static var unavailableStaticPropertyOfOptionalUnavailableType: ClassAvailableOn10_10?
+
   func methodWithUnavailableParameterType(o : ClassAvailableOn10_10) { // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{add @availability attribute to enclosing class}}
       // expected-note@-2 {{add @availability attribute to enclosing instance method}}
@@ -742,6 +775,12 @@ class ClassWithDeclarationsOfUnavailableClasses {
   func unavailableMethodWithUnavailableLocalDeclaration() {
     let o : ClassAvailableOn10_10 = methodWithUnavailableReturnType()
   }
+}
+
+func referToUnavailableStaticProperty() {
+  let _ = ClassWithDeclarationsOfUnavailableClasses.unavailableStaticPropertyOfUnavailableType // expected-error {{'unavailableStaticPropertyOfUnavailableType' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 {{add @availability attribute to enclosing global function}}
+      // expected-note@-2 {{guard with version check}}
 }
 
 class ClassExtendingUnavailableClass : ClassAvailableOn10_10 { // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}

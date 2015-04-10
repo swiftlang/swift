@@ -190,10 +190,10 @@ func callUnavailableInitializer() {
 
 class ClassWithUnavailableProperties {
   @availability(OSX, introduced=10.9)
-  var availableOn10_9Stored: Int = 9
+  lazy var availableOn10_9Stored: Int = 9
   
   @availability(OSX, introduced=10.10)
-  var availableOn10_10Stored : Int = 10
+  lazy var availableOn10_10Stored : Int = 10
 
   @availability(OSX, introduced=10.9)
   var availableOn10_9Computed: Int {
