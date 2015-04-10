@@ -136,7 +136,7 @@ extern "C" void swift_getErrorValue(const SwiftError *errorObject,
                                     ErrorValueResult *out);
 
 /// Initialize an ErrorType box to make it usable as an NSError instance.
-extern "C" id swift_becomeNSError(SwiftError *errorObject);
+extern "C" id swift_bridgeErrorTypeToNSError(SwiftError *errorObject);
 
 #if SWIFT_OBJC_INTEROP
 /// Attempt to dynamically cast an NSError instance to a Swift ErrorType

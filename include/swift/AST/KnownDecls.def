@@ -55,8 +55,8 @@ FUNC_DECL(ForceBridgeFromObjectiveC,
           "_forceBridgeFromObjectiveC")
 FUNC_DECL(ConditionallyBridgeFromObjectiveC,
           "_conditionallyBridgeFromObjectiveC")
-FUNC_DECL(BecomeNSError,
-          "_becomeNSError")
+FUNC_DECL(BridgeErrorTypeToNSError,
+          "_bridgeErrorTypeToNSError")
 
 FUNC_DECL(ForceBridgeFromObjectiveCBridgeable,
           "_forceBridgeFromObjectiveC_bridgeable")

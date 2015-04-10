@@ -4851,8 +4851,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::BridgeToNSError: {
-      // Tell the ErrorType to become an NSError, using _becomeNSError.
-      auto fn = tc.Context.getBecomeNSError(&tc);
+      // Tell the ErrorType to become an NSError, using _bridgeErrorTypeToNSError.
+      auto fn = tc.Context.getBridgeErrorTypeToNSError(&tc);
       if (!fn) {
         tc.diagnose(expr->getLoc(), diag::missing_nserror_bridging_function);
         return nullptr;
@@ -4867,7 +4867,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
       
-      // The return type of _becomeNSError is formally 'AnyObject' to avoid
+      // The return type of _bridgeErrorTypeToNSError is formally 'AnyObject' to avoid
       // stdlib-to-Foundation dependencies, but it's really NSError.
       // Abuse CovariantReturnConversionExpr to fix this.
       

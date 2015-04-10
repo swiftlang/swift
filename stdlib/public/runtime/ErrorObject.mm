@@ -245,7 +245,7 @@ extern "C" NSInteger swift_stdlib_getErrorCode(const OpaqueValue *error,
                                                const WitnessTable *ErrorType);
 
 /// Take an ErrorType box and turn it into a valid NSError instance.
-static id _swift_becomeNSError_(SwiftError *errorObject) {
+static id _swift_bridgeErrorTypeToNSError_(SwiftError *errorObject) {
   auto ns = reinterpret_cast<NSError *>(errorObject);
   // If we already have a domain set, then we've already initialized.
   if (errorObject->domain.load(SWIFT_MEMORY_ORDER_CONSUME))
@@ -281,11 +281,11 @@ static id _swift_becomeNSError_(SwiftError *errorObject) {
   return ns;
 }
 
-extern "C" auto *_swift_becomeNSError = _swift_becomeNSError_;
+extern "C" auto *_swift_bridgeErrorTypeToNSError = _swift_bridgeErrorTypeToNSError_;
 
 id
-swift::swift_becomeNSError(SwiftError *errorObject) {
-  return _swift_becomeNSError(errorObject);
+swift::swift_bridgeErrorTypeToNSError(SwiftError *errorObject) {
+  return _swift_bridgeErrorTypeToNSError(errorObject);
 }
 
 bool
