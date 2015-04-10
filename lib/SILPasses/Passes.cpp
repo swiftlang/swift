@@ -329,6 +329,20 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   DEBUG(Module.verify());
 }
 
+void swift::runSILPassesForOnone(SILModule &Module) {
+  SILPassManager PM(&Module, "Onone");
+  registerAnalysisPasses(PM);
+
+  // Don't keep external functions from stdlib and other modules.
+  // We don't want that our unoptimized version will be linked instead
+  // of the optimized version from the stdlib.
+  // Here we just convert external definitions to declarations. LLVM will
+  // eventually remove unused declarations.
+  PM.addExternalDefsToDecls();
+
+  PM.runOneIteration();
+}
+
 #ifndef NDEBUG
 
 namespace {
