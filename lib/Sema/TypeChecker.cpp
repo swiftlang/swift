@@ -2021,6 +2021,17 @@ bool TypeChecker::isInsideImplicitFunction(SourceRange ReferenceRange,
                                   IsInsideImplicitFunc);
 }
 
+
+bool TypeChecker::isInsideUnavailableDeclaration(
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC) {
+  std::function<bool(const Decl *)> IsUnavailable = [](const Decl *D) {
+    return D->getAttrs().getUnavailable(D->getASTContext());
+  };
+
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
+                                  IsUnavailable);
+}
+
 /// Returns true if the reference is lexically contained in a declaration
 /// that is deprecated on all deployment targets.
 static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,

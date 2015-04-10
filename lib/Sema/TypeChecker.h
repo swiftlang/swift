@@ -1336,6 +1336,11 @@ public:
   bool isInsideImplicitFunction(SourceRange ReferenceRange,
                                 const DeclContext *DC);
 
+  /// Returns true if the reference or any of its parents is an
+  /// unavailable (or obsoleted) declaration.
+  bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
+                                     const DeclContext *DC);
+
   /// Returns the availability attribute indicating deprecation if the
   /// declaration is deprecated or null otherwise.
   static const AvailabilityAttr *getDeprecated(const Decl *D);

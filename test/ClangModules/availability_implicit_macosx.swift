@@ -1,5 +1,5 @@
 // RUN: %swift -parse -verify -target x86_64-apple-macosx10.10 -enable-experimental-availability-checking -enable-availability-checking-in-implicit-functions %clang-importer-sdk -I %S/Inputs/custom-modules %s
-// RUN: %swift -parse -target x86_64-apple-macosx10.10 -enable-experimental-availability-checking -enable-availability-checking-in-implicit-functions %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: not %swift -parse -target x86_64-apple-macosx10.10 -enable-experimental-availability-checking -enable-availability-checking-in-implicit-functions %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // REQUIRES: OS=macosx
 
@@ -76,4 +76,20 @@ class ClassWithLimitedAvailabilityAccessors {
     @availability(OSX, introduced=10.11)
     set(newVal) {}
   }
+}
+
+@availability(*, unavailable)
+func unavailableFunction() -> Int { return 10 } // expected-note 3{{'unavailableFunction()' has been explicitly marked unavailable here}}
+
+class ClassWithReferencesLazyInitializers {
+  var propWithUnavailableInInitializer: Int = unavailableFunction() // expected-error {{'unavailableFunction()' is unavailable}}
+
+  lazy var lazyPropWithUnavailableInInitializer: Int = unavailableFunction() // expected-error {{'unavailableFunction()' is unavailable}}
+}
+
+@availability(*, unavailable)
+func unavailableUseInUnavailableFunction() {
+  // Diagnose references to unavailable functions in non-implicit code
+  // as errors
+  unavailableFunction() // expected-error {{'unavailableFunction()' is unavailable}}
 }

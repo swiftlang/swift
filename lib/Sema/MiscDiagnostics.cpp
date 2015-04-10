@@ -472,6 +472,75 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 // Diagnose availability.
 //===--------------------------------------------------------------------===//
 
+/// Emit a diagnostic for references to declarations that have been
+/// marked as unavailable, either through "unavailable" or "obsoleted=".
+static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
+                                           SourceRange R,
+                                           const DeclContext *DC) {
+  auto *Attr = AvailabilityAttr::isUnavailable(D);
+  if (!Attr)
+    return false;
+
+  // Suppress the diagnostic if we are in synthesized code inside
+  // a synthesized function and the reference is lexically
+  // contained in a declaration that is itself marked unavailable.
+  // The right thing to do here is to not synthesize that code in the
+  // first place. rdar://problem/20491640
+  if (R.isInvalid() && TC.isInsideImplicitFunction(R, DC) &&
+      TC.isInsideUnavailableDeclaration(R, DC)) {
+    return false;
+  }
+
+  SourceLoc Loc = R.Start;
+  auto Name = D->getFullName();
+
+  switch (Attr->Unavailable) {
+  case AvailabilityAttr::UnavailabilityKind::None:
+  case AvailabilityAttr::UnavailabilityKind::Normal:
+    if (!Attr->Rename.empty()) {
+      TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
+                  Attr->Rename).fixItReplace(R, Attr->Rename);
+    } else if (Attr->Message.empty()) {
+      TC.diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
+    } else {
+      TC.diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
+                  Attr->Message).highlight(R);
+    }
+    break;
+
+  case AvailabilityAttr::UnavailabilityKind::InSwift:
+    if (Attr->Message.empty()) {
+      TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift, Name)
+          .highlight(R);
+    } else {
+      TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg, Name,
+                  Attr->Message).highlight(R);
+    }
+    break;
+  }
+
+  auto MinVersion = TC.Context.LangOpts.getMinPlatformVersion();
+  switch (Attr->getMinVersionAvailability(MinVersion)) {
+  case MinVersionComparison::Available:
+  case MinVersionComparison::PotentiallyUnavailable:
+    llvm_unreachable("These aren't considered unavailable");
+
+  case MinVersionComparison::Unavailable:
+    TC.diagnose(D, diag::availability_marked_unavailable, Name)
+        .highlight(Attr->getRange());
+    break;
+
+  case MinVersionComparison::Obsoleted:
+    // FIXME: Use of the platformString here is non-awesome for application
+    // extensions.
+    TC.diagnose(D, diag::availability_obsoleted, Name,
+                Attr->prettyPlatformString(),
+                *Attr->Obsoleted).highlight(Attr->getRange());
+    break;
+  }
+  return true;
+}
+
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
@@ -491,62 +560,8 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
     return false;
   }
 
-  SourceLoc Loc = R.Start;
-  if (auto Attr = AvailabilityAttr::isUnavailable(D)) {
-    auto Name = D->getFullName();
-
-    switch (Attr->Unavailable) {
-    case AvailabilityAttr::UnavailabilityKind::None:
-    case AvailabilityAttr::UnavailabilityKind::Normal:
-      if (!Attr->Rename.empty()) {
-        TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
-                    Attr->Rename)
-          .fixItReplace(R, Attr->Rename);
-      } else if (Attr->Message.empty()) {
-        TC.diagnose(Loc, diag::availability_decl_unavailable, Name)
-          .highlight(R);
-      } else {
-        TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                    Name, Attr->Message)
-          .highlight(R);
-      }
-      break;
-
-    case AvailabilityAttr::UnavailabilityKind::InSwift:
-      if (Attr->Message.empty()) {
-        TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift, Name)
-          .highlight(R);
-      } else {
-        TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg,
-                    Name, Attr->Message)
-          .highlight(R);
-      }
-      break;
-    }
-
-    auto MinVersion = TC.Context.LangOpts.getMinPlatformVersion();
-    switch (Attr->getMinVersionAvailability(MinVersion)) {
-      case MinVersionComparison::Available:
-      case MinVersionComparison::PotentiallyUnavailable:
-        llvm_unreachable("These aren't considered unavailable");
-
-      case MinVersionComparison::Unavailable:
-        TC.diagnose(D, diag::availability_marked_unavailable, Name)
-          .highlight(Attr->getRange());
-        break;
-
-      case MinVersionComparison::Obsoleted: {
-        // FIXME: Use of the platformString here is non-awesome for application
-        // extensions.
-        TC.diagnose(D, diag::availability_obsoleted, Name,
-                    Attr->prettyPlatformString(), *Attr->Obsoleted)
-          .highlight(Attr->getRange());
-        break;
-      }
-
-    }
+  if (diagnoseExplicitUnavailability(TC, D, R, DC))
     return true;
-  }
 
   // Diagnose for deprecation
   if (const AvailabilityAttr *Attr = TypeChecker::getDeprecated(D)) {
@@ -562,7 +577,7 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   }
 
   // Diagnose for potential unavailability
-  auto maybeUnavail = TC.checkDeclarationAvailability(D, Loc, DC);
+  auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
     TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
     return true;
