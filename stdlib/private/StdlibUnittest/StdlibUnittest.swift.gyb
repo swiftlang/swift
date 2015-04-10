@@ -756,7 +756,15 @@ struct _ParentProcess {
   }
 }
 
+internal var _runAllTestsWasCalled: Bool = false
+
 public func runAllTests() {
+  if _runAllTestsWasCalled {
+    println("runAllTests() called twice.  It is not allowed, aborting.")
+    abort()
+  }
+  _runAllTestsWasCalled = true
+
 #if _runtime(ObjC)
   autoreleasepool {
     _stdlib_initializeReturnAutoreleased()

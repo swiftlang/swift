@@ -122,6 +122,7 @@ Algorithm.test("sorted/${name}") {
   expectSortedCollection(sortedAry2[i1..<i2], ary[i1..<i2])
   expectEqual(ary[i2..<count], sortedAry2[i2..<count])
 }
+%   end
 % end
 
 Algorithm.test("sort/CollectionsWithUnusualIndices") {
