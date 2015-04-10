@@ -2049,22 +2049,6 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
                                      const AvailabilityAttr *Attr,
                                      DeclName Name) {
-
-  // Suppress the warning if the reference is inside an
-  // implicit function. This avoids spurious warnings for synthesized
-  // methods (for example, for nil literal conformances of deprecated
-  // imported enums) but also erroneously allows some references
-  // to deprecated symbols (for example, a synthesized call to
-  // to a deprecated default constructor of a super class).
-  // We should emit special-case diagnostics for those cases
-  // where the compiler will synthesize a reference to
-  // a deprecated API element. rdar://problem/20024980 tracks these
-  // special-case diagnostics.
-  if (!getLangOpts().EnableAvailabilityCheckingInImplicitFunctions &&
-      isInsideImplicitFunction(ReferenceRange, ReferenceDC)) {
-    return;
-  }
-
   // We match the behavior of clang to not report deprecation warnigs
   // inside declarations that are themselves deprecated on all deployment
   // targets.

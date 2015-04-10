@@ -53,7 +53,7 @@ class ClassAdoptingUnavailableProtocol : NSProtocolAvailableOn10_10 { // expecte
 
 // Enums from Objective-C
 
-let _: NSUnavailableOptions = .First // expected-error {{'NSUnavailableOptions' is only available on OS X 10.10 or newer}}
+let _: NSPotentiallyUnavailableOptions = .First // expected-error {{'NSPotentiallyUnavailableOptions' is only available on OS X 10.10 or newer}}
     // expected-note@-1 {{guard with version check}}
 
 let _: NSOptionsWithUnavailableElement = .Third // expected-error {{'Third' is only available on OS X 10.10 or newer}}

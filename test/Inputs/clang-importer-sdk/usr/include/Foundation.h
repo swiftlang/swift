@@ -440,11 +440,11 @@ typedef NS_OPTIONS(NSUInteger, NSABitmapFormat5) {
   NSAB32d,
 };
 
-/// Aaa.  NSUnavailableOptions.  Bbb.
-typedef NS_OPTIONS(NSUInteger, NSUnavailableOptions) {
-  NSUnavailableOptionsFirst   = (1 << 0),
-  NSUnavailableOptionsSecond  = (1 << 1),
-  NSUnavailableOptionsThird   = (1 << 2),
+/// Aaa.  NSPotentiallyUnavailableOptions.  Bbb.
+typedef NS_OPTIONS(NSUInteger, NSPotentiallyUnavailableOptions) {
+  NSPotentiallyUnavailableOptionsFirst   = (1 << 0),
+  NSPotentiallyUnavailableOptionsSecond  = (1 << 1),
+  NSPotentiallyUnavailableOptionsThird   = (1 << 2),
 }  __attribute__((availability(macosx, introduced=10.10)));
 
 /// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
@@ -504,6 +504,11 @@ typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
   - (void)someMethodWithUnavailableOptions:(NSExplicitlyUnavailableOptions)options __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
 
   - (void)someMethodWithUnavailableOptionsOnOSX:(NSExplicitlyUnavailableOnOSXOptions)options __attribute__((availability(macosx, unavailable, message="Use a different API")));
+@end
+
+@interface NSClassWithPotentiallyUnavailableOptionsInMethodSignature : NSObject
++ (NSClassWithPotentiallyUnavailableOptionsInMethodSignature *) sharedInstance;
+- (void)someMethodWithPotentiallyUnavailableOptions:(NSPotentiallyUnavailableOptions)options __attribute__((availability(macosx, introduced=10.11)));
 @end
 
 @protocol NSWobbling

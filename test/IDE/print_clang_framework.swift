@@ -34,9 +34,9 @@
 //
 // REQUIRES: OS=macosx
 
-// FOUNDATION-LABEL: {{^}}/// Aaa.  NSUnavailableOptions.  Bbb.
+// FOUNDATION-LABEL: {{^}}/// Aaa.  NSPotentiallyUnavailableOptions.  Bbb.
 // FOUNDATION-NEXT: {{^}}@availability(OSX, introduced=10.10){{$}}
-// FOUNDATION-NEXT: {{^}}struct NSUnavailableOptions : RawOptionSetType {{{$}}
+// FOUNDATION-NEXT: {{^}}struct NSPotentiallyUnavailableOptions : RawOptionSetType {{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
 // FOUNDATION-NEXT: {{^}}struct NSOptionsWithUnavailableElement : RawOptionSetType {{{$}}
