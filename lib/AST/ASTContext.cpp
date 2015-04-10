@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExprHandle.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
@@ -171,6 +172,11 @@ struct ASTContext::Implementation {
   /// \brief Map from local declarations to their discriminators.
   /// Missing entries implicitly have value 0.
   llvm::DenseMap<const ValueDecl *, unsigned> LocalDiscriminators;
+
+  /// \brief Map from declarations to foreign error conventions.
+  /// This applies to both actual imported functions and to @objc functions.
+  llvm::DenseMap<const AbstractFunctionDecl *,
+                 ForeignErrorConvention> ForeignErrorConventions;
 
   /// Conformance loaders for declarations that have them.
   llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
@@ -1615,6 +1621,24 @@ static AbstractFunctionDecl *lookupObjCMethodInType(
   return lookupObjCMethodInType(classDecl->getSuperclass(), selector,
                                 isInstanceMethod, isInitializer, srcMgr,
                                 inheritingInits);
+}
+
+void AbstractFunctionDecl::setForeignErrorConvention(
+                                         const ForeignErrorConvention &conv) {
+  assert(isObjC() && "setting foreign error convention on non-@objc decl");
+  assert(isBodyThrowing() && "setting error convention on non-throwing decl");
+  auto &conventionsMap = getASTContext().Impl.ForeignErrorConventions;
+  assert(!conventionsMap.count(this) && "error convention already set");
+  conventionsMap.insert({this, conv});
+}
+
+Optional<ForeignErrorConvention>
+AbstractFunctionDecl::getForeignErrorConvention() const {
+  if (!isObjC() || !isBodyThrowing()) return None;
+  auto &conventionsMap = getASTContext().Impl.ForeignErrorConventions;
+  auto it = conventionsMap.find(this);
+  if (it == conventionsMap.end()) return None;
+  return it->second;
 }
 
 bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {

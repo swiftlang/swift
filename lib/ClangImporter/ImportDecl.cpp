@@ -2733,16 +2733,18 @@ namespace {
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
+      Optional<ForeignErrorConvention> errorConvention;
       auto type = Impl.importMethodType(decl,
                                         decl->getReturnType(),
-                                          { decl->param_begin(),
-                                            decl->param_size() },
-                                          decl->isVariadic(),
-                                          decl->hasAttr<clang::NoReturnAttr>(),
-                                          isInSystemModule(dc),
-                                          bodyPatterns,
-                                          name,
-                                          kind);
+                                        { decl->param_begin(),
+                                          decl->param_size() },
+                                        decl->isVariadic(),
+                                        decl->hasAttr<clang::NoReturnAttr>(),
+                                        isInSystemModule(dc),
+                                        bodyPatterns,
+                                        name,
+                                        errorConvention,
+                                        kind);
       if (!type)
         return nullptr;
 
@@ -2831,6 +2833,11 @@ namespace {
 
       // If this method overrides another method, mark it as such.
       recordObjCOverride(result);
+
+      // Record the error convention.
+      if (errorConvention) {
+        result->setForeignErrorConvention(*errorConvention);
+      }
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBActionAttr>())
@@ -3113,6 +3120,7 @@ namespace {
       bodyPatterns.push_back(selfPat);
 
       // Import the type that this method will have.
+      Optional<ForeignErrorConvention> errorConvention;
       auto type = Impl.importMethodType(objcMethod,
                                         objcMethod->getReturnType(),
                                         args,
@@ -3121,6 +3129,7 @@ namespace {
                                         isInSystemModule(dc),
                                         bodyPatterns,
                                         name,
+                                        errorConvention,
                                         SpecialMethodKind::Constructor);
       if (!type)
         return nullptr;
@@ -3145,13 +3154,15 @@ namespace {
 
       // Determine the type of the result.
       Type resultTy = selfTy;
-      if (failability != OTK_None) {
+      if (failability != OTK_None &&
+          (!errorConvention || !errorConvention->stripsResultOptionality())) {
         resultTy = OptionalType::get(failability, resultTy);
       }
 
       // A constructor returns an object of the type, not 'id'.
-      type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
-                               resultTy);
+      auto oldFnType = type->castTo<FunctionType>();
+      type = FunctionType::get(oldFnType->getInput(), resultTy,
+                               oldFnType->getExtInfo());
 
       // Add the 'self' parameter to the function types.
       Type allocType = FunctionType::get(selfMetaVar->getType(), type);
@@ -3241,7 +3252,7 @@ namespace {
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(objcMethod,
                       name, SourceLoc(), failability, SourceLoc(), selfPat, 
                       bodyPatterns.back(), /*GenericParams=*/nullptr, dc);
-      
+
       // Make the constructor declaration immediately visible in its
       // class or protocol type.
       nominalOwner->makeMemberVisible(result);
@@ -3308,6 +3319,11 @@ namespace {
       if (required) {
         result->getAttrs().add(
           new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
+      }
+
+      // Record the error convention.
+      if (errorConvention) {
+        result->setForeignErrorConvention(*errorConvention);
       }
 
       // Record the constructor for future re-use.

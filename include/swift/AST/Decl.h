@@ -63,6 +63,7 @@ namespace swift {
   class DynamicSelfType;
   class Type;
   class Expr;
+  class ForeignErrorConvention;
   class LiteralExpr;
   class FuncDecl;
   class BraceStmt;
@@ -4746,6 +4747,14 @@ public:
 
   /// Whether the function body is 'throws'.
   bool isBodyThrowing() const;
+
+  /// Set information about the foreign error convention used by this
+  /// declaration.
+  void setForeignErrorConvention(const ForeignErrorConvention &convention);
+
+  /// Get information about the foreign error convention used by this
+  /// declaration, given that it is @objc and 'throws'.
+  Optional<ForeignErrorConvention> getForeignErrorConvention() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&

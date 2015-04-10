@@ -98,12 +98,12 @@ class AbstractionPattern {
     return OtherData;
   }
 
-  bool hasClangType() const {
+  bool hasStoredClangType() const {
     return (getKind() == Kind::ClangType ||
             getKind() == Kind::ClangFunctionParamTupleType);
   }
 
-  bool hasObjCMethod() const {
+  bool hasStoredObjCMethod() const {
     return (getKind() == Kind::ObjCMethodType ||
             getKind() == Kind::ObjCMethodParamTupleType ||
             getKind() == Kind::ObjCMethodFormalParamTupleType);
@@ -206,6 +206,14 @@ public:
     return pattern;
   }
 
+  /// Return an abstraction pattern with an added level of optionality.
+  ///
+  /// The based abstraction pattern must be either opaque or based on
+  /// a Clang or Swift type.  That is, it cannot be a tuple or an ObjC
+  /// method type.
+  static AbstractionPattern getOptional(AbstractionPattern objectPattern,
+                                        OptionalTypeKind optionalKind);
+
   /// Does this abstraction pattern have something that can be used as a key?
   bool hasCachingKey() const {
     // Only the simplest Kind::Type pattern has a caching key; we
@@ -253,13 +261,48 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  /// Return whether this abstraction pattern contains foreign type
+  /// information.
+  ///
+  /// In general, after eliminating tuples, a foreign abstraction
+  /// pattern will satisfy either isClangType() or isObjCMethod().
+  bool isForeign() const {
+    switch (getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("querying invalid abstraction pattern!");
+    case Kind::Opaque:
+    case Kind::Tuple:
+    case Kind::Type:
+      return false;
+    case Kind::ClangType:
+    case Kind::ClangFunctionParamTupleType:
+    case Kind::ObjCMethodType:
+    case Kind::ObjCMethodParamTupleType:
+    case Kind::ObjCMethodFormalParamTupleType:
+      return true;
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  /// Return whether this abstraction pattern represents a Clang type.
+  /// If so, it is legal to return getClangType().
+  bool isClangType() const {
+    return (getKind() == Kind::ClangType);
+  }
+
   const clang::Type *getClangType() const {
-    assert(hasClangType());
+    assert(hasStoredClangType());
     return ClangType;
   }
 
+  /// Return whether this abstraction pattern represents an
+  /// Objective-C method.  If so, it is legal to call getObjCMethod().
+  bool isObjCMethod() const {
+    return (getKind() == Kind::ObjCMethodType);
+  }
+
   const clang::ObjCMethodDecl *getObjCMethod() const {
-    assert(hasObjCMethod());
+    assert(hasStoredObjCMethod());
     return ObjCMethod;
   }
 

@@ -22,6 +22,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/APINotes/APINotesReader.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -237,6 +238,7 @@ public:
   const bool SplitPrepositions;
   const bool InferImplicitProperties;
   const bool ImportForwardDeclarations;
+  const bool ErrorHandling;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";
@@ -953,6 +955,7 @@ public:
   /// \param bodyPatterns The patterns visible inside the function body.
   ///   whether the created arg/body patterns are different (selector-style).
   /// \param methodName The name of the imported method.
+  /// \param errorConvention Information about the method's error conventions.
   /// \param kind Controls whether we're building a type for a method that
   ///        needs special handling.
   ///
@@ -964,7 +967,8 @@ public:
                         bool isVariadic, bool isNoReturn,
                         bool isFromSystemModule,
                         SmallVectorImpl<Pattern*> &bodyPatterns,
-                        DeclName methodName,
+                        DeclName &methodName,
+                        Optional<ForeignErrorConvention> &errorConvention,
                         SpecialMethodKind kind);
 
   /// \brief Determine whether the given typedef-name is "special", meaning

@@ -1239,6 +1239,158 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
           decl->hasAttr<clang::ObjCReturnsInnerPointerAttr>());
 }
 
+namespace {
+  struct ErrorImportInfo {
+    ForeignErrorConvention::Kind Kind;
+    ForeignErrorConvention::IsOwned_t IsOwned;
+    unsigned ParamIndex;
+    CanType ParamType;
+    CanType OrigResultType;
+
+    ForeignErrorConvention asForeignErrorConvention() const {
+      assert(ParamType && "not fully initialized!");
+      using FEC = ForeignErrorConvention;
+      switch (Kind) {
+      case FEC::ZeroResult:
+        return FEC::getZeroResult(ParamIndex, IsOwned, ParamType,
+                                  OrigResultType);
+      case FEC::NonZeroResult:
+        return FEC::getNonZeroResult(ParamIndex, IsOwned, ParamType,
+                                     OrigResultType);
+      case FEC::NilResult:
+        return FEC::getNilResult(ParamIndex, IsOwned, ParamType);
+      case FEC::NonNilError:
+        return FEC::getNonNilError(ParamIndex, IsOwned, ParamType);
+      }
+      llvm_unreachable("bad error convention");
+    }
+  };
+}
+
+static bool isBlockParameter(const clang::ParmVarDecl *param) {
+  return param->getType()->isBlockPointerType();
+}
+
+static bool isErrorOutParameter(const clang::ParmVarDecl *param,
+                         ForeignErrorConvention::IsOwned_t &isErrorOwned) {
+  if (auto ptrType = param->getType()->getAs<clang::PointerType>()) {
+    auto pointeeType = ptrType->getPointeeType();
+    if (auto ifaceType = pointeeType->getAs<clang::ObjCInterfaceType>()) {
+      if (ifaceType->getDecl()->getName() == "NSError") {
+        switch (pointeeType.getObjCLifetime()) {
+        case clang::Qualifiers::OCL_None:
+          llvm_unreachable("not in ARC?");
+
+        case clang::Qualifiers::OCL_ExplicitNone:
+        case clang::Qualifiers::OCL_Autoreleasing:
+          isErrorOwned = ForeignErrorConvention::IsNotOwned;
+          return true;
+
+        case clang::Qualifiers::OCL_Weak:
+          // We just don't know how to handle this.
+          return false;
+
+        case clang::Qualifiers::OCL_Strong:
+          isErrorOwned = ForeignErrorConvention::IsOwned;
+          return false;
+        }
+        llvm_unreachable("bad error ownership");
+      }
+    }
+  }
+  return false;
+}
+
+static Optional<ForeignErrorConvention::Kind>
+classifyMethodErrorHandling(ClangImporter::Implementation &importer,
+                            const clang::ObjCMethodDecl *clangDecl,
+                            Type importedResultType) {
+  // TODO: opt out any non-standard methods here?
+
+  // For bool results, a zero value is an error.
+  if (auto nominalType = importedResultType->getAs<NominalType>()) {
+    if (nominalType->getDecl() == importer.SwiftContext.getBoolDecl()) {
+      return ForeignErrorConvention::ZeroResult;
+    }
+  }
+
+  // For optional reference results, a nil value is normally an error.
+  if (importedResultType->getAnyOptionalObjectType()) {
+    return ForeignErrorConvention::NilResult;
+  }
+
+  return None;
+}
+
+
+static Optional<ErrorImportInfo>
+considerErrorImport(ClangImporter::Implementation &importer,
+                    const clang::ObjCMethodDecl *clangDecl,
+                    DeclName &methodName,
+                    ArrayRef<const clang::ParmVarDecl *> params,
+                    Type &importedResultType) {
+  // Respect the compiler option.
+  if (!importer.ErrorHandling) return None;
+
+  // If the declaration name isn't parallel to the actual parameter
+  // list (e.g. if the method has C-style parameter declarations),
+  // don't try to apply error conventions.
+  auto paramNames = methodName.getArgumentNames();
+  if (paramNames.size() < params.size()) return None;
+
+  for (unsigned index = params.size(); index-- != 0; ) {
+    // Allow an arbitrary number of trailing blocks.
+    if (isBlockParameter(params[index]))
+      continue;
+
+    // Otherwise, require the last parameter to be an out-parameter.
+    auto isErrorOwned = ForeignErrorConvention::IsNotOwned;
+    if (!isErrorOutParameter(params[index], isErrorOwned))
+      break;
+
+    auto errorKind =
+      classifyMethodErrorHandling(importer, clangDecl, importedResultType);
+    if (!errorKind) return None;
+
+    ErrorImportInfo errorInfo = {
+      *errorKind, isErrorOwned, index, CanType(),
+      importedResultType->getCanonicalType()
+    };
+    
+    // Adjust the return type.
+    switch (*errorKind) {
+    case ForeignErrorConvention::ZeroResult:
+    case ForeignErrorConvention::NonZeroResult:
+      importedResultType = TupleType::getEmpty(importer.SwiftContext);
+      break;
+
+    case ForeignErrorConvention::NilResult:
+      importedResultType = importedResultType->getAnyOptionalObjectType();
+      assert(importedResultType &&
+             "result type of NilResult convention was not imported as optional");
+      break;
+
+    case ForeignErrorConvention::NonNilError:
+      break;
+    }
+
+    // Adjust the declaration name to remove the parameter.
+    SmallVector<Identifier, 8> newParamNames;
+    newParamNames.append(paramNames.begin(),
+                         paramNames.begin() + index);
+    newParamNames.append(paramNames.begin() + index + 1,
+                         paramNames.end());
+    methodName = DeclName(importer.SwiftContext,
+                          methodName.getBaseName(),
+                          newParamNames);
+
+    return errorInfo;
+  }
+
+  // Didn't find an error parameter.
+  return None;
+}
+
 Type ClangImporter::Implementation::importMethodType(
        const clang::ObjCMethodDecl *clangDecl,
        clang::QualType resultType,
@@ -1246,7 +1398,8 @@ Type ClangImporter::Implementation::importMethodType(
        bool isVariadic, bool isNoReturn,
        bool isFromSystemModule,
        SmallVectorImpl<Pattern*> &bodyPatterns,
-       DeclName methodName,
+       DeclName &methodName,
+       Optional<ForeignErrorConvention> &foreignErrorInfo,
        SpecialMethodKind kind) {
 
   // Cannot import variadic types.
@@ -1270,11 +1423,9 @@ Type ClangImporter::Implementation::importMethodType(
 
   // Check if we know more about the type from our whitelists.
   Optional<api_notes::ObjCMethodInfo> knownMethod;
-  if (auto MD = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-    if (auto knownMethodTmp = getKnownObjCMethod(MD)) {
-      if (knownMethodTmp->NullabilityAudited)
-        knownMethod = knownMethodTmp;
-    }
+  if (auto knownMethodTmp = getKnownObjCMethod(clangDecl)) {
+    if (knownMethodTmp->NullabilityAudited)
+      knownMethod = knownMethodTmp;
   }
 
   OptionalTypeKind OptionalityOfReturn;
@@ -1308,17 +1459,22 @@ Type ClangImporter::Implementation::importMethodType(
   if (!swiftResultTy)
     return Type();
 
+  auto errorInfo = considerErrorImport(*this, clangDecl, methodName, params,
+                                       swiftResultTy);
+
   // Import the parameters.
   SmallVector<TupleTypeElt, 4> swiftArgParams;
   SmallVector<TupleTypeElt, 4> swiftBodyParams;
   SmallVector<TuplePatternElt, 4> bodyPatternElts;
   auto argNames = methodName.getArgumentNames();
   llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
-  unsigned index = 0;
-  for (auto param : params) {
+  unsigned nameIndex = 0;
+  for (size_t paramIndex = 0; paramIndex != params.size(); paramIndex++) {
+    auto param = params[paramIndex];
     auto paramTy = param->getType();
     if (paramTy->isVoidType()) {
-      ++index;
+      assert(!errorInfo || paramIndex != errorInfo->ParamIndex);
+      ++nameIndex;
       continue;
     }
 
@@ -1333,7 +1489,7 @@ Type ClangImporter::Implementation::importMethodType(
     // If the parameter type has explicit nullability, it takes precedence.
     if (param->getType()->getNullability(param->getASTContext())) {
       optionalityOfParam = OTK_None;
-    } else if (!nonNullArgs.empty() && nonNullArgs[index]) {
+    } else if (!nonNullArgs.empty() && nonNullArgs[paramIndex]) {
       // Fall back to API notes.
       optionalityOfParam = OTK_None;
     } else if (param->hasAttr<clang::NonNullAttr>()) {
@@ -1341,10 +1497,10 @@ Type ClangImporter::Implementation::importMethodType(
     } else if (knownMethod) {
       // Fall back to API notes.
       optionalityOfParam =
-        translateNullability(knownMethod->getParamTypeInfo(index));
+        translateNullability(knownMethod->getParamTypeInfo(paramIndex));
     }
 
-    if (index == 0 && clangDecl->isPropertyAccessor()) {
+    if (paramIndex == 0 && clangDecl->isPropertyAccessor()) {
       // If we have the parameter for a setter for a property that has
       // nullability, strip the outer nullability off the parameter
       // type: we want the property's nullability here.
@@ -1379,6 +1535,13 @@ Type ClangImporter::Implementation::importMethodType(
     if (!swiftParamTy)
       return Type();
 
+    // If this is the error parameter, remember it, but don't build it
+    // into the parameter type.
+    if (errorInfo && paramIndex == errorInfo->ParamIndex) {
+      errorInfo->ParamType = swiftParamTy->getCanonicalType();
+      continue;
+    }
+
     // Map __attribute__((noescape)) to @noescape.
     bool addNoEscapeAttr = false;
     if (param->hasAttr<clang::NoEscapeAttr>()) {
@@ -1394,9 +1557,10 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Figure out the name for this argument, which comes from the method name.
     Identifier name;
-    if (index < argNames.size()) {
-      name = argNames[index];
+    if (nameIndex < argNames.size()) {
+      name = argNames[nameIndex];
     }
+    ++nameIndex;
 
     // Compute the pattern to put into the body.
     Pattern *bodyPattern;
@@ -1425,7 +1589,6 @@ Type ClangImporter::Implementation::importMethodType(
     // Add the tuple elements for the function types.
     swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
     swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));
-    ++index;
   }
 
   // If we have a constructor with no parameters and a name with an
@@ -1461,6 +1624,13 @@ Type ClangImporter::Implementation::importMethodType(
   
   FunctionType::ExtInfo extInfo;
   extInfo = extInfo.withIsNoReturn(isNoReturn);
+
+  if (errorInfo) {
+    foreignErrorInfo = errorInfo->asForeignErrorConvention();
+
+    // Mark that the function type throws.
+    extInfo = extInfo.withThrows(true);
+  }
   
   // Form the function type.
   auto argTy = TupleType::get(swiftArgParams, SwiftContext);

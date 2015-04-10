@@ -29,6 +29,7 @@ namespace clang {
 
 namespace swift {
   class AnyFunctionRef;
+  class ForeignErrorConvention;
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
   class SILBuilder;

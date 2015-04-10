@@ -75,6 +75,31 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   return AbstractionPattern(decl->getArgumentType());
 }
 
+AbstractionPattern
+AbstractionPattern::getOptional(AbstractionPattern object,
+                                OptionalTypeKind optionalKind) {
+  switch (object.getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::Tuple:
+  case Kind::ObjCMethodType:
+  case Kind::ObjCMethodParamTupleType:
+  case Kind::ObjCMethodFormalParamTupleType:
+  case Kind::ClangFunctionParamTupleType:
+    llvm_unreachable("cannot add optionality to non-type abstraction");
+  case Kind::Opaque:
+    return AbstractionPattern::getOpaque();
+  case Kind::ClangType:
+    return AbstractionPattern(OptionalType::get(optionalKind, object.getType())
+                                ->getCanonicalType(),
+                              object.getClangType());
+  case Kind::Type:
+    return AbstractionPattern(OptionalType::get(optionalKind, object.getType())
+                                ->getCanonicalType());
+  }
+  llvm_unreachable("bad kind");
+}
+
 bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   switch (getKind()) {
   case Kind::Invalid:
