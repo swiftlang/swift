@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -84,9 +85,24 @@ removeUnwantedFunctions(SILModule *M, llvm::StringRef Name) {
   assert(!Name.empty() && "Expected name of function we want to retain!");
   assert(M && "Expected a SIL module to extract from.");
 
+  // If the function name passed is already mangled then we assume the
+  // user knows exactly what function they want and thus don't try
+  // to demangle any functions.
+  bool isMangled = Name.startswith("_T");
+
   std::vector<SILFunction *> DeadFunctions;
   for (auto &F : M->getFunctionList()) {
-    if (Name != F.getName().str()) {
+    auto FnName = isMangled
+        ? F.getName().str()
+        : swift::Demangle::demangleSymbolAsString(F.getName());
+
+    // A rather simple way to get at just the demangled function
+    // name (fully qualified i.e. Swift.String.init) without the
+    // argument and return types.
+    if (!isMangled)
+      FnName = FnName.substr(0, FnName.find(' '));
+
+    if (Name != FnName) {
       if (F.size()) {
         SILBasicBlock &BB = F.front();
 
