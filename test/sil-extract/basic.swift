@@ -19,8 +19,8 @@
 
 // EXTRACT-FOO-LABEL: sil hidden @_TF5basic3fooFT_Si : $@thin () -> Int {
 // EXTRACT-FOO:       bb0:
-// EXTRACT-FOO-NEXT:    %0 = integer_literal $Builtin.Int64, 7
-// EXTRACT-FOO-NEXT:    %1 = struct $Int (%0 : $Builtin.Int64)
+// EXTRACT-FOO-NEXT:    %0 = integer_literal
+// EXTRACT-FOO-NEXT:    %1 = struct $Int
 // EXTRACT-FOO-NEXT:    return %1 : $Int
 
 
