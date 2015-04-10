@@ -90,7 +90,8 @@
    ;; Aggregate Types
    `(,(regexp-opt '("retain_value" "release_value" "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"
-                    "struct_element_addr" "ref_element_addr")
+                    "struct_element_addr" "ref_element_addr"
+                    "autorelease_value")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
    ;; swift declaration as well handled at the top.
