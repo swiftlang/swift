@@ -394,6 +394,9 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
     if (hasSharedVisibility(F->getLinkage()))
       return false;
     // Make this definition a declaration by removing the body of a function.
+
+    DEBUG(llvm::dbgs() << "  removed external function " << F->getName()
+          << "\n");
     F->dropAllReferences();
     auto &Blocks = F->getBlocks();
     Blocks.clear();
@@ -404,8 +407,6 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
       FunctionWasErased = true;
     }
     NumEliminatedExternalDefs++;
-    DEBUG(llvm::dbgs() << "  removed external function " << F->getName()
-                       << "\n");
     return FunctionWasErased;
   }
 
