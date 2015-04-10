@@ -56,7 +56,7 @@ option(SWIFT_ENABLE_TARGET_LINUX
     "Enable compiler support for targeting Linux"
     TRUE)
 
-set(SWIFT_VERSION "1.2" CACHE STRING
+set(SWIFT_VERSION "2.0" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
