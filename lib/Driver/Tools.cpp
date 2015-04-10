@@ -144,13 +144,15 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     arguments.push_back("-color-diagnostics");
 }
 
-Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
-                         std::unique_ptr<CommandOutput> Output,
-                         const ActionList &InputActions, const ArgList &Args,
-                         const OutputInfo &OI) const {
-  ArgStringList Arguments;
-
-  const char *Exec = getToolChain().getDriver().getSwiftProgramPath().c_str();
+/// Setup executable name and argument based on whether we should delegate
+/// to 'swift -frontend' or to 'swift-update'.
+/// \returns the executable name.
+static const char *setupSwiftFrontendOrSwiftUpdate(const Tool &Tool,
+                                                   const ArgList &Args,
+                                                   const OutputInfo &OI,
+                                                   ArgStringList &Arguments) {
+  const char *Exec =
+    Tool.getToolChain().getDriver().getSwiftProgramPath().c_str();
 
   if (OI.CompilerMode == OutputInfo::Mode::UpdateCode) {
     SmallString<128> SwiftUpdatePath = llvm::sys::path::parent_path(Exec);
@@ -160,6 +162,18 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     // Invoke ourselves in -frontend mode.
     Arguments.push_back("-frontend");
   }
+
+  return Exec;
+}
+
+Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
+                         std::unique_ptr<CommandOutput> Output,
+                         const ActionList &InputActions, const ArgList &Args,
+                         const OutputInfo &OI) const {
+  ArgStringList Arguments;
+
+  const char *Exec = setupSwiftFrontendOrSwiftUpdate(*this, Args, OI,
+                                                     Arguments);
 
   // Determine the frontend mode option.
   const char *FrontendModeOption = nullptr;
@@ -405,16 +419,8 @@ Job *MergeModule::constructJob(const JobAction &JA,
                                const OutputInfo &OI) const {
   ArgStringList Arguments;
 
-  const char *Exec = getToolChain().getDriver().getSwiftProgramPath().c_str();
-
-  if (OI.CompilerMode == OutputInfo::Mode::UpdateCode) {
-    SmallString<128> SwiftUpdatePath = llvm::sys::path::parent_path(Exec);
-    llvm::sys::path::append(SwiftUpdatePath, "swift-update");
-    Exec = Args.MakeArgString(SwiftUpdatePath.str());
-  } else {
-    // Invoke ourselves in -frontend mode.
-    Arguments.push_back("-frontend");
-  }
+  const char *Exec = setupSwiftFrontendOrSwiftUpdate(*this, Args, OI,
+                                                     Arguments);
 
   // We just want to emit a module, so pass -emit-module without any other
   // mode options.
