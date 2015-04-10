@@ -2057,6 +2057,10 @@ ERROR(availability_global_script_no_potential, sema_avail,
       none, "global variable cannot be marked potentially "
       "unavailable with 'introduced=' in script mode", ())
 
+ERROR(availability_stored_property_no_potential, sema_avail,
+      none, "stored properties cannot be marked potentially unavailable with "
+      "'introduced='", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
