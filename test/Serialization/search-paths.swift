@@ -18,8 +18,11 @@
 
 // Make sure we don't end up with duplicate search paths.
 // RUN: %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I %t/secret -F %t/Frameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options
-// RUN: llvm-bcanalyzer -dump %t/has_xref.swiftmodule | FileCheck %s
 // RUN: %target-swift-frontend %s -parse -I %t
+// RUN: llvm-bcanalyzer -dump %t/has_xref.swiftmodule | FileCheck %s
+
+// RUN: %target-swift-frontend %s -emit-module -o %t/main.swiftmodule -I %t -I %t/secret -F %t/Frameworks
+// RUN: llvm-bcanalyzer -dump %t/main.swiftmodule | FileCheck %s
 
 // XFAIL: linux
 
@@ -28,7 +31,11 @@ import has_xref // expected-error {{missing required modules: 'has_alias', 'stru
 numeric(42) // expected-error {{use of unresolved identifier 'numeric'}}
 
 // CHECK: <INPUT_BLOCK
-// CHECK-NEXT: <SEARCH_PATH abbrevid={{[0-9]+}} op0=0/> blob data = '{{.+}}/secret'
-// CHECK-NEXT: <SEARCH_PATH abbrevid={{[0-9]+}} op0=1/> blob data = '{{.+}}/Frameworks'
-// CHECK-NOT: SEARCH_PATH
+// CHECK-NOT: /secret'
+// CHECK-NOT: /Frameworks'
+// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=0/> blob data = '{{.+}}/secret'
+// CHECK-NOT: /secret'
+// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=1/> blob data = '{{.+}}/Frameworks'
+// CHECK-NOT: /secret'
+// CHECK-NOT: /Frameworks'
 // CHECK: </INPUT_BLOCK>
