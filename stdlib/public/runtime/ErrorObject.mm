@@ -268,7 +268,7 @@ static id _swift_bridgeErrorTypeToNSError_(SwiftError *errorObject) {
   errorObject->code.store(code, std::memory_order_relaxed);
 
   // However, we need to cmpxchg in the domain; if somebody beat us to it,
-  // we need to release
+  // we need to release.
   //
   // Storing the domain must be the LAST THING we do, since it's
   // the signal that the NSError has been initialized.
@@ -367,4 +367,26 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
     return true;
   }
   return false;
+}
+
+static SwiftError *_swift_errorRetain_(SwiftError *error) {
+  // For now, SwiftError is always objc-refcounted.
+  return (SwiftError*)objc_retain((id)error);
+}
+
+extern "C" auto *_swift_errorRetain = _swift_errorRetain_;
+
+SwiftError *swift::swift_errorRetain(SwiftError *error) {
+  return _swift_errorRetain(error);
+}
+
+static void _swift_errorRelease_(SwiftError *error) {
+  // For now, SwiftError is always objc-refcounted.
+  return objc_release((id)error);
+}
+
+extern "C" auto *_swift_errorRelease = _swift_errorRelease_;
+
+void swift::swift_errorRelease(SwiftError *error) {
+  return _swift_errorRelease(error);
 }

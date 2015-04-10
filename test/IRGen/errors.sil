@@ -56,7 +56,7 @@ bb1(%2 : $AnyObject):
   br bb3
 
 // CHECK:      [[T0:%.*]] = phi %swift.error* [ [[ERR]],
-// CHECK-NEXT: call void bitcast (void (%objc_object*)* @objc_release to void (%swift.error*)*)(%swift.error* [[T0]])
+// CHECK-NEXT: call void @swift_errorRelease(%swift.error* [[T0]])
 // CHECK-NEXT: br label [[CONT]]
 bb2(%3 : $_ErrorType):
   release_value %3 : $_ErrorType

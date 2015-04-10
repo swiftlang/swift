@@ -134,7 +134,7 @@ FUNCTION(RetainUnowned,  swift_retainUnowned, RuntimeCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_bridgeObjectRetain(void *ptr);
+// void *swift_bridgeObjectRetain(void *ptr);
 FUNCTION(BridgeObjectRetain, swift_bridgeObjectRetain, RuntimeCC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy),
@@ -144,6 +144,18 @@ FUNCTION(BridgeObjectRetain, swift_bridgeObjectRetain, RuntimeCC,
 FUNCTION(BridgeObjectRelease, swift_bridgeObjectRelease, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind))
+
+// error *swift_errorRetain(error *ptr);
+FUNCTION(ErrorRetain, swift_errorRetain, RuntimeCC,
+         RETURNS(ErrorPtrTy),
+         ARGS(ErrorPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_errorRelease(void *ptr);
+FUNCTION(ErrorRelease, swift_errorRelease, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakRetain(void *ptr);

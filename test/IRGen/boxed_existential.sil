@@ -5,9 +5,9 @@ import Swift
 // CHECK-LABEL: define void @retain_release_boxed_existential(%swift.error*)
 sil @retain_release_boxed_existential : $@thin (_ErrorType) -> () {
 entry(%e : $_ErrorType):
-  // CHECK: @objc_retain
+  // CHECK: @swift_errorRetain
   strong_retain %e : $_ErrorType
-  // CHECK: @objc_release
+  // CHECK: @swift_errorRelease
   strong_release %e : $_ErrorType
   return undef : $()
 }

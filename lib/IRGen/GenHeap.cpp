@@ -883,6 +883,19 @@ void IRGenFunction::emitBridgeRelease(llvm::Value *value) {
   emitUnaryRefCountCall(*this, IGM.getBridgeObjectReleaseFn(), value);
 }
 
+void IRGenFunction::emitErrorRetain(llvm::Value *value) {
+  emitUnaryRefCountCall(*this, IGM.getErrorRetainFn(), value);
+}
+
+llvm::Value *IRGenFunction::emitErrorRetainCall(llvm::Value *value) {
+  emitUnaryRefCountCall(*this, IGM.getErrorRetainFn(), value);
+  return value;
+}
+
+void IRGenFunction::emitErrorRelease(llvm::Value *value) {
+  emitUnaryRefCountCall(*this, IGM.getErrorReleaseFn(), value);
+}
+
 llvm::Value *IRGenFunction::emitTryPin(llvm::Value *value) {
   llvm::CallInst *call = Builder.CreateCall(IGM.getTryPinFn(), value);
   call->setCallingConv(IGM.RuntimeCC);

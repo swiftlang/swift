@@ -241,6 +241,9 @@ public:
   /// Emit a release of a class instance with bridge retain semantics.
   void emitBridgeRelease(llvm::Value *value);
   void emitBridgeRetainUnowned(llvm::Value *value);
+  void emitErrorRetain(llvm::Value *value);
+  llvm::Value *emitErrorRetainCall(llvm::Value *value);
+  void emitErrorRelease(llvm::Value *value);
   void emitUnknownWeakDestroy(Address addr);
   void emitUnknownWeakCopyInit(Address destAddr, Address srcAddr);
   void emitUnknownWeakTakeInit(Address destAddr, Address srcAddr);

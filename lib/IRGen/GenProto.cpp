@@ -3423,8 +3423,8 @@ public:
       ErrorProtocolEntry(errorProtocolEntry) {}
 
   ReferenceCounting getReferenceCounting() const {
-    // TODO: If there's no ObjC interop, the error box can be Swift-refcounted.
-    return ReferenceCounting::ObjC;
+    // ErrorType uses its own rc entry points.
+    return ReferenceCounting::Error;
   }
   
   ArrayRef<ProtocolEntry> getStoredProtocols() const {
