@@ -1,4 +1,5 @@
 #import "ObjectiveC.h"
+#import "BridgeTestFoundation.h"
 
 @protocol NSAnsing
 - (void) anse;
@@ -66,10 +67,6 @@ typedef long NSInteger;
 @interface Guisemeau : Gizmo
 - (id)objectAtIndexedSubscript:(NSInteger)idx;
 - (void)setObject:(id)obj atIndexedSubscript:(NSInteger)idx;
-@end
-
-@interface NSString : NSObject
-- (id) copyWithZone: (void*)zone;
 @end
 
 @interface NSView : NSObject
