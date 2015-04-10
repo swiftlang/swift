@@ -472,6 +472,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                           OPT_emit_objc_header_path,
                           "h", false);
 
+  if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
+    Opts.FixitsOutputPath = A->getValue();
+  }
+
   bool IsSIB =
     Opts.RequestedAction == FrontendOptions::EmitSIB ||
     Opts.RequestedAction == FrontendOptions::EmitSIBGen;

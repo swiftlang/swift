@@ -84,7 +84,7 @@ def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
   HelpText<"Use the given executable to perform compilations">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
-  HelpText<"Set the driver mode to either 'swift' or 'swiftc' or 'swift-fixit'">;
+  HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
 def help : Flag<["-", "--"], "help">,
   Flags<[FrontendOption, AutolinkExtractOption]>,
@@ -336,8 +336,8 @@ def update_code : Flag<["-"], "update-code">,
   Flags<[HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def fixit_code : Flag<["-"], "fixit-code">,
-  HelpText<"Get compiler fixits as code edits">, ModeOpt,
-  Flags<[HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+  HelpText<"Get compiler fixits as code edits">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 // No Output Modes
 def parse : Flag<["-"], "parse">,

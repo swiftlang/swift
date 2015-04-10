@@ -1,7 +1,6 @@
 add_swift_executable(swift
   driver.cpp
   autolink_extract_main.cpp
-  fixit_main.cpp
   frontend_main.cpp
   LINK_LIBRARIES
     swiftIDE
@@ -18,10 +17,6 @@ target_link_libraries(swift edit)
 
 add_custom_command(TARGET swift POST_BUILD
     COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swiftc"
-    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-
-add_custom_command(TARGET swift POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-fixit"
     WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
 add_custom_command(TARGET swift POST_BUILD
@@ -53,9 +48,6 @@ swift_install_in_component(compiler
     RUNTIME DESTINATION "bin")
 swift_install_in_component(compiler
     FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
-    DESTINATION "bin")
-swift_install_in_component(compiler
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-fixit"
     DESTINATION "bin")
 
 if(SWIFT_HOST_VARIANT STREQUAL "LINUX")

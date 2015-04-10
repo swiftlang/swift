@@ -93,8 +93,6 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   llvm::StringSwitch<Optional<DriverKind>>(DriverName)
   .Case("swift", DriverKind::Interactive)
   .Case("swiftc", DriverKind::Batch)
-  .Case("swift-fixit", DriverKind::FixCode)
-  .Case("swift-update", DriverKind::FixCode) // FIXME: remove once fully transitioned.
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
   .Default(None);
   
@@ -309,7 +307,9 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   // For updating code we need to go through all the files and pick up changes,
   // even if they have compiler errors.
-  if (OI.CompilerMode == OutputInfo::Mode::UpdateCode)
+  // Also for getting bulk fixits.
+  if (OI.CompilerMode == OutputInfo::Mode::UpdateCode ||
+      OI.ShouldGenerateFixitEdits)
     C->setContinueBuildingAfterErrors();
 
   if (OFM)
@@ -674,10 +674,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.CompilerMode = OutputInfo::Mode::UpdateCode;
     OI.CompilerOutputType = types::TY_Remapping;
     OI.LinkAction = LinkKind::None;
-  } else if (Args.hasArg(options::OPT_fixit_code)) {
-    OI.CompilerMode = OutputInfo::Mode::FixCode;
-    OI.CompilerOutputType = types::TY_Remapping;
-    OI.LinkAction = LinkKind::None;
   } else {
     diagnoseOutputModeArg(Diags, OutputModeArg, !Inputs.empty(), Args,
                           driverKind == DriverKind::Interactive, Name);
@@ -821,6 +817,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                      OI.ModuleName, !Args.hasArg(options::OPT_module_name));
       OI.ModuleName = "__bad__";
     }
+  }
+
+  if (Args.hasArg(options::OPT_fixit_code)) {
+    OI.ShouldGenerateFixitEdits = true;
   }
 
   {
@@ -1032,7 +1032,6 @@ void Driver::buildActions(const ToolChain &TC,
   ActionList CompileActions;
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::FixCode:
   case OutputInfo::Mode::UpdateCode: {
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
@@ -1631,6 +1630,26 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     }
   }
 
+  if (OI.ShouldGenerateFixitEdits && isa<CompileJobAction>(JA)) {
+    StringRef OFMFixitsOutputPath;
+    if (OutputMap) {
+      auto iter = OutputMap->find(types::TY_Remapping);
+      if (iter != OutputMap->end())
+        OFMFixitsOutputPath = iter->second;
+    }
+    if (!OFMFixitsOutputPath.empty()) {
+      Output->setAdditionalOutputForType(types::ID::TY_Remapping,
+                                         OFMFixitsOutputPath);
+    } else {
+      llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
+      bool isTempFile = C.isTemporaryFile(Path);
+      llvm::sys::path::replace_extension(Path, "remap");
+      Output->setAdditionalOutputForType(types::ID::TY_Remapping, Path);
+      if (isTempFile)
+        C.addTemporaryFile(Path);
+    }
+  }
+
   if (isa<CompileJobAction>(JA)) {
     // Choose the serialized diagnostics output path.
     if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
@@ -1837,7 +1856,6 @@ void Driver::printHelp(bool ShowHidden) const {
     ExcludedFlagsBitmask |= options::NoInteractiveOption;
     break;
   case DriverKind::Batch:
-  case DriverKind::FixCode:
   case DriverKind::AutolinkExtract:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;

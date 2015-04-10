@@ -49,6 +49,10 @@ def serialize_diagnostics_path
   : Separate<["-"], "serialize-diagnostics-path">, MetaVarName<"<path>">,
     HelpText<"Output serialized diagnostics to <path>">;
 
+def emit_fixits_path
+  : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
+    HelpText<"Output compiler fixits as source edits to <path>">;
+
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;

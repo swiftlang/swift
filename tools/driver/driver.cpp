@@ -48,10 +48,6 @@ std::string getExecutablePath(const char *FirstArg) {
 extern int frontend_main(ArrayRef<const char *> Args, const char *Argv0,
                          void *MainAddr);
 
-/// Run 'swift-fixit'.
-extern int fixit_main(ArrayRef<const char *> Args, const char *Argv0,
-                       void *MainAddr);
-
 /// Run 'swift-autolink-extract'.
 extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
                                  void *MainAddr);
@@ -93,10 +89,6 @@ int main(int argc_, const char **argv_) {
 
   Driver TheDriver(Path, llvm::sys::path::stem(argv[0]), argv, Diags);
   switch (TheDriver.getDriverKind()) {
-  case Driver::DriverKind::FixCode:
-    return fixit_main(TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
-                       argv[0],
-                       (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::AutolinkExtract:
     return autolink_extract_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),

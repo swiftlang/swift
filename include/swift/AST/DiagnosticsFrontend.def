@@ -46,6 +46,8 @@ ERROR(error_no_frontend_args, frontend, none,
 ERROR(error_no_such_file_or_directory,frontend,none,
   "no such file or directory: '%0'", (StringRef))
 
+ERROR(cannot_open_file,frontend,none,
+  "cannot open file '%0' (%1)", (StringRef, StringRef))
 ERROR(cannot_open_serialized_file,frontend,none,
   "cannot open file '%0' for diagnostics emission (%1)", (StringRef, StringRef))
 ERROR(error_open_input_file,frontend,none,

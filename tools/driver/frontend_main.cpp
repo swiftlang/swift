@@ -349,6 +349,60 @@ static IRGenOutputKind getOutputKind(FrontendOptions::ActionType Action) {
   }
 }
 
+namespace {
+
+/// If there is an error with fixits it writes the fixits as edits in json
+/// format.
+class JSONFixitWriter : public DiagnosticConsumer {
+  std::unique_ptr<llvm::raw_ostream> OSPtr;
+
+public:
+  explicit JSONFixitWriter(std::unique_ptr<llvm::raw_ostream> OS)
+    : OSPtr(std::move(OS)) {
+    *OSPtr << "[\n";
+  }
+  ~JSONFixitWriter() {
+    *OSPtr << "]\n";
+  }
+
+private:
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                        DiagnosticKind Kind, StringRef Text,
+                        const DiagnosticInfo &Info) override {
+    if (Kind != DiagnosticKind::Error)
+      return;
+    if (Info.FixIts.empty())
+      return;
+    for (const auto &Fix : Info.FixIts) {
+      writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
+    }
+  }
+
+  void writeEdit(SourceManager &SM, CharSourceRange Range, StringRef Text,
+                 llvm::raw_ostream &OS) {
+    SourceLoc Loc = Range.getStart();
+    unsigned BufID = SM.findBufferContainingLoc(Loc);
+    unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufID);
+    unsigned Length = Range.getByteLength();
+    SmallString<200> Path =
+      StringRef(SM.getIdentifierForBuffer(BufID));
+
+    OS << " {\n";
+    OS << "  \"file\": \"";
+    OS.write_escaped(Path.str()) << "\",\n";
+    OS << "  \"offset\": " << Offset << ",\n";
+    if (Length != 0)
+      OS << "  \"remove\": " << Length << ",\n";
+    if (!Text.empty()) {
+      OS << "  \"text\": \"";
+      OS.write_escaped(Text) << "\",\n";
+    }
+    OS << " },\n";
+  }
+};
+
+} // anonymous namespace
+
 /// Performs the compile requested by the user.
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
@@ -725,6 +779,29 @@ int frontend_main(ArrayRef<const char *>Args,
       SerializedConsumer.reset(
           serialized_diagnostics::createConsumer(std::move(OS)));
       Instance.addDiagnosticConsumer(SerializedConsumer.get());
+    }
+  }
+
+  std::unique_ptr<DiagnosticConsumer> FixitsConsumer;
+  {
+    const std::string &FixitsOutputPath =
+      Invocation.getFrontendOptions().FixitsOutputPath;
+    if (!FixitsOutputPath.empty()) {
+      std::error_code EC;
+      std::unique_ptr<llvm::raw_fd_ostream> OS;
+      OS.reset(new llvm::raw_fd_ostream(FixitsOutputPath,
+                                        EC,
+                                        llvm::sys::fs::F_None));
+
+      if (EC) {
+        Instance.getDiags().diagnose(SourceLoc(),
+                                     diag::cannot_open_file,
+                                     FixitsOutputPath, EC.message());
+        return 1;
+      }
+
+      FixitsConsumer.reset(new JSONFixitWriter(std::move(OS)));
+      Instance.addDiagnosticConsumer(FixitsConsumer.get());
     }
   }
 

@@ -156,10 +156,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     SmallString<128> SwiftUpdatePath = llvm::sys::path::parent_path(Exec);
     llvm::sys::path::append(SwiftUpdatePath, "swift-update");
     Exec = Args.MakeArgString(SwiftUpdatePath.str());
-  } else if (OI.CompilerMode == OutputInfo::Mode::FixCode) {
-    SmallString<128> SwiftFixPath = llvm::sys::path::parent_path(Exec);
-    llvm::sys::path::append(SwiftFixPath, "swift-fixit");
-    Exec = Args.MakeArgString(SwiftFixPath.str());
   } else {
     // Invoke ourselves in -frontend mode.
     Arguments.push_back("-frontend");
@@ -230,7 +226,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   case OutputInfo::Mode::REPL:
     FrontendModeOption = "-repl";
     break;
-  case OutputInfo::Mode::FixCode:
   case OutputInfo::Mode::UpdateCode:
     // Make sure that adding '-update-code' will permit accepting all arguments
     // '-c' accepts.
@@ -248,7 +243,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   // Add input arguments.
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::FixCode:
   case OutputInfo::Mode::UpdateCode: {
     if (isa<BackendJobAction>(JA)) {
       assert(Inputs->size() == 1 && "The Swift backend expects one input!");
@@ -316,7 +310,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::FixCode:
   case OutputInfo::Mode::UpdateCode:
     break;
   case OutputInfo::Mode::Immediate:
@@ -363,6 +356,13 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   if (!ReferenceDependenciesPath.empty()) {
     Arguments.push_back("-emit-reference-dependencies-path");
     Arguments.push_back(ReferenceDependenciesPath.c_str());
+  }
+
+  const std::string &FixitsPath =
+    Output->getAdditionalOutputForType(types::TY_Remapping);
+  if (!FixitsPath.empty()) {
+    Arguments.push_back("-emit-fixits-path");
+    Arguments.push_back(FixitsPath.c_str());
   }
 
   if (OI.numThreads > 0) {

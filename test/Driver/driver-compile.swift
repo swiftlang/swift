@@ -101,9 +101,9 @@
 // UPDATE-CODE: -c{{ }}
 // UPDATE-CODE: -o {{.+}}.remap
 
-// FIXIT-CODE: bin/swift-fixit
+// FIXIT-CODE: bin/swift
 // FIXIT-CODE: -c{{ }}
-// FIXIT-CODE: -o {{.+}}.remap
+// FIXIT-CODE: -emit-fixits-path {{.+}}.remap
 
 
 // NO-REFERENCE-DEPENDENCIES: bin/swift

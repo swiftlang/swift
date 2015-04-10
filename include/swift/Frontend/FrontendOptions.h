@@ -112,6 +112,9 @@ public:
   /// The path to which we should output a Swift reference dependencies file.
   std::string ReferenceDependenciesFilePath;
 
+  /// The path to which we should output a fixits as source edits.
+  std::string FixitsOutputPath;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 

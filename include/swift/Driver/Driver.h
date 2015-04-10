@@ -68,9 +68,6 @@ public:
 
     /// Invoke swift-update with the compiler frontend options.
     UpdateCode,
-
-    /// Invoke swift-fixit with the compiler frontend options.
-    FixCode,
   };
 
   /// The mode in which the driver should invoke the frontend.
@@ -99,6 +96,9 @@ public:
 
   /// Whether the compiler picked the current module name, rather than the user.
   bool ModuleNameIsFallback = false;
+
+  // Whether the driver should generate compiler fixits as source edits.
+  bool ShouldGenerateFixitEdits = false;
   
   /// The number of threads for multi-threaded compilation.
   unsigned numThreads = 0;
@@ -121,7 +121,6 @@ public:
   enum class DriverKind {
     Interactive,     // swift
     Batch,           // swiftc
-    FixCode,         // swift-fixit
     AutolinkExtract, // swift-autolink-extract
   };
 
