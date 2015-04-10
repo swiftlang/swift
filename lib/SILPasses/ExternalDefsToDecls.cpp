@@ -23,11 +23,14 @@ class ExternalDefsToDecls : public SILModuleTransform {
   virtual ~ExternalDefsToDecls() {}
 
   void run() override {
-    for (auto &F : *getModule())
-      if (isAvailableExternally(F.getLinkage()) && F.isDefinition())
+    for (auto &F : *getModule()) {
+      SILLinkage linkage = F.getLinkage();
+      if (isAvailableExternally(linkage) && F.isDefinition() &&
+          !hasSharedVisibility(linkage)) {
         F.convertToDeclaration();
-
-    invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
+        invalidateAnalysis(&F, SILAnalysis::PreserveKind::Nothing);
+      }
+    }
   }
 
   StringRef getName() override { return "External Defs To Decls"; }
