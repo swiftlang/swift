@@ -50,6 +50,11 @@ llvm::cl::list<std::string>
                    llvm::cl::desc("Print out the sil before and after passes "
                                   "which contain a string from this list"));
 
+llvm::cl::list<std::string>
+    SILDisablePass("sil-disable-pass",
+                     llvm::cl::desc("Disable passes "
+                                    "which contain a string from this list"));
+
 llvm::cl::opt<bool> SILValidateAnalyses(
     "sil-validate-analyses", llvm::cl::init(false),
     llvm::cl::desc("Validate analyses when running with -sil-verify-all"));
@@ -100,6 +105,14 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
   return Default;
 }
 
+static bool isDisabled(SILTransform *T) {
+  for (const std::string &NamePattern : SILDisablePass) {
+    if (T->getName().find(NamePattern) != StringRef::npos)
+      return true;
+  }
+  return false;
+}
+
 static void printModule(SILModule *Mod) {
   if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
     Mod->dump();
@@ -133,6 +146,9 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       // If nothing changed since the last run of this pass, we can skip this
       // pass.
       if (completedPasses.test((size_t)SFT->getPassKind()))
+        continue;
+
+      if (isDisabled(SFT))
         continue;
 
       currentPassHasInvalidated = false;
@@ -226,6 +242,9 @@ void SILPassManager::runOneIteration() {
 
       PendingFuncTransforms.clear();
 
+      if (isDisabled(SMT))
+        continue;
+      
       PrettyStackTraceSILModuleTransform X(SMT);
 
       SMT->injectPassManager(this);
