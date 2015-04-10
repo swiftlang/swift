@@ -205,6 +205,10 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;
 
+def import_error_handling : Flag<["-"], "import-error-handling">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Recognize and import ObjC error handling idioms as 'throws' functions">;
+
 def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;   
