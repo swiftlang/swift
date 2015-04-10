@@ -370,7 +370,7 @@ public:
 
   struct OpaqueValueState {
     SILValue value;
-    bool isUniquelyReferenced;
+    bool isConsumable;
     bool hasBeenConsumed;
   };
 
@@ -401,8 +401,8 @@ public:
              "Opaque value already has a binding");
       Self.OpaqueValues[OpaqueValue] = OpaqueValueState{
         value,
-        isUniquelyReferenced,
-        /*destroy*/ false
+        /*isConsumable*/ isUniquelyReferenced && destroy,
+        /*hasBeenConsumed*/ false
       };
     }
 

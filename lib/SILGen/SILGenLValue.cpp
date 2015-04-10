@@ -1587,8 +1587,8 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
   assert(gen.OpaqueValues.count(e) && "Didn't bind OpaqueValueExpr");
 
   auto &entry = gen.OpaqueValues[e];
-  assert((!entry.isUniquelyReferenced || !entry.hasBeenConsumed) &&
-         "uniquely-referenced opaque value already consumed");
+  assert((!entry.isConsumable || !entry.hasBeenConsumed) &&
+         "consumable opaque value already consumed");
   entry.hasBeenConsumed = true;
 
   SILType type = gen.getLoweredType(getSubstFormalRValueType(e));

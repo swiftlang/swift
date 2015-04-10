@@ -65,18 +65,13 @@ func testArchetypeDispatch<T: P>(t: T) {
 // CHECK-LABEL: sil hidden @_TF12dynamic_self23testExistentialDispatch{{.*}}
 func testExistentialDispatch(p: P) {
 // CHECK: bb0([[P:%[0-9]+]] : $*P):
-// CHECK:   [[PCOPY:%[0-9]+]] = alloc_stack $P
-// CHECK:   copy_addr [[P]] to [initialization] [[PCOPY]]#1 : $*P
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr [[PCOPY]]#1 : $*P to $*@opened([[N:".*"]]) P
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr [[P]] : $*P to $*@opened([[N:".*"]]) P
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
 // CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]]#1 : $*P, $@opened([[N]]) P
 // CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f!1, [[PCOPY_ADDR]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
 // CHECK:   apply [[P_F_METHOD]]<@opened([[N]]) P>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
-// CHECK:   destroy_addr [[PCOPY_ADDR]] : $*@opened([[N]]) P
 // CHECK:   destroy_addr [[P_RESULT]]#1 : $*P
 // CHECK:   dealloc_stack [[P_RESULT]]#0 : $*@local_storage P
-// CHECK:   deinit_existential_addr [[PCOPY]]#1
-// CHECK:   dealloc_stack [[PCOPY]]#0 : $*@local_storage P
 // CHECK:   destroy_addr [[P]] : $*P
   p.f()
 }
@@ -84,13 +79,11 @@ func testExistentialDispatch(p: P) {
 // CHECK-LABEL: sil hidden @_TF12dynamic_self28testExistentialDispatchClass{{.*}} : $@thin (@owned CP) -> ()
 func testExistentialDispatchClass(cp: CP) {
 // CHECK: bb0([[CP:%[0-9]+]] : $CP):
-// CHECK:   strong_retain [[CP]] : $CP
 // CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]]) CP
 // CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.f!1, [[CP_ADDR]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0) -> @owned τ_0_0
 // CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]]) CP>([[CP_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0) -> @owned τ_0_0
 // CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]]) CP : $@opened([[N]]) CP, $CP
 // CHECK:   strong_release [[CP_F_RESULT]] : $@opened([[N]]) CP
-// CHECK:   strong_release [[CP]] : $CP
   cp.f()
 }
 

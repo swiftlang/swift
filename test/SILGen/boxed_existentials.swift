@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-guaranteed-self %s | FileCheck %s --check-prefix=GUARANTEED
 
 func test_type_lowering(x: _ErrorType) { }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials18test_type_loweringFPSs10_ErrorType_T_ : $@thin (@owned _ErrorType) -> () {
@@ -62,9 +63,6 @@ extension _ErrorType {
 
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_extension_methodFPSs10_ErrorType_T_
 func test_extension_method(error: _ErrorType) {
-  // -- TODO: could avoid an r/r here by guaranteeing the box, even if
-  //          the value inside is still wanted at +1
-  // CHECK: strong_retain %0
   // CHECK: [[VALUE:%.*]] = open_existential_box %0
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
@@ -73,9 +71,75 @@ func test_extension_method(error: _ErrorType) {
   // CHECK-NOT: destroy_addr [[VALUE]]
   // CHECK: dealloc_stack [[COPY]]#0
   // CHECK-NOT: destroy_addr [[VALUE]]
-  // -- release the guarantee (TODO: redundant; see above)
-  // CHECK: strong_release %0
   // -- release the owned argument
   // CHECK: strong_release %0
   error.extensionMethod()
+}
+
+func plusOneErrorType() -> _ErrorType { }
+
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPSs10_ErrorType_PS0___T_
+// GUARANTEED-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPSs10_ErrorType_PS0___T_
+func test_open_existential_semantics(guaranteed: _ErrorType,
+                                     var immediate: _ErrorType) {
+  // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $_ErrorType
+  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $_ErrorType
+
+  // CHECK-NOT: strong_retain %0
+  // CHECK: [[VALUE:%.*]] = open_existential_box %0
+  // CHECK: [[METHOD:%.*]] = function_ref
+  // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
+  // CHECK: apply [[METHOD]]<{{.*}}>([[COPY]]#1)
+  // CHECK: dealloc_stack [[COPY]]#0
+  // CHECK-NOT: strong_release %0
+
+  // GUARANTEED-NOT: strong_retain %0
+  // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[GUARANTEED:%0]]
+  // GUARANTEED: [[METHOD:%.*]] = function_ref
+  // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
+  // GUARANTEED-NOT: destroy_addr [[VALUE]]
+  // GUARANTEED-NOT: strong_release [[GUARANTEED]]
+  guaranteed.extensionMethod()
+
+  // CHECK: [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]#1
+  // -- need a retain to guarantee
+  // CHECK: strong_retain [[IMMEDIATE]]
+  // CHECK: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
+  // CHECK: [[METHOD:%.*]] = function_ref
+  // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
+  // CHECK: apply [[METHOD]]<{{.*}}>([[COPY]]#1)
+  // CHECK: dealloc_stack [[COPY]]#0
+  // -- end the guarantee
+  // -- TODO: could in theory do this sooner, after the value's been copied
+  //    out.
+  // CHECK: strong_release [[IMMEDIATE]]
+
+  // GUARANTEED: [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]#1
+  // -- need a retain to guarantee
+  // GUARANTEED: strong_retain [[IMMEDIATE]]
+  // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
+  // GUARANTEED: [[METHOD:%.*]] = function_ref
+  // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
+  // GUARANTEED-NOT: destroy_addr [[VALUE]]
+  // -- end the guarantee
+  // GUARANTEED: strong_release [[IMMEDIATE]]
+  immediate.extensionMethod()
+
+  // CHECK: [[F:%.*]] = function_ref {{.*}}plusOneErrorType
+  // CHECK: [[PLUS_ONE:%.*]] = apply [[F]]()
+  // CHECK: [[VALUE:%.*]] = open_existential_box [[PLUS_ONE]]
+  // CHECK: [[METHOD:%.*]] = function_ref
+  // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
+  // CHECK: apply [[METHOD]]<{{.*}}>([[COPY]]#1)
+  // CHECK: dealloc_stack [[COPY]]#0
+  // CHECK: strong_release [[PLUS_ONE]]
+
+  // GUARANTEED: [[F:%.*]] = function_ref {{.*}}plusOneErrorType
+  // GUARANTEED: [[PLUS_ONE:%.*]] = apply [[F]]()
+  // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[PLUS_ONE]]
+  // GUARANTEED: [[METHOD:%.*]] = function_ref
+  // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
+  // GUARANTEED-NOT: destroy_addr [[VALUE]]
+  // GUARANTEED: strong_release [[PLUS_ONE]]
+  plusOneErrorType().extensionMethod()
 }
