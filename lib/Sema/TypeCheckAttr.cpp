@@ -358,42 +358,42 @@ void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
     return diagnoseAndRemoveAttr(attr, diag::override_nonclass_decl);
 }
 
-/// Returns the diagnostic ID indicating why a lazy attribute cannot
-/// be attached to the variable declaration, or None if the attribute
-/// can be attached.
-static Optional<Diag<>> diagnosticForLazyAttribute(VarDecl *VD) {
+void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
+  // lazy may only be used on properties.
+  auto *VD = cast<VarDecl>(D);
+
   // It cannot currently be used on let's since we don't have a mutability model
   // that supports it.
   if (VD->isLet())
-    return diag::lazy_not_on_let;
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_let);
 
   // lazy is not allowed on a protocol requirement.
   auto varDC = VD->getDeclContext();
   if (isa<ProtocolDecl>(varDC))
-    return diag::lazy_not_in_protocol;
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_in_protocol);
 
   // It only works with stored properties.
   if (!VD->hasStorage())
-    return diag::lazy_not_on_computed;
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
 
   // lazy is not allowed on a lazily initiailized global variable or on a
   // static property (which is already lazily initialized).
   if (VD->isStatic() ||
       (varDC->isModuleScopeContext() &&
        !varDC->getParentSourceFile()->isScriptMode()))
-    return diag::lazy_on_already_lazy_global;
+    return diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
 
   // lazy must have an initializer, and the pattern binding must be a simple
   // one.
   if (!VD->getParentInitializer())
-    return diag::lazy_requires_initializer;
+    return diagnoseAndRemoveAttr(attr, diag::lazy_requires_initializer);
 
   if (!VD->getParentPatternBinding()->getSingleVar())
-    return diag::lazy_requires_single_var;
+    return diagnoseAndRemoveAttr(attr, diag::lazy_requires_single_var);
 
   // TODO: we can't currently support lazy properties on non-type-contexts.
   if (!VD->getDeclContext()->isTypeContext())
-    return diag::lazy_must_be_property;
+    return diagnoseAndRemoveAttr(attr, diag::lazy_must_be_property);
 
   // TODO: Lazy properties can't yet be observed.
   switch (VD->getStorageKind()) {
@@ -402,7 +402,7 @@ static Optional<Diag<>> diagnosticForLazyAttribute(VarDecl *VD) {
     break;
 
   case AbstractStorageDecl::StoredWithObservers:
-    return diag::lazy_not_observable;
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
 
   case AbstractStorageDecl::InheritedWithObservers:
   case AbstractStorageDecl::ComputedWithMutableAddress:
@@ -411,18 +411,6 @@ static Optional<Diag<>> diagnosticForLazyAttribute(VarDecl *VD) {
   case AbstractStorageDecl::AddressedWithTrivialAccessors:
   case AbstractStorageDecl::AddressedWithObservers:
     llvm_unreachable("non-stored variable not filtered out?");
-  }
-
-  return None;
-}
-
-void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
-  // lazy may only be used on properties.
-  auto *VD = cast<VarDecl>(D);
-  Optional<Diag<>> diag = diagnosticForLazyAttribute(VD);
-
-  if (diag.hasValue()) {
-    diagnoseAndRemoveAttr(attr, diag.getValue());
   }
 }
 
@@ -775,29 +763,6 @@ void AttributeChecker::visitAvailabilityAttr(AvailabilityAttr *attr) {
       DC->getParentSourceFile()->isScriptMode()) {
     TC.diagnose(attrLoc, diag::availability_global_script_no_potential);
     return;
-  }
-
-  // For now, we don't allow stored properties to be potentially unavailable.
-  // We will want to support these eventually, but we haven't figured out how
-  // this will interact with Definite Initialization, deinitializers and
-  // resilience yet.
-  if (auto *varDecl = dyn_cast<VarDecl>(D)) {
-    // Globals and statics are lazily initialized, so they are safe
-    // for potentialy unavailability.
-    bool lazilyInitializedStored =
-        varDecl->isStatic() || DC->isModuleScopeContext();
-
-    if (varDecl->hasStorage() && !lazilyInitializedStored) {
-      TC.diagnose(attrLoc, diag::availability_stored_property_no_potential);
-
-      bool SafeToAddLazy = !diagnosticForLazyAttribute(varDecl).hasValue();
-      if (SafeToAddLazy) {
-        TC.diagnose(attrLoc, diag::availability_fix_make_lazy_property)
-            .fixItInsert(
-                varDecl->getAttributeInsertionLoc(/*forModifiers*/ true),
-                "lazy ");
-      }
-    }
   }
 
   // Find the innermost enclosing declaration with an availability
