@@ -1770,7 +1770,7 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
                                     const Metadata *srcType,
                                     const WitnessTable *srcErrorTypeWitness,
                                     DynamicCastFlags flags) {
-  auto errorBox = swift_allocError(srcType, srcErrorTypeWitness);
+  BoxPair errorBox = swift_allocError(srcType, srcErrorTypeWitness);
   
   if (flags & DynamicCastFlags::TakeOnSuccess)
     srcType->vw_initializeWithTake(errorBox.value, src);
