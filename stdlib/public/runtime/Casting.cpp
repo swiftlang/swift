@@ -1753,6 +1753,32 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   }
   _failCorruptType(srcType);
 }
+
+extern "C" const ProtocolDescriptor _TMpSs10_ErrorType;
+
+static const WitnessTable *findErrorTypeWitness(const Metadata *srcType) {
+  return swift_conformsToProtocol(srcType, &_TMpSs10_ErrorType);
+}
+
+static const Metadata *getNSErrorTypeMetadata() {
+  static auto TheNSErrorMetadata
+    = swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass());
+  return TheNSErrorMetadata;
+}
+
+static id dynamicCastValueToNSError(OpaqueValue *src,
+                                    const Metadata *srcType,
+                                    const WitnessTable *srcErrorTypeWitness,
+                                    DynamicCastFlags flags) {
+  auto errorBox = swift_allocError(srcType, srcErrorTypeWitness);
+  
+  if (flags & DynamicCastFlags::TakeOnSuccess)
+    srcType->vw_initializeWithTake(errorBox.value, src);
+  else
+    srcType->vw_initializeWithCopy(errorBox.value, src);
+  
+  return swift_bridgeErrorTypeToNSError((SwiftError*)errorBox.heapObject);
+}
 #endif
 
 /// Perform a dynamic cast to an arbitrary type.
@@ -1793,6 +1819,16 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                                                          targetType,
                                                          srcBridgeWitness,
                                                          flags);
+      }
+      // If the destination type is an NSError, and the source type is an
+      // ErrorType, then the cast can succeed by NSError bridging.
+      if (targetType == getNSErrorTypeMetadata()) {
+        if (auto srcErrorTypeWitness = findErrorTypeWitness(srcType)) {
+          auto error = dynamicCastValueToNSError(src, srcType,
+                                                 srcErrorTypeWitness, flags);
+          *reinterpret_cast<id *>(dest) = error;
+          return true;
+        }
       }
 #endif
       return _fail(src, srcType, targetType, flags);

@@ -87,11 +87,21 @@ using namespace swift;
 
 @end
 
+Class swift::getNSErrorClass() {
+  static auto TheNSError = [NSError class];
+  return TheNSError;
+}
+
+static Class getSwiftNativeNSErrorClass() {
+  static auto TheSwiftNativeNSError = [_SwiftNativeNSError class];
+  return TheSwiftNativeNSError;
+}
+
 /// Allocate a catchable error object.
 static BoxPair::Return
 _swift_allocError_(const Metadata *type,
                    const WitnessTable *errorConformance) {
-  static auto TheSwiftNativeNSError = [_SwiftNativeNSError class];
+  auto TheSwiftNativeNSError = getSwiftNativeNSErrorClass();
   assert(class_getInstanceSize(TheSwiftNativeNSError) == sizeof(NSErrorLayout)
          && "NSError layout changed!");
   
@@ -168,7 +178,7 @@ static const WitnessTable *getNSErrorConformanceToErrorType() {
 }
 
 bool SwiftError::isPureNSError() const {
-  static auto TheSwiftNativeNSError = [_SwiftNativeNSError class];
+  auto TheSwiftNativeNSError = getSwiftNativeNSErrorClass();
   // We can do an exact type check; _SwiftNativeNSError shouldn't be subclassed
   // or proxied.
   return (Class)_swift_getClass(this) != TheSwiftNativeNSError;
@@ -294,7 +304,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                     const Metadata *srcType,
                                     const Metadata *destType,
                                     DynamicCastFlags flags) {
-  static Class TheNSErrorClass = [NSError class];
+  Class TheNSErrorClass = [NSError class];
   static CFTypeID TheCFErrorTypeID = CFErrorGetTypeID();
   // @asmname("swift_stdlib_bridgeNSErrorToErrorType")
   // public func _stdlib_bridgeNSErrorToErrorType<

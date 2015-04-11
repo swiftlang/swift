@@ -152,6 +152,9 @@ bool tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                   const Metadata *srcType,
                                   const Metadata *destType,
                                   DynamicCastFlags flags);
+
+/// Get the NSError Objective-C class.
+Class getNSErrorClass();
 #endif
 
 } // namespace swift

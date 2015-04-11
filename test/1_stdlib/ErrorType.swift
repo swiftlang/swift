@@ -149,6 +149,15 @@ ErrorTypeTests.test("NSError-to-enum bridging") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
+func opaqueUpcastToAny<T>(x: T) -> Any {
+  return x
+}
+
+struct StructError: _ErrorType {
+  var domain: String { return "StructError" }
+  var code: Int { return 4812 }
+}
+
 ErrorTypeTests.test("ErrorType-to-NSError bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
@@ -178,6 +187,24 @@ ErrorTypeTests.test("ErrorType-to-NSError bridging") {
     expectTrue(nativeNS === nativeNS2)
     expectEqual(nativeNS2.domain, NSCocoaErrorDomain)
     expectEqual(nativeNS2.code, NSFileNoSuchFileError)
+
+    /* TODO: Because of rdar://problem/20507075, we can't support rc-identity-
+     * changing dynamic casts between class types.
+    let any: Any = NoisyError()
+    let ns3 = any as! NSError
+    expectEqual(ns3.domain, "NoisyError")
+    expectEqual(ns3.code, 123)
+
+    let ao: AnyObject = NoisyError()
+    let ns4 = ao as! NSError
+    expectEqual(ns4.domain, "NoisyError")
+    expectEqual(ns4.code, 123)
+     */
+
+    let any2: Any = StructError()
+    let ns5 = any2 as! NSError
+    expectEqual(ns5.domain, "StructError")
+    expectEqual(ns5.code, 4812)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
