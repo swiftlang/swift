@@ -359,6 +359,8 @@ typedef NS_OPTIONS(NSUInteger, NSCalendarUnitDeprecated) {
   NSCalendarCalendarUnitDeprecated NS_CALENDAR_ENUM_DEPRECATED(10_7, 10_9, 4_0, 7_0, "Use NSCalendarUnitCalendar instead") = NSCalendarUnitCalendar,
 };
 
+// FIXME: update these macros to use availability(swift, unavailable) when we
+// phase out swift1_unavailable.
 #define CF_SWIFT_UNAVAILABLE(_msg) __attribute__((annotate("swift1_unavailable")))
 #define NS_SWIFT_UNAVAILABLE(_msg) CF_SWIFT_UNAVAILABLE(_msg)
 
@@ -370,8 +372,8 @@ typedef NS_ENUM(NSUInteger, NSRectEdge) {
 
   NSMinXEdge NS_SWIFT_UNAVAILABLE("Use NSRectEdge.MinX instead") = NSRectEdgeMinX,
   NSMinYEdge NS_SWIFT_UNAVAILABLE("Use NSRectEdge.MinY instead") = NSRectEdgeMinY,
-  NSMaxXEdge NS_SWIFT_UNAVAILABLE("Use NSRectEdge.MaxX instead") = NSRectEdgeMaxX,
-  NSMaxYEdge NS_SWIFT_UNAVAILABLE("Use NSRectEdge.MaxX instead") = NSRectEdgeMaxY,
+  NSMaxXEdge __attribute__((availability(swift, unavailable, message="Use NSRectEdge.MaxX instead"))) = NSRectEdgeMaxX,
+  NSMaxYEdge __attribute__((availability(swift, unavailable, message="Use NSRectEdge.MaxY instead"))) = NSRectEdgeMaxY,
 };
 
 // From CoreBluetooth
