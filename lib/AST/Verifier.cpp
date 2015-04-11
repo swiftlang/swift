@@ -670,15 +670,6 @@ struct ASTNodeBase {};
       verifyCheckedAlwaysBase(D);
     }
 
-    void verifyChecked(OpenExistentialExpr *E) {
-      Type resultType = E->getType();
-      Type existentialValueType = E->getExistentialValue()->getType();
-      checkSameLValueness(
-        resultType, existentialValueType,
-        "opened existential type and underlying existential value");
-      verifyCheckedBase(E);
-    }
-
     void verifyChecked(ThrowExpr *E) {
       checkSameType(E->getSubExpr()->getType(),
                     checkExceptionTypeExists("throw expression"),
@@ -1207,11 +1198,18 @@ struct ASTNodeBase {};
         abort();
       }
       
+      // The base of a member reference cannot be an existential type.
+      if (E->getBase()->getType()->getLValueOrInOutObjectType()
+            ->isAnyExistentialType()) {
+        Out << "Member reference into an unopened existential type\n";
+        E->dump(Out);
+        abort();
+      }
+
       // The only time the base is allowed to be inout is if we are accessing
       // a computed property or if the base is a protocol or existential.
       if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
-        if (!baseIOT->getObjectType()->isExistentialType() &&
-            !baseIOT->getObjectType()->is<ArchetypeType>()) {
+        if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
           VarDecl *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
           if (!VD || !VD->hasAccessorFunctions()) {
             Out << "member_ref_expr on value of inout type\n";
@@ -1229,17 +1227,11 @@ struct ASTNodeBase {};
     void verifyChecked(DynamicMemberRefExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicMemberRefExpr", E);
 
-      // The base type must be AnyObject.
-      auto baseTy = E->getBase()->getType();
-
-      // The base might be a metatype of AnyObject.
-      if (auto baseMetaTy = baseTy->getAs<AnyMetatypeType>()) {
-        baseTy = baseMetaTy->getInstanceType();
-      }
-
-      auto baseProtoTy = baseTy->getAs<ProtocolType>();
-      if (!baseProtoTy) {
-        Out << "Dynamic member reference base isn't a protocol\n";
+      // The base of a dynamic emmber reference cannot be an
+      // existential type.
+      if (E->getBase()->getType()->getLValueOrInOutObjectType()
+            ->isAnyExistentialType()) {
+        Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
         abort();
       }
@@ -1252,6 +1244,30 @@ struct ASTNodeBase {};
 
       if (!E->getDecl()) {
         Out << "Subscript expression is missing subscript declaration";
+        abort();
+      }
+
+      // The base of a subscript cannot be an existential type.
+      if (E->getBase()->getType()->getLValueOrInOutObjectType()
+            ->isAnyExistentialType()) {
+        Out << "Member reference into an unopened existential type\n";
+        E->dump(Out);
+        abort();
+      }
+
+      // FIXME: Check base/member types through substitutions.
+
+      verifyCheckedBase(E);
+    }
+
+    void verifyChecked(DynamicSubscriptExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicSubscriptExpr", E);
+
+      // The base of a subscript cannot be an existential type.
+      if (E->getBase()->getType()->getLValueOrInOutObjectType()
+            ->isAnyExistentialType()) {
+        Out << "Member reference into an unopened existential type\n";
+        E->dump(Out);
         abort();
       }
 

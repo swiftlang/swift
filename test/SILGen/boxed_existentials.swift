@@ -50,10 +50,13 @@ func test_property(x: _ErrorType) -> String {
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials13test_propertyFPSs10_ErrorType_SS
 // CHECK:         [[VALUE:%.*]] = open_existential_box %0 : $_ErrorType to $*[[VALUE_TYPE:@opened\(.*\) _ErrorType]]
+// FIXME: Extraneous copy here
+// CHECK-NEXT: [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
+// CHECK-NEXT: copy_addr [[VALUE]] to [initialization] [[COPY]]#1 : $*[[VALUE_TYPE]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #_ErrorType.domain!getter.1
 // -- self parameter of witness is @in_guaranteed; no need to copy since
 //    value in box is immutable and box is guaranteed
-// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[VALUE]])
+// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]]#1)
 // CHECK:         strong_release %0
 // CHECK:         return [[RESULT]]
 

@@ -10,4 +10,4 @@ protocol a {
 class b: a {
     class func c() { }
 }
-(b() as a).dynamicType.c() // expected-error {{accessing members of protocol type value '(a).Type' is unimplemented}}
+(b() as a).dynamicType.c()

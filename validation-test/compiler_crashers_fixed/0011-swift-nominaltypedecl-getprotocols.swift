@@ -9,6 +9,6 @@ protocol b {
 struct c {
     var d: b.Type
     func e() {
-        d.e() // expected-error {{accessing members of protocol type value 'b.Type' is unimplemented}}
+        d.e()
     }
 }

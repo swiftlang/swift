@@ -141,51 +141,6 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
   return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
 }
 
-/// Remap all of the 'Self'-related substitutions within the given set of
-/// substitutions to an opened archetype.
-///
-/// TODO: This should be done by the type checker.
-static void remapSelfSubstitutions(SILGenFunction &gen,
-                                   ArrayRef<Substitution> &subs,
-                                   Type newSelfArchetype) {
-  MutableArrayRef<Substitution> replacementBuf;
-  
-  auto copySubstitutions = [&]{
-    if (!replacementBuf.empty())
-      return;
-    replacementBuf = gen.getASTContext().Allocate<Substitution>(subs.size());
-    memcpy(replacementBuf.data(), subs.data(),
-           sizeof(Substitution) * subs.size());
-    subs = replacementBuf;
-  };
-  
-  unsigned i = 0, n = subs.size();
-  for (; i != n; ++i) {
-    auto archetype = subs[i].getArchetype();
-    auto rootArchetype = archetype;
-    while (rootArchetype->getParent())
-      rootArchetype = rootArchetype->getParent();
-    if (!rootArchetype->getSelfProtocol())
-      continue;
-    
-    copySubstitutions();
-    
-    TypeSubstitutionMap map;
-    map[rootArchetype] = newSelfArchetype;
-    
-    auto substType = Type(archetype)
-      .subst(gen.SGM.SwiftModule, map, /*ignoreMissing*/false,
-             nullptr);
-    assert(substType && "could not substitute?!");
-    
-    replacementBuf[i] = Substitution(archetype,
-                                          substType,
-                                          subs[i].getConformances());
-  }
-
-}
-
-
 namespace {
 
 /// Abstractly represents a callee, and knows how to emit the entry point
@@ -680,7 +635,7 @@ static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &gen,
                                                     SILValue result) {
   if (orig.hasCleanup()) {
     orig.forwardCleanup(gen);
-    return gen.emitManagedRValueWithCleanup(result);
+    return gen.emitManagedBufferWithCleanup(result);
   } else {
     return ManagedValue::forUnmanaged(result);
   }
@@ -742,7 +697,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
   };
 
   // If we're calling a member of a non-class-constrained protocol,
-  // but our archetype/protocol refines it to be class-bound, then
+  // but our archetype refines it to be class-bound, then
   // we have to materialize the value in order to pass it indirectly.
   auto materializeSelfIfNecessary = [&] {
     // Only an instance method of a non-class protocol is ever passed
@@ -781,97 +736,20 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
     setSelfValueToAddress(selfLoc, address);
   };
 
-  // If this is an archetype case, construct an archetype call.
-  if (!selfTy.isAnyExistentialType()) {
-    // Link back to something to create a data dependency if we have
-    // an opened type.
-    SILValue openingSite;
-    auto archetype =
-      cast<ArchetypeType>(CanType(selfTy->getRValueInstanceType()));
-    if (archetype->getOpenedExistentialType()) {
-      openingSite = gen.getArchetypeOpeningSite(archetype);
-    }
+  // Construct an archetype call.
 
-    materializeSelfIfNecessary();
-
-    return Callee::forArchetype(gen, openingSite, selfTy,
-                                constant, substAccessorType, loc);
-  }
-    
-  // If this is an existential (not archetype) use, open the container
-  // type immediately.
-  ManagedValue existentialVal =
-    std::move(selfValue).getAsSingleValue(gen, getSGFContextForSelf());
-
-  CanArchetypeType openedTy = ArchetypeType::getOpened(selfTy);
-  auto selfLoc = selfValue.getLocation();
-
-  // Open the existential and project out the value, then update the
-  // self value to use the projection.
+  // Link back to something to create a data dependency if we have
+  // an opened type.
   SILValue openingSite;
-  switch (existentialVal.getType()
-                            .getPreferredExistentialRepresentation(gen.SGM.M)) {
-  case ExistentialRepresentation::None:
-    llvm_unreachable("not existential");
-  case ExistentialRepresentation::Metatype:
-    llvm_unreachable("existential metatypes not handled on this path");
-    
-  case ExistentialRepresentation::Class: {
-    // Attach the existential cleanup to the projection so that it gets
-    // consumed (or not) when the call is applied to it (or isn't).
-    openingSite =
-      gen.B.createOpenExistentialRef(loc, existentialVal.getValue(),
-                                SILType::getPrimitiveObjectType(openedTy));
-    gen.setArchetypeOpeningSite(openedTy, openingSite);
-
-    ManagedValue openedVal =
-      maybeEnterCleanupForTransformed(gen, existentialVal, openingSite);
-    selfValue =
-      ArgumentSource(selfLoc, RValue(openedVal, openedTy));
-
-    materializeSelfIfNecessary();
-    break;
-  }
-  case ExistentialRepresentation::Opaque: {
-    assert(existentialVal.getType().isAddress() && "should be address-only");
-    openingSite = gen.B.createOpenExistentialAddr(selfLoc,
-                                              existentialVal.getValue(),
-                               SILType::getPrimitiveAddressType(openedTy));
-    gen.setArchetypeOpeningSite(openedTy, openingSite);
-
-    // Push a cleanup for the existential container if we're going to forward
-    // the contained value.
-    if (existentialVal.hasCleanup())
-      gen.Cleanups.pushCleanup<TakeFromExistentialCleanup>(
-                                                     existentialVal.getValue());
-    ManagedValue openedVal =
-      maybeEnterCleanupForTransformed(gen, existentialVal, openingSite);
-    setSelfValueToAddress(selfLoc, openedVal);
-    break;
-  }
-  case ExistentialRepresentation::Boxed: {
-    assert(existentialVal.getType().isObject() && "should be loadable");
-    openingSite = gen.B.createOpenExistentialBox(selfLoc,
-                                              existentialVal.getValue(),
-                               SILType::getPrimitiveAddressType(openedTy));
-    gen.setArchetypeOpeningSite(openedTy, openingSite);
-    ManagedValue openedVal = ManagedValue::forUnmanaged(openingSite);
-    // If the box is guaranteed, then that guarantee is good enough to
-    // guarantee the immutable box value. However,
-    // if the argument is consumed, we can't safely consume it out of the box,
-    // because it might be shared. Copy it out if that's the case.
-    if (existentialVal.hasCleanup()) {
-      openedVal = openedVal.copyUnmanaged(gen, selfLoc);
-    }
-    
-    setSelfValueToAddress(selfLoc, openedVal);
-    break;
-  }
+  auto archetype =
+    cast<ArchetypeType>(CanType(selfTy->getRValueInstanceType()));
+  if (archetype->getOpenedExistentialType()) {
+    openingSite = gen.getArchetypeOpeningSite(archetype);
   }
 
-  remapSelfSubstitutions(gen, substitutions, openedTy);
-    
-  return Callee::forArchetype(gen, openingSite, openedTy,
+  materializeSelfIfNecessary();
+
+  return Callee::forArchetype(gen, openingSite, selfTy,
                               constant, substAccessorType, loc);
 }
   
@@ -1228,14 +1106,14 @@ public:
     //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
     //     which is loadable.
     //  3) for a mutating method, the base has inout type.
-    //  4) for a nonmutating method, the base is a general protocol/archetype
+    //  4) for a nonmutating method, the base is a general archetype
     //     rvalue, which is address-only.  The base is passed at +0, so it isn't
     //     consumed.
     //
-    // In the last case, the AST has this call typed as being applied to an
-    // rvalue, but the witness is actually expecting a pointer to the +0 value
-    // in memory.  We access this with the open_existential_addr instruction, or
-    // just pass in the address since archetypes are address-only.
+    // In the last case, the AST has this call typed as being applied
+    // to an rvalue, but the witness is actually expecting a pointer
+    // to the +0 value in memory.  We just pass in the address since
+    // archetypes are address-only.
 
     ArgumentSource selfValue = e->getBase();
 
@@ -1479,6 +1357,11 @@ public:
   bool emitForcedDynamicMemberRef(ForceValueExpr *e) {
     // Check whether the argument is a dynamic member reference.
     auto arg = ignoreParensAndImpConversions(e->getSubExpr());
+
+    auto openExistential = dyn_cast<OpenExistentialExpr>(arg);
+    if (openExistential)
+      arg = openExistential->getSubExpr();
+
     auto dynamicMemberRef = dyn_cast<DynamicMemberRefExpr>(arg);
     if (!dynamicMemberRef)
       return false;
@@ -1493,48 +1376,35 @@ public:
     if (!fd || !fd->isObjC())
       return false;
 
-    // We found it. Emit the base.
-    ManagedValue existential =
-      gen.emitRValueAsSingleValue(dynamicMemberRef->getBase());
+    // Local function that actually emits the dynamic member reference.
+    auto emitDynamicMemberRef = [&] {
+      // We found it. Emit the base.
+      ManagedValue base =
+        gen.emitRValueAsSingleValue(dynamicMemberRef->getBase());
 
-    SILValue val;
-    if (fd->isInstanceMember()) {
-      assert(fd->isInstanceMember() && "Non-instance dynamic member reference");
-
-      CanArchetypeType openedType = ArchetypeType::getOpened(
-                                   existential.getType().getSwiftRValueType());
-      SILType loweredOpenedType = gen.getLoweredLoadableType(openedType);
-      
-      // Attach the existential cleanup to the projection so that it gets
-      // consumed (or not) when the call is applied to it (or isn't).
-      val = gen.B.createOpenExistentialRef(dynamicMemberRef,
-                      existential.getValue(),
-                      loweredOpenedType);
-      gen.setArchetypeOpeningSite(openedType, val);
-      ManagedValue proj(val, existential.getCleanup());
       setSelfParam(ArgumentSource(dynamicMemberRef->getBase(),
                                   RValue(gen, dynamicMemberRef,
-                                    proj.getType().getSwiftRValueType(), proj)),
+                                    base.getType().getSwiftRValueType(), base)),
                    dynamicMemberRef);
+
+      // Determine the type of the method we referenced, by replacing the
+      // class type of the 'Self' parameter with Builtin.UnknownObject.
+      SILDeclRef member(fd, SILDeclRef::ConstructAtBestResilienceExpansion,
+                        SILDeclRef::ConstructAtNaturalUncurryLevel,
+                        /*isObjC=*/true);
+
+      setCallee(Callee::forDynamic(gen, base.getValue(), member,
+                                   getSubstFnType(), e));
+    };
+
+    // When we have an open existential, open it and then emit the
+    // member reference.
+    if (openExistential) {
+      gen.emitOpenExistential(openExistential, 
+                              [&](Expr*) { emitDynamicMemberRef(); });
     } else {
-      assert(existential.getType().is<ExistentialMetatypeType>() &&
-             "non-dynamic-lookup-metatype for static method?!");
-      val = existential.getValue();
-      ManagedValue proj(val, existential.getCleanup());
-      setSelfParam(ArgumentSource(dynamicMemberRef->getBase(),
-                                  RValue(gen, dynamicMemberRef,
-                                    existential.getType().getSwiftRValueType(),
-                                         existential)),
-                   dynamicMemberRef);
+      emitDynamicMemberRef();
     }
-
-    // Determine the type of the method we referenced, by replacing the
-    // class type of the 'Self' parameter with Builtin.UnknownObject.
-    SILDeclRef member(fd, SILDeclRef::ConstructAtBestResilienceExpansion,
-                      SILDeclRef::ConstructAtNaturalUncurryLevel,
-                      /*isObjC=*/true);
-
-    setCallee(Callee::forDynamic(gen, val, member, getSubstFnType(), e));
     return true;
   }
 };
@@ -3684,35 +3554,14 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
 RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
                                                 SGFContext c) {
   // Emit the operand.
-  ManagedValue existential = emitRValueAsSingleValue(e->getBase());
+  ManagedValue base = emitRValueAsSingleValue(e->getBase());
 
-  SILValue operand = existential.getValue();
-  if (e->getMember().getDecl()->isInstanceMember()) {
-    
-    // Attach the existential cleanup to the projection so that it gets
-    // consumed (or not) when the call is applied to it (or isn't).
-    ManagedValue proj;
-    CanArchetypeType openedType = ArchetypeType::getOpened(operand.getType()
-                                                         .getSwiftRValueType());
-    SILType loweredOpenedType = getLoweredType(openedType);
-    
-    if (operand.getType().isClassExistentialType()) {
-      SILValue val = B.createOpenExistentialRef(e, operand, loweredOpenedType);
-      setArchetypeOpeningSite(openedType, val);
-      proj = ManagedValue(val, existential.getCleanup());
-    } else {
-      assert(loweredOpenedType.isAddress() && "Self should be address-only");
-      SILValue val = B.createOpenExistentialAddr(e, operand, loweredOpenedType);
-      setArchetypeOpeningSite(openedType, val);
-      proj = ManagedValue::forUnmanaged(val);
-    }
-    
-    operand = proj.getValue();
-  } else {
-    auto metatype = operand.getType().castTo<ExistentialMetatypeType>();
+  SILValue operand = base.getValue();
+  if (!e->getMember().getDecl()->isInstanceMember()) {
+    auto metatype = operand.getType().castTo<MetatypeType>();
     assert(metatype->getRepresentation() == MetatypeRepresentation::Thick);
-    metatype = CanExistentialMetatypeType::get(metatype.getInstanceType(),
-                                               MetatypeRepresentation::ObjC);
+    metatype = CanMetatypeType::get(metatype.getInstanceType(),
+                                    MetatypeRepresentation::ObjC);
     operand = B.createThickToObjCMetatype(e, operand,
                                     SILType::getPrimitiveObjectType(metatype));
   }
@@ -3802,15 +3651,9 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, 
                                                 SGFContext c) {
   // Emit the base operand.
-  ManagedValue existential = emitRValueAsSingleValue(e->getBase());
+  ManagedValue managedBase = emitRValueAsSingleValue(e->getBase());
 
-  auto openedType = ArchetypeType::getOpened(
-                                   existential.getType().getSwiftRValueType());
-  SILType loweredOpenedType = getLoweredLoadableType(openedType);
-  
-  SILValue base = existential.getValue();
-  base = B.createOpenExistentialRef(e, base, loweredOpenedType);
-  setArchetypeOpeningSite(openedType, base);
+  SILValue base = managedBase.getValue();
 
   // Emit the index.
   RValue index = emitRValue(e->getIndex());

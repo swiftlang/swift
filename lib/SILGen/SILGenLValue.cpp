@@ -513,8 +513,10 @@ namespace {
       auto addr = gen.B.createOpenExistentialAddr(loc, base.getLValueAddress(),
                                            getTypeOfRValue().getAddressType());
 
-      // Leave a cleanup to deinit the existential container.
-      gen.Cleanups.pushCleanup<TakeFromExistentialCleanup>(base.getValue());
+      if (base.hasCleanup()) {
+        // Leave a cleanup to deinit the existential container.
+        gen.Cleanups.pushCleanup<TakeFromExistentialCleanup>(base.getValue());
+      }
 
       gen.setArchetypeOpeningSite(cast<ArchetypeType>(getSubstFormalType()),
                                   addr);
@@ -1759,6 +1761,15 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
 
 LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
                                               AccessKind accessKind) {
+  // If the opaque value is not an lvalue, open the existential immediately.
+  if (!e->getOpaqueValue()->getType()->is<LValueType>()) {
+    return gen.emitOpenExistential<LValue>(e,
+                                           [&](Expr *subExpr) -> LValue {
+                                             return visitRec(subExpr,
+                                                             accessKind);
+                                           });
+  }
+
   // Record the fact that we're opening this existential. The actual
   // opening operation will occur when we see the OpaqueValueExpr.
   bool inserted = openedExistentials.insert({e->getOpaqueValue(), e}).second;

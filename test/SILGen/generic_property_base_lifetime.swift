@@ -14,8 +14,8 @@ protocol ProtocolB {
 
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21getIntPropExistentialFPS_9ProtocolA_Si
-// CHECK:         strong_retain %0
 // CHECK:         [[PROJECTION:%.*]] = open_existential_ref %0
+// CHECK:         strong_retain [[PROJECTION]]
 // CHECK:         apply {{%.*}}<@opened{{.*}}>([[PROJECTION]])
 // CHECK:         strong_release %0
 func getIntPropExistential(a: ProtocolA) -> Int {
@@ -23,8 +23,8 @@ func getIntPropExistential(a: ProtocolA) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21setIntPropExistentialFPS_9ProtocolA_T_
-// CHECK:         strong_retain %0
 // CHECK:         [[PROJECTION:%.*]] = open_existential_ref %0
+// CHECK:         strong_retain [[PROJECTION]]
 // CHECK:         apply {{%.*}}<@opened{{.*}}>({{%.*}}, [[PROJECTION]])
 // CHECK:         strong_release %0
 func setIntPropExistential(a: ProtocolA) {
@@ -48,12 +48,11 @@ func setIntPropGeneric<T: ProtocolA>(a: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21getIntPropExistentialFPS_9ProtocolB_Si
-// CHECK:         [[STACK:%[0-9]+]] = alloc_stack $ProtocolB
-// CHECK:         copy_addr %0 to [initialization] [[STACK]]#1
-// CHECK:         [[PROJECTION:%.*]] = open_existential_addr [[STACK]]#1
-// CHECK:         apply {{%.*}}([[PROJECTION]])
-// CHECK:         destroy_addr [[PROJECTION]]
-// CHECK:         deinit_existential_addr [[STACK]]#1
+// CHECK:         [[PROJECTION:%.*]] = open_existential_addr %0
+// CHECK:         [[STACK:%[0-9]+]] = alloc_stack $@opened({{".*"}}) ProtocolB
+// CHECK:         copy_addr [[PROJECTION]] to [initialization] [[STACK]]#1
+// CHECK:         apply {{%.*}}([[STACK]]#1)
+// CHECK:         destroy_addr [[STACK]]#1
 // CHECK:         dealloc_stack [[STACK]]#0
 // CHECK:         destroy_addr %0
 func getIntPropExistential(a: ProtocolB) -> Int {
@@ -73,8 +72,8 @@ func getIntPropGeneric<T: ProtocolB>(a: T) -> Int {
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21getIntPropExistentialFPS_9ProtocolO_Si
 // CHECK:         debug_value
-// CHECK-NEXT:    strong_retain %0
 // CHECK-NEXT:    [[PROJECTION:%.*]] = open_existential_ref %0
+// CHECK-NEXT:    strong_retain [[PROJECTION]]
 // CHECK-NEXT:    [[METHOD:%.*]] = witness_method
 // CHECK-NEXT:    apply [[METHOD]]<@opened{{.*}}>([[PROJECTION]])
 // CHECK-NEXT:    strong_release [[PROJECTION]]
@@ -85,9 +84,9 @@ func getIntPropExistential(a: ProtocolO) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime21setIntPropExistentialFPS_9ProtocolO_T_
-// CHECK:         strong_retain %0
-// CHECK-NEXT:    [[PROJECTION:%.*]] = open_existential_ref %0
-// CHECK-NEXT:    [[METHOD:%.*]] = witness_method
+// CHECK:         [[PROJECTION:%.*]] = open_existential_ref %0
+// CHECK-NEXT:    strong_retain [[PROJECTION]]
+// CHECK:    [[METHOD:%.*]] = witness_method
 // CHECK-NEXT:    apply [[METHOD]]<@opened{{.*}}>({{.*}}, [[PROJECTION]])
 // CHECK-NEXT:    strong_release [[PROJECTION]]
 // CHECK-NEXT:    strong_release %0

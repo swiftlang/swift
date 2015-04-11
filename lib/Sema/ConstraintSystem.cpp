@@ -1038,17 +1038,6 @@ Type ConstraintSystem::replaceSelfTypeInArchetype(ArchetypeType *archetype) {
   return archetype;
 }
 
-/// Determine whether this is a member of a protocol that returns 'Self'.
-static bool isSelfReturningProtocolMember(ValueDecl *value) {
-  if (!isa<ProtocolDecl>(value->getDeclContext()))
-    return false;
-
-  if (auto func = dyn_cast<FuncDecl>(value))
-    return func->hasDynamicSelf();
-
-  return isa<ConstructorDecl>(value);
-}
-
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                            bool isTypeReference,
@@ -1193,14 +1182,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                    outerFnType->getExtInfo());
   }
 
-  // If we are looking at a member of an existential that was found in
-  // a protocol extension, open the existential, or a function or
-  // initializer in a protocol that returns 'Self'.
-  // FIXME: Extend this to all operations on existentials.
-  if (baseObjTy->isExistentialType() && !isDynamicResult &&
-      !value->getAttrs().hasAttribute<OptionalAttr>() &&
-      (value->getDeclContext()->isProtocolExtensionContext() ||
-       isSelfReturningProtocolMember(value))) {
+  // If we are looking at a member of an existential, open the existential.
+  if (baseObjTy->isExistentialType()) {
     ArchetypeType *openedArchetype = ArchetypeType::getOpened(baseObjTy);
     OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
                                        openedArchetype });

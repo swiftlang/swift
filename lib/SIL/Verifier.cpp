@@ -1493,15 +1493,11 @@ public:
 
     require(EMI->getMember().getDecl()->isObjC(), "method must be @objc");
     if (!EMI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
+      require(operandType.getSwiftType()->is<MetatypeType>(),
               "operand must have metatype type");
-      require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()
-                ->getInstanceType()->is<ProtocolType>(),
-              "operand must have metatype of protocol type");
-      require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()
-                ->getInstanceType()->castTo<ProtocolType>()->getDecl()
-                ->isSpecificProtocol(KnownProtocolKind::AnyObject),
-              "operand must have metatype of AnyObject type");
+      require(operandType.getSwiftType()->castTo<MetatypeType>()
+                ->getInstanceType()->mayHaveSuperclass(),
+              "operand must have metatype of class or class-bound type");
     }
     
     requireSameType(EMI->getType(),
@@ -2470,15 +2466,11 @@ public:
 
     require(DMBI->getMember().getDecl()->isObjC(), "method must be @objc");
     if (!DMBI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
+      require(operandType.getSwiftType()->is<MetatypeType>(),
               "operand must have metatype type");
-      require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()
-              ->getInstanceType()->is<ProtocolType>(),
-              "operand must have metatype of protocol type");
-      require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()
-              ->getInstanceType()->castTo<ProtocolType>()->getDecl()
-              ->isSpecificProtocol(KnownProtocolKind::AnyObject),
-              "operand must have metatype of AnyObject type");
+      require(operandType.getSwiftType()->castTo<MetatypeType>()
+                ->getInstanceType()->mayHaveSuperclass(),
+              "operand must have metatype of class or class-bound type");
     }
 
     // Check that the branch argument is of the expected dynamic method type.

@@ -44,8 +44,9 @@ func direct_to_static_method(var obj: AnyObject) {
   // CHECK-NEXT: store [[OBJ]] to [[OBJBOX]]#1 : $*AnyObject
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[OBJBOX]]#1 : $*AnyObject
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
-  // CHECK-NEXT: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OBJMETA]] : $@thick AnyObject.Type, #X.staticF!1.foreign : X.Type -> () -> (), $@cc(objc_method) @thin (@thick AnyObject.Type) -> ()
-  // CHECK: apply [[METHOD]]([[OBJMETA]]) : $@cc(objc_method) @thin (@thick AnyObject.Type) -> ()
+  // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick @opened([[UUID:".*"]]) AnyObject.Type
+  // CHECK-NEXT: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OPENMETA]] : $@thick @opened([[UUID]]) AnyObject.Type, #X.staticF!1.foreign : X.Type -> () -> (), $@cc(objc_method) @thin (@thick @opened([[UUID]]) AnyObject.Type) -> ()
+  // CHECK: apply [[METHOD]]([[OPENMETA]]) : $@cc(objc_method) @thin (@thick @opened([[UUID]]) AnyObject.Type) -> ()
   obj.dynamicType.staticF!()
 }
 
@@ -85,7 +86,7 @@ func opt_to_class(var obj: AnyObject) {
   var of = obj.f
 
   // Exit
-  // CHECK-NEXT: strong_release [[EXISTVAL]] : $AnyObject
+  // CHECK-NEXT: strong_release [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
   // CHECK-NEXT: strong_release [[OPTBOX]]#0 : $Builtin.NativeObject
   // CHECK-NEXT: strong_release [[EXISTBOX]]#0 : $Builtin.NativeObject
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ()
@@ -106,9 +107,10 @@ func opt_to_static_method(var obj: AnyObject) {
   // CHECK-NEXT: [[OPTBOX:%[0-9]+]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [[OBJBOX]]#1 : $*AnyObject
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
-  // CHECK-NEXT: [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OBJMETA]]
+  // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick @opened
+  // CHECK-NEXT: [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
   // CHECK-NEXT: [[OPTTEMP:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<() -> ()>
-  // CHECK-NEXT: dynamic_method_br [[OBJCMETA]] : $@objc_metatype AnyObject.Type, #X.staticF!1.foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
+  // CHECK-NEXT: dynamic_method_br [[OBJCMETA]] : $@objc_metatype @opened({{".*"}}) AnyObject.Type, #X.staticF!1.foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
   var optF = obj.dynamicType.staticF
 }
 

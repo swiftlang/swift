@@ -1085,6 +1085,45 @@ public:
   /// Emit a dynamic subscript.
   RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
 
+  /// Open up the given existential expression and emit its
+  /// subexpression in a caller-specified manner.
+  ///
+  /// \param e The expression.
+  ///
+  /// \param emitSubExpr A function to call to emit the subexpression
+  /// (which will be passed in).
+  void emitOpenExistentialImpl(OpenExistentialExpr *e,
+                               llvm::function_ref<void(Expr *)> emitSubExpr);
+
+  /// Open up the given existential expression and emit its
+  /// subexpression in a caller-specified manner.
+  ///
+  /// \param e The expression.
+  ///
+  /// \param emitSubExpr A function to call to emit the subexpression
+  /// (which will be passed in).
+  template<typename R, typename F>
+  R emitOpenExistential(OpenExistentialExpr *e, F emitSubExpr) {
+    Optional<R> result;
+    emitOpenExistentialImpl(e,
+                            [&](Expr *subExpr) {
+                              result.emplace(emitSubExpr(subExpr));
+                            });
+    return std::move(*result);
+  }
+
+  /// Open up the given existential expression and emit its
+  /// subexpression in a caller-specified manner.
+  ///
+  /// \param e The expression.
+  ///
+  /// \param emitSubExpr A function to call to emit the subexpression
+  /// (which will be passed in).
+  template<typename F>
+  void emitOpenExistential(OpenExistentialExpr *e, F emitSubExpr) {
+    emitOpenExistentialImpl(e, emitSubExpr);
+  }
+
   /// \brief Emit a conditional checked cast branch. Does not
   /// re-abstract the argument to the success branch. Terminates the
   /// current BB.

@@ -148,14 +148,16 @@ func testExistentialSetters(var p1: P1, b: Bool) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[PBOX]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1s5prop2Sb
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
-  // CHECK-NEXT: deinit_existential_addr [[PBOX]]#1 : $*P1
+  // CHECK-NOT: deinit_existential_addr
   p1.prop2 = b
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[PBOX]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1s9subscriptFSbSb
   // CHECK: apply [[SUBSETTER]]<@opened([[UUID]]) P1>([[B]], [[B]], [[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, Bool, @inout τ_0_0) -> ()
-  // CHECK-NEXT: deinit_existential_addr [[PBOX]]#1 : $*P1
+  // CHECK-NOT: deinit_existential_addr [[PBOX]]#1 : $*P1
   p1[b] = b
+
+  // CHECK: return
 }
 
 struct HasAP1 {
@@ -182,8 +184,9 @@ func testLogicalExistentialSetters(var hasAP1: HasAP1, b: Bool) {
   // CHECK: apply [[PROP2_SETTER]]<@opened([[UUID]]) P1>([[B]], [[P1_OPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: [[SOMEP1_SETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1s6someP1PS_2P1_ : $@cc(method) @thin (@in P1, @inout HasAP1) -> ()
   // CHECK: apply [[SOMEP1_SETTER]]([[P1_COPY]]#1, [[HASP1_BOX]]#1) : $@cc(method) @thin (@in P1, @inout HasAP1) -> ()
-  // CHECK: deinit_existential_addr [[P1_COPY]]#1 : $*P1
+  // CHECK-NOT: deinit_existential_addr
   hasAP1.someP1.prop2 = b
+  // CHECK: return
 }
 
 func plusOneP1() -> P1 {}

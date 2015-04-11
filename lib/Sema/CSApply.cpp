@@ -62,6 +62,22 @@ Type Solution::getFixedType(TypeVariableType *typeVar) const {
   return knownBinding->second;
 }
 
+/// Determine whether the given type is an opened AnyObject.
+static bool isOpenedAnyObject(Type type) {
+  auto archetype = type->getAs<ArchetypeType>();
+  if (!archetype)
+    return false;
+
+  auto existential = archetype->getOpenedExistentialType();
+  if (!existential)
+    return false;
+
+  SmallVector<ProtocolDecl *, 2> protocols;
+  existential->isExistentialType(protocols);
+  return protocols.size() == 1 &&
+         protocols[0]->isSpecificProtocol(KnownProtocolKind::AnyObject);
+}
+
 Type Solution::computeSubstitutions(
        Type origType, DeclContext *dc,
        Type openedType,
@@ -127,8 +143,8 @@ Type Solution::computeSubstitutions(
                                               /*expression=*/true,
                                               &conformance);
         assert((conforms ||
-                replacement->isExistentialType() ||
                 firstArchetype->getIsRecursive() ||
+                isOpenedAnyObject(replacement) ||
                 replacement->is<GenericTypeParamType>()) &&
                "Constraint system missed a conformance?");
         (void)conforms;
@@ -585,6 +601,15 @@ namespace {
         assert(isa<AbstractStorageDecl>(member) &&
                "unknown member when opening existential");
         depth = 1;
+
+        // If the base was an lvalue but it will only be treated as an
+        // rvalue, turn the base into an rvalue now. This results in
+        // better SILGen.
+        if (isLValue &&
+            (baseTy->isClassExistentialType() || baseTy->is<ExistentialMetatypeType>())) {
+          base = tc.coerceToRValue(base);
+          isLValue = false;
+        }
       }
 
       // Create the opaque opened value. If we started with a
@@ -618,14 +643,21 @@ namespace {
       // Find the key expression that could be associated with an opened
       // existential.
       Expr *keyExpr;
+      bool isDynamic = false;
       if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(result)) {
         keyExpr = dotSyntax->getArg();
       } else if (auto apply = dyn_cast<ApplyExpr>(result)) {
         keyExpr = apply->getFn();
       } else if (auto memberRef = dyn_cast<MemberRefExpr>(result)) {
         keyExpr = memberRef->getBase();
+      } else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(result)) {
+        keyExpr = dynMemberRef->getBase();
+        isDynamic = true;
       } else if (auto subscriptRef = dyn_cast<SubscriptExpr>(result)) {
         keyExpr = subscriptRef->getBase();
+      } else if (auto dynSubscriptRef = dyn_cast<DynamicSubscriptExpr>(result)) {
+        keyExpr = dynSubscriptRef->getBase();
+        isDynamic = true;
       } else if (auto load = dyn_cast<LoadExpr>(result)) {
         keyExpr = load->getSubExpr();
       } else {
@@ -637,6 +669,10 @@ namespace {
       keyExpr = keyExpr->getValueProvidingExpr();
       if (auto inout = dyn_cast<InOutExpr>(keyExpr))
         keyExpr = inout->getSubExpr()->getValueProvidingExpr();
+      if (auto load = dyn_cast<LoadExpr>(keyExpr))
+        keyExpr = load->getSubExpr()->getValueProvidingExpr();
+      if (auto force = dyn_cast<ForceValueExpr>(keyExpr))
+        keyExpr = force->getSubExpr();
       auto known = OpenedExistentials.find(keyExpr);
       if (known == OpenedExistentials.end())
         return false;
@@ -645,7 +681,7 @@ namespace {
       auto record = known->second;
       --record.Depth;
       OpenedExistentials.erase(known);
-      if (record.Depth > 0) {
+      if (record.Depth > 0 && !isDynamic) {
         // We're not ready to close this existential yet. Replace the previous
         // result with our current result at the new depth.
         bool inserted = OpenedExistentials.insert({result, record}).second;
@@ -856,35 +892,16 @@ namespace {
 
       // Otherwise, we're referring to a member of a type.
 
-      // Is it an archetype or existential member?
+      // Is it an archetype member?
       bool isDependentConformingRef
             = isa<ProtocolDecl>(member->getDeclContext()) &&
               baseTy->hasDependentProtocolConformances();
-
-      // If we are referring to an optional member of a protocol, convert
-      // the base type (which may be something that conforms to the protocol) to
-      // the protocol type itself.
-      if (isDependentConformingRef &&
-          member->getAttrs().hasAttribute<OptionalAttr>())
-        baseTy =cast<ProtocolDecl>(member->getDeclContext())->getDeclaredType();
 
       // References to properties with accessors and storage usually go
       // through the accessors, but sometimes are direct.
       if (auto *VD = dyn_cast<VarDecl>(member)) {
         if (semantics == AccessSemantics::Ordinary)
           semantics = getImplicitMemberReferenceAccessSemantics(base, VD, dc);
-      }
-
-      // Handle dynamic references.
-      if (isDynamic) {
-        base = tc.coerceToRValue(base);
-        if (!base) return nullptr;
-        Expr *ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
-                                                       memberLoc);
-        ref->setImplicit(Implicit);
-        ref->setType(simplifyType(openedType));
-        closeExistential(ref);
-        return ref;
       }
 
       if (baseIsInstance) {
@@ -919,35 +936,38 @@ namespace {
       }
       assert(base && "Unable to convert base?");
 
-      // Handle archetype and existential references.
-      if (isDependentConformingRef) {
-        assert(semantics == AccessSemantics::Ordinary &&
-               "Direct property access doesn't make sense for this");
-        assert(!dynamicSelfFnType && 
-               "Archetype/existential DynamicSelf with extra conversion");
-
-        Expr *ref;
-
-        if (member->getAttrs().hasAttribute<OptionalAttr>()) {
-          base = tc.coerceToRValue(base);
-          if (!base) return nullptr;
-          ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
-                                                   memberLoc);
-        } else {
-          assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
-          ref = new (context) MemberRefExpr(base, dotLoc, memberRef,
-                                            memberLoc, Implicit, semantics);
-          cast<MemberRefExpr>(ref)->setIsSuper(isSuper);
-        }
-        
+      // Handle dynamic references.
+      if (isDynamic || member->getAttrs().hasAttribute<OptionalAttr>()) {
+        base = tc.coerceToRValue(base);
+        if (!base) return nullptr;
+        Expr *ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
+                                                       memberLoc);
         ref->setImplicit(Implicit);
-        ref->setType(simplifyType(openedType));
-        closeExistential(ref);
+
+        // Compute the type of the reference.
+        Type refType = simplifyType(openedType);
+
+        // If the base was an opened existential, erase the opened
+        // existential.
+        if (openedExistential &&
+            refType->hasOpenedExistential(knownOpened->second)) {
+          refType = refType->eraseOpenedExistential(
+                      cs.DC->getParentModule(),
+                      knownOpened->second);
+        }
+
+        ref->setType(refType);
+
+        if (openedExistential)
+          closeExistential(ref);
+
         return ref;
       }
 
-      // For types and properties, build member references.
-      if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
+      // For types, properties, and members of archetypes, build
+      // member references.
+      if (isDependentConformingRef || isa<TypeDecl>(member) ||
+          isa<VarDecl>(member)) {
         assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
         auto memberRefExpr
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
@@ -1236,17 +1256,6 @@ namespace {
       // Handle dynamic lookup.
       if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
           subscript->getAttrs().hasAttribute<OptionalAttr>()) {
-        // If we've found an optional method in a protocol, the base type is
-        // AnyObject.
-        if (selected.choice.getKind() != OverloadChoiceKind::DeclViaDynamic) {
-          auto proto = tc.getProtocol(index->getStartLoc(),
-                                      KnownProtocolKind::AnyObject);
-          if (!proto)
-            return nullptr;
-
-          baseTy = proto->getDeclaredType();
-        }
-
         base = coerceObjectArgumentToType(base, baseTy, subscript,
                                           AccessSemantics::Ordinary, locator);
         if (!base)
@@ -1258,7 +1267,9 @@ namespace {
                                                                    subscript);
         subscriptExpr->setType(resultTy);
         subscriptExpr->setImplicit(isImplicit);
-        return subscriptExpr;
+        Expr *result = subscriptExpr;
+        closeExistential(result);
+        return result;
       }
 
       // Handle subscripting of generics.
@@ -2541,7 +2552,7 @@ namespace {
             goto not_value_type_member;
         } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
           auto baseTy = pmRef->getBase()->getType();
-          if (baseTy->isAnyExistentialType()) {
+          if (baseTy->getRValueType()->isOpenedExistential()) {
             kind = MemberPartialApplication::Protocol;
           } else if (baseTy->hasReferenceSemantics()) {
             goto not_value_type_member;
@@ -2855,8 +2866,10 @@ namespace {
                            cs.getConstraintLocator(expr)));
 
       // See if this application advanced a partial value type application.
-      auto foundApplication = InvalidPartialApplications.find(
-                                   expr->getFn()->getSemanticsProvidingExpr());
+      Expr *fn = expr->getFn()->getSemanticsProvidingExpr();
+      if (auto force = dyn_cast<ForceValueExpr>(fn))
+        fn = force->getSubExpr()->getSemanticsProvidingExpr();
+      auto foundApplication = InvalidPartialApplications.find(fn);
       if (foundApplication != InvalidPartialApplications.end()) {
         unsigned level = foundApplication->second.level;
         assert(level > 0);
@@ -3385,9 +3398,24 @@ namespace {
                     kind);
       }
 
-      assert((OpenedExistentials.empty() ||
-              !InvalidPartialApplications.empty()) &&
-             "Opened existentials haven't been closed?");
+      // Close out any existentials that are still open.
+      // This happens when we don't compute a tighter bound for the
+      // open-existential expression.
+      // FIXME: This would go away with a smarter post-pass for placing
+      // open-existential expressions.
+      SmallVector<OpenedExistential, 4> remainingOpenedExistentials;
+      for (const auto &opened : OpenedExistentials) {
+        remainingOpenedExistentials.push_back(opened.second);
+      }
+      llvm::array_pod_sort(remainingOpenedExistentials.begin(),
+                           remainingOpenedExistentials.end());
+      for (auto &opened : remainingOpenedExistentials) {
+        result = new (tc.Context) OpenExistentialExpr(
+                                    opened.ExistentialValue,
+                                    opened.OpaqueValue,
+                                    result);
+      }
+      OpenedExistentials.clear();
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {
@@ -4059,7 +4087,8 @@ Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type ob
   if (optTy->is<LValueType>())
     objTy = LValueType::get(objTy);
 
-  expr = new (cs.getTypeChecker().Context) ForceValueExpr(expr, expr->getEndLoc());
+  expr = new (cs.getTypeChecker().Context) ForceValueExpr(expr,
+                                                          expr->getEndLoc());
   expr->setType(objTy);
   expr->setImplicit();
   return expr;
@@ -4706,8 +4735,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Load from the lvalue.
       expr = new (tc.Context) LoadExpr(expr, fromType->getRValueType());
 
-      closeExistential(expr);
-
       // Coerce the result.
       return coerceToType(expr, toType, locator);
     }
@@ -4925,8 +4952,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Load from the lvalue.
       expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
 
-      closeExistential(expr);
-
       // Coerce the result.
       return coerceToType(expr, toType, locator);
     }
@@ -5064,15 +5089,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
   }
   
-  // We do not currently support existential metatype to metatype coercions.
-  // We'll emit a diagnostic here, rather than induce a solver failure, so that
-  // a more specific diagnostic can be displayed.
-  if (fromType->is<ExistentialMetatypeType>() && toType->is<MetatypeType>()) {
-    tc.diagnose(expr->getLoc(), diag::cannot_convert_existential_to_metatype,
-                fromType);
-    return expr;
-  }
-
   llvm_unreachable("Unhandled coercion");
 }
 

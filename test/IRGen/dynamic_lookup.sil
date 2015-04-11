@@ -84,9 +84,10 @@ bb0(%0 : $@thick AnyObject.Type):
   // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(g)", align {{(4|8)}}
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]])
   // CHECK: br i1 [[HAS_SEL]]
-  dynamic_method_br %0 : $@thick AnyObject.Type, #X.g!1.foreign, bb1, bb2
+  %1 = open_existential_metatype %0 : $@thick AnyObject.Type to $@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type
+  dynamic_method_br %1 : $@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type, #X.g!1.foreign, bb1, bb2
 
-bb1(%8 : $@cc(objc_method) @thin (@thick AnyObject.Type) -> ()):
+bb1(%8 : $@cc(objc_method) @thin (@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type) -> ()):
   br bb3
 
 bb2:

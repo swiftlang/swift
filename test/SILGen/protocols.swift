@@ -22,14 +22,13 @@ func use_subscript_rvalue_get(i : Int) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_rvalue_get
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols16subscriptableGetPS_16SubscriptableGet_ : $*SubscriptableGet
-// CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $SubscriptableGet
-// CHECK: copy_addr [[GLOB]] to [initialization] [[ALLOCSTACK]]#1 : $*SubscriptableGet
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[ALLOCSTACK]]#1 : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
+// CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
+// CHECK: copy_addr [[PROJ]] to [initialization] [[ALLOCSTACK]]#1 : $*[[OPENED]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGet.subscript!getter.1
-// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])
-// CHECK-NEXT: destroy_addr [[PROJ]]
-// CHECK-NEXT: deinit_existential_addr [[ALLOCSTACK]]#1 : $*SubscriptableGet
-// CHECK-NEXT: dealloc_stack [[ALLOCSTACK]]#0 : $*@local_storage SubscriptableGet
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[ALLOCSTACK]]#1)
+// CHECK-NEXT: destroy_addr [[ALLOCSTACK]]#1
+// CHECK-NEXT: dealloc_stack [[ALLOCSTACK]]#0 : $*@local_storage [[OPENED]]
 // CHECK-NEXT: return [[RESULT]]
 
 func use_subscript_lvalue_get(i : Int) -> Int {
@@ -39,14 +38,13 @@ func use_subscript_lvalue_get(i : Int) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_get
 // CHECK-NEXT: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
-// CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $SubscriptableGetSet
-// CHECK: copy_addr [[GLOB]] to [initialization] [[ALLOCSTACK]]#1 : $*SubscriptableGetSet
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[ALLOCSTACK]]#1 : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
+// CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
+// CHECK: copy_addr [[PROJ]] to [initialization] [[ALLOCSTACK]]#1 : $*[[OPENED]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGetSet.subscript!getter.1
-// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])
-// CHECK-NEXT: destroy_addr [[PROJ]]
-// CHECK-NEXT: deinit_existential_addr [[ALLOCSTACK]]#1 : $*SubscriptableGetSet
-// CHECK-NEXT: dealloc_stack [[ALLOCSTACK]]#0 : $*@local_storage SubscriptableGetSet
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[ALLOCSTACK]]#1)
+// CHECK-NEXT: destroy_addr [[ALLOCSTACK]]#1 : $*[[OPENED]]
+// CHECK-NEXT: dealloc_stack [[ALLOCSTACK]]#0 : $*@local_storage [[OPENED]]
 // CHECK-NEXT: return [[RESULT]]
 
 func use_subscript_lvalue_set(i : Int) {
@@ -128,21 +126,22 @@ func use_property_rvalue_get() -> Int {
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_rvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols11propertyGetPS_18PropertyWithGetter_ : $*PropertyWithGetter
-// CHECK: [[COPY:%.*]] = alloc_stack $PropertyWithGetter
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[COPY]]#1 : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
+// CHECK: [[COPY:%.*]] = alloc_stack $[[OPENED]]
+// CHECK-NEXT: copy_addr [[PROJ]] to [initialization] [[COPY]]#1 : $*[[OPENED]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
-// CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[PROJ]])
+// CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[COPY]]#1)
 
 func use_property_lvalue_get() -> Int {
   return propertyGetSet.b
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
-// CHECK: [[STACK:%[0-9]+]] = alloc_stack $PropertyWithGetterSetter
-// CHECK: copy_addr [[GLOB]] to [initialization] [[STACK]]#1
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[STACK]]#1 : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
+// CHECK: [[STACK:%[0-9]+]] = alloc_stack $[[OPENED]]
+// CHECK: copy_addr [[PROJ]] to [initialization] [[STACK]]#1
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetterSetter.b!getter.1
-// CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[PROJ]])
+// CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[STACK]]#1)
 
 func use_property_lvalue_set(x : Int) {
   propertyGetSet.b = x
