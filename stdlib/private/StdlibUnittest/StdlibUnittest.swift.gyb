@@ -761,7 +761,8 @@ internal var _runAllTestsWasCalled: Bool = false
 public func runAllTests() {
   if _runAllTestsWasCalled {
     println("runAllTests() called twice.  It is not allowed, aborting.")
-    abort()
+    _testSuiteFailedCallback()
+    return
   }
   _runAllTestsWasCalled = true
 
