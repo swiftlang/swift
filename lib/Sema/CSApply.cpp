@@ -440,7 +440,8 @@ namespace {
         Expr *base = TypeExpr::createImplicitHack(loc, baseTy, ctx);
         auto result = buildMemberRef(base, openedType, SourceLoc(), decl,
                                      loc, openedFnType->getResult(),
-                                     locator, locator, implicit, semantics);
+                                     locator, locator, implicit, semantics,
+                                     /*isDynamic=*/false);
         if (!result)
           return nullptr;;
 
@@ -733,7 +734,8 @@ namespace {
                          ValueDecl *member, SourceLoc memberLoc,
                          Type openedType, ConstraintLocatorBuilder locator,
                          ConstraintLocatorBuilder memberLocator,
-                         bool Implicit, AccessSemantics semantics) {
+                         bool Implicit, AccessSemantics semantics,
+                         bool isDynamic) {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -873,6 +875,18 @@ namespace {
           semantics = getImplicitMemberReferenceAccessSemantics(base, VD, dc);
       }
 
+      // Handle dynamic references.
+      if (isDynamic) {
+        base = tc.coerceToRValue(base);
+        if (!base) return nullptr;
+        Expr *ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
+                                                       memberLoc);
+        ref->setImplicit(Implicit);
+        ref->setType(simplifyType(openedType));
+        closeExistential(ref);
+        return ref;
+      }
+
       if (baseIsInstance) {
         // Convert the base to the appropriate container type, turning it
         // into an lvalue if required.
@@ -984,12 +998,13 @@ namespace {
                                     ConstraintLocatorBuilder memberLocator,
                                     bool implicit,
                                     AccessSemantics semantics,
+                                    bool isDynamic,
                                     Optional<UnavailabilityReason> reason) {
 
       // Let buildMemberRef() do the heavy lifting.
-      Expr *ref = buildMemberRef(base, openedFullType, dotLoc, member, memberLoc,
-                                 openedType, locator, memberLocator, implicit,
-                                 semantics);
+      Expr *ref = buildMemberRef(base, openedFullType, dotLoc, member,
+                                 memberLoc, openedType, locator, memberLocator,
+                                 implicit, semantics, isDynamic);
 
       // Wrap in a conversion expression if the member reference
       // may not be available.
@@ -1001,37 +1016,6 @@ namespace {
       return ref;
     }
     
-    /// \brief Build a new dynamic member reference with the given base and
-    /// member.
-    Expr *buildDynamicMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
-                                SourceLoc memberLoc, Type openedType,
-                                ConstraintLocatorBuilder locator) {
-      auto &context = cs.getASTContext();
-
-      // If we're specializing a polymorphic function, compute the set of
-      // substitutions and form the member reference.
-      Optional<ConcreteDeclRef> memberRef(member);
-      if (auto func = dyn_cast<FuncDecl>(member)) {
-        auto resultTy = func->getType()->castTo<AnyFunctionType>()->getResult();
-        (void)resultTy;
-        assert(!resultTy->is<PolymorphicFunctionType>() &&
-               "Polymorphic function type slipped through");
-      }
-
-      // The base must always be an rvalue.
-      base = cs.getTypeChecker().coerceToRValue(base);
-      if (!base) return nullptr;
-      if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(base->getType())) {
-        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
-        if (!base) return nullptr;
-      }
-
-      auto result = new (context) DynamicMemberRefExpr(base, dotLoc, *memberRef,
-                                                       memberLoc);
-      result->setType(simplifyType(openedType));
-      return result;
-    }
-
     /// \brief Describes either a type or the name of a type to be resolved.
     typedef llvm::PointerUnion<Identifier, Type> TypeOrName;
 
@@ -2090,7 +2074,8 @@ namespace {
                            segment->getStartLoc(), choice.choice.getDecl(),
                            segment->getStartLoc(), choice.openedType,
                            locator, locator, /*Implicit=*/true,
-                           AccessSemantics::Ordinary);
+                           AccessSemantics::Ordinary,
+                           /*isDynamic=*/false);
         ApplyExpr *apply =
             new (tc.Context) CallExpr(memberRef, arg, /*Implicit=*/true);
 
@@ -2228,7 +2213,8 @@ namespace {
                                 cs.getConstraintLocator(expr)),
                               ctorLocator,
                               expr->isImplicit(),
-                              AccessSemantics::Ordinary);
+                              AccessSemantics::Ordinary,
+                              /*isDynamic=*/false);
       }
 
       // The subexpression must be either 'self' or 'super'.
@@ -2327,6 +2313,8 @@ namespace {
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
       auto selected = getOverloadChoice(memberLocator);
+      bool isDynamic = selected.choice.getKind()
+                         == OverloadChoiceKind::DeclViaDynamic;
       return buildMemberRef(expr->getBase(),
                             selected.openedFullType,
                             expr->getDotLoc(),
@@ -2334,7 +2322,8 @@ namespace {
                             selected.openedType,
                             cs.getConstraintLocator(expr),
                             memberLocator,
-                            expr->isImplicit(), expr->getAccessSemantics());
+                            expr->isImplicit(), expr->getAccessSemantics(),
+                            isDynamic);
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -2366,6 +2355,8 @@ namespace {
       if (selected.choice.isPotentiallyUnavailable()) {
         reason = selected.choice.getReasonUnavailable(cs);
       }
+      bool isDynamic
+        = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
       return buildUnavailableMemberRef(expr->getBase(),
                             selected.openedFullType,
                             expr->getDotLoc(),
@@ -2375,19 +2366,12 @@ namespace {
                             memberLocator,
                             expr->isImplicit(),
                             expr->getAccessSemantics(),
+                            isDynamic,
                             reason);
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(expr,
-                                                ConstraintLocator::Member));
-
-      return buildDynamicMemberRef(expr->getBase(), expr->getDotLoc(),
-                                   selected.choice.getDecl(),
-                                   expr->getNameLoc(),
-                                   selected.openedType,
-                                   cs.getConstraintLocator(expr));
+      llvm_unreachable("already type-checked?");
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
@@ -2416,6 +2400,8 @@ namespace {
                                                baseTy, tc.Context);
 
       // Build the member reference.
+      bool isDynamic
+        = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
       auto result = buildMemberRef(base,
                                    selected.openedFullType,
                                    expr->getDotLoc(), member, 
@@ -2424,7 +2410,8 @@ namespace {
                                    cs.getConstraintLocator(expr),
                                    memberLocator,
                                    expr->isImplicit(),
-                                   AccessSemantics::Ordinary);
+                                   AccessSemantics::Ordinary,
+                                   isDynamic);
       if (!result)
         return nullptr;
 
@@ -2512,7 +2499,10 @@ namespace {
       }
 
       case OverloadChoiceKind::Decl:
-      case OverloadChoiceKind::DeclViaUnwrappedOptional: {
+      case OverloadChoiceKind::DeclViaUnwrappedOptional:
+      case OverloadChoiceKind::DeclViaDynamic: {
+        bool isDynamic
+          = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
         auto member = buildUnavailableMemberRef(base,
                                                 selected.openedFullType,
                                                 dotLoc,
@@ -2523,6 +2513,7 @@ namespace {
                                                 memberLocator,
                                                 implicit,
                                                 AccessSemantics::Ordinary,
+                                                isDynamic,
                                                 reason);
         
         // If this is an application of a value type method or enum constructor,
@@ -2578,13 +2569,6 @@ namespace {
       not_value_type_member:
         return member;
       }
-
-      case OverloadChoiceKind::DeclViaDynamic:
-        return buildDynamicMemberRef(base, dotLoc,
-                                     selected.choice.getDecl(),
-                                     nameLoc,
-                                     selected.openedType,
-                                     cs.getConstraintLocator(expr));
 
       case OverloadChoiceKind::TupleIndex: {
         auto baseTy = base->getType()->getRValueType();
@@ -5383,6 +5367,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
+  bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
   Expr *declRef = buildMemberRef(fn,
                                  selected->openedFullType,
                                  /*DotLoc=*/SourceLoc(),
@@ -5390,7 +5375,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                  selected->openedType,
                                  locator,
                                  ctorLocator,
-                                 /*Implicit=*/true, AccessSemantics::Ordinary);
+                                 /*Implicit=*/true, AccessSemantics::Ordinary,
+                                 isDynamic);
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
 
@@ -6371,7 +6357,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                            witness, base->getEndLoc(),
                                            openedType, locator, locator,
                                            /*Implicit=*/true,
-                                           AccessSemantics::Ordinary);
+                                           AccessSemantics::Ordinary,
+                                           /*isDynamic=*/false);
 
   // Call the witness.
   ApplyExpr *apply = new (Context) CallExpr(memberRef, arg, /*Implicit=*/true);
