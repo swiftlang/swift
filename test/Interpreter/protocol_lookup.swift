@@ -140,6 +140,31 @@ if let fruncible = c2 as? protocol<Fooable, Runcible> {
   println("not fooable and runcible")
 }
 
+// Protocol lookup for metatypes.
+protocol StaticFoo {
+  static func foo() -> String
+}
+
+class StaticBar {
+  class func mightHaveFoo() -> String {
+    if let selfAsFoo? = self as? StaticFoo.Type {
+      return selfAsFoo.foo()
+    } else {
+      return "no Foo for you"
+    }
+  }
+}
+
+class StaticWibble : StaticBar, StaticFoo {
+  static func foo() -> String { return "StaticWibble.foo" }
+}
+
+// CHECK: no Foo for you
+println(StaticBar.mightHaveFoo())
+
+// CHECK: StaticWibble.foo
+println(StaticWibble.mightHaveFoo())
+
 #if _runtime(_ObjC)
 let d: D = D()
 let d1: AnyObject = D()
