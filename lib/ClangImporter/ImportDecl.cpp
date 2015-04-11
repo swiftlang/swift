@@ -1558,6 +1558,10 @@ namespace {
         switch (elem->getAvailability(nullptr, maxVersion)) {
         case clang::AR_Available:
         case clang::AR_NotYetIntroduced:
+          if (auto attr = elem->getAttr<clang::AnnotateAttr>()) {
+            if (attr->getAnnotation() == "swift1_unavailable")
+              return false;
+          }
           return true;
         case clang::AR_Deprecated:
         case clang::AR_Unavailable:

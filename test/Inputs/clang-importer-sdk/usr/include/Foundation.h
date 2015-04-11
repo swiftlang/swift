@@ -359,6 +359,21 @@ typedef NS_OPTIONS(NSUInteger, NSCalendarUnitDeprecated) {
   NSCalendarCalendarUnitDeprecated NS_CALENDAR_ENUM_DEPRECATED(10_7, 10_9, 4_0, 7_0, "Use NSCalendarUnitCalendar instead") = NSCalendarUnitCalendar,
 };
 
+#define CF_SWIFT_UNAVAILABLE(_msg) __attribute__((annotate("swift1_unavailable")))
+#define NS_SWIFT_UNAVAILABLE(_msg) CF_SWIFT_UNAVAILABLE(_msg)
+
+typedef NS_ENUM(NSUInteger, NSRectEdge) {
+  NSRectEdgeMinX = 0,
+  NSRectEdgeMinY = 1,
+  NSRectEdgeMaxX = 2,
+  NSRectEdgeMaxY = 3,
+
+  NSMinXEdge NS_SWIFT_UNAVAILABLE("Use NSRectEdge.MinX instead") = NSRectEdgeMinX,
+  NSMinYEdge NS_SWIFT_UNAVAILABLE("Use NSRectEdge.MinY instead") = NSRectEdgeMinY,
+  NSMaxXEdge NS_SWIFT_UNAVAILABLE("Use NSRectEdge.MaxX instead") = NSRectEdgeMaxX,
+  NSMaxYEdge NS_SWIFT_UNAVAILABLE("Use NSRectEdge.MaxX instead") = NSRectEdgeMaxY,
+};
+
 // From CoreBluetooth
 typedef NS_OPTIONS(NSInteger, CBCharacteristicProperties) {
   CBCharacteristicPropertyBroadcast = 0x01,
