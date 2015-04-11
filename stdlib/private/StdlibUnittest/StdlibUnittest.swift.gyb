@@ -756,15 +756,17 @@ struct _ParentProcess {
   }
 }
 
-internal var _runAllTestsWasCalled: Bool = false
-
 public func runAllTests() {
-  if _runAllTestsWasCalled {
+  struct PersistentState {
+    static var runAllTestsWasCalled: Bool = false
+  }
+
+  if PersistentState.runAllTestsWasCalled {
     println("runAllTests() called twice.  It is not allowed, aborting.")
     _testSuiteFailedCallback()
     return
   }
-  _runAllTestsWasCalled = true
+  PersistentState.runAllTestsWasCalled = true
 
 #if _runtime(ObjC)
   autoreleasepool {
