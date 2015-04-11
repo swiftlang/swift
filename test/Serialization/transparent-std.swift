@@ -2,7 +2,7 @@
 // RUN: mkdir %t
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t %S/Inputs/def_transparent_std.swift
 // RUN: llvm-bcanalyzer %t/def_transparent_std.swiftmodule | FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-disable-pass="External Defs To Decls" -sil-debug-serialization -parse-stdlib -I %t %s | FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -emit-sil -sil-debug-serialization -parse-stdlib -I %t %s | FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 

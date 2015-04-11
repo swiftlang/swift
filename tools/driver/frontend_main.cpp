@@ -595,10 +595,8 @@ static bool performCompile(CompilerInstance &Instance,
     } else {
       runSILOptimizationPasses(*SM);
     }
-  } else {
-    runSILPassesForOnone(*SM);
+    SM->verify();
   }
-  SM->verify();
 
   // Gather instruction counts if we are asked to do so.
   if (SM->getOptions().PrintInstCounts) {
