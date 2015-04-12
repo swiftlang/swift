@@ -455,7 +455,3 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
     return {};
   return params->getForwardingSubstitutions(getASTContext());
 }
-
-llvm::Optional<SILDeclRef> SILFunction::getDeclRef() const {
-  return getModule().lookUpDeclRef(this);
-}

@@ -281,6 +281,34 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
   }
 }
 
+static bool verifySILSelfParameterType(SILDeclRef DeclRef,
+                                       SILFunction *F, CanSILFunctionType FTy) {
+  SILModule &M = F->getModule();
+  SILParameterInfo PInfo = FTy->getSelfParameter();
+  CanType CTy = PInfo.getType();
+  SILType Ty = SILType::getPrimitiveObjectType(CTy);
+
+  // We do not care about trivial parameters (for now). There seem to be
+  // cases where we lower them as unowned.
+  //
+  // *NOTE* We do not run this check when we have a generic type since
+  // *generic types do not have type lowering and are always treated as
+  // *non-trivial since we do not know the type.
+  if (CTy->hasArchetype() || CTy->isDependentType() ||
+      M.getTypeLowering(Ty).isTrivial())
+    return true;
+
+  // If this function is a constructor or destructor, bail. These have @owned
+  // parameters.
+  if (DeclRef.isConstructor() || DeclRef.isDestructor())
+    return true;
+
+  // Otherwise, if this function type has a guaranteed self parameter type,
+  // make sure that we have a +0 self param.
+  return !FTy->getExtInfo().hasGuaranteedSelfParam() ||
+          PInfo.isGuaranteed() || PInfo.isIndirectInOut();
+}
+
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             SILDeclRef constant,
                                             ForDefinition_t forDefinition) {
@@ -321,8 +349,6 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   else if (constant.isAlwaysInline())
     inlineStrategy = AlwaysInline;
 
-
-
   auto *F = SILFunction::create(*this, linkage, name,
                                 constantType, nullptr,
                                 None, IsNotBare, IsTrans, IsFrag, IsNotThunk,
@@ -339,7 +365,17 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
       F->setSemanticsAttr(SemanticsA->Value);
 
   F->setDeclContext(constant.hasDecl() ? constant.getDecl() : nullptr);
-  FunctionToDeclRefMap[F] = constant;
+
+  // If this function has a self parameter, make sure that it has a +0 calling
+  // convention. This can not be done for general function types, since
+  // function_ref's SILFunctionTypes do not have archetypes associated with
+  // it.
+  CanSILFunctionType FTy = F->getLoweredFunctionType();
+  if (FTy->hasSelfParam()) {
+    assert(verifySILSelfParameterType(constant, F, FTy) &&
+           "Invalid signature for SIL Self parameter type");
+  }
+                                      
 
   return F;
 }
@@ -604,11 +640,4 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   }
 
   return nullptr;
-}
-
-llvm::Optional<SILDeclRef> SILModule::lookUpDeclRef(const SILFunction *F) const {
-  auto Iter = FunctionToDeclRefMap.find(F);
-  if (Iter == FunctionToDeclRefMap.end())
-    return None;
-  return Iter->second;
 }

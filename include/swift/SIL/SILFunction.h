@@ -257,15 +257,6 @@ public:
   /// Return the mangled name of this SILFunction.
   StringRef getName() const { return Name; }
 
-  /// Returns the DeclRef used to identify this SILFunction if one was used to
-  /// create the function. Returns None otherwise.
-  ///
-  /// This function will work for most functions except for certain thunks
-  /// created by SILGen. This should be fixed in the future. Until then it is
-  /// useful to provide additional verification in situations where the
-  /// false-negative rate is acceptable.
-  llvm::Optional<SILDeclRef> getDeclRef() const;
-
   /// True if this is a declaration of a function defined in another module.
   bool isExternalDeclaration() const { return BlockList.empty(); }
 
