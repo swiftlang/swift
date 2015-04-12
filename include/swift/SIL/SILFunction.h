@@ -254,14 +254,28 @@ public:
     return getLoweredFunctionType()->hasSelfParam();
   }
 
+  /// Return the mangled name of this SILFunction.
   StringRef getName() const { return Name; }
+
+  /// Returns the DeclRef used to identify this SILFunction if one was used to
+  /// create the function. Returns None otherwise.
+  ///
+  /// This function will work for most functions except for certain thunks
+  /// created by SILGen. This should be fixed in the future. Until then it is
+  /// useful to provide additional verification in situations where the
+  /// false-negative rate is acceptable.
+  llvm::Optional<SILDeclRef> getDeclRef() const;
 
   /// True if this is a declaration of a function defined in another module.
   bool isExternalDeclaration() const { return BlockList.empty(); }
+
+  /// Returns true if this is a definition of a function defined in this module.
   bool isDefinition() const { return !isExternalDeclaration(); }
 
   /// Get this function's linkage attribute.
   SILLinkage getLinkage() const { return SILLinkage(Linkage); }
+
+  /// Set the function's linkage attribute.
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
   /// Get's the effective linkage which is used to derive the llvm linkage.
@@ -490,6 +504,12 @@ public:
   }
 
   ArrayRef<SILArgument *> getArguments() const { return begin()->getBBArgs(); }
+
+  const SILArgument *getSelfArgument() const {
+    assert(hasSelfParam() && "This method can only be called if the "
+                             "SILFunction has a self parameter");
+    return getArguments().back();
+  }
 
   //===--------------------------------------------------------------------===//
   // Miscellaneous

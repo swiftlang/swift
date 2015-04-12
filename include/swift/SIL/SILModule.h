@@ -32,8 +32,9 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
@@ -152,6 +153,16 @@ private:
 
   /// This is the set of undef values we've created, for uniquing purposes.
   llvm::DenseMap<SILType, SILUndef*> UndefValues;
+
+  /// A mapping of SILFunctions -> SILDeclRefs.
+  ///
+  /// This is populated when ever a SILDeclRef is used to construct a function
+  /// via getOrCreateFunction(SILLocation, SILDeclRef, ForDefinition_t). It
+  /// currently may have false negatives, i.e., SILFunctions with SILDeclRefs
+  /// which are created via the other getOrCreateFunction. Thus this should only
+  /// be used for conservative queries. It is currently just being used to
+  /// trigger extra verification of functions with self in the SIL verifier.
+  llvm::DenseMap<const SILFunction *, SILDeclRef> FunctionToDeclRefMap;
 
   /// The stage of processing this module is at.
   SILStage Stage;
@@ -348,14 +359,14 @@ public:
   /// Look for a global variable by name.
   ///
   /// \return null if this module has no such global variable
-  SILGlobalVariable *lookUpGlobalVariable(StringRef name) {
+ SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
     return GlobalVariableTable.lookup(name);
   }
 
   /// Look for a function by name.
   ///
   /// \return null if this module has no such function
-  SILFunction *lookUpFunction(StringRef name) {
+  SILFunction *lookUpFunction(StringRef name) const {
     return FunctionTable.lookup(name);
   }
 
@@ -363,6 +374,11 @@ public:
   ///
   /// \return null if this module has no such function
   SILFunction *lookUpFunction(SILDeclRef fnRef);
+
+  /// Look for a declaration for a function.
+  ///
+  /// Returns an optional since some functions will not have SILDeclRefs.
+  llvm::Optional<SILDeclRef> lookUpDeclRef(const SILFunction *F) const;
 
   /// Attempt to link the SILFunction. Returns true if linking succeeded, false
   /// otherwise.

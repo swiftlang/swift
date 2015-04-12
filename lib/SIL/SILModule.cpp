@@ -338,11 +338,8 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
         constant.getDecl()->getAttrs().getAttribute<SemanticsAttr>())
       F->setSemanticsAttr(SemanticsA->Value);
 
-  ValueDecl *VD = nullptr;
-  if (constant.hasDecl())
-    VD = constant.getDecl();
-
-  F->setDeclContext(VD);
+  F->setDeclContext(constant.hasDecl() ? constant.getDecl() : nullptr);
+  FunctionToDeclRefMap[F] = constant;
 
   return F;
 }
@@ -607,4 +604,11 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   }
 
   return nullptr;
+}
+
+llvm::Optional<SILDeclRef> SILModule::lookUpDeclRef(const SILFunction *F) const {
+  auto Iter = FunctionToDeclRefMap.find(F);
+  if (Iter == FunctionToDeclRefMap.end())
+    return None;
+  return Iter->second;
 }

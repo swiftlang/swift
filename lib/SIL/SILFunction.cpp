@@ -18,6 +18,7 @@
 #include "swift/SIL/SILModule.h"
 // FIXME: For mapTypeInContext
 #include "swift/AST/ArchetypeBuilder.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
 
@@ -453,4 +454,8 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
   if (!params)
     return {};
   return params->getForwardingSubstitutions(getASTContext());
+}
+
+llvm::Optional<SILDeclRef> SILFunction::getDeclRef() const {
+  return getModule().lookUpDeclRef(this);
 }
