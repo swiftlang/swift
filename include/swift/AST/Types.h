@@ -2718,7 +2718,21 @@ public:
         return true;
       }
     }
-    
+
+    bool hasGuaranteedSelfParam() const {
+      switch (getRepresentation()) {
+      case Representation::Thick:
+      case Representation::Block:
+      case Representation::Thin:
+      case Representation::CFunctionPointer:
+      case Representation::ObjCMethod:
+        return false;
+      case Representation::Method:
+      case Representation::WitnessMethod:
+        return true;
+      }
+    }
+
     /// True if the function representation carries context.
     bool hasContext() const {
       switch (getRepresentation()) {

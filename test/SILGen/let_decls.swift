@@ -395,30 +395,30 @@ struct StructMemberTest {
   func testIntMemberLoad() -> Int {
     return i
   }
-  // CHECK-LABEL: sil hidden @{{.*}}testIntMemberLoad
+  // CHECK-LABEL: sil hidden @{{.*}}testIntMemberLoad{{.*}} : $@cc(method) @thin (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest  // let self
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.i
-  // CHECK:  release_value %0 : $StructMemberTest
+  // CHECK-NOT:  release_value %0 : $StructMemberTest
   // CHECK:  return %2 : $Int
 
   // Accessing the int member in s should not retain the whole struct.
   func testRecursiveIntMemberLoad() -> Int {
     return s.i
   }
-  // CHECK-LABEL: sil hidden @{{.*}}testRecursiveIntMemberLoad
+  // CHECK-LABEL: sil hidden @{{.*}}testRecursiveIntMemberLoad{{.*}} : $@cc(method) @thin (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest  // let self
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
   // CHECK:  %3 = struct_extract %2 : $AnotherStruct, #AnotherStruct.i
-  // CHECK:  release_value %0 : $StructMemberTest
+  // CHECK-NOT:  release_value %0 : $StructMemberTest
   // CHECK:  return %3 : $Int
   
   func testTupleMemberLoad() -> Int {
     return t.1.i
   }
   //   FIXME: these retains and releases are unnecessary
-  // CHECK-LABEL: sil hidden @{{.*}}testTupleMemberLoad
+  // CHECK-LABEL: sil hidden @{{.*}}testTupleMemberLoad{{.*}} : $@cc(method) @thin (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:   debug_value %0 : $StructMemberTest  // let self
   // CHECK:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
@@ -427,7 +427,7 @@ struct StructMemberTest {
   // CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 1
   // CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $AnotherStruct, #AnotherStruct.i
   // CHECK:   release_value [[T2]] : $AnotherStruct
-  // CHECK:   release_value %0 : $StructMemberTest
+  // CHECK-NOT:   release_value %0 : $StructMemberTest
   // CHECK:   return [[T3]] : $Int
 
 }
@@ -439,25 +439,24 @@ struct GenericStruct<T> {
   func getA() -> T {
     return a
   }
-  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA
+  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA{{.*}} : $@cc(method) @thin <T> (@out T, @in_guaranteed GenericStruct<T>)
   // CHECK-NEXT: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>  // let self
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
   // CHECK-NEXT: copy_addr %3 to [initialization] %0 : $*T
-  // CHECK-NEXT: destroy_addr %1 : $*GenericStruct<T>
-  // CHECK-NEXT: %6 = tuple ()
-  // CHECK-NEXT: return %6 : $()
+  // CHECK-NEXT: %5 = tuple ()
+  // CHECK-NEXT: return %5 : $()
 
   func getB() -> Int {
     return b
   }
   
-  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB
+  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB{{.*}} : $@cc(method) @thin <T> (@in_guaranteed GenericStruct<T>) -> Int
   // CHECK-NEXT: bb0(%0 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %0 : $*GenericStruct<T>  // let self
   // CHECK-NEXT: %2 = struct_element_addr %0 : $*GenericStruct<T>, #GenericStruct.b
   // CHECK-NEXT: %3 = load %2 : $*Int
-  // CHECK-NEXT: destroy_addr %0 : $*GenericStruct<T>
+  // CHECK-NOT: destroy_addr %0 : $*GenericStruct<T>
   // CHECK-NEXT: return %3 : $Int
 }
 

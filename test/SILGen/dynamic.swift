@@ -420,7 +420,7 @@ public class Base {
 }
 
 public class Sub : Base {
-  // CHECK-LABEL: sil hidden @_TFC7dynamic3Subg1xSb : $@cc(method) @thin (@owned Sub) -> Bool {
+  // CHECK-LABEL: sil hidden @_TFC7dynamic3Subg1xSb : $@cc(method) @thin (@guaranteed Sub) -> Bool {
   // CHECK: [[AUTOCLOSURE:%.*]] = function_ref @_TFFC7dynamic3Subg1xSbu_KT_Sb : $@thin (@owned Sub) -> Bool
   // CHECK: = partial_apply [[AUTOCLOSURE]](%0)
   // CHECK: return {{%.*}} : $Bool

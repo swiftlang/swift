@@ -25,9 +25,12 @@ class Foo: Fooable {
 }
 
 // CHECK-LABEL: sil hidden @_TF15witnesses_class3genUS_7Fooable__FQ_T_
+// CHECK:         bb0([[SELF:%.*]] : $T)
 // CHECK:         [[METHOD:%.*]] = witness_method $T
-// CHECK:         strong_retain [[SELF:%.*]] : $
+// CHECK-NOT:     strong_retain [[SELF]]
 // CHECK:         apply [[METHOD]]<T>([[SELF]])
+// CHECK:         strong_release [[SELF]]
+// CHECK-NOT:         strong_release [[SELF]]
 // CHECK:         return
 func gen<T: Fooable>(foo: T) {
   foo.foo()
@@ -37,8 +40,10 @@ func gen<T: Fooable>(foo: T) {
 // CHECK: bb0([[SELF:%[0-0]+]] : $Fooable):
 // CHECK:         [[SELF_PROJ:%.*]] = open_existential_ref [[SELF]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Fooable]],
-// CHECK:         strong_retain [[SELF_PROJ]] : $
+// CHECK-NOT:     strong_retain [[SELF_PROJ]] : $
 // CHECK:         apply [[METHOD]]<[[OPENED]]>([[SELF_PROJ]])
+// CHECK:         strong_release [[SELF]]
+// CHECK-NOT:     strong_release [[SELF]]
 // CHECK:         return
 func ex(foo: Fooable) {
   foo.foo()

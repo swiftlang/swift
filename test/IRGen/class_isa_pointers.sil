@@ -24,8 +24,8 @@ sil_vtable Purebred {}
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
 sil @purebred_method : $@thin (@owned Purebred) -> () {
 entry(%0 : $Purebred):
-  %m = class_method %0 : $Purebred, #Purebred.method!1 : Purebred -> () -> (), $@cc(method) @thin (@owned Purebred) -> ()
-  %z = apply %m(%0) : $@cc(method) @thin (@owned Purebred) -> ()
+  %m = class_method %0 : $Purebred, #Purebred.method!1 : Purebred -> () -> (), $@cc(method) @thin (@guaranteed Purebred) -> ()
+  %z = apply %m(%0) : $@cc(method) @thin (@guaranteed Purebred) -> ()
   return %z : $()
 }
 
@@ -48,8 +48,8 @@ sil_vtable Mongrel {}
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
 sil @mongrel_method : $@thin (@owned Mongrel) -> () {
 entry(%0 : $Mongrel):
-  %m = class_method %0 : $Mongrel, #Mongrel.method!1 : Mongrel -> () -> (), $@cc(method) @thin (@owned Mongrel) -> ()
-  %z = apply %m(%0) : $@cc(method) @thin (@owned Mongrel) -> ()
+  %m = class_method %0 : $Mongrel, #Mongrel.method!1 : Mongrel -> () -> (), $@cc(method) @thin (@guaranteed Mongrel) -> ()
+  %z = apply %m(%0) : $@cc(method) @thin (@guaranteed Mongrel) -> ()
   return %z : $()
 }
 

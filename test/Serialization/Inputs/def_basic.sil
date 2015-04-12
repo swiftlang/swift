@@ -201,7 +201,7 @@ bb0:
   %O = unchecked_ref_cast %C : $C to $Builtin.UnknownObject
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
-  %2 = class_method %C : $C, #C.doIt!1 : C -> () -> (), $@cc(method) @thin (@owned C) -> ()
+  %2 = class_method %C : $C, #C.doIt!1 : C -> () -> (), $@cc(method) @thin (@guaranteed C) -> ()
 
   // CHECK: alloc_ref $D
   %D = alloc_ref $D
@@ -415,8 +415,8 @@ class M {
   init()
 }
 
-// CHECK-LABEL: @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, M) -> ()
-sil [fragile] @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, M) -> () {
+// CHECK-LABEL: @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, @guaranteed M) -> ()
+sil [fragile] @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, @guaranteed M) -> () {
 bb0(%0 : $Int, %1 : $M):
   %2 = alloc_box $Int
   %3 = store %0 to %2#1 : $*Int
@@ -605,7 +605,7 @@ class Bas : NSObject {
   override init()
 }
 sil [fragile] @test_autorelease_return : $@cc(objc_method) @thin (Bas) -> NSString 
-sil [fragile] @test_super_method : $@cc(method) @thin (Bas) -> Bas
+sil [fragile] @test_super_method : $@cc(method) @thin (@guaranteed Bas) -> Bas
 
 sil [fragile] @swift_StringToNSString : $@thin (@inout String) -> @owned NSString
 sil [fragile] @_TFSSCfMSSFT_SS : $@thin (@thin String.Type) -> String
@@ -1095,9 +1095,9 @@ class Foo {
   init()
 }
 
-// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @owned Foo) -> Int32
-// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @owned Foo) -> Int32{{$}}
-sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @owned Foo) -> Int32 {
+// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @guaranteed Foo) -> Int32
+// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @guaranteed Foo) -> Int32{{$}}
+sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, @guaranteed Foo) -> Int32 {
 bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int  // var x               // users: %17, %6
@@ -1116,9 +1116,9 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   return %13 : $Int32
 }
 
-// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int32, Int, Int, @owned Foo) -> ()
-// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int32, Int, Int, @owned Foo) -> (){{$}}
-sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int32, Int, Int, @owned Foo) -> () {
+// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int32, Int, Int, @guaranteed Foo) -> ()
+// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int32, Int, Int, @guaranteed Foo) -> (){{$}}
+sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int32, Int, Int, @guaranteed Foo) -> () {
 bb0(%0 : $Int32, %1 : $Int, %2 : $Int, %3 : $Foo):
   %4 = alloc_stack $Int32  // var value         // users: %16, %5
   store %0 to %4#1 : $*Int32
@@ -1158,7 +1158,7 @@ struct ConformingAssoc : AssocReqt {
   func requiredMethod()
 }
 
-sil [fragile] @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (ConformingAssoc) -> () {
+sil [fragile] @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (@guaranteed ConformingAssoc) -> () {
 bb0(%0 : $ConformingAssoc):
   debug_value %0 : $ConformingAssoc
   %2 = tuple ()
@@ -1168,8 +1168,8 @@ bb0(%0 : $ConformingAssoc):
 sil [fragile] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout ConformingAssoc) -> () {
 bb0(%0 : $*ConformingAssoc):
   %1 = load %0 : $*ConformingAssoc
-  %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (ConformingAssoc) -> ()
-  %3 = apply %2(%1) : $@cc(method) @thin (ConformingAssoc) -> ()
+  %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (@guaranteed ConformingAssoc) -> ()
+  %3 = apply %2(%1) : $@cc(method) @thin (@guaranteed ConformingAssoc) -> ()
   return %3 : $()
 }
 
@@ -1239,7 +1239,7 @@ bb0:
   %43 = function_ref @_TF5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
   %45 = function_ref @_TF5tuple5tupleFT_TSiSf_ : $@thin () -> (Int, Float32)
   %47 = function_ref @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int, Float32) -> ()
-  %49 = function_ref @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, M) -> ()
+  %49 = function_ref @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, @guaranteed M) -> ()
   %51 = function_ref @_TF4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1
   %53 = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
   %55 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
@@ -1254,7 +1254,7 @@ bb0:
   %75 = function_ref @test_cond_branch_basic_block_args : $@thin (Int, Builtin.Int1) -> Int
 
   %77 = function_ref @test_autorelease_return : $@cc(objc_method) @thin (Bas) -> NSString
-  %79 = function_ref @test_super_method : $@cc(method) @thin (Bas) -> Bas
+  %79 = function_ref @test_super_method : $@cc(method) @thin (@guaranteed Bas) -> Bas
   %81 = function_ref @test_builtin_func_ref : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %83 = function_ref @test_dealloc_ref : $@thin () -> ()
   %85 = function_ref @test_dealloc_box : $@thin () -> ()

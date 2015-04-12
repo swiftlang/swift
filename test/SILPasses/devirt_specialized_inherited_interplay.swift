@@ -52,8 +52,12 @@
 // CHECK-NEXT: class_method
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: class_method
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release

@@ -80,11 +80,11 @@ class SomeClass {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
   init(x:Int, y:Int) {}
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass6method{{.*}} : $@cc(method) @thin (Builtin.Int64, @owned SomeClass) -> () 
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass6method{{.*}} : $@cc(method) @thin (Builtin.Int64, @guaranteed SomeClass) -> () 
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $SomeClass):
   func method(x: Int) {}
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass14curried_method{{.*}} : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> ()
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClass14curried_method{{.*}} : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
   func curried_method(x: Int)(y: Int) {}
 
@@ -325,7 +325,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
-  // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : SomeClass -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 , $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> Builtin.Int64
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : SomeClass -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 , $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> Builtin.Int64
   // CHECK: apply [[GETTER]]([[J]], [[K]], [[C]])
   i = c[j, k]
 
@@ -333,7 +333,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
-  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : SomeClass -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () , $@cc(method) @thin (Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned SomeClass) -> () 
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : SomeClass -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> () , $@cc(method) @thin (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> () 
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
   c[i, j] = k
 
@@ -567,8 +567,8 @@ final class r17828355Class {
 // CHECK-LABEL: sil shared @_TFC9functions14r17828355Class6methodFS0_FBi64_T_
 // CHECK-NEXT: bb0(%0 : $r17828355Class):
 // CHECK-NEXT: // function_ref functions.r17828355Class.method (functions.r17828355Class)(Builtin.Int64) -> ()
-// CHECK-NEXT:  %1 = function_ref @_TFC9functions14r17828355Class6methodfS0_FBi64_T_ : $@cc(method) @thin (Builtin.Int64, @owned r17828355Class) -> ()
-// CHECK-NEXT:  partial_apply %1(%0) : $@cc(method) @thin (Builtin.Int64, @owned r17828355Class) -> ()
+// CHECK-NEXT:  %1 = function_ref @_TFC9functions14r17828355Class6methodfS0_FBi64_T_ : $@cc(method) @thin (Builtin.Int64, @guaranteed r17828355Class) -> ()
+// CHECK-NEXT:  partial_apply %1(%0) : $@cc(method) @thin (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  return
 
 

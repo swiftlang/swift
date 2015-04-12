@@ -263,16 +263,15 @@ class F {
   }
 }
 
-// CHECK: sil hidden @_TFC10addressors1Flo5valueVSs5Int32 : $@cc(method) @thin (@owned F) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject) {
-// CHECK: sil hidden @_TFC10addressors1Fao5valueVSs5Int32 : $@cc(method) @thin (@owned F) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject) {
+// CHECK: sil hidden @_TFC10addressors1Flo5valueVSs5Int32 : $@cc(method) @thin (@guaranteed F) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject) {
+// CHECK: sil hidden @_TFC10addressors1Fao5valueVSs5Int32 : $@cc(method) @thin (@guaranteed F) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject) {
 
 func test_f0(f: F) -> Int32 {
   return f.value
 }
 // CHECK: sil hidden @_TF10addressors7test_f0FCS_1FVSs5Int32 : $@thin (@owned F) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $F):
-// CHECK:   strong_retain [[SELF]] : $F
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Flo5valueVSs5Int32 : $@cc(method) @thin (@owned F) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Flo5valueVSs5Int32 : $@cc(method) @thin (@guaranteed F) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 1
@@ -291,8 +290,7 @@ func test_f1(f: F) {
 // CHECK: bb0([[SELF:%0]] : $F):
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int32, 14
 // CHECK:   [[VALUE:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
-// CHECK:   strong_retain [[SELF]] : $F
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Fao5valueVSs5Int32 : $@cc(method) @thin (@owned F) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Fao5valueVSs5Int32 : $@cc(method) @thin (@guaranteed F) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
@@ -315,10 +313,9 @@ class G {
     }
   }
 }
-// CHECK: sil hidden [transparent] @_TFC10addressors1Gg5valueVSs5Int32 : $@cc(method) @thin (@owned G) -> Int32 {
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gg5valueVSs5Int32 : $@cc(method) @thin (@guaranteed G) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $G):
-// CHECK:   strong_retain [[SELF]]
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Glo5valueVSs5Int32 : $@cc(method) @thin (@owned G) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Glo5valueVSs5Int32 : $@cc(method) @thin (@guaranteed G) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 1
@@ -327,13 +324,11 @@ class G {
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
 // CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-// CHECK:   strong_release [[SELF]] : $G
 // CHECK:   return [[VALUE]] : $Int32
 
-// CHECK: sil hidden [transparent] @_TFC10addressors1Gs5valueVSs5Int32 : $@cc(method) @thin (Int32, @owned G) -> () {
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gs5valueVSs5Int32 : $@cc(method) @thin (Int32, @guaranteed G) -> () {
 // CHECK: bb0([[VALUE:%0]] : $Int32, [[SELF:%1]] : $G):
-// CHECK:   strong_retain [[SELF]] : $G
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVSs5Int32 : $@cc(method) @thin (@owned G) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVSs5Int32 : $@cc(method) @thin (@guaranteed G) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
@@ -342,14 +337,12 @@ class G {
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Builtin.NativeObject
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-// CHECK:   strong_release [[SELF]] : $G
 
 //   materializeForSet for G.value
-// CHECK: sil hidden [transparent] @_TFC10addressors1Gm5valueVSs5Int32 : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned G) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>) {
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gm5valueVSs5Int32 : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed G) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $G):
 //   Call the addressor.
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVSs5Int32 : $@cc(method) @thin (@owned G) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
-// CHECK:   strong_retain [[SELF]] : $G
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVSs5Int32 : $@cc(method) @thin (@guaranteed G) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
@@ -363,6 +356,7 @@ class G {
 // CHECK:   store [[T3]] to [[T2]] : $*Builtin.NativeObject
 //   Pull out the address.
 // CHECK:   [[T0:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
+// CHECK:   [[ADDR_OWNER:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
 // CHECK:   [[PTR:%.*]] = struct_extract [[T0]] :
 //   Set up the callback.
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>
@@ -373,8 +367,8 @@ class G {
 // CHECK:   [[CALLBACK:%.*]] = load [[TEMP]]#1 :
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>)
+// CHECK:   strong_release [[ADDR_OWNER]]
 // CHECK:   release_value [[TUPLE]]
-// CHECK:   strong_release [[SELF]]
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for G.value
@@ -400,16 +394,15 @@ class H {
   }
 }
 
-// CHECK: sil hidden @_TFC10addressors1Hlp5valueVSs5Int32 : $@cc(method) @thin (@owned H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>) {
-// CHECK: sil hidden @_TFC10addressors1Hap5valueVSs5Int32 : $@cc(method) @thin (@owned H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>) {
+// CHECK: sil hidden @_TFC10addressors1Hlp5valueVSs5Int32 : $@cc(method) @thin (@guaranteed H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>) {
+// CHECK: sil hidden @_TFC10addressors1Hap5valueVSs5Int32 : $@cc(method) @thin (@guaranteed H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>) {
 
 func test_h0(f: H) -> Int32 {
   return f.value
 }
 // CHECK-LABEL: sil hidden @_TF10addressors7test_h0FCS_1HVSs5Int32 : $@thin (@owned H) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $H):
-// CHECK:   strong_retain [[SELF]] : $H
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hlp5valueVSs5Int32 : $@cc(method) @thin (@owned H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hlp5valueVSs5Int32 : $@cc(method) @thin (@guaranteed H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -428,8 +421,7 @@ func test_h1(f: H) {
 // CHECK: bb0([[SELF:%0]] : $H):
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int32, 14
 // CHECK:   [[VALUE:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
-// CHECK:   strong_retain [[SELF]] : $H
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hap5valueVSs5Int32 : $@cc(method) @thin (@owned H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hap5valueVSs5Int32 : $@cc(method) @thin (@guaranteed H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -452,10 +444,9 @@ class I {
     }
   }
 }
-// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Ig5valueVSs5Int32 : $@cc(method) @thin (@owned I) -> Int32 {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Ig5valueVSs5Int32 : $@cc(method) @thin (@guaranteed I) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $I):
-// CHECK:   strong_retain [[SELF]]
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Ilp5valueVSs5Int32 : $@cc(method) @thin (@owned I) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Ilp5valueVSs5Int32 : $@cc(method) @thin (@guaranteed I) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -464,13 +455,11 @@ class I {
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   [[VALUE:%.*]] = load [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK:   strong_release [[SELF]] : $I
 // CHECK:   return [[VALUE]] : $Int32
 
-// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Is5valueVSs5Int32 : $@cc(method) @thin (Int32, @owned I) -> () {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Is5valueVSs5Int32 : $@cc(method) @thin (Int32, @guaranteed I) -> () {
 // CHECK: bb0([[VALUE:%0]] : $Int32, [[SELF:%1]] : $I):
-// CHECK:   strong_retain [[SELF]] : $I
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVSs5Int32 : $@cc(method) @thin (@owned I) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVSs5Int32 : $@cc(method) @thin (@guaranteed I) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -479,13 +468,11 @@ class I {
 // CHECK:   [[T2:%.*]] = mark_dependence [[T1]] : $*Int32 on [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK:   strong_release [[SELF]] : $I
 
-// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Im5valueVSs5Int32 : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @owned I) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Im5valueVSs5Int32 : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed I) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $I):
 //   Call the addressor.
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVSs5Int32 : $@cc(method) @thin (@owned I) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
-// CHECK:   strong_retain [[SELF]] : $I
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVSs5Int32 : $@cc(method) @thin (@guaranteed I) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -510,7 +497,6 @@ class I {
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>)
 // CHECK:   release_value [[TUPLE]]
-// CHECK:   strong_release [[SELF]]
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for I.value

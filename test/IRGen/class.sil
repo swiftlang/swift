@@ -120,7 +120,7 @@ bb0(%0 : $D):
   return %1 : $()
 }
 
-sil hidden @_TFC5class1D8multiplyfS0_fT1xBi8__FT1yBi16__Bi32_ : $@cc(method) @thin (Builtin.Int16, Builtin.Int8, @owned D) -> Builtin.Int32 {
+sil hidden @_TFC5class1D8multiplyfS0_fT1xBi8__FT1yBi16__Bi32_ : $@cc(method) @thin (Builtin.Int16, Builtin.Int8, @guaranteed D) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int16, %1 : $Builtin.Int8, %2 : $D):
   %3 = integer_literal $Builtin.Int32, 0
   return %3 : $Builtin.Int32

@@ -339,7 +339,7 @@ class RefWithProp {
   var aleph_prop: Aleph { get {} set {} }
 }
 
-// CHECK-LABEL: sil hidden @_TF8lifetime23logical_lvalue_lifetime
+// CHECK-LABEL: sil hidden @_TF8lifetime23logical_lvalue_lifetimeFTCS_11RefWithPropSiVS_3Val_T_ : $@thin (@owned RefWithProp, Int, Val) -> () {
 func logical_lvalue_lifetime(var r: RefWithProp, var i: Int, var v: Val) {
   // CHECK: [[RADDR:%[0-9]+]] = alloc_box $RefWithProp
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
@@ -348,16 +348,16 @@ func logical_lvalue_lifetime(var r: RefWithProp, var i: Int, var v: Val) {
   // -- Reference types need to be retained as property method args.
   r.int_prop = i
   // CHECK: [[R1:%[0-9]+]] = load [[RADDR]]
-  // CHECK: retain [[R1]]
-  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : RefWithProp -> (Int) -> ()
+  // CHECK: strong_retain [[R1]]
+  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : RefWithProp -> (Int) -> () , $@cc(method) @thin (Int, @guaranteed RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
+  // CHECK: strong_release [[R1]]
 
   r.aleph_prop.b = v
   // CHECK: [[R2:%[0-9]+]] = load [[RADDR]]
-  // CHECK: retain [[R2]]
+  // CHECK: strong_retain [[R2]]
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[ALEPH_PROP_TEMP:%[0-9]+]] = alloc_stack $Aleph
-  // CHECK: retain [[R2]]
   // CHECK: [[T0:%.*]] = address_to_pointer [[ALEPH_PROP_TEMP]]#1
   // CHECK: [[MATERIALIZE_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!materializeForSet.1 :
   // CHECK: [[MATERIALIZE:%.*]] = apply [[MATERIALIZE_METHOD]]([[T0]], [[STORAGE]]#1, [[R2]])
@@ -460,13 +460,13 @@ class Foo<T> {
   // Deallocating destructor for Foo.
   // CHECK-LABEL: sil hidden @_TFC8lifetime3FooD : $@cc(method) @thin <T> (@owned Foo<T>) -> ()
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $Foo<T>):
-  // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_TFC8lifetime3Food : $@cc(method) @thin <τ_0_0> (@owned Foo<τ_0_0>) -> @owned Builtin.NativeObject
-  // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[SELF]]) : $@cc(method) @thin <τ_0_0> (@owned Foo<τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_TFC8lifetime3Food : $@cc(method) @thin <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[SELF]]) : $@cc(method) @thin <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = unchecked_ref_cast [[RESULT_SELF]] : $Builtin.NativeObject to $Foo<T>
   // CHECK-NEXT:   dealloc_ref [[SELF]] : $Foo<T>
   // CHECK-NEXT:   [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT:   return [[RESULT]] : $()
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3Food : $@cc(method) @thin <T> (@owned Foo<T>) -> @owned Builtin.NativeObject
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3Food : $@cc(method) @thin <T> (@guaranteed Foo<T>) -> @owned Builtin.NativeObject
 
   deinit {
     // CHECK: bb0([[THIS:%[0-9]+]] : $Foo<T>):
@@ -636,7 +636,7 @@ func downcast(var b: B) {
   // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to $D
   // CHECK: apply {{.*}}([[D]])
   // CHECK-NOT: release [[B]]
-  // CHECK-NOT: release [[D]]
+  // CHECK: release [[D]]
   // CHECK: release [[BADDR]]
   // CHECK: return
 }

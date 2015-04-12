@@ -6,7 +6,7 @@ public protocol P1 {
 }
 
 extension P1 {
-  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@cc(method) @thin <Self where Self : P1> (@in Self) -> () {
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@cc(method) @thin <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
   final func extP1a() {
     // CHECK: [[WITNESS:%[0-9]+]] = witness_method $Self, #P1.reqP1a!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
@@ -15,13 +15,11 @@ extension P1 {
     // CHECK: return
   }
 
-  // CHECK-LABEL: sil @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_ : $@cc(method) @thin <Self where Self : P1> (@in Self) -> () {
+  // CHECK-LABEL: sil @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_ : $@cc(method) @thin <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
   public final func extP1b() {
-    // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> ()
-    // CHECK-NEXT: [[SELF_COPY:%[0-9]+]] = alloc_stack $Self
-    // CHECK-NEXT: copy_addr [[SELF]] to [initialization] [[SELF_COPY]]#1 : $*Self
-    // CHECK-NEXT: apply [[FN]]<Self>([[SELF_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> ()
+    // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
+    // CHECK-NEXT: apply [[FN]]<Self>([[SELF]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     extP1a()
     // CHECK: return
   }
@@ -44,7 +42,7 @@ func testD(d: D) {
   // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
   // CHECK: store [[D]] to [[DCOPY]]#1 : $*D
   // CHECK: [[RESULT:%[0-9]+]] = alloc_stack $D
-  // CHECK: apply [[FN]]<D>([[RESULT]]#1, [[DCOPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in τ_0_0) -> ()
+  // CHECK: apply [[FN]]<D>([[RESULT]]#1, [[DCOPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
   var d2: D = d.returnsSelf()
 }
 
@@ -82,22 +80,19 @@ extension P1 {
 func testExistentials1(p1: P1, b: Bool, i: Int64) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]])
   // CHECK: [[F1:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P12f1US0___fQPS0_FT_T_
-  // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
-  // CHECK: apply [[F1]]<@opened([[UUID]]) P1>([[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> ()
-  // CHECK: dealloc_stack [[POPENED_COPY]]
+  // CHECK: apply [[F1]]<@opened([[UUID]]) P1>([[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
   p1.f1()
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P18curried1US0___fQPS0_fSbFVSs5Int64T_
-  // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
-  // CHECK: [[CURRIED1]]<@opened([[UUID]]) P1>([[I]], [[B]], [[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Int64, Bool, @in τ_0_0) -> ()
-  // CHECK: dealloc_stack [[POPENED_COPY]]
+  // CHECK: [[CURRIED1]]<@opened([[UUID]]) P1>([[I]], [[B]], [[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Int64, Bool, @in_guaranteed τ_0_0) -> ()
   p1.curried1(b)(i)
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1g9subscriptFVSs5Int64Sb
-  // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[I]], [[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Int64, @in τ_0_0) -> Bool
+  // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[I]], [[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Int64, @in_guaranteed τ_0_0) -> Bool
+  // CHECK: destroy_addr [[POPENED_COPY]]#1
   // CHECK: store{{.*}} : $*Bool
   // CHECK: dealloc_stack [[POPENED_COPY]]
   var b2 = p1[i]
@@ -105,7 +100,7 @@ func testExistentials1(p1: P1, b: Bool, i: Int64) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1g4propSb
-  // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> Bool
+  // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   // CHECK: store{{.*}} : $*Bool
   // CHECK: dealloc_stack [[POPENED_COPY]]
   var b3 = p1.prop
@@ -118,10 +113,8 @@ func testExistentials2(p1: P1) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[P1A]]#1 : $*P1, $@opened([[UUID2:".*"]]) P1
   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P111returnsSelfUS0___fQPS0_FT_S1_
-  // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
-  // CHECK: apply [[FN]]<@opened([[UUID]]) P1>([[P1AINIT]], [[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in τ_0_0) -> ()
+  // CHECK: apply [[FN]]<@opened([[UUID]]) P1>([[P1AINIT]], [[POPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
   var p1a: P1 = p1.returnsSelf()
-  // CHECK: dealloc_stack [[POPENED_COPY]]#0
 }
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions23testExistentialsGetters
@@ -130,13 +123,13 @@ func testExistentialsGetters(p1: P1) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1g5prop2Sb
-  // CHECK: [[B:%[0-9]+]] = apply [[FN]]<@opened([[UUID]]) P1>([[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> Bool
+  // CHECK: [[B:%[0-9]+]] = apply [[FN]]<@opened([[UUID]]) P1>([[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   let b: Bool = p1.prop2
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1g9subscriptFSbSb
-  // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @in τ_0_0) -> Bool
+  // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED_COPY]]#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @in_guaranteed τ_0_0) -> Bool
   let b2: Bool = p1[b]
 }
 
@@ -177,8 +170,8 @@ func testLogicalExistentialSetters(var hasAP1: HasAP1, b: Bool) {
   // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $P1
   // CHECK-NEXT: [[HASP1_COPY:%[0-9]+]] = alloc_stack $HasAP1
   // CHECK-NEXT: copy_addr [[HASP1_BOX]]#1 to [initialization] [[HASP1_COPY]]#1 : $*HasAP1
-  // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1g6someP1PS_2P1_ : $@cc(method) @thin (@out P1, @in HasAP1) -> ()
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]]#1, %6#1) : $@cc(method) @thin (@out P1, @in HasAP1) -> ()
+  // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1g6someP1PS_2P1_ : $@cc(method) @thin (@out P1, @in_guaranteed HasAP1) -> ()
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]]#1, %6#1) : $@cc(method) @thin (@out P1, @in_guaranteed HasAP1) -> ()
   // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr [[P1_COPY]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P1s5prop2Sb : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: apply [[PROP2_SETTER]]<@opened([[UUID]]) P1>([[B]], [[P1_OPENED]]) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
@@ -200,12 +193,7 @@ func test_open_existential_semantics_opaque(guaranteed: P1,
 
   // CHECK: [[VALUE:%.*]] = open_existential_addr %0
   // CHECK: [[METHOD:%.*]] = function_ref
-  // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
-  // CHECK: apply [[METHOD]]<{{.*}}>([[COPY]]#1)
-  // CHECK-NOT: destroy_addr [[COPY]]#1
-  // CHECK: dealloc_stack [[COPY]]#0
-  // CHECK-NOT: destroy_addr [[VALUE]]
-  // CHECK-NOT: destroy_addr %0
+  // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
 
   // GUARANTEED: [[VALUE:%.*]] = open_existential_addr %0
   // GUARANTEED: [[METHOD:%.*]] = function_ref
@@ -268,7 +256,6 @@ func test_open_existential_semantics_class(guaranteed: CP1,
   // CHECK-NOT: strong_retain %0
   // CHECK: [[VALUE:%.*]] = open_existential_ref %0
   // CHECK: [[METHOD:%.*]] = function_ref
-  // CHECK: strong_retain [[VALUE]]
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK-NOT: strong_release [[VALUE]]
   // CHECK-NOT: strong_release %0
@@ -286,7 +273,7 @@ func test_open_existential_semantics_class(guaranteed: CP1,
   // CHECK: [[VALUE:%.*]] = open_existential_ref [[IMMEDIATE]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // CHECK-NOT: strong_release [[VALUE]]
+  // CHECK: strong_release [[VALUE]]
   // CHECK-NOT: strong_release [[IMMEDIATE]]
 
   // GUARANTEED: [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]
@@ -303,7 +290,7 @@ func test_open_existential_semantics_class(guaranteed: CP1,
   // CHECK: [[VALUE:%.*]] = open_existential_ref [[PLUS_ONE]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // CHECK-NOT: strong_release [[VALUE]]
+  // CHECK: strong_release [[VALUE]]
   // CHECK-NOT: strong_release [[PLUS_ONE]]
 
   // GUARANTEED: [[F:%.*]] = function_ref {{.*}}plusOneCP1

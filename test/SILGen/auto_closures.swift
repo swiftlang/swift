@@ -35,7 +35,7 @@ public class Base {
 }
 
 public class Sub : Base {
-  // CHECK-LABEL: sil hidden @_TFC13auto_closures3Subg1xVS_4Bool : $@cc(method) @thin (@owned Sub) -> Bool {
+  // CHECK-LABEL: sil hidden @_TFC13auto_closures3Subg1xVS_4Bool : $@cc(method) @thin (@guaranteed Sub) -> Bool {
   // CHECK: [[AUTOCLOSURE:%.*]] = function_ref @_TFFC13auto_closures3Subg1xVS_4Boolu_KT_S1_ : $@thin (@owned Sub) -> Bool
   // CHECK: = partial_apply [[AUTOCLOSURE]](%0)
   // CHECK: return {{%.*}} : $Bool

@@ -217,7 +217,7 @@ bb0:
   %O = unchecked_ref_cast %C : $C to $Builtin.UnknownObject
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
-  %2 = class_method %C : $C, #C.doIt!1 : C -> () -> () , $@cc(method) @thin (@owned C) -> ()
+  %2 = class_method %C : $C, #C.doIt!1 : C -> () -> () , $@cc(method) @thin (@guaranteed C) -> ()
   
   // CHECK: alloc_ref $D
   %D = alloc_ref $D

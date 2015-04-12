@@ -28,12 +28,12 @@ func testSubscriptSet(a: A, i: Int, v: ObjCClass) {
 // 'super' subscript usage
 class B : A {
   @objc override subscript (i: Int) -> ObjCClass {
-    // CHECK-LABEL: sil hidden @_TFC14objc_subscript1Bg9subscriptFSiCS_9ObjCClass : $@cc(method) @thin (Int, @owned B) -> @owned ObjCClass
+    // CHECK-LABEL: sil hidden @_TFC14objc_subscript1Bg9subscriptFSiCS_9ObjCClass : $@cc(method) @thin (Int, @guaranteed B) -> @owned ObjCClass
     get {
       // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.subscript!getter.1.foreign : A -> (Int) -> ObjCClass , $@cc(objc_method) @thin (Int, A) -> @autoreleased ObjCClass
       return super[i]
     }
-    // CHECK-LABEL: sil hidden @_TFC14objc_subscript1Bs9subscriptFSiCS_9ObjCClass : $@cc(method) @thin (@owned ObjCClass, Int, @owned B) -> ()
+    // CHECK-LABEL: sil hidden @_TFC14objc_subscript1Bs9subscriptFSiCS_9ObjCClass : $@cc(method) @thin (@owned ObjCClass, Int, @guaranteed B) -> ()
     set(value) {
       // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.subscript!setter.1.foreign : A -> (ObjCClass, Int) -> () , $@cc(objc_method) @thin (ObjCClass, Int, A) -> ()
       super[i] = value

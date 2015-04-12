@@ -2647,13 +2647,10 @@ public:
 
   void verifySILFunctionType(CanSILFunctionType FTy) {
     // Make sure that if FTy's calling convention implies that it must have a
-    // self parameter, it is not empty if we do not have canonical sil.
-    if (F.getModule().getStage() == SILStage::Raw &&
-        FTy->hasSelfParam()) {
-      require(!FTy->getParameters().empty(),
-              "Functions with a calling convention with self parameter must "
-              "have at least one argument for self.");
-    }
+    // self parameter.
+    require(!FTy->hasSelfParam() || !FTy->getParameters().empty(),
+            "Functions with a calling convention with self parameter must "
+            "have at least one argument for self.");
 
     // Make sure that FTy does not have any out parameters except for the first
     // parameter.
@@ -2784,6 +2781,40 @@ public:
     SILVisitor::visitSILBasicBlock(BB);
   }
 
+  void verifySILSelfParameterType(SILFunction *F, CanSILFunctionType FTy) {
+    SILModule &M = F->getModule();
+    SILParameterInfo PInfo = FTy->getSelfParameter();
+    CanType CTy = PInfo.getType();
+    SILType Ty = SILType::getPrimitiveObjectType(CTy);
+
+    // We do not care about trivial parameters (for now). There seem to be
+    // cases where we lower them as unowned.
+    //
+    // *NOTE* We do not run this check when we have a generic type since
+    // *generic types do not have type lowering and are always treated as
+    // *non-trivial since we do not know the type.
+    if (CTy->hasArchetype() || CTy->isDependentType() ||
+        M.getTypeLowering(Ty).isTrivial())
+      return;
+
+    // If we don't have a decl ref, return.
+    auto DeclRef = M.lookUpDeclRef(F);
+    if (!DeclRef)
+      return;
+
+    // If this function is a constructor or destructor, bail. These have @owned
+    // parameters.
+    if (DeclRef.getValue().isConstructor() || DeclRef.getValue().isDestructor())
+      return;
+
+    // Otherwise, if this function type has a guaranteed self parameter type,
+    // make sure that we have a +0 self param.
+    require(!FTy->getExtInfo().hasGuaranteedSelfParam() ||
+                PInfo.isGuaranteed() || PInfo.isIndirectInOut(),
+            "Function with guaranteed self, but self param is not "
+            "+0?!");
+  }
+
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
@@ -2801,6 +2832,13 @@ public:
 
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
+
+    // If this function has a self parameter, make sure that it has a +0 calling
+    // convention. This can not be done for general function types, since
+    // function_ref's SILFunctionTypes do not have archetypes associated with
+    // it.
+    if (F->getModule().getStage() == SILStage::Canonical && FTy->hasSelfParam())
+      verifySILSelfParameterType(F, FTy);
 
     if (F->isExternalDeclaration()) {
       assert(F->isAvailableExternally() &&

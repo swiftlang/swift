@@ -249,11 +249,14 @@ class ClassWithGetter : PropertyWithGetter {
 // Make sure we are generating a protocol witness that calls the class method on
 // ClassWithGetter.
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9protocols15ClassWithGetterS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed ClassWithGetter) -> Int {
-// CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
-// CHECK-NEXT: class_method
-// CHECK-NEXT: apply
+// CHECK: bb0([[C:%.*]] : $*ClassWithGetter):
+// CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetter
+// CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
+// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : ClassWithGetter -> () -> Int , $@cc(method) @thin (@guaranteed ClassWithGetter) -> Int
+// CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
+// CHECK-NEXT: strong_release [[CCOPY_LOADED]]
+// CHECK-NEXT: dealloc_stack [[CCOPY]]#0
 // CHECK-NEXT: return
 
 class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
@@ -272,11 +275,14 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
 }
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9protocols21ClassWithGetterSetterS_24PropertyWithGetterSetterS_FS1_g1bSi : $@cc(witness_method) @thin (@in_guaranteed ClassWithGetterSetter) -> Int {
-// CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: strong_retain
-// CHECK-NEXT: class_method
-// CHECK-NEXT: apply
+// CHECK: bb0([[C:%.*]] : $*ClassWithGetterSetter):
+// CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetterSetter
+// CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
+// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : ClassWithGetterSetter -> () -> Int , $@cc(method) @thin (@guaranteed ClassWithGetterSetter) -> Int
+// CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
+// CHECK-NEXT: strong_release [[CCOPY_LOADED]]
+// CHECK-NEXT: dealloc_stack [[CCOPY]]#0
 // CHECK-NEXT: return
 
 // Stored variables fulfilling property requirements
@@ -289,13 +295,13 @@ class ClassWithStoredProperty : PropertyWithGetter {
     return a
   }
   // CHECK-LABEL: sil hidden @{{.*}}ClassWithStoredProperty{{.*}}methodUsingProperty
-  // CHECK-NEXT: bb0(%0 : $ClassWithStoredProperty):
-  // CHECK-NEXT: debug_value %0
-  // CHECK-NEXT: strong_retain %0 : $ClassWithStoredProperty
-  // CHECK-NEXT: %3 = class_method %0 : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter.1
-  // CHECK-NEXT: %4 = apply %3(%0)
-  // CHECK-NEXT: strong_release %0 : $ClassWithStoredProperty
-  // CHECK-NEXT: return %4 : $Int
+  // CHECK-NEXT: bb0([[ARG:%.*]] : $ClassWithStoredProperty):
+  // CHECK-NEXT: debug_value [[ARG]]
+  // CHECK-NOT: strong_retain
+  // CHECK-NEXT: [[FUN:%.*]] = class_method [[ARG]] : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter.1 : ClassWithStoredProperty -> () -> Int , $@cc(method) @thin (@guaranteed ClassWithStoredProperty) -> Int
+  // CHECK-NEXT: [[RESULT:%.*]] = apply [[FUN]]([[ARG]])
+  // CHECK-NOT: strong_release
+  // CHECK-NEXT: return [[RESULT]] : $Int
 }
 
 struct StructWithStoredProperty : PropertyWithGetter {
@@ -314,13 +320,56 @@ struct StructWithStoredProperty : PropertyWithGetter {
 
 // Make sure that we generate direct function calls for out struct protocl
 // witness since structs don't do virtual calls for methods.
+//
+// *NOTE* Even though at first glance the copy_addr looks like a leak
+// here, StructWithStoredProperty is a trivial struct implying that no
+// leak is occuring. See the test with StructWithStoredClassProperty
+// that makes sure in such a case we don't leak. This is due to the
+// thunking code being too dumb but it is harmless to program
+// correctness.
+//
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9protocols24StructWithStoredPropertyS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed StructWithStoredProperty) -> Int {
-// CHECK: bb0
-// CHECK-NEXT: load
+// CHECK: bb0([[C:%.*]] : $*StructWithStoredProperty):
+// CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredProperty
+// CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @_TFV9protocols24StructWithStoredPropertyg1aSi : $@cc(method) @thin (StructWithStoredProperty) -> Int
-// CHECK-NEXT: apply %2(%1) : $@cc(method) @thin (StructWithStoredProperty) -> Int
+// CHECK-NEXT: [[FUN:%.*]] = function_ref @_TFV9protocols24StructWithStoredPropertyg1aSi : $@cc(method) @thin (StructWithStoredProperty) -> Int
+// CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
+// CHECK-NEXT: dealloc_stack [[CCOPY]]#0
 // CHECK-NEXT: return
+
+class C {}
+
+// Make sure that if the getter has a class property, we pass it in
+// in_guaranteed and don't leak.
+struct StructWithStoredClassProperty : PropertyWithGetter {
+  var a : Int
+  var c: C = C()
+
+  // Make sure that accesses aren't going through the generated accessors.
+  func methodUsingProperty() -> Int {
+    return a
+  }
+  // CHECK-LABEL: sil hidden @{{.*}}StructWithStoredClassProperty{{.*}}methodUsingProperty
+  // CHECK-NEXT: bb0(%0 : $StructWithStoredClassProperty):
+  // CHECK-NEXT: debug_value %0
+  // CHECK-NEXT: %2 = struct_extract %0 : $StructWithStoredClassProperty, #StructWithStoredClassProperty.a
+  // CHECK-NEXT: return %2 : $Int
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9protocols29StructWithStoredClassPropertyS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed StructWithStoredClassProperty) -> Int {
+// CHECK: bb0([[C:%.*]] : $*StructWithStoredClassProperty):
+// CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredClassProperty
+// CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[FUN:%.*]] = function_ref @_TFV9protocols29StructWithStoredClassPropertyg1aSi : $@cc(method) @thin (@guaranteed StructWithStoredClassProperty) -> Int
+// CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
+// CHECK-NEXT: release_value [[CCOPY_LOADED]]
+// CHECK-NEXT: dealloc_stack [[CCOPY]]#0
+// CHECK-NEXT: return
+
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: @_TTWC9protocols15ClassWithGetterS_18PropertyWithGetterS_FS1_g1aSi
@@ -336,4 +385,10 @@ struct StructWithStoredProperty : PropertyWithGetter {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: @_TTWC9protocols21ClassWithGetterSetterS_18PropertyWithGetterS_FS1_g1aSi
 // CHECK-NEXT: }
 
+// CHECK-LABEL: sil_witness_table hidden StructWithStoredProperty: PropertyWithGetter module protocols {
+// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: @_TTWV9protocols24StructWithStoredPropertyS_18PropertyWithGetterS_FS1_g1aSi
+// CHECK-NEXT: }
 
+// CHECK-LABEL: sil_witness_table hidden StructWithStoredClassProperty: PropertyWithGetter module protocols {
+// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: @_TTWV9protocols29StructWithStoredClassPropertyS_18PropertyWithGetterS_FS1_g1aSi
+// CHECK-NEXT: }

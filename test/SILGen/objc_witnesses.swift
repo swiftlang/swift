@@ -22,9 +22,17 @@ class Phoûx : NSObject, Fooable {
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo3Foo14objc_witnesses7FooableS0_FS1_3fooUS1___fQPS1_FT_GSQSS_
 // CHECK:         function_ref @_TTOFCSo3Foo3foofS_FT_GSQSS_
 
+// *NOTE* We have an extra copy here for the time being right
+// now. This will change once we teach SILGen how to not emit the
+// extra copy.
+//
 // witness for Phoûx.foo uses the Swift vtable
 // CHECK-LABEL: _TTWC14objc_witnessesX8Phox_xraS_7FooableS_FS1_3fooUS1___fQPS1_FT_GSQSS_
-// CHECK:         class_method %1 : $Phoûx, #Phoûx.foo!1
+// CHECK:      bb0([[IN_ADDR:%.*]] : 
+// CHECK:         [[STACK_SLOT:%.*]] = alloc_stack $Phoûx
+// CHECK:         copy_addr [[IN_ADDR]] to [initialization] [[STACK_SLOT]]#1
+// CHECK:         [[VALUE:%.*]] = load [[STACK_SLOT]]#1
+// CHECK:         class_method [[VALUE]] : $Phoûx, #Phoûx.foo!1
 
 protocol Bells {
   init(bellsOn: Int)

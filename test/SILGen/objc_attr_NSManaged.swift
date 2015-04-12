@@ -18,7 +18,7 @@ class SwiftGizmo : Gizmo {
   // CHECK-NOT: sil hidden @_TToFC19objc_attr_NSManaged10SwiftGizmos1xCS_1X
 
   // Make sure that we're calling through the @objc entry points.
-  // CHECK-LABEL: sil hidden @_TFC19objc_attr_NSManaged10SwiftGizmo7modifyX{{.*}} : $@cc(method) @thin (@owned SwiftGizmo) -> () {
+  // CHECK-LABEL: sil hidden @_TFC19objc_attr_NSManaged10SwiftGizmo7modifyX{{.*}} : $@cc(method) @thin (@guaranteed SwiftGizmo) -> () {
   func modifyX() {
     // CHECK:   [[GETTER:%[0-9]+]] = class_method [volatile] [[SELF:%.*]] : $SwiftGizmo, #SwiftGizmo.x!getter.1.foreign : SwiftGizmo -> () -> X , $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X
     // CHECK-NEXT: apply [[GETTER]]([[SELF]]) : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X

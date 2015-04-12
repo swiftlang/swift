@@ -9,8 +9,11 @@ func curry_pod(x: CurryTest) -> Int -> Int {
   return x.pod
 }
 // CHECK-LABEL: sil hidden @_TF13objc_currying9curry_podFCSo9CurryTestFSiSi : $@thin (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
-// CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_FOO_1:@_TTOFCSo9CurryTest3podFS_FSiSi]]
+// CHECK:      bb0([[ARG1:%.*]] : $CurryTest):
+// CHECK:         strong_retain [[ARG1]]
+// CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_FOO_1:@_TTOFCSo9CurryTest3podFS_FSiSi]] : $@thin (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
+// CHECK:         strong_release [[ARG1]]
 // CHECK:         return [[FN]]
 
 // CHECK: sil shared [[THUNK_FOO_1]] : $@thin (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
@@ -18,10 +21,12 @@ func curry_pod(x: CurryTest) -> Int -> Int {
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:   return [[FN]]
 
-// CHECK: sil shared [[THUNK_FOO_2]] : $@cc(method) @thin (Int, @owned CurryTest) -> Int
+// CHECK: sil shared [[THUNK_FOO_2]] : $@cc(method) @thin (Int, @guaranteed CurryTest) -> Int
+// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $CurryTest):
+// CHECK:   strong_retain [[ARG2]]
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %1 : $CurryTest, #CurryTest.pod!1.foreign
 // CHECK:   [[RESULT:%.*]] = apply [[METHOD]](%0, %1)
-// CHECK:   strong_release %1
+// CHECK:   strong_release [[ARG2]]
 // CHECK:   return [[RESULT]]
 
 func curry_bridged(x: CurryTest) -> String! -> String! {
@@ -37,7 +42,7 @@ func curry_bridged(x: CurryTest) -> String! -> String! {
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:   return [[FN]]
 
-// CHECK: sil shared [[THUNK_BAR_2]] : $@cc(method) @thin (@owned ImplicitlyUnwrappedOptional<String>, @owned CurryTest) -> @owned ImplicitlyUnwrappedOptional<String>
+// CHECK: sil shared [[THUNK_BAR_2]] : $@cc(method) @thin (@owned ImplicitlyUnwrappedOptional<String>, @guaranteed CurryTest) -> @owned ImplicitlyUnwrappedOptional<String>
 // CHECK:   function_ref @swift_StringToNSString
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %1 : $CurryTest, #CurryTest.bridged!1.foreign
 // CHECK:   [[RES:%.*]] = apply [[METHOD]]({{%.*}}, %1) : $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<NSString>, CurryTest) -> @autoreleased ImplicitlyUnwrappedOptional<NSString>
@@ -59,7 +64,9 @@ func curry_returnsInnerPointer(x: CurryTest) -> () -> UnsafeMutablePointer<Void>
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:   return [[FN]]
 
-// CHECK: sil shared @_TTOFCSo9CurryTest19returnsInnerPointerfS_FT_GVSs20UnsafeMutablePointerT__ : $@cc(method) @thin (@owned CurryTest) -> UnsafeMutablePointer<()>
+// CHECK: sil shared @_TTOFCSo9CurryTest19returnsInnerPointerfS_FT_GVSs20UnsafeMutablePointerT__ : $@cc(method) @thin (@guaranteed CurryTest) -> UnsafeMutablePointer<()>
+// CHECK:  bb0([[ARG1:%.*]] : 
+// CHECK:   strong_retain [[ARG1]]
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] %0 : $CurryTest, #CurryTest.returnsInnerPointer!1.foreign
 // CHECK:   [[RES:%.*]] = apply [[METHOD]](%0) : $@cc(objc_method) @thin (CurryTest) -> @unowned_inner_pointer UnsafeMutablePointer<()>
 // CHECK:   autorelease_value %0

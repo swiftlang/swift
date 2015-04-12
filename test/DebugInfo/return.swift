@@ -12,7 +12,6 @@ public func ifelseexpr() -> Int {
   // CHECK: [[X:%.*]] = call %C6return1X* @_TFC6return1XCfMS0_FT1iSi_S0_(i{{32|64}} 0, %swift.type* [[META]])
   // CHECK:  @swift_release to void (%C6return1X*)*)(%C6return1X* [[X]])
   if true {
-    // CHECK:  @swift_release to void (%C6return1X*)*)(%C6return1X* [[X]])
     x.x++; 
   } else {
     x.x--;

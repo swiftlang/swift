@@ -35,7 +35,6 @@ func test0(ref: A) {
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $OrdinarySub
-// CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: [[T0:%.*]] = class_method %0 : $A, #A.array!getter.1
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]](%0)
 // CHECK-NEXT: store [[T1]] to [[TEMP]]
@@ -43,10 +42,10 @@ func test0(ref: A) {
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T1:%.*]] = function_ref @_TFV9accessors11OrdinarySubg9subscriptFSiSi
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[T0]])
+// CHECK-NEXT: release_value [[T0]]
 //   Formal access to LHS.
 // CHECK-NEXT: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $OrdinarySub
-// CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $A, #A.array!materializeForSet.1
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]]#1, %0)
@@ -102,7 +101,6 @@ func test1(ref: B) {
 //   Formal access to RHS.
 // CHECK-NEXT: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $MutatingSub
-// CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $B, #B.array!materializeForSet.1
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]]#1, %0)
@@ -126,7 +124,6 @@ func test1(ref: B) {
 //   Formal access to LHS.
 // CHECK-NEXT: [[STORAGE2:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER2:%.*]] = alloc_stack $MutatingSub
-// CHECK-NEXT: strong_retain %0
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER2]]
 // CHECK-NEXT: [[T1:%.*]] = class_method %0 : $B, #B.array!materializeForSet.1
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE2]]#1, %0)

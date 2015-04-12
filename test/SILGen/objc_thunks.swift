@@ -11,9 +11,10 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   retain [[Y]]
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
-  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7typicalfS0_FTSi1yCSo5Gizmo_S1_ : $@cc(method) @thin (Int, @owned Gizmo, @owned Hoozit) -> @owned Gizmo
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7typicalfS0_FTSi1yCSo5Gizmo_S1_ : $@cc(method) @thin (Int, @owned Gizmo, @guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[X]], [[Y]], [[THIS]]) {{.*}} line:[[@LINE-7]]:8:auto_gen
-  // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo // {{.*}} line:[[@LINE-8]]:8:auto_gen
+  // CHECK-NEXT:   strong_release [[THIS]] : $Hoozit // {{.*}}
+  // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo // {{.*}} line:[[@LINE-9]]:8:auto_gen
   // CHECK-NEXT: }
 
   // NS_CONSUMES_SELF by inheritance
@@ -21,8 +22,9 @@ class Hoozit : Gizmo {
   // CHECK-LABEL: sil hidden  @_TToFC11objc_thunks6Hoozit4forkfS0_FT_T_ : $@cc(objc_method) @thin (@owned Hoozit) -> () {
   // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   // function_ref
-  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit4forkfS0_FT_T_ : $@cc(method) @thin (@owned Hoozit) -> ()
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit4forkfS0_FT_T_ : $@cc(method) @thin (@guaranteed Hoozit) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[THIS]])
+  // CHECK-NEXT:   strong_release [[THIS]]
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
@@ -42,10 +44,10 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
-  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7copyFoofS0_FT_CSo5Gizmo : $@cc(method) @thin (@owned Hoozit) -> @owned Gizmo
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7copyFoofS0_FT_CSo5Gizmo : $@cc(method) @thin (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
+  // CHECK:        release [[THIS]]
   // CHECK-NOT:    autorelease_return
-  // CHECK-NOT:    release
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
@@ -57,16 +59,16 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.typicalProperty.getter
   // CHECK-NEXT:   [[GETIMPL:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[GETIMPL]](%0)
+  // CHECK-NEXT:   strong_release %0
   // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo
   // CHECK-NEXT: }
   
-  // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo
+  // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@cc(method) @thin (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty {{.*}}
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]] {{.*}}
   // CHECK-NEXT:   strong_retain [[RES]] : $Gizmo
-  // CHECK-NEXT:   strong_release %0 : $Hoozit
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter
@@ -93,6 +95,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.getter
   // CHECK-NEXT:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[FR]](%0)
+  // CHECK-NEXT:   strong_release %0
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
 
@@ -100,8 +103,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: bb0(%0 : $Hoozit):
   // CHECK:        [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.copyProperty
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]]
-  // CHECK-NEXT:   retain [[RES]]
-  // CHECK-NEXT:   release %0
+  // CHECK-NEXT:   retain [[RES]] 
   // CHECK-NEXT:   return [[RES]]
 
   // -- setter is normal
@@ -112,6 +114,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.setter
   // CHECK-NEXT:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[FR]](%0, %1)
+  // CHECK-NEXT:   strong_release [[THIS]]
   // CHECK-NEXT:   return [[RES]]
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo
@@ -125,8 +128,9 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
-  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg10roPropertyCSo5Gizmo : $@cc(method) @thin (@owned Hoozit) -> @owned Gizmo
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg10roPropertyCSo5Gizmo : $@cc(method) @thin (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
+  // CHECK-NEXT:   release [[THIS]] : $Hoozit
   // CHECK-NEXT:   autorelease_return [[RES]] : $Gizmo
   // CHECK-NEXT: }
 
@@ -148,8 +152,9 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   retain [[VALUE]]
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
-  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozits10rwPropertyCSo5Gizmo : $@cc(method) @thin (@owned Gizmo, @owned Hoozit) -> ()
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozits10rwPropertyCSo5Gizmo : $@cc(method) @thin (@owned Gizmo, @guaranteed Hoozit) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[VALUE]], [[THIS]])
+  // CHECK-NEXT:   release [[THIS]]
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
@@ -164,9 +169,9 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
-  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg14copyRWPropertyCSo5Gizmo : $@cc(method) @thin (@owned Hoozit) -> @owned Gizmo
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg14copyRWPropertyCSo5Gizmo : $@cc(method) @thin (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[THIS]])
-  // CHECK-NOT:    release
+  // CHECK-NEXT:   release [[THIS]]
   // CHECK-NOT:    autorelease_return
   // CHECK-NEXT:   return [[RES]]
   // CHECK-NEXT: }
@@ -177,8 +182,9 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   retain [[VALUE]]
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
-  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozits14copyRWPropertyCSo5Gizmo : $@cc(method) @thin (@owned Gizmo, @owned Hoozit) -> ()
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozits14copyRWPropertyCSo5Gizmo : $@cc(method) @thin (@owned Gizmo, @guaranteed Hoozit) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[VALUE]], [[THIS]])
+  // CHECK-NEXT:   release [[THIS]]
   // CHECK-NEXT:   return
   // CHECK-NEXT: }
 
@@ -220,8 +226,9 @@ class Hoozit : Gizmo {
   // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6Hoozitg9subscriptFSiS0_ : $@cc(objc_method) @thin (Int, Hoozit) -> @autoreleased Hoozit
   // CHECK-NEXT: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $Hoozit):
   // CHECK-NEXT:   strong_retain [[SELF]] : $Hoozit
-  // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozitg9subscript{{.*}} : $@cc(method) @thin (Int, @owned Hoozit) -> @owned Hoozit
-  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[NATIVE]]([[I]], [[SELF]]) : $@cc(method) @thin (Int, @owned Hoozit) -> @owned Hoozit
+  // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozitg9subscript{{.*}} : $@cc(method) @thin (Int, @guaranteed Hoozit) -> @owned Hoozit
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[NATIVE]]([[I]], [[SELF]]) : $@cc(method) @thin (Int, @guaranteed Hoozit) -> @owned Hoozit
+  // CHECK-NEXT: strong_release [[SELF]]
   // CHECK-NEXT: autorelease_return [[RESULT]] : $Hoozit
   get {
     return self
@@ -232,8 +239,9 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $Hoozit, [[I:%[0-9]+]] : $Int, [[VALUE:%[0-9]+]] : $Hoozit):
   // CHECK-NEXT: strong_retain [[SELF]] : $Hoozit
   // CHECK_NEXT: strong_retain [[VALUE]] : $Hoozit
-  // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozits9subscript{{.*}} : $@cc(method) @thin (@owned Hoozit, Int, @owned Hoozit) -> ()
-  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[NATIVE]]([[SELF]], [[I]], [[VALUE]]) : $@cc(method) @thin (@owned Hoozit, Int, @owned Hoozit) -> ()
+  // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozits9subscript{{.*}} : $@cc(method) @thin (@owned Hoozit, Int, @guaranteed Hoozit) -> ()
+  // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[NATIVE]]([[SELF]], [[I]], [[VALUE]]) : $@cc(method) @thin (@owned Hoozit, Int, @guaranteed Hoozit) -> ()
+  // CHECK-NEXT: strong_release [[VALUE]]
   // CHECK-NEXT: return [[RESULT]] : $()
   set {}
   }
@@ -295,7 +303,7 @@ extension Hoozit {
   // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6Hoozit4fooffS0_FT_T_ : $@cc(objc_method) @thin (Hoozit) -> () {
 
   var extensionProperty: Int { return 0 }
-  // CHECK-LABEL: sil hidden  @_TFC11objc_thunks6Hoozitg17extensionPropertySi : $@cc(method) @thin (@owned Hoozit) -> Int
+  // CHECK-LABEL: sil hidden  @_TFC11objc_thunks6Hoozitg17extensionPropertySi : $@cc(method) @thin (@guaranteed Hoozit) -> Int
 }
 
 // Calling objc methods of subclass should go through native entry points

@@ -36,6 +36,7 @@ func main(x: Int) -> Void
         {
             var result = my_class.do_something(x)
             print ("Here is something you might consider doing: \(result).\n")
+// CHECK: call {{.*}} @swift_release {{.*}}
 // CHECK: call {{.*}} @swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
 // CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]
 // CHECK: ![[CLOSURE_END]] = !MDLocation(line: [[@LINE+1]],

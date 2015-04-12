@@ -1053,10 +1053,15 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
       }
     }
 
-    // If the upcast is used by a class_method + apply, then this is a call of
-    // a superclass method or property accessor.
+    // If the upcast is used by a class_method + apply, then this is a call of a
+    // superclass method or property accessor. If we have a guaranteed method,
+    // we will have a release due to a missing optimization in SILGen that will
+    // be removed.
+    //
+    // TODO: Implement the SILGen fixes so this can be removed.
     ClassMethodInst *CMI = nullptr;
     ApplyInst *AI = nullptr;
+    SILInstruction *Release = nullptr;
     for (auto UI : SILValue(UCI, 0).getUses()) {
       auto *User = UI->getUser();
       if (auto *TAI = dyn_cast<ApplyInst>(User)) {
@@ -1072,11 +1077,26 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         }
       }
 
+      if (isa<ReleaseValueInst>(User) || isa<StrongReleaseInst>(User)) {
+        if (!Release) {
+          Release = User;
+          continue;
+        }
+      }
+
       // Not a pattern we recognize, conservatively generate a generic
       // diagnostic.
       CMI = nullptr;
       break;
     }
+
+    // If we have a release, make sure that AI is guaranteed. If it is not, emit
+    // the generic error that we would emit before.
+    //
+    // That is the only case where we support pattern matching a release.
+    if (Release &&
+        !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
+      CMI = nullptr;
 
     if (AI && CMI) {
       // TODO: Could handle many other members more specifically.

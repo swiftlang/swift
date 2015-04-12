@@ -31,7 +31,7 @@ bb0(%c : $Builtin.Int32, %v : $Builtin.RawPointer):
 }
 
 // single.REC.recursive (single.REC)(Swift.Int) -> ()
-sil @_TFC6single3REC9recursivefS0_FSiT_ : $@cc(method) @thin (Int, @owned REC) -> () {
+sil @_TFC6single3REC9recursivefS0_FSiT_ : $@cc(method) @thin (Int, @guaranteed REC) -> () {
 bb0(%0 : $Int, %1 : $REC):
   debug_value %0 : $Int  // let a                 // id: %2
   debug_value %1 : $REC  // let self              // id: %3
@@ -50,7 +50,7 @@ bb0(%0 : $Int, %1 : $REC):
 
 bb1:                                              // Preds: bb0
   strong_retain %1 : $REC                         // id: %13
-  %14 = class_method %1 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@cc(method) @thin (Int, @owned REC) -> () // user: %21
+  %14 = class_method %1 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@cc(method) @thin (Int, @guaranteed REC) -> () // user: %21
   // function_ref Swift.- @infix (Swift.Int, Swift.Int) -> Swift.Int
   %15 = function_ref @_TFSsoi1sFTSiSi_Si : $@thin (Int, Int) -> Int // user: %20
   // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
@@ -59,7 +59,7 @@ bb1:                                              // Preds: bb0
   %18 = integer_literal $Builtin.Int2048, 2       // user: %19
   %19 = apply %16(%18, %17) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %20
   %20 = apply %15(%0, %19) : $@thin (Int, Int) -> Int // user: %21
-  %21 = apply %14(%20, %1) : $@cc(method) @thin (Int, @owned REC) -> ()
+  %21 = apply %14(%20, %1) : $@cc(method) @thin (Int, @guaranteed REC) -> ()
   br bb2                                          // id: %22
 
 bb2:                                              // Preds: bb0 bb1
@@ -129,8 +129,8 @@ bb0(%0 : $Int):
   %4 = apply %2(%3) : $@thin (@thick REC.Type) -> @owned REC // users: %5, %6, %7, %8, %9
   debug_value %4 : $REC  // let rec               // id: %5
   strong_retain %4 : $REC                         // id: %6
-  %7 = class_method %4 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@cc(method) @thin (Int, @owned REC) -> () // user: %8
-  %8 = apply %7(%0, %4) : $@cc(method) @thin (Int, @owned REC) -> ()
+  %7 = class_method %4 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@cc(method) @thin (Int, @guaranteed REC) -> () // user: %8
+  %8 = apply %7(%0, %4) : $@cc(method) @thin (Int, @guaranteed REC) -> ()
   strong_release %4 : $REC                        // id: %9
   %10 = tuple ()                                  // user: %11
   return %10 : $()                                // id: %11

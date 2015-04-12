@@ -14,6 +14,7 @@ class A {
 // CHECK:    sil hidden @_TToFC8optional1A3foofS0_FT_GSqSS_ : $@cc(objc_method) @thin (A) -> @autoreleased Optional<NSString>
 // CHECK:      [[T0:%.*]] = function_ref @_TFC8optional1A3foofS0_FT_GSqSS_
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]](%0)
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: [[TMP_OPTNSSTR:%.*]] = alloc_stack $Optional<NSString>
 // CHECK-NEXT: [[TMP_OPTSTR:%.*]] = alloc_stack $Optional<String>
 // CHECK-NEXT: store [[T1]] to [[TMP_OPTSTR]]#1
@@ -64,6 +65,7 @@ class A {
 // CHECK-NEXT: dealloc_stack [[TMP_OPTSTR]]
 // CHECK:      [[T1:%.*]] = function_ref @_TFC8optional1A3barfS0_FT1xGSqSS__T_
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], %1)
+// CHECK-NEXT: strong_release %1
 // CHECK-NEXT: return [[T2]] : $()
 }
 

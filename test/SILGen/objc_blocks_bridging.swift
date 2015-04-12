@@ -9,7 +9,7 @@ import Foundation
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3foo{{.*}} : $@cc(method) @thin (@owned @callee_owned (Int) -> Int, Int, @owned Foo) -> Int
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3foo{{.*}} : $@cc(method) @thin (@owned @callee_owned (Int) -> Int, Int, @guaranteed Foo) -> Int
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], %1, %2)
   dynamic func foo(f: Int -> Int, x: Int) -> Int {
     return f(x)
@@ -19,7 +19,7 @@ import Foundation
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb_dCSo8NSString_aS__XFo_oSS_oSS_
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bar{{.*}} : $@cc(method) @thin (@owned @callee_owned (@owned String) -> @owned String, @owned String, @owned Foo) -> @owned String
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bar{{.*}} : $@cc(method) @thin (@owned @callee_owned (@owned String) -> @owned String, @owned String, @guaranteed Foo) -> @owned String
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, %2)
   dynamic func bar(f: String -> String, x: String) -> String {
     return f(x)
@@ -29,7 +29,7 @@ import Foundation
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb_dGSqCSo8NSString__aGSqS___XFo_oGSqSS__oGSqSS__
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bas{{.*}} : $@cc(method) @thin (@owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>, @owned Optional<String>, @owned Foo) -> @owned Optional<String>
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bas{{.*}} : $@cc(method) @thin (@owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>, @owned Optional<String>, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, %2)
   dynamic func bas(f: String? -> String?, x: String?) -> String? {
     return f(x)
@@ -55,7 +55,7 @@ import Foundation
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[BLOCK_THUNK]]([[BLOCK]])
   // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @_TTRXFo_oSS_oSS_XFo_iSS_iSS_
   // CHECK:         [[REABSTRACT:%.*]] = partial_apply [[REABSTRACT_THUNK]]([[BRIDGED]])
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo7optFunc{{.*}} : $@cc(method) @thin (@owned Optional<String -> String>, @owned String, @owned Foo) -> @owned Optional<String>
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo7optFunc{{.*}} : $@cc(method) @thin (@owned Optional<String -> String>, @owned String, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]
   dynamic func optFunc(f: (String -> String)?, x: String) -> String? {
     return f?(x)

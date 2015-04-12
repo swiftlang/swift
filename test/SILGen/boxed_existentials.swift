@@ -68,11 +68,10 @@ extension _ErrorType {
 func test_extension_method(error: _ErrorType) {
   // CHECK: [[VALUE:%.*]] = open_existential_box %0
   // CHECK: [[METHOD:%.*]] = function_ref
-  // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
-  // CHECK: apply [[METHOD]]<{{.*}}>([[COPY]]#1)
+  // CHECK-NOT: copy_addr
+  // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK-NOT: destroy_addr [[COPY]]
   // CHECK-NOT: destroy_addr [[VALUE]]
-  // CHECK: dealloc_stack [[COPY]]#0
   // CHECK-NOT: destroy_addr [[VALUE]]
   // -- release the owned argument
   // CHECK: strong_release %0
@@ -91,9 +90,8 @@ func test_open_existential_semantics(guaranteed: _ErrorType,
   // CHECK-NOT: strong_retain %0
   // CHECK: [[VALUE:%.*]] = open_existential_box %0
   // CHECK: [[METHOD:%.*]] = function_ref
-  // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
-  // CHECK: apply [[METHOD]]<{{.*}}>([[COPY]]#1)
-  // CHECK: dealloc_stack [[COPY]]#0
+  // CHECK-NOT: copy_addr
+  // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK-NOT: strong_release %0
 
   // GUARANTEED-NOT: strong_retain %0
@@ -109,9 +107,8 @@ func test_open_existential_semantics(guaranteed: _ErrorType,
   // CHECK: strong_retain [[IMMEDIATE]]
   // CHECK: [[VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
   // CHECK: [[METHOD:%.*]] = function_ref
-  // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
-  // CHECK: apply [[METHOD]]<{{.*}}>([[COPY]]#1)
-  // CHECK: dealloc_stack [[COPY]]#0
+  // CHECK-NOT: copy_addr
+  // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // -- end the guarantee
   // -- TODO: could in theory do this sooner, after the value's been copied
   //    out.
@@ -132,9 +129,8 @@ func test_open_existential_semantics(guaranteed: _ErrorType,
   // CHECK: [[PLUS_ONE:%.*]] = apply [[F]]()
   // CHECK: [[VALUE:%.*]] = open_existential_box [[PLUS_ONE]]
   // CHECK: [[METHOD:%.*]] = function_ref
-  // CHECK: copy_addr [[VALUE]] to [initialization] [[COPY:%.*]]#1 :
-  // CHECK: apply [[METHOD]]<{{.*}}>([[COPY]]#1)
-  // CHECK: dealloc_stack [[COPY]]#0
+  // CHECK-NOT: copy_addr
+  // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK: strong_release [[PLUS_ONE]]
 
   // GUARANTEED: [[F:%.*]] = function_ref {{.*}}plusOneErrorType

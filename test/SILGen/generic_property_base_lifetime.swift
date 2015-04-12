@@ -18,6 +18,7 @@ protocol ProtocolB {
 // CHECK:         strong_retain [[PROJECTION]]
 // CHECK:         apply {{%.*}}<@opened{{.*}}>([[PROJECTION]])
 // CHECK:         strong_release %0
+// CHECK-NOT:     strong_release
 func getIntPropExistential(a: ProtocolA) -> Int {
   return a.intProp
 }
@@ -27,12 +28,13 @@ func getIntPropExistential(a: ProtocolA) -> Int {
 // CHECK:         strong_retain [[PROJECTION]]
 // CHECK:         apply {{%.*}}<@opened{{.*}}>({{%.*}}, [[PROJECTION]])
 // CHECK:         strong_release %0
+// CHECK_NOT:     strong_release
 func setIntPropExistential(a: ProtocolA) {
   a.intProp = 0
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericUS_9ProtocolA__FQ_Si
-// CHECK:         strong_retain %0
+// CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>(%0)
 // CHECK:         strong_release %0
 func getIntPropGeneric<T: ProtocolA>(a: T) -> Int {
@@ -40,7 +42,7 @@ func getIntPropGeneric<T: ProtocolA>(a: T) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGenericUS_9ProtocolA__FQ_T_
-// CHECK:         strong_retain %0
+// CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>({{%.*}}, %0)
 // CHECK:         strong_release %0
 func setIntPropGeneric<T: ProtocolA>(a: T) {
@@ -97,19 +99,19 @@ func setIntPropExistential(a: ProtocolO) {
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericUS_9ProtocolO__FQ_Si
-// CHECK:         strong_retain %0
+// CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>(%0)
 // CHECK:         strong_release %0
-// CHECK:         strong_release %0
+// CHECK-NOT:     strong_release %0
 func getIntPropGeneric<T: ProtocolO>(a: T) -> Int {
   return a.intProp
 }
 
 // CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGenericUS_9ProtocolO__FQ_T_
-// CHECK:         strong_retain %0
+// CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>({{%.*}}, %0)
 // CHECK:         strong_release %0
-// CHECK:         strong_release %0
+// CHECK-NOT:     strong_release %0
 func setIntPropGeneric<T: ProtocolO>(a: T) {
   a.intProp = 0
 }

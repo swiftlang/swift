@@ -24,9 +24,9 @@ sil @_TFC4main4HashcfMS0_FT_S0_ : $@cc(method) @thin (@owned Hash) -> @owned Has
 sil @_TFC4main4HashCfMS0_FT_S0_ : $@thin (@thick Hash.Type) -> @owned Hash
 
 // main.Hash.update (main.Hash)() -> ()
-sil @_TFC4main4Hash6updatefS0_FT_T_ : $@cc(method) @thin (@owned Hash) -> () {
+sil @_TFC4main4Hash6updatefS0_FT_T_ : $@cc(method) @thin (@guaranteed Hash) -> () {
 bb0(%0 : $Hash):
-  %1 = class_method %0 : $Hash, #Hash.hash!1 : Hash -> () -> () , $@cc(method) @thin (@owned Hash) -> () // user: %9
+  %1 = class_method %0 : $Hash, #Hash.hash!1 : Hash -> () -> () , $@cc(method) @thin (@guaranteed Hash) -> () // user: %9
   checked_cast_br [exact] %0 : $Hash to $MD5, bb2, bb3 // id: %2
 
 bb1:                                              // Preds: bb2 bb3
@@ -34,16 +34,14 @@ bb1:                                              // Preds: bb2 bb3
   return %3 : $()                                 // id: %4
 
 bb2(%5 : $MD5):                                   // Preds: bb0
-  %6 = upcast %5 : $MD5 to $Hash                  // user: %7
-  strong_release %6 : $Hash                       // id: %7
   br bb1                                          // id: %8
 
 bb3:                                              // Preds: bb0
-  %9 = apply %1(%0) : $@cc(method) @thin (@owned Hash) -> ()
+  %9 = apply %1(%0) : $@cc(method) @thin (@guaranteed Hash) -> ()
   br bb1                                          // id: %10
 }
 
-sil @_TFC4main4Hash4hashfS0_FT_T_ : $@cc(method) @thin (@owned Hash) -> ()
+sil @_TFC4main4Hash4hashfS0_FT_T_ : $@cc(method) @thin (@guaranteed Hash) -> ()
 sil @_TFC4main4Hashd : $@cc(method) @thin (@owned Hash) -> @owned Builtin.NativeObject
 sil @_TFC4main4HashD : $@cc(method) @thin (@owned Hash) -> ()
 sil @_TFC4main3MD5cfMS0_FT_S0_ : $@cc(method) @thin (@owned MD5) -> @owned MD5

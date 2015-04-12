@@ -11,7 +11,7 @@ protocol CP : class {
 class X : P, CP {
   required init(int i: Int) { }
 
-  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1X1ffDS0_FT_DS0_ : $@cc(method) @thin (@owned X) -> @owned
+  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1X1ffDS0_FT_DS0_ : $@cc(method) @thin (@guaranteed X) -> @owned
   func f() -> Self { return self }
 
   // CHECK-LABEL: sil hidden @_TZFC12dynamic_self1X7factory{{.*}} : $@thin (Int, @thick X.Type) -> @owned X
@@ -34,22 +34,28 @@ class GY<T> : GX<[T]> { }
 // CHECK-LABEL: sil hidden @_TF12dynamic_self23testDynamicSelfDispatch{{.*}} : $@thin (@owned Y) -> ()
 func testDynamicSelfDispatch(y: Y) {
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
-// CHECK:   [[Y_AS_X:%[0-9]+]] = upcast [[Y]] : $Y to $X
-// CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X]] : $X, #X.f!1 : Self -> () -> Self , $@cc(method) @thin (@owned X) -> @owned X
-// CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X]]) : $@cc(method) @thin (@owned X) -> @owned X
+// CHECK:   strong_retain [[Y]]
+// CHECK:   [[Y_AS_X:%[0-9]+]] = upcast [[Y]] : $Y to $X  
+// CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X]] : $X, #X.f!1 : Self -> () -> Self , $@cc(method) @thin (@guaranteed X) -> @owned X
+// CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X]]) : $@cc(method) @thin (@guaranteed X) -> @owned X
+// CHECK:   strong_release [[Y_AS_X]]
 // CHECK:   [[Y_RESULT:%[0-9]+]] = unchecked_ref_cast [[X_RESULT]] : $X to $Y
 // CHECK:   strong_release [[Y_RESULT]] : $Y
+// CHECK:   strong_release [[Y]] : $Y
   y.f()
 }
 
 // CHECK-LABEL: sil hidden @_TF12dynamic_self30testDynamicSelfDispatchGeneric{{.*}} : $@thin (@owned GY<Int>) -> ()
 func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK: bb0([[GY:%[0-9]+]] : $GY<Int>):
+  // CHECK:   strong_retain [[GY]]
   // CHECK:   [[GY_AS_GX:%[0-9]+]] = upcast [[GY]] : $GY<Int> to $GX<Array<Int>>
-  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX]] : $GX<Array<Int>>, #GX.f!1 : <T> Self -> () -> Self , $@cc(method) @thin <τ_0_0> (@owned GX<τ_0_0>) -> @owned GX<τ_0_0>
-  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX]]) : $@cc(method) @thin <τ_0_0> (@owned GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX]] : $GX<Array<Int>>, #GX.f!1 : <T> Self -> () -> Self , $@cc(method) @thin <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX]]) : $@cc(method) @thin <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   strong_release [[GY_AS_GX]]
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
   // CHECK:   strong_release [[GY_RESULT]] : $GY<Int>
+  // CHECK:   strong_release [[GY]]
   gy.f()
 }
 
@@ -80,8 +86,8 @@ func testExistentialDispatch(p: P) {
 func testExistentialDispatchClass(cp: CP) {
 // CHECK: bb0([[CP:%[0-9]+]] : $CP):
 // CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]]) CP
-// CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.f!1, [[CP_ADDR]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0) -> @owned τ_0_0
-// CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]]) CP>([[CP_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : CP> (@owned τ_0_0) -> @owned τ_0_0
+// CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.f!1, [[CP_ADDR]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]]) CP>([[CP_ADDR]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]]) CP : $@opened([[N]]) CP, $CP
 // CHECK:   strong_release [[CP_F_RESULT]] : $@opened([[N]]) CP
   cp.f()
@@ -123,14 +129,13 @@ func testObjCInit(meta: ObjCInit.Type) {
 class OptionalResult {
   func foo() -> Self? { return self }
 }
-// CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foofDS0_FT_GSqDS0__ : $@cc(method) @thin (@owned OptionalResult) -> @owned Optional<OptionalResult>
+// CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foofDS0_FT_GSqDS0__ : $@cc(method) @thin (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK:      [[SOME:%.*]] = init_enum_data_addr [[OPT:%[0-9]+]]
 // CHECK-NEXT: strong_retain [[VALUE:%[0-9]+]]
 // CHECK-NEXT: store [[VALUE]] to [[SOME]]
 // CHECK-NEXT: inject_enum_addr [[OPT]]{{.*}}Some
 // CHECK-NEXT: [[T0:%.*]] = load [[OPT]]#1
 // CHECK-NEXT: dealloc_stack [[OPT]]#0
-// CHECK-NEXT: strong_release [[VALUE]]
 // CHECK-NEXT: return [[T0]] : $Optional<OptionalResult>
 
 class OptionalResultInheritor : OptionalResult {
@@ -141,7 +146,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
   v.foo()?.bar()
 }
 // CHECK-LABEL: sil hidden @_TF12dynamic_self18testOptionalResult{{.*}} : $@thin (@owned OptionalResultInheritor) -> ()
-// CHECK:      [[T0:%.*]] = class_method [[V:%.*]] : $OptionalResult, #OptionalResult.foo!1 : Self -> () -> Self? , $@cc(method) @thin (@owned OptionalResult) -> @owned Optional<OptionalResult>
+// CHECK:      [[T0:%.*]] = class_method [[V:%.*]] : $OptionalResult, #OptionalResult.foo!1 : Self -> () -> Self? , $@cc(method) @thin (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK-NEXT: apply [[T0]]([[V]])
 // CHECK:      select_enum_addr
 // CHECK:      [[T1:%.*]] = unchecked_take_enum_data_addr 

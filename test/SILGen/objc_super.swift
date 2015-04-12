@@ -20,7 +20,7 @@ class Hoozit : Gizmo {
     super.runce()
   }
 
-  // CHECK-LABEL: sil hidden  @_TFC10objc_super6Hoozit4frobfS0_FT_T_ : $@cc(method) @thin (@owned Hoozit) -> ()
+  // CHECK-LABEL: sil hidden  @_TFC10objc_super6Hoozit4frobfS0_FT_T_ : $@cc(method) @thin (@guaranteed Hoozit) -> ()
   override func frob() {
     // CHECK: super_method [volatile] {{%.*}} : $Hoozit, #Gizmo.frob!1.foreign
     super.frob()

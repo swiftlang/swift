@@ -101,9 +101,8 @@ func physical_struct_lvalue(c: Int) {
  func physical_class_lvalue(r: Ref, a: Int) {
     r.y = a
 
-   // CHECK: strong_retain %0 : $Ref
    // CHECK: [[FN:%[0-9]+]] = class_method %0 : $Ref, #Ref.y!setter.1
-   // CHECK: apply [[FN]](%1, %0) : $@cc(method) @thin (Int, @owned Ref) -> ()
+   // CHECK: apply [[FN]](%1, %0) : $@cc(method) @thin (Int, @guaranteed Ref) -> ()
    // CHECK: strong_release %0 : $Ref
   }
 
@@ -111,16 +110,15 @@ func physical_struct_lvalue(c: Int) {
 // CHECK-LABEL: sil hidden  @_TF10properties24physical_subclass_lvalue
  func physical_subclass_lvalue(r: RefSubclass, a: Int) {
     r.y = a
-   // CHECK: strong_retain %0 : $RefSubclass
+   // strong_retain %0 : $RefSubclass
    // CHECK: [[R_SUP:%[0-9]+]] = upcast %0 : $RefSubclass to $Ref
-   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : Ref
+   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : Ref -> (Int) -> () , $@cc(method) @thin (Int, @guaranteed Ref) -> ()
    // CHECK: apply [[FN]](%1, [[R_SUP]]) :
-  
+   // CHECK: strong_release [[R_SUP]]
     r.w = a
 
-   // CHECK: strong_retain %0 : $RefSubclass
    // CHECK: [[FN:%[0-9]+]] = class_method %0 : $RefSubclass, #RefSubclass.w!setter.1
-   // CHECK: apply [[FN]](%1, %0) : $@cc(method) @thin (Int, @owned RefSubclass) -> ()
+   // CHECK: apply [[FN]](%1, %0) : $@cc(method) @thin (Int, @guaranteed RefSubclass) -> ()
   }
   
 
@@ -337,9 +335,8 @@ func physical_inout(var x: Int) {
 // CHECK-NEXT: bb0([[VVAL:%[0-9]+]] : $Val, [[I:%[0-9]+]] : $Int):
 func val_subscript_get(v: Val, i: Int) -> Float {
   return v[i]
-  // CHECK: retain_value [[VVAL]]
   // CHECK: [[SUBSCRIPT_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg9subscript
-  // CHECK: [[RET:%[0-9]+]] = apply [[SUBSCRIPT_GET_METHOD]]([[I]], [[VVAL]])
+  // CHECK: [[RET:%[0-9]+]] = apply [[SUBSCRIPT_GET_METHOD]]([[I]], [[VVAL]]) : $@cc(method) @thin (Int, @guaranteed Val)
   // CHECK: return [[RET]]
 }
 
@@ -707,7 +704,7 @@ class DerivedProperty : BaseProperty {
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
 // CHECK:  // function_ref properties.BaseProperty.x.getter
 // CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1x
-// CHECK:  apply [[FN]]([[BASEPTR]]) : $@cc(method) @thin (@owned BaseProperty) -> Int // user: %7
+// CHECK:  apply [[FN]]([[BASEPTR]]) : $@cc(method) @thin (@guaranteed BaseProperty) -> Int // user: %7
 
 
 // <rdar://problem/16411449> ownership qualifiers don't work with non-mutating struct property
@@ -723,7 +720,6 @@ struct ReferenceStorageTypeRValues {
 // CHECK-NEXT:   %2 = struct_extract %0 : $ReferenceStorageTypeRValues, #ReferenceStorageTypeRValues.p1
 // CHECK-NEXT:   strong_retain_unowned %2 : $@sil_unowned Ref
 // CHECK-NEXT:   %4 = unowned_to_ref %2 : $@sil_unowned Ref to $Ref
-// CHECK-NEXT:   release_value %0 : $ReferenceStorageTypeRValues
 // CHECK-NEXT:   return %4 : $Ref
 
   init() {
@@ -875,7 +871,6 @@ class ClassWithLetProperty {
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr %0 : $ClassWithLetProperty, #ClassWithLetProperty.p
 // CHECK-NEXT:    [[VAL:%[0-9]+]] = load [[PTR]] : $*Int
-// CHECK-NEXT:    strong_release %0 : $ClassWithLetProperty
 // CHECK-NEXT:   return [[VAL]] : $Int
 
 
@@ -971,11 +966,11 @@ func addressOnlyNonmutatingProperty<T>(x: AddressOnlyNonmutatingSet<T>)
 // CHECK-LABEL: sil hidden @_TF10properties30addressOnlyNonmutatingPropertyU__FGVS_25AddressOnlyNonmutatingSetQ__Si : $@thin <T> (@in AddressOnlyNonmutatingSet<T>) -> Int {
 // CHECK:         [[SET:%.*]] = function_ref @_TFV10properties25AddressOnlyNonmutatingSets4propSi
 // CHECK:         apply [[SET]]<T>({{%.*}}, [[TMP:%.*]]#1)
-// CHECK-NOT:     destroy_addr [[TMP]]
+// CHECK:         destroy_addr [[TMP]]
 // CHECK:         dealloc_stack [[TMP]]
 // CHECK:         [[GET:%.*]] = function_ref @_TFV10properties25AddressOnlyNonmutatingSetg4propSi
 // CHECK:         apply [[GET]]<T>([[TMP:%.*]]#1)
-// CHECK-NOT:     destroy_addr [[TMP]]
+// CHECK:         destroy_addr [[TMP]]
 // CHECK:         dealloc_stack [[TMP]]
 
 protocol MakeAddressOnly {}

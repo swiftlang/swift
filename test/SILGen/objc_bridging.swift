@@ -241,7 +241,8 @@ class Bas : NSObject {
   // CHECK:   strong_retain [[THIS]] : $Bas
   // CHECK:   // function_ref objc_bridging.Bas.strRealProp.getter
   // CHECK:   [[PROPIMPL:%.*]] = function_ref @_TFC13objc_bridging3Basg11strRealPropSS
-  // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[THIS]]) : $@cc(method) @thin (@owned Bas) -> @owned String
+  // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[THIS]]) : $@cc(method) @thin (@guaranteed Bas) -> @owned String
+  // CHECK:   strong_release [[THIS]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[PROP_COPY]])
   // CHECK:   autorelease_return [[NSSTR]]
@@ -352,18 +353,21 @@ class Bas : NSObject {
   // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray{{.*}} : $@thin <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
   // CHECK-NEXT: [[OPT_NSARRAY:%[0-9]+]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[NSARRAY]] : $NSArray
   // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]]) : $@thin <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@cc(method) @thin (@owned Array<AnyObject>, @owned Bas) -> ()
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@cc(method) @thin (@owned Array<AnyObject>, @owned Bas) -> ()
+  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@cc(method) @thin (@owned Array<AnyObject>, @guaranteed Bas) -> ()
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@cc(method) @thin (@owned Array<AnyObject>, @guaranteed Bas) -> ()
+  // CHECK:   strong_release [[SELF]] : $Bas
   // CHECK:   return [[RESULT]] : $()
   func arrayArg(array: [AnyObject]) { }
   
   // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@cc(objc_method) @thin (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : $Bas):
   // CHECK:   strong_retain [[SELF]] : $Bas
-  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas11arrayResult{{.*}} : $@cc(method) @thin (@owned Bas) -> @owned Array<AnyObject>
-  // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@cc(method) @thin (@owned Bas) -> @owned Array<AnyObject>
+  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas11arrayResult{{.*}} : $@cc(method) @thin (@guaranteed Bas) -> @owned Array<AnyObject>
+  // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@cc(method) @thin (@guaranteed Bas) -> @owned Array<AnyObject>
+  // CHECK:   strong_release [[SELF]]
   // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertArrayToNSArray{{.*}} : $@thin <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
   // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[ARRAY]]) : $@thin <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
+  // CHECK:   autorelease_return [[NSARRAY]]
   func arrayResult() -> [AnyObject] { return [] }
 
   // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg9arrayPropGSaSS_ : $@cc(objc_method) @thin (Bas) -> @autoreleased NSArray

@@ -15,8 +15,8 @@ import gizmo
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertNSSetToSet{{.*}} : $@thin <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
     // CHECK: [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.Some!enumelt.1, [[NSSET]] : $NSSet
     // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]]) : $@thin <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
-    // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foo16bridge_Set_param{{.*}} : $@cc(method) @thin (@owned Set<Foo>, @owned Foo) -> ()
-    // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[SET]], [[SELF]]) : $@cc(method) @thin (@owned Set<Foo>, @owned Foo) -> ()
+    // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foo16bridge_Set_param{{.*}} : $@cc(method) @thin (@owned Set<Foo>, @guaranteed Foo) -> ()
+    // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[SET]], [[SELF]]) : $@cc(method) @thin (@owned Set<Foo>, @guaranteed Foo) -> ()
     // CHECK:   return [[RESULT]] : $()
   }
 
@@ -25,8 +25,8 @@ import gizmo
   func bridge_Set_result() -> Set<Foo> { 
     // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
     // CHECK: strong_retain [[SELF]] : $Foo
-    // CHECK: [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foo17bridge_Set_result{{.*}} : $@cc(method) @thin (@owned Foo) -> @owned Set<Foo>
-    // CHECK: [[SET:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@cc(method) @thin (@owned Foo) -> @owned Set<Foo>
+    // CHECK: [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foo17bridge_Set_result{{.*}} : $@cc(method) @thin (@guaranteed Foo) -> @owned Set<Foo>
+    // CHECK: [[SET:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@cc(method) @thin (@guaranteed Foo) -> @owned Set<Foo>
     // CHECK: [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertSetToNSSet{{.*}} : $@thin <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
     // CHECK: [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@thin <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
     // CHECK: autorelease_return [[NSSET]] : $NSSet
@@ -38,8 +38,8 @@ import gizmo
   // CHECK-LABEL: sil hidden [transparent] @_TToFC17objc_set_bridging3Foog8property{{.*}} : $@cc(objc_method) @thin (Foo) -> @autoreleased NSSet
   // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
   // CHECK:   strong_retain [[SELF]] : $Foo
-  // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foog8property{{.*}} : $@cc(method) @thin (@owned Foo) -> @owned Set<Foo>
-  // CHECK:   [[SET:%[0-9]+]] = apply [[GETTER]]([[SELF]]) : $@cc(method) @thin (@owned Foo) -> @owned Set<Foo>
+  // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foog8property{{.*}} : $@cc(method) @thin (@guaranteed Foo) -> @owned Set<Foo>
+  // CHECK:   [[SET:%[0-9]+]] = apply [[GETTER]]([[SELF]]) : $@cc(method) @thin (@guaranteed Foo) -> @owned Set<Foo>
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertSetToNSSet{{.*}} : $@thin <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
   // CHECK:   [[NSSET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[SET]]) : $@thin <τ_0_0 where τ_0_0 : Hashable> (@owned Set<τ_0_0>) -> @owned NSSet
   // CHECK:   autorelease_return [[NSSET]] : $NSSet
@@ -52,8 +52,9 @@ import gizmo
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation18_convertNSSetToSet{{.*}} : $@thin <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
   // CHECK: [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.Some!enumelt.1, [[NSSET]] : $NSSet
   // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]]) : $@thin <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
-  // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foos8property{{.*}} : $@cc(method) @thin (@owned Set<Foo>, @owned Foo) -> ()
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[SET]], [[SELF]]) : $@cc(method) @thin (@owned Set<Foo>, @owned Foo) -> ()
+  // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foos8property{{.*}} : $@cc(method) @thin (@owned Set<Foo>, @guaranteed Foo) -> ()
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[SET]], [[SELF]]) : $@cc(method) @thin (@owned Set<Foo>, @guaranteed Foo) -> ()
+  // CHECK:   strong_release [[SELF]] : $Foo
   // CHECK:   return [[RESULT]] : $()
   
   // CHECK-LABEL: sil hidden [transparent] @_TToFC17objc_set_bridging3Foog19nonVerbatimProperty{{.*}} : $@cc(objc_method) @thin (Foo) -> @autoreleased NSSet

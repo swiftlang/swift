@@ -167,9 +167,10 @@ final class ConformingClass : X {
   // CHECK-NEXT:    strong_retain %3 : $ConformingClass
   // CHECK-NEXT:    %5 = load %1 : $*ConformingClass
   // CHECK:         %6 = function_ref @_TFC9witnesses15ConformingClass9selfTypesfS0_FT1xS0__S0_ 
-  // CHECK-NEXT:    %7 = apply %6(%5, %3) : $@cc(method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass
+  // CHECK-NEXT:    %7 = apply %6(%5, %3) : $@cc(method) @thin (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
   // CHECK-NEXT:    store %7 to %0 : $*ConformingClass
   // CHECK-NEXT:    %9 = tuple ()
+  // CHECK-NEXT:    strong_release %3
   // CHECK-NEXT:    return %9 : $()
   // CHECK-NEXT:  }
   func loadable(#x: Loadable) -> Loadable { return x }
@@ -180,11 +181,14 @@ final class ConformingClass : X {
 func <~>(x: ConformingClass, y: ConformingClass) -> ConformingClass { return x }
 
 extension ConformingClass : ClassBounded { }
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_12ClassBoundedS_FS1_9selfTypesUS1___fQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass {
-// CHECK-NEXT:  bb0(%0 : $ConformingClass, %1 : $ConformingClass):
-// CHECK:         %2 = function_ref @_TFC9witnesses15ConformingClass9selfTypesfS0_FT1xS0__S0_
-// CHECK-NEXT:    %3 = apply %2(%0, %1) : $@cc(method) @thin (@owned ConformingClass, @owned ConformingClass) -> @owned ConformingClass
-// CHECK-NEXT:    return %3 : $ConformingClass
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_12ClassBoundedS_FS1_9selfTypesUS1___fQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass {
+// CHECK:  bb0([[C0:%.*]] : $ConformingClass, [[C1:%.*]] : $ConformingClass):
+// CHECK-NEXT:    strong_retain [[C1]]
+// CHECK-NEXT:    function_ref
+// CHECK-NEXT:    [[FUN:%.*]] = function_ref @_TFC9witnesses15ConformingClass9selfTypesfS0_FT1xS0__S0_
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FUN]]([[C0]], [[C1]]) : $@cc(method) @thin (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
+// CHECK-NEXT:    strong_release [[C1]]
+// CHECK-NEXT:    return [[RESULT]] : $ConformingClass
 // CHECK-NEXT:  }
 
 struct ConformingAOStruct : X {

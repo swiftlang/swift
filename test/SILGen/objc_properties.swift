@@ -47,7 +47,7 @@ class A {
     other.prop = x
   }
 
-  // CHECK-LABEL: sil hidden @_TFC15objc_properties1Ad : $@cc(method) @thin (@owned A) -> @owned Builtin.NativeObject {
+  // CHECK-LABEL: sil hidden @_TFC15objc_properties1Ad : $@cc(method) @thin (@guaranteed A) -> @owned Builtin.NativeObject {
   // CHECK-NOT:     class_method {{.*}} #A.prop
   // CHECK:       }
   deinit {
@@ -84,12 +84,12 @@ func testComputedPropSet(a: A, i: Int) {
 // 'super' property references.
 class B : A {
   @objc override var computedProp: Int {
-    // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bg12computedPropSi : $@cc(method) @thin (@owned B) -> Int
+    // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bg12computedPropSi : $@cc(method) @thin (@guaranteed B) -> Int
     get {
       // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!getter.1.foreign : A -> () -> Int , $@cc(objc_method) @thin (A) -> Int
       return super.computedProp
     }
-    // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bs12computedPropSi : $@cc(method) @thin (Int, @owned B) -> ()
+    // CHECK-LABEL: sil hidden @_TFC15objc_properties1Bs12computedPropSi : $@cc(method) @thin (Int, @guaranteed B) -> ()
     set(value) {
       // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.computedProp!setter.1.foreign : A -> (Int) -> () , $@cc(objc_method) @thin (Int, A) -> ()
       super.computedProp = value
@@ -101,7 +101,7 @@ class B : A {
 // Test the @NSCopying attribute.
 class TestNSCopying {
   // CHECK: // objc_properties.TestNSCopying.property.setter : ObjectiveC.NSString
-  // CHECK-NEXT: sil hidden [transparent] @_TFC15objc_properties13TestNSCopyings8propertyCSo8NSString : $@cc(method) @thin (@owned NSString, @owned TestNSCopying) -> ()
+  // CHECK-NEXT: sil hidden [transparent] @_TFC15objc_properties13TestNSCopyings8propertyCSo8NSString : $@cc(method) @thin (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK-NEXT: bb0(%0 : $NSString, %1 : $TestNSCopying):
   // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copyWithZone!1.foreign
   @NSCopying var property : NSString

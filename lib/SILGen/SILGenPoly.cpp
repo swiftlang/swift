@@ -1643,8 +1643,13 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     
     if (selfInstanceType.getClassOrBoundGenericClass()) {
       if (selfInstanceType != witnessInstanceType) {
-        SILValue upcast = B.createUpcast(loc, selfOrigParam.getValue(),
-                                 SILType::getPrimitiveObjectType(witnessType));
+        // Match the category of selfOrigParam. We leave the loading to
+        // TranslateArguments.
+        auto upcastCategory = selfOrigParam.getValue().getType().getCategory();
+        SILType upcastTy =
+            SILType::getPrimitiveType(witnessType, upcastCategory);
+        SILValue upcast =
+            B.createUpcast(loc, selfOrigParam.getValue(), upcastTy);
         selfOrigParam = ManagedValue(upcast, selfOrigParam.getCleanup());
       }
     } else {

@@ -4,15 +4,15 @@ class C {
   var member: Int = 0
 
   // Methods have method calling convention.
-  // CHECK-LABEL: sil hidden  @{{.*}}C3foo{{.*}} : $@cc(method) @thin (Int, @owned C) -> ()
+  // CHECK-LABEL: sil hidden @_TFC5types1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, @guaranteed C) -> () {
   func foo(#x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
 
-    // CHECK: strong_retain %1 : $C
+    // CHECK-NOT: strong_retain
     // CHECK: [[FN:%[0-9]+]] = class_method %1 : $C, #C.member!setter.1
-    // CHECK: apply [[FN]](%0, %1) : $@cc(method) @thin (Int, @owned C) -> ()
-    // CHECK: strong_release %1 : $C
+    // CHECK: apply [[FN]](%0, %1) : $@cc(method) @thin (Int, @guaranteed C) -> ()
+    // CHECK-NOT: strong_release
 
 
   }

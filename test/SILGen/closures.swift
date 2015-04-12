@@ -495,7 +495,7 @@ class SuperSub : SuperBase {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TFC8closures24UnownedSelfNestedCapture13nestedCapturefS0_FT_T_ : $@cc(method) @thin (@owned UnownedSelfNestedCapture) -> ()
+// CHECK-LABEL: sil hidden @_TFC8closures24UnownedSelfNestedCapture13nestedCapturefS0_FT_T_ : $@cc(method) @thin (@guaranteed UnownedSelfNestedCapture) -> ()
 // CHECK:         [[OUTER_SELF_CAPTURE:%.*]] = alloc_box $@sil_unowned UnownedSelfNestedCapture
 // CHECK:         [[UNOWNED_SELF:%.*]] = ref_to_unowned [[SELF_PARAM:%.*]] :
 // -- TODO: A lot of fussy r/r traffic and owned/unowned conversions here.
@@ -516,12 +516,12 @@ class SuperSub : SuperBase {
 // -- call consumes closure
 // -- strong +1, unowned +1
 // CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CLOSURE]]
-// CHECK:         apply [[INNER_CLOSURE]]()
+// CHECK:         [[CONSUMED_RESULT:%.*]] = apply [[INNER_CLOSURE]]()
+// CHECK:         strong_release [[CONSUMED_RESULT]]
 // -- releases unowned self in box
 // -- strong +1, unowned +0
 // CHECK:         strong_release [[OUTER_SELF_CAPTURE]]
 // -- strong +0, unowned +0
-// CHECK:         strong_release [[SELF_PARAM]]
 // CHECK:         return
 
 // -- outer closure

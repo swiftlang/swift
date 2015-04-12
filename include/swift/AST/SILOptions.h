@@ -90,7 +90,7 @@ public:
   bool EnableFuncSigOpts = true;
 
   /// Should we emit self as a guaranteed parameter?
-  bool EnableGuaranteedSelf = false;
+  bool EnableGuaranteedSelf = true;
 
   /// Instrument code to generate profiling information.
   bool GenerateProfile = false;

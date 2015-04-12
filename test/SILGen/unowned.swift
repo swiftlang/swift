@@ -92,13 +92,14 @@ func test_unowned_let_capture(aC : C) {
 }
 
 // CHECK-LABEL: sil shared @_TFF7unowned24test_unowned_let_captureFCS_1CT_U_FT_Si : $@thin (@owned @sil_unowned C) -> Int {
-// CHECK-NEXT: bb0(%0 : $@sil_unowned C):
-// CHECK-NEXT:   strong_retain_unowned %0 : $@sil_unowned C
-// CHECK-NEXT:   %2 = unowned_to_ref %0 : $@sil_unowned C to $C
-// CHECK-NEXT:   %3 = class_method %2 : $C, #C.f!1 : C -> () -> Int , $@cc(method) @thin (@owned C) -> Int
-// CHECK-NEXT:   %4 = apply %3(%2) : $@cc(method) @thin (@owned C) -> Int
-// CHECK-NEXT:   unowned_release %0 : $@sil_unowned C
-// CHECK-NEXT:   return %4 : $Int
+// CHECK-NEXT: bb0([[ARG:%.*]] : $@sil_unowned C):
+// CHECK-NEXT:   strong_retain_unowned [[ARG]] : $@sil_unowned C
+// CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = unowned_to_ref [[ARG]] : $@sil_unowned C to $C
+// CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f!1 : C -> () -> Int , $@cc(method) @thin (@guaranteed C) -> Int
+// CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[UNOWNED_ARG]]) : $@cc(method) @thin (@guaranteed C) -> Int
+// CHECK-NEXT:   strong_release [[UNOWNED_ARG]]
+// CHECK-NEXT:   unowned_release [[ARG]] : $@sil_unowned C
+// CHECK-NEXT:   return [[RESULT]] : $Int
 
 
 

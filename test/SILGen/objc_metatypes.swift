@@ -16,7 +16,7 @@ class A {
     // CHECK:   [[M_AS_THICK:%[0-9]+]] = objc_to_thick_metatype [[M]] : $@objc_metatype ObjCClass.Type to $@thick ObjCClass.Type
 
     // CHECK:   [[NATIVE_FOO:%[0-9]+]] = function_ref @_TFC14objc_metatypes1A3foo
-    // CHECK:   [[NATIVE_RESULT:%[0-9]+]] = apply [[NATIVE_FOO]]([[M_AS_THICK]], [[SELF]]) : $@cc(method) @thin (@thick ObjCClass.Type, @owned A) -> @thick ObjCClass.Type
+    // CHECK:   [[NATIVE_RESULT:%[0-9]+]] = apply [[NATIVE_FOO]]([[M_AS_THICK]], [[SELF]]) : $@cc(method) @thin (@thick ObjCClass.Type, @guaranteed A) -> @thick ObjCClass.Type
     // CHECK:   [[OBJC_RESULT:%[0-9]+]] = thick_to_objc_metatype [[NATIVE_RESULT]] : $@thick ObjCClass.Type to $@objc_metatype ObjCClass.Type
     // CHECK:   return [[OBJC_RESULT]] : $@objc_metatype ObjCClass.Type
     return m

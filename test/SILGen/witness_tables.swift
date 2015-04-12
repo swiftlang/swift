@@ -270,9 +270,9 @@ func <~>(x: ConformingClassToClassProtocol,
 // TABLE-NEXT:    method #ClassProtocol.staticMethod!1: @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_ZFS1_12staticMethodUS1__U_S_9AssocReqt__fMQPS1_FT1xS3__T_
 // TABLE-NEXT:    method #ClassProtocol."<~>"!1: @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_ZFS1_oi3ltgUS1__U_S_9AssocReqt__fMQPS1
 // TABLE-NEXT:  }
-// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_6methodUS1__U_S_9AssocReqt__fQPS1_FT1xVS_3Arg1yS3__T_ : $@cc(witness_method) @thin (Arg, @owned ConformingClassToClassProtocol, @owned ConformingClassToClassProtocol) -> ()
-// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_7genericUS1__U_S_9AssocReqt__fQPS1_US_13ArchetypeReqt__FT1xQ_1yS3__T_ : $@cc(witness_method) @thin <B where B : ArchetypeReqt> (@in B, @owned ConformingClassToClassProtocol, @owned ConformingClassToClassProtocol) -> ()
-// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_16assocTypesMethodUS1__U_S_9AssocReqt__fQPS1_FT1xQS3_9AssocType1yQS3_13AssocWithReqt_T_ : $@cc(witness_method) @thin (@in SomeAssoc, @in ConformingAssoc, @owned ConformingClassToClassProtocol) -> ()
+// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_6methodUS1__U_S_9AssocReqt__fQPS1_FT1xVS_3Arg1yS3__T_ : $@cc(witness_method) @thin (Arg, @owned ConformingClassToClassProtocol, @guaranteed ConformingClassToClassProtocol) -> ()
+// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_7genericUS1__U_S_9AssocReqt__fQPS1_US_13ArchetypeReqt__FT1xQ_1yS3__T_ : $@cc(witness_method) @thin <B where B : ArchetypeReqt> (@in B, @owned ConformingClassToClassProtocol, @guaranteed ConformingClassToClassProtocol) -> ()
+// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_16assocTypesMethodUS1__U_S_9AssocReqt__fQPS1_FT1xQS3_9AssocType1yQS3_13AssocWithReqt_T_ : $@cc(witness_method) @thin (@in SomeAssoc, @in ConformingAssoc, @guaranteed ConformingClassToClassProtocol) -> ()
 // SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_ZFS1_12staticMethodUS1__U_S_9AssocReqt__fMQPS1_FT1xS3__T_ : $@cc(witness_method) @thin (@owned ConformingClassToClassProtocol, @thick ConformingClassToClassProtocol.Type) -> ()
 // SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_ZFS1_oi3ltgUS1__U_S_9AssocReqt__fMQPS1{{.*}} : $@cc(witness_method) @thin (@owned ConformingClassToClassProtocol, @owned ConformingClassToClassProtocol, @thick ConformingClassToClassProtocol.Type) -> ()
 
@@ -468,7 +468,7 @@ func <~>(x: ClassInheritedConformance, y: ClassInheritedConformance) {}
 //    InheritedClassProtocol has a class bound, so its witnesses treat Self as
 //    a reference value.
 // SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_FS1_6methodUS1__U_S_9AssocReqt__fQPS1_FT1xVS_3Arg1yS3__T_ : $@cc(witness_method) @thin (Arg, @in ClassInheritedConformance, @in_guaranteed ClassInheritedConformance) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables25ClassInheritedConformanceS_22InheritedClassProtocolS_FS1_15inheritedMethodUS1__U_S_9AssocReqt__fQPS1_FT_T_ : $@cc(witness_method) @thin (@owned ClassInheritedConformance) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables25ClassInheritedConformanceS_22InheritedClassProtocolS_FS1_15inheritedMethodUS1__U_S_9AssocReqt__fQPS1_FT_T_ : $@cc(witness_method) @thin (@guaranteed ClassInheritedConformance) -> ()
 
 struct GenericAssocType<T> : AssocReqt {
   func requiredMethod() {}
