@@ -1981,12 +1981,18 @@ public:
               "upcast must convert a class metatype to a class metatype");
       require(instTy->isSuperclassOf(opInstTy, nullptr),
               "upcast must cast to a superclass or an existential metatype");
-    } else {
-      require(UI->getType().getClassOrBoundGenericClass(),
-              "upcast must convert a class instance to a class type");
-      require(UI->getType().isSuperclassOf(UI->getOperand().getType()),
-              "upcast must cast to a superclass");
+      return;
     }
+
+    require(UI->getType().getCategory() ==
+            UI->getOperand().getType().getCategory(),
+            "Upcast can only upcast in between types of the same "
+            "SILValueCategory. This prevents address types from being cast to "
+            "object types or vis-a-versa");
+    require(UI->getType().getClassOrBoundGenericClass(),
+            "upcast must convert a class instance to a class type");
+    require(UI->getType().isSuperclassOf(UI->getOperand().getType()),
+            "upcast must cast to a superclass");
   }
 
   void checkIsNonnullInst(IsNonnullInst *II) {
