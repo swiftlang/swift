@@ -135,9 +135,8 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         
         // Advance by the field's size to start the next field.
         offset = IGF.Builder.CreateAdd(offset,
-                                     prevElt.getType().getSize(IGF, prevType));
-        totalAlign = IGF.Builder.CreateOr(totalAlign,
-                                    elt.getType().getAlignmentMask(IGF, eltTy));
+                                       elt.getType().getSize(IGF, eltTy));
+        totalAlign = IGF.Builder.CreateOr(totalAlign, alignMask);
 
         break;
       }

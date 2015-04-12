@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -303,6 +303,60 @@ bb0(%x : $*SwiftClass):
 sil public_external @captured_fixed_and_dependent_params : $@thin <A> (@owned SwiftClass, @in A, Int) -> ()
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_non_fixed_layout(%C13partial_apply10SwiftClass*, %swift.opaque*, i64, %swift.type* %T)
+// -- Round the base offset for the T field up to T's alignment.
+// CHECK:         [[T_METADATA_BASE:%.*]] = bitcast %swift.type* %T to i8***
+// CHECK:         [[T_VWTABLE_ADDR:%.*]] = getelementptr {{.*}} [[T_METADATA_BASE]], [[WORD:i[0-9]+]] -1
+// CHECK:         [[T_VWTABLE:%.*]] = load {{.*}} [[T_VWTABLE_ADDR]]
+// CHECK:         [[T_FLAGS_ADDR:%.*]] = getelementptr {{.*}} [[T_VWTABLE]], i32 18
+// CHECK:         [[T_FLAGS_PTR:%.*]] = load {{.*}} [[T_FLAGS_ADDR]]
+// CHECK:         [[T_FLAGS:%.*]] = ptrtoint {{.*}} [[T_FLAGS_PTR]] to [[WORD]]
+// CHECK:         [[T_ALIGN_MASK:%.*]] = and [[WORD]] [[T_FLAGS]], 65535
+// CHECK:         [[T_ALIGN_MASK_NOT:%.*]] = xor [[WORD]] [[T_ALIGN_MASK]], -1
+// -- 32 is 64-bit offset of 'T' field, 16 for obj header + 8 for T metadata + 8 for SwiftClass field
+// CHECK-64:      [[T_UP_TO_ALIGN_1:%.*]] = add i64 32, [[T_ALIGN_MASK]]
+// -- 16 is 32-bit
+// CHECK-32:      [[T_UP_TO_ALIGN_1:%.*]] = add i32 16, [[T_ALIGN_MASK]]
+// CHECK:         [[T_OFFSET:%.*]] = and [[WORD]] [[T_UP_TO_ALIGN_1]], [[T_ALIGN_MASK_NOT]]
+
+// -- Add the size of T to start the Int field.
+// CHECK:         [[T_METADATA_BASE:%.*]] = bitcast %swift.type* %T to i8***
+// CHECK:         [[T_VWTABLE_ADDR:%.*]] = getelementptr {{.*}} [[T_METADATA_BASE]], [[WORD:i[0-9]+]] -1
+// CHECK:         [[T_VWTABLE:%.*]] = load {{.*}} [[T_VWTABLE_ADDR]]
+// CHECK:         [[T_SIZE_ADDR:%.*]] = getelementptr {{.*}} [[T_VWTABLE]], i32 17
+// CHECK:         [[T_SIZE_PTR:%.*]] = load {{.*}} [[T_SIZE_ADDR]]
+// CHECK:         [[T_SIZE:%.*]] = ptrtoint {{.*}} [[T_SIZE_PTR]] to [[WORD]]
+// CHECK:         [[T_END:%.*]] = add [[WORD]] [[T_OFFSET]], [[T_SIZE]]
+
+// -- Accumulate total alignment.
+// CHECK:         [[TOTAL_ALIGN_1:%.*]] = or [[WORD]] 7, [[T_ALIGN_MASK]]
+
+// -- Round up to alignment for the Int field.
+//    TODO: could skip this since the best-known alignment is better than
+//          fixed alignment of Int
+// CHECK-64:      [[INT_UP_TO_ALIGN_1:%.*]] = add [[WORD]] [[T_END]], 7
+// CHECK-64:      [[INT_OFFSET:%.*]] = and [[WORD]] [[INT_UP_TO_ALIGN_1]], -8
+// CHECK-32:      [[INT_UP_TO_ALIGN_1:%.*]] = add [[WORD]] [[T_END]], 3
+// CHECK-32:      [[INT_OFFSET:%.*]] = and [[WORD]] [[INT_UP_TO_ALIGN_1]], -4
+// -- Add the size of Int, and accumulate total alignment.
+// CHECK-64:      [[TOTAL_SIZE:%.*]] = add [[WORD]] [[INT_OFFSET]], 8
+// CHECK-64:      [[TOTAL_ALIGN:%.*]] = or [[WORD]] [[TOTAL_ALIGN_1]], 7
+// CHECK-32:      [[TOTAL_SIZE:%.*]] = add [[WORD]] [[INT_OFFSET]], 4
+// CHECK-32:      [[TOTAL_ALIGN:%.*]] = or [[WORD]] [[TOTAL_ALIGN_1]], 3
+
+// -- Allocate using the total size and alignment.
+// CHECK:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}}, [[WORD]] [[TOTAL_SIZE]], [[WORD]] [[TOTAL_ALIGN]])
+// CHECK:         [[BOX_DATA:%.*]] = bitcast %swift.refcounted* [[BOX]]
+// -- metadata
+// CHECK:         getelementptr inbounds {{.*}} [[BOX_DATA]], i32 0, i32 1
+// -- SwiftClass
+// CHECK:         getelementptr inbounds {{.*}} [[BOX_DATA]], i32 0, i32 2
+// -- T
+// CHECK:         [[BOX_BYTES:%.*]] = bitcast {{.*}} [[BOX_DATA]] to i8*
+// CHECK:         getelementptr inbounds {{.*}} [[BOX_BYTES]], [[WORD]] [[T_OFFSET]]
+// -- Int
+// CHECK:         [[BOX_BYTES:%.*]] = bitcast {{.*}} [[BOX_DATA]] to i8*
+// CHECK:         getelementptr inbounds {{.*}} [[BOX_BYTES]], [[WORD]] [[INT_OFFSET]]
+
 // CHECK:         insertvalue {{.*}} [[PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_]+]]
 // CHECK:       define internal void [[PARTIAL_APPLY_STUB]](%swift.refcounted*)
 sil @partial_apply_indirect_non_fixed_layout : $@thin <T> (@owned SwiftClass, @in T, Int) -> @callee_owned () -> () {
