@@ -19,6 +19,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/NameLookup.h"
@@ -369,13 +370,19 @@ private:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind, StringRef Text,
                         const DiagnosticInfo &Info) override {
-    if (Kind != DiagnosticKind::Error)
-      return;
-    if (Info.FixIts.empty())
+    if (!shouldFix(Kind, Info))
       return;
     for (const auto &Fix : Info.FixIts) {
       writeEdit(SM, Fix.getRange(), Fix.getText(), *OSPtr);
     }
+  }
+
+  bool shouldFix(DiagnosticKind Kind, const DiagnosticInfo &Info) {
+    if (Kind == DiagnosticKind::Error)
+      return true;
+    if (Info.ID == diag::conditional_pattern_bind_not_refutable.ID)
+      return true;
+    return false;
   }
 
   void writeEdit(SourceManager &SM, CharSourceRange Range, StringRef Text,
