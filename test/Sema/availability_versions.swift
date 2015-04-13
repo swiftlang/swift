@@ -1127,3 +1127,52 @@ enum EnumForFixit {
       // expected-note@-2 {{add @availability attribute to enclosing case}} {{3-3=@availability(OSX, introduced=10.10)\n  }}
       // expected-note@-3 {{add @availability attribute to enclosing enum}} {{1-1=@availability(OSX, introduced=10.10)\n}}
 }
+
+// Protocol Conformances
+
+protocol HasMethodF {
+  typealias T
+  func f(p: T) // expected-note 2{{protocol requirement here}}
+}
+
+class TriesToConformWithUnavailableFunction : HasMethodF {
+  @availability(OSX, introduced=10.9)
+  func f(p: Int) { } // expected-error {{'f' is less available than protocol requires}}
+}
+
+// We do not want potential unavailability to play a role in picking a witness for a
+// protocol requirement. Rather, the witness should be chosen, regardless of its
+// potential unavailability, and then it should be diagnosed if it is less available
+// than the protocol requires.
+class TestAvailabilityDoesNotAffectWitnessCandidacy : HasMethodF {
+  // Test that we choose the more specialized witness even though it is
+  // less available than the protocol requires and there is a less specialized
+  // witness that has suitable availability.
+
+  @availability(OSX, introduced=10.9)
+  func f(p: Int) { } // expected-error {{'f' is less available than protocol requires}}
+
+  func f<T>(p: T) { }
+}
+
+protocol HasUnavailableMethodF {
+  @availability(OSX, introduced=10.10)
+  func f(p: String)
+}
+
+class ConformsWithUnavailableFunction : HasUnavailableMethodF {
+  @availability(OSX, introduced=10.9)
+  func f(p: String) { }
+}
+
+func useUnavailableProtocolMethod(h: HasUnavailableMethodF) {
+  h.f("Foo") // expected-error {{'f' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 {{add @availability attribute to enclosing global function}}
+      // expected-note@-2 {{guard with version check}}
+}
+
+func useUnavailableProtocolMethod<H : HasUnavailableMethodF> (h: H) {
+  h.f("Foo") // expected-error {{'f' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 {{add @availability attribute to enclosing global function}}
+      // expected-note@-2 {{guard with version check}}
+}

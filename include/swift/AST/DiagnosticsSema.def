@@ -2070,6 +2070,12 @@ ERROR(availability_stored_property_no_potential, sema_avail,
       none, "stored properties cannot be marked potentially unavailable with "
       "'introduced='", ())
 
+ERROR(availability_declaration_less_available_than_protocol, sema_avail,
+      none, "%0 is less available than protocol requires", (DeclName))
+
+NOTE(availability_protocol_requirement_here, sema_avail, none,
+     "protocol requirement here", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

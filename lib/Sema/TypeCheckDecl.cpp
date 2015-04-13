@@ -4991,20 +4991,6 @@ public:
     return true;
   }
 
-  /// Returns true if the override is safe from an availability perspective
-  /// and false otherwise.
-  static bool safeOverrideForAvailability(TypeChecker &TC, ValueDecl *override,
-                                          ValueDecl *base) {
-    // API availability ranges are contravariant: make sure the version range
-    // of an overriden declaration is fully contained in the range of the
-    // overriding declaration.
-    VersionRange overrideRange = TypeChecker::availableRange(override,
-                                                             TC.Context);
-    VersionRange baseRange = TypeChecker::availableRange(base, TC.Context);
-
-    return baseRange.isContainedIn(overrideRange);
-  }
-
   /// Returns true if a  diagnostic about an accessor being less available
   /// than the accessor it overrides would be redundant because we will
   /// already emit another diagnostic.
@@ -5028,7 +5014,7 @@ public:
 
     // If we have already emitted a diagnostic about an unsafe override
     // for the property, don't complain about the accessor.
-    if (!safeOverrideForAvailability(TC, overrideASD, baseASD)) {
+    if (!TC.isAvailabilitySafeForOverride(overrideASD, baseASD)) {
       return true;
     }
 
@@ -5038,7 +5024,7 @@ public:
       FuncDecl *overrideAccessor = overrideASD->getAccessorFunction(kind);
       FuncDecl *baseAccessor = baseASD->getAccessorFunction(kind);
       if (overrideAccessor && baseAccessor &&
-          !safeOverrideForAvailability(TC, overrideAccessor, baseAccessor)) {
+          !TC.isAvailabilitySafeForOverride(overrideAccessor, baseAccessor)) {
         return true;
       }
       return false;
@@ -5063,7 +5049,7 @@ public:
   static bool diagnoseOverrideForAvailability(TypeChecker &TC,
                                               ValueDecl *override,
                                               ValueDecl *base) {
-    if (safeOverrideForAvailability(TC, override, base))
+    if (TC.isAvailabilitySafeForOverride(override, base))
       return false;
 
     // Suppress diagnostics about availability overrides for accessors
@@ -5675,6 +5661,18 @@ public:
 
 bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
   return DeclChecker::checkOverrides(TC, decl);
+}
+
+bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
+                                                ValueDecl *base) {
+  // API availability ranges are contravariant: make sure the version range
+  // of an overridden declaration is fully contained in the range of the
+  // overriding declaration.
+  VersionRange overrideRange = TypeChecker::availableRange(override,
+                                                           Context);
+  VersionRange baseRange = TypeChecker::availableRange(base, Context);
+
+  return baseRange.isContainedIn(overrideRange);
 }
 
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {

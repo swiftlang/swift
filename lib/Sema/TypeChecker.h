@@ -1277,6 +1277,9 @@ public:
   static Optional<VersionRange> annotatedAvailableRange(const Decl *D,
                                                         ASTContext &C);
 
+  /// \brief Returns true if the availability of the overridding declaration
+  /// makes it a safe override, given the availability of the base declation.
+  bool isAvailabilitySafeForOverride(ValueDecl *override, ValueDecl *base);
 
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
   ///

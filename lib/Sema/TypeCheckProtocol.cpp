@@ -1531,6 +1531,13 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
     return;
   }
 
+  if (!TC.isAvailabilitySafeForOverride(match.Witness, requirement)) {
+    TC.diagnose(match.Witness,
+                diag::availability_declaration_less_available_than_protocol,
+                match.Witness->getFullName());
+    TC.diagnose(requirement, diag::availability_protocol_requirement_here);
+  }
+
   // Record this witness in the conformance.
   ConcreteDeclRef witness;
   if (match.WitnessSubstitutions.empty())
