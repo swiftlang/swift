@@ -3803,7 +3803,7 @@ public:
       
       // For curried functions, 'throws' only applies to the innnermost
       // function.
-      auto doesThrow = i ? false : FD->throws();
+      auto doesThrow = i ? false : FD->getThrowsLoc().isValid();
       if (params) {
         funcTy = PolymorphicFunctionType::get(argTy,
                                               funcTy,

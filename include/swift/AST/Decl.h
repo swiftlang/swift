@@ -5065,11 +5065,6 @@ public:
   /// method  from its direct or indirect superclass.
   bool isOverridingDecl(const FuncDecl *method) const;
   
-  /// Returns true if the function declaration has a 'throws' annotation.
-  bool throws() const {
-    return ThrowsLoc.isValid();
-  }
-
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const AbstractFunctionDecl *D) {
     return classof(static_cast<const Decl*>(D));
