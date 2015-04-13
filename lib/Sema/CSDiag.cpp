@@ -65,7 +65,12 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     out << "noescape attribute mismatch " << getFirstType().getString()
         << " vs. " << getSecondType().getString();
     break;
-    
+
+  case FunctionThrowsMismatch:
+    out << "function throws mismatch " << getFirstType().getString() << " vs. "
+        << getSecondType().getString();
+    break;
+
   case IsNotMetatype:
     out << getFirstType().getString() << " is not a metatype";
     break;
@@ -875,6 +880,18 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::FunctionNoEscapeMismatch: {
     tc.diagnose(loc, diag::noescape_functiontype_mismatch,
                 failure.getSecondType()).highlight(range2);
+    if (!useExprLoc)
+      noteTargetOfDiagnostic(cs, failure, locator);
+    break;
+  }
+
+  case Failure::FunctionThrowsMismatch: {
+    tc.diagnose(loc, diag::throws_functiontype_mismatch,
+                failure.getFirstType()->getAs<AnyFunctionType>()->throws(),
+                failure.getFirstType(),
+                failure.getSecondType()->getAs<AnyFunctionType>()->throws(),
+                failure.getSecondType())
+      .highlight(range2);
     if (!useExprLoc)
       noteTargetOfDiagnostic(cs, failure, locator);
     break;

@@ -929,9 +929,16 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
   
-  // Check for trivial subtype matching on function types that throw.
-  if (func1->throws() && !func2->throws()) {
-    if (kind >= TypeMatchKind::Subtype) {
+  // A non-throwing function can be a subtype of a throwing function.
+  if (func1->throws() != func2->throws()) {
+    // Cannot drop 'throws'.
+    if (func1->throws() ||
+        (func2->throws() && kind < TypeMatchKind::Subtype)) {
+      if (shouldRecordFailures()) {
+        recordFailure(getConstraintLocator(locator),
+                      Failure::FunctionThrowsMismatch, func1, func2);
+      }
+
       return SolutionKind::Error;
     }
   }
