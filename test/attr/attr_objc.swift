@@ -1754,3 +1754,21 @@ extension Protocol_ObjC1 {
   final var property: Int { return 5 }
 }
 
+//===---
+//===--- Error handling
+//===---
+class ClassThrows1 {
+  // CHECK: @objc func methodReturnsVoid() throws
+  @objc func methodReturnsVoid() throws { }
+
+  // CHECK: @objc func methodReturnsObjCClass() throws -> Class_ObjC1
+  @objc func methodReturnsObjCClass() throws -> Class_ObjC1 {
+    return Class_ObjC1()
+  }
+
+  // CHECK: @objc func methodReturnsBridged() throws -> String
+  @objc func methodReturnsBridged() throws -> String { return String() }
+
+  // CHECK: @objc func methodReturnsArray() throws -> [String]
+  @objc func methodReturnsArray() throws -> [String] { return [String]() }
+}

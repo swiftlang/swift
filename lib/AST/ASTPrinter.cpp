@@ -1466,6 +1466,9 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                       /*Curried=*/CurrPattern > 0);
     Printer << ")";
   }
+
+  if (AFD->isBodyThrowing())
+    Printer << " throws";
 }
 
 bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
