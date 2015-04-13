@@ -11,11 +11,11 @@ import Swift
 // CHECK: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
 
-// CHECK: sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@thin () -> ()
-sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@thin () -> ()
+// CHECK: sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
+sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil private @globalinit_func0 : $@thin () -> () {
-sil private @globalinit_func0 : $@thin () -> () {
+// CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {
+sil private @globalinit_func0 : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Int32
   %1 = integer_literal $Builtin.Int32, 2
@@ -25,16 +25,16 @@ bb0:
   return %4 : $()
 }
 
-// CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
-sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
+// CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
+sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Int32
   %1 = address_to_pointer %0 : $*Int32 to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
-sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
+// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
+sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Int32
   %1 = load %0 : $*Int32

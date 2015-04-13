@@ -207,10 +207,10 @@ protocol Initializable {
 
 // CHECK-LABEL: sil hidden @_TF9protocols27use_initializable_archetype
 func use_initializable_archetype<T: Initializable>(t: T, i: Int) {
-  // CHECK:   [[T_INIT:%[0-9]+]] = witness_method $T, #Initializable.init!allocator.1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+  // CHECK:   [[T_INIT:%[0-9]+]] = witness_method $T, #Initializable.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
   // CHECK:   [[T_META:%[0-9]+]] = metatype $@thick T.Type
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
-  // CHECK:   [[T_RESULT_ADDR:%[0-9]+]] = apply [[T_INIT]]<T>([[T_RESULT]]#1, %1, [[T_META]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+  // CHECK:   [[T_RESULT_ADDR:%[0-9]+]] = apply [[T_INIT]]<T>([[T_RESULT]]#1, %1, [[T_META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
   // CHECK:   destroy_addr [[T_RESULT]]#1 : $*T
   // CHECK:   dealloc_stack [[T_RESULT]]#0 : $*@local_storage T
   // CHECK:   destroy_addr [[VAR_0:%[0-9]+]] : $*T
@@ -225,8 +225,8 @@ func use_initializable_existential(im: Initializable.Type, i: Int) {
 // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[IM]] : $@thick Initializable.Type to $@thick @opened([[N:".*"]]) Initializable.Type
 // CHECK:   [[TEMP_VALUE:%[0-9]+]] = alloc_stack $Initializable
 // CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential_addr [[TEMP_VALUE]]#1 : $*Initializable, $@opened([[N]]) Initializable
-// CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened([[N]]) Initializable, #Initializable.init!allocator.1, [[ARCHETYPE_META]]{{.*}} : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
-// CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[TEMP_ADDR]], [[I]], [[ARCHETYPE_META]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+// CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened([[N]]) Initializable, #Initializable.init!allocator.1, [[ARCHETYPE_META]]{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
+// CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[TEMP_ADDR]], [[I]], [[ARCHETYPE_META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
 // CHECK:   destroy_addr [[TEMP_VALUE]]#1 : $*Initializable
 // CHECK:   dealloc_stack [[TEMP_VALUE]]#0 : $*@local_storage Initializable
   im(int: i)
@@ -248,12 +248,12 @@ class ClassWithGetter : PropertyWithGetter {
 
 // Make sure we are generating a protocol witness that calls the class method on
 // ClassWithGetter.
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9protocols15ClassWithGetterS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed ClassWithGetter) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9protocols15ClassWithGetterS_18PropertyWithGetterS_FS1_g1aSi : $@convention(witness_method) (@in_guaranteed ClassWithGetter) -> Int {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetter):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
-// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : ClassWithGetter -> () -> Int , $@cc(method) @thin (@guaranteed ClassWithGetter) -> Int
+// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : ClassWithGetter -> () -> Int , $@convention(method) (@guaranteed ClassWithGetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
 // CHECK-NEXT: strong_release [[CCOPY_LOADED]]
 // CHECK-NEXT: dealloc_stack [[CCOPY]]#0
@@ -274,12 +274,12 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9protocols21ClassWithGetterSetterS_24PropertyWithGetterSetterS_FS1_g1bSi : $@cc(witness_method) @thin (@in_guaranteed ClassWithGetterSetter) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9protocols21ClassWithGetterSetterS_24PropertyWithGetterSetterS_FS1_g1bSi : $@convention(witness_method) (@in_guaranteed ClassWithGetterSetter) -> Int {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetterSetter):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetterSetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
-// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : ClassWithGetterSetter -> () -> Int , $@cc(method) @thin (@guaranteed ClassWithGetterSetter) -> Int
+// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : ClassWithGetterSetter -> () -> Int , $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
 // CHECK-NEXT: strong_release [[CCOPY_LOADED]]
 // CHECK-NEXT: dealloc_stack [[CCOPY]]#0
@@ -298,7 +298,7 @@ class ClassWithStoredProperty : PropertyWithGetter {
   // CHECK-NEXT: bb0([[ARG:%.*]] : $ClassWithStoredProperty):
   // CHECK-NEXT: debug_value [[ARG]]
   // CHECK-NOT: strong_retain
-  // CHECK-NEXT: [[FUN:%.*]] = class_method [[ARG]] : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter.1 : ClassWithStoredProperty -> () -> Int , $@cc(method) @thin (@guaranteed ClassWithStoredProperty) -> Int
+  // CHECK-NEXT: [[FUN:%.*]] = class_method [[ARG]] : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter.1 : ClassWithStoredProperty -> () -> Int , $@convention(method) (@guaranteed ClassWithStoredProperty) -> Int
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[FUN]]([[ARG]])
   // CHECK-NOT: strong_release
   // CHECK-NEXT: return [[RESULT]] : $Int
@@ -328,13 +328,13 @@ struct StructWithStoredProperty : PropertyWithGetter {
 // thunking code being too dumb but it is harmless to program
 // correctness.
 //
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9protocols24StructWithStoredPropertyS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed StructWithStoredProperty) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9protocols24StructWithStoredPropertyS_18PropertyWithGetterS_FS1_g1aSi : $@convention(witness_method) (@in_guaranteed StructWithStoredProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredProperty):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredProperty
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[FUN:%.*]] = function_ref @_TFV9protocols24StructWithStoredPropertyg1aSi : $@cc(method) @thin (StructWithStoredProperty) -> Int
+// CHECK-NEXT: [[FUN:%.*]] = function_ref @_TFV9protocols24StructWithStoredPropertyg1aSi : $@convention(method) (StructWithStoredProperty) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
 // CHECK-NEXT: dealloc_stack [[CCOPY]]#0
 // CHECK-NEXT: return
@@ -358,13 +358,13 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
   // CHECK-NEXT: return %2 : $Int
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9protocols29StructWithStoredClassPropertyS_18PropertyWithGetterS_FS1_g1aSi : $@cc(witness_method) @thin (@in_guaranteed StructWithStoredClassProperty) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9protocols29StructWithStoredClassPropertyS_18PropertyWithGetterS_FS1_g1aSi : $@convention(witness_method) (@in_guaranteed StructWithStoredClassProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredClassProperty):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredClassProperty
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]#1
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [[CCOPY]]#1
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[FUN:%.*]] = function_ref @_TFV9protocols29StructWithStoredClassPropertyg1aSi : $@cc(method) @thin (@guaranteed StructWithStoredClassProperty) -> Int
+// CHECK-NEXT: [[FUN:%.*]] = function_ref @_TFV9protocols29StructWithStoredClassPropertyg1aSi : $@convention(method) (@guaranteed StructWithStoredClassProperty) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
 // CHECK-NEXT: release_value [[CCOPY_LOADED]]
 // CHECK-NEXT: dealloc_stack [[CCOPY]]#0

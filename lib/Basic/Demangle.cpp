@@ -1451,7 +1451,7 @@ private:
       return NodeFactory::create(Node::Kind::MetatypeRepresentation, "@thick");
 
     if (Mangled.nextIf('o'))
-      return NodeFactory::create(Node::Kind::MetatypeRepresentation, "@objc");
+      return NodeFactory::create(Node::Kind::MetatypeRepresentation, "@objc_metatype");
 
     unreachable("Unhandled metatype representation");
   }
@@ -1941,15 +1941,15 @@ private:
 
     if (Mangled.nextIf('C')) {
       if (Mangled.nextIf('b'))
-        addImplFunctionAttribute(type, "@objc_block");
+        addImplFunctionAttribute(type, "@convention(block)");
       else if (Mangled.nextIf('c'))
-        addImplFunctionAttribute(type, "@cc(cdecl)");
+        addImplFunctionAttribute(type, "@convention(c)");
       else if (Mangled.nextIf('m'))
-        addImplFunctionAttribute(type, "@cc(method)");
+        addImplFunctionAttribute(type, "@convention(method)");
       else if (Mangled.nextIf('O'))
-        addImplFunctionAttribute(type, "@cc(objc_method)");
+        addImplFunctionAttribute(type, "@convention(objc_method)");
       else if (Mangled.nextIf('w'))
-        addImplFunctionAttribute(type, "@cc(witness_method)");
+        addImplFunctionAttribute(type, "@convention(witness_method)");
       else
         return nullptr;
     }
@@ -2024,7 +2024,7 @@ private:
   bool demangleImplCalleeConvention(NodePointer type) {
     StringRef attr;
     if (Mangled.nextIf('t')) {
-      attr = "@thin";
+      attr = "@convention(thin)";
     } else {
       attr = demangleImplConvention(ImplConventionContext::Callee);
     }
@@ -2677,7 +2677,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     printChildren(pointer);
     return;
   case Node::Kind::ThinFunctionType:
-    Printer << "@thin ";
+    Printer << "@convention(thin) ";
     printChildren(pointer);
     return;
   case Node::Kind::FunctionType:
@@ -3010,8 +3010,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "Self";
     return;
   case Node::Kind::CFunctionPointer: {
-    // TODO: spelling for C function pointer types
-    Printer << "@__c_function_pointer ";
+    Printer << "@convention(c) ";
     NodePointer tuple = pointer->getChild(0);
     NodePointer rettype = pointer->getChild(1);
     print(tuple);
@@ -3019,7 +3018,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   }
   case Node::Kind::ObjCBlock: {
-    Printer << "@objc_block ";
+    Printer << "@convention(block) ";
     NodePointer tuple = pointer->getChild(0);
     NodePointer rettype = pointer->getChild(1);
     print(tuple);

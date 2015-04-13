@@ -78,19 +78,19 @@ func staticMetatypeToGenericMetatype(x: S.Type) {
 }
 // CHECK-LABEL: sil hidden @_TF20metatype_abstraction24dynamicMetatypeToGeneric
 // CHECK:         [[MAT:%.*]] = alloc_stack $@thick C.Type
-// CHECK:         apply {{%.*}}<C.Type>([[MAT]]#1) : $@thin <τ_0_0> (@in τ_0_0) -> ()
+// CHECK:         apply {{%.*}}<C.Type>([[MAT]]#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 func dynamicMetatypeToGeneric(var x: C.Type) {
   takeGeneric(x)
 }
 // CHECK-LABEL: sil hidden @_TF20metatype_abstraction32dynamicMetatypeToGenericMetatype
 // CHECK:         [[META:%.*]] = load %1#1 : $*@thick C.Type
-// CHECK:         apply {{%.*}}<C>([[META]]) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> ()
+// CHECK:         apply {{%.*}}<C>([[META]]) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
 func dynamicMetatypeToGenericMetatype(var x: C.Type) {
   takeGenericMetatype(x)
 }
 // CHECK-LABEL: sil hidden @_TF20metatype_abstraction24genericMetatypeToGeneric
 // CHECK:         [[MAT:%.*]] = alloc_stack $@thick U.Type
-// CHECK:         apply {{%.*}}<U.Type>([[MAT]]#1) : $@thin <τ_0_0> (@in τ_0_0) -> ()
+// CHECK:         apply {{%.*}}<U.Type>([[MAT]]#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 func genericMetatypeToGeneric<U>(var x: U.Type) {
   takeGeneric(x)
 }

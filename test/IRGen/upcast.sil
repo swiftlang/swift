@@ -12,7 +12,7 @@ sil_vtable C {}
 class D : C {}
 sil_vtable D {}
 
-sil @upcast_test : $@thin (@inout D) -> () {
+sil @upcast_test : $@convention(thin) (@inout D) -> () {
 bb0(%0 : $*D):
   %1 = upcast %0 : $*D to $*C
   %33 = tuple()

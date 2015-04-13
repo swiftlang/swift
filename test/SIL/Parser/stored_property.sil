@@ -9,7 +9,7 @@ class Rect {
 }
 
 // CHECK_LABEL: sil @_TFC4rect4Rectg4orgxSd
-sil @_TFC4rect4Rectg4orgxSd : $@cc(method) @thin (@owned Rect) -> Double {
+sil @_TFC4rect4Rectg4orgxSd : $@convention(method) (@owned Rect) -> Double {
 bb0(%0 : $Rect):
   debug_value %0 : $Rect
   // CHECK: ref_element_addr

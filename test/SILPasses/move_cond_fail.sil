@@ -7,7 +7,7 @@ sil_global @startTime : $Double
 sil_global @sum1 : $Int32
 
 // CHECK-LABEl: @sink_cond_fail
-sil @sink_cond_fail : $@thin () -> () {
+sil @sink_cond_fail : $@convention(thin) () -> () {
 // CHECK: bb0
 bb0:
   %0 = global_addr @startTime : $*Double
@@ -15,8 +15,8 @@ bb0:
   %2 = integer_literal $Builtin.Int32, 0
   %3 = struct $Int32 (%2 : $Builtin.Int32)
   store %3 to %1 : $*Int32
-  %5 = function_ref @callee : $@cc(cdecl) @thin () -> Double
-  %6 = apply %5() : $@cc(cdecl) @thin () -> Double
+  %5 = function_ref @callee : $@convention(c) () -> Double
+  %6 = apply %5() : $@convention(c) () -> Double
   store %6 to %0 : $*Double
   %8 = integer_literal $Builtin.Int32, 1000000000
   // CHECK: integer_literal $Builtin.Int32, 1
@@ -60,4 +60,4 @@ bb2(%13 : $Builtin.Int32):
   cond_br %29, bb1, bb2(%18 : $Builtin.Int32)
 }
 
-sil @callee : $@cc(cdecl) @thin () -> Double
+sil @callee : $@convention(c) () -> Double

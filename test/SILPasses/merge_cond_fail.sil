@@ -19,7 +19,7 @@ import Swift
 // CHECK: cond_fail [[OVERFLOW]]
 // CHECK: return [[RES]]
 
-sil @merge_cond_fail : $@thin (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1, @inout Builtin.Int64) -> Builtin.Int64 {
+sil @merge_cond_fail : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1, @inout Builtin.Int64) -> Builtin.Int64 {
 bb0 (%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1, %3: $Builtin.Int1, %4 : $*Builtin.Int64):
   cond_fail %0 : $Builtin.Int1
   cond_fail %1 : $Builtin.Int1

@@ -18,158 +18,158 @@ sil_stage canonical
 // CHECK: define available_externally hidden void @hidden_external_resilient_function_def_test() {
 // CHECK: define linkonce_odr hidden void @shared_external_resilient_function_def_test() {
 
-sil public [fragile] @public_fragile_function_test : $@thin () -> () {
+sil public [fragile] @public_fragile_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden [fragile] @hidden_fragile_function_test : $@thin () -> () {
+sil hidden [fragile] @hidden_fragile_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared [fragile] @shared_fragile_function_test : $@thin () -> () {
+sil shared [fragile] @shared_fragile_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil private [fragile] @private_fragile_function_test : $@thin () -> () {
+sil private [fragile] @private_fragile_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil public_external [fragile] @public_external_fragile_function_def_test : $@thin () -> () {
+sil public_external [fragile] @public_external_fragile_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden_external [fragile] @hidden_external_fragile_function_def_test : $@thin () -> () {
+sil hidden_external [fragile] @hidden_external_fragile_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared_external [fragile] @shared_external_fragile_function_def_test : $@thin () -> () {
+sil shared_external [fragile] @shared_external_fragile_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil private_external [fragile] @private_external_fragile_function_def_test : $@thin () -> () {
+sil private_external [fragile] @private_external_fragile_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil public_external [fragile] @public_external_fragile_function_decl_test : $@thin () -> ()
+sil public_external [fragile] @public_external_fragile_function_decl_test : $@convention(thin) () -> ()
 
-sil hidden_external [fragile] @hidden_external_fragile_function_decl_test : $@thin () -> ()
+sil hidden_external [fragile] @hidden_external_fragile_function_decl_test : $@convention(thin) () -> ()
 
 // 'shared' should always be a definition.
-// sil shared_external [fragile] @shared_external_fragile_function_decl_test : $@thin () -> ()
+// sil shared_external [fragile] @shared_external_fragile_function_decl_test : $@convention(thin) () -> ()
 
 // 'private' should always be a definition.
-// sil private_external [fragile] @private_external_fragile_function_decl_test : $@thin () -> ()
+// sil private_external [fragile] @private_external_fragile_function_decl_test : $@convention(thin) () -> ()
 
-sil public @public_resilient_function_test : $@thin () -> () {
+sil public @public_resilient_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden @hidden_resilient_function_test : $@thin () -> () {
+sil hidden @hidden_resilient_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared @shared_resilient_function_test : $@thin () -> () {
+sil shared @shared_resilient_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil private @private_resilient_function_test : $@thin () -> () {
+sil private @private_resilient_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil public_external @public_external_resilient_function_def_test : $@thin () -> () {
+sil public_external @public_external_resilient_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden_external @hidden_external_resilient_function_def_test : $@thin () -> () {
+sil hidden_external @hidden_external_resilient_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared_external @shared_external_resilient_function_def_test : $@thin () -> () {
+sil shared_external @shared_external_resilient_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
 // 'private_external' should always be fragile.
-// sil private_external @private_external_resilient_function_def_test : $@thin () -> () {
+// sil private_external @private_external_resilient_function_def_test : $@convention(thin) () -> () {
 //   %0 = tuple()
 //   return %0 : $()
 // }
 
-sil public_external @public_external_resilient_function_decl_test : $@thin () -> ()
+sil public_external @public_external_resilient_function_decl_test : $@convention(thin) () -> ()
 
-sil hidden_external @hidden_external_resilient_function_decl_test : $@thin () -> ()
+sil hidden_external @hidden_external_resilient_function_decl_test : $@convention(thin) () -> ()
 
 // 'shared' should always be a definition.
-// sil shared_external @shared_external_resilient_function_decl_test : $@thin () -> ()
+// sil shared_external @shared_external_resilient_function_decl_test : $@convention(thin) () -> ()
 
 // 'private' should always be a definition.
-// sil private_external @private_external_resilient_function_decl_test : $@thin () -> ()
+// sil private_external @private_external_resilient_function_decl_test : $@convention(thin) () -> ()
 
 
-sil public @use_all_symbols : $@thin () -> () {
-  %0 = function_ref @public_fragile_function_test : $@thin () -> ()
-  %1 = function_ref @hidden_fragile_function_test : $@thin () -> ()
-  %2 = function_ref @shared_fragile_function_test : $@thin () -> ()
-  %3 = function_ref @private_fragile_function_test : $@thin () -> ()
-  %4 = function_ref @public_external_fragile_function_def_test : $@thin () -> ()
-  %5 = function_ref @hidden_external_fragile_function_def_test : $@thin () -> ()
-  %6 = function_ref @shared_external_fragile_function_def_test : $@thin () -> ()
-  %7 = function_ref @private_external_fragile_function_def_test : $@thin () -> ()
-  %8 = function_ref @public_external_fragile_function_decl_test : $@thin () -> ()
-  %9 = function_ref @hidden_external_fragile_function_decl_test : $@thin () -> ()
-  // %10 = function_ref @shared_external_fragile_function_decl_test : $@thin () -> ()
-  // %11 = function_ref @private_external_fragile_function_decl_test : $@thin () -> ()
-  %12 = function_ref @public_resilient_function_test : $@thin () -> ()
-  %13 = function_ref @hidden_resilient_function_test : $@thin () -> ()
-  %14 = function_ref @shared_resilient_function_test : $@thin () -> ()
-  %15 = function_ref @private_resilient_function_test : $@thin () -> ()
-  %16 = function_ref @public_external_resilient_function_def_test : $@thin () -> ()
-  %17 = function_ref @hidden_external_resilient_function_def_test : $@thin () -> ()
-  %18 = function_ref @shared_external_resilient_function_def_test : $@thin () -> ()
-  // %19 = function_ref @private_external_resilient_function_def_test : $@thin () -> ()
-  %20 = function_ref @public_external_resilient_function_decl_test : $@thin () -> ()
-  %21 = function_ref @hidden_external_resilient_function_decl_test : $@thin () -> ()
-  // %22 = function_ref @shared_external_resilient_function_decl_test : $@thin () -> ()
-  // %23 = function_ref @private_external_resilient_function_decl_test : $@thin () -> ()
+sil public @use_all_symbols : $@convention(thin) () -> () {
+  %0 = function_ref @public_fragile_function_test : $@convention(thin) () -> ()
+  %1 = function_ref @hidden_fragile_function_test : $@convention(thin) () -> ()
+  %2 = function_ref @shared_fragile_function_test : $@convention(thin) () -> ()
+  %3 = function_ref @private_fragile_function_test : $@convention(thin) () -> ()
+  %4 = function_ref @public_external_fragile_function_def_test : $@convention(thin) () -> ()
+  %5 = function_ref @hidden_external_fragile_function_def_test : $@convention(thin) () -> ()
+  %6 = function_ref @shared_external_fragile_function_def_test : $@convention(thin) () -> ()
+  %7 = function_ref @private_external_fragile_function_def_test : $@convention(thin) () -> ()
+  %8 = function_ref @public_external_fragile_function_decl_test : $@convention(thin) () -> ()
+  %9 = function_ref @hidden_external_fragile_function_decl_test : $@convention(thin) () -> ()
+  // %10 = function_ref @shared_external_fragile_function_decl_test : $@convention(thin) () -> ()
+  // %11 = function_ref @private_external_fragile_function_decl_test : $@convention(thin) () -> ()
+  %12 = function_ref @public_resilient_function_test : $@convention(thin) () -> ()
+  %13 = function_ref @hidden_resilient_function_test : $@convention(thin) () -> ()
+  %14 = function_ref @shared_resilient_function_test : $@convention(thin) () -> ()
+  %15 = function_ref @private_resilient_function_test : $@convention(thin) () -> ()
+  %16 = function_ref @public_external_resilient_function_def_test : $@convention(thin) () -> ()
+  %17 = function_ref @hidden_external_resilient_function_def_test : $@convention(thin) () -> ()
+  %18 = function_ref @shared_external_resilient_function_def_test : $@convention(thin) () -> ()
+  // %19 = function_ref @private_external_resilient_function_def_test : $@convention(thin) () -> ()
+  %20 = function_ref @public_external_resilient_function_decl_test : $@convention(thin) () -> ()
+  %21 = function_ref @hidden_external_resilient_function_decl_test : $@convention(thin) () -> ()
+  // %22 = function_ref @shared_external_resilient_function_decl_test : $@convention(thin) () -> ()
+  // %23 = function_ref @private_external_resilient_function_decl_test : $@convention(thin) () -> ()
 
-  apply %0() : $@thin () -> ()
-  apply %1() : $@thin () -> ()
-  apply %2() : $@thin () -> ()
-  apply %3() : $@thin () -> ()
-  apply %4() : $@thin () -> ()
-  apply %5() : $@thin () -> ()
-  apply %6() : $@thin () -> ()
-  apply %7() : $@thin () -> ()
-  apply %8() : $@thin () -> ()
-  apply %9() : $@thin () -> ()
-  // apply %10() : $@thin () -> ()
-  // apply %11() : $@thin () -> ()
-  apply %12() : $@thin () -> ()
-  apply %13() : $@thin () -> ()
-  apply %14() : $@thin () -> ()
-  apply %15() : $@thin () -> ()
-  apply %16() : $@thin () -> ()
-  apply %17() : $@thin () -> ()
-  apply %18() : $@thin () -> ()
-  // apply %19() : $@thin () -> ()
-  apply %20() : $@thin () -> ()
-  apply %21() : $@thin () -> ()
-  // apply %22() : $@thin () -> ()
-  // apply %23() : $@thin () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  apply %8() : $@convention(thin) () -> ()
+  apply %9() : $@convention(thin) () -> ()
+  // apply %10() : $@convention(thin) () -> ()
+  // apply %11() : $@convention(thin) () -> ()
+  apply %12() : $@convention(thin) () -> ()
+  apply %13() : $@convention(thin) () -> ()
+  apply %14() : $@convention(thin) () -> ()
+  apply %15() : $@convention(thin) () -> ()
+  apply %16() : $@convention(thin) () -> ()
+  apply %17() : $@convention(thin) () -> ()
+  apply %18() : $@convention(thin) () -> ()
+  // apply %19() : $@convention(thin) () -> ()
+  apply %20() : $@convention(thin) () -> ()
+  apply %21() : $@convention(thin) () -> ()
+  // apply %22() : $@convention(thin) () -> ()
+  // apply %23() : $@convention(thin) () -> ()
   %24 = tuple()
   return %24 : $()
 }

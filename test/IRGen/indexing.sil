@@ -14,7 +14,7 @@ struct DifferentSizeStride { var x: Builtin.Int32, y: Builtin.Int16 }
 
 // CHECK: define void @same_size_stride(%V8indexing14SameSizeStride*, i64) {
 // CHECK:   getelementptr inbounds %V8indexing14SameSizeStride, %V8indexing14SameSizeStride* %0, i64 %1
-sil @same_size_stride : $@thin (@in SameSizeStride, Builtin.Word) -> () {
+sil @same_size_stride : $@convention(thin) (@in SameSizeStride, Builtin.Word) -> () {
 entry(%p : $*SameSizeStride, %i: $Builtin.Word):
   %q = index_addr %p : $*SameSizeStride, %i : $Builtin.Word
   return undef : $()
@@ -25,7 +25,7 @@ entry(%p : $*SameSizeStride, %i: $Builtin.Word):
 // CHECK-NEXT:   %3 = mul nsw i64 %1, 8
 // CHECK-NEXT:   %4 = getelementptr inbounds i8, i8* %2, i64 %3
 // CHECK-NEXT:   %5 = bitcast i8* %4 to %V8indexing19DifferentSizeStride*
-sil @different_size_stride : $@thin (@in DifferentSizeStride, Builtin.Word) -> () {
+sil @different_size_stride : $@convention(thin) (@in DifferentSizeStride, Builtin.Word) -> () {
 entry(%p : $*DifferentSizeStride, %i: $Builtin.Word):
   %q = index_addr %p : $*DifferentSizeStride, %i : $Builtin.Word
   return undef : $()
@@ -41,7 +41,7 @@ entry(%p : $*DifferentSizeStride, %i: $Builtin.Word):
 // CHECK-NEXT:   %8 = mul nsw i64 %1, %stride
 // CHECK-NEXT:   %9 = getelementptr inbounds i8, i8* %2, i64 %8
 
-sil @dynamic_size : $@thin <T> (@in T, Builtin.Word) -> () {
+sil @dynamic_size : $@convention(thin) <T> (@in T, Builtin.Word) -> () {
 entry(%p : $*T, %i: $Builtin.Word):
   %q = index_addr %p : $*T, %i : $Builtin.Word
   return undef : $()

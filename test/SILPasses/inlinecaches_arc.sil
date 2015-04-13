@@ -9,8 +9,8 @@ class Foo {
   func ping() -> Int
 }
 
-sil @_TFC4main3Foo4pingfS0_FT_Si : $@cc(method) @thin (@guaranteed Foo) -> Int
-sil @_TFC4main3FoocfMS0_FT_S0_ : $@cc(method) @thin (@owned Foo) -> @owned Foo
+sil @_TFC4main3Foo4pingfS0_FT_Si : $@convention(method) (@guaranteed Foo) -> Int
+sil @_TFC4main3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo
 
 // CHECK-LABEL: _TF4main7my_mainFCS_3FooSi
 // CHECK: bb0
@@ -29,11 +29,11 @@ sil @_TFC4main3FoocfMS0_FT_S0_ : $@cc(method) @thin (@owned Foo) -> @owned Foo
 
 // CHECK: bb3
 // CHECK-NOT: strong_release
-sil @_TF4main7my_mainFCS_3FooSi : $@thin (@owned Foo) -> Int {
+sil @_TF4main7my_mainFCS_3FooSi : $@convention(thin) (@owned Foo) -> Int {
 bb0(%0 : $Foo):
   debug_value %0 : $Foo  // let x                 // id: %1
-  %3 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> Int , $@cc(method) @thin (@guaranteed Foo) -> Int // user: %4
-  %4 = apply %3(%0) : $@cc(method) @thin (@guaranteed Foo) -> Int // user: %6
+  %3 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> Int , $@convention(method) (@guaranteed Foo) -> Int // user: %4
+  %4 = apply %3(%0) : $@convention(method) (@guaranteed Foo) -> Int // user: %6
   strong_release %0 : $Foo                        // id: %5
   return %4 : $Int                                // id: %6
 }

@@ -8,7 +8,7 @@ import Swift
 
 // CHECK-LABEL: define i64 @bitcast_different_size1
 
-sil @bitcast_different_size1 : $@thin (Int32) -> Int64 {
+sil @bitcast_different_size1 : $@convention(thin) (Int32) -> Int64 {
 entry(%i : $Int32):
   // CHECK: ret {{.*}}undef
   // CHECK: call {{.*}}trap
@@ -18,7 +18,7 @@ entry(%i : $Int32):
 
 // CHECK-LABEL: define i64 @bitcast_different_size2
 
-sil @bitcast_different_size2 : $@thin (Int32) -> Int64 {
+sil @bitcast_different_size2 : $@convention(thin) (Int32) -> Int64 {
 entry(%i : $Int32):
   // CHECK: ret {{.*}}undef
   // CHECK: call {{.*}}trap

@@ -3,10 +3,10 @@
 // RUN: %target-swift-frontend -disable-func-sig-opts -sil-inline-threshold 0 %S/Inputs/shared_function_serialization_input.swift -o %t/Swift.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-link-name swiftCore -module-name Swift -sil-serialize-all -O
 // RUN: %target-sil-opt -I %t -linker -verify %s -o - | FileCheck %s
 
-// CHECK: sil private @top_level_code : $@thin () -> () {
-// CHECK: sil public_external [fragile] @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X {
-// CHECK: sil public_external [fragile] @_TFSs17the_thing_it_doesFT1xVSs1X_T_ : $@thin (X) -> () {
-// CHECK: sil shared_external [fragile] @_TTSg5VSs1X___TFSs9the_thingU__FT1tQ__T_ : $@thin (@in X) -> () {
+// CHECK: sil private @top_level_code : $@convention(thin) () -> () {
+// CHECK: sil public_external [fragile] @_TFVSs1XCfMS_FT_S_ : $@convention(thin) (@thin X.Type) -> X {
+// CHECK: sil public_external [fragile] @_TFSs17the_thing_it_doesFT1xVSs1X_T_ : $@convention(thin) (X) -> () {
+// CHECK: sil shared_external [fragile] @_TTSg5VSs1X___TFSs9the_thingU__FT1tQ__T_ : $@convention(thin) (@in X) -> () {
 
 sil_stage canonical
 
@@ -16,26 +16,26 @@ import Swift
 sil_global @x : $X
 
 // top_level_code
-sil private @top_level_code : $@thin () -> () {
+sil private @top_level_code : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @x : $*X                       // users: %4, %6
   // function_ref Swift.X.init (Swift.X.Type)() -> Swift.X
-  %1 = function_ref @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X // user: %3
+  %1 = function_ref @_TFVSs1XCfMS_FT_S_ : $@convention(thin) (@thin X.Type) -> X // user: %3
   %2 = metatype $@thin X.Type                     // user: %3
-  %3 = apply %1(%2) : $@thin (@thin X.Type) -> X  // user: %4
+  %3 = apply %1(%2) : $@convention(thin) (@thin X.Type) -> X  // user: %4
   store %3 to %0 : $*X                            // id: %4
   // function_ref Swift.the_thing_it_does (x : Swift.X) -> ()
-  %5 = function_ref @_TFSs17the_thing_it_doesFT1xVSs1X_T_ : $@thin (X) -> () // user: %7
+  %5 = function_ref @_TFSs17the_thing_it_doesFT1xVSs1X_T_ : $@convention(thin) (X) -> () // user: %7
   %6 = load %0 : $*X                              // user: %7
-  %7 = apply %5(%6) : $@thin (X) -> ()
+  %7 = apply %5(%6) : $@convention(thin) (X) -> ()
   %8 = tuple ()                                   // user: %9
   return %8 : $()                                 // id: %9
 }
 
 // Swift.X.init (Swift.X.Type)() -> Swift.X
-sil @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X
+sil @_TFVSs1XCfMS_FT_S_ : $@convention(thin) (@thin X.Type) -> X
 
 // Swift.the_thing_it_does (x : Swift.X) -> ()
-sil @_TFSs17the_thing_it_doesFT1xVSs1X_T_ : $@thin (X) -> ()
+sil @_TFSs17the_thing_it_doesFT1xVSs1X_T_ : $@convention(thin) (X) -> ()
 
 

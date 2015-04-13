@@ -13,7 +13,7 @@ struct C {
 struct D {
   var (i, j) : (Int, Double) = (2, 3.5)
 }
-// CHECK-LABEL: sil hidden @_TFV19default_constructor1DCfMS0_FT_S0_ : $@thin (@thin D.Type) -> D
+// CHECK-LABEL: sil hidden @_TFV19default_constructor1DCfMS0_FT_S0_ : $@convention(thin) (@thin D.Type) -> D
 // CHECK: [[THISBOX:%[0-9]+]] = alloc_box $D
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
 // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
@@ -33,27 +33,27 @@ class E {
   var i = Int64()
 }
 
-// CHECK-LABEL: sil hidden @_TFC19default_constructor1EcfMS0_FT_S0_ : $@cc(method) @thin (@owned E) -> @owned E
+// CHECK-LABEL: sil hidden @_TFC19default_constructor1EcfMS0_FT_S0_ : $@convention(method) (@owned E) -> @owned E
 // CHECK-NEXT: bb0([[SELFIN:%[0-9]+]] : $E)
 // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
-// CHECK: [[INT64_CTOR:%[0-9]+]] = function_ref @_TFVSs5Int64CfMS_FT_S_ : $@thin (@thin Int64.Type) -> Int64
+// CHECK: [[INT64_CTOR:%[0-9]+]] = function_ref @_TFVSs5Int64CfMS_FT_S_ : $@convention(thin) (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int64.Type
-// CHECK-NEXT: [[ZERO:%[0-9]+]] = apply [[INT64_CTOR]]([[INT64]]) : $@thin (@thin Int64.Type) -> Int64
+// CHECK-NEXT: [[ZERO:%[0-9]+]] = apply [[INT64_CTOR]]([[INT64]]) : $@convention(thin) (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[SELF]] : $E, #E.i
 // CHECK-NEXT: assign [[ZERO]] to [[IREF]] : $*Int64
 // CHECK-NEXT: return [[SELF]] : $E
 
 class F : E { }
 
-// CHECK-LABEL: sil hidden @_TFC19default_constructor1FcfMS0_FT_S0_ : $@cc(method) @thin (@owned F) -> @owned F
+// CHECK-LABEL: sil hidden @_TFC19default_constructor1FcfMS0_FT_S0_ : $@convention(method) (@owned F) -> @owned F
 // CHECK-NEXT: bb0([[ORIGSELF:%[0-9]+]] : $F)
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $F
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself]
 // CHECK-NEXT: store [[ORIGSELF]] to [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
 // CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELFP]] : $F to $E
-// CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_TFC19default_constructor1EcfMS0_FT_S0_ : $@cc(method) @thin (@owned E) -> @owned E
-// CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@cc(method) @thin (@owned E) -> @owned E
+// CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_TFC19default_constructor1EcfMS0_FT_S0_ : $@convention(method) (@owned E) -> @owned E
+// CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@convention(method) (@owned E) -> @owned E
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
 // CHECK-NEXT: store [[ESELFW]] to [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F

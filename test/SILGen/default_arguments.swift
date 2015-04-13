@@ -5,20 +5,20 @@
 // CHECK:         string_literal utf16 "default_arguments"
 
 // Default argument for first parameter.
-// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1{{.*}} : $@thin () -> Int
+// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1{{.*}} : $@convention(thin) () -> Int
 // CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
 // CHECK: [[INT:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[LIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 17
-// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK: return [[RESULT]] : $Int
 
 // Default argument for third parameter.
-// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1{{.*}} : $@thin () -> @owned String
+// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1{{.*}} : $@convention(thin) () -> @owned String
 // CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSSCfMSSFT21_builtinStringLiteralBp8byteSizeBw7isASCIIBi1__SS
 // CHECK: [[STRING:%[0-9]+]] = metatype $@thin String.Type
 // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "Hello"
 // CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
-// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]]) : $@thin
+// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]]) : $@convention(thin)
 // CHECK: return [[RESULT]] : $String
 func defarg1(i: Int = 17, #d: Double, s: String = "Hello") { }
 
@@ -41,16 +41,16 @@ func defarg2(i: Int, d: Double = 3.125, s: String = "Hello") { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments15testDefaultArg2
 func testDefaultArg2() {
-// CHECK:  [[FNREF:%[0-9]+]] = function_ref @_TF17default_arguments7defarg2{{.*}} : $@thin (Int, Double, @owned String) -> ()
+// CHECK:  [[FNREF:%[0-9]+]] = function_ref @_TF17default_arguments7defarg2{{.*}} : $@convention(thin) (Int, Double, @owned String) -> ()
 // CHECK:  [[LITFN:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
 // CHECK:  [[INT64:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK:  [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
-// CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK:  [[DFN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg2{{.*}}_A0_ : $@thin () -> Double
-// CHECK:  [[D:%[0-9]+]] = apply [[DFN]]() : $@thin () -> Double
-// CHECK:  [[SFN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg2{{.*}}_A1_ : $@thin () -> @owned String
-// CHECK:  [[S:%[0-9]+]] = apply [[SFN]]() : $@thin () -> @owned String
-// CHECK:  apply [[FNREF]]([[I]], [[D]], [[S]]) : $@thin (Int, Double, @owned String) -> ()
+// CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:  [[DFN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg2{{.*}}_A0_ : $@convention(thin) () -> Double
+// CHECK:  [[D:%[0-9]+]] = apply [[DFN]]() : $@convention(thin) () -> Double
+// CHECK:  [[SFN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg2{{.*}}_A1_ : $@convention(thin) () -> @owned String
+// CHECK:  [[S:%[0-9]+]] = apply [[SFN]]() : $@convention(thin) () -> @owned String
+// CHECK:  apply [[FNREF]]([[I]], [[D]], [[S]]) : $@convention(thin) (Int, Double, @owned String) -> ()
   defarg2(5)
 }
 
@@ -58,10 +58,10 @@ func autocloseFile(@autoclosure x: () -> String = __FILE__,
                    @autoclosure y: () -> Int = __LINE__) { }
 // CHECK-LABEL: sil hidden @_TF17default_arguments17testAutocloseFileFT_T_
 func testAutocloseFile() {
-  // CHECK-LABEL: sil shared [transparent] @_TFF17default_arguments17testAutocloseFileFT_T_u_KT_SS : $@thin () -> @owned String
+  // CHECK-LABEL: sil shared [transparent] @_TFF17default_arguments17testAutocloseFileFT_T_u_KT_SS : $@convention(thin) () -> @owned String
   // CHECK: string_literal utf16{{.*}}default_arguments.swift
 
-  // CHECK-LABEL: sil shared [transparent] @_TFF17default_arguments17testAutocloseFileFT_T_u0_KT_Si : $@thin () -> Int
+  // CHECK-LABEL: sil shared [transparent] @_TFF17default_arguments17testAutocloseFileFT_T_u0_KT_Si : $@convention(thin) () -> Int
   // CHECK: integer_literal $Builtin.Int2048, [[@LINE+1]]
   autocloseFile()
 }
@@ -114,7 +114,7 @@ var testPropWithMagicLiterals: Int {
 
 class Foo {
 
-  // CHECK-LABEL: sil hidden @_TFC17default_arguments3FoocfMS0_FT3intSi6stringSS_S0_ : $@cc(method) @thin (Int, @owned String, @owned Foo) -> @owned Foo
+  // CHECK-LABEL: sil hidden @_TFC17default_arguments3FoocfMS0_FT3intSi6stringSS_S0_ : $@convention(method) (Int, @owned String, @owned Foo) -> @owned Foo
   // CHECK:         string_literal utf16 "init(int:string:)"
   init(int: Int, string: String) {
     testMagicLiterals()
@@ -162,13 +162,13 @@ class SuperDefArg {
   init(int i: Int = 10) { }
 }
 
-// CHECK: sil hidden @_TIFC17default_arguments11SuperDefArgcFMS0_FT3intSi_S0_A_ : $@thin () -> Int
+// CHECK: sil hidden @_TIFC17default_arguments11SuperDefArgcFMS0_FT3intSi_S0_A_ : $@convention(thin) () -> Int
 
-// CHECK-NOT: sil hidden @_TIFC17default_arguments9SubDefArgcFMS0_FT3intSi_S0_A_ : $@thin () -> Int
+// CHECK-NOT: sil hidden @_TIFC17default_arguments9SubDefArgcFMS0_FT3intSi_S0_A_ : $@convention(thin) () -> Int
 
 class SubDefArg : SuperDefArg { }
 
-// CHECK: sil hidden @_TF17default_arguments13testSubDefArgFT_CS_9SubDefArg : $@thin () -> @owned SubDefArg
+// CHECK: sil hidden @_TF17default_arguments13testSubDefArgFT_CS_9SubDefArg : $@convention(thin) () -> @owned SubDefArg
 func testSubDefArg() -> SubDefArg {
   // CHECK: function_ref @_TFC17default_arguments9SubDefArgCfMS0_FT3intSi_S0_
   // CHECK: function_ref @_TIFC17default_arguments11SuperDefArgcFMS0_FT3intSi_S0_A_
@@ -176,7 +176,7 @@ func testSubDefArg() -> SubDefArg {
   return SubDefArg()
 }
 
-// CHECK-NOT: sil hidden @_TIFC17default_arguments9SubDefArgcFMS0_FT3intSi_S0_A_ : $@thin () -> Int
+// CHECK-NOT: sil hidden @_TIFC17default_arguments9SubDefArgcFMS0_FT3intSi_S0_A_ : $@convention(thin) () -> Int
 
 // <rdar://problem/17379550>
 func takeDefaultArgUnnamed(_ x: Int = 5) { }
@@ -184,8 +184,8 @@ func takeDefaultArgUnnamed(_ x: Int = 5) { }
 // CHECK-LABEL: sil hidden @_TF17default_arguments25testTakeDefaultArgUnnamed
 func testTakeDefaultArgUnnamed(i: Int) {
   // CHECK: bb0([[I:%[0-9]+]] : $Int):
-  // CHECK:   [[FN:%[0-9]+]] = function_ref @_TF17default_arguments21takeDefaultArgUnnamedFTSi_T_ : $@thin (Int) -> ()
-  // CHECK:   apply [[FN]]([[I]]) : $@thin (Int) -> ()
+  // CHECK:   [[FN:%[0-9]+]] = function_ref @_TF17default_arguments21takeDefaultArgUnnamedFTSi_T_ : $@convention(thin) (Int) -> ()
+  // CHECK:   apply [[FN]]([[I]]) : $@convention(thin) (Int) -> ()
   takeDefaultArgUnnamed(i)
 }
 

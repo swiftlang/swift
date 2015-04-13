@@ -30,7 +30,7 @@ func if_no_else() {
   // CHECK-NEXT:   tuple ()
 }
 
-// CHECK-LABEL: sil hidden @_TF16if_while_binding13if_else_chainFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF16if_while_binding13if_else_chainFT_T_ : $@convention(thin) () -> () {
 func if_else_chain() {
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3foo
   // CHECK:   [[OPT_RES:%.*]] = apply [[FOO]]()
@@ -63,7 +63,7 @@ func if_else_chain() {
   // CHECK: [[CONT_X]]:
 }
 
-// CHECK-LABEL: sil hidden @_TF16if_while_binding10while_loopFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF16if_while_binding10while_loopFT_T_ : $@convention(thin) () -> () {
 func while_loop() {
   // CHECK:   br [[LOOP_ENTRY:bb[0-9]+]]
   // CHECK: [[LOOP_ENTRY]]:
@@ -236,14 +236,14 @@ func if_leading_boolean(a : Int) {
   // Test the boolean condition.
   
   // CHECK: debug_value %0 : $Int  // let a
-  // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0) : $@thin (Int, Int) -> Bool
+  // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0) : $@convention(thin) (Int, Int) -> Bool
 
-  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply %2([[EQRESULT]]) : $@cc(method) @thin (Bool) -> Builtin.Int1
+  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply %2([[EQRESULT]]) : $@convention(method) (Bool) -> Builtin.Int1
   // CHECK-NEXT: cond_br [[EQRESULTI1]], [[CHECKFOO:bb[0-9]+]], [[IFDONE:bb[0-9]+]]
 
   // Call Foo and test for the optional being present.
 // CHECK: [[CHECKFOO]]:
-  // CHECK: [[OPTRESULT:%[0-9]+]] = apply {{.*}}() : $@thin () -> @owned Optional<String>
+  // CHECK: [[OPTRESULT:%[0-9]+]] = apply {{.*}}() : $@convention(thin) () -> @owned Optional<String>
   
   // CHECK:   switch_enum [[OPTRESULT]] : $Optional<String>, case #Optional.Some!enumelt.1: [[SUCCESS:bb.*]], default [[IF_DONE:bb[0-9]+]]
 
@@ -300,8 +300,8 @@ func testAsPatternInIfLet(a : BaseClass?) {
 
 func testLetElseExprPattern(a : Int) {
   marker_1()
-  // CHECK: [[M1:%[0-9]+]] = function_ref @_TF16if_while_binding8marker_1FT_T_ : $@thin () -> ()
-  // CHECK-NEXT: apply [[M1]]() : $@thin () -> ()
+  // CHECK: [[M1:%[0-9]+]] = function_ref @_TF16if_while_binding8marker_1FT_T_ : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply [[M1]]() : $@convention(thin) () -> ()
 
   // CHECK: function_ref static Swift.~= infix <A : Swift.Equatable>(A, A) -> Swift.Bool
   // CHECK: cond_br {{.*}}, bb1, bb2
@@ -310,14 +310,14 @@ func testLetElseExprPattern(a : Int) {
   // Fall through case comes first.
 
   // CHECK: bb1:
-  // CHECK: [[M3:%[0-9]+]] = function_ref @_TF16if_while_binding8marker_3FT_T_ : $@thin () -> ()
-  // CHECK-NEXT: apply [[M3]]() : $@thin () -> ()
+  // CHECK: [[M3:%[0-9]+]] = function_ref @_TF16if_while_binding8marker_3FT_T_ : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply [[M3]]() : $@convention(thin) () -> ()
   // CHECK-NEXT: br bb3
   marker_3()
 
   // CHECK: bb2:
-  // CHECK: [[M2:%[0-9]+]] = function_ref @_TF16if_while_binding8marker_2FT_T_ : $@thin () -> ()
-  // CHECK-NEXT: apply [[M2]]() : $@thin () -> ()
+  // CHECK: [[M2:%[0-9]+]] = function_ref @_TF16if_while_binding8marker_2FT_T_ : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply [[M2]]() : $@convention(thin) () -> ()
   // CHECK-NEXT: br bb3
 
   // CHECK: bb3:
@@ -343,7 +343,7 @@ func testLetElseOptional1(a : Int?) -> Int {
 // CHECK:  bb2:
 // CHECK-NEXT:    // function_ref if_while_binding.abort () -> ()
 // CHECK-NEXT:    %6 = function_ref @_TF16if_while_binding5abortFT_T_
-// CHECK-NEXT:    %7 = apply %6() : $@thin @noreturn () -> ()
+// CHECK-NEXT:    %7 = apply %6() : $@convention(thin) @noreturn () -> ()
 // CHECK-NEXT:    unreachable
 return t
 }

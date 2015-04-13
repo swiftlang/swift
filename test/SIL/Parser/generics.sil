@@ -3,12 +3,12 @@
 sil_stage raw
 import Builtin
 
-// CHECK-LABEL: sil @foo : $@thin <T> (@out T, @in T) -> () {
+// CHECK-LABEL: sil @foo : $@convention(thin) <T> (@out T, @in T) -> () {
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK:   copy_addr [take] %1 to [initialization] %0 : $*T
 // CHECK:   return undef : $()
 // CHECK: }
-sil @foo : $@thin <T> (@out T, @in T) -> () {
+sil @foo : $@convention(thin) <T> (@out T, @in T) -> () {
 entry(%o : $*T, %i : $*T):
   copy_addr [take] %i to [initialization] %o : $*T
   return undef : $()
@@ -17,43 +17,43 @@ entry(%o : $*T, %i : $*T):
 struct Bar {}
 struct Bas {}
 
-// CHECK-LABEL: sil @ref_foo_1 : $@thin () -> () {
-// CHECK:   %2 = function_ref @foo : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:   %3 = apply %2<Bar>(%1#1, %0#1) : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-sil @ref_foo_1 : $@thin () -> () {
+// CHECK-LABEL: sil @ref_foo_1 : $@convention(thin) () -> () {
+// CHECK:   %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:   %3 = apply %2<Bar>(%1#1, %0#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+sil @ref_foo_1 : $@convention(thin) () -> () {
 entry:
   %i = alloc_stack $Bar
   %o = alloc_stack $Bar
-  %f = function_ref @foo : $@thin <XYZ> (@out XYZ, @in XYZ) -> ()
-  %z = apply %f<Bar>(%o#1, %i#1) : $@thin <ZYX> (@out ZYX, @in ZYX) -> ()
+  %f = function_ref @foo : $@convention(thin) <XYZ> (@out XYZ, @in XYZ) -> ()
+  %z = apply %f<Bar>(%o#1, %i#1) : $@convention(thin) <ZYX> (@out ZYX, @in ZYX) -> ()
   dealloc_stack %o#0 : $*@local_storage Bar
   dealloc_stack %i#0 : $*@local_storage Bar
   return %z : $()
 }
 
-// CHECK-LABEL: sil @ref_foo_2 : $@thin () -> () {
-// CHECK:  %2 = function_ref @foo : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:  %3 = apply %2<Bas>(%1#1, %0#1) : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-sil @ref_foo_2 : $@thin () -> () {
+// CHECK-LABEL: sil @ref_foo_2 : $@convention(thin) () -> () {
+// CHECK:  %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:  %3 = apply %2<Bas>(%1#1, %0#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+sil @ref_foo_2 : $@convention(thin) () -> () {
 entry:
   %i = alloc_stack $Bas
   %o = alloc_stack $Bas
-  %f = function_ref @foo : $@thin <ABC> (@out ABC, @in ABC) -> ()
-  %z = apply %f<Bas>(%o#1, %i#1) : $@thin <CBA> (@out CBA, @in CBA) -> ()
+  %f = function_ref @foo : $@convention(thin) <ABC> (@out ABC, @in ABC) -> ()
+  %z = apply %f<Bas>(%o#1, %i#1) : $@convention(thin) <CBA> (@out CBA, @in CBA) -> ()
   dealloc_stack %o#0 : $*@local_storage Bas
   dealloc_stack %i#0 : $*@local_storage Bas
   return %z : $()
 }
 
-// CHECK-LABEL: sil @ref_foo_partial_apply : $@thin () -> @owned @callee_owned (@out Bas) -> () {
-// CHECK:  %1 = function_ref @foo : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
-// CHECK:  %2 = partial_apply %1<Bas>(%0#1) : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK-LABEL: sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned (@out Bas) -> () {
+// CHECK:  %1 = function_ref @foo : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:  %2 = partial_apply %1<Bas>(%0#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
 // CHECK:  return %2 : $@callee_owned (@out Bas) -> ()
-sil @ref_foo_partial_apply : $@thin () -> @owned @callee_owned (@out Bas) -> () {
+sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned (@out Bas) -> () {
 entry:
   %i = alloc_stack $Bas
-  %f = function_ref @foo : $@thin <Z> (@out Z, @in Z) -> ()
-  %g = partial_apply %f<Bas>(%i#1) : $@thin <Y> (@out Y, @in Y) -> ()
+  %f = function_ref @foo : $@convention(thin) <Z> (@out Z, @in Z) -> ()
+  %g = partial_apply %f<Bas>(%i#1) : $@convention(thin) <Y> (@out Y, @in Y) -> ()
   dealloc_stack %i#0 : $*@local_storage Bas
   return %g : $@callee_owned (@out Bas) -> ()
 }
@@ -62,20 +62,20 @@ sil_global @zero: $Builtin.Int64
 sil_global @f: $@callee_owned (Builtin.Int32) -> ()
 
 // CHECK-LABEL: sil @test_apply
-sil @test_apply : $@thin () -> () {
+sil @test_apply : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @zero : $*Builtin.Int64
   %1 = mark_uninitialized [var] %0 : $*Builtin.Int64
   %2 = global_addr @f : $*@callee_owned (Builtin.Int32) -> ()
-  %3 = function_ref @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+  %3 = function_ref @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
   %4 = load %1 : $*Builtin.Int64
   %5 = alloc_stack $Builtin.Int64
   store %4 to %5#1 : $*Builtin.Int64
-  // CHECK: apply %{{[0-9]+}}<{{.*}}Int64, {{.*}}Int32>(%{{.*}}) : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
-  %7 = apply %3<Builtin.Int64, Builtin.Int32>(%5#1) : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
-  %8 = function_ref @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
-  // CHECK: partial_apply %{{[0-9]+}}(%{{[0-9]+}}) : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
-  %9 = partial_apply %8(%7) : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
+  // CHECK: apply %{{[0-9]+}}<{{.*}}Int64, {{.*}}Int32>(%{{.*}}) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+  %7 = apply %3<Builtin.Int64, Builtin.Int32>(%5#1) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+  %8 = function_ref @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
+  // CHECK: partial_apply %{{[0-9]+}}(%{{[0-9]+}}) : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
+  %9 = partial_apply %8(%7) : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
   store %9 to %2 : $*@callee_owned (Builtin.Int32) -> ()
   dealloc_stack %5#0 : $*@local_storage Builtin.Int64
   %12 = tuple ()
@@ -83,7 +83,7 @@ bb0:
 }
 
 // generic_closures.generic_curried_function <A, B>(x : A) -> (y : B) -> ()
-sil @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+sil @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
 
 // reabstraction thunk helper from @callee_owned (@in Builtin.Int32) -> (@unowned ()) to @callee_owned (@unowned Builtin.Int32) -> (@unowned ())
-sil [transparent] @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
+sil [transparent] @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()

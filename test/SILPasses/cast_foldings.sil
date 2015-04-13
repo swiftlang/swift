@@ -6,7 +6,7 @@ import Swift
 
 // CHECK-LABEL: sil @dont_fold_unconditional_checked_cast_to_existentials
 // CHECK: unconditional_checked_cast %1 : $NSCloud to $AnyObject
-sil @dont_fold_unconditional_checked_cast_to_existentials : $@thin () -> AnyObject {
+sil @dont_fold_unconditional_checked_cast_to_existentials : $@convention(thin) () -> AnyObject {
 entry:
   %0 = alloc_stack $NSCloud
   %1 = load %0#1 : $*NSCloud
@@ -17,7 +17,7 @@ entry:
 
 // CHECK-LABEL: sil @dont_fold_unconditional_checked_cast_from_existentials
 // CHECK: unconditional_checked_cast %0 : $AnyObject to $NSCloud
-sil @dont_fold_unconditional_checked_cast_from_existentials : $@thin (AnyObject) -> NSCloud {
+sil @dont_fold_unconditional_checked_cast_from_existentials : $@convention(thin) (AnyObject) -> NSCloud {
 entry (%0 : $AnyObject):
   %1 = unconditional_checked_cast %0 : $AnyObject to $NSCloud
   return %1 : $NSCloud

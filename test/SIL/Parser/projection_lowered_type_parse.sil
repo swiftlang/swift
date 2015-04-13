@@ -6,15 +6,15 @@ struct A {
   var f : () -> ()
 }
 
-sil @callee_check : $@thin (@callee_owned () -> ()) -> ()
+sil @callee_check : $@convention(thin) (@callee_owned () -> ()) -> ()
 
-sil @test1 : $@thin (@inout A) -> () {
+sil @test1 : $@convention(thin) (@inout A) -> () {
 bb0(%0 : $*A):
   %1 = struct_element_addr %0 : $*A, #A.f
   %2 = load %0 : $*A
   %3 = struct_extract %2 : $A, #A.f
-  %4 = function_ref @callee_check : $@thin (@callee_owned () -> ()) -> ()
-  apply %4(%3) : $@thin (@callee_owned () -> ()) -> ()
+  %4 = function_ref @callee_check : $@convention(thin) (@callee_owned () -> ()) -> ()
+  apply %4(%3) : $@convention(thin) (@callee_owned () -> ()) -> ()
   %5 = tuple()
   return %5 : $()
 }
@@ -24,7 +24,7 @@ class B {
   init()
 }
 
-sil @test2 : $@thin (B) -> () {
+sil @test2 : $@convention(thin) (B) -> () {
 bb0(%0 : $B):
   %1 = ref_element_addr %0 : $B, #B.f
   %5 = tuple()

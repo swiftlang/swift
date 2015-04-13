@@ -4,19 +4,19 @@
 // protocol conformances with covariant return types correctly. The verifier
 // should trip if we do not handle things correctly.
 
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return6driverFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return6driverFT_T_ : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK: alloc_ref
 // CHECK: alloc_ref
 // CHECK: alloc_ref
-// CHECK: function_ref @unknown1a : $@thin () -> ()
+// CHECK: function_ref @unknown1a : $@convention(thin) () -> ()
 // CHECK: apply
-// CHECK: function_ref @defrenestrate : $@thin () -> ()
+// CHECK: function_ref @defrenestrate : $@convention(thin) () -> ()
 // CHECK: apply
-// CHECK: function_ref @unknown2a : $@thin () -> ()
+// CHECK: function_ref @unknown2a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: apply
-// CHECK: function_ref @unknown3a : $@thin () -> ()
+// CHECK: function_ref @unknown3a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: apply
 // CHECK: strong_release

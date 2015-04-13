@@ -4,9 +4,9 @@
 public struct mmConstUnsafePointer<T> {
 }
 
-// CHECK-LABEL: sil hidden @test : $@thin <T> (@thin mmConstUnsafePointer<T>.Type) -> mmConstUnsafePointer<T> {
+// CHECK-LABEL: sil hidden @test : $@convention(thin) <T> (@thin mmConstUnsafePointer<T>.Type) -> mmConstUnsafePointer<T> {
 // CHECK: struct $mmConstUnsafePointer<T> ()
-sil hidden @test : $@thin <T> (@thin mmConstUnsafePointer<T>.Type) -> mmConstUnsafePointer<T> {
+sil hidden @test : $@convention(thin) <T> (@thin mmConstUnsafePointer<T>.Type) -> mmConstUnsafePointer<T> {
 bb0(%0 : $@thin mmConstUnsafePointer<T>.Type):
   %1 = struct $mmConstUnsafePointer<T> ()
   return %1 : $mmConstUnsafePointer<T>

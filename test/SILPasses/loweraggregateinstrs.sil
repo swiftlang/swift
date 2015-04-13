@@ -57,7 +57,7 @@ struct S3 {
 // CHECK: bb0
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @expand_destroy_addr_trivial : $@thin (@inout Builtin.Int64) -> () {
+sil @expand_destroy_addr_trivial : $@convention(thin) (@inout Builtin.Int64) -> () {
 bb0(%0 : $*Builtin.Int64):
   destroy_addr %0 : $*Builtin.Int64
   %1 = tuple()
@@ -76,7 +76,7 @@ bb0(%0 : $*Builtin.Int64):
 // CHECK-NEXT: strong_release [[innerstruct_cls2]] : $C2
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_destroy_addr_aggstructnontrivial : $@thin (@inout S) -> () {
+sil @expand_destroy_addr_aggstructnontrivial : $@convention(thin) (@inout S) -> () {
 bb0(%0 : $*S):
   destroy_addr %0 : $*S
   %1 = tuple()
@@ -103,7 +103,7 @@ bb0(%0 : $*S):
 // CHECK-NEXT: strong_release [[ELT2]]
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @expand_destroy_addr_aggtuplenontrivial : $@thin (@inout (S, S2, C1)) -> () {
+sil @expand_destroy_addr_aggtuplenontrivial : $@convention(thin) (@inout (S, S2, C1)) -> () {
 bb0(%0 : $*(S, S2, C1)):
   destroy_addr %0 : $*(S, S2, C1)
   %1 = tuple()
@@ -126,7 +126,7 @@ bb0(%0 : $*T):
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_destroy_addr_reference : $@thin (@inout C1) -> () {
+sil @expand_destroy_addr_reference : $@convention(thin) (@inout C1) -> () {
 bb0(%0 : $*C1):
   destroy_addr %0 : $*C1
   %1 = tuple()
@@ -139,7 +139,7 @@ bb0(%0 : $*C1):
 // CHECK-NEXT: release_value
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_destroy_addr_enum : $@thin (@inout E) -> () {
+sil @expand_destroy_addr_enum : $@convention(thin) (@inout E) -> () {
 bb0(%0 : $*E):
   destroy_addr %0 : $*E
   %1 = tuple()
@@ -156,7 +156,7 @@ bb0(%0 : $*E):
 // CHECK-NEXT: store [[LOAD1]] to [[IN2]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_copy_addr_takeinit : $@thin (@inout S, @inout S) -> () {
+sil @expand_copy_addr_takeinit : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
   copy_addr [take] %0 to [initialization] %1 : $*S
   %2 = tuple()
@@ -178,7 +178,7 @@ bb0(%0 : $*S, %1 : $*S):
 // CHECK-NEXT: store [[IN1]] to [[IN2PTR]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_copy_addr_init : $@thin (@inout S, @inout S) -> () {
+sil @expand_copy_addr_init : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
   copy_addr %0 to [initialization] %1 : $*S
   %2 = tuple()
@@ -199,7 +199,7 @@ bb0(%0 : $*S, %1 : $*S):
 // CHECK-NEXT: store [[IN1]] to [[IN2PTR]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_copy_addr_take : $@thin (@inout S, @inout S) -> () {
+sil @expand_copy_addr_take : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
   copy_addr [take] %0 to %1 : $*S
   %2 = tuple()
@@ -215,7 +215,7 @@ bb0(%0 : $*S, %1 : $*S):
 // CHECK-NEXT: store
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_copy_addr_trivial : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
+sil @expand_copy_addr_trivial : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
 bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
   copy_addr %0 to %1 : $*Builtin.Int64
   %2 = tuple()
@@ -245,7 +245,7 @@ bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
 // CHECK-NEXT: store [[IN1]] to [[IN2PTR]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_copy_addr_aggstructnontrivial : $@thin (@inout S, @inout S) -> () {
+sil @expand_copy_addr_aggstructnontrivial : $@convention(thin) (@inout S, @inout S) -> () {
 bb0(%0 : $*S, %1 : $*S):
   copy_addr %0 to %1 : $*S
   %2 = tuple()
@@ -298,7 +298,7 @@ bb0(%0 : $*S, %1 : $*S):
 // CHECK-NEXT: return
 
 
-sil @expand_copy_addr_aggtuplenontrivial : $@thin (@inout (S, S2, C1, E), @inout (S, S2, C1, E)) -> () {
+sil @expand_copy_addr_aggtuplenontrivial : $@convention(thin) (@inout (S, S2, C1, E), @inout (S, S2, C1, E)) -> () {
 bb0(%0 : $*(S, S2, C1, E), %1 : $*(S, S2, C1, E)):
   copy_addr %0 to %1 : $*(S, S2, C1, E)
   %2 = tuple()
@@ -325,7 +325,7 @@ bb0(%0 : $*T):
 // CHECK-NEXT: store [[LOAD1]] to [[IN2]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_copy_addr_reference : $@thin (@inout C1, @inout C1) -> () {
+sil @expand_copy_addr_reference : $@convention(thin) (@inout C1, @inout C1) -> () {
 bb0(%0 : $*C1, %1 : $*C1):
   copy_addr %0 to %1 : $*C1
   %2 = tuple()
@@ -341,7 +341,7 @@ bb0(%0 : $*C1, %1 : $*C1):
 // CHECK-NEXT: store [[LOAD1]] to [[IN2]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_copy_addr_enum : $@thin (@inout E, @inout E) -> () {
+sil @expand_copy_addr_enum : $@convention(thin) (@inout E, @inout E) -> () {
 bb0(%0 : $*E, %1 : $*E):
   copy_addr %0 to %1 : $*E
   %2 = tuple()
@@ -359,7 +359,7 @@ bb0(%0 : $*E, %1 : $*E):
 // CHECK: bb0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_release_value_trivial : $@thin (Builtin.Int64) -> () {
+sil @expand_release_value_trivial : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
   release_value %0 : $Builtin.Int64
   %1 = tuple()
@@ -375,7 +375,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-NEXT: strong_release [[innerstructcls1]] : $C1
 // CHECK-NEXT: [[innerstructcls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
 // CHECK-NEXT: strong_release [[innerstructcls2]]
-sil @expand_release_value_aggstructnontrivial : $@thin (S) -> () {
+sil @expand_release_value_aggstructnontrivial : $@convention(thin) (S) -> () {
 bb0(%0 : $S):
   release_value %0 : $S
   %1 = tuple()
@@ -403,7 +403,7 @@ bb0(%0 : $S):
 // CHECK-NEXT: release_value [[ELT3]] : $E
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @expand_release_value_aggtuplenontrivial : $@thin ((S, S2, C1, E)) -> () {
+sil @expand_release_value_aggtuplenontrivial : $@convention(thin) ((S, S2, C1, E)) -> () {
 bb0(%0 : $(S, S2, C1, E)):
   release_value %0 : $(S, S2, C1, E)
   %1 = tuple()
@@ -416,7 +416,7 @@ bb0(%0 : $(S, S2, C1, E)):
 // CHECK-NEXT: strong_release [[IN]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_release_value_reference : $@thin (C1) -> () {
+sil @expand_release_value_reference : $@convention(thin) (C1) -> () {
 bb0(%0 : $C1):
   release_value %0 : $C1
   %1 = tuple()
@@ -428,7 +428,7 @@ bb0(%0 : $C1):
 // CHECK-NEXT: release_value
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @expand_release_value_enum : $@thin (E) -> () {
+sil @expand_release_value_enum : $@convention(thin) (E) -> () {
 bb0(%0 : $E):
   release_value %0 : $E
   %1 = tuple()
@@ -446,7 +446,7 @@ bb0(%0 : $E):
 // CHECK-LABEL: sil @expand_retain_value_trivial
 // CHECK: bb0
 // CHECK-NEXT: return
-sil @expand_retain_value_trivial : $@thin (Builtin.Int64) -> (Builtin.Int64) {
+sil @expand_retain_value_trivial : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $Builtin.Int64):
   retain_value %0 : $Builtin.Int64
   return %0 : $Builtin.Int64
@@ -470,7 +470,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-NEXT: retain_value [[enum]] : $E
 // CHECK-NEXT: [[trivial3:%[0-9]+]] = struct_extract [[IN]] : $S3, #S3.trivial3
 // CHECK-NEXT: return [[IN]] : $S3
-sil @expand_retain_value_aggstructnontrivial : $@thin (S3) -> (S3) {
+sil @expand_retain_value_aggstructnontrivial : $@convention(thin) (S3) -> (S3) {
 bb0(%0 : $S3):
   retain_value %0 : $S3
   return %0 : $S3
@@ -502,7 +502,7 @@ bb0(%0 : $S3):
 // CHECK-NEXT: retain_value [[ELT5]] : $E
 // CHECK-NEXT: return [[IN]]
 
-sil @expand_retain_value_aggtuplenontrivial : $@thin ((S, Builtin.Int64, S2, C1, Builtin.Int64, E)) -> ((S, Builtin.Int64, S2, C1, Builtin.Int64, E)) {
+sil @expand_retain_value_aggtuplenontrivial : $@convention(thin) ((S, Builtin.Int64, S2, C1, Builtin.Int64, E)) -> ((S, Builtin.Int64, S2, C1, Builtin.Int64, E)) {
 bb0(%0 : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E)):
   retain_value %0 : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E)
   return %0 : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E)
@@ -512,7 +512,7 @@ bb0(%0 : $(S, Builtin.Int64, S2, C1, Builtin.Int64, E)):
 // CHECK: bb0([[IN:%[0-9]+]] : $C1):
 // CHECK-NEXT: strong_retain [[IN]]
 // CHECK-NEXT: return
-sil @expand_retain_value_reference : $@thin (C1) -> (C1) {
+sil @expand_retain_value_reference : $@convention(thin) (C1) -> (C1) {
 bb0(%0 : $C1):
   retain_value %0 : $C1
   return %0 : $C1
@@ -522,7 +522,7 @@ bb0(%0 : $C1):
 // CHECK: bb0([[IN1:%[0-9]+]] : $E):
 // CHECK-NEXT: retain_value
 // CHECK-NEXT: return
-sil @expand_retain_value_enum : $@thin (E) -> (E) {
+sil @expand_retain_value_enum : $@convention(thin) (E) -> (E) {
 bb0(%0 : $E):
   retain_value %0 : $E
   return %0 : $E

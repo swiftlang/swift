@@ -22,7 +22,7 @@ class ParentNode : Node {
 }
 
 // pic_crash.Node.init (pic_crash.Node.Type)(index : Swift.Int) -> pic_crash.Node
-sil @_TFC9pic_crash4Node5checkfS0_FT_Si : $@cc(method) @thin (@guaranteed Node) -> Int {
+sil @_TFC9pic_crash4Node5checkfS0_FT_Si : $@convention(method) (@guaranteed Node) -> Int {
 bb0(%0 : $Node):
 //CHECK-LABEL: @_TFC9pic_crash4Node5checkfS0_FT_Si
 //CHECK:       load %swift.type
@@ -40,16 +40,16 @@ bb3:                                              // Preds: bb0
   br bb1                              // id: %12
 }
 
-sil @_TFC9pic_crash4NodecfMS0_FT5indexSi_S0_ : $@cc(method) @thin (Int, @owned Node) -> @owned Node 
-sil @_TFC9pic_crash4NodeCfMS0_FT5indexSi_S0_ : $@thin (Int, @thick Node.Type) -> @owned Node 
-sil [transparent] @_TFC9pic_crash4Nodeg5indexSi : $@cc(method) @thin (@guaranteed Node) -> Int 
-sil [transparent] @_TFC9pic_crash4Nodes5indexSi : $@cc(method) @thin (Int, @guaranteed Node) -> () 
-sil @_TFC9pic_crash10ParentNodecfMS0_FT4leftCS_4Node5rightS1_5indexSi_S0_ : $@cc(method) @thin (@owned Node, @owned Node, Int, @owned ParentNode) -> @owned ParentNode 
-sil @_TFC9pic_crash10ParentNodeCfMS0_FT4leftCS_4Node5rightS1_5indexSi_S0_ : $@thin (@owned Node, @owned Node, Int, @thick ParentNode.Type) -> @owned ParentNode 
-sil @_TFC9pic_crash10ParentNoded : $@cc(method) @thin (@guaranteed ParentNode) -> @owned Builtin.NativeObject 
-sil @_TFC9pic_crash10ParentNodeD : $@cc(method) @thin (@guaranteed ParentNode) -> () 
-sil @_TFC9pic_crash10ParentNodecfMS0_FT5indexSi_S0_ : $@cc(method) @thin (Int, @owned ParentNode) -> @owned ParentNode
-sil @_TFC9pic_crash10ParentNodeCfMS0_FT5indexSi_S0_ : $@thin (Int, @thick ParentNode.Type) -> @owned ParentNode 
+sil @_TFC9pic_crash4NodecfMS0_FT5indexSi_S0_ : $@convention(method) (Int, @owned Node) -> @owned Node 
+sil @_TFC9pic_crash4NodeCfMS0_FT5indexSi_S0_ : $@convention(thin) (Int, @thick Node.Type) -> @owned Node 
+sil [transparent] @_TFC9pic_crash4Nodeg5indexSi : $@convention(method) (@guaranteed Node) -> Int 
+sil [transparent] @_TFC9pic_crash4Nodes5indexSi : $@convention(method) (Int, @guaranteed Node) -> () 
+sil @_TFC9pic_crash10ParentNodecfMS0_FT4leftCS_4Node5rightS1_5indexSi_S0_ : $@convention(method) (@owned Node, @owned Node, Int, @owned ParentNode) -> @owned ParentNode 
+sil @_TFC9pic_crash10ParentNodeCfMS0_FT4leftCS_4Node5rightS1_5indexSi_S0_ : $@convention(thin) (@owned Node, @owned Node, Int, @thick ParentNode.Type) -> @owned ParentNode 
+sil @_TFC9pic_crash10ParentNoded : $@convention(method) (@guaranteed ParentNode) -> @owned Builtin.NativeObject 
+sil @_TFC9pic_crash10ParentNodeD : $@convention(method) (@guaranteed ParentNode) -> () 
+sil @_TFC9pic_crash10ParentNodecfMS0_FT5indexSi_S0_ : $@convention(method) (Int, @owned ParentNode) -> @owned ParentNode
+sil @_TFC9pic_crash10ParentNodeCfMS0_FT5indexSi_S0_ : $@convention(thin) (Int, @thick ParentNode.Type) -> @owned ParentNode 
 
 sil_vtable Node {
   #Node.init!initializer.1: _TFC9pic_crash4NodecfMS0_FT5indexSi_S0_	// pic_crash.Node.init (pic_crash.Node.Type)(index : Swift.Int) -> pic_crash.Node

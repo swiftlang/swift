@@ -12,11 +12,11 @@ struct S {}
 class C {}
 sil_vtable C {}
 
-sil @_TFC12typemetadata1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject
+sil @_TFC12typemetadata1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
 
-sil @_TFC12typemetadata1CD : $@cc(method) @thin (@owned C) -> ()
+sil @_TFC12typemetadata1CD : $@convention(method) (@owned C) -> ()
 
-sil @test0 : $@thin () -> () {
+sil @test0 : $@convention(thin) () -> () {
 bb0:
   %0 = metatype $@thin S.Type
   %1 = metatype $@thick C.Type

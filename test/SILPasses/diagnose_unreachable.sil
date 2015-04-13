@@ -23,7 +23,7 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK-NEXT:  return
 // CHECK-NEXT: }
 
-sil @test2 : $@thin () -> () {
+sil @test2 : $@convention(thin) () -> () {
 bb0:
   %11 = integer_literal $Builtin.Int1, 0
   %13 = cond_br %11, bb1, bb2
@@ -47,7 +47,7 @@ bb2:                                              // Preds: bb1 bb0
 //      return
 //  }
 //}
-sil @loopWithFalse : $@thin () -> () {
+sil @loopWithFalse : $@convention(thin) () -> () {
 bb0:
   %6 = br bb1
 
@@ -90,7 +90,7 @@ bb6:
 //      return
 //  }
 //}
-sil @InfLoop : $@thin () -> () {
+sil @InfLoop : $@convention(thin) () -> () {
 bb0:
   %6 = br bb1
 
@@ -129,14 +129,14 @@ bb6:
 class B { }
 class E : B { }
 
-sil @exit : $@thin @noreturn () -> () {
+sil @exit : $@convention(thin) @noreturn () -> () {
 bb0:
   %1 = tuple ()
   return %1 : $()
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
-sil @removeTriviallyDeadInstructions : $@thin (@owned B) -> () {
+sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B                           
   %2 = store %0 to %1#1 : $*B                 // CHECK: store
@@ -145,15 +145,15 @@ bb0(%0 : $B):
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject     // CHECK-NOT: unchecked_ref_cast
   %7 = strong_release %3 : $B                        // CHECK: strong_release
   %8 = strong_release %1#0 : $Builtin.NativeObject  // CHECK-NEXT: strong_release
-  %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@thin @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
   %6 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B // CHECK-NOT: unchecked_ref_cast
   %11 = tuple()
   %12 = return %11 : $()                      
 }                                             
 
 // CHECK-LABEL: sil @removeTriviallyDeadButUsedByUnreachableBlock
-sil @removeTriviallyDeadButUsedByUnreachableBlock : $@thin (@owned B) -> () {
+sil @removeTriviallyDeadButUsedByUnreachableBlock : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject  // CHECK-NOT: unchecked_ref_cast
   %11 = integer_literal $Builtin.Int1, 0          // CHECK-NOT: integer_literal
@@ -167,21 +167,21 @@ bb2:
 }                                                 // CHECK: }
 
 // CHECK-LABEL: sil @removeTriviallyDeadCrossBasicBlocks
-sil @removeTriviallyDeadCrossBasicBlocks : $@thin (@owned B, Builtin.Int1) -> () {
+sil @removeTriviallyDeadCrossBasicBlocks : $@convention(thin) (@owned B, Builtin.Int1) -> () {
 bb0(%0:  $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject     // CHECK-NOT: unchecked_ref_cast
   %13 = cond_br %1, bb1, bb2                   // CHECK: cond_br
 bb1:                                              
   %22 = br bb2
 bb2:                                              
-  %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@thin @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
   %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B // CHECK-NOT: unchecked_ref_cast
   %32 = tuple ()                                
   %33 = return %32 : $()
 }                                                 // CHECK: }
 
-sil @testCondBranchBBArgs : $@thin (Int, Int) -> Int {
+sil @testCondBranchBBArgs : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
   %2 = integer_literal $Builtin.Int1, 0
   cond_br %2, bb1(%0 : $Int), bb2(%1 : $Int)
@@ -201,7 +201,7 @@ bb3(%5 : $Int):
 // CHECK-NEXT:  return
 // CHECK: }
 
-sil @removePredecessorWithBBArgs : $@thin (Int, Int) -> Int {
+sil @removePredecessorWithBBArgs : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
  %2 = integer_literal $Builtin.Int1, 0
  %3 = cond_br %2, bb2(%0 : $Int), bb3(%1 : $Int)
@@ -221,10 +221,10 @@ bb4(%6 : $Int):
 // CHECK-NEXT:  return
 // CHECK: }
 
-sil @code_removed_after_a_call_to_noreturn : $@thin (Int, Builtin.Int1) -> () {
+sil @code_removed_after_a_call_to_noreturn : $@convention(thin) (Int, Builtin.Int1) -> () {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
-  %6 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
-  %7 = apply %6() : $@thin @noreturn () -> ()
+  %6 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
+  %7 = apply %6() : $@convention(thin) @noreturn () -> ()
   cond_br %1, bb1, bb2
 bb1:                                              // Preds: bb0
   br bb2
@@ -240,7 +240,7 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK-NEXT:  unreachable
 // CHECK: }
 
-sil @dead_use_of_alloc_stack : $@thin () -> () {
+sil @dead_use_of_alloc_stack : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_stack $((), (), ())
   %2 = tuple_element_addr %1#1 : $*((), (), ()), 0
@@ -256,7 +256,7 @@ bb0:
 
 enum BoolLike { case true_, false_ }
 
-sil @constant_fold_switch_enum : $@thin (Int) -> Int {
+sil @constant_fold_switch_enum : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %6 = enum $BoolLike, #BoolLike.false_!enumelt          // user: %9
   switch_enum %6 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
@@ -279,7 +279,7 @@ bb3:
 enum Singleton {
   case x(Int, UnicodeScalar)
 };
-sil @constant_fold_switch_enum_with_payload : $@thin (Int, UnicodeScalar) -> (Int, UnicodeScalar) {
+sil @constant_fold_switch_enum_with_payload : $@convention(thin) (Int, UnicodeScalar) -> (Int, UnicodeScalar) {
 bb0(%6 : $Int, %10 : $UnicodeScalar):
   %11 = tuple (%6 : $Int, %10 : $UnicodeScalar)
   %12 = enum $Singleton, #Singleton.x!enumelt.1, %11 : $(Int, UnicodeScalar)
@@ -299,7 +299,7 @@ b2:
 // CHECK:   return
 }
 
-sil @constant_fold_switch_value : $@thin (Int) -> Int {
+sil @constant_fold_switch_value : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = integer_literal $Builtin.Word, 2
   %2 = integer_literal $Builtin.Word, 1
@@ -320,7 +320,7 @@ bb3:
 // CHECK: }
 }
 
-sil @propagate_BB_args : $@thin (Int) -> Int {
+sil @propagate_BB_args : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = integer_literal $Builtin.Int1, 0
   br bb1(%1 : $Builtin.Int1)
@@ -346,7 +346,7 @@ bb5:
 // CHECK-NOT: cond_br
 }
 
-sil @propagate_BB_mult_args : $@thin () -> Builtin.Int1 {
+sil @propagate_BB_mult_args : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
   %1 = integer_literal $Builtin.Int1, 1
@@ -363,7 +363,7 @@ bb1(%3 : $Builtin.Int1, %4 : $Builtin.Int1):
 // CHECK: return
 }
 
-sil @builtin_unreachable : $@thin () -> () {
+sil @builtin_unreachable : $@convention(thin) () -> () {
 bb0:
   %z = builtin "unreachable"() : $()
   unreachable

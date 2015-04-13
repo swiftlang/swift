@@ -18,29 +18,29 @@
 // CHECK: func unknown()
 // SIB-CHECK: func unknown()
 
-// CHECK: sil hidden [fragile] @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X
+// CHECK: sil hidden [fragile] @_TFVSs1XCfMS_FT_S_ : $@convention(thin) (@thin X.Type) -> X
 // CHECK: bb0
 // CHECK-NEXT: struct $X ()
 // CHECK-NEXT: return
-// SIB-CHECK: sil hidden @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X
+// SIB-CHECK: sil hidden @_TFVSs1XCfMS_FT_S_ : $@convention(thin) (@thin X.Type) -> X
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: struct $X ()
 // SIB-CHECK-NEXT: return
 
-// CHECK: sil @unknown : $@thin () -> ()
-// SIB-CHECK: sil @unknown : $@thin () -> ()
+// CHECK: sil @unknown : $@convention(thin) () -> ()
+// SIB-CHECK: sil @unknown : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil hidden [fragile] @_TFVSs1X4testfS_FT_T_ : $@cc(method) @thin (X) -> ()
+// CHECK-LABEL: sil hidden [fragile] @_TFVSs1X4testfS_FT_T_ : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown : $@thin () -> ()
+// CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-// SIB-CHECK-LABEL: sil hidden @_TFVSs1X4testfS_FT_T_ : $@cc(method) @thin (X) -> ()
+// SIB-CHECK-LABEL: sil hidden @_TFVSs1X4testfS_FT_T_ : $@convention(method) (X) -> ()
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: function_ref
-// SIB-CHECK-NEXT: function_ref @unknown : $@thin () -> ()
+// SIB-CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
 // SIB-CHECK-NEXT: apply
 // SIB-CHECK-NEXT: tuple
 // SIB-CHECK-NEXT: return

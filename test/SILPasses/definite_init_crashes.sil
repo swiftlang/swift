@@ -13,7 +13,7 @@ struct Triple {
 }
 
 // CHECK-LABEL: sil @TripleTest
-sil @TripleTest : $@cc(method) @thin (Int, @inout Triple) -> Triple {
+sil @TripleTest : $@convention(method) (Int, @inout Triple) -> Triple {
 bb0(%0 : $Int, %1 : $*Triple):
   %4 = alloc_box $Triple
   %5 = load %1 : $*Triple
@@ -31,7 +31,7 @@ struct Single {
 }
 
 // CHECK-LABEL: sil @SingleTest
-sil @SingleTest : $@cc(method) @thin (@inout  Single, Int) -> Single {
+sil @SingleTest : $@convention(method) (@inout  Single, Int) -> Single {
 bb0(%0 : $*Single, %1 : $Int):
   %4 = alloc_box $Single
   %5 = load %0 : $*Single
@@ -53,21 +53,21 @@ enum SomeUnion {
   case y(SomeClass)
 }
 
-sil @getSomeClass : $@thin (@thick SomeClass.Type) -> @owned SomeClass
-sil @getSomeUnion : $@thin (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+sil @getSomeClass : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
+sil @getSomeUnion : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
 
 
 // CHECK-LABEL: sil @test_union_release
-sil @test_union_release : $@thin () -> () {
+sil @test_union_release : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   %1 = alloc_box $SomeUnion                       // users: %9, %8
-  %2 = function_ref @getSomeUnion : $@thin (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %7
+  %2 = function_ref @getSomeUnion : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %7
   %3 = metatype $@thin SomeUnion.Type               // user: %7
-  %4 = function_ref @getSomeClass : $@thin (@thick SomeClass.Type) -> @owned SomeClass // user: %6
+  %4 = function_ref @getSomeClass : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass // user: %6
   %5 = metatype $@thick SomeClass.Type               // user: %6
-  %6 = apply %4(%5) : $@thin (@thick SomeClass.Type) -> @owned SomeClass // user: %7
-  %7 = apply %2(%6, %3) : $@thin (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %8
+  %6 = apply %4(%5) : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass // user: %7
+  %7 = apply %2(%6, %3) : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %8
   assign %7 to %1#1 : $*SomeUnion
   strong_release %1#0 : $Builtin.NativeObject
   %10 = tuple ()                                  // user: %11

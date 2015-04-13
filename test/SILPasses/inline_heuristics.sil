@@ -37,16 +37,16 @@ enum E {
 // LOG: Eligible callee: takeDirectClosure
 // LOG: Boost: apply const function
 
-sil @testDirectClosure : $@thin () -> Int32 {
+sil @testDirectClosure : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = function_ref @takeDirectClosure : $@thin (@owned @callee_owned (Int32) -> Int32) -> Int32
-  %1 = function_ref @closure : $@thin (Int32) -> Int32
-  %2 = thin_to_thick_function %1 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
-  %3 = apply %0(%2) : $@thin (@owned @callee_owned (Int32) -> Int32) -> Int32
+  %0 = function_ref @takeDirectClosure : $@convention(thin) (@owned @callee_owned (Int32) -> Int32) -> Int32
+  %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %3 = apply %0(%2) : $@convention(thin) (@owned @callee_owned (Int32) -> Int32) -> Int32
   return %3 : $Int32
 }
 
-sil @takeDirectClosure : $@thin (@owned @callee_owned (Int32) -> Int32) -> Int32 {
+sil @takeDirectClosure : $@convention(thin) (@owned @callee_owned (Int32) -> Int32) -> Int32 {
 bb0(%0 : $@callee_owned (Int32) -> Int32):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
@@ -68,17 +68,17 @@ bb0(%0 : $@callee_owned (Int32) -> Int32):
 // LOG: Eligible callee: takeStructClosure
 // LOG: Boost: apply const function
 
-sil @testStructClosure : $@thin () -> Int32 {
+sil @testStructClosure : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = function_ref @takeStructClosure : $@thin (@owned Cont) -> Int32
-  %1 = function_ref @closure : $@thin (Int32) -> Int32
-  %2 = thin_to_thick_function %1 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %0 = function_ref @takeStructClosure : $@convention(thin) (@owned Cont) -> Int32
+  %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
   %3 = struct $Cont (%2 : $@callee_owned (Int32) -> Int32)
-  %4 = apply %0(%3) : $@thin (@owned Cont) -> Int32
+  %4 = apply %0(%3) : $@convention(thin) (@owned Cont) -> Int32
   return %4 : $Int32
 }
 
-sil @takeStructClosure : $@thin (@owned Cont) -> Int32 {
+sil @takeStructClosure : $@convention(thin) (@owned Cont) -> Int32 {
 bb0(%0 : $Cont):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
@@ -101,15 +101,15 @@ bb0(%0 : $Cont):
 // LOG: Eligible callee: takeStructAddrClosure
 // LOG: Boost: apply const function
 
-sil @testStructAddrClosure : $@thin () -> Int32 {
+sil @testStructAddrClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $Cont
-  %1 = function_ref @closure : $@thin (Int32) -> Int32
-  %2 = thin_to_thick_function %1 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
   %3 = struct $Cont (%2 : $@callee_owned (Int32) -> Int32)
   store %3 to %0#1 : $*Cont
-  %5 = function_ref @takeStructAddrClosure : $@thin (@inout Cont) -> Int32
-  %6 = apply %5(%0#1) : $@thin (@inout Cont) -> Int32
+  %5 = function_ref @takeStructAddrClosure : $@convention(thin) (@inout Cont) -> Int32
+  %6 = apply %5(%0#1) : $@convention(thin) (@inout Cont) -> Int32
   %7 = struct_element_addr %0#1 : $*Cont, #Cont.cl
   %8 = load %7 : $*@callee_owned (Int32) -> Int32
   strong_release %8 : $@callee_owned (Int32) -> Int32
@@ -117,7 +117,7 @@ bb0:
   return %6 : $Int32
 }
 
-sil @takeStructAddrClosure : $@thin (@inout Cont) -> Int32 {
+sil @takeStructAddrClosure : $@convention(thin) (@inout Cont) -> Int32 {
 bb0(%0 : $*Cont):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
@@ -142,21 +142,21 @@ bb0(%0 : $*Cont):
 // LOG: Eligible callee: takeTupleClosure
 // LOG: Boost: apply const function
 
-sil @testTupleClosure : $@thin () -> Int32 {
+sil @testTupleClosure : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = function_ref @takeTupleClosure : $@thin (@owned Cont2) -> Int32
+  %0 = function_ref @takeTupleClosure : $@convention(thin) (@owned Cont2) -> Int32
   %1 = integer_literal $Builtin.Int32, 27
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = function_ref @closure : $@thin (Int32) -> Int32
-  %4 = thin_to_thick_function %3 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %3 = function_ref @closure : $@convention(thin) (Int32) -> Int32
+  %4 = thin_to_thick_function %3 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
   %5 = tuple (%2 : $Int32, %4 : $@callee_owned (Int32) -> Int32)
   %6 = struct $Cont2 (%5 : $(Int32, @callee_owned (Int32) -> Int32))
-  %7 = apply %0(%6) : $@thin (@owned Cont2) -> Int32
+  %7 = apply %0(%6) : $@convention(thin) (@owned Cont2) -> Int32
   return %7 : $Int32
 }
 
 
-sil @takeTupleClosure : $@thin (@owned Cont2) -> Int32 {
+sil @takeTupleClosure : $@convention(thin) (@owned Cont2) -> Int32 {
 bb0(%0 : $Cont2):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
@@ -179,18 +179,18 @@ bb0(%0 : $Cont2):
 // LOG: Eligible callee: takeEnumClosure
 // LOG: Boost: apply const function
 
-sil @testEnumClosure : $@thin () -> Int32 {
+sil @testEnumClosure : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = function_ref @takeEnumClosure : $@thin (@owned E) -> Int32
-  %1 = function_ref @closure : $@thin (Int32) -> Int32
-  %2 = thin_to_thick_function %1 : $@thin (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
+  %0 = function_ref @takeEnumClosure : $@convention(thin) (@owned E) -> Int32
+  %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
   %3 = enum $E, #E.B!enumelt.1, %2 : $@callee_owned (Int32) -> Int32
-  %4 = apply %0(%3) : $@thin (@owned E) -> Int32
+  %4 = apply %0(%3) : $@convention(thin) (@owned E) -> Int32
   return %4 : $Int32
 }
 
 
-sil @takeEnumClosure : $@thin (@owned E) -> Int32 {
+sil @takeEnumClosure : $@convention(thin) (@owned E) -> Int32 {
 bb0(%0 : $E):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
@@ -205,7 +205,7 @@ bb0(%0 : $E):
 
 // The closure which is used by all tests above.
 
-sil shared @closure : $@thin (Int32) -> Int32 {
+sil shared @closure : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 1
   %2 = struct_extract %0 : $Int32, #Int32.value
@@ -228,18 +228,18 @@ bb0(%0 : $Int32):
 // LOG: Eligible callee: condBrCallee
 // LOG: Take bb1 of cond_br
 
-sil @testCondBr : $@thin () -> () {
+sil @testCondBr : $@convention(thin) () -> () {
 bb0:
 
-  %0 = function_ref @condBrCallee : $@thin (Int32) -> Int32
+  %0 = function_ref @condBrCallee : $@convention(thin) (Int32) -> Int32
   %1 = integer_literal $Builtin.Int32, 27
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = apply %0(%2) : $@thin (Int32) -> Int32
+  %3 = apply %0(%2) : $@convention(thin) (Int32) -> Int32
   %4 = tuple ()
   return %4 : $()
 }
 
-sil @condBrCallee : $@thin (Int32) -> Int32 {
+sil @condBrCallee : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 27
   %2 = struct_extract %0 : $Int32, #Int32.value
@@ -271,18 +271,18 @@ bb3(%8 : $Int32):
 // LOG: Eligible callee: switchValueCallee
 // LOG: Take bb2 of switch_value
 
-sil @testSwitchValue : $@thin () -> () {
+sil @testSwitchValue : $@convention(thin) () -> () {
 bb0:
 
-  %0 = function_ref @switchValueCallee : $@thin (Int32) -> Int32
+  %0 = function_ref @switchValueCallee : $@convention(thin) (Int32) -> Int32
   %1 = integer_literal $Builtin.Int32, 28
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = apply %0(%2) : $@thin (Int32) -> Int32
+  %3 = apply %0(%2) : $@convention(thin) (Int32) -> Int32
   %4 = tuple ()
   return %4 : $()
 }
 
-sil @switchValueCallee : $@thin (Int32) -> Int32 {
+sil @switchValueCallee : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 27
   %2 = integer_literal $Builtin.Int32, 28
@@ -322,18 +322,18 @@ bb4(%8 : $Builtin.Int32):
 // LOG: Take bb1 of switch_enum
 
 
-sil @testSwitchEnum : $@thin () -> () {
+sil @testSwitchEnum : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @switchEnumCallee : $@thin (Optional<Int32>) -> Int32
+  %0 = function_ref @switchEnumCallee : $@convention(thin) (Optional<Int32>) -> Int32
   %1 = integer_literal $Builtin.Int32, 27
   %2 = struct $Int32 (%1 : $Builtin.Int32)
   %3 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %2 : $Int32
-  %4 = apply %0(%3) : $@thin (Optional<Int32>) -> Int32
+  %4 = apply %0(%3) : $@convention(thin) (Optional<Int32>) -> Int32
   %5 = tuple ()
   return %5 : $()
 }
 
-sil @switchEnumCallee : $@thin (Optional<Int32>) -> Int32 {
+sil @switchEnumCallee : $@convention(thin) (Optional<Int32>) -> Int32 {
 bb0(%0 : $Optional<Int32>):
   switch_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
 

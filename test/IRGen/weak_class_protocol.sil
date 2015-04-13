@@ -19,7 +19,7 @@ protocol Foo: class { }
 // CHECK:         call void @swift_unknownWeakAssign(%swift.weak* [[INSTANCE_SLOT]], %objc_object* [[INSTANCE]]) #0
 // CHECK:         ret void
 // CHECK:       }
-sil @store_weak : $@thin (@out @sil_weak Foo?, @owned Foo?) -> () {
+sil @store_weak : $@convention(thin) (@out @sil_weak Foo?, @owned Foo?) -> () {
 entry(%w : $*@sil_weak Foo?, %x : $Foo?):
   store_weak %x to %w : $*@sil_weak Foo?
   return undef : $()

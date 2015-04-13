@@ -1300,15 +1300,15 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
 /// SILGenBuiltin.cpp.
 ///
 /// %208 = thin_function_to_pointer %207 :
-///  $@thin <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer,
+///  $@convention(thin) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer,
 ///                  @inout UnsafeMutableBufferPointer<τ_0_0>,
 ///                  @thick UnsafeMutableBufferPointer<τ_0_0>.Type) -> ()
 ///                  to $Builtin.RawPointer
 /// %209 = pointer_to_thin_function %217 : $Builtin.RawPointer to
-///  $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer,
+///  $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer,
 ///          @inout UnsafeMutableBufferPointer<Int>,
 ///          @thick UnsafeMutableBufferPointer<Int>.Type) -> ()
-/// apply %209(%227, %200#1, %0, %224) : $@thin (Builtin.RawPointer,
+/// apply %209(%227, %200#1, %0, %224) : $@convention(thin) (Builtin.RawPointer,
 ///  @inout Builtin.UnsafeValueBuffer, @inout UnsafeMutableBufferPointer<Int>,
 ///  @thick UnsafeMutableBufferPointer<Int>.Type) -> ()
 ///

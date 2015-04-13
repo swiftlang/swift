@@ -219,7 +219,7 @@ func cast29(o: AnyObject) -> Bool {
   return o is CX
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test0FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test0FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -230,7 +230,7 @@ func test0() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -240,7 +240,7 @@ func test1() -> Bool {
   return cast1(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -250,7 +250,7 @@ func test2() -> Bool {
   return cast2(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test3FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test3FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -260,7 +260,7 @@ func test3() -> Bool {
   return cast3(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test4FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test4FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -270,7 +270,7 @@ func test4() -> Bool {
   return cast4(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test5_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test5_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -280,7 +280,7 @@ func test5_1() -> Bool {
     return cast5(B.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test5_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test5_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -291,7 +291,7 @@ func test5_2() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test6_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test6_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -302,7 +302,7 @@ func test6_1() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test6_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test6_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -312,7 +312,7 @@ func test6_2() -> Bool {
     return cast6(AnyObject.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test7_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test7_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -322,7 +322,7 @@ func test7_1() -> Bool {
     return cast7(B.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test7_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding7test7_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -333,7 +333,7 @@ func test7_2() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test8FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test8FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -343,7 +343,7 @@ func test8() -> Bool {
   return cast8(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test9FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test9FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -353,7 +353,7 @@ func test9() -> Bool {
   return cast9(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test10FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test10FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -363,7 +363,7 @@ func test10() -> Bool {
   return cast10(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test11FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test11FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -373,7 +373,7 @@ func test11() -> Bool {
   return cast11(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test12_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test12_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -384,7 +384,7 @@ func test12_1() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test12_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test12_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -394,7 +394,7 @@ func test12_2() -> Bool {
     return cast12(P.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test13_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test13_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -404,7 +404,7 @@ func test13_1() -> Bool {
     return cast13(A.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test13_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test13_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -414,7 +414,7 @@ func test13_2() -> Bool {
     return cast13(P.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test13_3FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test13_3FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -425,7 +425,7 @@ func test13_3() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test14_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test14_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -435,7 +435,7 @@ func test14_1() -> Bool {
     return cast14(A.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test14_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test14_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -445,7 +445,7 @@ func test14_2() -> Bool {
     return cast14(P.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test15_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test15_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -455,7 +455,7 @@ func test15_1() -> Bool {
     return cast15(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test15_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test15_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -465,7 +465,7 @@ func test15_2() -> Bool {
     return cast15(A() as P)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test16_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test16_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -475,7 +475,7 @@ func test16_1() -> Bool {
     return cast16(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test16_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test16_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -486,7 +486,7 @@ func test16_2() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test17_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test17_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -496,7 +496,7 @@ func test17_1() -> Bool {
     return cast17(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test17_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test17_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -506,7 +506,7 @@ func test17_2() -> Bool {
     return cast17(A() as AnyObject)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test18_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test18_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -516,7 +516,7 @@ func test18_1() -> Bool {
     return cast18(A())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test18_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test18_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -527,7 +527,7 @@ func test18_2() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test19FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test19FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -538,13 +538,13 @@ func test19() -> Bool {
     return t is Int.Type
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test20_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test20_1FT_Sb : $@convention(thin) () -> Bool
 @inline(never)
 func test20_1() -> Bool {
     return cast20(S.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test20_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test20_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -555,7 +555,7 @@ func test20_2() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test21_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test21_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -565,7 +565,7 @@ func test21_1() -> Bool {
     return cast21(S.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test21_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test21_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -575,7 +575,7 @@ func test21_2() -> Bool {
     return cast21(A() as P)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test22_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test22_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -585,7 +585,7 @@ func test22_1() -> Bool {
     return cast22(T.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test22_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test22_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -595,7 +595,7 @@ func test22_2() -> Bool {
     return cast22(S.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test23FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test23FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -605,7 +605,7 @@ func test23() -> Bool {
     return cast23(P.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test24_1FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test24_1FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -615,7 +615,7 @@ func test24_1() -> Bool {
     return cast24(T.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test24_2FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test24_2FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
@@ -625,7 +625,7 @@ func test24_2() -> Bool {
     return cast24(S.self)
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test24_3FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test24_3FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
@@ -636,7 +636,7 @@ func test24_3() -> Bool {
 }
 
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test25FT_Sb : $@thin () -> Bool
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test25FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool

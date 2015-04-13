@@ -9,7 +9,7 @@ import Builtin
 // CHECK: bb0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @test : $@thin <T> (@inout T, Builtin.Int64) -> () {
+sil @test : $@convention(thin) <T> (@inout T, Builtin.Int64) -> () {
 bb0(%0 : $*T, %1 : $Builtin.Int64):
   debug_value_addr %0 : $*T
   debug_value %1 : $Builtin.Int64

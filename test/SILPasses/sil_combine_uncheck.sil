@@ -19,7 +19,7 @@ class E {
 // CHECK: bb0
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: return
-sil @test_unconditional_checked_cast : $@thin <T_0_0, T_0_1> (RawBuffer) -> HeapBufferStorage<T_0_0, T_0_1> {
+sil @test_unconditional_checked_cast : $@convention(thin) <T_0_0, T_0_1> (RawBuffer) -> HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : $RawBuffer):
   %3 = unconditional_checked_cast %0 : $RawBuffer to $HeapBufferStorage<T_0_0, T_0_1>
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
@@ -29,7 +29,7 @@ bb0(%0 : $RawBuffer):
 // CHECK: bb0
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @test_cond_fail : $@thin (Builtin.Int1) -> () {
+sil @test_cond_fail : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_fail %0 : $Builtin.Int1
   %2 = tuple ()
@@ -41,7 +41,7 @@ bb0(%0 : $Builtin.Int1):
 // CHECK-NEXT: builtin "int_trap"
 // CHECK: unreachable
 // CHECK: }
-sil @test_unconditional_checked_cast_addr_fail : $@thin (@out D, @in E, @in D) -> () {
+sil @test_unconditional_checked_cast_addr_fail : $@convention(thin) (@out D, @in E, @in D) -> () {
 bb0(%0 : $*D, %1 : $*E, %2 : $*D):
   unconditional_checked_cast_addr take_always E in %1 : $*E to D in %0 : $*D
   %4 = load %2 : $*D

@@ -15,15 +15,15 @@ import Swift
 // CHECK-x86_64: %VSC36BitfieldSeparatorDifferentNameStruct = type [[BITFIELD_SEP_TYPE]]
 // CHECK-x86_64: %VSC21BitfieldSeparatorAnon = type [[BITFIELD_SEP_TYPE]]
 
-sil public_external @createBitfieldOne : $@thin @cc(cdecl) () -> BitfieldOne
-sil public_external @consumeBitfieldOne : $@thin @cc(cdecl) (BitfieldOne) -> ()
+sil public_external @createBitfieldOne : $@convention(c) () -> BitfieldOne
+sil public_external @consumeBitfieldOne : $@convention(c) (BitfieldOne) -> ()
 
 sil @test0 : $() -> () {
 bb0:
-  %0 = function_ref @createBitfieldOne : $@thin @cc(cdecl) () -> BitfieldOne
-  %1 = apply %0() : $@thin @cc(cdecl) () -> BitfieldOne
-  %2 = function_ref @consumeBitfieldOne : $@thin @cc(cdecl) (BitfieldOne) -> ()
-  apply %2(%1) : $@thin @cc(cdecl) (BitfieldOne) -> ()
+  %0 = function_ref @createBitfieldOne : $@convention(c) () -> BitfieldOne
+  %1 = apply %0() : $@convention(c) () -> BitfieldOne
+  %2 = function_ref @consumeBitfieldOne : $@convention(c) (BitfieldOne) -> ()
+  apply %2(%1) : $@convention(c) (BitfieldOne) -> ()
   %r = tuple ()
   return %r : $()
 }
@@ -93,32 +93,32 @@ bb0:
 // CHECK-x86_64:   ret void
 
 
-sil public_external @testBitfields : $@thin () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
+sil public_external @testBitfields : $@convention(thin) () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
 
 sil @testTypedefs : $() -> () {
 bb0:
-  %0 = function_ref @testBitfields : $@thin () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
-  %1 = apply %0() : $@thin () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
+  %0 = function_ref @testBitfields : $@convention(thin) () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
+  %1 = apply %0() : $@convention(thin) () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
   %r = tuple ()
   return %r : $()
 }
 
-sil public_external @createSIMDStruct : $@thin @cc(cdecl) () -> SIMDStruct
-sil public_external @consumeSIMDStruct : $@thin @cc(cdecl) SIMDStruct -> ()
+sil public_external @createSIMDStruct : $@convention(c) () -> SIMDStruct
+sil public_external @consumeSIMDStruct : $@convention(c) SIMDStruct -> ()
 
 // CHECK-x86_64-LABEL: define void @testSIMDStruct()
 // CHECK-x86_64:         alloca i128, align 16
 // CHECK-x86_64:         alloca i128, align 16
 sil @testSIMDStruct : $() -> () {
 bb0:
-  %f = function_ref @createSIMDStruct : $@thin @cc(cdecl) () -> SIMDStruct
-  %x = apply %f() : $@thin @cc(cdecl) () -> SIMDStruct
-  %g = function_ref @consumeSIMDStruct : $@thin @cc(cdecl) SIMDStruct -> ()
-  %z = apply %g(%x) : $@thin @cc(cdecl) SIMDStruct -> ()
+  %f = function_ref @createSIMDStruct : $@convention(c) () -> SIMDStruct
+  %x = apply %f() : $@convention(c) () -> SIMDStruct
+  %g = function_ref @consumeSIMDStruct : $@convention(c) SIMDStruct -> ()
+  %z = apply %g(%x) : $@convention(c) SIMDStruct -> ()
   return undef : $()
 }
 
-sil @testRecursive : $@thin () -> Builtin.Word {
+sil @testRecursive : $@convention(thin) () -> Builtin.Word {
 bb0:
   %m = metatype $@thin HasRecursivePointers.Type
   %s = builtin "sizeof"<HasRecursivePointers>(%m : $@thin HasRecursivePointers.Type) : $Builtin.Word
@@ -189,53 +189,53 @@ bb0:
 // CHECK-arm64-LABEL: declare i32 @ints(i32)
 // CHECK-arm64-LABEL: declare i32 @unsigneds(i32)
 
-sil @testIntegerExtension : $@thin (CChar, CSignedChar, CUnsignedChar, CShort, CUnsignedShort, CInt, CUnsignedInt) -> () {
+sil @testIntegerExtension : $@convention(thin) (CChar, CSignedChar, CUnsignedChar, CShort, CUnsignedShort, CInt, CUnsignedInt) -> () {
 entry(%a : $CChar, %b : $CSignedChar, %c : $CUnsignedChar, %d : $CShort, %e : $CUnsignedShort, %f : $CInt, %g : $CUnsignedInt):
-  %h = function_ref @chareth : $@thin @cc(cdecl) (CChar) -> CChar
-  %i = apply %h(%a) : $@thin @cc(cdecl) (CChar) -> CChar
+  %h = function_ref @chareth : $@convention(c) (CChar) -> CChar
+  %i = apply %h(%a) : $@convention(c) (CChar) -> CChar
 
-  %j = function_ref @signedChareth : $@thin @cc(cdecl) (CSignedChar) -> CSignedChar
-  %k = apply %j(%b) : $@thin @cc(cdecl) (CSignedChar) -> CSignedChar
+  %j = function_ref @signedChareth : $@convention(c) (CSignedChar) -> CSignedChar
+  %k = apply %j(%b) : $@convention(c) (CSignedChar) -> CSignedChar
 
-  %l = function_ref @unsignedChareth : $@thin @cc(cdecl) (CUnsignedChar) -> CUnsignedChar
-  %m = apply %l(%c) : $@thin @cc(cdecl) (CUnsignedChar) -> CUnsignedChar
+  %l = function_ref @unsignedChareth : $@convention(c) (CUnsignedChar) -> CUnsignedChar
+  %m = apply %l(%c) : $@convention(c) (CUnsignedChar) -> CUnsignedChar
 
-  %n = function_ref @eatMyShorts : $@thin @cc(cdecl) (CShort) -> CShort
-  %o = apply %n(%d) : $@thin @cc(cdecl) (CShort) -> CShort
+  %n = function_ref @eatMyShorts : $@convention(c) (CShort) -> CShort
+  %o = apply %n(%d) : $@convention(c) (CShort) -> CShort
 
-  %p = function_ref @eatMyUnsignedShorts : $@thin @cc(cdecl) (CUnsignedShort) -> CUnsignedShort
-  %q = apply %p(%e) : $@thin @cc(cdecl) (CUnsignedShort) -> CUnsignedShort
+  %p = function_ref @eatMyUnsignedShorts : $@convention(c) (CUnsignedShort) -> CUnsignedShort
+  %q = apply %p(%e) : $@convention(c) (CUnsignedShort) -> CUnsignedShort
 
-  %r = function_ref @ints : $@thin @cc(cdecl) (CInt) -> CInt
-  %s = apply %r(%f) : $@thin @cc(cdecl) (CInt) -> CInt
+  %r = function_ref @ints : $@convention(c) (CInt) -> CInt
+  %s = apply %r(%f) : $@convention(c) (CInt) -> CInt
 
-  %t = function_ref @unsigneds : $@thin @cc(cdecl) (CUnsignedInt) -> CUnsignedInt
-  %u = apply %t(%g) : $@thin @cc(cdecl) (CUnsignedInt) -> CUnsignedInt
+  %t = function_ref @unsigneds : $@convention(c) (CUnsignedInt) -> CUnsignedInt
+  %u = apply %t(%g) : $@convention(c) (CUnsignedInt) -> CUnsignedInt
 
   return undef : $()
 }
 
 // CHECK-x86_64-LABEL: define i8 @testIntegerExtensionInBlock(%objc_block*, i8)
-sil @testIntegerExtensionInBlock : $@thin (@owned @objc_block @cc(cdecl) (CChar) -> CChar, CChar) -> CChar {
-entry(%b : $@objc_block @cc(cdecl) (CChar) -> CChar, %c : $CChar):
+sil @testIntegerExtensionInBlock : $@convention(thin) (@owned @convention(block) (CChar) -> CChar, CChar) -> CChar {
+entry(%b : $@convention(block) (CChar) -> CChar, %c : $CChar):
 // CHECK-x86_64: call signext i8 {{%.*}}(%objc_block* {{%.*}}, i8 signext {{%.*}})
-  %r = apply %b(%c) : $@objc_block @cc(cdecl) (CChar) -> CChar
+  %r = apply %b(%c) : $@convention(block) (CChar) -> CChar
   return %r : $CChar
 }
 
 // CHECK-x86_64-LABEL: define void @testBitfieldInBlock
 // CHECK-x86_64:         call void {{%.*}}(%VSC11BitfieldOne* noalias sret {{%.*}}, %objc_block* {{%.*}}, %VSC11BitfieldOne* byval align 8 {{%.*}})
-sil @testBitfieldInBlock : $@thin (@owned @objc_block @cc(cdecl) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
-entry(%b : $@objc_block @cc(cdecl) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
-  %r = apply %b(%x) : $@objc_block @cc(cdecl) (BitfieldOne) -> BitfieldOne
+sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
+entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
+  %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
   return %r : $BitfieldOne
 }
 
-sil public_external @chareth : $@thin @cc(cdecl) (CChar) -> CChar
-sil public_external @signedChareth : $@thin @cc(cdecl) (CSignedChar) -> CSignedChar
-sil public_external @unsignedChareth : $@thin @cc(cdecl) (CUnsignedChar) -> CUnsignedChar
-sil public_external @eatMyShorts : $@thin @cc(cdecl) (CShort) -> CShort
-sil public_external @eatMyUnsignedShorts : $@thin @cc(cdecl) (CUnsignedShort) -> CUnsignedShort
-sil public_external @ints : $@thin @cc(cdecl) (CInt) -> CInt
-sil public_external @unsigneds : $@thin @cc(cdecl) (CUnsignedInt) -> CUnsignedInt
+sil public_external @chareth : $@convention(c) (CChar) -> CChar
+sil public_external @signedChareth : $@convention(c) (CSignedChar) -> CSignedChar
+sil public_external @unsignedChareth : $@convention(c) (CUnsignedChar) -> CUnsignedChar
+sil public_external @eatMyShorts : $@convention(c) (CShort) -> CShort
+sil public_external @eatMyUnsignedShorts : $@convention(c) (CUnsignedShort) -> CUnsignedShort
+sil public_external @ints : $@convention(c) (CInt) -> CInt
+sil public_external @unsigneds : $@convention(c) (CUnsignedInt) -> CUnsignedInt
 

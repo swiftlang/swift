@@ -26,15 +26,15 @@ class Bar {
   @objc func foo_objc()
 }
 
-sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@guaranteed Bar) -> ()
-sil @_TFC4main3Bar3foo_objcfS0_FT_T_ : $@cc(objc_method) @thin (Bar) -> ()
+sil @_TFC4main3Bar3foofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
+sil @_TFC4main3Bar3foo_objcfS0_FT_T_ : $@convention(objc_method) (Bar) -> ()
 
 sil_vtable Bar {
   #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
   #Bar.foo_objc!1: _TFC4main3Bar3foofS0_FT_T_
 }
 
-sil @looprotate : $@thin (Int32, @owned Bar) -> Int32 {
+sil @looprotate : $@convention(thin) (Int32, @owned Bar) -> Int32 {
 bb0(%0 : $Int32, %25: $Bar):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
@@ -42,8 +42,8 @@ bb0(%0 : $Int32, %25: $Bar):
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30#0 : $Builtin.NativeObject, %30#1 : $*Bool)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar, %31 : $Builtin.NativeObject, %32 : $*Bool):
-  %24 = class_method %26 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@cc(method) @thin (@guaranteed Bar) -> () // user: %6
-  %27 = apply %24(%25) : $@cc(method) @thin (@guaranteed Bar) -> ()
+  %24 = class_method %26 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %27 = apply %24(%25) : $@convention(method) (@guaranteed Bar) -> ()
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %8, bb3, bb2
@@ -74,7 +74,7 @@ bb3:
 
 // CHECK-LABEL: looprotate2
 // CHECK: return
-sil @looprotate2 : $@thin (Int32) -> Int32 {
+sil @looprotate2 : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
@@ -108,7 +108,7 @@ bb3 (%23 : $Builtin.Int32) :
 
 // CHECK-LABEL: @testnested
 // CHECK: return
-sil @testnested : $@thin () -> () {
+sil @testnested : $@convention(thin) () -> () {
 bb0:
   br bb1(undef : $Builtin.Int32, undef : $Builtin.Int32) // id: %0
 
@@ -169,7 +169,7 @@ bb10:                                             // Preds: bb1
 // CHECK: bb3:
 // CHECK:   return
 
-sil @dont_looprotate_objc : $@thin (Int32, @owned Bar) -> Int32 {
+sil @dont_looprotate_objc : $@convention(thin) (Int32, @owned Bar) -> Int32 {
 bb0(%0 : $Int32, %25: $Bar):
   %100 = alloc_ref $Bar
   %1 = struct_extract %0 : $Int32, #Int32.value
@@ -177,13 +177,13 @@ bb0(%0 : $Int32, %25: $Bar):
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar):
-  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : Bar -> () -> () , $@cc(objc_method) @thin (Bar) -> ()
+  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : Bar -> () -> () , $@convention(objc_method) (Bar) -> ()
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %8, bb3, bb2
 
 bb2:
-  %102 = apply %101(%100) : $@cc(objc_method) @thin (Bar) -> ()
+  %102 = apply %101(%100) : $@convention(objc_method) (Bar) -> ()
   %10 = integer_literal $Builtin.Int32, 1
   %12 = integer_literal $Builtin.Int1, -1
   %13 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -201,7 +201,7 @@ bb3:
   return %23 : $Int32
 }
 
-sil @readInt : $@thin (Int32) -> () {
+sil @readInt : $@convention(thin) (Int32) -> () {
 bb0(%a0 : $Int32):
   %t1 = tuple ()
   return %t1 : $()
@@ -220,7 +220,7 @@ bb0(%a0 : $Int32):
 // CHECK:  cond_br
 // CHECK: bb3:
 // CHECK:  return
-sil @struct_arg : $@thin () -> () {
+sil @struct_arg : $@convention(thin) () -> () {
 bb0:
   %c0 = integer_literal $Builtin.Int32, 0
   %c100 = integer_literal $Builtin.Int32, 100
@@ -236,8 +236,8 @@ bb3:
   %z2 = integer_literal $Builtin.Int1, 0
   %d1 = builtin "sadd_with_overflow_Word"(%a0 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %t1 = tuple_extract %d1 : $(Builtin.Int32, Builtin.Int1), 0
-  %f1 = function_ref @readInt : $@thin (Int32) -> ()
-  %l1 = apply %f1(%s0) : $@thin (Int32) -> ()
+  %f1 = function_ref @readInt : $@convention(thin) (Int32) -> ()
+  %l1 = apply %f1(%s0) : $@convention(thin) (Int32) -> ()
   br bb1(%t1 : $Builtin.Int32)
 
 bb2:
@@ -267,7 +267,7 @@ bb2:
 // CHECK:   br bb4(%
 // CHECK: bb6
 // CHECK:   return
-sil @insert_backedge_block : $@thin (@owned @callee_owned () -> Builtin.Int32) -> () {
+sil @insert_backedge_block : $@convention(thin) (@owned @callee_owned () -> Builtin.Int32) -> () {
 bb0(%0 : $@callee_owned () -> Builtin.Int32):
   %r0 = apply %0() : $@callee_owned () -> Builtin.Int32
   br bb1(%r0: $Builtin.Int32)

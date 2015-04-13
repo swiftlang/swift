@@ -14,7 +14,7 @@ import Builtin
 
 // Utilities
 
-sil @user : $@thin (Builtin.NativeObject) -> ()
+sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
 
 // Loop form 1 consists of CFG of the following form:
 //
@@ -27,8 +27,8 @@ sil @user : $@thin (Builtin.NativeObject) -> ()
 // We generate test retain release pairs at 
 % for i in range(16):
 
-// CHECK-LABEL: sil @loop_form_1_${i} : $@thin (Builtin.NativeObject) -> () {
-sil @loop_form_1_${i} : $@thin (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @loop_form_1_${i} : $@convention(thin) (Builtin.NativeObject) -> () {
+sil @loop_form_1_${i} : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0
 bb0(%0 : $Builtin.NativeObject):
 % if i & 1:
@@ -79,7 +79,7 @@ bb2:
 % for i in range(3):
 % for j in range(4):
 
-sil @loop_form_2_${i}_${j} : $@thin (Builtin.NativeObject) -> () {
+sil @loop_form_2_${i}_${j} : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0({{.*}}):
 bb0(%0 : $Builtin.NativeObject):
 % if i & 1:

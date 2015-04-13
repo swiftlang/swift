@@ -14,7 +14,7 @@ import Builtin
 class C {}
 sil_vtable C {}
 
-sil @_TFC11enum_32_bit1CD : $@thin (@owned C) -> ()
+sil @_TFC11enum_32_bit1CD : $@convention(thin) (@owned C) -> ()
 
 // CHECK-LABEL: %O11enum_32_bit3Foo = type <{ [4 x i8] }>
 enum Foo {
@@ -38,24 +38,24 @@ enum Bas {
 }
 
 // CHECK-LABEL: define void @foo(i32)
-sil @foo : $@thin (@owned Foo) -> () {
+sil @foo : $@convention(thin) (@owned Foo) -> () {
 entry(%0 : $Foo):
   return undef : $()
 }
 
 // CHECK-LABEL: define void @bar(i32)
-sil @bar : $@thin (@owned Bar) -> () {
+sil @bar : $@convention(thin) (@owned Bar) -> () {
 entry(%0 : $Bar):
   return undef : $()
 }
 
 // CHECK-LABEL: define void @bas(i32)
-sil @bas : $@thin (@owned Bas) -> () {
+sil @bas : $@convention(thin) (@owned Bas) -> () {
 entry(%0 : $Bas):
   return undef : $()
 }
 
 // Force instantiation of the IR types
-sil @indirect_foo : $@thin (@in Foo) -> ()
-sil @indirect_bar : $@thin (@in Bar) -> ()
-sil @indirect_bas : $@thin (@in Bas) -> ()
+sil @indirect_foo : $@convention(thin) (@in Foo) -> ()
+sil @indirect_bar : $@convention(thin) (@in Bar) -> ()
+sil @indirect_bas : $@convention(thin) (@in Bas) -> ()

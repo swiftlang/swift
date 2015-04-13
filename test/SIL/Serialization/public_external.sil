@@ -1,22 +1,22 @@
 // RUN: %target-swift-frontend %s -parse-sil -emit-module -module-name Swift -module-link-name swiftCore -parse-stdlib -parse-as-library -sil-serialize-all -o - | %target-sil-opt -module-name Swift -verify | FileCheck %s
 
-// CHECK-NOT: sil public_external @pe : $@thin () -> () {
-// CHECK-NOT: sil hidden_external @he : $@thin () -> () {
-// CHECK-NOT: sil shared_external @se : $@thin () -> () {
+// CHECK-NOT: sil public_external @pe : $@convention(thin) () -> () {
+// CHECK-NOT: sil hidden_external @he : $@convention(thin) () -> () {
+// CHECK-NOT: sil shared_external @se : $@convention(thin) () -> () {
 
 import Builtin
 
-sil public_external @pe : $@thin () -> () {
+sil public_external @pe : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden_external @he : $@thin () -> () {
+sil hidden_external @he : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared_external @se : $@thin () -> () {
+sil shared_external @se : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }

@@ -5,18 +5,18 @@ sil_stage canonical
 import Builtin
 
 // CHECK-LABEL: @caller_of_noinline
-sil @caller_of_noinline : $@thin () -> () {
+sil @caller_of_noinline : $@convention(thin) () -> () {
 bb0:
   // CHECK-NOT: function_ref @noinlin_callee
   // CHECK-NOT: apply
-  %0 = function_ref @noinlin_callee : $@thin (Builtin.Int64) -> Builtin.Int64
+  %0 = function_ref @noinlin_callee : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
   %2 = integer_literal $Builtin.Int64, 0
-  %3 = apply %0(%2) : $@thin (Builtin.Int64) -> Builtin.Int64
+  %3 = apply %0(%2) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
   %4 = tuple ()
   return %4 : $()
 }
 // CHECK-LABEL: [always_inline] @noinlin_callee
-sil [always_inline] @noinlin_callee : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil [always_inline] @noinlin_callee : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %2 = integer_literal $Builtin.Int1, 0
   %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)

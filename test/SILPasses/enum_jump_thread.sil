@@ -19,7 +19,7 @@ enum E2 {
 
 // CHECK-LABEL: sil @testfunc
 
-sil @testfunc : $@thin (Builtin.Int1, Builtin.Int1) -> E2 {
+sil @testfunc : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> E2 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   cond_br %0, bb1, bb4
 

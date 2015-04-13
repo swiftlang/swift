@@ -3,7 +3,7 @@
 func foo(var f: (()->())?) {
   f?()
 }
-// CHECK:    sil hidden @{{.*}}foo{{.*}} : $@thin (@owned Optional<() -> ()>) -> () {
+// CHECK:    sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> ()>):
 // CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> ()>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
@@ -18,7 +18,7 @@ func foo(var f: (()->())?) {
 // CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[F]]
 // CHECK-NEXT: [[FN0:%.*]] = load [[FN0_ADDR]]
 //   ...unnecessarily reabstract back to () -> ()...
-// CHECK:      [[T0:%.*]] = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@thin (@owned @callee_owned (@out (), @in ()) -> ()) -> ()
+// CHECK:      [[T0:%.*]] = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@owned @callee_owned (@out (), @in ()) -> ()) -> ()
 // CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
 //   .... then call it
 // CHECK-NEXT: apply [[FN1]]()
@@ -31,7 +31,7 @@ func foo(var f: (()->())?) {
 func foo2<T>(var f: (()->T)?) {
   var x = f?()
 }
-// CHECK-LABEL: sil hidden @{{.*}}foo{{.*}} : $@thin <T> (@owned Optional<() -> T>) -> ()
+// CHECK-LABEL: sil hidden @{{.*}}foo{{.*}} : $@convention(thin) <T> (@owned Optional<() -> T>) -> ()
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> T>):
 // CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> T>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
@@ -47,7 +47,7 @@ func foo2<T>(var f: (()->T)?) {
 // CHECK-NEXT: strong_retain
 //   ...evaluate the rest of the suffix...
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: [[THUNK:%.*]] = function_ref @{{.*}} : $@thin <τ_0_0> (@out τ_0_0, @owned @callee_owned (@out τ_0_0, @in ()) -> ()) -> ()
+// CHECK-NEXT: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned @callee_owned (@out τ_0_0, @in ()) -> ()) -> ()
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[THUNK]]<T>([[T0]])
 // CHECK-NEXT: apply [[T1]]([[TEMP_RESULT]])
 //   ...and coerce to T?

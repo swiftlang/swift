@@ -11,14 +11,14 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil @top_level_code
-// CHECK: function_ref @_TF18def_generic_marker4testUS_16mmCollectionType_S0__US_15mmGeneratorType__S1___FTQ_Q0__Q_ : $@thin <τ_0_0, τ_0_1 where τ_0_0 : mmCollectionType, τ_0_1 : mmCollectionType, τ_0_0.Generator : mmGeneratorType, τ_0_1.Generator : mmGeneratorType, τ_0_0.Generator.Element == τ_0_1.Generator.Element> (@out τ_0_0, @in τ_0_0, @in τ_0_1) -> ()
-sil @top_level_code : $@thin () -> () {
+// CHECK: function_ref @_TF18def_generic_marker4testUS_16mmCollectionType_S0__US_15mmGeneratorType__S1___FTQ_Q0__Q_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : mmCollectionType, τ_0_1 : mmCollectionType, τ_0_0.Generator : mmGeneratorType, τ_0_1.Generator : mmGeneratorType, τ_0_0.Generator.Element == τ_0_1.Generator.Element> (@out τ_0_0, @in τ_0_0, @in τ_0_1) -> ()
+sil @top_level_code : $@convention(thin) () -> () {
 bb0:
-  %43 = function_ref @_TF18def_generic_marker4testUS_16mmCollectionType_S0__US_15mmGeneratorType__S1___FTQ_Q0__Q_ : $@thin <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator : mmGeneratorType, EC2.Generator : mmGeneratorType, EC1.Generator.Element == EC2.Generator.Element> (@out EC1, @in EC1, @in EC2) -> ()
+  %43 = function_ref @_TF18def_generic_marker4testUS_16mmCollectionType_S0__US_15mmGeneratorType__S1___FTQ_Q0__Q_ : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator : mmGeneratorType, EC2.Generator : mmGeneratorType, EC1.Generator.Element == EC2.Generator.Element> (@out EC1, @in EC1, @in EC2) -> ()
   %0 = tuple ()
   return %0 : $()
 }
 
 // Make sure the function body is deserialized.
-// CHECK-LABEL: @_TF18def_generic_marker4testUS_16mmCollectionType_S0__US_15mmGeneratorType__S1___FTQ_Q0__Q_ : $@thin <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator : mmGeneratorType, EC2.Generator : mmGeneratorType, EC1.Generator.Element == EC2.Generator.Element> (@out EC1, @in EC1, @in EC2) -> () {
-sil @_TF18def_generic_marker4testUS_16mmCollectionType_S0__US_15mmGeneratorType__S1___FTQ_Q0__Q_ : $@thin <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator : mmGeneratorType, EC2.Generator : mmGeneratorType, EC1.Generator.Element == EC2.Generator.Element> (@out EC1, @in EC1, @in EC2) -> ()
+// CHECK-LABEL: @_TF18def_generic_marker4testUS_16mmCollectionType_S0__US_15mmGeneratorType__S1___FTQ_Q0__Q_ : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator : mmGeneratorType, EC2.Generator : mmGeneratorType, EC1.Generator.Element == EC2.Generator.Element> (@out EC1, @in EC1, @in EC2) -> () {
+sil @_TF18def_generic_marker4testUS_16mmCollectionType_S0__US_15mmGeneratorType__S1___FTQ_Q0__Q_ : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator : mmGeneratorType, EC2.Generator : mmGeneratorType, EC1.Generator.Element == EC2.Generator.Element> (@out EC1, @in EC1, @in EC2) -> ()

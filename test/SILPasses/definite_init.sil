@@ -4,13 +4,13 @@ import Builtin
 import Swift
 
 
-sil @takes_Int_inout : $@thin (@inout Int) -> ()
-sil @makesInt : $@thin () -> Int
+sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
+sil @makesInt : $@convention(thin) () -> Int
 
 
 
 // CHECK-LABEL: sil @use_before_init
-sil @use_before_init : $@thin () -> Int {
+sil @use_before_init : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_box $Int
   %1 = mark_uninitialized [var] %0#1 : $*Int // expected-note {{variable defined here}}
@@ -21,13 +21,13 @@ bb0:
 
 
 // CHECK-LABEL: @inout_uninit
-sil @inout_uninit : $@thin () -> () {
+sil @inout_uninit : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $Int
   %1 = mark_uninitialized [var] %0#1 : $*Int // expected-note {{variable defined here}}
 
-  %5 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
-  %6 = apply %5(%1) : $@thin (@inout Int) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
+  %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@inout Int) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
   
   %t = tuple ()
   strong_release %0#0 : $Builtin.NativeObject
@@ -45,15 +45,15 @@ bb0:
 //  return (t,a)
 //}
 // CHECK-LABEL: sil @used_by_inout
-sil @used_by_inout : $@thin (Int) -> (Int, Int) {
+sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
   %91 = alloc_box $Int
   %1 = mark_uninitialized [var] %91#1 : $*Int
 
   %2 = store %0 to %1 : $*Int
   %3 = load %1 : $*Int
-  %5 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
-  %6 = apply %5(%1) : $@thin (@inout Int) -> ()
+  %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@inout Int) -> ()
   %7 = load %1 : $*Int
   %8 = tuple (%3 : $Int, %7 : $Int)
   strong_release %91#0 : $Builtin.NativeObject
@@ -67,17 +67,17 @@ struct AddressOnlyStruct {
 }
 
 /// returns_generic_struct - This returns a struct by reference.
-sil @returns_generic_struct : $@thin (@out AddressOnlyStruct) -> ()
+sil @returns_generic_struct : $@convention(thin) (@out AddressOnlyStruct) -> ()
 
 // There should be no error in this function.
 // CHECK-LABEL: sil @call_struct_return_function
-sil @call_struct_return_function : $@thin () -> Int {
+sil @call_struct_return_function : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_box $AddressOnlyStruct
   %1 = mark_uninitialized [var] %0#1 : $*AddressOnlyStruct
 
-  %2 = function_ref @returns_generic_struct : $@thin (@out AddressOnlyStruct) -> ()
-  %3 = apply %2(%1) : $@thin (@out AddressOnlyStruct) -> ()
+  %2 = function_ref @returns_generic_struct : $@convention(thin) (@out AddressOnlyStruct) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@out AddressOnlyStruct) -> ()
   %4 = struct_element_addr %1 : $*AddressOnlyStruct, #AddressOnlyStruct.b
   %5 = load %4 : $*Int
   strong_release %0#0 : $Builtin.NativeObject
@@ -86,15 +86,15 @@ bb0:
 
 
 // CHECK-LABEL: sil @tuple_elements1
-sil @tuple_elements1 : $@thin (Int) -> () {
+sil @tuple_elements1 : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box $(Int, Int)
   %3 = mark_uninitialized [var] %2#1 : $*(Int, Int) // expected-note {{variable defined here}}
   %4 = tuple_element_addr %3 : $*(Int, Int), 0
   %5 = tuple_element_addr %3 : $*(Int, Int), 1
-  %14 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
+  %14 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
   %15 = tuple_element_addr %3 : $*(Int, Int), 1
-  %16 = apply %14(%15) : $@thin (@inout Int) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
+  %16 = apply %14(%15) : $@convention(thin) (@inout Int) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
 
   strong_release %2#0 : $Builtin.NativeObject
   %99 = tuple ()
@@ -102,7 +102,7 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: sil @tuple_elements2
-sil @tuple_elements2 : $@thin (Int) -> (Int, Int) {
+sil @tuple_elements2 : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
   %2 = alloc_box $(Int, Int)
   %3 = mark_uninitialized [var] %2#1 : $*(Int, Int) // expected-note {{variable defined here}}
@@ -119,7 +119,7 @@ bb0(%0 : $Int):
 
 
 // CHECK-LABEL: sil @copy_addr1
-sil @copy_addr1 : $@thin <T> (@out T, @in T) -> () {
+sil @copy_addr1 : $@convention(thin) <T> (@out T, @in T) -> () {
 bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $T
   %4 = mark_uninitialized [var] %3#1 : $*T
@@ -131,7 +131,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // CHECK-LABEL: sil @copy_addr2
-sil @copy_addr2 : $@thin <T> (@out T, @in T) -> () {
+sil @copy_addr2 : $@convention(thin) <T> (@out T, @in T) -> () {
 bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $T
   %4 = mark_uninitialized [var] %3#1 : $*T // expected-note {{variable defined here}}
@@ -142,20 +142,20 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 
-sil @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-sil @closure0 : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
+sil @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
 
 // CHECK-LABEL: sil @closure_test
-sil @closure_test : $@thin () -> () {
+sil @closure_test : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_box $Int
   %0 = mark_uninitialized [var] %1#1 : $*Int // expected-note {{variable defined here}}
 
-  %5 = function_ref @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+  %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
   strong_retain %1#0 : $Builtin.NativeObject
-  %8 = partial_apply %6(%1#0, %0) : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
-  %9 = apply %5(%8) : $@thin (@callee_owned () -> ()) -> ()
+  %8 = partial_apply %6(%1#0, %0) : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
+  %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
   strong_release %1#0 : $Builtin.NativeObject
 
   %11 = tuple ()
@@ -165,12 +165,12 @@ bb0:
 
 class SomeClass {}
 
-sil @getSomeClass : $@thin () -> @owned SomeClass
-sil @getSomeOptionalClass : $@thin () -> Optional<SomeClass>
+sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
+sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 
 
 // CHECK-LABEL: sil @assign_test_trivial
-sil @assign_test_trivial : $@thin (Int) -> Int {
+sil @assign_test_trivial : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %7 = alloc_box $Int
   %1 = mark_uninitialized [var] %7#1 : $*Int
@@ -188,7 +188,7 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: sil @assign_test_nontrivial
-sil @assign_test_nontrivial : $@thin () -> () {
+sil @assign_test_nontrivial : $@convention(thin) () -> () {
 bb0:
   // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
   // lone store), the second becomes an assignment (retain/release dance).
@@ -196,15 +196,15 @@ bb0:
   %b = alloc_box $SomeClass
   %c = mark_uninitialized [var] %b#1 : $*SomeClass
 
-  %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
 
-  %4 = apply %f() : $@thin () -> @owned SomeClass
+  %4 = apply %f() : $@convention(thin) () -> @owned SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
   assign %4 to %c : $*SomeClass
   // CHECK-NEXT: store
 
-  %8 = apply %f() : $@thin () -> @owned SomeClass
+  %8 = apply %f() : $@convention(thin) () -> @owned SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   assign %8 to %c : $*SomeClass
@@ -222,7 +222,7 @@ bb0:
 
 
 // CHECK-LABEL: sil @assign_test_addressonly
-sil @assign_test_addressonly : $@thin <T> (@out T, @in T) -> () {
+sil @assign_test_addressonly : $@convention(thin) <T> (@out T, @in T) -> () {
 bb0(%0 : $*T, %1 : $*T):
   %b = alloc_box $T
   %2 = mark_uninitialized [var] %b#1 : $*T
@@ -259,9 +259,9 @@ bb0:
   // Invalid load to keep the alloc_box around so we can check init semantics.
   load %c : $*@sil_weak Optional<SomeClass>    // expected-error {{used before being initialized}}
 
-  %f = function_ref @getSomeOptionalClass : $@thin () -> Optional<SomeClass>
+  %f = function_ref @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 
-  %4 = apply %f() : $@thin () -> Optional<SomeClass>
+  %4 = apply %f() : $@convention(thin) () -> Optional<SomeClass>
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // This should become an initialization.
@@ -271,7 +271,7 @@ bb0:
   release_value %4 : $Optional<SomeClass>
   // CHECK-NEXT: release_value [[C1]]
 
-  %8 = apply %f() : $@thin () -> Optional<SomeClass>
+  %8 = apply %f() : $@convention(thin) () -> Optional<SomeClass>
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   store_weak %8 to %c : $*@sil_weak Optional<SomeClass>
@@ -295,9 +295,9 @@ bb0:
   %b = alloc_box $@sil_unowned SomeClass
   %c = mark_uninitialized [var] %b#1 : $*@sil_unowned SomeClass
 
-  %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
 
-  %4 = apply %f() : $@thin () -> @owned SomeClass
+  %4 = apply %f() : $@convention(thin) () -> @owned SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // This should become an initialization.
@@ -310,7 +310,7 @@ bb0:
   strong_release %4 : $SomeClass
   // CHECK-NEXT: strong_release [[C1]]
 
-  %8 = apply %f() : $@thin () -> @owned SomeClass
+  %8 = apply %f() : $@convention(thin) () -> @owned SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
   %9 = ref_to_unowned %8 : $SomeClass to $@sil_unowned SomeClass
@@ -341,7 +341,7 @@ struct ContainsNativeObject {
   var y : Builtin.NativeObject
 }
 
-sil @test_struct : $@thin (@inout ContainsNativeObject) -> () {
+sil @test_struct : $@convention(thin) (@inout ContainsNativeObject) -> () {
 bb0(%0 : $*ContainsNativeObject):
   %b = alloc_box $ContainsNativeObject
   %c = mark_uninitialized [var] %b#1 : $*ContainsNativeObject
@@ -357,7 +357,7 @@ bb0(%0 : $*ContainsNativeObject):
 // CHECK-NOT: load
 // CHECK: store
 // CHECK: return
-sil @non_box_assign_trivial : $@thin (@inout Bool, Bool) -> () {
+sil @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
 bb0(%0 : $*Bool, %1 : $Bool):
   assign %1 to %0 : $*Bool
   %9 = tuple ()
@@ -368,7 +368,7 @@ bb0(%0 : $*Bool, %1 : $Bool):
 // CHECK: load
 // CHECK: store
 // CHECK: return
-sil @non_box_assign : $@thin (@inout SomeClass, @owned SomeClass) -> () {
+sil @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
 bb0(%0 : $*SomeClass, %1 : $SomeClass):
   assign %1 to %0 : $*SomeClass
   %9 = tuple ()
@@ -391,18 +391,18 @@ sil @test_tlc : $() -> () {
 
 
 struct XYStruct { var x, y : Int }
-sil @init_xy_struct : $@thin () -> XYStruct
+sil @init_xy_struct : $@convention(thin) () -> XYStruct
 
 
 
 protocol P {}
 class C : P {}
 
-sil @use : $@thin (@in P) -> ()
+sil @use : $@convention(thin) (@in P) -> ()
 
 
 // CHECK-LABEL: sil @release_not_constructed
-sil @release_not_constructed : $@thin () -> () {
+sil @release_not_constructed : $@convention(thin) () -> () {
 bb0:  // CHECK: bb0:
   %3 = alloc_stack $SomeClass
   // CHECK-NEXT: alloc_stack
@@ -421,14 +421,14 @@ bb0:  // CHECK: bb0:
 }
 
 // CHECK-LABEL: sil @release_some_constructed
-sil @release_some_constructed : $@thin () -> () {
+sil @release_some_constructed : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   %b = alloc_stack $(SomeClass, SomeClass)
   %1 = mark_uninitialized [var] %b#1 : $*(SomeClass, SomeClass)
 
-  %2 = function_ref @getSomeClass : $@thin () -> @owned SomeClass
-  %3 = apply %2() : $@thin () -> @owned SomeClass
+  %2 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %3 = apply %2() : $@convention(thin) () -> @owned SomeClass
   %4 = tuple_element_addr %1 : $*(SomeClass, SomeClass), 0
   store %3 to %4 : $*SomeClass
   // CHECK: store
@@ -449,7 +449,7 @@ bb0:
 
 // rdar://15379013
 // CHECK-LABEL: sil @init_existential_with_class
-sil @init_existential_with_class : $@thin (@inout C) -> () {
+sil @init_existential_with_class : $@convention(thin) (@inout C) -> () {
 entry(%a : $*C):
   %p = alloc_stack $P
   %b = mark_uninitialized [var] %p#1 : $*P
@@ -458,8 +458,8 @@ entry(%a : $*C):
   
   // CHECK: copy_addr {{.*}} to [initialization] %2 : $*C
   copy_addr %a to [initialization] %q : $*C
-  %u = function_ref @use : $@thin (@in P) -> ()
-  %v = apply %u(%b) : $@thin (@in P) -> ()
+  %u = function_ref @use : $@convention(thin) (@in P) -> ()
+  %v = apply %u(%b) : $@convention(thin) (@in P) -> ()
   dealloc_stack %p#0 : $*@local_storage P
   %z = tuple ()
   return %z : $()
@@ -470,7 +470,7 @@ entry(%a : $*C):
 // initialized on some paths, we need to either hoist up the destroy_addr or 
 // emit a boolean control value to make sure the value is only destroyed if
 //  actually initialized.
-sil @conditional_init : $@thin (Bool) -> () {
+sil @conditional_init : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %2 = alloc_stack $SomeClass
   %3 = mark_uninitialized [var] %2#1 : $*SomeClass
@@ -486,8 +486,8 @@ bb1:
 // CHECK: function_ref @getSomeClass
 // CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
 // CHECK: store [[ONE]] to [[CONTROL]]#1 : $*Builtin.Int1
-  %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
-  %6 = apply %f() : $@thin () -> @owned SomeClass
+  %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %6 = apply %f() : $@convention(thin) () -> @owned SomeClass
   assign %6 to %3 : $*SomeClass
   br bb2
 
@@ -499,7 +499,7 @@ bb2:
 }
 
 // CHECK-LABEL: sil @conditionalInitOrAssign
-sil @conditionalInitOrAssign : $@thin (Builtin.Int1) -> () {
+sil @conditionalInitOrAssign : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   // CHECK: [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
   // CHECK: [[CLASSVAL:%[0-9]+]] = alloc_stack $SomeClass
@@ -511,9 +511,9 @@ bb0(%0 : $Builtin.Int1):
 
 bb1:
   // CHECK: = function_ref
-  %2 = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  %2 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   // CHECK-NEXT: [[V1:%[0-9]+]] = apply
-  %12 = apply %2() : $@thin () -> @owned SomeClass
+  %12 = apply %2() : $@convention(thin) () -> @owned SomeClass
 
   // This assign becomes a simple store, since it is an initialize. This updates
   // the control variable to say that it is initialized.
@@ -524,10 +524,10 @@ bb1:
   br bb2                                          // id: %14
 
 bb2:
-  // CHECK: = function_ref @getSomeClass : $@thin () -> @owned SomeClass
-  %3 = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  // CHECK: = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %3 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
   // CHECK-NEXT: [[V2:%[0-9]+]] = apply
-  %17 = apply %3() : $@thin () -> @owned SomeClass
+  %17 = apply %3() : $@convention(thin) () -> @owned SomeClass
   
   // This assign is either an initialize or an assign depending on whether %0 is
   // true or not.  This gets expanded out to a conditional destroy of the value.
@@ -557,7 +557,7 @@ class RootClassWithIVars {
 
 
 // CHECK-LABEL: sil @rootclass_test1
-sil @rootclass_test1 : $@cc(method) @thin (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
 bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
@@ -577,7 +577,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int):
 }
 
 // CHECK-LABEL: sil @rootclass_test2
-sil @rootclass_test2 : $@cc(method) @thin (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+sil @rootclass_test2 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
 bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
@@ -595,7 +595,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int):
 }
 
 // CHECK-LABEL: sil @rootclass_test3
-sil @rootclass_test3 : $@cc(method) @thin (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+sil @rootclass_test3 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
 bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars  
 
@@ -610,18 +610,18 @@ class DerivedClassWithIVars : RootClassWithIVars {
   override init()
 }
 
-sil @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+sil @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
 
-sil @derived_test1 :  $@cc(method) @thin (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
+sil @derived_test1 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars):
   %1 = alloc_box $DerivedClassWithIVars
   %3 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithIVars
   store %0 to %3 : $*DerivedClassWithIVars
 
   // Get an int
-  %5 = function_ref @makesInt : $@thin () -> Int
-  %7 = apply %5() : $@thin () -> Int
+  %5 = function_ref @makesInt : $@convention(thin) () -> Int
+  %7 = apply %5() : $@convention(thin) () -> Int
 
   // Initialize the 'a' ivar with the int.
   %8 = load %3 : $*DerivedClassWithIVars
@@ -631,8 +631,8 @@ bb0(%0 : $DerivedClassWithIVars):
 
   %11 = load %3 : $*DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
-  %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
-  %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %15 = apply %14(%13) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
   %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
   assign %16 to %3 : $*DerivedClassWithIVars
@@ -642,7 +642,7 @@ bb0(%0 : $DerivedClassWithIVars):
   return %18 : $DerivedClassWithIVars
 }
 
-sil @derived_test2 :  $@cc(method) @thin (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
+sil @derived_test2 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars):
   %1 = alloc_box $DerivedClassWithIVars
   %3 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithIVars
@@ -650,8 +650,8 @@ bb0(%0 : $DerivedClassWithIVars):
 
   %11 = load %3 : $*DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
-  %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
-  %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars     // expected-error {{property 'self.a' not initialized at super.init call}}
+  %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %15 = apply %14(%13) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars     // expected-error {{property 'self.a' not initialized at super.init call}}
 
   %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
   assign %16 to %3 : $*DerivedClassWithIVars
@@ -668,22 +668,22 @@ struct MyStruct : P {}
 //CHECK-NEXT: store
 //CHECK-NEXT: load
 //CHECK:  return
-sil @self_init_assert_instruction : $@thin (Int, @thin MyStruct.Type) -> MyStruct {
+sil @self_init_assert_instruction : $@convention(thin) (Int, @thin MyStruct.Type) -> MyStruct {
 bb0(%0 : $Int, %1 : $@thin MyStruct.Type):
   %2 = alloc_stack $MyStruct  // var self         // users: %3, %10
   %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct // users: %8, %9
   debug_value %0 : $Int  // let i                 // id: %4
   %5 = metatype $@thin MyStruct.Type              // user: %7
   // function_ref main.MyStruct.init (main.MyStruct.Type)() -> main.MyStruct
-  %6 = function_ref @selfinit : $@thin (@thin MyStruct.Type) -> MyStruct // user: %7
-  %7 = apply %6(%5) : $@thin (@thin MyStruct.Type) -> MyStruct // user: %8
+  %6 = function_ref @selfinit : $@convention(thin) (@thin MyStruct.Type) -> MyStruct // user: %7
+  %7 = apply %6(%5) : $@convention(thin) (@thin MyStruct.Type) -> MyStruct // user: %8
   assign %7 to %3 : $*MyStruct                    // id: %8
   %9 = load %3 : $*MyStruct                       // user: %11
   dealloc_stack %2#0 : $*@local_storage MyStruct  // id: %10
   return %9 : $MyStruct                           // id: %11
 }
 
-sil @selfinit : $@thin (@thin MyStruct.Type) -> MyStruct // user: %7
+sil @selfinit : $@convention(thin) (@thin MyStruct.Type) -> MyStruct // user: %7
 
 struct MyStruct2 {
   var x: P
@@ -691,21 +691,21 @@ struct MyStruct2 {
   init()
 }
 
-sil @selfinit_delegate : $@thin (@out MyStruct2, @thin MyStruct2.Type) -> ()
+sil @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
 
 // <rdar://problem/18089574> Protocol member in struct + delegating init miscompilation
 // CHECK-LABEL: @self_init_copyaddr
-sil @self_init_copyaddr : $@thin (@out MyStruct2, @thin MyStruct2.Type) -> () {
+sil @self_init_copyaddr : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> () {
 bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
   // CHECK: [[SELF:%[0-9]+]] = alloc_stack $MyStruct2
   %2 = alloc_stack $MyStruct2  // var self
   %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct2
   %6 = metatype $@thin MyStruct2.Type
-  %7 = function_ref @selfinit_delegate : $@thin (@out MyStruct2, @thin MyStruct2.Type) -> ()
+  %7 = function_ref @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
   %8 = alloc_stack $MyStruct2
 
   // Make sure this copy_addr ends up being an initialization.
-  apply %7(%8#1, %6) : $@thin (@out MyStruct2, @thin MyStruct2.Type) -> ()
+  apply %7(%8#1, %6) : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
   copy_addr [take] %8#1 to %3 : $*MyStruct2
   dealloc_stack %8#0 : $*@local_storage MyStruct2
 
@@ -733,7 +733,7 @@ class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStored
 // CHECK-LABEL: sil @test_root_release
 // CHECK-NEXT: bb0(%0 :
 // CHECK-NEXT: dealloc_ref %0
-sil @test_root_release : $@cc(method) @thin (@owned RootClassWithNontrivialStoredProperties) -> () {
+sil @test_root_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
   strong_release %4 : $RootClassWithNontrivialStoredProperties  // expected-error {{all stored properties of a class instance must be initialized before returning nil from an initializer}}
@@ -750,7 +750,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-NEXT: ref_element_addr
 // CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_ref %0
-sil @test_root_partial_release : $@cc(method) @thin (@owned RootClassWithNontrivialStoredProperties) -> () {
+sil @test_root_partial_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
 
@@ -772,7 +772,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-NEXT: dealloc_ref [[SELF]]
 // CHECK-NEXT: dealloc_stack [[SELFBOX]]
 
-sil @test_derived_release : $@cc(method) @thin (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+sil @test_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithNontrivialStoredProperties
@@ -802,7 +802,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: dealloc_ref [[SELF]]
 // CHECK-NEXT: dealloc_stack [[SELFBOX]]
 
-sil @test_derived_partial_release : $@cc(method) @thin (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+sil @test_derived_partial_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithNontrivialStoredProperties
@@ -828,7 +828,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
 // CHECK-NEXT: dealloc_ref [[SELF]]
 // CHECK-NEXT: dealloc_box $RootClassWithNontrivialStoredProperties, [[SELFBOX]]#0
-sil @test_delegating_release : $@cc(method) @thin (@owned RootClassWithNontrivialStoredProperties) -> () {
+sil @test_delegating_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $RootClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [delegatingself] %2#1 : $*RootClassWithNontrivialStoredProperties
@@ -846,7 +846,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
 // CHECK-NEXT: dealloc_ref [[SELF]]
 // CHECK-NEXT: dealloc_stack [[SELFBOX]]#0
-sil @test_delegating_derived_release : $@cc(method) @thin (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+sil @test_delegating_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %2 = alloc_stack $DerivedClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [delegatingself] %2#1 : $*DerivedClassWithNontrivialStoredProperties
@@ -861,7 +861,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 
 
 // <rdar://problem/18199087> DI doesn't catch use of super properties lexically inside super.init call
-sil @super_init_out_of_order :  $@cc(method) @thin (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
+sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
 bb0(%0 : $DerivedClassWithIVars, %i : $Int):
   %1 = alloc_box $DerivedClassWithIVars
   %3 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithIVars
@@ -876,7 +876,7 @@ bb0(%0 : $DerivedClassWithIVars, %i : $Int):
   // Get the super.init function information, but don't apply it.
   %11 = load %3 : $*DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
-  %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
   // Access a super property before super.init is called.
   %a = load %3 : $*DerivedClassWithIVars
@@ -885,7 +885,7 @@ bb0(%0 : $DerivedClassWithIVars, %i : $Int):
   load %c : $*Int
 
   // Call super.init.
-  %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %15 = apply %14(%13) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
   %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
   assign %16 to %3 : $*DerivedClassWithIVars

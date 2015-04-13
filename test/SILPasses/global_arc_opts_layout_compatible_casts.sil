@@ -13,10 +13,10 @@ enum FakeOptional<T> {
 }
 
 // Simple test that stripping works.
-// CHECK-LABEL: sil @test1 : $@thin (C) -> () {
+// CHECK-LABEL: sil @test1 : $@convention(thin) (C) -> () {
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-sil @test1 : $@thin (C) -> () {
+sil @test1 : $@convention(thin) (C) -> () {
 bb0(%0 : $C):
   strong_retain %0 : $C
   %1 = unchecked_ref_bit_cast %0 : $C to $Builtin.NativeObject
@@ -28,12 +28,12 @@ bb0(%0 : $C):
 // We allow for matching up of retain_value, strong_release now that we
 // have unchecked_ref_bit_cast.
 
-// CHECK-LABEL: sil @test2 : $@thin (FakeOptional<C>, FakeOptional<C>) -> () {
+// CHECK-LABEL: sil @test2 : $@convention(thin) (FakeOptional<C>, FakeOptional<C>) -> () {
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
 // CHECK-NOT: retain_value
 // CHECK-NOT: release_value
-sil @test2 : $@thin (FakeOptional<C>, FakeOptional<C>) -> () {
+sil @test2 : $@convention(thin) (FakeOptional<C>, FakeOptional<C>) -> () {
 bb0(%0 : $FakeOptional<C>, %1 : $FakeOptional<C>):
   retain_value %0 : $FakeOptional<C>
   %2 = unchecked_ref_bit_cast %0 : $FakeOptional<C> to $C

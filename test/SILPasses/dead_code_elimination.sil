@@ -6,7 +6,7 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil @dead1
-sil @dead1 : $@thin (Int32, Int32) -> Int32 {
+sil @dead1 : $@convention(thin) (Int32, Int32) -> Int32 {
 // CHECK: bb0
 bb0(%0 : $Int32, %1 : $Int32):
   %3 = struct_extract %0 : $Int32, #Int32.value
@@ -20,7 +20,7 @@ bb0(%0 : $Int32, %1 : $Int32):
 }
 
 // CHECK-LABEL: sil @dead2
-sil @dead2 : $@thin () -> () {
+sil @dead2 : $@convention(thin) () -> () {
 // CHECK: bb0
 bb0:
 // CHECK-NOT: integer_literal $Builtin.Int32, 2
@@ -60,7 +60,7 @@ bb3:
 // We currently bail out on functions that have structurally infinite
 // loops.
 // CHECK-LABEL: sil @dead3
-sil @dead3 : $@thin () -> () {
+sil @dead3 : $@convention(thin) () -> () {
 // CHECK: bb0
 bb0:
 // CHECK: integer_literal $Builtin.Int32, 0
@@ -69,7 +69,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil hidden @test_dce_bbargs
-sil hidden @test_dce_bbargs : $@thin () -> () {
+sil hidden @test_dce_bbargs : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int32, 0
   %1 = struct $Int32 (%0 : $Builtin.Int32)

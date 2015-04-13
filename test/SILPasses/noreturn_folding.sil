@@ -14,13 +14,13 @@ struct Int64 {
 // CHECK: apply %[[E]]
 // CHECK: unreachable
 
-sil private @unreachable_outside_block_user : $@thin () -> Int64 {
+sil private @unreachable_outside_block_user : $@convention(thin) () -> Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int1, -1
   %1 = integer_literal $Builtin.Int32, 3
   // function_ref exit
-  %2 = function_ref @exit : $@thin @noreturn (Builtin.Int32) -> ()
-  %3 = apply %2(%1) : $@thin @noreturn (Builtin.Int32) -> ()
+  %2 = function_ref @exit : $@convention(thin) @noreturn (Builtin.Int32) -> ()
+  %3 = apply %2(%1) : $@convention(thin) @noreturn (Builtin.Int32) -> ()
   %4 = integer_literal $Builtin.Int64, 7
   cond_br %0, bb1, bb2
 
@@ -40,4 +40,4 @@ bb3 (%11: $Int64):
   return %11 : $Int64
 }
 
-sil @exit : $@thin @noreturn (Builtin.Int32) -> ()
+sil @exit : $@convention(thin) @noreturn (Builtin.Int32) -> ()

@@ -18,7 +18,7 @@ class GenericInheritsObjC<D> : Gizmo {
   override init()
 }
 sil_vtable GenericInheritsObjC {}
-sil @_TFC15generic_classes19GenericInheritsObjCD : $@cc(method) @thin <T> (GenericInheritsObjC<T>) -> ()
+sil @_TFC15generic_classes19GenericInheritsObjCD : $@convention(method) <T> (GenericInheritsObjC<T>) -> ()
 
 class GenericInheritsObjC2<E> : Gizmo {
   var x : UInt8
@@ -28,6 +28,6 @@ class GenericInheritsObjC2<E> : Gizmo {
   override init()
 }
 sil_vtable GenericInheritsObjC2 {}
-sil @_TFC15generic_classes20GenericInheritsObjC2D : $@cc(method) @thin <T> (GenericInheritsObjC2<T>) -> ()
+sil @_TFC15generic_classes20GenericInheritsObjC2D : $@convention(method) <T> (GenericInheritsObjC2<T>) -> ()
 
 

@@ -12,14 +12,14 @@ sil_global private @globalinit_token0 : $Builtin.Word
 
 // Linkage types.
 
-// CHECK-LABEL: sil shared @clang_thunk : $@thin () -> ()
+// CHECK-LABEL: sil shared @clang_thunk : $@convention(thin) () -> ()
 sil shared @clang_thunk : $() -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
 }
 
-// CHECK-LABEL: sil private @internal_fn : $@thin () -> ()
+// CHECK-LABEL: sil private @internal_fn : $@convention(thin) () -> ()
 sil private @internal_fn : $() -> () {
 bb0:
   %0 = tuple ()
@@ -38,12 +38,12 @@ class Class2 {
   init()
 }
 
-sil @type_ref1 : $(Class1, Int) -> ()  // CHECK-LABEL: sil @type_ref1 : $@thin (Class1, Int)
+sil @type_ref1 : $(Class1, Int) -> ()  // CHECK-LABEL: sil @type_ref1 : $@convention(thin) (Class1, Int)
 
 
 // Instructions
 
-sil @test1 : $() -> () {              // CHECK-LABEL: sil @test1 : $@thin () -> ()
+sil @test1 : $() -> () {              // CHECK-LABEL: sil @test1 : $@convention(thin) () -> ()
 bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
   br bb1                              // CHECK:   br bb1
@@ -56,7 +56,7 @@ bb1:
 }
 
 // Forward referenced values.
-sil @test2 : $(Int) -> () {               // CHECK-LABEL: sil @test2 : $@thin (Int) -> ()
+sil @test2 : $(Int) -> () {               // CHECK-LABEL: sil @test2 : $@convention(thin) (Int) -> ()
 bb0(%0 : $Int):
   br bb2
 bb1:
@@ -77,7 +77,7 @@ sil @named_tuple : $() -> (x: Builtin.Word, Builtin.Word) {
   %10 = return %9 : $(x: Builtin.Word, Builtin.Word)
 }
 
-sil @return_int : $@thin (Int) -> Int { // CHECK: $@thin (Int) -> Int {
+sil @return_int : $@convention(thin) (Int) -> Int { // CHECK: $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                          // CHECK: bb0(%0 : $Int):
   %1 = alloc_stack $Int                  // CHECK: alloc_stack $Int
   store %0 to %1#1 : $*Int               // CHECK: store %0 to %1#1 : $*Int
@@ -86,7 +86,7 @@ bb0(%0 : $Int):                          // CHECK: bb0(%0 : $Int):
   return %3 : $Int                       // CHECK: return {{.*}} : $Int
 }
 
-sil @call_fn_pointer : $@thin (() -> Int) -> Int {
+sil @call_fn_pointer : $@convention(thin) (() -> Int) -> Int {
 bb0(%0 : $() -> Int):
   %1 = alloc_stack $() -> Int            // CHECK: alloc_stack $() -> Int
   store %0 to %1#1 : $*() -> Int         // CHECK: store %0 to %1#1 : $*() -> Int
@@ -99,10 +99,10 @@ bb0(%0 : $() -> Int):
   return %5 : $Int                       // CHECK: return %5 : $Int
 }
 
-sil @return_constant : $@thin () -> Int {  // CHECK-LABEL: @return_constant
+sil @return_constant : $@convention(thin) () -> Int {  // CHECK-LABEL: @return_constant
 bb0:                                         // CHECK: bb0:
-  // CHECK: function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Word, @thin Int.Type) -> Int
-  %1 = function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Word, @thin Int.Type) -> Int
+  // CHECK: function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+  %1 = function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
 
   // CHECK: metatype $@thin Int.Type
   %2 = metatype $@thin Int.Type
@@ -111,43 +111,43 @@ bb0:                                         // CHECK: bb0:
   %3 = integer_literal $Builtin.Word, 1
   
   // CHECK: apply
-  %4 = apply %1(%3, %2) : $@thin (Builtin.Word, @thin Int.Type) -> Int
+  %4 = apply %1(%3, %2) : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
   // CHECK: return
   %5 = return %4 : $Int
 }
 
-sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Word, @thin Int.Type) -> Int
+sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
 
 // Parse SIL generated from the following swift program:
 // func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
-sil @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
-sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+sil @_TSb13getLogicValuefRSbFT_Bi1_ : $@convention(method) (@inout Bool) -> Builtin.Int1
+sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
 
 // CHECK-LABEL: @_T4test1xFT1aSb_Si
-sil @_T4test1xFT1aSb_Si : $@thin (Bool) -> Int {
+sil @_T4test1xFT1aSb_Si : $@convention(thin) (Bool) -> Int {
 // CHECK: bb0(%0 : $Bool):
 bb0(%0 : $Bool):
   // CHECK: alloc_stack $Bool
   %1 = alloc_stack $Bool
   // CHECK: store
   %2 = store %0 to %1#1 : $*Bool
-  // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
-  %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
+  // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@convention(method) (@inout Bool) -> Builtin.Int1
+  %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@convention(method) (@inout Bool) -> Builtin.Int1
   // CHECK: apply
-  %4 = apply %3(%1#1) : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
+  %4 = apply %3(%1#1) : $@convention(method) (@inout Bool) -> Builtin.Int1
   // CHECK: cond_br
   %5 = cond_br %4, bb1, bb2
 
 // CHECK: bb1:
 bb1:
-  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin (Builtin.Int128, @thin Int.Type) -> Int
-  %6 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
+  %6 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
   // CHECK: metatype $@thin Int.Type
   %7 = metatype $@thin Int.Type
   // CHECK: integer_literal $Builtin.Int128, 4
   %8 = integer_literal $Builtin.Int128, 4
   // CHECK: apply
-  %9 = apply %6(%8, %7) : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+  %9 = apply %6(%8, %7) : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
   // CHECK: dealloc_stack
   %10 = dealloc_stack %1#0 : $*@local_storage Bool
   // CHECK: br
@@ -155,14 +155,14 @@ bb1:
 
 // CHECK: bb2:
 bb2:
-  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin (Builtin.Int128, @thin Int.Type) -> Int
-  %12 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
+  %12 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
   // CHECK: metatype $@thin Int.Type
   %13 = metatype $@thin Int.Type
   // CHECK: integer_literal $Builtin.Int128, 5
   %14 = integer_literal $Builtin.Int128, 5
   // CHECK: apply
-  %15 = apply %12(%14, %13) : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+  %15 = apply %12(%14, %13) : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
   // CHECK: dealloc_stack
   %16 = dealloc_stack %1#0 : $*@local_storage Bool
   // CHECK: br
@@ -178,18 +178,18 @@ protocol P {
   func doIt()
 }
 
-sil @existentials : $@thin (@in P) -> () {
+sil @existentials : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: open_existential_addr %0
   %1 = open_existential_addr %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P 
 
   // CHECK: witness_method ${{.*}}, #P.doIt!1
-  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@thin @cc(witness_method) <T: P> (@inout T) -> ()
+  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method) <T: P> (@inout T) -> ()
   // Make sure we have the correct scope for generic parameters.
   // CHECK: witness_method $@opened("{{.*}}") P, #P.doIt!1
-  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@thin @cc(witness_method) <T: P> (@inout T) -> ()
+  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method) <T: P> (@inout T) -> ()
   // CHECK: apply
-  %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000") P>(%1) : $@thin @cc(witness_method) <T: P> (@inout T) -> ()
+  %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000") P>(%1) : $@convention(witness_method) <T: P> (@inout T) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
   %6 = return %4 : $()                // CHECK: return 
@@ -207,7 +207,7 @@ class D : C {
 }
 
 
-sil @classes : $@thin () -> () {
+sil @classes : $@convention(thin) () -> () {
 bb0:
   // CHECK: %0 = alloc_ref $C
   %C = alloc_ref $C
@@ -217,7 +217,7 @@ bb0:
   %O = unchecked_ref_cast %C : $C to $Builtin.UnknownObject
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
-  %2 = class_method %C : $C, #C.doIt!1 : C -> () -> () , $@cc(method) @thin (@guaranteed C) -> ()
+  %2 = class_method %C : $C, #C.doIt!1 : C -> () -> () , $@convention(method) (@guaranteed C) -> ()
   
   // CHECK: alloc_ref $D
   %D = alloc_ref $D
@@ -246,8 +246,8 @@ protocol Runcible {
 }
 
 /* SIL parsing of substitutions in apply insts is totally busted.
-// C/HECK: $@thin <T : Runcible> (@in T) -> ()
-sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@thin <T : Runcible> (@in T) -> () {
+// C/HECK: $@convention(thin) <T : Runcible> (@in T) -> ()
+sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@convention(thin) <T : Runcible> (@in T) -> () {
 bb0(%0 : $*T):
   // C/HECK: witness_method $*T, #Runcible.free_method!1
   %1 = witness_method $*T, #Runcible.free_method!1 : $@cc(method) (@inout T) -> Int
@@ -270,8 +270,8 @@ bb0(%0 : $*T):
 
 protocol Bendable { }
 
-// CHECK: $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
-sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@thin (@out Runcible, @in protocol<Bendable, Runcible>) -> () {
+// CHECK: $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
+sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> () {
 bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: alloc_box
   %2 = alloc_box $protocol<Bendable, Runcible>
@@ -296,8 +296,8 @@ protocol ClassBound : class {
   func classBoundMethod()
 }
 
-// CHECK: $@thin (ClassBound) -> ()
-sil @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@thin (ClassBound) -> () {
+// CHECK: $@convention(thin) (ClassBound) -> ()
+sil @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (ClassBound) -> () {
 bb0(%0 : $ClassBound):
   %1 = alloc_box $ClassBound                // CHECK: alloc_box
   %2 = store %0 to %1#1 : $*ClassBound      // CHECK: store
@@ -306,8 +306,8 @@ bb0(%0 : $ClassBound):
   // CHECK: open_existential_ref {{%.*}} : $ClassBound to $@opened({{.*}}) ClassBound
   %5 = open_existential_ref %3 : $ClassBound to $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound
   // CHECK: witness_method
-  %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod!1, %5 : $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound : $@thin @cc(witness_method) <T: ClassBound> (T) -> ()
-  %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111") ClassBound>(%5) : $@thin @cc(witness_method) <T: ClassBound> (T) -> ()
+  %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod!1, %5 : $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound : $@convention(witness_method) <T: ClassBound> (T) -> ()
+  %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111") ClassBound>(%5) : $@convention(witness_method) <T: ClassBound> (T) -> ()
   %8 = tuple ()
   %9 = strong_release %1#0 : $Builtin.NativeObject
   %10 = return %8 : $()
@@ -316,8 +316,8 @@ bb0(%0 : $ClassBound):
 struct Val {
 }
 
-// CHECK: $@thin (@thin Val.Type) -> Val
-sil @_TV4todo3ValCfMS0_FT_S0_ : $@thin (@thin Val.Type) -> Val {
+// CHECK: $@convention(thin) (@thin Val.Type) -> Val
+sil @_TV4todo3ValCfMS0_FT_S0_ : $@convention(thin) (@thin Val.Type) -> Val {
 bb0(%0 : $@thin Val.Type):
   %1 = alloc_stack $Val // CHECK: alloc_stack
   %3 = load %1#1 : $*Val
@@ -332,16 +332,16 @@ struct Aleph {
   var b:Val
 }
 
-// CHECK: $@thin (Ref, Val, @thin Aleph.Type) -> Aleph
-sil @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (Ref, Val, @thin Aleph.Type) -> Aleph {
+// CHECK: $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
+sil @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph {
 bb0(%0 : $Ref, %1 : $Val, %2 : $@thin Aleph.Type):
   // CHECK: struct $Aleph ({{%.*}} : $Ref, {{%.*}} : $Val)
   %3 = struct $Aleph (%0 : $Ref, %1 : $Val)
   %4 = return %3 : $Aleph  // CHECK: return
 }
 
-// CHECK: $@thin (@thin Aleph.Type) -> Aleph
-sil @_TV6struct5AlephCfMS0_FT_S0_ : $@thin (@thin Aleph.Type) -> Aleph {
+// CHECK: $@convention(thin) (@thin Aleph.Type) -> Aleph
+sil @_TV6struct5AlephCfMS0_FT_S0_ : $@convention(thin) (@thin Aleph.Type) -> Aleph {
 bb0(%0 : $@thin Aleph.Type):
   %1 = tuple ()
   %2 = alloc_box $Aleph       // CHECK: alloc_box
@@ -362,7 +362,7 @@ enum Beth {
   case DataCase(Int)
 }
 
-// CHECK-LABEL: sil @test_union_empty_case : $@thin () -> Beth {
+// CHECK-LABEL: sil @test_union_empty_case : $@convention(thin) () -> Beth {
 sil @test_union_empty_case : $() -> Beth {
 bb0:
   // CHECK: %0 = enum $Beth, #Beth.EmptyCase!enumelt
@@ -370,7 +370,7 @@ bb0:
   return %0 : $Beth
 }
 
-// CHECK-LABEL: sil @test_union_data_case : $@thin (Int) -> Beth {
+// CHECK-LABEL: sil @test_union_data_case : $@convention(thin) (Int) -> Beth {
 sil @test_union_data_case : $Int -> Beth {
 bb0(%0 : $Int):
   // CHECK: %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
@@ -403,11 +403,11 @@ bb0(%0 : $*Gimel, %1 : $*Q):
   return %t : $()
 }
 
-sil @_T5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
-sil @_T5tuple5tupleFT_TSiSf_ : $@thin () -> (Int, Float32)
+sil @_T5tuple5floatFT1xSf_T_ : $@convention(thin) (Float32) -> ()
+sil @_T5tuple5tupleFT_TSiSf_ : $@convention(thin) () -> (Int, Float32)
 
-// CHECK: $@thin (Int, Float) -> ()
-sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int, Float) -> () {
+// CHECK: $@convention(thin) (Int, Float) -> ()
+sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@convention(thin) (Int, Float) -> () {
 bb0(%0 : $Int, %1 : $Float):
   %2 = alloc_box $(Int, Float)
   // CHECK: tuple ({{%.*}} : $Int, {{%.*}} : $Float)
@@ -422,15 +422,15 @@ bb0(%0 : $Int, %1 : $Float):
   // CHECK: load
   %11 = load %10 : $*Float
   // CHECK: function_ref
-  %14 = function_ref @_T5tuple5tupleFT_TSiSf_ : $@thin () -> (Int, Float)
+  %14 = function_ref @_T5tuple5tupleFT_TSiSf_ : $@convention(thin) () -> (Int, Float)
   // CHECK: apply
-  %15 = apply %14() : $@thin () -> (Int, Float)
+  %15 = apply %14() : $@convention(thin) () -> (Int, Float)
   // CHECK: function_ref
-  %19 = function_ref @_T5tuple5floatFT1xSf_T_ : $@thin (Float) -> ()
+  %19 = function_ref @_T5tuple5floatFT1xSf_T_ : $@convention(thin) (Float) -> ()
   // CHECK: tuple_extract {{%.*}} : $(Int, Float), 1
   %17 = tuple_extract %15 : $(Int, Float), 1
   // CHECK: apply
-  %24 = apply %19(%17) : $@thin (Float) -> ()
+  %24 = apply %19(%17) : $@convention(thin) (Float) -> ()
   %25 = tuple ()
   %26 = strong_release %2#0 : $Builtin.NativeObject
   %27 = return %25 : $()
@@ -441,8 +441,8 @@ class M {
   init()
 }
 
-// CHECK: $@cc(method) @thin (Int, M) -> ()
-sil @_TC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, M) -> () {
+// CHECK: $@convention(method) (Int, M) -> ()
+sil @_TC3ref1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, M) -> () {
 bb0(%0 : $Int, %1 : $M):
   %2 = alloc_box $Int     // CHECK: alloc_box $Int
   %3 = store %0 to %2#1 : $*Int
@@ -466,7 +466,7 @@ class GenericClass<Q> {
   init()
 }
 
-// CHECK: sil @bound_generic_class_ref_element_addr : $@thin (GenericClass<Int>) -> Int {
+// CHECK: sil @bound_generic_class_ref_element_addr : $@convention(thin) (GenericClass<Int>) -> Int {
 sil @bound_generic_class_ref_element_addr : $@thin GenericClass<Int> -> Int {
 entry(%0 : $GenericClass<Int>):
   // CHECK: %1 = ref_element_addr %0 : $GenericClass<Int>, #GenericClass.member
@@ -479,8 +479,8 @@ entry(%0 : $GenericClass<Int>):
 class B { }
 class E : B { }
 
-// CHECK: $@thin (B) -> Builtin.Int1
-sil @_T4null3isaFT1bCS_1B_Sb : $@thin (B) -> Builtin.Int1 {
+// CHECK: $@convention(thin) (B) -> Builtin.Int1
+sil @_T4null3isaFT1bCS_1B_Sb : $@convention(thin) (B) -> Builtin.Int1 {
 bb0(%0 : $B):
   %1 = alloc_box $B                           // CHECK: alloc_box
   %2 = store %0 to %1#1 : $*B
@@ -499,11 +499,11 @@ isa(%6 : $Builtin.Int1):
   %9 = return %6 : $Builtin.Int1
 }
 
-sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@thin (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
+sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
 
 
-sil @_T5index5gep64FT1pBp1iBi64__Bp : $@thin (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+sil @_T5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %2 = alloc_box $Builtin.RawPointer              // CHECK: alloc_box
   %3 = alloc_box $Builtin.Word                   // CHECK: alloc_box
@@ -519,17 +519,17 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 }
 
 sil_global @x : $Int
-sil @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+sil @global_callee : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
 
-// CHECK-LABEL: @global_code : $@thin () -> ()
+// CHECK-LABEL: @global_code : $@convention(thin) () -> ()
 sil private @global_code : $() -> () {
 bb0:
   // CHECK: global_addr @x : $*Int
   %0 = global_addr @x : $*Int
-  %1 = function_ref @global_callee : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+  %1 = function_ref @global_callee : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
   %2 = metatype $@thin Int.Type
   %3 = integer_literal $Builtin.Int128, 0 // CHECK: integer_literal $Builtin.Int128, 0
-  %4 = apply %1(%3, %2) : $@thin (Builtin.Int128, @thin Int.Type) -> Int
+  %4 = apply %1(%3, %2) : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
   %5 = store %4 to %0 : $*Int
   %6 = tuple ()
   %7 = return %6 : $()
@@ -541,7 +541,7 @@ class SomeClass : SomeProtocol {
 }
 class SomeSubclass : SomeClass {}
 
-sil @test_class_metatype : $@thin (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type) {
+sil @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type) {
 bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   %2 = alloc_box $SomeClass                       // CHECK: alloc_box
   %3 = alloc_box $SomeSubclass                    // CHECK: alloc_box
@@ -564,7 +564,7 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   %20 = return %15 : $(@thick SomeClass.Type, @thick SomeClass.Type)
 }
 
-sil @test_value_metatype : $@thin <T> (@in T) -> (@thick T.Type, @thick T.Type) {
+sil @test_value_metatype : $@convention(thin) <T> (@in T) -> (@thick T.Type, @thick T.Type) {
 bb0(%0 : $*T):
   %1 = alloc_box $T                               // CHECK: alloc_box
   %2 = copy_addr [take] %0 to [initialization] %1#1 : $*T
@@ -580,7 +580,7 @@ bb0(%0 : $*T):
   %12 = return %8 : $(@thick T.Type, @thick T.Type)
 }
 
-sil @test_existential_metatype : $@thin (@in SomeProtocol) -> @thick SomeProtocol.Type {
+sil @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
   %1 = alloc_box $SomeProtocol                    // CHECK: alloc_box
   %2 = copy_addr [take] %0 to [initialization] %1#1 : $*SomeProtocol
@@ -601,7 +601,7 @@ bb0:
 // CHECK: unreachable
 }
 
-sil @test_unowned_retain : $@thin (SomeClass) -> () {
+sil @test_unowned_retain : $@convention(thin) (SomeClass) -> () {
 bb0(%0 : $SomeClass):
   %1 = ref_to_unowned %0 : $SomeClass to $@sil_unowned SomeClass
 // CHECK: ref_to_unowned %0 : $SomeClass to $@sil_unowned SomeClass
@@ -616,7 +616,7 @@ bb0(%0 : $SomeClass):
 }
 
 // CHECK-LABEL: sil @test_basic_block_arguments
-sil @test_basic_block_arguments : $@thin (Builtin.Int1) -> Builtin.Word {
+sil @test_basic_block_arguments : $@convention(thin) (Builtin.Int1) -> Builtin.Word {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 bb1:                                        
@@ -633,7 +633,7 @@ bb3(%6 : $Builtin.Word):
 }
 
 // CHECK-LABEL: sil @test_cond_branch_basic_block_args
-sil @test_cond_branch_basic_block_args : $@thin (Int, Builtin.Int1) -> Int {
+sil @test_cond_branch_basic_block_args : $@convention(thin) (Int, Builtin.Int1) -> Int {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
   cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
 // CHECK: cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
@@ -646,7 +646,7 @@ bb3(%4 : $Int):
 }
 
 // CHECK-LABEL: sil @test_builtin
-sil @test_builtin : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+sil @test_builtin : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %2 = alloc_box $Builtin.Int1
   %3 = alloc_box $Builtin.Int1
@@ -662,7 +662,7 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil @test_dealloc_ref
-sil @test_dealloc_ref : $@thin () -> () {
+sil @test_dealloc_ref : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $Class1
   dealloc_ref %0 : $Class1
@@ -671,7 +671,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @test_dealloc_box
-sil @test_dealloc_box : $@thin () -> () {
+sil @test_dealloc_box : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $Class1
   dealloc_box $Class1, %0#0 : $Builtin.NativeObject
@@ -682,31 +682,31 @@ bb0:
 
 
 // CHECK-LABEL: closure_test
-sil @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-sil @closure0 : $@thin (Builtin.NativeObject, @inout Int) -> ()
+sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
+sil @closure0 : $@convention(thin) (Builtin.NativeObject, @inout Int) -> ()
 
-sil @closure_test : $@thin () -> () {
+sil @closure_test : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $Int                           // users: %10, %8, %8, %7, %4
 
-  %5 = function_ref @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@thin (Builtin.NativeObject, @inout Int) -> ()
+  %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (Builtin.NativeObject, @inout Int) -> ()
   strong_retain %0#0 : $Builtin.NativeObject
-  %8 = partial_apply %6(%0#0, %0#1) : $@thin (Builtin.NativeObject, @inout Int) -> ()
-  %9 = apply %5(%8) : $@thin (@callee_owned () -> ()) -> ()
+  %8 = partial_apply %6(%0#0, %0#1) : $@convention(thin) (Builtin.NativeObject, @inout Int) -> ()
+  %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
   strong_release %0#0 : $Builtin.NativeObject
 
   %11 = tuple ()
   return %11 : $()
 }
 
-sil @test_super_to_archetype_ref : $@thin <T : Class1> (Class1) -> T {
+sil @test_super_to_archetype_ref : $@convention(thin) <T : Class1> (Class1) -> T {
 bb0(%c : $Class1):
   %0 = unconditional_checked_cast %c : $Class1 to $T
   return %0 : $T
 }
 
-sil @test_downcast_archetype_ref : $@thin <T:Class1, U:Class1> (T) -> () {
+sil @test_downcast_archetype_ref : $@convention(thin) <T:Class1, U:Class1> (T) -> () {
 bb0(%t : $T):
   %0 = unconditional_checked_cast %t : $T to $U
   %1 = tuple ()
@@ -715,7 +715,7 @@ bb0(%t : $T):
 
 protocol ClassP : class {}
 
-sil @test_downcast_existential_ref : $@thin <U : ClassP> (ClassP) -> () {
+sil @test_downcast_existential_ref : $@convention(thin) <U : ClassP> (ClassP) -> () {
 bb0(%t : $ClassP):
   %0 = unconditional_checked_cast %t : $ClassP to $U
   %1 = tuple ()
@@ -727,12 +727,12 @@ enum MaybePair {
   case Left(Int)
 }
 
-sil @_T6switch1aFT_T_ : $@thin () -> ()
-sil @_T6switch1bFT_T_ : $@thin () -> ()
-sil @_T6switch1cFT_T_ : $@thin () -> ()
+sil @_T6switch1aFT_T_ : $@convention(thin) () -> ()
+sil @_T6switch1bFT_T_ : $@convention(thin) () -> ()
+sil @_T6switch1cFT_T_ : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil @test_switch_union : $@thin (MaybePair) -> ()
-sil @test_switch_union : $@thin (MaybePair) -> () {
+// CHECK-LABEL: sil @test_switch_union : $@convention(thin) (MaybePair) -> ()
+sil @test_switch_union : $@convention(thin) (MaybePair) -> () {
 bb0(%0 : $MaybePair):
   %1 = alloc_box $MaybePair
   store %0 to %1#1 : $*MaybePair
@@ -745,8 +745,8 @@ bb1:
   br bb2
 
 bb2:
-  %7 = function_ref @_T6switch1aFT_T_ : $@thin () -> () // CHECK: function_ref
-  %8 = apply %7() : $@thin () -> ()
+  %7 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
+  %8 = apply %7() : $@convention(thin) () -> ()
   br bb5                                                 // CHECK: br
 
 bb3(%10 : $Int):
@@ -755,13 +755,13 @@ bb3(%10 : $Int):
   br bb4(%x : $Int)
 
 bb4(%y : $Int):
-  %12 = function_ref @_T6switch1bFT_T_ : $@thin () -> () // CHECK: function_ref
-  %13 = apply %12() : $@thin () -> ()
+  %12 = function_ref @_T6switch1bFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
+  %13 = apply %12() : $@convention(thin) () -> ()
   br bb5                                                  // CHECK: br
 
 bb5:
-  %15 = function_ref @_T6switch1cFT_T_ : $@thin () -> () // CHECK: function_ref
-  %16 = apply %15() : $@thin () -> ()
+  %15 = function_ref @_T6switch1cFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
+  %16 = apply %15() : $@convention(thin) () -> ()
   strong_release %1#0 : $Builtin.NativeObject                   // CHECK: release
   %18 = tuple ()
   return %18 : $()                                        // CHECK: return
@@ -772,8 +772,8 @@ enum MaybeAddressOnlyPair {
   case Left(Q)
 }
 
-// CHECK-LABEL: sil @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> ()
-sil @test_switch_union_addr : $@thin (@in MaybeAddressOnlyPair) -> () {
+// CHECK-LABEL: sil @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+sil @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
   // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
   switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt.1: bb2
@@ -791,8 +791,8 @@ bb3:
   return %t : $()
 }
 
-// CHECK-LABEL: sil @test_switch_value : $@thin (Builtin.Word) -> ()
-sil @test_switch_value : $@thin (Builtin.Word) -> () {
+// CHECK-LABEL: sil @test_switch_value : $@convention(thin) (Builtin.Word) -> ()
+sil @test_switch_value : $@convention(thin) (Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word):
   // CHECK: switch_value %{{.*}} : $Builtin.Word, case %1: bb1, case %2: bb2
   %1 = integer_literal $Builtin.Word, 1
@@ -800,34 +800,34 @@ bb0(%0 : $Builtin.Word):
   switch_value %0 : $Builtin.Word, case %1: bb1, case %2: bb2
 
 bb1:
-  %7 = function_ref @_T6switch1aFT_T_ : $@thin () -> () // CHECK: function_ref
-  %8 = apply %7() : $@thin () -> ()
+  %7 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
+  %8 = apply %7() : $@convention(thin) () -> ()
   br bb3
 
 bb2:
-  %12 = function_ref @_T6switch1bFT_T_ : $@thin () -> () // CHECK: function_ref
-  %13 = apply %12() : $@thin () -> ()
+  %12 = function_ref @_T6switch1bFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
+  %13 = apply %12() : $@convention(thin) () -> ()
   br bb3
 
 bb3:
   // CHECK: [[FUNC1:%.*]] = function_ref @_T6switch1aFT_T_
   // CHECK: [[FUNC2:%.*]] = function_ref @_T6switch1bFT_T_
-  // CHECK: switch_value %{{.*}} : $@thin () -> (), case [[FUNC1]]: bb4, case [[FUNC2]]: bb5
-  %20 = function_ref @_T6switch1bFT_T_ : $@thin () -> ()
-  %21 = function_ref @_T6switch1aFT_T_ : $@thin () -> ()
-  %22 = function_ref @_T6switch1bFT_T_ : $@thin () -> ()
-  switch_value %20 : $@thin () -> (), case %21: bb4, case %22: bb5
+  // CHECK: switch_value %{{.*}} : $@convention(thin) () -> (), case [[FUNC1]]: bb4, case [[FUNC2]]: bb5
+  %20 = function_ref @_T6switch1bFT_T_ : $@convention(thin) () -> ()
+  %21 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> ()
+  %22 = function_ref @_T6switch1bFT_T_ : $@convention(thin) () -> ()
+  switch_value %20 : $@convention(thin) () -> (), case %21: bb4, case %22: bb5
 
 bb4:
   // CHECK: function_ref
-  %37 = function_ref @_T6switch1aFT_T_ : $@thin () -> () 
-  %38 = apply %37() : $@thin () -> ()
+  %37 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> () 
+  %38 = apply %37() : $@convention(thin) () -> ()
   br bb6
 
 bb5:
   // CHECK: function_ref
-  %42 = function_ref @_T6switch1bFT_T_ : $@thin () -> ()
-  %43 = apply %42() : $@thin () -> ()
+  %42 = function_ref @_T6switch1bFT_T_ : $@convention(thin) () -> ()
+  %43 = apply %42() : $@convention(thin) () -> ()
   br bb6
 
 bb6:
@@ -836,8 +836,8 @@ bb6:
   return %18 : $()
 }
 
-// CHECK-LABEL: sil @test_select_value : $@thin (Builtin.Word) -> Builtin.Word
-sil @test_select_value : $@thin (Builtin.Word) -> Builtin.Word {
+// CHECK-LABEL: sil @test_select_value : $@convention(thin) (Builtin.Word) -> Builtin.Word
+sil @test_select_value : $@convention(thin) (Builtin.Word) -> Builtin.Word {
 bb0(%0 : $Builtin.Word):
 
   %1 = integer_literal $Builtin.Word, 1
@@ -866,8 +866,8 @@ enum IntEnum : Int {
   case E2
 }
 
-// CHECK-LABEL: sil @test_select_value_with_enum : $@thin (Builtin.Word) -> Optional<IntEnum>
-sil @test_select_value_with_enum : $@thin (Builtin.Word) -> Optional<IntEnum> {
+// CHECK-LABEL: sil @test_select_value_with_enum : $@convention(thin) (Builtin.Word) -> Optional<IntEnum>
+sil @test_select_value_with_enum : $@convention(thin) (Builtin.Word) -> Optional<IntEnum> {
 bb0(%0 : $Builtin.Word):
   %1 = integer_literal $Builtin.Word, 0
   %2 = integer_literal $Builtin.Word, 1
@@ -892,8 +892,8 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil @test_init_existential : $@thin (@out Bendable, Spoon) -> ()
-sil @test_init_existential : $@thin (@out Bendable, Spoon) -> () {
+// CHECK-LABEL: sil @test_init_existential : $@convention(thin) (@out Bendable, Spoon) -> ()
+sil @test_init_existential : $@convention(thin) (@out Bendable, Spoon) -> () {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $Spoon
   store %1 to %2#1 : $*Spoon
@@ -908,8 +908,8 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil @test_existential_ref : $@thin (ConcreteClass) -> ClassP
-sil @test_existential_ref : $@thin (ConcreteClass) -> ClassP {
+// CHECK-LABEL: sil @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP
+sil @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
   %1 = alloc_box $ConcreteClass
   store %0 to %1#1 : $*ConcreteClass
@@ -927,34 +927,34 @@ bb0(%0 : $Int, %1 : $*Int):
   unreachable
 }
 
-// CHECK-LABEL: sil @test_transparent : $@thin () -> () {
-sil @test_transparent : $@thin () -> () {
+// CHECK-LABEL: sil @test_transparent : $@convention(thin) () -> () {
+sil @test_transparent : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @classes : $@thin () -> ()
-  // CHECK: apply %{{.*}}() : $@thin () -> ()
-  %1 = apply %0() : $@thin () -> ()
+  %0 = function_ref @classes : $@convention(thin) () -> ()
+  // CHECK: apply %{{.*}}() : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
   %2 = tuple ()
   %3 = return %2 : $()
 }
 
-// CHECK-LABEL: sil [thunk] @test_thunk : $@thin () -> () {
-sil [thunk] @test_thunk : $@thin () -> () {
+// CHECK-LABEL: sil [thunk] @test_thunk : $@convention(thin) () -> () {
+sil [thunk] @test_thunk : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   %1 = return %0 : $()
 }
 
-// CHECK-LABEL: sil @takes_unnamed_closure : $@thin (@callee_owned () -> Int) -> () -> () -> Int
-sil @takes_unnamed_closure : $@thin (@callee_owned () -> Int) -> () -> () -> Int
+// CHECK-LABEL: sil @takes_unnamed_closure : $@convention(thin) (@callee_owned () -> Int) -> () -> () -> Int
+sil @takes_unnamed_closure : $@convention(thin) (@callee_owned () -> Int) -> () -> () -> Int
 
-sil @takes_int64_float32 : $@thin (Int, Float32) -> ()
+sil @takes_int64_float32 : $@convention(thin) (Int, Float32) -> ()
 
-// CHECK-LABEL: sil @test_partial_apply : $@thin (Float) -> @callee_owned (Int) -> () {
+// CHECK-LABEL: sil @test_partial_apply : $@convention(thin) (Float) -> @callee_owned (Int) -> () {
 sil @test_partial_apply : $@thin Float -> @callee_owned Int -> () {
 bb0(%0 : $Float):
-  %1 = function_ref @takes_int64_float32 : $@thin (Int, Float) -> ()
-  // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@thin (Int, Float) -> ()
-  %2 = partial_apply %1(%0) : $@thin (Int, Float) -> ()
+  %1 = function_ref @takes_int64_float32 : $@convention(thin) (Int, Float) -> ()
+  // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@convention(thin) (Int, Float) -> ()
+  %2 = partial_apply %1(%0) : $@convention(thin) (Int, Float) -> ()
   %3 = return %2 : $@callee_owned Int -> ()
 }
 
@@ -962,8 +962,8 @@ class X {
   @objc func f() { }
 }
 
-// CHECK-LABEL: sil @test_dynamic_lookup_br : $@thin (AnyObject) -> ()
-sil @test_dynamic_lookup_br : $@thin (AnyObject) -> () {
+// CHECK-LABEL: sil @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
+sil @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
   %1 = alloc_box $AnyObject
   store %0 to %1#1 : $*AnyObject
@@ -973,7 +973,7 @@ bb0(%0 : $AnyObject):
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject
   %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject to $Builtin.UnknownObject
   dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
-bb1(%z : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
+bb1(%z : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
   br bb3
 
 bb2:
@@ -1037,7 +1037,7 @@ class Foo {
   init()
 }
 
-sil @_TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_ : $@cc(method) @thin (Int32, Int32, Foo) -> Int32 {
+sil @_TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Foo) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int32  // var x               // users: %17, %6
@@ -1056,7 +1056,7 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   return %13 : $Int32
 }
 
-sil @_TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_ : $@cc(method) @thin (Int32, Int32, Int32, Foo) -> () {
+sil @_TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Int32, Foo) -> () {
 bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
   %4 = alloc_stack $Int32  // var value           // users: %16, %5
   store %0 to %4#1 : $*Int32
@@ -1075,7 +1075,7 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
   return %17 : $()
 }
 
-// CHECK-LABEL: sil @cond_fail_test : $@thin (Builtin.Int1) -> () {
+// CHECK-LABEL: sil @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
 sil @cond_fail_test : $Builtin.Int1 -> () {
 entry(%0 : $Builtin.Int1):
   // CHECK: cond_fail %0 : $Builtin.Int1
@@ -1086,8 +1086,8 @@ entry(%0 : $Builtin.Int1):
 
 sil_global @staticProp: $Int
 
-// CHECK-LABEL: sil private @globalinit_func0 : $@thin () -> () {
-sil private @globalinit_func0 : $@thin () -> () {
+// CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {
+sil private @globalinit_func0 : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @staticProp : $*Int
   %1 = mark_uninitialized [var] %0 : $*Int
@@ -1095,16 +1095,16 @@ bb0:
   return %7 : $()
 }
 
-// CHECK-LABEL: sil @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
-sil @_TV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
+// CHECK-LABEL: sil @_TV18lazy_global_access4Type10staticPropSia : $@convention(thin) () -> Builtin.RawPointer {
+sil @_TV18lazy_global_access4Type10staticPropSia : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   // CHECK: global_addr @globalinit_token0 : $*Builtin.Word
   %1 = global_addr @globalinit_token0 : $*Builtin.Word
   // CHECK: unchecked_addr_cast {{%.*}} : $*Builtin.Word to $*Builtin.RawPointer
   %a = unchecked_addr_cast %1 : $*Builtin.Word to $*Builtin.RawPointer
   %2 = address_to_pointer %a : $*Builtin.RawPointer to $Builtin.RawPointer
-  %3 = function_ref @globalinit_func0 : $@thin () -> ()
-  %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
+  %3 = function_ref @globalinit_func0 : $@convention(thin) () -> ()
+  %4 = thin_to_thick_function %3 : $@convention(thin) () -> () to $@callee_owned () -> ()
   // CHECK: {{%.*}} = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@callee_owned () -> ()) : $()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
   %6 = global_addr @staticProp : $*Int
@@ -1112,8 +1112,8 @@ bb0:
   return %7 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil @thin_metatype : $@thin (@thin Int.Type) -> @thick Int.Type
-sil @thin_metatype : $@thin (@thin Int.Type) -> @thick Int.Type
+// CHECK-LABEL: sil @thin_metatype : $@convention(thin) (@thin Int.Type) -> @thick Int.Type
+sil @thin_metatype : $@convention(thin) (@thin Int.Type) -> @thick Int.Type
 
 sil @undef_value : $() -> () {
 bb0:
@@ -1122,7 +1122,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @debug_value
-sil @debug_value : $@thin (Int, @in P) -> () {
+sil @debug_value : $@convention(thin) (Int, @in P) -> () {
 bb0(%0 : $Int, %1 : $*P):
   debug_value %0 : $Int        // CHECK: debug_value %0 : $Int
   debug_value_addr %1 : $*P    // CHECK: debug_value_addr %1 : $*P
@@ -1130,7 +1130,7 @@ bb0(%0 : $Int, %1 : $*P):
 }
 
 // CHECK-LABEL: sil @block_storage_type
-sil @block_storage_type : $@thin Int -> @cc(cdecl) @objc_block () -> () {
+sil @block_storage_type : $@thin Int -> @convention(block) () -> () {
 entry(%0 : $Int):
   // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
   %s = alloc_stack $@block_storage Int
@@ -1139,27 +1139,27 @@ entry(%0 : $Int):
   // CHECK: store %0 to [[PROJECT]]
   store %0 to %c : $*Int
   // CHECK: [[FUNC:%.*]] = function_ref
-  %f = function_ref @block_invoke : $@thin @cc(cdecl) (@inout @block_storage Int) -> ()
-  // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]]#1 : $*@block_storage Int, invoke [[FUNC]] : $@cc(cdecl) @thin (@inout @block_storage Int) -> (), type $@cc(cdecl) @objc_block () -> ()
-  %b = init_block_storage_header %s#1 : $*@block_storage Int, invoke %f : $@thin @cc(cdecl) (@inout @block_storage Int) -> (), type $@cc(cdecl) @objc_block () -> ()
+  %f = function_ref @block_invoke : $@convention(c) (@inout @block_storage Int) -> ()
+  // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]]#1 : $*@block_storage Int, invoke [[FUNC]] : $@convention(c) (@inout @block_storage Int) -> (), type $@convention(block) () -> ()
+  %b = init_block_storage_header %s#1 : $*@block_storage Int, invoke %f : $@convention(c) (@inout @block_storage Int) -> (), type $@convention(block) () -> ()
   // CHECK: dealloc_stack [[STORAGE]]#0 : $*@local_storage @block_storage Int
   dealloc_stack %s#0 : $*@local_storage @block_storage Int
-  // CHECK: return [[BLOCK]] : $@cc(cdecl) @objc_block () -> ()
-  return %b : $@cc(cdecl) @objc_block () -> ()
+  // CHECK: return [[BLOCK]] : $@convention(block) () -> ()
+  return %b : $@convention(block) () -> ()
 }
 
-sil @block_invoke : $@thin @cc(cdecl) (@inout @block_storage Int) -> () {
+sil @block_invoke : $@convention(c) (@inout @block_storage Int) -> () {
 entry(%0 : $*@block_storage Int):
   return undef : $()
 }
 
-// CHECK-LABEL: sil @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
+// CHECK-LABEL: sil @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int) {
 // CHECK-NEXT:  bb0(%0 : $Class1):
 // CHECK-NEXT:    %1 = unchecked_ref_bit_cast %0 : $Class1 to $Class2
 // CHECK-NEXT:    %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
 // CHECK-NEXT:    %3 = tuple (%1 : $Class2, %2 : $Int)
 // CHECK-NEXT:    return %3 : $(Class2, Int)
-sil @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
+sil @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int) {
 entry(%0 : $Class1):
   %1 = unchecked_ref_bit_cast %0 : $Class1 to $Class2
   %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
@@ -1167,13 +1167,13 @@ entry(%0 : $Class1):
   return %3 : $(Class2, Int)
 }
 
-// CHECK-LABEL: sil @bridge_object : $@thin (@owned Class1, Builtin.Word) -> () {
+// CHECK-LABEL: sil @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> () {
 // CHECK-NEXT:  bb0([[X:%.*]] : $Class1, [[W:%.*]] : $Builtin.Word):
 // CHECK-NEXT:    [[A:%.*]] = ref_to_bridge_object [[X]] : $Class1, [[W]] : $Builtin.Word
 // CHECK-NEXT:    [[B:%.*]] = bridge_object_to_ref [[A]] : $Builtin.BridgeObject to $Class1
 // CHECK-NEXT:    [[C:%.*]] = bridge_object_to_word [[A]] : $Builtin.BridgeObject to $Builtin.Word
 // CHECK-NEXT:    return undef : $()
-sil @bridge_object : $@thin (@owned Class1, Builtin.Word) -> () {
+sil @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> () {
 entry(%x : $Class1, %w : $Builtin.Word):
   %a = ref_to_bridge_object %x : $Class1, %w : $Builtin.Word
   %b = bridge_object_to_ref %a : $Builtin.BridgeObject to $Class1
@@ -1181,22 +1181,22 @@ entry(%x : $Class1, %w : $Builtin.Word):
   return undef : $()
 }
 
-// CHECK-LABEL: sil [semantics "foo"] @test_semantics : $@thin () -> () {
-sil [semantics "foo"] @test_semantics : $@thin () -> () {
+// CHECK-LABEL: sil [semantics "foo"] @test_semantics : $@convention(thin) () -> () {
+sil [semantics "foo"] @test_semantics : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $() 
 }
 
-// CHECK-LABEL: sil shared_external @test_shared_external_definition : $@thin () -> () {
-sil shared_external @test_shared_external_definition : $@thin () -> () {
+// CHECK-LABEL: sil shared_external @test_shared_external_definition : $@convention(thin) () -> () {
+sil shared_external @test_shared_external_definition : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
 }
 
-// CHECK-LABEL: sil @select_enum : $@thin (@in Beth) -> () {
-sil @select_enum : $@thin (@in Beth) -> () {
+// CHECK-LABEL: sil @select_enum : $@convention(thin) (@in Beth) -> () {
+sil @select_enum : $@convention(thin) (@in Beth) -> () {
 bb0(%0 : $*Beth):
   %1 = load %0 : $*Beth
   %2 = integer_literal $Builtin.Int32, 2
@@ -1217,8 +1217,8 @@ struct SomeError: _ErrorType {
   var code: Int { get }
 }
 
-// CHECK-LABEL: sil @existential_box : $@thin (SomeError) -> () {
-sil @existential_box : $@thin (SomeError) -> () {
+// CHECK-LABEL: sil @existential_box : $@convention(thin) (SomeError) -> () {
+sil @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
   // CHECK: %1 = alloc_existential_box $_ErrorType, $SomeError
   %1 = alloc_existential_box $_ErrorType, $SomeError
@@ -1233,68 +1233,68 @@ bb0(%0 : $SomeError):
   return undef : $()
 }
 
-sil @convert_function : $@thin (@thin (AnyObject) -> Optional<AnyObject>) -> (@thin (Optional<AnyObject>) -> AnyObject) {
-entry(%0 : $@thin (AnyObject) -> Optional<AnyObject>):
-  %1 = convert_function %0 : $@thin (AnyObject) -> Optional<AnyObject> to $@thin (Optional<AnyObject>) -> AnyObject
-  return %1 : $@thin (Optional<AnyObject>) -> AnyObject
+sil @convert_function : $@convention(thin) (@convention(thin) (AnyObject) -> Optional<AnyObject>) -> (@convention(thin) (Optional<AnyObject>) -> AnyObject) {
+entry(%0 : $@convention(thin) (AnyObject) -> Optional<AnyObject>):
+  %1 = convert_function %0 : $@convention(thin) (AnyObject) -> Optional<AnyObject> to $@convention(thin) (Optional<AnyObject>) -> AnyObject
+  return %1 : $@convention(thin) (Optional<AnyObject>) -> AnyObject
 }
 
-sil @meta_metatype : $@thin () -> @thick Beth.Type.Type {
+sil @meta_metatype : $@convention(thin) () -> @thick Beth.Type.Type {
 entry:
   %m = metatype $@thick Beth.Type.Type
   return %m : $@thick Beth.Type.Type
 }
 
-sil @concrete_meta_existential_metatype : $@thin () -> @thick P.Type.Protocol {
+sil @concrete_meta_existential_metatype : $@convention(thin) () -> @thick P.Type.Protocol {
 entry:
   %m = metatype $@thick P.Type.Protocol
   return %m : $@thick P.Type.Protocol
 }
 
 sil @concrete_meta_existential_meta_existential_metatype
-  : $@thin () -> @thick P.Type.Type.Protocol {
+  : $@convention(thin) () -> @thick P.Type.Type.Protocol {
 entry:
   %m = metatype $@thick P.Type.Type.Protocol
   return %m : $@thick P.Type.Type.Protocol
 }
 
-sil @function_metatype : $@thin () -> @thick (() -> ()).Type {
+sil @function_metatype : $@convention(thin) () -> @thick (() -> ()).Type {
 entry:
   %m = metatype $@thick (() -> ()).Type
   return %m : $@thick (() -> ()).Type
 }
 
 
-// CHECK-LABEL: sil @error_result : $@thin () -> @error _ErrorType
-sil @error_result : $@thin () -> @error _ErrorType {
+// CHECK-LABEL: sil @error_result : $@convention(thin) () -> @error _ErrorType
+sil @error_result : $@convention(thin) () -> @error _ErrorType {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result2 : $@thin () -> (Int, @error _ErrorType)
-sil @error_result2 : $@thin () -> (Int, @error _ErrorType) {
+// CHECK-LABEL: sil @error_result2 : $@convention(thin) () -> (Int, @error _ErrorType)
+sil @error_result2 : $@convention(thin) () -> (Int, @error _ErrorType) {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result3 : $@thin () -> (@owned Class1, @error _ErrorType)
-sil @error_result3 : $@thin () -> (@owned Class1, @error _ErrorType) {
+// CHECK-LABEL: sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error _ErrorType)
+sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error _ErrorType) {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result4 : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType)
-sil @error_result4 : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType) {
+// CHECK-LABEL: sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType)
+sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType) {
 entry(%0 : $Class1):
   return %0 : $Class1
 }
 
-// CHECK-LABEL: sil @try_apply : $@thin (@owned Class1) -> ()
-sil @try_apply : $@thin (@owned Class1) -> () {
+// CHECK-LABEL: sil @try_apply : $@convention(thin) (@owned Class1) -> ()
+sil @try_apply : $@convention(thin) (@owned Class1) -> () {
 entry(%0 : $Class1):
-  %1 = function_ref @error_result4 : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType)
-  // CHECK: try_apply %1(%0) : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType), normal bb1, error bb2
-  try_apply %1(%0) : $@thin (@owned Class1) -> (@owned Class1, @error _ErrorType),
+  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType)
+  // CHECK: try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType), normal bb1, error bb2
+  try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType),
     normal bb1, error bb2
 bb1(%2 : $Class1):
   strong_release %2 : $Class1
@@ -1313,7 +1313,7 @@ sil @method_convention : $@convention(method) (Int) -> ()
 sil @objc_method_convention : $@convention(objc_method) (Int) -> ()
 sil @witness_method_convention : $@convention(witness_method) (Int) -> ()
 
-// CHECK-LABEL: sil @conventions : $@thin (() -> (), @thin () -> (), @cc(cdecl) @thin () -> (), @cc(cdecl) @objc_block () -> (), @cc(method) @thin () -> (), @cc(objc_method) @thin () -> (), @cc(witness_method) @thin () -> ()) -> () {
+// CHECK-LABEL: sil @conventions : $@convention(thin) (() -> (), @convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(method) () -> (), @convention(objc_method) () -> (), @convention(witness_method) () -> ()) -> () {
 sil @conventions : $@convention(thin) (@convention(thick) () -> (),
                                        @convention(thin) () -> (),
                                        @convention(c) () -> (),

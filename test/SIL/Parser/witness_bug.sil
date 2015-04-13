@@ -3,9 +3,9 @@
 import Builtin
 import Swift
 
-sil @_TF7arrtest6arreltFRVS_1ST_ : $@thin () -> () {
+sil @_TF7arrtest6arreltFRVS_1ST_ : $@convention(thin) () -> () {
 bb0:
-  %15 = witness_method $Int, #Comparable."<="!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Comparable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool // user: %20
+  %15 = witness_method $Int, #Comparable."<="!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Comparable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool // user: %20
   %91 = tuple ()                                  // user: %93
   return %91 : $()                                // id: %93
 }

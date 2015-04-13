@@ -55,13 +55,13 @@ printTypeName(F.self) // CHECK-NEXT: () -> ()
 printTypeName(F2.self) // CHECK-NEXT: () -> () -> ()
 printTypeName(F3.self) // CHECK-NEXT: (() -> ()) -> ()
 
-typealias B = @objc_block () -> ()
-typealias B2 = () -> @objc_block () -> ()
-typealias B3 = (@objc_block () -> ()) -> ()
+typealias B = @convention(block) () -> ()
+typealias B2 = () -> @convention(block) () -> ()
+typealias B3 = (@convention(block) () -> ()) -> ()
 
-printTypeName(B.self) // CHECK-NEXT: @objc_block () -> ()
-printTypeName(B2.self) // CHECK-NEXT: () -> @objc_block () -> ()
-printTypeName(B3.self) // CHECK-NEXT: (@objc_block () -> ()) -> ()
+printTypeName(B.self) // CHECK-NEXT: @convention(block) () -> ()
+printTypeName(B2.self) // CHECK-NEXT: () -> @convention(block) () -> ()
+printTypeName(B3.self) // CHECK-NEXT: (@convention(block) () -> ()) -> ()
 
 printTypeName(F.Type.self) // CHECK-NEXT: (() -> ()).Type
 printTypeName(C.Type.self) // CHECK-NEXT: [[THIS]].C.Type

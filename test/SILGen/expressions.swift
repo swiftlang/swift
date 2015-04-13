@@ -90,7 +90,7 @@ func call_one() {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions8call_oneFT_T_
-// CHECK: [[BAR:%[0-9]+]] = function_ref @_TF11expressions3bar{{.*}} : $@thin (Int) -> ()
+// CHECK: [[BAR:%[0-9]+]] = function_ref @_TF11expressions3bar{{.*}} : $@convention(thin) (Int) -> ()
 // CHECK: [[FORTYTWO:%[0-9]+]] = integer_literal {{.*}} 42
 // CHECK: [[FORTYTWO_CONVERTED:%[0-9]+]] = apply {{.*}}([[FORTYTWO]], {{.*}})
 // CHECK: apply [[BAR]]([[FORTYTWO_CONVERTED]])
@@ -100,7 +100,7 @@ func call_two() {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions8call_twoFT_T_
-// CHECK: [[BAR:%[0-9]+]] = function_ref @_TF11expressions3bar{{.*}} : $@thin (Int, Int) -> ()
+// CHECK: [[BAR:%[0-9]+]] = function_ref @_TF11expressions3bar{{.*}} : $@convention(thin) (Int, Int) -> ()
 // CHECK: [[FORTYTWO:%[0-9]+]] = integer_literal {{.*}} 42
 // CHECK: [[FORTYTWO_CONVERTED:%[0-9]+]] = apply {{.*}}([[FORTYTWO]], {{.*}})
 // CHECK: [[TWONINETEEN:%[0-9]+]] = integer_literal {{.*}} 219
@@ -128,9 +128,9 @@ class C {
 
 // CHECK-LABEL: sil hidden @_TF11expressions7classesFT_T_
 func classes() {
-  // CHECK: function_ref @_TFC11expressions1CCfMS0_FT_S0_ : $@thin (@thick C.Type) -> @owned C
+  // CHECK: function_ref @_TFC11expressions1CCfMS0_FT_S0_ : $@convention(thin) (@thick C.Type) -> @owned C
   var a = C()
-  // CHECK: function_ref @_TFC11expressions1CCfMS0_FT1xSi_S0_ : $@thin (Int, @thick C.Type) -> @owned C
+  // CHECK: function_ref @_TFC11expressions1CCfMS0_FT1xSi_S0_ : $@convention(thin) (Int, @thick C.Type) -> @owned C
   var b = C(x: 0)
 }
 
@@ -146,9 +146,9 @@ struct S {
 
 // CHECK-LABEL: sil hidden @_TF11expressions7structsFT_T_
 func structs() {
-  // CHECK: function_ref @_TFV11expressions1SCfMS0_FT_S0_ : $@thin (@thin S.Type) -> S
+  // CHECK: function_ref @_TFV11expressions1SCfMS0_FT_S0_ : $@convention(thin) (@thin S.Type) -> S
   var a = S()
-  // CHECK: function_ref @_TFV11expressions1SCfMS0_FT1xSi_S0_ : $@thin (Int, @thin S.Type) -> S
+  // CHECK: function_ref @_TFV11expressions1SCfMS0_FT1xSi_S0_ : $@convention(thin) (Int, @thin S.Type) -> S
   var b = S(x: 0)
 }
 
@@ -169,7 +169,7 @@ struct SomeStruct {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions5callsFT_T_
-// CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFV11expressions10SomeStruct1afRS0_FT_T_ : $@cc(method) @thin (@inout SomeStruct) -> ()
+// CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFV11expressions10SomeStruct1afRS0_FT_T_ : $@convention(method) (@inout SomeStruct) -> ()
 // CHECK: apply [[METHOD]]({{.*}})
 func calls() {
   var a : SomeStruct

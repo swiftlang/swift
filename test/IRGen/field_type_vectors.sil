@@ -45,7 +45,7 @@ class Zim<T, U> {
 }
 sil_vtable Zim {}
 
-sil @_TFC18field_type_vectors3ZimcU___fMGS0_Q_Q0__FT_GS0_Q_Q0__ : $@cc(method) @thin <T, U> (@owned Zim<T, U>) -> @owned Zim<T, U>
+sil @_TFC18field_type_vectors3ZimcU___fMGS0_Q_Q0__FT_GS0_Q_Q0__ : $@convention(method) <T, U> (@owned Zim<T, U>) -> @owned Zim<T, U>
 
 // CHECK-LABEL: @_TMnC18field_type_vectors4Zang = constant
 // CHECK:         %swift.type** (%swift.type*)* [[ZANG_TYPES_ACCESSOR:@[^,]*]],
@@ -58,7 +58,7 @@ class Zang<V>: Zim<V, V> {
 }
 sil_vtable Zang {}
 
-sil @_TFC18field_type_vectors4ZangcU__fMGS0_Q__FT_GS0_Q__ : $@cc(method) @thin <V> (@owned Zang<V>) -> @owned Zang<V>
+sil @_TFC18field_type_vectors4ZangcU__fMGS0_Q__FT_GS0_Q__ : $@convention(method) <V> (@owned Zang<V>) -> @owned Zang<V>
 
 // -- For storage-qualified fields, we just report the formal type.
 class StorageQualified {

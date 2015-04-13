@@ -27,12 +27,12 @@ class MyArrayContainer<T> {
   deinit
 }
 
-sil [semantics "array.make_mutable"] @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
-sil [semantics "array.get_count"] @guaranteed_array_get_count : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
-sil [semantics "array.get_capacity"] @guaranteed_array_get_capacity : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+sil [semantics "array.make_mutable"] @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+sil [semantics "array.get_count"] @guaranteed_array_get_count : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+sil [semantics "array.get_capacity"] @guaranteed_array_get_capacity : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
 
 // An unknown user
-sil @unknown : $@thin () -> ()
+sil @unknown : $@convention(thin) () -> ()
 
 ///////////
 // Tests //
@@ -45,14 +45,14 @@ sil @unknown : $@thin () -> ()
 // CHECK: bb1
 // CHECK-NOT: array_make_mutable
 // CHECK-NOT: apply [[FUN]]
-sil @simple_hoist : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+sil @simple_hoist : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1
 
 bb1:
-  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
-  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
@@ -71,7 +71,7 @@ bb2:
 // CHECK: bb1:
 // CHECK-NOT: apply
 // CHECK:  cond_br {{.*}}, bb1
-sil @hoist_ignoring_paired_retain_release_and_hoist : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+sil @hoist_ignoring_paired_retain_release_and_hoist : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1
@@ -81,8 +81,8 @@ bb1:
   %3 = load %1 : $*Builtin.Int1
   %4 = load %0 : $*MyArray<MyStruct>
   release_value %2 : $MyArray<MyStruct>
-  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
-  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br %3, bb1, bb2
 
 bb2:
@@ -98,7 +98,7 @@ bb2:
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
 // CHECK: apply [[MM]]
 // CHECK:  cond_br {{.*}}, bb1
-sil @hoist_blocked_by_unpaired_retain_release_1 : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+sil @hoist_blocked_by_unpaired_retain_release_1 : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1
@@ -107,8 +107,8 @@ bb1:
   retain_value %2 : $MyArray<MyStruct>
   %3 = load %1 : $*Builtin.Int1
   %4 = load %0 : $*MyArray<MyStruct>
-  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
-  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br %3, bb1, bb2
 
 bb2:
@@ -127,7 +127,7 @@ bb2:
 // CHECK: bb1:
 // CHECK-NOT: apply
 // CHECK:  cond_br {{.*}}, bb1
-sil @hoist_not_blocked_by_unpaired_release : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+sil @hoist_not_blocked_by_unpaired_release : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1
@@ -136,8 +136,8 @@ bb1:
   %3 = load %1 : $*Builtin.Int1
   %4 = load %0 : $*MyArray<MyStruct>
   release_value %2 : $MyArray<MyStruct>
-  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
-  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br %3, bb1, bb2
 
 bb2:
@@ -145,7 +145,7 @@ bb2:
   return %7 : $()
 }
 
-// CHECK-LABEL: sil @cow_should_ignore_mark_dependence_addrproj_use : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+// CHECK-LABEL: sil @cow_should_ignore_mark_dependence_addrproj_use : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 // CHECK: bb0(
 // CHECK-NOT: br
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
@@ -155,7 +155,7 @@ bb2:
 // CHECK: bb1:
 // CHECK-NOT: apply
 // CHECK:  cond_br {{.*}}, bb1
-sil @cow_should_ignore_mark_dependence_addrproj_use : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+sil @cow_should_ignore_mark_dependence_addrproj_use : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %999 = struct_element_addr %0 : $*MyArray<MyStruct>, #MyArray.buffer
   %9999 = struct_element_addr %999 : $*ArrayIntBuffer, #ArrayIntBuffer.storage
@@ -168,8 +168,8 @@ bb1:
   %3 = load %1 : $*Builtin.Int1
   %4 = load %0 : $*MyArray<MyStruct>
   release_value %2 : $MyArray<MyStruct>
-  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
-  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   mark_dependence %1 : $*Builtin.Int1 on %99999 : $Builtin.NativeObject
   cond_br %3, bb1, bb2
 
@@ -178,7 +178,7 @@ bb2:
   return %7 : $()
 }
 
-// CHECK-LABEL: sil @cow_should_ignore_mark_dependence_value : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+// CHECK-LABEL: sil @cow_should_ignore_mark_dependence_value : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 // CHECK: bb0(
 // CHECK-NOT: br
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
@@ -188,7 +188,7 @@ bb2:
 // CHECK: bb1:
 // CHECK-NOT: apply
 // CHECK:  cond_br {{.*}}, bb1
-sil @cow_should_ignore_mark_dependence_value : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+sil @cow_should_ignore_mark_dependence_value : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1
@@ -198,8 +198,8 @@ bb1:
   %3 = load %1 : $*Builtin.Int1
   %4 = load %0 : $*MyArray<MyStruct>
   release_value %2 : $MyArray<MyStruct>
-  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
-  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   mark_dependence %1 : $*Builtin.Int1 on %2 : $MyArray<MyStruct>
   cond_br %3, bb1, bb2
 
@@ -208,7 +208,7 @@ bb2:
   return %7 : $()
 }
 
-// CHECK-LABEL: sil @cow_should_ignore_enum : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+// CHECK-LABEL: sil @cow_should_ignore_enum : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 // CHECK: bb0(
 // CHECK-NOT: br
 // CHECK: [[MM:%.*]] = function_ref @array_make_mutable
@@ -218,7 +218,7 @@ bb2:
 // CHECK: bb1:
 // CHECK-NOT: apply
 // CHECK:  cond_br {{.*}}, bb1
-sil @cow_should_ignore_enum : $@thin (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+sil @cow_should_ignore_enum : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1
@@ -228,8 +228,8 @@ bb1:
   %3 = load %1 : $*Builtin.Int1
   %4 = load %0 : $*MyArray<MyStruct>
   release_value %2 : $MyArray<MyStruct>
-  %5 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
-  %6 = apply %5(%0) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %8 = enum $Optional<MyArray<MyStruct>>, #Optional.Some!enumelt.1, %2 : $MyArray<MyStruct>
   mark_dependence %1 : $*Builtin.Int1 on %8 : $Optional<MyArray<MyStruct>>
   cond_br %3, bb1, bb2
@@ -239,9 +239,9 @@ bb2:
   return %7 : $()
 }
 
-// CHECK-LABEL: sil @cow_should_ignore_guaranteed_semantic_call_sequence : $@thin (@guaranteed MyArrayContainer<MyStruct>, Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @cow_should_ignore_guaranteed_semantic_call_sequence : $@convention(thin) (@guaranteed MyArrayContainer<MyStruct>, Builtin.NativeObject) -> () {
 // CHECK: bb0
-// CHECK: [[F:%.*]] = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+// CHECK: [[F:%.*]] = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
 // CHECK: apply [[F]](
 // CHECK: bb1:
 // CHECK: bb2:
@@ -256,23 +256,23 @@ bb2:
 // CHECK: bb8:
 // CHECK-NOT: apply [[F]](
 // CHECK: bb9:
-sil @cow_should_ignore_guaranteed_semantic_call_sequence : $@thin (@guaranteed MyArrayContainer<MyStruct>, Builtin.NativeObject) -> () {
+sil @cow_should_ignore_guaranteed_semantic_call_sequence : $@convention(thin) (@guaranteed MyArrayContainer<MyStruct>, Builtin.NativeObject) -> () {
 bb0(%0 : $MyArrayContainer<MyStruct>, %00 : $Builtin.NativeObject):
   %1 = ref_element_addr %0 : $MyArrayContainer<MyStruct>, #MyArrayContainer.array
   %2 = load %1 : $*MyArray<MyStruct>
-  %3 = function_ref @guaranteed_array_get_count : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
-  %4 = function_ref @guaranteed_array_get_capacity : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
-  %5 = function_ref @unknown : $@thin () -> ()
-  %6 = function_ref @array_make_mutable : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  %3 = function_ref @guaranteed_array_get_count : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+  %4 = function_ref @guaranteed_array_get_capacity : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+  %5 = function_ref @unknown : $@convention(thin) () -> ()
+  %6 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   br bb1
 
 bb1:
   // Simple case. This should hoist.
   retain_value %2 : $MyArray<MyStruct>
-  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
-  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %3(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+  apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   release_value %2 : $MyArray<MyStruct>
-  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb1, bb2
 
 bb2:
@@ -281,11 +281,11 @@ bb2:
 bb3:
   // Failure case b/c of use in between release and call.
   retain_value %2 : $MyArray<MyStruct>
-  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
-  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %3(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+  apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   fix_lifetime %0 : $MyArrayContainer<MyStruct>
   release_value %2 : $MyArray<MyStruct>
-  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb4, bb3
 
 bb4:
@@ -294,11 +294,11 @@ bb4:
 bb5:
   // Failure case b/c of use in between calls.
   retain_value %2 : $MyArray<MyStruct>
-  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %3(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   fix_lifetime %0 : $MyArrayContainer<MyStruct>
-  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   release_value %2 : $MyArray<MyStruct>
-  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb5, bb6
 
 bb6:
@@ -309,10 +309,10 @@ bb7:
   // past the fix_lifetime.
   retain_value %2 : $MyArray<MyStruct>
   fix_lifetime %0 : $MyArrayContainer<MyStruct>
-  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
-  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %3(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+  apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   release_value %2 : $MyArray<MyStruct>
-  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb7, bb8
 
 bb8:
@@ -322,11 +322,11 @@ bb9:
   // Failure b/c of release_value
   retain_value %00 : $Builtin.NativeObject
   retain_value %2 : $MyArray<MyStruct>
-  apply %3(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
-  apply %4(%2) : $@cc(method) @thin (@guaranteed MyArray<MyStruct>) -> Int
+  apply %3(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+  apply %4(%2) : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
   release_value %00 : $Builtin.NativeObject
   release_value %2 : $MyArray<MyStruct>
-  apply %6(%1) : $@cc(method) @thin (@inout MyArray<MyStruct>) -> ()
+  apply %6(%1) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   cond_br undef, bb9, bb10
 
 bb10:

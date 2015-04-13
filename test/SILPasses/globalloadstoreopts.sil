@@ -27,14 +27,14 @@ struct C {
   var i : Builtin.Int16
 }
 
-sil @use : $@thin (Builtin.Int32) -> ()
+sil @use : $@convention(thin) (Builtin.Int32) -> ()
 
 // CHECK-LABEL: sil @store_promotion
 // CHECK: store
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: strong_retain
 // CHECK: return
-sil @store_promotion : $@thin (@owned B) -> () {
+sil @store_promotion : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
   %2 = store %0 to %1#1 : $*B
@@ -51,7 +51,7 @@ bb0(%0 : $B):
 // CHECK-NEXT: store
 // CHECK-NEXT: tuple
 // CHECK: return
-sil @store_after_store : $@thin (@owned B) -> () {
+sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
   %2 = store %0 to %1#1 : $*B
@@ -69,7 +69,7 @@ bb0(%0 : $B):
 // CHECK-NEXT: builtin "sadd_with_overflow_Int64"([[LOAD_RESULT]] : ${{.*}}, [[APPLY_RESULT]]
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: return
-sil @eliminate_duplicate_loads_over_noread_builtins : $@thin (@inout Builtin.Int64) -> (Builtin.Int64) {
+sil @eliminate_duplicate_loads_over_noread_builtins : $@convention(thin) (@inout Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $*Builtin.Int64):
   %1 = load %0 : $*Builtin.Int64
   %3 = integer_literal $Builtin.Int1, 0
@@ -90,7 +90,7 @@ bb0(%0 : $*Builtin.Int64):
 // CHECK-NEXT: store
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @dead_store_elimination_over_noread_builtins : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
+sil @dead_store_elimination_over_noread_builtins : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
 bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
   %2 = load %0 : $*Builtin.Int64
   %4 = integer_literal $Builtin.Int1, 0
@@ -116,7 +116,7 @@ bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
 // CHECK-NEXT: builtin
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: return
-sil @load_store_forwarding_over_noread_builtins : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> (Builtin.Int64) {
+sil @load_store_forwarding_over_noread_builtins : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
   %2 = load %0 : $*Builtin.Int64
   %4 = integer_literal $Builtin.Int1, 0
@@ -142,7 +142,7 @@ bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return
-sil @load_store_forwarding_over_dealloc_stack : $@thin (Builtin.Int64) -> (Builtin.Int64) {
+sil @load_store_forwarding_over_dealloc_stack : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $Builtin.Int64):
   %1 = alloc_stack $Builtin.Int64
   %2 = alloc_stack $Builtin.Int64
@@ -173,7 +173,7 @@ struct Agg1 {
 // CHECK-NEXT: struct_extract
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: return
-sil @load_dedup_forwarding_from_aggregate_to_field : $@thin (@inout Agg1) -> (Builtin.Int32) {
+sil @load_dedup_forwarding_from_aggregate_to_field : $@convention(thin) (@inout Agg1) -> (Builtin.Int32) {
 bb0(%0 : $*Agg1):
   %1 = load %0 : $*Agg1
   %2 = struct_element_addr %0 : $*Agg1, #Agg1.a
@@ -191,7 +191,7 @@ struct Wrapper {
 // CHECK-NOT: load
 // CHECK: [[RESULT:%[0-9]+]] = struct_extract
 // CHECK: return [[RESULT]]
-sil @promote_partial_load : $@thin (Builtin.Int32) -> Builtin.Int32 {
+sil @promote_partial_load : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
   %1 = alloc_stack $Wrapper
   %2 = struct $Wrapper (%0 : $Builtin.Int32)
@@ -206,7 +206,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK: strong_retain [[RET:%[0-9]+]]
 // CHECK: strong_retain [[RET]]
 // CHECK: return
-sil @tbaa_class_alias_nonclass : $@thin (@owned B, @inout Agg1) -> () {
+sil @tbaa_class_alias_nonclass : $@convention(thin) (@owned B, @inout Agg1) -> () {
 bb0(%0 : $B, %1 : $*Agg1):
   %2 = alloc_box $B
   %3 = load %1 : $*Agg1
@@ -223,7 +223,7 @@ bb0(%0 : $B, %1 : $*Agg1):
 // CHECK-LABEL: sil @store_loaded_value
 // CHECK-NOT: store
 // CHECK: return
-sil @store_loaded_value : $@thin (@inout Agg2, @inout Agg1) -> () {
+sil @store_loaded_value : $@convention(thin) (@inout Agg2, @inout Agg1) -> () {
 bb0(%0 : $*Agg2, %1 : $*Agg1):
   %2 = load %1 : $*Agg1
   %3 = load %0 : $*Agg2
@@ -233,7 +233,7 @@ bb0(%0 : $*Agg2, %1 : $*Agg1):
   %7 = return %6 : $()
 }
 
-// CHECK-LABEL: sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
+// CHECK-LABEL: sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
 // CHECK: bb0([[INPUT_PTR1:%[0-9]+]] : $*Builtin.Int32, [[INPUT_PTR2:%[0-9]+]] : $*Builtin.Int32):
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK-NEXT: [[INT_LITERAL:%[0-9]+]] = integer_literal
@@ -243,7 +243,7 @@ bb0(%0 : $*Agg2, %1 : $*Agg1):
 // CHECK-NEXT: dealloc_stack [[ALLOCA]]#0
 // CHECK-NEXT: tuple ([[INT_LOADED]] : $Builtin.Int32, [[INT_LOADED]] : $Builtin.Int32, [[INT_LITERAL]] : $Builtin.Int32)
 // CHECK-NEXT: return
-sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
+sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
 bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
   %2 = alloc_stack $Builtin.Int32
   %3 = integer_literal $Builtin.Int32, 32
@@ -260,7 +260,7 @@ bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
 }
 
 // *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
-// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_struct : $@thin (Optional<A>) -> () {
+// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]]
 // CHECK-NEXT: alloc_stack
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Builtin.Int32
@@ -270,7 +270,7 @@ bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Optional<Builtin.Int32>
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_addr_cast
-sil @store_to_load_forward_unchecked_addr_cast_struct : $@thin (Optional<A>) -> () {
+sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
 bb0(%0 : $Optional<A>):
   %1 = alloc_stack $Optional<A>
   store %0 to %1#1 : $*Optional<A>
@@ -297,7 +297,7 @@ bb0(%0 : $Optional<A>):
 // compatible with heap references, but does not have reference
 // semantics b/c it is a trivial type. We currently do not handle such a case.
 
-// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_class : $@thin (Optional<B>) -> () {
+// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (Optional<B>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]]
 // CHECK-NEXT: alloc_stack
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.Int32
@@ -307,7 +307,7 @@ bb0(%0 : $Optional<A>):
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.Int32>
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.NativeObject>
-sil @store_to_load_forward_unchecked_addr_cast_class : $@thin (Optional<B>) -> () {
+sil @store_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (Optional<B>) -> () {
 bb0(%0 : $Optional<B>):
   %1 = alloc_stack $Optional<B>
   store %0 to %1#1 : $*Optional<B>
@@ -339,7 +339,7 @@ bb0(%0 : $Optional<B>):
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return
-sil @load_store_forwarding_from_aggregate_to_field : $@thin (Agg1) -> (Builtin.Int32) {
+sil @load_store_forwarding_from_aggregate_to_field : $@convention(thin) (Agg1) -> (Builtin.Int32) {
 bb0(%0 : $Agg1):
   %1 = alloc_stack $Agg1
   store %0 to %1#1 : $*Agg1
@@ -354,7 +354,7 @@ bb0(%0 : $Agg1):
 
 
 // *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
-// CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_struct : $@thin (@inout Optional<A>) -> () {
+// CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (@inout Optional<A>) -> () {
 // CHECK: bb0(
 
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Builtin.Int32
@@ -364,7 +364,7 @@ bb0(%0 : $Agg1):
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Optional<Builtin.Int32>
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_addr_cast
-sil @load_to_load_forward_unchecked_addr_cast_struct : $@thin (@inout Optional<A>) -> () {
+sil @load_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (@inout Optional<A>) -> () {
 bb0(%0 : $*Optional<A>):
   %1 = load %0 : $*Optional<A>
   %2 = unchecked_addr_cast %0 : $*Optional<A> to $*Builtin.Int32
@@ -389,7 +389,7 @@ bb0(%0 : $*Optional<A>):
 // compatible with heap references, but does not have reference
 // semantics b/c it is a trivial type. We currently do not handle such a case.
 
-// CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_class : $@thin (@inout Optional<B>) -> () {
+// CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (@inout Optional<B>) -> () {
 // CHECK: bb0({{%[0-9]+}} : $*Optional<B>):
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.Int32
 // CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $B
@@ -398,7 +398,7 @@ bb0(%0 : $*Optional<A>):
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.Int32>
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.RawPointer>
 // CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.NativeObject>
-sil @load_to_load_forward_unchecked_addr_cast_class : $@thin (@inout Optional<B>) -> () {
+sil @load_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (@inout Optional<B>) -> () {
 bb0(%0 : $*Optional<B>):
   %1 = load %0 : $*Optional<B>
   %2 = unchecked_addr_cast %0 : $*Optional<B> to $*Builtin.Int32
@@ -419,11 +419,11 @@ bb0(%0 : $*Optional<B>):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @load_to_load_forwarding_diamonds : $@thin (@inout Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil @load_to_load_forwarding_diamonds : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
 // CHECK: load
 // CHECK-NOT: load
 // CHECK: return
-sil @load_to_load_forwarding_diamonds : $@thin (@inout Builtin.Int32) -> Builtin.Int32 {
+sil @load_to_load_forwarding_diamonds : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $*Builtin.Int32):
   %1 = load %0 : $*Builtin.Int32
   // Simple diamond.
@@ -447,7 +447,7 @@ bb5:
   return %2 : $Builtin.Int32
 }
 
-// CHECK-LABEL: sil @load_to_load_conflicting_branches_diamond : $@thin (@inout Builtin.Int32) -> () {
+// CHECK-LABEL: sil @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: bb0(
 // CHECK: load
 // CHECK: bb1:
@@ -457,7 +457,7 @@ bb5:
 // CHECK: bb2:
 // CHECK: bb3:
 // CHECK: load
-sil @load_to_load_conflicting_branches_diamond : $@thin (@inout Builtin.Int32) -> () {
+sil @load_to_load_conflicting_branches_diamond : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = load %0 : $*Builtin.Int32
   builtin "trunc_Int32_Int1"(%1 : $Builtin.Int32) : $Builtin.Int1
@@ -485,7 +485,7 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @load_to_load_irreducible_loop : $@thin (@inout Builtin.Int32) -> () {
+// CHECK-LABEL: sil @load_to_load_irreducible_loop : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: bb0(
 // CHECK: load
 // CHECK: bb1:
@@ -495,7 +495,7 @@ bb3:
 // CHECK: bb2:
 // CHECK: bb3:
 // CHECK: load
-sil @load_to_load_irreducible_loop : $@thin (@inout Builtin.Int32) -> () {
+sil @load_to_load_irreducible_loop : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = load %0 : $*Builtin.Int32
   builtin "trunc_Int32_Int1"(%1 : $Builtin.Int32) : $Builtin.Int1
@@ -523,7 +523,7 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @load_to_load_loop : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> () {
+// CHECK-LABEL: sil @load_to_load_loop : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> () {
 // CHECK: bb0([[PTR0:%[0-9]+]] : $*Builtin.Int32, [[PTR1:%[0-9]+]] : $*Builtin.Int32):
 // CHECK: load [[PTR0]]
 // CHECK: bb1:
@@ -532,7 +532,7 @@ bb3:
 // CHECK-NOT: load
 // CHECK: bb2:
 // CHECK: load [[PTR1]]
-sil @load_to_load_loop : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> () {
+sil @load_to_load_loop : $@convention(thin) (@inout Builtin.Int32, @inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
   %2 = load %0 : $*Builtin.Int32
   %99 = load %1 : $*Builtin.Int32
@@ -558,11 +558,11 @@ bb2:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @post_dominating_dead_store : $@thin (@inout Builtin.Int32) -> () {
+// CHECK-LABEL: sil @post_dominating_dead_store : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: store
 // CHECK-NOT: store
 // CHECK: return
-sil @post_dominating_dead_store : $@thin (@inout Builtin.Int32) -> () {
+sil @post_dominating_dead_store : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = integer_literal $Builtin.Int32, 0
   store %1 to %0 : $*Builtin.Int32
@@ -584,7 +584,7 @@ bb3:
 // to understand that the first store is post dominated by the set of
 // stores. We are not smart enough to do that.
 //
-// CHECK-LABEL: sil @post_dominating_dead_store_partial_fail : $@thin (@inout Builtin.Int32) -> () {
+// CHECK-LABEL: sil @post_dominating_dead_store_partial_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: bb0(
 // CHECK: store
 // CHECK: bb1:
@@ -593,7 +593,7 @@ bb3:
 // CHECK: bb3:
 // CHECK: store
 // CHECK: return
-sil @post_dominating_dead_store_partial_fail : $@thin (@inout Builtin.Int32) -> () {
+sil @post_dominating_dead_store_partial_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = integer_literal $Builtin.Int32, 1
@@ -615,12 +615,12 @@ bb3:
 }
 
 // We can't eliminate any stores here.
-// CHECK-LABEL: sil @post_dominating_dead_store_fail : $@thin (@inout Builtin.Int32) -> () {
+// CHECK-LABEL: sil @post_dominating_dead_store_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: store
 // CHECK: store
 // CHECK-NOT: store
 // CHECK: return
-sil @post_dominating_dead_store_fail : $@thin (@inout Builtin.Int32) -> () {
+sil @post_dominating_dead_store_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = integer_literal $Builtin.Int32, 1
@@ -640,7 +640,7 @@ bb2:
 // CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct
 // CHECK-NOT: unchecked_trivial_bit_cast
 // CHECK: return
-sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct : $@thin (A) -> () {
+sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct : $@convention(thin) (A) -> () {
 bb0(%0 : $A):
   %1 = alloc_stack $A
   store %0 to %1#1 : $*A
@@ -652,7 +652,7 @@ bb0(%0 : $A):
 }
 
 // Check that we can perform partial load forwarding.
-// CHECK-LABEL: sil @forward_partial_aliasing_loads : $@thin (@in AA) -> () {
+// CHECK-LABEL: sil @forward_partial_aliasing_loads : $@convention(thin) (@in AA) -> () {
 // CHECK: bb0([[INPUT_PTR:%.*]] : $*AA):
 // CHECK: [[INPUT_GEP1:%.*]] = struct_element_addr [[INPUT_PTR]] : $*AA, #AA.a
 // CHECK: [[INPUT_GEP2:%.*]] = struct_element_addr [[INPUT_GEP1]] : $*A, #A.i
@@ -669,7 +669,7 @@ bb0(%0 : $A):
 // CHECK: [[LOAD_STACK_GEP2:%.*]] = load [[STACK_GEP2]]
 // CHECK: apply [[USE_FUN]]([[LOAD_STACK_GEP2]])
 // CHECK: apply [[USE_FUN]]([[LOAD_STACK_GEP2]])
-sil @forward_partial_aliasing_loads : $@thin (@in AA) -> () {
+sil @forward_partial_aliasing_loads : $@convention(thin) (@in AA) -> () {
 bb0(%0 : $*AA):
   %1 = struct_element_addr %0 : $*AA, #AA.a
   %2 = struct_element_addr %1 : $*A, #A.i
@@ -678,12 +678,12 @@ bb0(%0 : $*AA):
   %4 = load %0 : $*AA
   %5 = struct_extract %4 : $AA, #AA.a
   %6 = struct_extract %5 : $A, #A.i
-  %7 = function_ref @use : $@thin (Builtin.Int32) -> ()
-  apply %7(%3) : $@thin (Builtin.Int32) -> ()
-  apply %7(%6) : $@thin (Builtin.Int32) -> ()
+  %7 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  apply %7(%3) : $@convention(thin) (Builtin.Int32) -> ()
+  apply %7(%6) : $@convention(thin) (Builtin.Int32) -> ()
 
   %8 = struct_extract %4 : $AA, #AA.i
-  apply %7(%8) : $@thin (Builtin.Int32) -> ()
+  apply %7(%8) : $@convention(thin) (Builtin.Int32) -> ()
 
   %9 = alloc_stack $AA
 
@@ -695,8 +695,8 @@ bb0(%0 : $*AA):
   %14 = struct_extract %13 : $AA, #AA.a
   %15 = struct_extract %14 : $A, #A.i
 
-  apply %7(%12) : $@thin (Builtin.Int32) -> ()
-  apply %7(%15) : $@thin (Builtin.Int32) -> ()
+  apply %7(%12) : $@convention(thin) (Builtin.Int32) -> ()
+  apply %7(%15) : $@convention(thin) (Builtin.Int32) -> ()
 
   dealloc_stack %9#0 : $*@local_storage AA
 
@@ -705,11 +705,11 @@ bb0(%0 : $*AA):
 }
 
 /// Make sure that we don't crash and don't opitimize here.
-// CHECK-LABEL: sil @covering_store_with_unchecked_addr : $@thin (A, A) -> () {
+// CHECK-LABEL: sil @covering_store_with_unchecked_addr : $@convention(thin) (A, A) -> () {
 // CHECK-NOT: unchecked_trivial_bit_cast
 // CHECK: unchecked_addr_cast
 // CHECK-NOT: unchecked_trivial_bit_cast
-sil @covering_store_with_unchecked_addr : $@thin (A, A) -> () {
+sil @covering_store_with_unchecked_addr : $@convention(thin) (A, A) -> () {
 bb0(%0 : $A, %1 : $A):
   %2 = alloc_stack $A
   cond_br undef, bb1, bb2
@@ -741,7 +741,7 @@ bb3:
 // CHECK:  store [[CONST1]] to [[STRUCTADDR]] : $*Builtin.Int32
 // CHECK:  [[LD:%.*]] = load [[ALLOC]]#1 : $*A
 // CHECK:  store [[LD]] to %0 : $*A
-sil @aliasing_store : $@thin (@inout A) -> () {
+sil @aliasing_store : $@convention(thin) (@inout A) -> () {
 bb0(%0: $*A):
   %1 = alloc_stack $A
   %2 = integer_literal $Builtin.Int32, 0
@@ -767,10 +767,10 @@ bb0(%0: $*A):
 /// 4. %5 can write to memory, so we try to check if it can alias %0#1. We look
 /// up the load that was erased and will use it in a memory unsafe way.
 //
-// CHECK-LABEL: sil @invalidate_dead_loads_with_only_store_user_correctly : $@thin () -> () {
+// CHECK-LABEL: sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) () -> () {
 // CHECK-NOT: load
 // CHECK-NOT: store
-sil @invalidate_dead_loads_with_only_store_user_correctly : $@thin () -> () {
+sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Optional<Builtin.Int32>
   %1 = integer_literal $Builtin.Int32, 0

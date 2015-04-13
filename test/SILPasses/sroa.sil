@@ -15,9 +15,9 @@ struct S1 {
   var z : Builtin.Int64
 }
 
-sil @use_int32 : $@thin (Builtin.Int32) -> ()
+sil @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 
-// CHECK-LABEL: sil @struct_with_scalar_fields : $@thin (S1) -> ()
+// CHECK-LABEL: sil @struct_with_scalar_fields : $@convention(thin) (S1) -> ()
 // CHECK: bb0([[VAR_0:%[0-9]+]] : $S1):
 // CHECK:   [[VAR_1:%[0-9]+]] = alloc_stack $Builtin.Int1
 // CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Builtin.Int32
@@ -28,9 +28,9 @@ sil @use_int32 : $@thin (Builtin.Int32) -> ()
 // CHECK:   store [[VAR_6]] to [[VAR_2]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #S1.z
 // CHECK:   store [[VAR_8]] to [[VAR_3]]#1 : $*Builtin.Int64
-// CHECK:   [[VAR_10:%[0-9]+]] = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_10:%[0-9]+]] = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_11:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int32
-// CHECK:   [[VAR_12:%[0-9]+]] = apply [[VAR_10]]([[VAR_11]]) : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_12:%[0-9]+]] = apply [[VAR_10]]([[VAR_11]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_13:%[0-9]+]] = load [[VAR_1]]#1 : $*Builtin.Int1
 // CHECK:   [[VAR_14:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_15:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int64
@@ -40,14 +40,14 @@ sil @use_int32 : $@thin (Builtin.Int32) -> ()
 // CHECK:   dealloc_stack [[VAR_1]]#0 : $*@local_storage Builtin.Int1
 // CHECK:   [[VAR_20:%[0-9]+]] = tuple ()
 // CHECK:   return [[VAR_20]] : $()
-sil @struct_with_scalar_fields : $@thin (S1) -> () {
+sil @struct_with_scalar_fields : $@convention(thin) (S1) -> () {
 bb0(%0 : $S1):
   %1 = alloc_stack $S1
   store %0 to %1#1 : $*S1
-  %2 = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
+  %2 = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
   %3 = struct_element_addr %1#1 : $*S1, #S1.y
   %4 = load %3 : $*Builtin.Int32
-  apply %2(%4) : $@thin (Builtin.Int32) -> ()
+  apply %2(%4) : $@convention(thin) (Builtin.Int32) -> ()
   %5 = load %1#1 : $*S1
   dealloc_stack %1#0 : $*@local_storage S1
   %6 = tuple ()
@@ -58,14 +58,14 @@ bb0(%0 : $S1):
 // Struct With Struct Fields //
 ///////////////////////////////
 
-sil @use_s1 : $@thin (S1) -> ()
+sil @use_s1 : $@convention(thin) (S1) -> ()
 
 struct S2 {
   var alpha : Builtin.FPIEEE32
   var beta : S1
 }
 
-// CHECK-LABEL: sil @struct_with_struct_fields : $@thin (S2, Builtin.Int64) -> ()
+// CHECK-LABEL: sil @struct_with_struct_fields : $@convention(thin) (S2, Builtin.Int64) -> ()
 // CHECK: bb0([[VAR_0:%[0-9]+]] : $S2, [[VAR_1:%[0-9]+]] : $Builtin.Int64):
 // CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Builtin.FPIEEE32
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int1
@@ -84,11 +84,11 @@ struct S2 {
 // CHECK:   [[VAR_16:%[0-9]+]] = load [[VAR_4]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_17:%[0-9]+]] = load [[VAR_5]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_18:%[0-9]+]] = struct $S1 ([[VAR_15]] : $Builtin.Int1, [[VAR_16]] : $Builtin.Int32, [[VAR_17]] : $Builtin.Int64)
-// CHECK:   [[VAR_19:%[0-9]+]] = function_ref @use_s1 : $@thin (S1) -> ()
-// CHECK:   [[VAR_20:%[0-9]+]] = apply [[VAR_19]]([[VAR_18]]) : $@thin (S1) -> ()
-// CHECK:   [[VAR_21:%[0-9]+]] = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_19:%[0-9]+]] = function_ref @use_s1 : $@convention(thin) (S1) -> ()
+// CHECK:   [[VAR_20:%[0-9]+]] = apply [[VAR_19]]([[VAR_18]]) : $@convention(thin) (S1) -> ()
+// CHECK:   [[VAR_21:%[0-9]+]] = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_22:%[0-9]+]] = load [[VAR_4]]#1 : $*Builtin.Int32
-// CHECK:   [[VAR_23:%[0-9]+]] = apply [[VAR_21]]([[VAR_22]]) : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_23:%[0-9]+]] = apply [[VAR_21]]([[VAR_22]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_24:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.FPIEEE32
 // CHECK:   [[VAR_25:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int1
 // CHECK:   [[VAR_26:%[0-9]+]] = load [[VAR_4]]#1 : $*Builtin.Int32
@@ -102,18 +102,18 @@ struct S2 {
 // CHECK:   dealloc_stack [[VAR_2]]#0 : $*@local_storage Builtin.FPIEEE32
 // CHECK:   [[VAR_35:%[0-9]+]] = tuple ()
 // CHECK:   return [[VAR_35]] : $()
-sil @struct_with_struct_fields : $@thin (S2, Builtin.Int64) -> () {
+sil @struct_with_struct_fields : $@convention(thin) (S2, Builtin.Int64) -> () {
 bb0(%0 : $S2, %1 : $Builtin.Int64):
   %2 = alloc_stack $S2
   store %0 to %2#1 : $*S2
   %3 = struct_element_addr %2#1 : $*S2, #S2.beta
   %4 = load %3 : $*S1
-  %5 = function_ref @use_s1 : $@thin (S1) -> ()
-  apply %5(%4) : $@thin (S1) -> ()
+  %5 = function_ref @use_s1 : $@convention(thin) (S1) -> ()
+  apply %5(%4) : $@convention(thin) (S1) -> ()
   %6 = struct_element_addr %3 : $*S1, #S1.y
-  %7 = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
+  %7 = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
   %8 = load %6 : $*Builtin.Int32
-  apply %7(%8) : $@thin (Builtin.Int32) -> ()
+  apply %7(%8) : $@convention(thin) (Builtin.Int32) -> ()
   %9 = load %2#1 : $*S2
   %10 = struct_element_addr %3 : $*S1, #S1.z
   store %1 to %10 : $*Builtin.Int64
@@ -126,14 +126,14 @@ bb0(%0 : $S2, %1 : $Builtin.Int64):
 // Struct with Tuple Fields //
 //////////////////////////////
 
-sil @use_tup : $@thin ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
+sil @use_tup : $@convention(thin) ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
 
 struct S3 {
   var gamma : (Builtin.Int32, Builtin.Int64, Builtin.Int16)
   var delta : Builtin.FPIEEE32
 }
 
-// CHECK-LABEL: sil @struct_with_tuple_fields : $@thin (S3, Builtin.Int64) -> ()
+// CHECK-LABEL: sil @struct_with_tuple_fields : $@convention(thin) (S3, Builtin.Int64) -> ()
 // CHECK: bb0([[VAR_0:%[0-9]+]] : $S3, [[VAR_1:%[0-9]+]] : $Builtin.Int64):
 // CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int64
@@ -148,15 +148,15 @@ struct S3 {
 // CHECK:   store [[VAR_11]] to [[VAR_4]]#1 : $*Builtin.Int16
 // CHECK:   [[VAR_13:%[0-9]+]] = struct_extract [[VAR_0]] : $S3, #S3.delta
 // CHECK:   store [[VAR_13]] to [[VAR_5]]#1 : $*Builtin.FPIEEE32
-// CHECK:   [[VAR_15:%[0-9]+]] = function_ref @use_tup : $@thin ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
+// CHECK:   [[VAR_15:%[0-9]+]] = function_ref @use_tup : $@convention(thin) ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
 // CHECK:   [[VAR_16:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_17:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_18:%[0-9]+]] = load [[VAR_4]]#1 : $*Builtin.Int16
 // CHECK:   [[VAR_19:%[0-9]+]] = tuple ([[VAR_16]] : $Builtin.Int32, [[VAR_17]] : $Builtin.Int64, [[VAR_18]] : $Builtin.Int16)
-// CHECK:   [[VAR_20:%[0-9]+]] = apply [[VAR_15]]([[VAR_19]]) : $@thin ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
+// CHECK:   [[VAR_20:%[0-9]+]] = apply [[VAR_15]]([[VAR_19]]) : $@convention(thin) ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
 // CHECK:   [[VAR_21:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int32
-// CHECK:   [[VAR_22:%[0-9]+]] = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
-// CHECK:   [[VAR_23:%[0-9]+]] = apply [[VAR_22]]([[VAR_21]]) : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_22:%[0-9]+]] = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:   [[VAR_23:%[0-9]+]] = apply [[VAR_22]]([[VAR_21]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_24:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_25:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_26:%[0-9]+]] = load [[VAR_4]]#1 : $*Builtin.Int16
@@ -170,18 +170,18 @@ struct S3 {
 // CHECK:   dealloc_stack [[VAR_2]]#0 : $*@local_storage Builtin.Int32
 // CHECK:   [[VAR_35:%[0-9]+]] = tuple ()
 // CHECK:   return [[VAR_35]] : $()
-sil @struct_with_tuple_fields : $@thin (S3, Builtin.Int64) -> () {
+sil @struct_with_tuple_fields : $@convention(thin) (S3, Builtin.Int64) -> () {
 bb0(%0 : $S3, %1 : $Builtin.Int64):
   %2 = alloc_stack $S3
   store %0 to %2#1 : $*S3
-  %3 = function_ref @use_tup : $@thin ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
+  %3 = function_ref @use_tup : $@convention(thin) ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
   %4 = struct_element_addr %2#1 : $*S3, #S3.gamma
   %5 = load %4 : $*(Builtin.Int32, Builtin.Int64, Builtin.Int16)
-  apply %3(%5) : $@thin ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
+  apply %3(%5) : $@convention(thin) ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
   %6 = tuple_element_addr %4 : $*(Builtin.Int32, Builtin.Int64, Builtin.Int16), 0
   %7 = load %6 : $*Builtin.Int32
-  %8 = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
-  apply %8(%7) : $@thin (Builtin.Int32) -> ()
+  %8 = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
+  apply %8(%7) : $@convention(thin) (Builtin.Int32) -> ()
   %9 = load %2#1 : $*S3
   %10 = tuple_element_addr %4 : $*(Builtin.Int32, Builtin.Int64, Builtin.Int16), 1
   store %1 to %10 : $*Builtin.Int64
@@ -194,7 +194,7 @@ bb0(%0 : $S3, %1 : $Builtin.Int64):
 // Tuple with Scalar Fields //
 //////////////////////////////
 
-// CHECK-LABEL: sil @tuple_with_scalar_fields : $@thin ((Builtin.Int1, Builtin.Int32, Builtin.Int64)) -> ()
+// CHECK-LABEL: sil @tuple_with_scalar_fields : $@convention(thin) ((Builtin.Int1, Builtin.Int32, Builtin.Int64)) -> ()
 // CHECK: bb0([[VAR_0:%[0-9]+]] : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)):
 // CHECK:   [[VAR_1:%[0-9]+]] = alloc_stack $Builtin.Int1
 // CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Builtin.Int32
@@ -205,9 +205,9 @@ bb0(%0 : $S3, %1 : $Builtin.Int64):
 // CHECK:   store [[VAR_6]] to [[VAR_2]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_8:%[0-9]+]] = tuple_extract [[VAR_0]] : $(Builtin.Int1, Builtin.Int32, Builtin.Int64), 2
 // CHECK:   store [[VAR_8]] to [[VAR_3]]#1 : $*Builtin.Int64
-// CHECK:   [[VAR_10:%[0-9]+]] = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_10:%[0-9]+]] = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_11:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int32
-// CHECK:   [[VAR_12:%[0-9]+]] = apply [[VAR_10]]([[VAR_11]]) : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_12:%[0-9]+]] = apply [[VAR_10]]([[VAR_11]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_13:%[0-9]+]] = load [[VAR_1]]#1 : $*Builtin.Int1
 // CHECK:   [[VAR_14:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_15:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int64
@@ -217,14 +217,14 @@ bb0(%0 : $S3, %1 : $Builtin.Int64):
 // CHECK:   dealloc_stack [[VAR_1]]#0 : $*@local_storage Builtin.Int1
 // CHECK:   [[VAR_20:%[0-9]+]] = tuple ()
 // CHECK:   return [[VAR_20]] : $()
-sil @tuple_with_scalar_fields : $@thin ((Builtin.Int1, Builtin.Int32, Builtin.Int64)) -> () {
+sil @tuple_with_scalar_fields : $@convention(thin) ((Builtin.Int1, Builtin.Int32, Builtin.Int64)) -> () {
 bb0(%0 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)):
   %1 = alloc_stack $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
   store %0 to %1#1 : $*(Builtin.Int1, Builtin.Int32, Builtin.Int64)
-  %2 = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
+  %2 = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
   %3 = tuple_element_addr %1#1 : $*(Builtin.Int1, Builtin.Int32, Builtin.Int64), 1
   %4 = load %3 : $*Builtin.Int32
-  apply %2(%4) : $@thin (Builtin.Int32) -> ()
+  apply %2(%4) : $@convention(thin) (Builtin.Int32) -> ()
   %5 = load %1#1 : $*(Builtin.Int1, Builtin.Int32, Builtin.Int64)
   dealloc_stack %1#0 : $*@local_storage (Builtin.Int1, Builtin.Int32, Builtin.Int64)
   %6 = tuple()
@@ -240,9 +240,9 @@ struct S4 {
   var bet : Builtin.Int32
 }
 
-sil @use_str4 : $@thin (S4) -> ()
+sil @use_str4 : $@convention(thin) (S4) -> ()
 
-// CHECK-LABEL: sil @tuple_with_struct_fields : $@thin ((S4, Builtin.Int16), Builtin.Int16) -> ()
+// CHECK-LABEL: sil @tuple_with_struct_fields : $@convention(thin) ((S4, Builtin.Int16), Builtin.Int16) -> ()
 // CHECK: bb0([[VAR_0:%[0-9]+]] : $(S4, Builtin.Int16), [[VAR_1:%[0-9]+]] : $Builtin.Int16):
 // CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Builtin.Int64
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int32
@@ -254,14 +254,14 @@ sil @use_str4 : $@thin (S4) -> ()
 // CHECK:   store [[VAR_8]] to [[VAR_3]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_10:%[0-9]+]] = tuple_extract [[VAR_0]] : $(S4, Builtin.Int16), 1
 // CHECK:   store [[VAR_10]] to [[VAR_4]]#1 : $*Builtin.Int16
-// CHECK:   [[VAR_12:%[0-9]+]] = function_ref @use_str4 : $@thin (S4) -> ()
+// CHECK:   [[VAR_12:%[0-9]+]] = function_ref @use_str4 : $@convention(thin) (S4) -> ()
 // CHECK:   [[VAR_13:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_14:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_15:%[0-9]+]] = struct $S4 ([[VAR_13]] : $Builtin.Int64, [[VAR_14]] : $Builtin.Int32)
-// CHECK:   [[VAR_16:%[0-9]+]] = apply [[VAR_12]]([[VAR_15]]) : $@thin (S4) -> ()
+// CHECK:   [[VAR_16:%[0-9]+]] = apply [[VAR_12]]([[VAR_15]]) : $@convention(thin) (S4) -> ()
 // CHECK:   [[VAR_17:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int32
-// CHECK:   [[VAR_18:%[0-9]+]] = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
-// CHECK:   [[VAR_19:%[0-9]+]] = apply [[VAR_18]]([[VAR_17]]) : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_18:%[0-9]+]] = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:   [[VAR_19:%[0-9]+]] = apply [[VAR_18]]([[VAR_17]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_20:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_21:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_22:%[0-9]+]] = struct $S4 ([[VAR_20]] : $Builtin.Int64, [[VAR_21]] : $Builtin.Int32)
@@ -273,18 +273,18 @@ sil @use_str4 : $@thin (S4) -> ()
 // CHECK:   dealloc_stack [[VAR_2]]#0 : $*@local_storage Builtin.Int64
 // CHECK:   [[VAR_29:%[0-9]+]] = tuple ()
 // CHECK:   return [[VAR_29]] : $()
-sil @tuple_with_struct_fields : $@thin ((S4, Builtin.Int16), Builtin.Int16) -> () {
+sil @tuple_with_struct_fields : $@convention(thin) ((S4, Builtin.Int16), Builtin.Int16) -> () {
 bb0(%0 : $(S4, Builtin.Int16), %1 : $Builtin.Int16):
   %2 = alloc_stack $(S4, Builtin.Int16)
   store %0 to %2#1 : $*(S4, Builtin.Int16)
-  %3 = function_ref @use_str4 : $@thin (S4) -> ()
+  %3 = function_ref @use_str4 : $@convention(thin) (S4) -> ()
   %4 = tuple_element_addr %2#1 : $*(S4, Builtin.Int16), 0
   %5 = load %4 : $*S4
-  apply %3(%5) : $@thin (S4) -> ()
+  apply %3(%5) : $@convention(thin) (S4) -> ()
   %6 = struct_element_addr %4 : $*S4, #S4.bet
   %7 = load %6 : $*Builtin.Int32
-  %8 = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
-  apply %8(%7) : $@thin (Builtin.Int32) -> ()
+  %8 = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
+  apply %8(%7) : $@convention(thin) (Builtin.Int32) -> ()
   %9 = load %2#1 : $*(S4, Builtin.Int16)
   %10 = tuple_element_addr %2#1 : $*(S4, Builtin.Int16), 1
   store %1 to %10 : $*Builtin.Int16
@@ -297,10 +297,10 @@ bb0(%0 : $(S4, Builtin.Int16), %1 : $Builtin.Int16):
 // Tuple with Tuple Field Test //
 /////////////////////////////////
 
-sil @use_tup2 : $@thin ((Builtin.Int64, Builtin.Int32)) -> ()
-sil @use_int16 : $@thin (Builtin.Int16) -> ()
+sil @use_tup2 : $@convention(thin) ((Builtin.Int64, Builtin.Int32)) -> ()
+sil @use_int16 : $@convention(thin) (Builtin.Int16) -> ()
 
-// CHECK-LABEL: sil @tuple_with_tuple_fields : $@thin (((Builtin.Int64, Builtin.Int32), Builtin.Int16), Builtin.Int16) -> ()
+// CHECK-LABEL: sil @tuple_with_tuple_fields : $@convention(thin) (((Builtin.Int64, Builtin.Int32), Builtin.Int16), Builtin.Int16) -> ()
 // CHECK: bb0([[VAR_0:%[0-9]+]] : $((Builtin.Int64, Builtin.Int32), Builtin.Int16), [[VAR_1:%[0-9]+]] : $Builtin.Int16):
 // CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Builtin.Int64
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int32
@@ -315,11 +315,11 @@ sil @use_int16 : $@thin (Builtin.Int16) -> ()
 // CHECK:   [[VAR_12:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_13:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_14:%[0-9]+]] = tuple ([[VAR_12]] : $Builtin.Int64, [[VAR_13]] : $Builtin.Int32)
-// CHECK:   [[VAR_15:%[0-9]+]] = function_ref @use_tup2 : $@thin ((Builtin.Int64, Builtin.Int32)) -> ()
-// CHECK:   [[VAR_16:%[0-9]+]] = apply [[VAR_15]]([[VAR_14]]) : $@thin ((Builtin.Int64, Builtin.Int32)) -> ()
-// CHECK:   [[VAR_17:%[0-9]+]] = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_15:%[0-9]+]] = function_ref @use_tup2 : $@convention(thin) ((Builtin.Int64, Builtin.Int32)) -> ()
+// CHECK:   [[VAR_16:%[0-9]+]] = apply [[VAR_15]]([[VAR_14]]) : $@convention(thin) ((Builtin.Int64, Builtin.Int32)) -> ()
+// CHECK:   [[VAR_17:%[0-9]+]] = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_18:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int32
-// CHECK:   [[VAR_19:%[0-9]+]] = apply [[VAR_17]]([[VAR_18]]) : $@thin (Builtin.Int32) -> ()
+// CHECK:   [[VAR_19:%[0-9]+]] = apply [[VAR_17]]([[VAR_18]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:   [[VAR_20:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_21:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_22:%[0-9]+]] = tuple ([[VAR_20]] : $Builtin.Int64, [[VAR_21]] : $Builtin.Int32)
@@ -331,18 +331,18 @@ sil @use_int16 : $@thin (Builtin.Int16) -> ()
 // CHECK:   dealloc_stack [[VAR_2]]#0 : $*@local_storage Builtin.Int64
 // CHECK:   [[VAR_29:%[0-9]+]] = tuple ()
 // CHECK:   return [[VAR_29]] : $()
-sil @tuple_with_tuple_fields : $@thin (((Builtin.Int64, Builtin.Int32), Builtin.Int16), Builtin.Int16) -> () {
+sil @tuple_with_tuple_fields : $@convention(thin) (((Builtin.Int64, Builtin.Int32), Builtin.Int16), Builtin.Int16) -> () {
 bb0(%0 : $((Builtin.Int64, Builtin.Int32), Builtin.Int16), %1 : $Builtin.Int16):
   %2 = alloc_stack $((Builtin.Int64, Builtin.Int32), Builtin.Int16)
   store %0 to %2#1 : $*((Builtin.Int64, Builtin.Int32), Builtin.Int16)
   %3 = tuple_element_addr %2#1 : $*((Builtin.Int64, Builtin.Int32), Builtin.Int16), 0
   %4 = load %3 : $*(Builtin.Int64, Builtin.Int32)
-  %5 = function_ref @use_tup2 : $@thin ((Builtin.Int64, Builtin.Int32)) -> ()
-  apply %5(%4) : $@thin ((Builtin.Int64, Builtin.Int32)) -> ()
+  %5 = function_ref @use_tup2 : $@convention(thin) ((Builtin.Int64, Builtin.Int32)) -> ()
+  apply %5(%4) : $@convention(thin) ((Builtin.Int64, Builtin.Int32)) -> ()
   %6 = tuple_element_addr %3 : $*(Builtin.Int64, Builtin.Int32), 1
-  %7 = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
+  %7 = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
   %8 = load %6 : $*Builtin.Int32
-  apply %7(%8) : $@thin (Builtin.Int32) -> ()
+  apply %7(%8) : $@convention(thin) (Builtin.Int32) -> ()
   %9 = load %2#1 : $*((Builtin.Int64, Builtin.Int32), Builtin.Int16)
   %10 = tuple_element_addr %2#1 : $*((Builtin.Int64, Builtin.Int32), Builtin.Int16), 1
   store %1 to %10 : $*Builtin.Int16
@@ -359,28 +359,28 @@ struct CapturedS {
   var x : Builtin.Int32
 }
 
-sil @use_capturedstruct : $@thin (@inout CapturedS) -> ()
+sil @use_capturedstruct : $@convention(thin) (@inout CapturedS) -> ()
 
-// CHECK-LABEL: sil @captured_struct : $@thin (CapturedS) -> ()
+// CHECK-LABEL: sil @captured_struct : $@convention(thin) (CapturedS) -> ()
 // CHECK: bb0([[VAR_0:%[0-9]+]] : $CapturedS):
 // CHECK:   [[VAR_1:%[0-9]+]] = alloc_stack $CapturedS
 // CHECK:   store [[VAR_0]] to [[VAR_1]]#1 : $*CapturedS
 // CHECK:   [[VAR_3:%[0-9]+]] = struct_element_addr [[VAR_1]]#1 : $*CapturedS, #CapturedS.x
 // CHECK:   [[VAR_4:%[0-9]+]] = load [[VAR_3]] : $*Builtin.Int32
-// CHECK:   [[VAR_5:%[0-9]+]] = function_ref @use_capturedstruct : $@thin (@inout CapturedS) -> ()
-// CHECK:   [[VAR_6:%[0-9]+]] = apply [[VAR_5]]([[VAR_1]]#1) : $@thin (@inout CapturedS) -> ()
+// CHECK:   [[VAR_5:%[0-9]+]] = function_ref @use_capturedstruct : $@convention(thin) (@inout CapturedS) -> ()
+// CHECK:   [[VAR_6:%[0-9]+]] = apply [[VAR_5]]([[VAR_1]]#1) : $@convention(thin) (@inout CapturedS) -> ()
 // CHECK:   [[VAR_7:%[0-9]+]] = load [[VAR_3]] : $*Builtin.Int32
 // CHECK:   dealloc_stack [[VAR_1]]#0 : $*@local_storage CapturedS
 // CHECK:   [[VAR_9:%[0-9]+]] = tuple ()
 // CHECK:   return [[VAR_9]] : $()
-sil @captured_struct : $@thin (CapturedS) -> () {
+sil @captured_struct : $@convention(thin) (CapturedS) -> () {
 bb0(%0 : $CapturedS):
   %1 = alloc_stack $CapturedS
   store %0 to %1#1 : $*CapturedS
   %3 = struct_element_addr %1#1 : $*CapturedS, #CapturedS.x
   %4 = load %3 : $*Builtin.Int32
-  %5 = function_ref @use_capturedstruct : $@thin (@inout CapturedS) -> ()
-  %6 = apply %5(%1#1) : $@thin (@inout CapturedS) -> ()
+  %5 = function_ref @use_capturedstruct : $@convention(thin) (@inout CapturedS) -> ()
+  %6 = apply %5(%1#1) : $@convention(thin) (@inout CapturedS) -> ()
   %7 = load %3 : $*Builtin.Int32
   dealloc_stack %1#0 : $*@local_storage CapturedS
   %9 = tuple ()
@@ -391,28 +391,28 @@ bb0(%0 : $CapturedS):
 // Captured Tuple Test //
 /////////////////////////
 
-sil @use_capturedtuple : $@thin (@inout (Builtin.Int32, Builtin.Int64)) -> ()
+sil @use_capturedtuple : $@convention(thin) (@inout (Builtin.Int32, Builtin.Int64)) -> ()
 
-// CHECK-LABEL: sil @captured_tuple : $@thin ((Builtin.Int32, Builtin.Int64)) -> ()
+// CHECK-LABEL: sil @captured_tuple : $@convention(thin) ((Builtin.Int32, Builtin.Int64)) -> ()
 // CHECK: bb0([[VAR_0:%[0-9]+]] : $(Builtin.Int32, Builtin.Int64)):
 // CHECK:   [[VAR_1:%[0-9]+]] = alloc_stack $(Builtin.Int32, Builtin.Int64)
 // CHECK:   store [[VAR_0]] to [[VAR_1]]#1 : $*(Builtin.Int32, Builtin.Int64)
 // CHECK:   [[VAR_3:%[0-9]+]] = tuple_element_addr [[VAR_1]]#1 : $*(Builtin.Int32, Builtin.Int64), 0
 // CHECK:   [[VAR_4:%[0-9]+]] = load [[VAR_3]] : $*Builtin.Int32
-// CHECK:   [[VAR_5:%[0-9]+]] = function_ref @use_capturedtuple : $@thin (@inout (Builtin.Int32, Builtin.Int64)) -> ()
-// CHECK:   [[VAR_6:%[0-9]+]] = apply [[VAR_5]]([[VAR_1]]#1) : $@thin (@inout (Builtin.Int32, Builtin.Int64)) -> ()
+// CHECK:   [[VAR_5:%[0-9]+]] = function_ref @use_capturedtuple : $@convention(thin) (@inout (Builtin.Int32, Builtin.Int64)) -> ()
+// CHECK:   [[VAR_6:%[0-9]+]] = apply [[VAR_5]]([[VAR_1]]#1) : $@convention(thin) (@inout (Builtin.Int32, Builtin.Int64)) -> ()
 // CHECK:   [[VAR_7:%[0-9]+]] = load [[VAR_3]] : $*Builtin.Int32
 // CHECK:   dealloc_stack [[VAR_1]]#0 : $*@local_storage (Builtin.Int32, Builtin.Int64)
 // CHECK:   [[VAR_9:%[0-9]+]] = tuple ()
 // CHECK:   return [[VAR_9]] : $()
-sil @captured_tuple : $@thin ((Builtin.Int32, Builtin.Int64)) -> () {
+sil @captured_tuple : $@convention(thin) ((Builtin.Int32, Builtin.Int64)) -> () {
 bb0(%0 : $(Builtin.Int32, Builtin.Int64)):
   %1 = alloc_stack $(Builtin.Int32, Builtin.Int64)
   store %0 to %1#1 : $*(Builtin.Int32, Builtin.Int64)
   %3 = tuple_element_addr %1#1 : $*(Builtin.Int32, Builtin.Int64), 0
   %4 = load %3 : $*Builtin.Int32
-  %5 = function_ref @use_capturedtuple : $@thin (@inout (Builtin.Int32, Builtin.Int64)) -> ()
-  %6 = apply %5(%1#1) : $@thin (@inout (Builtin.Int32, Builtin.Int64)) -> ()
+  %5 = function_ref @use_capturedtuple : $@convention(thin) (@inout (Builtin.Int32, Builtin.Int64)) -> ()
+  %6 = apply %5(%1#1) : $@convention(thin) (@inout (Builtin.Int32, Builtin.Int64)) -> ()
   %7 = load %3 : $*Builtin.Int32
   dealloc_stack %1#0 : $*@local_storage (Builtin.Int32, Builtin.Int64)
   %9 = tuple ()

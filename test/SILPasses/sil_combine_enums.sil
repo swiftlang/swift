@@ -9,13 +9,13 @@ class SomeClass {
   func hash() -> Int
 }
 
-sil @external_func: $@thin () -> ()
+sil @external_func: $@convention(thin) () -> ()
 
 //CHECK-LABEL: eliminate_sw_enum_addr
 //CHECK-NOT: switch_enum_addr
 //CHECK: switch_enum
 //CHECK: return
-sil @eliminate_sw_enum_addr : $@thin () -> Int {
+sil @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $Optional<SomeClass>  // var x // users: %2, %4, %5, %17, %19
   %1 = alloc_ref $SomeClass                       // user: %3
@@ -34,8 +34,8 @@ bb1:                                              // Preds: bb0
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7#0 : $*@local_storage Optional<SomeClass> // id: %13
   release_value %5 : $Optional<SomeClass>         // id: %14
-  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@guaranteed SomeClass) -> Int // user: %16
-  %16 = apply %15(%12) : $@cc(method) @thin (@guaranteed SomeClass) -> Int // user: %20
+  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@convention(method) (@guaranteed SomeClass) -> Int // user: %16
+  %16 = apply %15(%12) : $@convention(method) (@guaranteed SomeClass) -> Int // user: %20
   %17 = load %0#1 : $*Optional<SomeClass>         // user: %18
   release_value %17 : $Optional<SomeClass>        // id: %18
   dealloc_stack %0#0 : $*@local_storage Optional<SomeClass> // id: %19
@@ -50,7 +50,7 @@ bb2:                                              // Preds: bb0
 // CHECK: select_enum
 // CHECK: return
 
-sil @eliminate_select_enum_addr : $@thin () -> Int {
+sil @eliminate_select_enum_addr : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_stack $Optional<SomeClass>
   %1 = alloc_ref $SomeClass
@@ -72,8 +72,8 @@ bb1:
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7#0 : $*@local_storage Optional<SomeClass>
   release_value %5 : $Optional<SomeClass>
-  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@guaranteed SomeClass) -> Int
-  %16 = apply %15(%12) : $@cc(method) @thin (@guaranteed SomeClass) -> Int
+  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@convention(method) (@guaranteed SomeClass) -> Int
+  %16 = apply %15(%12) : $@convention(method) (@guaranteed SomeClass) -> Int
   %17 = load %0#1 : $*Optional<SomeClass>
   release_value %17 : $Optional<SomeClass>
   dealloc_stack %0#0 : $*@local_storage Optional<SomeClass>
@@ -82,8 +82,8 @@ bb1:
 bb2:
   // Invoke something here and jump to bb1. This prevents an cond_br(select_enum) -> switch_enum conversion,
   // since it would introduce a critical edge.
-  %20 = function_ref @external_func: $@thin ()->()
-  apply %20(): $@thin ()->()
+  %20 = function_ref @external_func: $@convention(thin) ()->()
+  apply %20(): $@convention(thin) ()->()
   br bb1
 }
 
@@ -97,7 +97,7 @@ enum E {
 // CHECK: select_enum {{.*}} case #E.E2!enumelt:
 // CHECK: return
 
-sil @canonicalize_select_enum : $@thin (E) -> Int32 {
+sil @canonicalize_select_enum : $@convention(thin) (E) -> Int32 {
 bb0(%0 : $E):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = integer_literal $Builtin.Int32, 1
@@ -117,7 +117,7 @@ enum G<T> {
 // CHECK: select_enum_addr {{.*}} case #G.E2!enumelt:
 // CHECK: return
 
-sil @canonicalize_select_enum_addr : $@thin <T> (@in G<T>) -> Int32 {
+sil @canonicalize_select_enum_addr : $@convention(thin) <T> (@in G<T>) -> Int32 {
 bb0(%0 : $*G<T>):
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int32, 1
@@ -133,7 +133,7 @@ bb0(%0 : $*G<T>):
 // CHECK: enum $Optional<Int32>, #Optional.Some!enumelt.1
 // CHECK-NOT: inject_enum_addr
 // CHECK: return
-sil @canonicalize_init_enum_data_addr : $@thin (@inout Int32, Builtin.Int32) -> Int32 {
+sil @canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
 bb0(%0 : $*Int32, %1 : $Builtin.Int32):
   %s1 = alloc_stack $Optional<Int32>
   %e1 = init_enum_data_addr %s1#1 : $*Optional<Int32>, #Optional.Some!enumelt.1
@@ -157,7 +157,7 @@ bb0(%0 : $*Int32, %1 : $Builtin.Int32):
 // CHECK: switch_enum
 // CHECK: return
 
-sil @convert_select_enum_cond_br_to_switch_enum : $@thin (@owned Optional<SomeClass>) -> Int {
+sil @convert_select_enum_cond_br_to_switch_enum : $@convention(thin) (@owned Optional<SomeClass>) -> Int {
 bb0(%0 : $Optional<SomeClass>):
   %1 = integer_literal $Builtin.Int1, 0
   %2 = integer_literal $Builtin.Int1, -1
@@ -166,8 +166,8 @@ bb0(%0 : $Optional<SomeClass>):
 
 bb1:
   %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.Some!enumelt.1
-  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@guaranteed SomeClass) -> Int
-  %7 = apply %6(%5) : $@cc(method) @thin (@guaranteed SomeClass) -> Int
+  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@convention(method) (@guaranteed SomeClass) -> Int
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed SomeClass) -> Int
   fix_lifetime %5 : $SomeClass
   strong_release %5 : $SomeClass
   return %7 : $Int
@@ -185,7 +185,7 @@ bb2:
 // CHECK: select_enum
 // CHECK-NOT: switch_enum
 // CHECK: return
-sil @dont_convert_select_enum_cond_br_to_switch_enum : $@thin (@owned Optional<SomeClass>) -> Int {
+sil @dont_convert_select_enum_cond_br_to_switch_enum : $@convention(thin) (@owned Optional<SomeClass>) -> Int {
 bb0(%0 : $Optional<SomeClass>):
   %2 = integer_literal $Builtin.Int1, 0
   %3 = integer_literal $Builtin.Int1, -1
@@ -194,15 +194,15 @@ bb0(%0 : $Optional<SomeClass>):
 
 bb1:
   %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.Some!enumelt.1
-  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@guaranteed SomeClass) -> Int
-  %7 = apply %6(%5) : $@cc(method) @thin (@guaranteed SomeClass) -> Int
+  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@convention(method) (@guaranteed SomeClass) -> Int
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed SomeClass) -> Int
   fix_lifetime %5 : $SomeClass
   strong_release %5 : $SomeClass
   return %7 : $Int
 
 bb2:
-  %10 = function_ref @external_func: $@thin ()->()
-  apply %10(): $@thin ()->()
+  %10 = function_ref @external_func: $@convention(thin) ()->()
+  apply %10(): $@convention(thin) ()->()
   br bb1
 }
 

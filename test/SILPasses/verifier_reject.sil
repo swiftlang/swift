@@ -10,7 +10,7 @@ import Builtin
 
 // CHECK: SIL verification failed: return with alloc_stacks that haven't been deallocated: stack.empty()
 
-sil @fail1: $@thin (Builtin.Int1) -> () {
+sil @fail1: $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   %2 = integer_literal $Builtin.Int1, -1
   cond_br %0, bb1, bb5

@@ -4,7 +4,7 @@
 class A {
 }
 
-sil @bad_instruction : $@thin (@inout A) -> () {
+sil @bad_instruction : $@convention(thin) (@inout A) -> () {
 bb0(%0 : $*A):
   %1 = upcast %0 : $*A to $*A
   %2 = tuple()

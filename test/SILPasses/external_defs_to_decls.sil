@@ -1,7 +1,7 @@
 // RUN: %target-sil-opt -external-defs-to-decls %s | FileCheck %s
 
-// CHECK: sil @no_op : $@thin () -> ()
-sil public_external @no_op : $@thin () -> () {
+// CHECK: sil @no_op : $@convention(thin) () -> ()
+sil public_external @no_op : $@convention(thin) () -> () {
 bb0:
   %9999 = tuple()
   return %9999 : $()

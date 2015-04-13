@@ -87,26 +87,26 @@ func getZim(f: Foo) -> Bool {
   return f.zim()
 }
 // CHECK-i386-LABEL: sil hidden @_TF13objc_bridging6getZim
-// CHECK-i386:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> ObjCBool
-// CHECK-i386:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@thin (ObjCBool) -> Bool
-// CHECK-i386:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@thin (ObjCBool) -> Bool
+// CHECK-i386:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@convention(objc_method) (Foo) -> ObjCBool
+// CHECK-i386:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
+// CHECK-i386:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-i386:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-i386: }
 
 // CHECK-macosx-x86_64-LABEL: sil hidden @_TF13objc_bridging6getZim
-// CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> ObjCBool
-// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@thin (ObjCBool) -> Bool
-// CHECK-macosx-x86_64:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@thin (ObjCBool) -> Bool
+// CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@convention(objc_method) (Foo) -> ObjCBool
+// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
+// CHECK-macosx-x86_64:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-macosx-x86_64:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-macosx-x86_64: }
 
 // CHECK-ios-x86_64-LABEL: sil hidden @_TF13objc_bridging6getZim
-// CHECK-ios-x86_64:   [[SWIFT_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> Bool
+// CHECK-ios-x86_64:   [[SWIFT_BOOL:%.*]] = apply {{.*}} : $@convention(objc_method) (Foo) -> Bool
 // CHECK-ios-x86_64:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-ios-x86_64: }
 
 // CHECK-arm64-LABEL: sil hidden @_TF13objc_bridging6getZim
-// CHECK-arm64:   [[SWIFT_BOOL:%.*]] = apply {{.*}} : $@cc(objc_method) @thin (Foo) -> Bool
+// CHECK-arm64:   [[SWIFT_BOOL:%.*]] = apply {{.*}} : $@convention(objc_method) (Foo) -> Bool
 // CHECK-arm64:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-arm64: }
 
@@ -115,25 +115,25 @@ func setZim(f: Foo, b: Bool) {
   f.setZim(b)
 }
 // CHECK-i386-LABEL: sil hidden @_TF13objc_bridging6setZim
-// CHECK-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@thin (Bool) -> ObjCBool
-// CHECK-i386:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@thin (Bool) -> ObjCBool
-// CHECK-i386:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@cc(objc_method) @thin (ObjCBool, Foo) -> ()
+// CHECK-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-i386:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-i386:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@convention(objc_method) (ObjCBool, Foo) -> ()
 // CHECK-i386: }
 
 // CHECK-macosx-x86_64-LABEL: sil hidden @_TF13objc_bridging6setZim
-// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@thin (Bool) -> ObjCBool
-// CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@thin (Bool) -> ObjCBool
-// CHECK-macosx-x86_64:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@cc(objc_method) @thin (ObjCBool, Foo) -> ()
+// CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-macosx-x86_64:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@convention(objc_method) (ObjCBool, Foo) -> ()
 // CHECK-macosx-x86_64: }
 
 // CHECK-ios-x86_64-LABEL: sil hidden @_TF13objc_bridging6setZim
 // CHECK-ios-x86_64: bb0([[FOO_OBJ:%[0-9]+]] : $Foo, [[SWIFT_BOOL:%[0-9]+]] : $Bool):
-// CHECK-ios-x86_64:   apply {{%.*}}([[SWIFT_BOOL]], [[FOO_OBJ]]) : $@cc(objc_method) @thin (Bool, Foo) -> ()
+// CHECK-ios-x86_64:   apply {{%.*}}([[SWIFT_BOOL]], [[FOO_OBJ]]) : $@convention(objc_method) (Bool, Foo) -> ()
 // CHECK-ios-x86_64: }
 
 // CHECK-arm64-LABEL: sil hidden @_TF13objc_bridging6setZim
 // CHECK-arm64: bb0([[FOO_OBJ:%[0-9]+]] : $Foo, [[SWIFT_BOOL:%[0-9]+]] : $Bool):
-// CHECK-arm64:   apply {{%.*}}([[SWIFT_BOOL]], [[FOO_OBJ]]) : $@cc(objc_method) @thin (Bool, Foo) -> ()
+// CHECK-arm64:   apply {{%.*}}([[SWIFT_BOOL]], [[FOO_OBJ]]) : $@convention(objc_method) (Bool, Foo) -> ()
 // CHECK-arm64: }
 
 // @interface Foo -(_Bool) zang; @end
@@ -141,7 +141,7 @@ func getZang(f: Foo) -> Bool {
   return f.zang()
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging7getZangFCSo3FooSb
-// CHECK:   [[BOOL:%.*]] = apply {{%.*}}(%0) : $@cc(objc_method) @thin (Foo) -> Bool
+// CHECK:   [[BOOL:%.*]] = apply {{%.*}}(%0) : $@convention(objc_method) (Foo) -> Bool
 // CHECK:   return [[BOOL]]
 
 // @interface Foo -(void) setZang: (_Bool)b; @end
@@ -149,7 +149,7 @@ func setZang(f: Foo, b: Bool) {
   f.setZang(b)
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging7setZangFTCSo3FooSb_T_
-// CHECK:   apply {{%.*}}(%1, %0) : $@cc(objc_method) @thin (Bool, Foo) -> ()
+// CHECK:   apply {{%.*}}(%1, %0) : $@convention(objc_method) (Bool, Foo) -> ()
 
 // NSString *bar(void);
 func callBar() -> String {
@@ -236,12 +236,12 @@ extension NSString {
 class Bas : NSObject {
   // -- Bridging thunks for String properties convert between NSString
   var strRealProp: String = "Hello"
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg11strRealPropSS : $@cc(objc_method) @thin (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg11strRealPropSS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
   // CHECK:   strong_retain [[THIS]] : $Bas
   // CHECK:   // function_ref objc_bridging.Bas.strRealProp.getter
   // CHECK:   [[PROPIMPL:%.*]] = function_ref @_TFC13objc_bridging3Basg11strRealPropSS
-  // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[THIS]]) : $@cc(method) @thin (@guaranteed Bas) -> @owned String
+  // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[THIS]]) : $@convention(method) (@guaranteed Bas) -> @owned String
   // CHECK:   strong_release [[THIS]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[PROP_COPY]])
@@ -255,7 +255,7 @@ class Bas : NSObject {
   // CHECK:   retain_value [[PROP]] : $String
 
 
-  // CHECK-LABEL: sil hidden [transparent]  @_TToFC13objc_bridging3Bass11strRealPropSS : $@cc(objc_method) @thin (NSString, Bas) -> () {
+  // CHECK-LABEL: sil hidden [transparent]  @_TToFC13objc_bridging3Bass11strRealPropSS : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
   // CHECK:   [[VALUE_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[VALUE]]
@@ -275,7 +275,7 @@ class Bas : NSObject {
     get { return "" }
     set {}
   }
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Basg11strFakePropSS : $@cc(objc_method) @thin (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Basg11strFakePropSS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
   // CHECK:   [[GETTER:%.*]] = function_ref @_TFC13objc_bridging3Basg11strFakePropSS
   // CHECK:   [[STR:%.*]] = apply [[GETTER]]([[THIS]])
@@ -284,7 +284,7 @@ class Bas : NSObject {
   // CHECK:   autorelease_return [[NSSTR]]
   // CHECK: }
 
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bass11strFakePropSS : $@cc(objc_method) @thin (NSString, Bas) -> () {
+  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bass11strFakePropSS : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
   // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[NSSTR]]
@@ -299,19 +299,19 @@ class Bas : NSObject {
     get { return NSS }
     set {}
   }
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg13nsstrRealPropCSo8NSString : $@cc(objc_method) @thin (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg13nsstrRealPropCSo8NSString : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
-  // CHECK-LABEL: sil hidden [transparent]  @_TToFC13objc_bridging3Bass13nsstrRealPropCSo8NSString : $@cc(objc_method) @thin (NSString, Bas) ->
+  // CHECK-LABEL: sil hidden [transparent]  @_TToFC13objc_bridging3Bass13nsstrRealPropCSo8NSString : $@convention(objc_method) (NSString, Bas) ->
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   // -- Bridging thunks for String methods convert between NSString
   func strResult() -> String { return "" }
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas9strResultfS0_FT_SS : $@cc(objc_method) @thin (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas9strResultfS0_FT_SS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
   // CHECK:   [[METHOD:%.*]] = function_ref @_TFC13objc_bridging3Bas9strResultfS0_FT_SS
   // CHECK:   [[STR:%.*]] = apply [[METHOD]]([[THIS]])
@@ -331,7 +331,7 @@ class Bas : NSObject {
 
   // -- Bridging thunks for explicitly NSString properties don't convert
   func nsstrResult() -> NSString { return NSS }
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas11nsstrResultfS0_FT_CSo8NSString : $@cc(objc_method) @thin (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas11nsstrResultfS0_FT_CSo8NSString : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
@@ -346,41 +346,41 @@ class Bas : NSObject {
     super.init()
   }
 
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas8arrayArg{{.*}} : $@cc(objc_method) @thin (NSArray, Bas) -> ()
+  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas8arrayArg{{.*}} : $@convention(objc_method) (NSArray, Bas) -> ()
   // CHECK: bb0([[NSARRAY:%[0-9]+]] : $NSArray, [[SELF:%[0-9]+]] : $Bas):
   // CHECK:   strong_retain [[NSARRAY]] : $NSArray
   // CHECK:   strong_retain [[SELF]] : $Bas
-  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray{{.*}} : $@thin <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
+  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray{{.*}} : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
   // CHECK-NEXT: [[OPT_NSARRAY:%[0-9]+]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[NSARRAY]] : $NSArray
-  // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]]) : $@thin <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@cc(method) @thin (@owned Array<AnyObject>, @guaranteed Bas) -> ()
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@cc(method) @thin (@owned Array<AnyObject>, @guaranteed Bas) -> ()
+  // CHECK-NEXT: [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
+  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas{{.*}} : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[SELF]]) : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   strong_release [[SELF]] : $Bas
   // CHECK:   return [[RESULT]] : $()
   func arrayArg(array: [AnyObject]) { }
   
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@cc(objc_method) @thin (Bas) -> @autoreleased NSArray
+  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : $Bas):
   // CHECK:   strong_retain [[SELF]] : $Bas
-  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas11arrayResult{{.*}} : $@cc(method) @thin (@guaranteed Bas) -> @owned Array<AnyObject>
-  // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@cc(method) @thin (@guaranteed Bas) -> @owned Array<AnyObject>
+  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
+  // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
   // CHECK:   strong_release [[SELF]]
-  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertArrayToNSArray{{.*}} : $@thin <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
-  // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[ARRAY]]) : $@thin <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
+  // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @_TF10Foundation22_convertArrayToNSArray{{.*}} : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
+  // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[ARRAY]]) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned NSArray
   // CHECK:   autorelease_return [[NSARRAY]]
   func arrayResult() -> [AnyObject] { return [] }
 
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg9arrayPropGSaSS_ : $@cc(objc_method) @thin (Bas) -> @autoreleased NSArray
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Bass9arrayPropGSaSS_ : $@cc(objc_method) @thin (NSArray, Bas) -> ()
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg9arrayPropGSaSS_ : $@convention(objc_method) (Bas) -> @autoreleased NSArray
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Bass9arrayPropGSaSS_ : $@convention(objc_method) (NSArray, Bas) -> ()
   var arrayProp: [String] = []
 }
 
 // CHECK-LABEL: sil hidden @_TF13objc_bridging16applyStringBlock
-func applyStringBlock(f: @objc_block String -> String, x: String) -> String {
+func applyStringBlock(f: @convention(block) String -> String, x: String) -> String {
   // CHECK: [[BLOCK:%.*]] = copy_block %0
   // CHECK: [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
   // CHECK: [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]
-  // CHECK: [[RES:%.*]] = apply [[BLOCK]]([[NSSTR]]) : $@cc(cdecl) @objc_block (NSString) -> @autoreleased NSString
+  // CHECK: [[RES:%.*]] = apply [[BLOCK]]([[NSSTR]]) : $@convention(block) (NSString) -> @autoreleased NSString
   // CHECK: function_ref @swift_NSStringToString
   // CHECK: return {{%.*}} : $String
   return f(x)
@@ -388,7 +388,7 @@ func applyStringBlock(f: @objc_block String -> String, x: String) -> String {
 
 // CHECK-LABEL: sil hidden @_TF13objc_bridging15bridgeCFunction
 func bridgeCFunction() -> (String!) -> (String!) {
-  // CHECK: [[THUNK:%.*]] = function_ref @_TTOFSC18NSStringFromStringFGSQSS_GSQSS_ : $@thin (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
+  // CHECK: [[THUNK:%.*]] = function_ref @_TTOFSC18NSStringFromStringFGSQSS_GSQSS_ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
   // CHECK: return [[THICK]]
   return NSStringFromString
@@ -413,32 +413,32 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // imported C functions.
 
 // CHECK-i386-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
-// CHECK-i386:         function_ref @useBOOL : $@cc(cdecl) @thin (ObjCBool) -> ()
-// CHECK-i386:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
-// CHECK-i386:         function_ref @getBOOL : $@cc(cdecl) @thin () -> ObjCBool
-// CHECK-i386:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+// CHECK-i386:         function_ref @useBOOL : $@convention(c) (ObjCBool) -> ()
+// CHECK-i386:         function_ref @useBool : $@convention(c) (Bool) -> ()
+// CHECK-i386:         function_ref @getBOOL : $@convention(c) () -> ObjCBool
+// CHECK-i386:         function_ref @getBool : $@convention(c) () -> Bool
 
 // CHECK-macosx-x86_64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
-// CHECK-macosx-x86_64:         function_ref @useBOOL : $@cc(cdecl) @thin (ObjCBool) -> ()
-// CHECK-macosx-x86_64:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
-// CHECK-macosx-x86_64:         function_ref @getBOOL : $@cc(cdecl) @thin () -> ObjCBool
-// CHECK-macosx-x86_64:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+// CHECK-macosx-x86_64:         function_ref @useBOOL : $@convention(c) (ObjCBool) -> ()
+// CHECK-macosx-x86_64:         function_ref @useBool : $@convention(c) (Bool) -> ()
+// CHECK-macosx-x86_64:         function_ref @getBOOL : $@convention(c) () -> ObjCBool
+// CHECK-macosx-x86_64:         function_ref @getBool : $@convention(c) () -> Bool
 
 // FIXME: no distinction on x86_64 and arm64, since SILGen looks at the
 // underlying Clang decl of the bridged decl to decide whether it needs
 // bridging.
 //
 // CHECK-ios-x86_64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
-// CHECK-ios-x86_64:         function_ref @useBOOL : $@cc(cdecl) @thin (Bool) -> ()
-// CHECK-ios-x86_64:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
-// CHECK-ios-x86_64:         function_ref @getBOOL : $@cc(cdecl) @thin () -> Bool
-// CHECK-ios-x86_64:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+// CHECK-ios-x86_64:         function_ref @useBOOL : $@convention(c) (Bool) -> ()
+// CHECK-ios-x86_64:         function_ref @useBool : $@convention(c) (Bool) -> ()
+// CHECK-ios-x86_64:         function_ref @getBOOL : $@convention(c) () -> Bool
+// CHECK-ios-x86_64:         function_ref @getBool : $@convention(c) () -> Bool
 
 // CHECK-arm64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
-// CHECK-arm64:         function_ref @useBOOL : $@cc(cdecl) @thin (Bool) -> ()
-// CHECK-arm64:         function_ref @useBool : $@cc(cdecl) @thin (Bool) -> ()
-// CHECK-arm64:         function_ref @getBOOL : $@cc(cdecl) @thin () -> Bool
-// CHECK-arm64:         function_ref @getBool : $@cc(cdecl) @thin () -> Bool
+// CHECK-arm64:         function_ref @useBOOL : $@convention(c) (Bool) -> ()
+// CHECK-arm64:         function_ref @useBool : $@convention(c) (Bool) -> ()
+// CHECK-arm64:         function_ref @getBOOL : $@convention(c) () -> Bool
+// CHECK-arm64:         function_ref @getBool : $@convention(c) () -> Bool
 
 func bools(x: Bool) -> (Bool, Bool) {
   useBOOL(x)

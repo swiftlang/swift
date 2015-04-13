@@ -43,8 +43,8 @@ class Inspect {
 
 @objc_block  // expected-error {{attribute can only be applied to types, not declarations}}
 func foo() {}
-func foo(x: @objc_block Int) {} // expected-error {{attribute only applies to syntactic function types}}
-func foo(x: @objc_block (Int) -> Int) {}
+func foo(x: @convention(block) Int) {} // expected-error {{attribute only applies to syntactic function types}}
+func foo(x: @convention(block) (Int) -> Int) {}
 
 @transparent
 func zim() {}

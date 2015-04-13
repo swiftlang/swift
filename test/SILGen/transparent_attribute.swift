@@ -184,17 +184,17 @@ struct testVarDeclShortenedSyntax {
 
 // Local functions in transparent context have public linkage.
 @transparent func foo() {
-  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_L_3barFT_T_ : $@thin () -> ()
+  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_L_3barFT_T_ : $@convention(thin) () -> ()
   func bar() {}
   bar()
 
-  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_U_FT_T_ : $@thin () -> () {
+  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_U_FT_T_ : $@convention(thin) () -> () {
   let f: () -> () = {}
   f()
 
-  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_L_3zimFT_T_ : $@thin () -> () {
+  // CHECK-LABEL: sil @_TFF21transparent_attribute3fooFT_T_L_3zimFT_T_ : $@convention(thin) () -> () {
   func zim() {
-    // CHECK-LABEL: sil @_TFFF21transparent_attribute3fooFT_T_L_3zimFT_T_L_4zangFT_T_ : $@thin () -> () {
+    // CHECK-LABEL: sil @_TFFF21transparent_attribute3fooFT_T_L_3zimFT_T_L_4zangFT_T_ : $@convention(thin) () -> () {
     func zang() {
     }
     zang()

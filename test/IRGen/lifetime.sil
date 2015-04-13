@@ -7,7 +7,7 @@
 
 sil_stage canonical
 
-sil @generic_tuple : $@thin <T> (@in T) -> () {
+sil @generic_tuple : $@convention(thin) <T> (@in T) -> () {
 bb0(%x : $*T):
   %y = alloc_stack $T
   copy_addr %x to [initialization] %y#1 : $*T

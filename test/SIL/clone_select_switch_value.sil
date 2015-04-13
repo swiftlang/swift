@@ -7,7 +7,7 @@ sil_stage canonical
 
 import Builtin
 
-sil [always_inline] @callee : $@thin () -> () {
+sil [always_inline] @callee : $@convention(thin) () -> () {
 bb0:
   %1 = integer_literal $Builtin.Word, 1
   %2 = integer_literal $Builtin.Word, 2
@@ -28,13 +28,13 @@ bb3:
   return %5 : $()
 }
 
-// CHECK-LABEL: sil @caller : $@thin () -> ()
+// CHECK-LABEL: sil @caller : $@convention(thin) () -> ()
 // CHECK: select_value
 // CHECK: switch_value
-sil @caller : $@thin () -> () {
+sil @caller : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @callee : $@thin () -> ()
-  %1 = apply %0() : $@thin () -> ()
+  %0 = function_ref @callee : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
   %2 = tuple ()
   return %2 : $()
 }

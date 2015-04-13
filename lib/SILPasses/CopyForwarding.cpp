@@ -536,7 +536,7 @@ bool CopyForwarding::areCopyDestUsersDominatedBy(
 /// CurrentBlock:
 /// copy_addr %arg to [initialization] %copy#1 : $*T
 /// ...
-/// %ret = apply %callee<T>(%copy#1) : $@thin <τ_0_0> (@in τ_0_0) -> ()
+/// %ret = apply %callee<T>(%copy#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 /// \endcode
 ///
 /// If the last use (deinit) is a copy, replace it with a destroy+copy[init].
@@ -895,7 +895,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
 ///
 /// The following SIL pattern will be detected:
 ///
-/// sil @foo : $@thin <T> (@out T) -> () {
+/// sil @foo : $@convention(thin) <T> (@out T) -> () {
 /// bb0(%0 : $*T):
 ///   %2 = alloc_stack $T
 /// ... // arbitrary control flow, but no other uses of %0

@@ -15,38 +15,38 @@ import Builtin
 
 protocol AnyObject {}
 
-sil @tmp : $@thin <T> (@out T) -> () {
+sil @tmp : $@convention(thin) <T> (@out T) -> () {
 bb0(%0 : $*T):
   %1 = tuple()
   return %1 : $()
 }
 
-// CHECK-LABEL: sil @tmp2 : $@thin () -> () {
-// CHECK: [[FUN1:%[0-9]+]] = function_ref @_TTSg5XPMTP4main9AnyObject___tmp : $@thin (@out @thick AnyObject.Type) -> ()
+// CHECK-LABEL: sil @tmp2 : $@convention(thin) () -> () {
+// CHECK: [[FUN1:%[0-9]+]] = function_ref @_TTSg5XPMTP4main9AnyObject___tmp : $@convention(thin) (@out @thick AnyObject.Type) -> ()
 // CHECK-NEXT: apply [[FUN1]]
-// CHECK: [[FUN2:%[0-9]+]] = function_ref @_TTSg5XPMoP4main9AnyObject___tmp : $@thin (@out @objc_metatype AnyObject.Type) -> ()
+// CHECK: [[FUN2:%[0-9]+]] = function_ref @_TTSg5XPMoP4main9AnyObject___tmp : $@convention(thin) (@out @objc_metatype AnyObject.Type) -> ()
 // CHECK-NEXT: apply [[FUN2]]
-// CHECK: [[FUN3:%[0-9]+]] = function_ref @_TTSg5XMTBi32___tmp : $@thin (@out @thick Builtin.Int32.Type) -> ()
+// CHECK: [[FUN3:%[0-9]+]] = function_ref @_TTSg5XMTBi32___tmp : $@convention(thin) (@out @thick Builtin.Int32.Type) -> ()
 // CHECK-NEXT: apply [[FUN3]]
-// CHECK: [[FUN4:%[0-9]+]] = function_ref @_TTSg5XMoBi32___tmp : $@thin (@out @objc_metatype Builtin.Int32.Type) -> ()
+// CHECK: [[FUN4:%[0-9]+]] = function_ref @_TTSg5XMoBi32___tmp : $@convention(thin) (@out @objc_metatype Builtin.Int32.Type) -> ()
 // CHECK-NEXT: apply [[FUN4]]
-// CHECK: [[FUN5:%[0-9]+]] = function_ref @_TTSg5XMtBi32___tmp : $@thin (@out @thin Builtin.Int32.Type) -> ()
+// CHECK: [[FUN5:%[0-9]+]] = function_ref @_TTSg5XMtBi32___tmp : $@convention(thin) (@out @thin Builtin.Int32.Type) -> ()
 // CHECK-NEXT: apply [[FUN5]]
 
-sil @tmp2 : $@thin () -> () {
+sil @tmp2 : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @tmp : $@thin <T> (@out T) -> ()
+  %0 = function_ref @tmp : $@convention(thin) <T> (@out T) -> ()
   %1 = alloc_box $@thick AnyObject.Type
   %2 = alloc_box $@objc_metatype AnyObject.Type
-  %4 = apply %0<@thick AnyObject.Type>(%1#1) : $@thin <T> (@out T) -> ()
-  %5 = apply %0<@objc_metatype AnyObject.Type>(%2#1) : $@thin <T> (@out T) -> ()
+  %4 = apply %0<@thick AnyObject.Type>(%1#1) : $@convention(thin) <T> (@out T) -> ()
+  %5 = apply %0<@objc_metatype AnyObject.Type>(%2#1) : $@convention(thin) <T> (@out T) -> ()
 
   %6 = alloc_box $@thick Builtin.Int32.Type
   %7 = alloc_box $@objc_metatype Builtin.Int32.Type
   %8 = alloc_box $@thin Builtin.Int32.Type
-  %9 = apply %0<@thick Builtin.Int32.Type>(%6#1) : $@thin <T> (@out T) -> ()
-  %10 = apply %0<@objc_metatype Builtin.Int32.Type>(%7#1) : $@thin <T> (@out T) -> ()
-  %11 = apply %0<@thin Builtin.Int32.Type>(%8#1) : $@thin <T> (@out T) -> ()
+  %9 = apply %0<@thick Builtin.Int32.Type>(%6#1) : $@convention(thin) <T> (@out T) -> ()
+  %10 = apply %0<@objc_metatype Builtin.Int32.Type>(%7#1) : $@convention(thin) <T> (@out T) -> ()
+  %11 = apply %0<@thin Builtin.Int32.Type>(%8#1) : $@convention(thin) <T> (@out T) -> ()
 
   %9999 = tuple()
   return %9999 : $()

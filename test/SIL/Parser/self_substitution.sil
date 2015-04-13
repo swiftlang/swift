@@ -4,24 +4,24 @@ import Builtin
 import Swift
 
 // This testing case is extracted from the sil dump of stdlib.
-// CHECK-LABEL: sil @test : $@thin (UnsafeMutablePointer<Optional<AnyObject>>) -> () {
-sil @test : $@thin (UnsafeMutablePointer<Optional<AnyObject>>) -> () {
+// CHECK-LABEL: sil @test : $@convention(thin) (UnsafeMutablePointer<Optional<AnyObject>>) -> () {
+sil @test : $@convention(thin) (UnsafeMutablePointer<Optional<AnyObject>>) -> () {
 bb0(%0 : $UnsafeMutablePointer<Optional<AnyObject>>):
-  %1 = function_ref @callee1 : $@thin (UnsafeMutablePointer<COpaquePointer>) -> COpaquePointer
+  %1 = function_ref @callee1 : $@convention(thin) (UnsafeMutablePointer<COpaquePointer>) -> COpaquePointer
   %2 = struct_extract %0 : $UnsafeMutablePointer<Optional<AnyObject>>, #UnsafeMutablePointer._rawValue
   %3 = struct $UnsafeMutablePointer<COpaquePointer> (%2 : $Builtin.RawPointer)
-  %4 = apply %1(%3) : $@thin (UnsafeMutablePointer<COpaquePointer>) -> COpaquePointer
-  %21 = function_ref @callee2 : $@cc(method) @thin <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
-  %22 = function_ref @callee3 : $@thin <τ_0_0 where τ_0_0 : AnyObject> (COpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
+  %4 = apply %1(%3) : $@convention(thin) (UnsafeMutablePointer<COpaquePointer>) -> COpaquePointer
+  %21 = function_ref @callee2 : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
+  %22 = function_ref @callee3 : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (COpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
   %23 = metatype $@thin Unmanaged<AnyObject>.Type
-  // CHECK: apply %{{[0-9]+}}<AnyObject>(%{{[0-9]+}}, %{{[0-9]+}}) : $@thin <τ_0_0 where τ_0_0 : AnyObject> (COpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
-  %24 = apply %22<AnyObject>(%4, %23) : $@thin <τ_0_0 where τ_0_0 : AnyObject> (COpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
-  // CHECK: apply %{{[0-9]+}}<AnyObject>(%{{[0-9]+}}) : $@cc(method) @thin <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
-  %25 = apply %21<AnyObject>(%24) : $@cc(method) @thin <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
+  // CHECK: apply %{{[0-9]+}}<AnyObject>(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (COpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
+  %24 = apply %22<AnyObject>(%4, %23) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (COpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
+  // CHECK: apply %{{[0-9]+}}<AnyObject>(%{{[0-9]+}}) : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
+  %25 = apply %21<AnyObject>(%24) : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
   %26 = tuple ()
   return %26 : $()
 }
 
-sil @callee1 : $@thin (UnsafeMutablePointer<COpaquePointer>) -> COpaquePointer
-sil @callee2 : $@cc(method) @thin <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
-sil @callee3 : $@thin <τ_0_0 where τ_0_0 : AnyObject> (COpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>
+sil @callee1 : $@convention(thin) (UnsafeMutablePointer<COpaquePointer>) -> COpaquePointer
+sil @callee2 : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (Unmanaged<τ_0_0>) -> @owned τ_0_0
+sil @callee3 : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (COpaquePointer, @thin Unmanaged<τ_0_0>.Type) -> Unmanaged<τ_0_0>

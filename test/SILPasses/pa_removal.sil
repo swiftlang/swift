@@ -8,10 +8,10 @@ import Swift
 //CHECK: sil @a_function1
 //CHECK-NOT: partial_apply
 //CHECK: return
-sil @a_function1 : $@thin (Int64) -> () {
+sil @a_function1 : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
-  %1 = function_ref @our_closure_function1 : $@thin (Int64) -> Bool // user: %2
-  %2 = partial_apply %1(%0) : $@thin (Int64) -> Bool // user: %3
+  %1 = function_ref @our_closure_function1 : $@convention(thin) (Int64) -> Bool // user: %2
+  %2 = partial_apply %1(%0) : $@convention(thin) (Int64) -> Bool // user: %3
   strong_release %2 : $@callee_owned () -> Bool   // id: %3
   %4 = tuple ()                                   // user: %5
   return %4 : $()                                 // id: %5
@@ -22,12 +22,12 @@ class K {
 
 //CHECK: sil @a_function2
 // The release_value of $K is optimized to a strong_release.
-sil @a_function2 : $@thin (@owned K) -> () {
+sil @a_function2 : $@convention(thin) (@owned K) -> () {
 bb0(%0 : $K):
   %1 = alloc_ref $K
-  %2 = function_ref @our_closure_function2 : $@thin (@owned K) -> Bool // user: %2
+  %2 = function_ref @our_closure_function2 : $@convention(thin) (@owned K) -> Bool // user: %2
 //CHECK-NOT: partial_apply
-  %3 = partial_apply %2(%0) : $@thin (@owned K) -> Bool // user: %3
+  %3 = partial_apply %2(%0) : $@convention(thin) (@owned K) -> Bool // user: %3
 //CHECK: br
   br bb1
  bb1:
@@ -38,5 +38,5 @@ bb0(%0 : $K):
   return %5 : $()                                 // id: %5
 }
 
-sil @our_closure_function2 : $@thin (@owned K) -> Bool
-sil @our_closure_function1 : $@thin (Int64) -> Bool
+sil @our_closure_function2 : $@convention(thin) (@owned K) -> Bool
+sil @our_closure_function1 : $@convention(thin) (Int64) -> Bool

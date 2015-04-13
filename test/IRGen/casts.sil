@@ -32,7 +32,7 @@ protocol CP2: class {}
 // CHECK-LABEL: define i8* @ref_to_raw_pointer_existential(%objc_object*, i8**) {
 // CHECK:         [[CAST:%.*]] = bitcast %objc_object* %0 to i8*
 // CHECK:         ret i8* [[CAST]]
-sil @ref_to_raw_pointer_existential : $@thin (@owned CP) -> Builtin.RawPointer {
+sil @ref_to_raw_pointer_existential : $@convention(thin) (@owned CP) -> Builtin.RawPointer {
 entry(%p : $CP):
   %r = ref_to_raw_pointer %p : $CP to $Builtin.RawPointer
   return %r : $Builtin.RawPointer
@@ -41,13 +41,13 @@ entry(%p : $CP):
 // CHECK-LABEL: define %objc_object* @raw_pointer_to_ref_existential(i8*) {
 // CHECK:         [[CAST:%.*]] = bitcast i8* %0 to %objc_object*
 // CHECK:         ret %objc_object* [[CAST]]
-sil @raw_pointer_to_ref_existential : $@thin (@owned Builtin.RawPointer) -> AnyObject {
+sil @raw_pointer_to_ref_existential : $@convention(thin) (@owned Builtin.RawPointer) -> AnyObject {
 entry(%p : $Builtin.RawPointer):
   %r = raw_pointer_to_ref %p : $Builtin.RawPointer to $AnyObject
   return %r : $AnyObject
 }
 
-sil @unchecked_ref_cast_to_existential : $@thin (@owned Builtin.NativeObject) -> @owned AnyObject {
+sil @unchecked_ref_cast_to_existential : $@convention(thin) (@owned Builtin.NativeObject) -> @owned AnyObject {
 entry(%n : $Builtin.NativeObject):
   %r = unchecked_ref_cast %n : $Builtin.NativeObject to $AnyObject
   return %r : $AnyObject
@@ -63,7 +63,7 @@ entry(%n : $Builtin.NativeObject):
 // CHECK:         ret i8** [[WITNESS]]
 // CHECK:       fail:
 // CHECK:         call void @llvm.trap()
-sil @u_cast_to_class_existential : $@thin (@owned AnyObject) -> @owned CP {
+sil @u_cast_to_class_existential : $@convention(thin) (@owned AnyObject) -> @owned CP {
 entry(%a : $AnyObject):
   %p = unconditional_checked_cast %a : $AnyObject to $CP
   return %p : $CP
@@ -71,7 +71,7 @@ entry(%a : $AnyObject):
 
 // CHECK-LABEL: define { %swift.type*, i8** } @u_cast_to_existential_metatype(%swift.type*)
 // CHECK:         call i8** @dynamic_cast_existential_1_unconditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP)
-sil @u_cast_to_existential_metatype : $@thin (@owned @thick Any.Type) -> @owned @thick CP.Type {
+sil @u_cast_to_existential_metatype : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick CP.Type {
 entry(%a : $@thick Any.Type):
   %p = unconditional_checked_cast %a : $@thick Any.Type to $@thick CP.Type
   return %p : $@thick CP.Type
@@ -91,7 +91,7 @@ entry(%a : $@thick Any.Type):
 // CHECK:         ret { i8**, i8** }
 // CHECK:       fail:
 // CHECK:         call void @llvm.trap()
-sil @u_cast_to_class_existential_2 : $@thin (@owned AnyObject) -> @owned protocol<CP, CP2> {
+sil @u_cast_to_class_existential_2 : $@convention(thin) (@owned AnyObject) -> @owned protocol<CP, CP2> {
 entry(%a : $AnyObject):
   %p = unconditional_checked_cast %a : $AnyObject to $protocol<CP, CP2>
   return %p : $protocol<CP, CP2>
@@ -100,7 +100,7 @@ entry(%a : $AnyObject):
 // CHECK-LABEL: define { %objc_object*, i8**, i8** } @u_cast_to_class_existential_mixed(%objc_object*)
 // CHECK:         call %objc_object* @swift_dynamicCastObjCProtocolUnconditional
 // CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_unconditional(%swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
-sil @u_cast_to_class_existential_mixed : $@thin (@owned AnyObject) -> @owned protocol<CP, OP, CP2> {
+sil @u_cast_to_class_existential_mixed : $@convention(thin) (@owned AnyObject) -> @owned protocol<CP, OP, CP2> {
 entry(%a : $AnyObject):
   %p = unconditional_checked_cast %a : $AnyObject to $protocol<CP, OP, CP2>
   return %p : $protocol<CP, OP, CP2>
@@ -110,7 +110,7 @@ entry(%a : $AnyObject):
 // CHECK:         [[CAST:%.*]] = call %swift.type* @swift_dynamicCastTypeToObjCProtocolUnconditional(%swift.type* %0, {{(i32|i64)}} 1, i8** {{%.*}})
 // CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_unconditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
 // CHECK:         insertvalue {{.*}} [[CAST]]
-sil @u_cast_to_existential_metatype_mixed : $@thin (@owned @thick Any.Type) -> @owned @thick protocol<CP, OP, CP2>.Type {
+sil @u_cast_to_existential_metatype_mixed : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick protocol<CP, OP, CP2>.Type {
 entry(%a : $@thick Any.Type):
   %p = unconditional_checked_cast %a : $@thick Any.Type to $@thick protocol<CP, OP, CP2>.Type
   return %p : $@thick protocol<CP, OP, CP2>.Type
@@ -127,7 +127,7 @@ entry(%a : $@thick Any.Type):
 // CHECK:         ret i8** [[WITNESS]]
 // CHECK:       fail:
 // CHECK:         ret i8** null
-sil @c_cast_to_class_existential : $@thin (@owned AnyObject) -> @owned CP {
+sil @c_cast_to_class_existential : $@convention(thin) (@owned AnyObject) -> @owned CP {
 entry(%a : $AnyObject):
   checked_cast_br %a : $AnyObject to $CP, yea, nay
 yea(%p : $CP):
@@ -138,7 +138,7 @@ nay:
 
 // CHECK-LABEL: define { %swift.type*, i8** } @c_cast_to_existential_metatype(%swift.type*) {
 // CHECK:         call i8** @dynamic_cast_existential_1_conditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP)
-sil @c_cast_to_existential_metatype : $@thin (@owned @thick Any.Type) -> @owned @thick CP.Type {
+sil @c_cast_to_existential_metatype : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick CP.Type {
 entry(%a : $@thick Any.Type):
   checked_cast_br %a : $@thick Any.Type to $@thick CP.Type, yea, nay
 yea(%p : $@thick CP.Type):
@@ -161,7 +161,7 @@ nay:
 // CHECK:         ret { i8**, i8** }
 // CHECK:       fail:
 // CHECK:         ret { i8**, i8** } zeroinitializer
-sil @c_cast_to_class_existential_2 : $@thin (@owned AnyObject) -> @owned protocol<CP, CP2> {
+sil @c_cast_to_class_existential_2 : $@convention(thin) (@owned AnyObject) -> @owned protocol<CP, CP2> {
 entry(%a : $AnyObject):
   checked_cast_br %a : $AnyObject to $protocol<CP, CP2>, yea, nay
 yea(%p : $protocol<CP, CP2>):
@@ -179,7 +179,7 @@ nay:
 // CHECK:         br label %cont
 // CHECK:       cont:
 // CHECK:         phi %objc_object* [ [[CAST:%.*]], %success ], [ null, %entry ]
-sil @c_cast_to_class_existential_mixed : $@thin (@owned AnyObject) -> @owned protocol<CP, OP, CP2> {
+sil @c_cast_to_class_existential_mixed : $@convention(thin) (@owned AnyObject) -> @owned protocol<CP, OP, CP2> {
 entry(%a : $AnyObject):
   checked_cast_br %a : $AnyObject to $protocol<CP, OP, CP2>, yea, nay
 yea(%p : $protocol<CP, OP, CP2>):
@@ -194,7 +194,7 @@ nay:
 // CHECK:         br i1 [[IS_NULL]], label %cont, label %success
 // CHECK:       success:
 // CHECK:         call { i8**, i8** } @dynamic_cast_existential_2_conditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP, %swift.protocol* @_TMp5casts3CP2)
-sil @c_cast_to_existential_metatype_mixed : $@thin (@owned @thick Any.Type) -> @owned @thick protocol<CP, OP, CP2>.Type {
+sil @c_cast_to_existential_metatype_mixed : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick protocol<CP, OP, CP2>.Type {
 entry(%a : $@thick Any.Type):
   checked_cast_br %a : $@thick Any.Type to $@thick protocol<CP, OP, CP2>.Type, yea, nay
 yea(%p : $@thick protocol<CP, OP, CP2>.Type):
@@ -207,7 +207,7 @@ nay:
 // -- Don't need to check conformance of an object to AnyObject.
 // CHECK-NOT:     call %objc_object* @swift_dynamicCastObjCProtocolConditional
 // CHECK:         phi %objc_object*
-sil @checked_upcast : $@thin (@owned A) -> @owned AnyObject {
+sil @checked_upcast : $@convention(thin) (@owned A) -> @owned AnyObject {
 entry(%a : $A):
   checked_cast_br %a : $A to $AnyObject, yea, nay
 yea(%o : $AnyObject):
@@ -217,7 +217,7 @@ nay:
 }
 
 // CHECK-LABEL: define void @checked_metatype_to_object_casts
-sil @checked_metatype_to_object_casts : $@thin <T> (@thick Any.Type) -> () {
+sil @checked_metatype_to_object_casts : $@convention(thin) <T> (@thick Any.Type) -> () {
 entry(%e : $@thick Any.Type):
   %a = metatype $@thin NotClass.Type
   // CHECK: br i1 false
@@ -253,21 +253,21 @@ e_nay:
 
 @objc class OA {}
 sil_vtable OA {}
-sil hidden @_TToFC5casts2OAcfMS0_FT_S0_ : $@thin (OA) -> OA {
+sil hidden @_TToFC5casts2OAcfMS0_FT_S0_ : $@convention(thin) (OA) -> OA {
 entry(%x : $OA):
   return %x : $OA
 }
 
 @objc class OB {}
 sil_vtable OB {}
-sil hidden_external @_TToFC5casts2OBcfMS0_FT_S0_ : $@thin (OB) -> OB {
+sil hidden_external @_TToFC5casts2OBcfMS0_FT_S0_ : $@convention(thin) (OB) -> OB {
 entry(%x : $OB):
   return %x : $OB
 }
 
 // CHECK-LABEL: define %C5casts1B* @checked_object_to_object_casts(%C5casts1A*)
 // CHECK:         @swift_dynamicCastClassUnconditional
-sil @checked_object_to_object_casts : $@thin (A) -> B {
+sil @checked_object_to_object_casts : $@convention(thin) (A) -> B {
 entry(%a : $A):
   %b = unconditional_checked_cast %a : $A to $B
   return %b : $B
@@ -275,7 +275,7 @@ entry(%a : $A):
 
 // CHECK-LABEL: define %C5casts2OB* @checked_objc_object_to_object_casts(%C5casts2OA*)
 // CHECK:         @swift_dynamicCastClassUnconditional
-sil @checked_objc_object_to_object_casts : $@thin (OA) -> OB {
+sil @checked_objc_object_to_object_casts : $@convention(thin) (OA) -> OB {
 entry(%a : $OA):
   %b = unconditional_checked_cast %a : $OA to $OB
   return %b : $OB

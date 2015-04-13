@@ -15,7 +15,7 @@ class X {
 //CHECK-NEXT:  store
 //CHECK-NOT:  ref_element_addr
 //CHECK: return
-sil @_RefElementAddr : $@thin () -> Int64 {
+sil @_RefElementAddr : $@convention(thin) () -> Int64 {
 bb0:
   %0 = alloc_ref $X                               // users: %5, %7, %3
   %1 = integer_literal $Builtin.Int64, 0          // user: %2

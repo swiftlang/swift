@@ -18,44 +18,44 @@ class MMObject : Hashable {
 class MMString : MMObject {
 }
 
-// CHECK-LABEL: @caller : $@thin (Int, Int) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>> {
-sil @caller : $@thin (Int, Int) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>> {
+// CHECK-LABEL: @caller : $@convention(thin) (Int, Int) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>> {
+sil @caller : $@convention(thin) (Int, Int) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>> {
 bb0(%0 : $Int, %1 : $Int):
   %3 = metatype $@thin MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>.Type
-  %13 = function_ref @ext_fn1 : $@thin (Int, @thin MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>.Type) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>
-  %14 = apply %13(%0, %3) : $@thin (Int, @thin MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>.Type) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>
+  %13 = function_ref @ext_fn1 : $@convention(thin) (Int, @thin MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>.Type) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>
+  %14 = apply %13(%0, %3) : $@convention(thin) (Int, @thin MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>.Type) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>
 
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $MMString
   %37 = alloc_stack $MMString
-  // CHECK: [[ID:%[0-9]+]] = function_ref @_TTSg5C7inherit8MMStringS0_Ss8HashableS__GSQCS_6MMFont___callee : $@cc(method) @thin (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
-  %34 = function_ref @callee : $@cc(method) @thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in τ_0_0, Int, @owned MMStorage<τ_0_0, τ_0_1>) -> Bool
-  // CHECK: apply [[ID]]([[STACK]]#1, %1, %{{[0-9]+}}) : $@cc(method) @thin (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
-  %45 = apply %34<MMString, MMFont!>(%37#1, %1, %14) : $@cc(method) @thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in τ_0_0, Int, @owned MMStorage<τ_0_0, τ_0_1>) -> Bool
+  // CHECK: [[ID:%[0-9]+]] = function_ref @_TTSg5C7inherit8MMStringS0_Ss8HashableS__GSQCS_6MMFont___callee : $@convention(method) (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
+  %34 = function_ref @callee : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in τ_0_0, Int, @owned MMStorage<τ_0_0, τ_0_1>) -> Bool
+  // CHECK: apply [[ID]]([[STACK]]#1, %1, %{{[0-9]+}}) : $@convention(method) (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
+  %45 = apply %34<MMString, MMFont!>(%37#1, %1, %14) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in τ_0_0, Int, @owned MMStorage<τ_0_0, τ_0_1>) -> Bool
   dealloc_stack %37#0 : $*@local_storage MMString
 
   return %14 : $MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>
 }
 
-// CHECK-LABEL: @_TTSg5C7inherit8MMStringS0_Ss8HashableS__GSQCS_6MMFont___callee : $@cc(method) @thin (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool {
+// CHECK-LABEL: @_TTSg5C7inherit8MMStringS0_Ss8HashableS__GSQCS_6MMFont___callee : $@convention(method) (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool {
 // CHECK: [[META:%[0-9]+]] = metatype $@thick MMString.Type
 // CHECK: [[ID3:%[0-9]+]] = witness_method $MMObject, #Equatable."=="!1 :
 // CHECK: [[STACK2:%[0-9]+]] = alloc_stack $MMString
 // CHECK: [[STACK3:%[0-9]+]] = alloc_stack $MMString
-// CHECK: apply [[ID3]]<MMString>([[STACK2]]#1, [[STACK3]]#1, [[META]]) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+// CHECK: apply [[ID3]]<MMString>([[STACK2]]#1, [[STACK3]]#1, [[META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
 
-// CHECK-LABEL: @callee : $@cc(method) @thin <Key, Value where Key : Hashable> (@in Key, Int, @owned MMStorage<Key, Value>) -> Bool {
-sil @callee : $@cc(method) @thin <Key, Value where Key : Hashable> (@in Key, Int, @owned MMStorage<Key, Value>) -> Bool {
+// CHECK-LABEL: @callee : $@convention(method) <Key, Value where Key : Hashable> (@in Key, Int, @owned MMStorage<Key, Value>) -> Bool {
+sil @callee : $@convention(method) <Key, Value where Key : Hashable> (@in Key, Int, @owned MMStorage<Key, Value>) -> Bool {
 bb0(%0 : $*Key, %1 : $Int, %2 : $MMStorage<Key, Value>):
   %25 = metatype $@thick Key.Type
   // CHECK: [[ID2:%[0-9]+]] = witness_method $Key, #Equatable."=="!1 :
-  %26 = witness_method $Key, #Equatable."=="!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  %26 = witness_method $Key, #Equatable."=="!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   %27 = alloc_stack $Key
   %33 = alloc_stack $Key
   // CHECK: apply [[ID2]]<Key>
-  %35 = apply %26<Key>(%27#1, %33#1, %25) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  %35 = apply %26<Key>(%27#1, %33#1, %25) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   dealloc_stack %33#0 : $*@local_storage Key
   dealloc_stack %27#0 : $*@local_storage Key
   return %35 : $Bool
 }
 
-sil @ext_fn1 : $@thin (Int, @thin MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>.Type) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>
+sil @ext_fn1 : $@convention(thin) (Int, @thin MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>.Type) -> @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>

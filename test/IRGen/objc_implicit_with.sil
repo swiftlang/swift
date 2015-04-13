@@ -22,27 +22,27 @@ class SwiftGizmo : Gizmo {
 }
 sil_vtable SwiftGizmo {}
 
-sil @_TToFC18objc_implicit_with10SwiftGizmocfMS0_FT3redSf5greenSf4blueSf_S0_ : $@cc(objc_method) @thin (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TToFC18objc_implicit_with10SwiftGizmocfMS0_FT3redSf5greenSf4blueSf_S0_ : $@convention(objc_method) (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
   return %3 : $SwiftGizmo
 }
 
-sil @_TToFC18objc_implicit_with10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__ : $@cc(objc_method) @thin (Int, @owned SwiftGizmo) -> @owned SwiftGizmo! {
+sil @_TToFC18objc_implicit_with10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__ : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo! {
 bb0(%0 : $Int, %1 : $SwiftGizmo):
   unreachable
 }
 
-sil @_TToFC18objc_implicit_with10SwiftGizmocfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TToFC18objc_implicit_with10SwiftGizmocfMS0_FT_S0_ : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @_TToFC18objc_implicit_with10SwiftGizmo5colorfS0_FT3redSf5greenSf4blueSf_T_ : $@cc(objc_method) @thin (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TToFC18objc_implicit_with10SwiftGizmo5colorfS0_FT3redSf5greenSf4blueSf_T_ : $@convention(objc_method) (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
   return %3 : $SwiftGizmo
 }
 
-sil @_TToFC18objc_implicit_with10SwiftGizmo13otherColorForfS0_FT3redSf5greenSf4blueSf_T_ : $@cc(objc_method) @thin (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TToFC18objc_implicit_with10SwiftGizmo13otherColorForfS0_FT3redSf5greenSf4blueSf_T_ : $@convention(objc_method) (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
   return %3 : $SwiftGizmo
 }

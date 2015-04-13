@@ -149,9 +149,9 @@ class SomeClass {
 }
 
 
-// Implicit conversions (in this case to @objc_block) are ok.
+// Implicit conversions (in this case to @convention(block)) are ok.
 @asmname("whatever")
-func takeNoEscapeAsObjCBlock(@noescape @objc_block () -> Void)
+func takeNoEscapeAsObjCBlock(@noescape @convention(block) () -> Void)
 func takeNoEscapeTest2(@noescape fn : () -> ()) {
   takeNoEscapeAsObjCBlock(fn)
 }

@@ -9,14 +9,14 @@ protocol P {
   func foo()
 }
 
-sil @takeInt : $@cc(method) @thin (@inout Int64) -> ()
+sil @takeInt : $@convention(method) (@inout Int64) -> ()
 
-sil @TrivialTest : $@thin (@inout Int64) -> () {
+sil @TrivialTest : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
   %1 = alloc_stack $Int64  // var a               // users: %6, %2, %4, %5
   copy_addr %0 to [initialization] %1#1 : $*Int64
-  %3 = function_ref @takeInt : $@cc(method) @thin (@inout Int64) -> () // user: %4
-  %4 = apply %3(%1#1) : $@cc(method) @thin (@inout Int64) -> ()
+  %3 = function_ref @takeInt : $@convention(method) (@inout Int64) -> () // user: %4
+  %4 = apply %3(%1#1) : $@convention(method) (@inout Int64) -> ()
   copy_addr %1#1 to %0 : $*Int64
   dealloc_stack %1#0 : $*@local_storage Int64
   %7 = tuple ()                                   // user: %8
@@ -25,17 +25,17 @@ bb0(%0 : $*Int64):
 
 
 // CHECK-LABEL: sil @AddressOnlyTest
-sil @AddressOnlyTest : $@thin (@inout P) -> () {
+sil @AddressOnlyTest : $@convention(thin) (@inout P) -> () {
 bb0(%0 : $*P):           // CHECK: bb0(%0 : $*P):
   %1 = alloc_stack $P
   copy_addr %0 to [initialization] %1#1 : $*P
   
   // CHECK-NEXT: open_existential_addr %0 : $*P
   %3 = open_existential_addr %1#1 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
-  %4 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo!1, %3 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@thin @cc(witness_method) @callee_owned <T: P> (@inout T) -> ()
+  %4 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.foo!1, %3 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method) @callee_owned <T: P> (@inout T) -> ()
   
   // CHECK: apply
-  %5 = apply %4<@opened("01234567-89ab-cdef-0123-000000000000") P>(%3) : $@thin @cc(witness_method) @callee_owned <T: P> (@inout T) -> ()
+  %5 = apply %4<@opened("01234567-89ab-cdef-0123-000000000000") P>(%3) : $@convention(witness_method) @callee_owned <T: P> (@inout T) -> ()
   
   copy_addr [take] %1#1 to %0 : $*P
   dealloc_stack %1#0 : $*@local_storage P
@@ -56,10 +56,10 @@ struct NontrivialStruct {
 }
 
 
-sil @takeNontrivial : $@cc(method) @thin (@inout NontrivialStruct) -> ()
+sil @takeNontrivial : $@convention(method) (@inout NontrivialStruct) -> ()
 
 // CHECK-LABEL: sil @NontrivialTest
-sil @NontrivialTest : $@thin (@inout NontrivialStruct) -> () {
+sil @NontrivialTest : $@convention(thin) (@inout NontrivialStruct) -> () {
 bb0(%0 : $*NontrivialStruct):
 // CHECK: bb0(%0 : $*NontrivialStruct):
 
@@ -68,10 +68,10 @@ bb0(%0 : $*NontrivialStruct):
 
   // CHECK-NEXT: // function_ref takeNontrivial
   // CHECK-NEXT: function_ref @takeNontrivial
-  %3 = function_ref @takeNontrivial : $@cc(method) @thin (@inout NontrivialStruct) -> () // user: %4
+  %3 = function_ref @takeNontrivial : $@convention(method) (@inout NontrivialStruct) -> () // user: %4
 
   // CHECK-NEXT: apply
-  %4 = apply %3(%1#1) : $@cc(method) @thin (@inout NontrivialStruct) -> ()
+  %4 = apply %3(%1#1) : $@convention(method) (@inout NontrivialStruct) -> ()
   copy_addr [take] %1#1 to %0 : $*NontrivialStruct
   dealloc_stack %1#0 : $*@local_storage NontrivialStruct
 
@@ -84,17 +84,17 @@ bb0(%0 : $*NontrivialStruct):
 // Inout deshadowing should *not* deshadow inouts that are copied to temporaries for use by
 // @in arguments. <rdar://problem/16105449>
 
-sil @in_argument : $@thin (@in protocol<>) -> ()
+sil @in_argument : $@convention(thin) (@in protocol<>) -> ()
 
 // CHECK-LABEL: sil @inout_argument_passed_to_in_argument
-sil @inout_argument_passed_to_in_argument : $@thin (@inout protocol<>) -> () {
+sil @inout_argument_passed_to_in_argument : $@convention(thin) (@inout protocol<>) -> () {
 // CHECK:       bb0([[INOUT:%.*]] : $*protocol<>):
 entry(%0 : $*protocol<>):
-  %f = function_ref @in_argument : $@thin (@in protocol<>) -> ()
+  %f = function_ref @in_argument : $@convention(thin) (@in protocol<>) -> ()
   %x = alloc_stack $protocol<>
   // CHECK:       copy_addr [[INOUT]] to [initialization]
   copy_addr %0 to [initialization] %x#1 : $*protocol<>
-  %z = apply %f(%x#1) : $@thin (@in protocol<>) -> ()
+  %z = apply %f(%x#1) : $@convention(thin) (@in protocol<>) -> ()
   dealloc_stack %x#0 : $*@local_storage protocol<>
   return %z : $()
 }

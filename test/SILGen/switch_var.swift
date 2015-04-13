@@ -273,7 +273,7 @@ func test_var_4(#p: P) {
   e()
 }
 
-// CHECK-LABEL: sil hidden @_TF10switch_var10test_var_5FT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF10switch_var10test_var_5FT_T_ : $@convention(thin) () -> () {
 func test_var_5() {
   // CHECK:   function_ref @_TF10switch_var3fooFT_Si
   // CHECK:   function_ref @_TF10switch_var3barFT_Si
@@ -313,7 +313,7 @@ func test_var_5() {
   e()
 }
 
-// CHECK-LABEL: sil hidden @_TF10switch_var15test_var_returnFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF10switch_var15test_var_returnFT_T_ : $@convention(thin) () -> () {
 func test_var_return() {
   switch (foo(), bar()) {
   case var x where runced():
@@ -355,7 +355,7 @@ func test_var_return() {
 
 // When all of the bindings in a column are immutable, don't emit a mutable
 // box. <rdar://problem/15873365>
-// CHECK-LABEL: sil hidden @_TF10switch_var8test_letFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF10switch_var8test_letFT_T_ : $@convention(thin) () -> () {
 func test_let() {
   // CHECK: [[FOOS:%.*]] = function_ref @_TF10switch_var4foosFT_SS
   // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
@@ -417,7 +417,7 @@ func test_let() {
 }
 
 // If one of the bindings is a "var", allocate a box for the column.
-// CHECK-LABEL: sil hidden @_TF10switch_var18test_mixed_let_varFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF10switch_var18test_mixed_let_varFT_T_ : $@convention(thin) () -> () {
 func test_mixed_let_var() {
   // CHECK: [[FOOS:%.*]] = function_ref @_TF10switch_var4foosFT_SS
   // CHECK: [[VAL:%.*]] = apply [[FOOS]]()

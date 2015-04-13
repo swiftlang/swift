@@ -7,26 +7,26 @@ import Swift
 // CHECK-NOT: alloc_stack
 // CHECK: return
 // simple.foo0 (c : Swift.Int64) -> ()
-sil @store_only_allocas : $@thin (Int64) -> () {
+sil @store_only_allocas : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var c               // users: %5, %2
   store %0 to %1#1 : $*Int64                      // id: %2
   // function_ref Swift.print (val : Swift.Int64) -> ()
-  %3 = function_ref @_TSs5printFT3valSi_T_ : $@thin (Int64) -> () // user: %4
-  %4 = apply %3(%0) : $@thin (Int64) -> ()
+  %3 = function_ref @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %4
+  %4 = apply %3(%0) : $@convention(thin) (Int64) -> ()
   dealloc_stack %1#0 : $*@local_storage Int64     // id: %5
   %6 = tuple ()                                   // user: %7
   return %6 : $()                                 // id: %7
 }
 
 // Swift.print (val : Swift.Int64) -> ()
-sil @_TSs5printFT3valSi_T_ : $@thin (Int64) -> ()
+sil @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
 
 // CHECK-LABEL: sil @multiple_store_vals
 // CHECK-NOT: alloc_stack
 // CHECK: return
 // simple.foo1 (c : Swift.Int64) -> Swift.Int64
-sil @multiple_store_vals : $@thin (Int64) -> Int64 {
+sil @multiple_store_vals : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var c               // users: %14, %2
   store %0 to %1#1 : $*Int64                      // id: %2
@@ -49,7 +49,7 @@ bb0(%0 : $Int64):
 // CHECK-NOT: alloc_stack
 // CHECK: return
 // simple.foo2 (c : Swift.Int64) -> Swift.Int64
-sil @multiple_store_vals2 : $@thin (Int64) -> Int64 {
+sil @multiple_store_vals2 : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var c               // users: %19, %2
   store %0 to %1#1 : $*Int64                      // id: %2
@@ -79,7 +79,7 @@ bb3(%18 : $Int64):                                // Preds: bb2 bb1
 
 // CHECK-LABEL: sil @with_loads
 // simple.foo2 (c : Swift.Int64) -> Swift.Int64
-sil @with_loads : $@thin (Int64) -> Int64 {
+sil @with_loads : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var c               // users: %19, %2, (%20)
   store %0 to %1#1 : $*Int64                      // id: %2
@@ -114,7 +114,7 @@ bb3(%18 : $Int64):                                // Preds: bb2 bb1
 // CHECK-NOT: alloc_stack
 // CHECK: return
 // test.foo3 (c : Swift.Int64) -> ()
-sil @basic_block_with_loads_and_stores : $@thin (Int64) -> () {
+sil @basic_block_with_loads_and_stores : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var c               // users: %20, %2
   store %0 to %1#1 : $*Int64                      // id: %2
@@ -131,9 +131,9 @@ bb0(%0 : $Int64):
   store %13 to %3#1 : $*Int64                     // id: %14
 
   // function_ref Swift.print (val : Swift.Int64) -> ()
-  %16 = function_ref @_TSs5printFT3valSi_T_ : $@thin (Int64) -> () // user: %18
+  %16 = function_ref @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %18
   %17 = load %3#1 : $*Int64                       // user: %18
-  %18 = apply %16(%17) : $@thin (Int64) -> ()
+  %18 = apply %16(%17) : $@convention(thin) (Int64) -> ()
   dealloc_stack %3#0 : $*@local_storage Int64     // id: %19
   dealloc_stack %1#0 : $*@local_storage Int64     // id: %20
   %21 = tuple ()                                  // user: %22
@@ -143,7 +143,7 @@ bb0(%0 : $Int64):
 // CHECK-LABEL: sil @load_uninitialized_empty
 // CHECK-NOT: load
 // CHECK: return
-sil @load_uninitialized_empty : $@thin (@inout ()) -> () {
+sil @load_uninitialized_empty : $@convention(thin) (@inout ()) -> () {
 bb0(%0 : $*()):
   %1 = alloc_stack $()
   %2 = load %1#1 : $*()
@@ -158,7 +158,7 @@ bb0(%0 : $*()):
 // CHECK-NOT: debug_value_addr
 // CHECK: debug_value %0
 // CHECK: return
-sil @mem2reg_debug_value_addr : $@thin (Int) -> Int {
+sil @mem2reg_debug_value_addr : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = alloc_stack $Int
   store %0 to %1#1 : $*Int
@@ -172,7 +172,7 @@ bb0(%0 : $Int):
 // CHECK-NOT: alloc_stack
 // CHECK: struct_extract
 // CHECK: return
-sil @mem2reg_struct_addr : $@thin (Int64) -> Builtin.Int64 {
+sil @mem2reg_struct_addr : $@convention(thin) (Int64) -> Builtin.Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64
   store %0 to %1#1 : $*Int64
@@ -186,7 +186,7 @@ bb0(%0 : $Int64):
 // CHECK-NOT: alloc_stack
 // CHECK: tuple_extract {{.*}}, 0
 // CHECK: return
-sil @mem2reg_tuple_addr : $@thin (Int64) -> Int64 {
+sil @mem2reg_tuple_addr : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $(Int64, Int64)
   %2 = tuple (%0 : $Int64, %0 : $Int64)
@@ -199,7 +199,7 @@ bb0(%0 : $Int64):
 
 // CHECK-LABEL: sil @struct_extract_if_then_else
 // CHECK-NOT: alloc_stack
-sil @struct_extract_if_then_else : $@thin (Int64) -> Int64 {
+sil @struct_extract_if_then_else : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64
   store %0 to %1#1 : $*Int64

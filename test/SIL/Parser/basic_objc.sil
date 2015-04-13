@@ -11,7 +11,7 @@ import ObjectiveC
 @objc protocol ObjCProto {}
 
 // CHECK-LABEL: sil @protocol_conversion
-sil @protocol_conversion : $@thin () -> @owned Protocol {
+sil @protocol_conversion : $@convention(thin) () -> @owned Protocol {
 entry:
   // CHECK: {{%.*}} = objc_protocol #ObjCProto : $Protocol
   %p = objc_protocol #ObjCProto : $Protocol
@@ -24,7 +24,7 @@ protocol SomeClassProtocol : class {}
 // CHECK-LABEL: sil @metatype_to_object
 // CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject
 // CHECK:         {{%.*}} = objc_existential_metatype_to_object {{%.*}} : $@objc_metatype SomeClassProtocol.Type to $AnyObject
-sil @metatype_to_object : $@thin (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
+sil @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
 entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtocol.Type):
   %x = objc_metatype_to_object %a : $@objc_metatype SomeClass.Type to $AnyObject
   %y = objc_existential_metatype_to_object %b : $@objc_metatype SomeClassProtocol.Type to $AnyObject

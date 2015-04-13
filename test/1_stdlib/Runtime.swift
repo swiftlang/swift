@@ -236,7 +236,7 @@ Runtime.test("_isClassOrObjCExistential") {
   expectFalse(_isClassOrObjCExistential(SwiftClosure.self))
   expectFalse(_isClassOrObjCExistential_Opaque(SwiftClosure.self))
 
-  typealias ObjCClosure = @objc_block ()->()
+  typealias ObjCClosure = @convention(block) ()->()
   expectTrue(_isClassOrObjCExistential(ObjCClosure.self))
   expectTrue(_isClassOrObjCExistential_Opaque(ObjCClosure.self))
 
@@ -253,7 +253,7 @@ Runtime.test("_canBeClass") {
   typealias SwiftClosure = ()->()
   expectEqual(0, _canBeClass(SwiftClosure.self))
 
-  typealias ObjCClosure = @objc_block ()->()
+  typealias ObjCClosure = @convention(block) ()->()
   expectEqual(1, _canBeClass(ObjCClosure.self))
 
   expectEqual(1, _canBeClass(CFArray.self))

@@ -16,7 +16,7 @@ import Swift
 // CHECK-NOT: fix_lifetime
 // CHECK: cond_br
 
-sil @memset : $@thin (@inout Builtin.NativeObject, Int) -> () {
+sil @memset : $@convention(thin) (@inout Builtin.NativeObject, Int) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Int):
   %5 = integer_literal $Builtin.Int1, -1
   %46 = integer_literal $Builtin.Word, 0
@@ -58,7 +58,7 @@ bb2(%54 : $Builtin.Word):
 // CHECK-NOT: load
 // CHECK: cond_br
 
-sil @must_move_condfail : $@thin (@inout Builtin.NativeObject, Int, Builtin.Word) -> () {
+sil @must_move_condfail : $@convention(thin) (@inout Builtin.NativeObject, Int, Builtin.Word) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Int, %2: $Builtin.Word):
   %5 = integer_literal $Builtin.Int1, -1
   %6 = load %0 : $*Builtin.NativeObject
@@ -99,7 +99,7 @@ bb2(%48 : $Builtin.Word):
 // CHECK: br bb1
 // CHECK: return
 
-sil @hoist_outer_loop : $@thin (@inout Builtin.Int1, Int) -> () {
+sil @hoist_outer_loop : $@convention(thin) (@inout Builtin.Int1, Int) -> () {
 bb0(%0 : $*Builtin.Int1, %1 : $Int):
   %2 = integer_literal $Builtin.Int1, -1
   %3 = integer_literal $Builtin.Word, 0
@@ -131,7 +131,7 @@ bb4:
 // CHECK:  load [[ADDR]]
 // CHECK: return
 
-sil @dont_hoist_outer_loop : $@thin (@inout Builtin.Int1, Int) -> () {
+sil @dont_hoist_outer_loop : $@convention(thin) (@inout Builtin.Int1, Int) -> () {
 bb0(%0 : $*Builtin.Int1, %1 : $Int):
   %2 = integer_literal $Builtin.Int1, -1
   %3 = integer_literal $Builtin.Word, 0

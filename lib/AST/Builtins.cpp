@@ -984,7 +984,7 @@ getMakeMaterializeForSetCallbackOperation(ASTContext &ctx, Identifier name) {
   //          inout T,
   //          T.Type) -> ())
   //      ->
-  //  @thin ((Builtin.RawPointer,
+  //  @convention(thin) ((Builtin.RawPointer,
   //          inout Builtin.UnsafeValueBuffer,
   //          inout T,
   //          @thick T.Type) -> ())

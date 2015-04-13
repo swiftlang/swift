@@ -16,50 +16,50 @@ class REC {
   func recursive(a: Int)
 }
 
-sil @main : $@cc(cdecl) @thin (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
+sil @main : $@convention(c) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32 {
 bb0(%c : $Builtin.Int32, %v : $Builtin.RawPointer):
   // function_ref single.test (Swift.Int) -> ()
-  %0 = function_ref @_TF6single4testFSiT_ : $@thin (Int) -> () // user: %5
+  %0 = function_ref @_TF6single4testFSiT_ : $@convention(thin) (Int) -> () // user: %5
   // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-  %1 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %4
+  %1 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %4
   %2 = metatype $@thin Int.Type                   // user: %4
   %3 = integer_literal $Builtin.Int2048, 1000     // user: %4
-  %4 = apply %1(%3, %2) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %5
-  %5 = apply %0(%4) : $@thin (Int) -> ()
+  %4 = apply %1(%3, %2) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %5
+  %5 = apply %0(%4) : $@convention(thin) (Int) -> ()
   %6 = integer_literal $Builtin.Int32, 0
   return %6 : $Builtin.Int32
 }
 
 // single.REC.recursive (single.REC)(Swift.Int) -> ()
-sil @_TFC6single3REC9recursivefS0_FSiT_ : $@cc(method) @thin (Int, @guaranteed REC) -> () {
+sil @_TFC6single3REC9recursivefS0_FSiT_ : $@convention(method) (Int, @guaranteed REC) -> () {
 bb0(%0 : $Int, %1 : $REC):
   debug_value %0 : $Int  // let a                 // id: %2
   debug_value %1 : $REC  // let self              // id: %3
   // function_ref Swift.Bool._getBuiltinLogicValue (Swift.Bool)() -> Builtin.Int1
-  %4 = function_ref @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@cc(method) @thin (Bool) -> Builtin.Int1 // user: %11
+  %4 = function_ref @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1 // user: %11
   // function_ref Swift.>= @infix (Swift.Int, Swift.Int) -> Swift.Bool
-  %5 = function_ref @_TFSsoi2geFTSiSi_Sb : $@thin (Int, Int) -> Bool // user: %10
+  %5 = function_ref @_TFSsoi2geFTSiSi_Sb : $@convention(thin) (Int, Int) -> Bool // user: %10
   // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-  %6 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %9
+  %6 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %9
   %7 = metatype $@thin Int.Type                   // user: %9
   %8 = integer_literal $Builtin.Int2048, 2        // user: %9
-  %9 = apply %6(%8, %7) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %10
-  %10 = apply %5(%0, %9) : $@thin (Int, Int) -> Bool // user: %11
-  %11 = apply %4(%10) : $@cc(method) @thin (Bool) -> Builtin.Int1 // user: %12
+  %9 = apply %6(%8, %7) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %10
+  %10 = apply %5(%0, %9) : $@convention(thin) (Int, Int) -> Bool // user: %11
+  %11 = apply %4(%10) : $@convention(method) (Bool) -> Builtin.Int1 // user: %12
   cond_br %11, bb1, bb2                           // id: %12
 
 bb1:                                              // Preds: bb0
   strong_retain %1 : $REC                         // id: %13
-  %14 = class_method %1 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@cc(method) @thin (Int, @guaranteed REC) -> () // user: %21
+  %14 = class_method %1 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@convention(method) (Int, @guaranteed REC) -> () // user: %21
   // function_ref Swift.- @infix (Swift.Int, Swift.Int) -> Swift.Int
-  %15 = function_ref @_TFSsoi1sFTSiSi_Si : $@thin (Int, Int) -> Int // user: %20
+  %15 = function_ref @_TFSsoi1sFTSiSi_Si : $@convention(thin) (Int, Int) -> Int // user: %20
   // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-  %16 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %19
+  %16 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %19
   %17 = metatype $@thin Int.Type                  // user: %19
   %18 = integer_literal $Builtin.Int2048, 2       // user: %19
-  %19 = apply %16(%18, %17) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int // user: %20
-  %20 = apply %15(%0, %19) : $@thin (Int, Int) -> Int // user: %21
-  %21 = apply %14(%20, %1) : $@cc(method) @thin (Int, @guaranteed REC) -> ()
+  %19 = apply %16(%18, %17) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %20
+  %20 = apply %15(%0, %19) : $@convention(thin) (Int, Int) -> Int // user: %21
+  %21 = apply %14(%20, %1) : $@convention(method) (Int, @guaranteed REC) -> ()
   br bb2                                          // id: %22
 
 bb2:                                              // Preds: bb0 bb1
@@ -69,19 +69,19 @@ bb2:                                              // Preds: bb0 bb1
 }
 
 // Swift.Bool._getBuiltinLogicValue (Swift.Bool)() -> Builtin.Int1
-sil [transparent] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@cc(method) @thin (Bool) -> Builtin.Int1
+sil [transparent] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1
 
 // Swift.>= @infix (Swift.Int, Swift.Int) -> Swift.Bool
-sil [transparent] @_TFSsoi2geFTSiSi_Sb : $@thin (Int, Int) -> Bool
+sil [transparent] @_TFSsoi2geFTSiSi_Sb : $@convention(thin) (Int, Int) -> Bool
 
 // Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
 
 // Swift.- @infix (Swift.Int, Swift.Int) -> Swift.Int
-sil [transparent] @_TFSsoi1sFTSiSi_Si : $@thin (Int, Int) -> Int
+sil [transparent] @_TFSsoi1sFTSiSi_Si : $@convention(thin) (Int, Int) -> Int
 
 // single.REC.deinit
-sil @_TFC6single3RECd : $@cc(method) @thin (@owned REC) -> @owned Builtin.NativeObject {
+sil @_TFC6single3RECd : $@convention(method) (@owned REC) -> @owned Builtin.NativeObject {
 bb0(%0 : $REC):
   debug_value %0 : $REC  // let self              // id: %1
   %2 = unchecked_ref_cast %0 : $REC to $Builtin.NativeObject // user: %3
@@ -89,12 +89,12 @@ bb0(%0 : $REC):
 }
 
 // single.REC.__deallocating_deinit
-sil @_TFC6single3RECD : $@cc(method) @thin (@owned REC) -> () {
+sil @_TFC6single3RECD : $@convention(method) (@owned REC) -> () {
 bb0(%0 : $REC):
   debug_value %0 : $REC  // let self              // id: %1
   // function_ref single.REC.deinit
-  %2 = function_ref @_TFC6single3RECd : $@cc(method) @thin (@owned REC) -> @owned Builtin.NativeObject // user: %3
-  %3 = apply %2(%0) : $@cc(method) @thin (@owned REC) -> @owned Builtin.NativeObject // user: %4
+  %2 = function_ref @_TFC6single3RECd : $@convention(method) (@owned REC) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@owned REC) -> @owned Builtin.NativeObject // user: %4
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $REC // user: %5
   dealloc_ref %4 : $REC                           // id: %5
   %6 = tuple ()                                   // user: %7
@@ -102,7 +102,7 @@ bb0(%0 : $REC):
 }
 
 // single.REC.init (single.REC.Type)() -> single.REC
-sil @_TFC6single3RECcfMS0_FT_S0_ : $@cc(method) @thin (@owned REC) -> @owned REC {
+sil @_TFC6single3RECcfMS0_FT_S0_ : $@convention(method) (@owned REC) -> @owned REC {
 bb0(%0 : $REC):
   debug_value %0 : $REC  // let self              // id: %1
   %2 = mark_uninitialized [rootself] %0 : $REC    // user: %3
@@ -110,27 +110,27 @@ bb0(%0 : $REC):
 }
 
 // single.REC.__allocating_init (single.REC.Type)() -> single.REC
-sil @_TFC6single3RECCfMS0_FT_S0_ : $@thin (@thick REC.Type) -> @owned REC {
+sil @_TFC6single3RECCfMS0_FT_S0_ : $@convention(thin) (@thick REC.Type) -> @owned REC {
 bb0(%0 : $@thick REC.Type):
   %1 = alloc_ref $REC                             // user: %3
   // function_ref single.REC.init (single.REC.Type)() -> single.REC
-  %2 = function_ref @_TFC6single3RECcfMS0_FT_S0_ : $@cc(method) @thin (@owned REC) -> @owned REC // user: %3
-  %3 = apply %2(%1) : $@cc(method) @thin (@owned REC) -> @owned REC // user: %4
+  %2 = function_ref @_TFC6single3RECcfMS0_FT_S0_ : $@convention(method) (@owned REC) -> @owned REC // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned REC) -> @owned REC // user: %4
   return %3 : $REC                                // id: %4
 }
 
 // single.test (Swift.Int) -> ()
-sil @_TF6single4testFSiT_ : $@thin (Int) -> () {
+sil @_TF6single4testFSiT_ : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   debug_value %0 : $Int  // let N                 // id: %1
   // function_ref single.REC.__allocating_init (single.REC.Type)() -> single.REC
-  %2 = function_ref @_TFC6single3RECCfMS0_FT_S0_ : $@thin (@thick REC.Type) -> @owned REC // user: %4
+  %2 = function_ref @_TFC6single3RECCfMS0_FT_S0_ : $@convention(thin) (@thick REC.Type) -> @owned REC // user: %4
   %3 = metatype $@thick REC.Type                  // user: %4
-  %4 = apply %2(%3) : $@thin (@thick REC.Type) -> @owned REC // users: %5, %6, %7, %8, %9
+  %4 = apply %2(%3) : $@convention(thin) (@thick REC.Type) -> @owned REC // users: %5, %6, %7, %8, %9
   debug_value %4 : $REC  // let rec               // id: %5
   strong_retain %4 : $REC                         // id: %6
-  %7 = class_method %4 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@cc(method) @thin (Int, @guaranteed REC) -> () // user: %8
-  %8 = apply %7(%0, %4) : $@cc(method) @thin (Int, @guaranteed REC) -> ()
+  %7 = class_method %4 : $REC, #REC.recursive!1 : REC -> (Int) -> () , $@convention(method) (Int, @guaranteed REC) -> () // user: %8
+  %8 = apply %7(%0, %4) : $@convention(method) (Int, @guaranteed REC) -> ()
   strong_release %4 : $REC                        // id: %9
   %10 = tuple ()                                  // user: %11
   return %10 : $()                                // id: %11

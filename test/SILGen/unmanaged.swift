@@ -5,7 +5,7 @@ class C {}
 struct Holder {
   unowned(unsafe) var value: C
 }
-// CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderCfMS0_FT5valueCS_1C_S0_ : $@thin (@owned C, @thin Holder.Type) -> Holder
+// CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderCfMS0_FT5valueCS_1C_S0_ : $@convention(thin) (@owned C, @thin Holder.Type) -> Holder
 // CHECK-NEXT: bb0([[T0:%.*]] : $C,
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[T0]] : $C to $@sil_unmanaged C
 // CHECK-NEXT:   strong_release [[T0]] : $C
@@ -15,7 +15,7 @@ struct Holder {
 func set(inout #holder: Holder) {
   holder.value = C()
 }
-// CHECK-LABEL:sil hidden @_TF9unmanaged3setFT6holderRVS_6Holder_T_ : $@thin (@inout Holder) -> ()
+// CHECK-LABEL:sil hidden @_TF9unmanaged3setFT6holderRVS_6Holder_T_ : $@convention(thin) (@inout Holder) -> ()
 // CHECK-NEXT: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK:        [[T0:%.*]] = function_ref @_TFC9unmanaged1CCfMS0_FT_S0_
 // CHECK:        [[C:%.*]] = apply [[T0]](
@@ -29,7 +29,7 @@ func set(inout #holder: Holder) {
 func get(inout #holder: Holder) -> C {
   return holder.value
 }
-// CHECK-LABEL:sil hidden @_TF9unmanaged3getFT6holderRVS_6Holder_CS_1C : $@thin (@inout Holder) -> @owned C
+// CHECK-LABEL:sil hidden @_TF9unmanaged3getFT6holderRVS_6Holder_CS_1C : $@convention(thin) (@inout Holder) -> @owned C
 // CHECK-NEXT: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[ADDR]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = load [[T0]] : $*@sil_unmanaged C
@@ -40,7 +40,7 @@ func get(inout #holder: Holder) -> C {
 func project(#fn: () -> Holder) -> C {
   return fn().value
 }
-// CHECK-LABEL:sil hidden @_TF9unmanaged7projectFT2fnFT_VS_6Holder_CS_1C : $@thin (@owned @callee_owned () -> Holder) -> @owned C
+// CHECK-LABEL:sil hidden @_TF9unmanaged7projectFT2fnFT_VS_6Holder_CS_1C : $@convention(thin) (@owned @callee_owned () -> Holder) -> @owned C
 // CHECK-NEXT: bb0([[FN:%.*]] : $@callee_owned () -> Holder):
 // CHECK:        strong_retain [[FN]]
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()

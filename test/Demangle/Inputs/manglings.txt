@@ -23,10 +23,10 @@ _TtGVSs10DictionarySSSi_ ---> [Swift.String : Swift.Int]
 _TtVSs7CString ---> Swift.CString
 _TtCSo8NSObject ---> ObjectiveC.NSObject
 _TtO6Monads6Either ---> Monads.Either
-_TtbSiSu ---> @objc_block (Swift.Int) -> Swift.UInt
-_TtcSiSu ---> @__c_function_pointer (Swift.Int) -> Swift.UInt
-_TtbTSiSc_Su ---> @objc_block (Swift.Int, Swift.UnicodeScalar) -> Swift.UInt
-_TtcTSiSc_Su ---> @__c_function_pointer (Swift.Int, Swift.UnicodeScalar) -> Swift.UInt
+_TtbSiSu ---> @convention(block) (Swift.Int) -> Swift.UInt
+_TtcSiSu ---> @convention(c) (Swift.Int) -> Swift.UInt
+_TtbTSiSc_Su ---> @convention(block) (Swift.Int, Swift.UnicodeScalar) -> Swift.UInt
+_TtcTSiSc_Su ---> @convention(c) (Swift.Int, Swift.UnicodeScalar) -> Swift.UInt
 _TtFSiSu ---> (Swift.Int) -> Swift.UInt
 _TtKSiSu ---> @autoclosure (Swift.Int) -> Swift.UInt
 _TtfSiFScSu ---> (Swift.Int)(Swift.UnicodeScalar) -> Swift.UInt
@@ -203,9 +203,9 @@ _TTSf2g___TTSf2s_d___TFVSs11_StringCoreCfMS_FVSs13_StringBufferS_ ---> function 
 _TTSf3d_i_d_i_d_i___TFVSs11_StringCoreCfMS_FVSs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead, Arg[1] = Value Promoted from InOut, Arg[2] = Dead, Arg[3] = Value Promoted from InOut, Arg[4] = Dead, Arg[5] = Value Promoted from InOut> of Swift._StringCore.init (Swift._StringCore.Type)(Swift._StringBuffer) -> Swift._StringCore
 _TTSf3d_i_n_i_d_i___TFVSs11_StringCoreCfMS_FVSs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead, Arg[1] = Value Promoted from InOut, Arg[3] = Value Promoted from InOut, Arg[4] = Dead, Arg[5] = Value Promoted from InOut> of Swift._StringCore.init (Swift._StringCore.Type)(Swift._StringBuffer) -> Swift._StringCore
 _TTSg5XPMTP4main9AnyObject____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@thick main.AnyObject.Type> of Swift._ContiguousArrayBuffer.init <A>(Swift._ContiguousArrayBuffer<A>.Type)(count : Swift.Int, minimumCapacity : Swift.Int) -> Swift._ContiguousArrayBuffer<A>
-_TTSg5XPMoP4main9AnyObject____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@objc main.AnyObject.Type> of Swift._ContiguousArrayBuffer.init <A>(Swift._ContiguousArrayBuffer<A>.Type)(count : Swift.Int, minimumCapacity : Swift.Int) -> Swift._ContiguousArrayBuffer<A>
+_TTSg5XPMoP4main9AnyObject____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@objc_metatype main.AnyObject.Type> of Swift._ContiguousArrayBuffer.init <A>(Swift._ContiguousArrayBuffer<A>.Type)(count : Swift.Int, minimumCapacity : Swift.Int) -> Swift._ContiguousArrayBuffer<A>
 _TTSg5XPMtP4main9AnyObject____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@thin main.AnyObject.Type> of Swift._ContiguousArrayBuffer.init <A>(Swift._ContiguousArrayBuffer<A>.Type)(count : Swift.Int, minimumCapacity : Swift.Int) -> Swift._ContiguousArrayBuffer<A>
 _TTSg5XMTBi32____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@thick Builtin.Int32.Type> of Swift._ContiguousArrayBuffer.init <A>(Swift._ContiguousArrayBuffer<A>.Type)(count : Swift.Int, minimumCapacity : Swift.Int) -> Swift._ContiguousArrayBuffer<A>
-_TTSg5XMoBi32____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@objc Builtin.Int32.Type> of Swift._ContiguousArrayBuffer.init <A>(Swift._ContiguousArrayBuffer<A>.Type)(count : Swift.Int, minimumCapacity : Swift.Int) -> Swift._ContiguousArrayBuffer<A>
+_TTSg5XMoBi32____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@objc_metatype Builtin.Int32.Type> of Swift._ContiguousArrayBuffer.init <A>(Swift._ContiguousArrayBuffer<A>.Type)(count : Swift.Int, minimumCapacity : Swift.Int) -> Swift._ContiguousArrayBuffer<A>
 _TTSg5XMtBi32____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@thin Builtin.Int32.Type> of Swift._ContiguousArrayBuffer.init <A>(Swift._ContiguousArrayBuffer<A>.Type)(count : Swift.Int, minimumCapacity : Swift.Int) -> Swift._ContiguousArrayBuffer<A>
 _TFIZvV8mangling10HasVarInit5stateSbiu_KT_Sb ---> static mangling.HasVarInit.(state : Swift.Bool).(variable initialization expression).(implicit closure #1)

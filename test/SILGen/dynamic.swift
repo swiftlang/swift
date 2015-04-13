@@ -232,7 +232,7 @@ class Subclass: Foo {
   dynamic override func overriddenByDynamic() {}
 }
 
-// CHECK-LABEL: sil hidden @_TF7dynamic20nativeMethodDispatchFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic20nativeMethodDispatchFT_T_ : $@convention(thin) () -> ()
 func nativeMethodDispatch() {
   // CHECK: function_ref @_TFC7dynamic3FooCfMS0_FT6nativeSi_S0_
   let c = Foo(native: 0)
@@ -248,7 +248,7 @@ func nativeMethodDispatch() {
   c[native: 0] = y
 }
 
-// CHECK-LABEL: sil hidden @_TF7dynamic18objcMethodDispatchFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic18objcMethodDispatchFT_T_ : $@convention(thin) () -> ()
 func objcMethodDispatch() {
   // CHECK: function_ref @_TFC7dynamic3FooCfMS0_FT4objcSi_S0_
   let c = Foo(objc: 0)
@@ -264,7 +264,7 @@ func objcMethodDispatch() {
   c[objc: 0 as NSNumber] = y
 }
 
-// CHECK-LABEL: sil hidden @_TF7dynamic21dynamicMethodDispatchFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic21dynamicMethodDispatchFT_T_ : $@convention(thin) () -> ()
 func dynamicMethodDispatch() {
   // CHECK: function_ref @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
   let c = Foo(dynamic: 0)
@@ -338,7 +338,7 @@ func foreignExtensionDispatch(g: Gizmo) {
 }
 
 
-// CHECK-LABEL: sil hidden @_TF7dynamic33nativeMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic33nativeMethodDispatchFromOtherFileFT_T_ : $@convention(thin) () -> ()
 func nativeMethodDispatchFromOtherFile() {
   // CHECK: function_ref @_TFC7dynamic13FromOtherFileCfMS0_FT6nativeSi_S0_
   let c = FromOtherFile(native: 0)
@@ -354,7 +354,7 @@ func nativeMethodDispatchFromOtherFile() {
   c[native: 0] = y
 }
 
-// CHECK-LABEL: sil hidden @_TF7dynamic31objcMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic31objcMethodDispatchFromOtherFileFT_T_ : $@convention(thin) () -> ()
 func objcMethodDispatchFromOtherFile() {
   // CHECK: function_ref @_TFC7dynamic13FromOtherFileCfMS0_FT4objcSi_S0_
   let c = FromOtherFile(objc: 0)
@@ -370,7 +370,7 @@ func objcMethodDispatchFromOtherFile() {
   c[objc: 0] = y
 }
 
-// CHECK-LABEL: sil hidden @_TF7dynamic34dynamicMethodDispatchFromOtherFileFT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF7dynamic34dynamicMethodDispatchFromOtherFileFT_T_ : $@convention(thin) () -> ()
 func dynamicMethodDispatchFromOtherFile() {
   // CHECK: function_ref @_TFC7dynamic13FromOtherFileCfMS0_FT7dynamicSi_S0_
   let c = FromOtherFile(dynamic: 0)
@@ -420,14 +420,14 @@ public class Base {
 }
 
 public class Sub : Base {
-  // CHECK-LABEL: sil hidden @_TFC7dynamic3Subg1xSb : $@cc(method) @thin (@guaranteed Sub) -> Bool {
-  // CHECK: [[AUTOCLOSURE:%.*]] = function_ref @_TFFC7dynamic3Subg1xSbu_KT_Sb : $@thin (@owned Sub) -> Bool
+  // CHECK-LABEL: sil hidden @_TFC7dynamic3Subg1xSb : $@convention(method) (@guaranteed Sub) -> Bool {
+  // CHECK: [[AUTOCLOSURE:%.*]] = function_ref @_TFFC7dynamic3Subg1xSbu_KT_Sb : $@convention(thin) (@owned Sub) -> Bool
   // CHECK: = partial_apply [[AUTOCLOSURE]](%0)
   // CHECK: return {{%.*}} : $Bool
   // CHECK: }
 
-  // CHECK-LABEL: sil shared [transparent] @_TFFC7dynamic3Subg1xSbu_KT_Sb : $@thin (@owned Sub) -> Bool {
-  // CHECK: [[SUPER:%.*]] = super_method [volatile] %0 : $Sub, #Base.x!getter.1.foreign : Base -> () -> Bool , $@cc(objc_method) @thin (Base) -> ObjCBool
+  // CHECK-LABEL: sil shared [transparent] @_TFFC7dynamic3Subg1xSbu_KT_Sb : $@convention(thin) (@owned Sub) -> Bool {
+  // CHECK: [[SUPER:%.*]] = super_method [volatile] %0 : $Sub, #Base.x!getter.1.foreign : Base -> () -> Bool , $@convention(objc_method) (Base) -> ObjCBool
   // CHECK: = apply [[SUPER]]({{%.*}})
   // CHECK: return {{%.*}} : $Bool
   // CHECK: }

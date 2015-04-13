@@ -5,14 +5,14 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@thin (@in Int, @inout _Stdout) -> ()
+// CHECK-LABEL: sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
 // CHECK: unconditional_checked_cast_addr
 // CHECK: inject_enum_addr
 // CHECK-NOT: select_enum_addr
 // CHECK-NOT: bb1
 // CHECK: unchecked_take_enum_data_addr
 // CHECK: return
-sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@thin (@in Int, @inout _Stdout) -> () {
+sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> () {
 bb0(%0 : $*Int, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
@@ -43,14 +43,14 @@ bb2:
 // Check that a checked_cast_addr_br converting a known type into a protocol type
 // is performed at the compile-time if protocol conformances are statically known.
 //
-// CHECK-LABEL: sil @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@thin (@in Int, @inout _Stdout) -> ()
+// CHECK-LABEL: sil @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
 // CHECK: store
 // CHECK-NOT: checked_cast_addr_br
 // CHECK-NOT: bb1
 // CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
 // CHECK: dealloc_stack
 // CHECK: return
-sil @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@thin (@in Int, @inout _Stdout) -> () {
+sil @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> () {
 bb0(%0 : $*Int, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
@@ -99,14 +99,14 @@ private class D : C {
 // a whole module optimization is used), because an extension implementing a conformance
 // could be defined elsewhere.
 //
-// CHECK-LABEL: sil @convert_checked_cast_addr_br_with_internal_type : $@thin (@in A, @inout _Stdout) -> ()
+// CHECK-LABEL: sil @convert_checked_cast_addr_br_with_internal_type : $@convention(thin) (@in A, @inout _Stdout) -> ()
 // CHECK: checked_cast_addr_br
 // CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
 // CHECK: dealloc_stack
 // CHECK: return
 // CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
 // CHECK: }
-sil @convert_checked_cast_addr_br_with_internal_type : $@thin (@in A, @inout _Stdout) -> () {
+sil @convert_checked_cast_addr_br_with_internal_type : $@convention(thin) (@in A, @inout _Stdout) -> () {
 bb0(%0 : $*A, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
@@ -139,14 +139,14 @@ bb22:
 // In a negative case, if the source type is private, it is safe to fold the check,
 // because a conformance for this type cannot be defined elsewhere.
 //
-// CHECK-LABEL: sil @convert_checked_cast_addr_br_with_private_type : $@thin (@in B, @inout _Stdout) -> ()
+// CHECK-LABEL: sil @convert_checked_cast_addr_br_with_private_type : $@convention(thin) (@in B, @inout _Stdout) -> ()
 // CHECK: store
 // CHECK-NOT: checked_cast_addr_br
 // CHECK-NOT: bb1
 // CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
 // CHECK: dealloc_stack
 // CHECK: return
-sil @convert_checked_cast_addr_br_with_private_type : $@thin (@in B, @inout _Stdout) -> () {
+sil @convert_checked_cast_addr_br_with_private_type : $@convention(thin) (@in B, @inout _Stdout) -> () {
 bb0(%0 : $*B, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>
@@ -179,14 +179,14 @@ bb22:
 // In a negative case, take care that cast for private types are not folded if one
 // of its superclasses could have a conformance extension defined elsewere.
 //
-// CHECK-LABEL: sil @convert_checked_cast_addr_br_with_non_private_superclass : $@thin (@in D, @inout _Stdout) -> ()
+// CHECK-LABEL: sil @convert_checked_cast_addr_br_with_non_private_superclass : $@convention(thin) (@in D, @inout _Stdout) -> ()
 // CHECK: checked_cast_addr_br
 // CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
 // CHECK: dealloc_stack
 // CHECK: return
 // CHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.None!enumelt
 // CHECK: }
-sil @convert_checked_cast_addr_br_with_non_private_superclass : $@thin (@in D, @inout _Stdout) -> () {
+sil @convert_checked_cast_addr_br_with_non_private_superclass : $@convention(thin) (@in D, @inout _Stdout) -> () {
 bb0(%0 : $*D, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
   %3 = alloc_stack $Optional<CustomStringConvertible>

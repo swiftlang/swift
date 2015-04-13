@@ -242,7 +242,7 @@ static void _buildNameForMetadata(const Metadata *type,
     if (level >= TypeSyntaxLevel::TypeSimple)
       result += "(";
 
-    result += "@objc_block ";
+    result += "@convention(block) ";
 
     auto func = static_cast<const FunctionTypeMetadata *>(type);
     _buildFunctionTypeName(func, result);
@@ -255,7 +255,7 @@ static void _buildNameForMetadata(const Metadata *type,
     if (level >= TypeSyntaxLevel::TypeSimple)
       result += "(";
 
-    result += "@thin ";
+    result += "@convention(thin) ";
 
     auto func = static_cast<const FunctionTypeMetadata *>(type);
     _buildFunctionTypeName(func, result);

@@ -5,32 +5,32 @@ import Swift
 
 // For now we do not remove dead functions so update this when that functionality is added.
 
-// CHECK-NOT: sil @takes_Int_inout : $@thin (@inout Int64) -> ()
-sil @takes_Int_inout : $@thin (@inout Int64) -> ()
+// CHECK-NOT: sil @takes_Int_inout : $@convention(thin) (@inout Int64) -> ()
+sil @takes_Int_inout : $@convention(thin) (@inout Int64) -> ()
 
-// CHECK-NOT: sil @makesInt : $@thin () -> Int64
-sil @makesInt : $@thin () -> Int64
+// CHECK-NOT: sil @makesInt : $@convention(thin) () -> Int64
+sil @makesInt : $@convention(thin) () -> Int64
 
-// CHECK-LABEL: sil @use_before_init : $@thin () -> Int64 {
+// CHECK-LABEL: sil @use_before_init : $@convention(thin) () -> Int64 {
 // CHECK: bb0:
 // CHECK: return
 // CHECK: }
-sil @use_before_init : $@thin () -> Int64 {
+sil @use_before_init : $@convention(thin) () -> Int64 {
 bb0:
   %1 = alloc_box $Int64
   %2 = load %1#1 : $*Int64
   %3 = function_ref @inout_uninit : $@thin() -> ()
-  apply %3() : $@thin () -> ()
+  apply %3() : $@convention(thin) () -> ()
   strong_release %1#0 : $Builtin.NativeObject
   %4 = return %2 : $Int64
 }
 
-// CHECK-NOT: sil @inout_uninit : $@thin () -> () {
-sil @inout_uninit : $@thin () -> () {
+// CHECK-NOT: sil @inout_uninit : $@convention(thin) () -> () {
+sil @inout_uninit : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_box $Int64
-  %5 = function_ref @takes_Int_inout : $@thin (@inout Int64) -> ()
-  %6 = apply %5(%1#1) : $@thin (@inout Int64) -> ()
+  %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int64) -> ()
+  %6 = apply %5(%1#1) : $@convention(thin) (@inout Int64) -> ()
 
   %0 = tuple ()
   strong_release %1#0 : $Builtin.NativeObject

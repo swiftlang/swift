@@ -14,7 +14,7 @@ struct Foo<T, U> {
 // CHECK:         bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
 // CHECK:         [[F_ORIG:%.*]] = struct_extract [[X_ORIG]] : $Foo<Int, Int>, #Foo.f
 // CHECK:         strong_retain [[F_ORIG]]
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_iV20property_abstraction3Int_iS0__XFo_dS0__dS0__ : $@thin (Int, @owned @callee_owned (@out Int, @in Int) -> ()) -> Int
+// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_iV20property_abstraction3Int_iS0__XFo_dS0__dS0__ : $@convention(thin) (Int, @owned @callee_owned (@out Int, @in Int) -> ()) -> Int
 // CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
 // CHECK:         return [[F_SUBST]]
 func getF(x: Foo<Int, Int>) -> Int -> Int {
@@ -23,7 +23,7 @@ func getF(x: Foo<Int, Int>) -> Int -> Int {
 
 // CHECK-LABEL: sil hidden @_TF20property_abstraction4setF
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_dV20property_abstraction3Int_dS0__XFo_iS0__iS0__ : $@thin (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
+// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_dV20property_abstraction3Int_dS0__XFo_iS0__iS0__ : $@convention(thin) (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]({{%.*}})
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
 func setF(inout x: Foo<Int, Int>, f: Int -> Int) {
@@ -37,12 +37,12 @@ func inOutFunc(inout f: (Int -> Int)) { }
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         [[F_SUBST_MAT:%.*]] = alloc_stack
 // CHECK:         [[F_ORIG:%.*]] = load [[F_ADDR]]
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_iV20property_abstraction3Int_iS0__XFo_dS0__dS0__ : $@thin (Int, @owned @callee_owned (@out Int, @in Int) -> ()) -> Int
+// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_iV20property_abstraction3Int_iS0__XFo_dS0__dS0__ : $@convention(thin) (Int, @owned @callee_owned (@out Int, @in Int) -> ()) -> Int
 // CHECK:         [[F_SUBST_IN:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
 // CHECK:         store [[F_SUBST_IN]] to [[F_SUBST_MAT]]
 // CHECK:         apply [[INOUTFUNC]]([[F_SUBST_MAT]]#1)
 // CHECK:         [[F_SUBST_OUT:%.*]] = load [[F_SUBST_MAT]]
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_dV20property_abstraction3Int_dS0__XFo_iS0__iS0__ : $@thin (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
+// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_dV20property_abstraction3Int_dS0__XFo_iS0__iS0__ : $@convention(thin) (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_SUBST_OUT]])
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
 func inOutF(var x: Foo<Int, Int>) {

@@ -8,8 +8,8 @@ enum HomeworkError : _ErrorType {
   case CatAteIt(Cat)
 }
 
-// CHECK: sil hidden @_TF10exceptions10make_a_catFzT_CS_3Cat : $@thin () -> (@owned Cat, @error _ErrorType) {
-// CHECK:      [[T0:%.*]] = function_ref @_TFC10exceptions3CatCfMS0_FT_S0_ : $@thin (@thick Cat.Type) -> @owned Cat
+// CHECK: sil hidden @_TF10exceptions10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error _ErrorType) {
+// CHECK:      [[T0:%.*]] = function_ref @_TFC10exceptions3CatCfMS0_FT_S0_ : $@convention(thin) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type 
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: return [[T2]] : $Cat
@@ -17,9 +17,9 @@ func make_a_cat() throws -> Cat {
   return Cat()
 }
 
-// CHECK: sil hidden @_TF10exceptions15dont_make_a_catFzT_CS_3Cat : $@thin () -> (@owned Cat, @error _ErrorType) {
+// CHECK: sil hidden @_TF10exceptions15dont_make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error _ErrorType) {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $_ErrorType, $HomeworkError
-// CHECK:      [[T0:%.*]] = function_ref @_TFO10exceptions13HomeworkError7TooHardFMS0_S0_ : $@thin (@thin HomeworkError.Type) -> @owned HomeworkError
+// CHECK:      [[T0:%.*]] = function_ref @_TFO10exceptions13HomeworkError7TooHardFMS0_S0_ : $@convention(thin) (@thin HomeworkError.Type) -> @owned HomeworkError
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: store [[T2]] to [[BOX]]#1
@@ -28,9 +28,9 @@ func dont_make_a_cat() throws -> Cat {
   throw HomeworkError.TooHard
 }
 
-// CHECK: sil hidden @_TF10exceptions11dont_returnU__FzQ_Q_ : $@thin <T> (@out T, @in T) -> @error _ErrorType {
+// CHECK: sil hidden @_TF10exceptions11dont_returnU__FzQ_Q_ : $@convention(thin) <T> (@out T, @in T) -> @error _ErrorType {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $_ErrorType, $HomeworkError
-// CHECK:      [[T0:%.*]] = function_ref @_TFO10exceptions13HomeworkError7TooMuchFMS0_S0_ : $@thin (@thin HomeworkError.Type) -> @owned HomeworkError
+// CHECK:      [[T0:%.*]] = function_ref @_TFO10exceptions13HomeworkError7TooMuchFMS0_S0_ : $@convention(thin) (@thin HomeworkError.Type) -> @owned HomeworkError
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: store [[T2]] to [[BOX]]#1
@@ -40,7 +40,7 @@ func dont_return<T>(argument: T) throws -> T {
   throw HomeworkError.TooMuch
 }
 
-// CHECK:    sil hidden @_TF10exceptions16all_together_nowFSbCS_3Cat : $@thin (Bool) -> @owned Cat {
+// CHECK:    sil hidden @_TF10exceptions16all_together_nowFSbCS_3Cat : $@convention(thin) (Bool) -> @owned Cat {
 // CHECK:    bb0(%0 : $Bool):
 // CHECK:      [[DR_FN:%.*]] = function_ref @_TF10exceptions11dont_returnU__FzQ_Q_ :
 
@@ -49,15 +49,15 @@ func dont_return<T>(argument: T) throws -> T {
 
 //   In the true case, call make_a_cat().
 // CHECK:    [[FLAG_TRUE]]:
-// CHECK:      [[MAC_FN:%.*]] = function_ref @_TF10exceptions10make_a_catFzT_CS_3Cat : $@thin () -> (@owned Cat, @error _ErrorType)
-// CHECK-NEXT: try_apply [[MAC_FN]]() : $@thin () -> (@owned Cat, @error _ErrorType), normal [[MAC_NORMAL:bb[0-9]+]], error [[MAC_ERROR:bb[0-9]+]]
+// CHECK:      [[MAC_FN:%.*]] = function_ref @_TF10exceptions10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error _ErrorType)
+// CHECK-NEXT: try_apply [[MAC_FN]]() : $@convention(thin) () -> (@owned Cat, @error _ErrorType), normal [[MAC_NORMAL:bb[0-9]+]], error [[MAC_ERROR:bb[0-9]+]]
 // CHECK:    [[MAC_NORMAL]]([[T0:%.*]] : $Cat):
 // CHECK-NEXT: br [[TERNARY_CONT:bb[0-9]+]]([[T0]] : $Cat)
 
 //   In the false case, call dont_make_a_cat().
 // CHECK:    [[FLAG_FALSE]]:
-// CHECK:      [[DMAC_FN:%.*]] = function_ref @_TF10exceptions15dont_make_a_catFzT_CS_3Cat : $@thin () -> (@owned Cat, @error _ErrorType)
-// CHECK-NEXT: try_apply [[DMAC_FN]]() : $@thin () -> (@owned Cat, @error _ErrorType), normal [[DMAC_NORMAL:bb[0-9]+]], error [[DMAC_ERROR:bb[0-9]+]]
+// CHECK:      [[DMAC_FN:%.*]] = function_ref @_TF10exceptions15dont_make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error _ErrorType)
+// CHECK-NEXT: try_apply [[DMAC_FN]]() : $@convention(thin) () -> (@owned Cat, @error _ErrorType), normal [[DMAC_NORMAL:bb[0-9]+]], error [[DMAC_ERROR:bb[0-9]+]]
 // CHECK:    [[DMAC_NORMAL]]([[T0:%.*]] : $Cat):
 // CHECK-NEXT: br [[TERNARY_CONT]]([[T0]] : $Cat)
 
@@ -66,7 +66,7 @@ func dont_return<T>(argument: T) throws -> T {
 // CHECK-NEXT: [[ARG_TEMP:%.*]] = alloc_stack $Cat
 // CHECK-NEXT: store [[T0]] to [[ARG_TEMP]]#1
 // CHECK-NEXT: [[RET_TEMP:%.*]] = alloc_stack $Cat
-// CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]]#1, [[ARG_TEMP]]#1) : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error _ErrorType, normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
+// CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]]#1, [[ARG_TEMP]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error _ErrorType, normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
 // CHECK:    [[DR_NORMAL]]({{%.*}} : $()):
 // CHECK-NEXT: [[T0:%.*]] = load [[RET_TEMP]]#1 : $*Cat
 // CHECK-NEXT: dealloc_stack [[RET_TEMP]]#0
@@ -112,7 +112,7 @@ func dont_return<T>(argument: T) throws -> T {
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]#0
 // CHECK-NEXT: br [[CATCHALL:bb[0-9]+]]
 // CHECK:    [[CATCHALL]]:
-// CHECK:      [[T0:%.*]] = function_ref @_TFC10exceptions3CatCfMS0_FT_S0_ : $@thin (@thick Cat.Type) -> @owned Cat
+// CHECK:      [[T0:%.*]] = function_ref @_TFC10exceptions3CatCfMS0_FT_S0_ : $@convention(thin) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: strong_release [[ERROR]] : $_ErrorType

@@ -113,8 +113,7 @@ struct PrintOptions {
   /// Empty means allow all.
   std::vector<DeclAttrKind> ExclusiveAttrList;
 
-  /// Whether to print function representation attributes on function types:
-  /// '@thin' or '@objc_block'.
+  /// Whether to print function @convention attribute on function types.
   bool PrintFunctionRepresentationAttrs = true;
 
   /// Whether to print storage representation attributes on types, e.g.

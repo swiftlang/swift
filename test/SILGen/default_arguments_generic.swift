@@ -11,7 +11,7 @@ struct Zim<T: IntegerLiteralConvertible> {
                                                y: U = 0.5) { }
 }
 
-// CHECK-LABEL: sil hidden @_TF25default_arguments_generic3barFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF25default_arguments_generic3barFT_T_ : $@convention(thin) () -> () {
 func bar() {
   // CHECK: [[FOO_DFLT:%.*]] = function_ref @_TIF25default_arguments_generic3fooUSs25IntegerLiteralConvertible_USs33_BuiltinIntegerLiteralConvertible__FT1xQ__T_A_
   // CHECK: apply [[FOO_DFLT]]<Int, Int>

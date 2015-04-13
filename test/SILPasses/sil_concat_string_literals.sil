@@ -7,415 +7,415 @@ import Builtin
 import Swift
 
 
-//CHECK-LABEL: sil @_TF12StringConcat58testStringConcat_UnicodeScalarLiteral_UnicodeScalarLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat58testStringConcat_UnicodeScalarLiteral_UnicodeScalarLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "1"
 //CHECK-NOT: string_literal utf8 "2"
 //CHECK: string_literal utf8 "12"
 // StringConcat.testStringConcat_UnicodeScalarLiteral_UnicodeScalarLiteral () -> Swift.String
-sil @_TF12StringConcat58testStringConcat_UnicodeScalarLiteral_UnicodeScalarLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat58testStringConcat_UnicodeScalarLiteral_UnicodeScalarLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %15, %16
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %14
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
+  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "1"                    // user: %7
   %5 = integer_literal $Builtin.Word, 1           // user: %7
   %6 = integer_literal $Builtin.Int1, -1          // user: %7
-  %7 = apply %2(%4, %5, %6, %3) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %7 = apply %2(%4, %5, %6, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
+  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf8 "2"                   // user: %13
   %11 = integer_literal $Builtin.Word, 1          // user: %13
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
-  %13 = apply %8(%10, %11, %12, %9) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
-  %14 = apply %1(%7, %13) : $@thin (@owned String, @owned String) -> @owned String // users: %15, %17
+  %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
   store %14 to %0#1 : $*String                    // id: %15
   dealloc_stack %0#0 : $*@local_storage String    // id: %16
   return %14 : $String                            // id: %17
 }
 
-//CHECK-LABEL: sil @_TF12StringConcat68testStringConcat_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat68testStringConcat_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "1"
 //CHECK-NOT: string_literal utf16 "á"
 //CHECK: string_literal utf16 "1á"
 // StringConcat.testStringConcat_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteral () -> Swift.String
-sil @_TF12StringConcat68testStringConcat_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat68testStringConcat_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %15, %16
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %14
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
+  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "1"                    // user: %7
   %5 = integer_literal $Builtin.Word, 1           // user: %7
   %6 = integer_literal $Builtin.Int1, -1          // user: %7
-  %7 = apply %2(%4, %5, %6, %3) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %7 = apply %2(%4, %5, %6, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %8 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %13
+  %8 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %13
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf16 "á"                // user: %13
   %11 = integer_literal $Builtin.Word, 2          // user: %13
   %12 = integer_literal $Builtin.Int1, 0
-  %13 = apply %8(%10, %11, %9) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
-  %14 = apply %1(%7, %13) : $@thin (@owned String, @owned String) -> @owned String // users: %15, %17
+  %13 = apply %8(%10, %11, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
   store %14 to %0#1 : $*String                    // id: %15
   dealloc_stack %0#0 : $*@local_storage String    // id: %16
   return %14 : $String                            // id: %17
 }
 
 // Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-sil [readonly] [semantics "string.concat"] @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String
+sil [readonly] [semantics "string.concat"] @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String
 
 // Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-sil [readonly] [semantics "string.makeUTF8"] @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [readonly] [semantics "string.makeUTF8"] @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 // Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-sil [readonly] [semantics "string.makeUTF16"] @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+sil [readonly] [semantics "string.makeUTF16"] @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
 
-//CHECK-LABEL: sil @_TF12StringConcat51testStringConcat_UnicodeScalarLiteral_StringLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat51testStringConcat_UnicodeScalarLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "1"
 //CHECK-NOT: string_literal utf8 "xyz"
 //CHECK: string_literal utf8 "1xyz"
 // StringConcat.testStringConcat_UnicodeScalarLiteral_StringLiteral () -> Swift.String
-sil @_TF12StringConcat51testStringConcat_UnicodeScalarLiteral_StringLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat51testStringConcat_UnicodeScalarLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %15, %16
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %14
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
+  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "1"                    // user: %7
   %5 = integer_literal $Builtin.Word, 1           // user: %7
   %6 = integer_literal $Builtin.Int1, -1          // user: %7
-  %7 = apply %2(%4, %5, %6, %3) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %7 = apply %2(%4, %5, %6, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
+  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf8 "xyz"                 // user: %13
   %11 = integer_literal $Builtin.Word, 3          // user: %13
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
-  %13 = apply %8(%10, %11, %12, %9) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
-  %14 = apply %1(%7, %13) : $@thin (@owned String, @owned String) -> @owned String // users: %15, %17
+  %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
   store %14 to %0#1 : $*String                    // id: %15
   dealloc_stack %0#0 : $*@local_storage String    // id: %16
   return %14 : $String                            // id: %17
 }
 
-//CHECK-LABEL: sil @_TF12StringConcat68testStringConcat_ExtendedGraphemeClusterLiteral_UnicodeScalarLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat68testStringConcat_ExtendedGraphemeClusterLiteral_UnicodeScalarLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf16 "á"
 //CHECK-NOT: string_literal utf8 "z"
 //CHECK: string_literal utf16 "áz"
 // StringConcat.testStringConcat_ExtendedGraphemeClusterLiteral_UnicodeScalarLiteral () -> Swift.String
-sil @_TF12StringConcat68testStringConcat_ExtendedGraphemeClusterLiteral_UnicodeScalarLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat68testStringConcat_ExtendedGraphemeClusterLiteral_UnicodeScalarLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %15, %16
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %14
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %2 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %7
+  %2 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %7
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf16 "á"                 // user: %7
   %5 = integer_literal $Builtin.Word, 2           // user: %7
   %6 = integer_literal $Builtin.Int1, 0
-  %7 = apply %2(%4, %5, %3) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
+  %7 = apply %2(%4, %5, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
+  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf8 "z"                   // user: %13
   %11 = integer_literal $Builtin.Word, 1          // user: %13
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
-  %13 = apply %8(%10, %11, %12, %9) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
-  %14 = apply %1(%7, %13) : $@thin (@owned String, @owned String) -> @owned String // users: %15, %17
+  %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
   store %14 to %0#1 : $*String                    // id: %15
   dealloc_stack %0#0 : $*@local_storage String    // id: %16
   return %14 : $String                            // id: %17
 }
 
-//CHECK-LABEL: sil @_TF12StringConcat78testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat78testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf16 "á"
 //CHECK-NOT: string_literal utf16 "ê"
 //CHECK: string_literal utf16 "áê"
 // StringConcat.testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteral () -> Swift.String
-sil @_TF12StringConcat78testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat78testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %15, %16
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %14
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %2 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %7
+  %2 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %7
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf16 "á"                 // user: %7
   %5 = integer_literal $Builtin.Word, 2           // user: %7
   %6 = integer_literal $Builtin.Int1, 0
-  %7 = apply %2(%4, %5, %3) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
+  %7 = apply %2(%4, %5, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %8 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %13
+  %8 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %13
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf16 "ê"                // user: %13
   %11 = integer_literal $Builtin.Word, 2          // user: %13
   %12 = integer_literal $Builtin.Int1, 0
-  %13 = apply %8(%10, %11, %9) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
-  %14 = apply %1(%7, %13) : $@thin (@owned String, @owned String) -> @owned String // users: %15, %17
+  %13 = apply %8(%10, %11, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
   store %14 to %0#1 : $*String                    // id: %15
   dealloc_stack %0#0 : $*@local_storage String    // id: %16
   return %14 : $String                            // id: %17
 }
 
-//CHECK-LABEL: sil @_TF12StringConcat61testStringConcat_ExtendedGraphemeClusterLiteral_StringLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat61testStringConcat_ExtendedGraphemeClusterLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf16 "á"
 //CHECK-NOT: string_literal utf8 "xyz"
 //CHECK: string_literal utf16 "áxyz"
 // StringConcat.testStringConcat_ExtendedGraphemeClusterLiteral_StringLiteral () -> Swift.String
-sil @_TF12StringConcat61testStringConcat_ExtendedGraphemeClusterLiteral_StringLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat61testStringConcat_ExtendedGraphemeClusterLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %15, %16
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %14
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %2 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %7
+  %2 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %7
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf16 "á"                 // user: %7
   %5 = integer_literal $Builtin.Word, 2           // user: %7
   %6 = integer_literal $Builtin.Int1, 0
-  %7 = apply %2(%4, %5, %3) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
+  %7 = apply %2(%4, %5, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
+  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf8 "xyz"                 // user: %13
   %11 = integer_literal $Builtin.Word, 3          // user: %13
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
-  %13 = apply %8(%10, %11, %12, %9) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
-  %14 = apply %1(%7, %13) : $@thin (@owned String, @owned String) -> @owned String // users: %15, %17
+  %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
   store %14 to %0#1 : $*String                    // id: %15
   dealloc_stack %0#0 : $*@local_storage String    // id: %16
   return %14 : $String                            // id: %17
 }
 
-//CHECK-LABEL: sil @_TF12StringConcat51testStringConcat_StringLiteral_UnicodeScalarLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat51testStringConcat_StringLiteral_UnicodeScalarLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "xyz"
 //CHECK-NOT: string_literal utf8 "1"
 //CHECK: string_literal utf8 "xyz1"
 // StringConcat.testStringConcat_StringLiteral_UnicodeScalarLiteral () -> Swift.String
-sil @_TF12StringConcat51testStringConcat_StringLiteral_UnicodeScalarLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat51testStringConcat_StringLiteral_UnicodeScalarLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %15, %16
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %14
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
+  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "xyz"                  // user: %7
   %5 = integer_literal $Builtin.Word, 3           // user: %7
   %6 = integer_literal $Builtin.Int1, -1          // user: %7
-  %7 = apply %2(%4, %5, %6, %3) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %7 = apply %2(%4, %5, %6, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
+  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf8 "1"                   // user: %13
   %11 = integer_literal $Builtin.Word, 1          // user: %13
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
-  %13 = apply %8(%10, %11, %12, %9) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
-  %14 = apply %1(%7, %13) : $@thin (@owned String, @owned String) -> @owned String // users: %15, %17
+  %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
   store %14 to %0#1 : $*String                    // id: %15
   dealloc_stack %0#0 : $*@local_storage String    // id: %16
   return %14 : $String                            // id: %17
 }
 
-//CHECK-LABEL: sil @_TF12StringConcat61testStringConcat_StringLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat61testStringConcat_StringLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "xyz"
 //CHECK-NOT: string_literal utf16 "á"
 //CHECK: string_literal utf16 "xyzá"
 // StringConcat.testStringConcat_StringLiteral_ExtendedGraphemeClusterLiteral () -> Swift.String
-sil @_TF12StringConcat61testStringConcat_StringLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat61testStringConcat_StringLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %15, %16
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %14
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
+  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "xyz"                  // user: %7
   %5 = integer_literal $Builtin.Word, 3           // user: %7
   %6 = integer_literal $Builtin.Int1, -1          // user: %7
-  %7 = apply %2(%4, %5, %6, %3) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %7 = apply %2(%4, %5, %6, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %8 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %13
+  %8 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %13
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf16 "á"                // user: %13
   %11 = integer_literal $Builtin.Word, 2          // user: %13
   %12 = integer_literal $Builtin.Int1, 0
-  %13 = apply %8(%10, %11, %9) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
-  %14 = apply %1(%7, %13) : $@thin (@owned String, @owned String) -> @owned String // users: %15, %17
+  %13 = apply %8(%10, %11, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
   store %14 to %0#1 : $*String                    // id: %15
   dealloc_stack %0#0 : $*@local_storage String    // id: %16
   return %14 : $String                            // id: %17
 }
 
-//CHECK-LABEL: sil @_TF12StringConcat44testStringConcat_StringLiteral_StringLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat44testStringConcat_StringLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "xyz"
 //CHECK-NOT: string_literal utf8 "abc"
 //CHECK: string_literal utf8 "xyzabc"
 // StringConcat.testStringConcat_StringLiteral_StringLiteral () -> Swift.String
-sil @_TF12StringConcat44testStringConcat_StringLiteral_StringLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat44testStringConcat_StringLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %15, %16
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %14
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
+  %2 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "xyz"                  // user: %7
   %5 = integer_literal $Builtin.Word, 3           // user: %7
   %6 = integer_literal $Builtin.Int1, -1          // user: %7
-  %7 = apply %2(%4, %5, %6, %3) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %7 = apply %2(%4, %5, %6, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
+  %8 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %13
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf8 "abc"                 // user: %13
   %11 = integer_literal $Builtin.Word, 3          // user: %13
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
-  %13 = apply %8(%10, %11, %12, %9) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
-  %14 = apply %1(%7, %13) : $@thin (@owned String, @owned String) -> @owned String // users: %15, %17
+  %13 = apply %8(%10, %11, %12, %9) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %1(%7, %13) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %15, %17
   store %14 to %0#1 : $*String                    // id: %15
   dealloc_stack %0#0 : $*@local_storage String    // id: %16
   return %14 : $String                            // id: %17
 }
 
-//CHECK-LABEL: sil @_TF12StringConcat72testStringConcat_StringLiteral_StringLiteral_StringLiteral_StringLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat72testStringConcat_StringLiteral_StringLiteral_StringLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "ab"
 //CHECK-NOT: string_literal utf8 "cd"
 //CHECK-NOT: string_literal utf8 "ef"
 //CHECK-NOT: string_literal utf8 "gh"
 //CHECK: string_literal utf8 "abcdefgh"
 // StringConcat.testStringConcat_StringLiteral_StringLiteral_StringLiteral_StringLiteral () -> Swift.String
-sil @_TF12StringConcat72testStringConcat_StringLiteral_StringLiteral_StringLiteral_StringLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat72testStringConcat_StringLiteral_StringLiteral_StringLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %31, %32
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %30
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %30
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %2 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %23
+  %2 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %23
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %3 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %16
+  %3 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %16
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %4 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %9
+  %4 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %9
   %5 = metatype $@thin String.Type                // user: %9
   %6 = string_literal utf8 "ab"                   // user: %9
   %7 = integer_literal $Builtin.Word, 2           // user: %9
   %8 = integer_literal $Builtin.Int1, -1          // user: %9
-  %9 = apply %4(%6, %7, %8, %5) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %9 = apply %4(%6, %7, %8, %5) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %10 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %15
+  %10 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %15
   %11 = metatype $@thin String.Type               // user: %15
   %12 = string_literal utf8 "cd"                  // user: %15
   %13 = integer_literal $Builtin.Word, 2          // user: %15
   %14 = integer_literal $Builtin.Int1, -1         // user: %15
-  %15 = apply %10(%12, %13, %14, %11) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
-  %16 = apply %3(%9, %15) : $@thin (@owned String, @owned String) -> @owned String // user: %23
+  %15 = apply %10(%12, %13, %14, %11) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %16 = apply %3(%9, %15) : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %23
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %17 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %22
+  %17 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %22
   %18 = metatype $@thin String.Type               // user: %22
   %19 = string_literal utf8 "ef"                  // user: %22
   %20 = integer_literal $Builtin.Word, 2          // user: %22
   %21 = integer_literal $Builtin.Int1, -1         // user: %22
-  %22 = apply %17(%19, %20, %21, %18) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %23
-  %23 = apply %2(%16, %22) : $@thin (@owned String, @owned String) -> @owned String // user: %30
+  %22 = apply %17(%19, %20, %21, %18) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %23
+  %23 = apply %2(%16, %22) : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %30
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %24 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %29
+  %24 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %29
   %25 = metatype $@thin String.Type               // user: %29
   %26 = string_literal utf8 "gh"                  // user: %29
   %27 = integer_literal $Builtin.Word, 2          // user: %29
   %28 = integer_literal $Builtin.Int1, -1         // user: %29
-  %29 = apply %24(%26, %27, %28, %25) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %30
-  %30 = apply %1(%23, %29) : $@thin (@owned String, @owned String) -> @owned String // users: %31, %33
+  %29 = apply %24(%26, %27, %28, %25) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %30
+  %30 = apply %1(%23, %29) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %31, %33
   store %30 to %0#1 : $*String                    // id: %31
   dealloc_stack %0#0 : $*@local_storage String    // id: %32
   return %30 : $String                            // id: %33
 }
 
-//CHECK-LABEL: sil @_TF12StringConcat82testStringConcat_StringLiteral_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat82testStringConcat_StringLiteral_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "ab"
 //CHECK-NOT: string_literal utf8 "c"
 //CHECK-NOT: string_literal utf16 "á"
 //CHECK: string_literal utf16 "abcá"
 // StringConcat.testStringConcat_StringLiteral_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteral () -> Swift.String
-sil @_TF12StringConcat82testStringConcat_StringLiteral_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat82testStringConcat_StringLiteral_UnicodeScalarLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %23, %24
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %22
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %22
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %2 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %15
+  %2 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %15
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %3 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %8
+  %3 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %8
   %4 = metatype $@thin String.Type                // user: %8
   %5 = string_literal utf8 "ab"                   // user: %8
   %6 = integer_literal $Builtin.Word, 2           // user: %8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
-  %8 = apply %3(%5, %6, %7, %4) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %15
+  %8 = apply %3(%5, %6, %7, %4) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %15
   // function_ref Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-  %9 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %9 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   %10 = metatype $@thin String.Type               // user: %14
   %11 = string_literal utf8 "c"                   // user: %14
   %12 = integer_literal $Builtin.Word, 1          // user: %14
   %13 = integer_literal $Builtin.Int1, -1         // user: %14
-  %14 = apply %9(%11, %12, %13, %10) : $@thin (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %15
-  %15 = apply %2(%8, %14) : $@thin (@owned String, @owned String) -> @owned String // user: %22
+  %14 = apply %9(%11, %12, %13, %10) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %15
+  %15 = apply %2(%8, %14) : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %22
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %16 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %21
+  %16 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %21
   %17 = metatype $@thin String.Type               // user: %21
   %18 = string_literal utf16 "á"                // user: %21
   %19 = integer_literal $Builtin.Word, 2          // user: %21
   %20 = integer_literal $Builtin.Int1, 0
-  %21 = apply %16(%18, %19, %17) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %22
-  %22 = apply %1(%15, %21) : $@thin (@owned String, @owned String) -> @owned String // users: %23, %25
+  %21 = apply %16(%18, %19, %17) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %22
+  %22 = apply %1(%15, %21) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %23, %25
   store %22 to %0#1 : $*String                    // id: %23
   dealloc_stack %0#0 : $*@local_storage String    // id: %24
   return %22 : $String                            // id: %25
 }
 
 
-//CHECK-LABEL: sil @_TF12StringConcat109testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String
+//CHECK-LABEL: sil @_TF12StringConcat109testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf16 "aaaá"
 //CHECK-NOT: string_literal utf16 "bbbb́"
 //CHECK-NOT: string_literal utf16 "cccć"
 //CHECK: string_literal utf16 "aaaábbbb́cccć"
 // StringConcat.testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteral () -> Swift.String
-sil @_TF12StringConcat109testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@thin () -> @owned String {
+sil @_TF12StringConcat109testStringConcat_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteral_ExtendedGraphemeClusterLiteralFT_SS : $@convention(thin) () -> @owned String {
 bb0:
   %0 = alloc_stack $String  // var s              // users: %23, %24
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %22
+  %1 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %22
   // function_ref Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-  %2 = function_ref @_TFSsoi1pFTSSSS_SS : $@thin (@owned String, @owned String) -> @owned String // user: %15
+  %2 = function_ref @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %15
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %3 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %8
+  %3 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %8
   %4 = metatype $@thin String.Type                // user: %8
   %5 = string_literal utf16 "aaaá"              // user: %8
   %6 = integer_literal $Builtin.Word, 5           // user: %8
   %7 = integer_literal $Builtin.Int1, 0
-  %8 = apply %3(%5, %6, %4) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %15
+  %8 = apply %3(%5, %6, %4) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %15
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %9 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
+  %9 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
   %10 = metatype $@thin String.Type               // user: %14
   %11 = string_literal utf16 "bbbb́"             // user: %14
   %12 = integer_literal $Builtin.Word, 5          // user: %14
   %13 = integer_literal $Builtin.Int1, 0
-  %14 = apply %9(%11, %12, %10) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %15
-  %15 = apply %2(%8, %14) : $@thin (@owned String, @owned String) -> @owned String // user: %22
+  %14 = apply %9(%11, %12, %10) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %15
+  %15 = apply %2(%8, %14) : $@convention(thin) (@owned String, @owned String) -> @owned String // user: %22
   // function_ref Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-  %16 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %21
+  %16 = function_ref @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %21
   %17 = metatype $@thin String.Type               // user: %21
   %18 = string_literal utf16 "cccć"             // user: %21
   %19 = integer_literal $Builtin.Word, 5          // user: %21
   %20 = integer_literal $Builtin.Int1, 0
-  %21 = apply %16(%18, %19, %17) : $@thin (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %22
-  %22 = apply %1(%15, %21) : $@thin (@owned String, @owned String) -> @owned String // users: %23, %25
+  %21 = apply %16(%18, %19, %17) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %22
+  %22 = apply %1(%15, %21) : $@convention(thin) (@owned String, @owned String) -> @owned String // users: %23, %25
   store %22 to %0#1 : $*String                    // id: %23
   dealloc_stack %0#0 : $*@local_storage String    // id: %24
   return %22 : $String                            // id: %25

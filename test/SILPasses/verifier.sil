@@ -7,7 +7,7 @@
 import Builtin
 
 // Don't fail in the verifier on an shared unreachable exit block of two loops.
-sil @dont_fail: $@thin (Builtin.Int1) -> () {
+sil @dont_fail: $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   %2 = integer_literal $Builtin.Int1, -1
   cond_br %0, bb1, bb5
@@ -41,7 +41,7 @@ bb4:
 }
 
 
-sil @dont_fail2: $@thin (Builtin.Int1) -> () {
+sil @dont_fail2: $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   %2 = integer_literal $Builtin.Int1, -1
   cond_br %0, bb1, bb5

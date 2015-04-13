@@ -12,7 +12,7 @@ class SwiftClass {
       @objc func objcmethod() -> () {}
       func swiftmethod() -> () {}
       // Block attribute
-      func f(someBlock: @objc_block (Int) -> Int) {
+      func f(someBlock: @convention(block) (Int) -> Int) {
       }
 }
 

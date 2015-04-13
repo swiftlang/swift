@@ -42,7 +42,7 @@ import gizmo
 // CHECK-NEXT:    %2 = load i8*, i8** %1, align 8
 // CHECK-NEXT:    ret i8* %2
 // CHECK-NEXT:  }
-sil @project_block_storage : $@thin (@inout @block_storage Builtin.RawPointer) -> Builtin.RawPointer {
+sil @project_block_storage : $@convention(thin) (@inout @block_storage Builtin.RawPointer) -> Builtin.RawPointer {
 entry(%0 : $*@block_storage Builtin.RawPointer):
   %c = project_block_storage %0 : $*@block_storage Builtin.RawPointer
   %p = load %c : $*Builtin.RawPointer
@@ -55,7 +55,7 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
 // CHECK-NEXT:    %2 = load fp128, fp128* %1, align 16
 // CHECK-NEXT:    ret fp128 %2
 // CHECK-NEXT:  }
-sil @overaligned_project_block_storage : $@thin (@inout @block_storage Builtin.FPIEEE128) -> Builtin.FPIEEE128 {
+sil @overaligned_project_block_storage : $@convention(thin) (@inout @block_storage Builtin.FPIEEE128) -> Builtin.FPIEEE128 {
 entry(%0 : $*@block_storage Builtin.FPIEEE128):
   %c = project_block_storage %0 : $*@block_storage Builtin.FPIEEE128
   %p = load %c : $*Builtin.FPIEEE128
@@ -74,34 +74,34 @@ entry(%0 : $*@block_storage Builtin.FPIEEE128):
 // CHECK:         }, %objc_block* %1
 // CHECK:         %2 = bitcast {{.*}} %0 to %objc_block*
 // CHECK:         ret %objc_block* %2
-sil @init_block_header_trivial : $@thin (@inout @block_storage Builtin.RawPointer) -> @cc(cdecl) @objc_block () -> () {
+sil @init_block_header_trivial : $@convention(thin) (@inout @block_storage Builtin.RawPointer) -> @convention(block) () -> () {
 entry(%0 : $*@block_storage Builtin.RawPointer):
-  %i = function_ref @invoke_trivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> ()
-  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> (), type $@cc(cdecl) @objc_block () -> ()
-  return %b : $@cc(cdecl) @objc_block () -> ()
+  %i = function_ref @invoke_trivial : $@convention(c) (@inout @block_storage Builtin.RawPointer) -> ()
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@convention(c) (@inout @block_storage Builtin.RawPointer) -> (), type $@convention(block) () -> ()
+  return %b : $@convention(block) () -> ()
 }
 
 // CHECK-LABEL: define void @invoke_trivial(void (...)*) {
 // CHECK:         %1 = bitcast void (...)* %0 to { %objc_block, i8* }*
 // CHECK:         %2 = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %1, i32 0, i32 1
-sil @invoke_trivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> () {
+sil @invoke_trivial : $@convention(c) (@inout @block_storage Builtin.RawPointer) -> () {
 entry(%0 : $*@block_storage Builtin.RawPointer):
   %c = project_block_storage %0 : $*@block_storage Builtin.RawPointer
   return undef : $()
 }
 
-sil @init_block_header_trivial_block_param : $@thin (@inout @block_storage Builtin.RawPointer) -> @cc(cdecl) @objc_block (@objc_block @cc(cdecl) (Int) -> Int) -> () {
+sil @init_block_header_trivial_block_param : $@convention(thin) (@inout @block_storage Builtin.RawPointer) -> @convention(block) (@convention(block) (Int) -> Int) -> () {
 entry(%0 : $*@block_storage Builtin.RawPointer):
-  %i = function_ref @invoke_trivial_block_param : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer, @objc_block @cc(cdecl) (Int) -> Int) -> ()
-  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer, @objc_block @cc(cdecl) (Int) -> Int) -> (), type $@cc(cdecl) @objc_block (@objc_block @cc(cdecl) (Int) -> Int) -> ()
-  return %b : $@cc(cdecl) @objc_block (@objc_block @cc(cdecl) (Int) -> Int) -> ()
+  %i = function_ref @invoke_trivial_block_param : $@convention(c) (@inout @block_storage Builtin.RawPointer, @convention(block) (Int) -> Int) -> ()
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@convention(c) (@inout @block_storage Builtin.RawPointer, @convention(block) (Int) -> Int) -> (), type $@convention(block) (@convention(block) (Int) -> Int) -> ()
+  return %b : $@convention(block) (@convention(block) (Int) -> Int) -> ()
 }
 
-sil @invoke_trivial_block_param : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer, @objc_block @cc(cdecl) (Int) -> Int) -> ()
+sil @invoke_trivial_block_param : $@convention(c) (@inout @block_storage Builtin.RawPointer, @convention(block) (Int) -> Int) -> ()
 
 // CHECK-LABEL: define i64 @invoke_trivial_with_arg(void (...)*, i64) {
 // CHECK:         ret i64 %1
-sil @invoke_trivial_with_arg : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer, Int) -> Int {
+sil @invoke_trivial_with_arg : $@convention(c) (@inout @block_storage Builtin.RawPointer, Int) -> Int {
 entry(%0 : $*@block_storage Builtin.RawPointer, %1 : $Int):
   return %1 : $Int
 }
@@ -115,11 +115,11 @@ entry(%0 : $*@block_storage Builtin.RawPointer, %1 : $Int):
 // CHECK:           i8* {{.*}} @invoke_nontrivial
 // CHECK:           i8* bitcast {{.*}} [[NONTRIVIAL_BLOCK_DESCRIPTOR]]
 // CHECK:         }, %objc_block* %1
-sil @init_block_header_nontrivial : $@thin (@inout @block_storage Builtin.NativeObject) -> @cc(cdecl) @objc_block () -> () {
+sil @init_block_header_nontrivial : $@convention(thin) (@inout @block_storage Builtin.NativeObject) -> @convention(block) () -> () {
 entry(%0 : $*@block_storage Builtin.NativeObject):
-  %i = function_ref @invoke_nontrivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.NativeObject) -> ()
-  %b = init_block_storage_header %0 : $*@block_storage Builtin.NativeObject, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.NativeObject) -> (), type $@cc(cdecl) @objc_block () -> ()
-  return %b : $@cc(cdecl) @objc_block () -> ()
+  %i = function_ref @invoke_nontrivial : $@convention(c) (@inout @block_storage Builtin.NativeObject) -> ()
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.NativeObject, invoke %i : $@convention(c) (@inout @block_storage Builtin.NativeObject) -> (), type $@convention(block) () -> ()
+  return %b : $@convention(block) () -> ()
 }
 
 // CHECK:       define internal void [[NONTRIVIAL_BLOCK_COPY]]
@@ -138,7 +138,7 @@ entry(%0 : $*@block_storage Builtin.NativeObject):
 // CHECK-NEXT:    call void @swift_release(%swift.refcounted* %toDestroy) #0
 // CHECK-NEXT:    ret void
 
-sil public_external @invoke_nontrivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.NativeObject) -> ()
+sil public_external @invoke_nontrivial : $@convention(c) (@inout @block_storage Builtin.NativeObject) -> ()
 
 // CHECK-LABEL: define %objc_block* @init_block_header_stret({ %objc_block, i8* }*) {
 // CHECK:         store %objc_block {
@@ -149,11 +149,11 @@ sil public_external @invoke_nontrivial : $@thin @cc(cdecl) (@inout @block_storag
 // CHECK:           i8* {{.*}} @invoke_stret
 // CHECK:           i8* bitcast {{.*}} [[STRET_BLOCK_DESCRIPTOR]]
 // CHECK:         }, %objc_block* %1
-sil @init_block_header_stret : $@thin (@inout @block_storage Builtin.RawPointer) -> @cc(cdecl) @objc_block () -> NSRect {
+sil @init_block_header_stret : $@convention(thin) (@inout @block_storage Builtin.RawPointer) -> @convention(block) () -> NSRect {
 entry(%0 : $*@block_storage Builtin.RawPointer):
-  %i = function_ref @invoke_stret : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> NSRect
-  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> NSRect, type $@cc(cdecl) @objc_block () -> NSRect
-  return %b : $@cc(cdecl) @objc_block () -> NSRect
+  %i = function_ref @invoke_stret : $@convention(c) (@inout @block_storage Builtin.RawPointer) -> NSRect
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@convention(c) (@inout @block_storage Builtin.RawPointer) -> NSRect, type $@convention(block) () -> NSRect
+  return %b : $@convention(block) () -> NSRect
 }
 
-sil public_external @invoke_stret : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> NSRect
+sil public_external @invoke_stret : $@convention(c) (@inout @block_storage Builtin.RawPointer) -> NSRect

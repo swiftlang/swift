@@ -24,14 +24,14 @@ public struct ECPoint {
 func unpack(ec : ECPoint?) -> ECPoint
 
 // top_level_code
-sil private @top_level_code : $@thin () -> () {
+sil private @top_level_code : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()                                   // user: %1
   return %0 : $()                                 // id: %1
 }
 
 // ECurve.ECurve.point (ECurve.ECurve)() -> Swift.Optional<ECurve.ECPoint>
-sil @_TFV6ECurve6ECurve5pointfS0_FT_GSqVS_7ECPoint_ : $@cc(method) @thin (ECurve) -> Optional<ECPoint> {
+sil @_TFV6ECurve6ECurve5pointfS0_FT_GSqVS_7ECPoint_ : $@convention(method) (ECurve) -> Optional<ECPoint> {
 bb0(%0 : $ECurve):
   %1 = integer_literal $Builtin.Int32, 9          // user: %2
   %2 = struct $Int32 (%1 : $Builtin.Int32)        // user: %4
@@ -42,7 +42,7 @@ bb0(%0 : $ECurve):
 }
 
 // ECurve.unpack (Swift.Optional<ECurve.ECPoint>) -> ECurve.ECPoint
-sil @_TF6ECurve6unpackFGSqVS_7ECPoint_S0_ : $@thin (Optional<ECPoint>) -> ECPoint {
+sil @_TF6ECurve6unpackFGSqVS_7ECPoint_S0_ : $@convention(thin) (Optional<ECPoint>) -> ECPoint {
 bb0(%0 : $Optional<ECPoint>):
   switch_enum %0 : $Optional<ECPoint>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2 // id: %1
 

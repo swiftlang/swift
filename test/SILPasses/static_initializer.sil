@@ -6,11 +6,11 @@ import Swift
 // CHECK: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
 
-// CHECK: sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@thin () -> ()
+// CHECK: sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
 sil_global @_Tv2ch1xSi : $Int32
 
-// CHECK-LABEL: sil private @globalinit_func0 : $@thin () -> () {
-sil private @globalinit_func0 : $@thin () -> () {
+// CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {
+sil private @globalinit_func0 : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Int32
   %1 = integer_literal $Builtin.Int32, 2
@@ -20,32 +20,32 @@ bb0:
   return %4 : $()
 }
 
-// CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
+// CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT: global_addr @globalinit_token0
 // CHECK-NEXT: address_to_pointer
-// CHECK: function_ref @globalinit_func0 : $@thin () -> ()
+// CHECK: function_ref @globalinit_func0 : $@convention(thin) () -> ()
 // CHECK-NEXT: thin_to_thick_function
 // CHECK-NEXT: global_addr @_Tv2ch1xSi : $*Int32
 // CHECK-NEXT: address_to_pointer
 // CHECK-NEXT: return
-sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
+sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %1 = global_addr @globalinit_token0 : $*Builtin.Word
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = function_ref @globalinit_func0 : $@thin () -> ()
-  %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
+  %3 = function_ref @globalinit_func0 : $@convention(thin) () -> ()
+  %4 = thin_to_thick_function %3 : $@convention(thin) () -> () to $@callee_owned () -> ()
   %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
   %6 = global_addr @_Tv2ch1xSi : $*Int32
   %7 = address_to_pointer %6 : $*Int32 to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
-sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
+// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
+sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = function_ref @_TF2cha1xSi : $@thin () -> Builtin.RawPointer
-  %1 = apply %0() : $@thin () -> Builtin.RawPointer
+  %0 = function_ref @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Int32
   %3 = load %2 : $*Int32
   return %3 : $Int32

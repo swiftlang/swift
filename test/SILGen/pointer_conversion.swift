@@ -140,7 +140,7 @@ func classInoutToPointer() {
 
 // Check that pointer types don't bridge anymore.
 @objc class ObjCMethodBridging {
-  // CHECK-LABEL: sil hidden @_TToFC18pointer_conversion18ObjCMethodBridging11pointerArgsfS0_FTGVSs20UnsafeMutablePointerSi_1yGVSs13UnsafePointerSi_1zGVSs33AutoreleasingUnsafeMutablePointerS0___T_ : $@cc(objc_method) @thin (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
+  // CHECK-LABEL: sil hidden @_TToFC18pointer_conversion18ObjCMethodBridging11pointerArgsfS0_FTGVSs20UnsafeMutablePointerSi_1yGVSs13UnsafePointerSi_1zGVSs33AutoreleasingUnsafeMutablePointerS0___T_ : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
   @objc func pointerArgs(x: UnsafeMutablePointer<Int>,
                          y: UnsafePointer<Int>,
                          z: AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>) {}

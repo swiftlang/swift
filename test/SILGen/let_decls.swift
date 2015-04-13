@@ -41,7 +41,7 @@ func test2() {
 
 // The closure just returns its value, which it captured directly.
 
-// CHECK: sil shared @_TFF9let_decls5test2FT_T_U_FT_Si : $@thin (Int) -> Int
+// CHECK: sil shared @_TFF9let_decls5test2FT_T_U_FT_Si : $@convention(thin) (Int) -> Int
 // CHECK: bb0(%0 : $Int):
 // CHECK:  return %0 : $Int
 
@@ -395,7 +395,7 @@ struct StructMemberTest {
   func testIntMemberLoad() -> Int {
     return i
   }
-  // CHECK-LABEL: sil hidden @{{.*}}testIntMemberLoad{{.*}} : $@cc(method) @thin (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden @{{.*}}testIntMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest  // let self
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.i
@@ -406,7 +406,7 @@ struct StructMemberTest {
   func testRecursiveIntMemberLoad() -> Int {
     return s.i
   }
-  // CHECK-LABEL: sil hidden @{{.*}}testRecursiveIntMemberLoad{{.*}} : $@cc(method) @thin (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden @{{.*}}testRecursiveIntMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest  // let self
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
@@ -418,7 +418,7 @@ struct StructMemberTest {
     return t.1.i
   }
   //   FIXME: these retains and releases are unnecessary
-  // CHECK-LABEL: sil hidden @{{.*}}testTupleMemberLoad{{.*}} : $@cc(method) @thin (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden @{{.*}}testTupleMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK:   debug_value %0 : $StructMemberTest  // let self
   // CHECK:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
@@ -439,7 +439,7 @@ struct GenericStruct<T> {
   func getA() -> T {
     return a
   }
-  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA{{.*}} : $@cc(method) @thin <T> (@out T, @in_guaranteed GenericStruct<T>)
+  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA{{.*}} : $@convention(method) <T> (@out T, @in_guaranteed GenericStruct<T>)
   // CHECK-NEXT: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>  // let self
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
@@ -451,7 +451,7 @@ struct GenericStruct<T> {
     return b
   }
   
-  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB{{.*}} : $@cc(method) @thin <T> (@in_guaranteed GenericStruct<T>) -> Int
+  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
   // CHECK-NEXT: bb0(%0 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %0 : $*GenericStruct<T>  // let self
   // CHECK-NEXT: %2 = struct_element_addr %0 : $*GenericStruct<T>, #GenericStruct.b
@@ -485,7 +485,7 @@ var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 // CHECK-NEXT: bb0(%0 : $*SimpleProtocol):
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:  %1 = function_ref @{{.*}}addressOnlyGetOnlyGlobalProperty
-// CHECK-NEXT:  %2 = apply %1(%0) : $@thin (@out SimpleProtocol) -> ()
+// CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) (@out SimpleProtocol) -> ()
 // CHECK-NEXT:  %3 = tuple ()
 // CHECK-NEXT:  return %3 : $()
 // CHECK-NEXT: }

@@ -7,21 +7,21 @@ import Swift
 import SwiftShims
 
 //CHECK: [readonly] @function1
-sil [readonly] @function1 : $@thin () -> () {
+sil [readonly] @function1 : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
 }
 
 //CHECK: [readnone] @function2
-sil [readnone] @function2 : $@thin () -> () {
+sil [readnone] @function2 : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
 }
 
 //CHECK: [readwrite] @function3
-sil [readwrite] @function3 : $@thin () -> () {
+sil [readwrite] @function3 : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()

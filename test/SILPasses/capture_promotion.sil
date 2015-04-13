@@ -22,30 +22,30 @@ struct Baz {
   var x: Int
 }
 
-sil @convert_from_integer_literal : $@thin (Builtin.Word, @thin Int.Type) -> Int
-sil @foo_allocating_init : $@thin (@thick Foo.Type) -> @owned Foo
-sil @baz_init : $@thin (@thin Baz.Type) -> @owned Baz
-sil @dummy_func : $@thin (Int, Int, Int) -> Int
+sil @convert_from_integer_literal : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+sil @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
+sil @baz_init : $@convention(thin) (@thin Baz.Type) -> @owned Baz
+sil @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
 
 // CHECK-LABEL: sil @test_capture_promotion
-sil @test_capture_promotion : $@thin () -> @owned @callee_owned () -> Int {
+sil @test_capture_promotion : $@convention(thin) () -> @owned @callee_owned () -> Int {
 bb0:
   %0 = tuple ()
   %1 = alloc_box $Foo
-  %2 = function_ref @foo_allocating_init : $@thin (@thick Foo.Type) -> @owned Foo
+  %2 = function_ref @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
   %3 = metatype $@thick Foo.Type
-  %4 = apply %2(%3) : $@thin (@thick Foo.Type) -> @owned Foo
+  %4 = apply %2(%3) : $@convention(thin) (@thick Foo.Type) -> @owned Foo
   store %4 to %1#1 : $*Foo
   %6 = alloc_box $Baz
-  %7 = function_ref @baz_init : $@thin (@thin Baz.Type) -> @owned Baz
+  %7 = function_ref @baz_init : $@convention(thin) (@thin Baz.Type) -> @owned Baz
   %8 = metatype $@thin Baz.Type
-  %9 = apply %7(%8) : $@thin (@thin Baz.Type) -> @owned Baz
+  %9 = apply %7(%8) : $@convention(thin) (@thin Baz.Type) -> @owned Baz
   store %9 to %6#1 : $*Baz
   %11 = alloc_box $Int
-  %12 = function_ref @convert_from_integer_literal : $@thin (Builtin.Word, @thin Int.Type) -> Int
+  %12 = function_ref @convert_from_integer_literal : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
   %13 = metatype $@thin Int.Type
   %14 = integer_literal $Builtin.Word, 3
-  %15 = apply %12(%14, %13) : $@thin (Builtin.Word, @thin Int.Type) -> Int
+  %15 = apply %12(%14, %13) : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
   store %15 to %11#1 : $*Int
 
 // CHECK-NOT: function_ref @closure0 :
@@ -70,11 +70,11 @@ bb0:
 // previously used to capture and pass the variable by reference
 // CHECK-NEXT: {{.*}} = partial_apply [[CLOSURE_PROMOTE]]([[LOADFOO]], [[LOADBAZ]], [[LOADINT]])
 
-  %17 = function_ref @closure0 : $@thin (@owned Builtin.NativeObject, @inout Foo, @owned Builtin.NativeObject, @inout Baz, @owned Builtin.NativeObject, @inout Int) -> Int
+  %17 = function_ref @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Foo, @owned Builtin.NativeObject, @inout Baz, @owned Builtin.NativeObject, @inout Int) -> Int
   strong_retain %1#0 : $Builtin.NativeObject
   strong_retain %6#0 : $Builtin.NativeObject
   strong_retain %11#0 : $Builtin.NativeObject
-  %21 = partial_apply %17(%1#0, %1#1, %6#0, %6#1, %11#0, %11#1) : $@thin (@owned Builtin.NativeObject, @inout Foo, @owned Builtin.NativeObject, @inout Baz, @owned Builtin.NativeObject, @inout Int) -> Int
+  %21 = partial_apply %17(%1#0, %1#1, %6#0, %6#1, %11#0, %11#1) : $@convention(thin) (@owned Builtin.NativeObject, @inout Foo, @owned Builtin.NativeObject, @inout Baz, @owned Builtin.NativeObject, @inout Int) -> Int
 
   strong_release %11#0 : $Builtin.NativeObject
   strong_release %6#0 : $Builtin.NativeObject
@@ -82,18 +82,18 @@ bb0:
   return %21 : $@callee_owned () -> Int
 }
 
-// CHECK-LABEL: sil private @_TTSf2d_i_d_i_d_i__closure0 : $@thin (@owned Foo, @owned Baz, Int) -> Int
-// CHECK: [[DUMMY_FUNC:%.*]] = function_ref @dummy_func : $@thin (Int, Int, Int) -> Int
+// CHECK-LABEL: sil private @_TTSf2d_i_d_i_d_i__closure0 : $@convention(thin) (@owned Foo, @owned Baz, Int) -> Int
+// CHECK: [[DUMMY_FUNC:%.*]] = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
 
 // The load of %1 is removed, and its uses replaced with the Foo argument
 // CHECK-NEXT: strong_retain {{.*}} : $Foo
-// CHECK-NEXT: [[METHOD_FOO:%.*]] = class_method {{.*}} : $Foo, #Foo.foo!1 : Foo -> () -> Int , $@cc(method) @thin (@guaranteed Foo) -> Int
-// CHECK-NEXT: [[APPLY_FOO:%.*]] = apply [[METHOD_FOO]]({{.*}}) : $@cc(method) @thin (@guaranteed Foo) -> Int
+// CHECK-NEXT: [[METHOD_FOO:%.*]] = class_method {{.*}} : $Foo, #Foo.foo!1 : Foo -> () -> Int , $@convention(method) (@guaranteed Foo) -> Int
+// CHECK-NEXT: [[APPLY_FOO:%.*]] = apply [[METHOD_FOO]]({{.*}}) : $@convention(method) (@guaranteed Foo) -> Int
 
 // The struct_element_addr of %3 followed by a load is replaced by a struct_extract of the Baz argument
 // CHECK-NEXT: [[EXTRACT_BAZ_X:%.*]] = struct_extract {{.*}} : $Baz, #Baz.x
 
-// CHECK-NEXT: [[RETVAL:%.*]] = apply [[DUMMY_FUNC]]([[APPLY_FOO]], [[EXTRACT_BAZ_X]], {{.*}}) : $@thin (Int, Int, Int) -> Int
+// CHECK-NEXT: [[RETVAL:%.*]] = apply [[DUMMY_FUNC]]([[APPLY_FOO]], [[EXTRACT_BAZ_X]], {{.*}}) : $@convention(thin) (Int, Int, Int) -> Int
 
 // The release of %4 is removed because the Int type is trivial
 
@@ -107,19 +107,19 @@ bb0:
 
 // CHECK-NEXT: return [[RETVAL]] : $Int
 
-sil private @closure0 : $@thin (@owned Builtin.NativeObject, @inout Foo, @owned Builtin.NativeObject, @inout Baz, @owned Builtin.NativeObject, @inout Int) -> Int {
+sil private @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Foo, @owned Builtin.NativeObject, @inout Baz, @owned Builtin.NativeObject, @inout Int) -> Int {
 bb0(%0 : $Builtin.NativeObject, %1 : $*Foo, %2 : $Builtin.NativeObject, %3 : $*Baz, %4 : $Builtin.NativeObject, %5 : $*Int):
   %6 = tuple ()
   // function_ref test14.plus (a : Swift.Int, b : Swift.Int, c : Swift.Int) -> Swift.Int
-  %7 = function_ref @dummy_func : $@thin (Int, Int, Int) -> Int
+  %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@cc(method) @thin (@guaranteed Foo) -> Int
-  %11 = apply %10(%8) : $@cc(method) @thin (@guaranteed Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
   %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load %12 : $*Int
   %14 = load %5 : $*Int
-  %15 = apply %7(%11, %13, %14) : $@thin (Int, Int, Int) -> Int
+  %15 = apply %7(%11, %13, %14) : $@convention(thin) (Int, Int, Int) -> Int
   strong_release %4 : $Builtin.NativeObject
   strong_release %2 : $Builtin.NativeObject
   strong_release %0 : $Builtin.NativeObject
@@ -129,57 +129,57 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Foo, %2 : $Builtin.NativeObject, %3 : $*B
 // The closure in this function is not promotable because it mutates its argument
 
 // CHECK-LABEL: sil @test_unpromotable
-sil @test_unpromotable : $@thin () -> @owned @callee_owned () -> Int {
+sil @test_unpromotable : $@convention(thin) () -> @owned @callee_owned () -> Int {
 bb0:
   %0 = tuple ()
   %1 = alloc_box $Foo
-  %2 = function_ref @foo_allocating_init : $@thin (@thick Foo.Type) -> @owned Foo
+  %2 = function_ref @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
   %3 = metatype $@thick Foo.Type
-  %4 = apply %2(%3) : $@thin (@thick Foo.Type) -> @owned Foo
+  %4 = apply %2(%3) : $@convention(thin) (@thick Foo.Type) -> @owned Foo
   store %4 to %1#1 : $*Foo
-  %17 = function_ref @closure1 : $@thin (Builtin.NativeObject, @inout Foo) -> Int
+  %17 = function_ref @closure1 : $@convention(thin) (Builtin.NativeObject, @inout Foo) -> Int
   strong_retain %1#0 : $Builtin.NativeObject
   // CHECK: partial_apply {{%.*}}({{%.*}}#0, {{%.*}}#1)
-  %21 = partial_apply %17(%1#0, %1#1) : $@thin (Builtin.NativeObject, @inout Foo) -> Int
+  %21 = partial_apply %17(%1#0, %1#1) : $@convention(thin) (Builtin.NativeObject, @inout Foo) -> Int
   strong_release %1#0 : $Builtin.NativeObject
   return %21 : $@callee_owned () -> Int
 }
 
-sil @mutate_foo : $@thin (@inout Foo) -> ()
+sil @mutate_foo : $@convention(thin) (@inout Foo) -> ()
 
-sil private @closure1 : $@thin (Builtin.NativeObject, @inout Foo) -> Int {
+sil private @closure1 : $@convention(thin) (Builtin.NativeObject, @inout Foo) -> Int {
 bb0(%0 : $Builtin.NativeObject, %1 : $*Foo):
   %6 = tuple ()
   // function_ref test14.plus (a : Swift.Int, b : Swift.Int, c : Swift.Int) -> Swift.Int
-  %7 = function_ref @dummy_func : $@thin (Int, Int, Int) -> Int
+  %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@cc(method) @thin (@guaranteed Foo) -> Int
-  %11 = apply %10(%8) : $@cc(method) @thin (@guaranteed Foo) -> Int
-  %12 = function_ref @mutate_foo : $@thin (@inout Foo) -> ()
-  %13 = apply %12(%1) : $@thin (@inout Foo) -> ()
+  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
+  %12 = function_ref @mutate_foo : $@convention(thin) (@inout Foo) -> ()
+  %13 = apply %12(%1) : $@convention(thin) (@inout Foo) -> ()
   strong_release %0 : $Builtin.NativeObject
   return %11 : $Int
 }
 
-sil @apply : $@thin (@owned @callee_owned () -> ()) -> ()
+sil @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 
 // CHECK-LABEL: sil @captureWithinGeneric
-sil @captureWithinGeneric : $@thin <T> (@inout Int, @inout Int) -> () {
+sil @captureWithinGeneric : $@convention(thin) <T> (@inout Int, @inout Int) -> () {
 // CHECK: bb0
 bb0(%0 : $*Int, %1 : $*Int):
   %2 = alloc_box $Int
   copy_addr %0 to [initialization] %2#1 : $*Int
   %4 = alloc_box $Int
   copy_addr %1 to [initialization] %4#1 : $*Int
-  %6 = function_ref @apply : $@thin (@owned @callee_owned () -> ()) -> ()
-  // CHECK: [[PROMOTED:%[0-9a-zA-Z]+]] = function_ref @_TTSf2n_n_d_i__closureWithGenericSignature : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout Int, Int) -> ()
-  %7 = function_ref @closureWithGenericSignature : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout Int, @owned Builtin.NativeObject, @inout Int) -> ()
+  %6 = function_ref @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  // CHECK: [[PROMOTED:%[0-9a-zA-Z]+]] = function_ref @_TTSf2n_n_d_i__closureWithGenericSignature : $@convention(thin) <τ_0_0> (@owned Builtin.NativeObject, @inout Int, Int) -> ()
+  %7 = function_ref @closureWithGenericSignature : $@convention(thin) <τ_0_0> (@owned Builtin.NativeObject, @inout Int, @owned Builtin.NativeObject, @inout Int) -> ()
   strong_retain %4#0 : $Builtin.NativeObject
   strong_retain %2#0 : $Builtin.NativeObject
   // CHECK: partial_apply [[PROMOTED]]<{{[^>]+}}>(
-  %10 = partial_apply %7<T>(%4#0, %4#1, %2#0, %2#1) : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout Int, @owned Builtin.NativeObject, @inout Int) -> ()
-  %11 = apply %6(%10) : $@thin (@owned @callee_owned () -> ()) -> ()
+  %10 = partial_apply %7<T>(%4#0, %4#1, %2#0, %2#1) : $@convention(thin) <τ_0_0> (@owned Builtin.NativeObject, @inout Int, @owned Builtin.NativeObject, @inout Int) -> ()
+  %11 = apply %6(%10) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   copy_addr %4#1 to %1 : $*Int
   strong_release %4#0 : $Builtin.NativeObject
   copy_addr %2#1 to %0 : $*Int
@@ -188,13 +188,13 @@ bb0(%0 : $*Int, %1 : $*Int):
   return %16 : $()
 }
 
-// CHECK: sil @_TTSf2n_n_d_i__closureWithGenericSignature : $@thin <{{[^>]+}}> (@owned Builtin.NativeObject, @inout Int, Int) -> ()
-sil @closureWithGenericSignature : $@thin <T> (@owned Builtin.NativeObject, @inout Int, @owned Builtin.NativeObject, @inout Int) -> () {
+// CHECK: sil @_TTSf2n_n_d_i__closureWithGenericSignature : $@convention(thin) <{{[^>]+}}> (@owned Builtin.NativeObject, @inout Int, Int) -> ()
+sil @closureWithGenericSignature : $@convention(thin) <T> (@owned Builtin.NativeObject, @inout Int, @owned Builtin.NativeObject, @inout Int) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $*Int, %2 : $Builtin.NativeObject, %3 : $*Int):
-  %4 = function_ref @_TFSsoi1pFTSiSi_Si : $@thin (Int, Int) -> Int
+  %4 = function_ref @_TFSsoi1pFTSiSi_Si : $@convention(thin) (Int, Int) -> Int
   %5 = load %3 : $*Int
   %6 = load %3 : $*Int
-  %7 = apply %4(%5, %6) : $@thin (Int, Int) -> Int
+  %7 = apply %4(%5, %6) : $@convention(thin) (Int, Int) -> Int
   assign %7 to %1 : $*Int
   strong_release %2 : $Builtin.NativeObject
   strong_release %0 : $Builtin.NativeObject
@@ -202,4 +202,4 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Int, %2 : $Builtin.NativeObject, %3 : $*I
   return %11 : $()
 }
 
-sil [transparent] [fragile] @_TFSsoi1pFTSiSi_Si : $@thin (Int, Int) -> Int
+sil [transparent] [fragile] @_TFSsoi1pFTSiSi_Si : $@convention(thin) (Int, Int) -> Int

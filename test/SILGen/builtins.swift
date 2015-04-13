@@ -436,7 +436,7 @@ func autorelease(o: O) {
 // CHECK-LABEL: sil hidden @_TF8builtins11unreachable
 // CHECK:         builtin "unreachable"()
 // CHECK:         return
-// CANONICAL-LABEL: sil hidden @_TF8builtins11unreachableFT_T_ : $@thin @noreturn () -> () {
+// CANONICAL-LABEL: sil hidden @_TF8builtins11unreachableFT_T_ : $@convention(thin) @noreturn () -> () {
 // CANONICAL-NOT:     builtin "unreachable"
 // CANONICAL-NOT:     return
 // CANONICAL:         unreachable
@@ -444,7 +444,7 @@ func autorelease(o: O) {
   Builtin.unreachable()
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins15reinterpretCastFCS_1CTBwCS_1DGSqS0___ : $@thin (@owned C) -> @owned (Builtin.Word, D, Optional<C>)
+// CHECK-LABEL: sil hidden @_TF8builtins15reinterpretCastFCS_1CTBwCS_1DGSqS0___ : $@convention(thin) (@owned C) -> @owned (Builtin.Word, D, Optional<C>)
 // CHECK-NEXT:  bb0(%0 : $C):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    strong_retain %0 : $C
@@ -505,7 +505,7 @@ func castBitPatternFromBridgeObject(bo: Builtin.BridgeObject) -> Builtin.Word {
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins14markDependenceFTVS_7PointerPS_10ClassProto__S0_ : $@thin (Pointer, @owned ClassProto) -> Pointer {
+// CHECK-LABEL: sil hidden @_TF8builtins14markDependenceFTVS_7PointerPS_10ClassProto__S0_ : $@convention(thin) (Pointer, @owned ClassProto) -> Pointer {
 // CHECK:         [[T0:%.*]] = mark_dependence %0 : $Pointer on %1 : $ClassProto
 // CHECK-NEXT:    strong_release %1 : $ClassProto
 // CHECK-NEXT:    return [[T0]] : $Pointer
@@ -534,7 +534,7 @@ func pinUnpin(object : Builtin.NativeObject) {
 // CHECK-NEXT:    return [[T0]] : $()
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBufferFRBBBp : $@thin (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
+// CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBufferFRBBBp : $@convention(thin) (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
 // CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = alloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
@@ -544,7 +544,7 @@ func allocateValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.Raw
   return Builtin.allocValueBuffer(&buffer, Int.self)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18projectValueBufferFRBBBp : $@thin (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
+// CHECK-LABEL: sil hidden @_TF8builtins18projectValueBufferFRBBBp : $@convention(thin) (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
 // CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = project_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
@@ -554,7 +554,7 @@ func projectValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawP
   return Builtin.projectValueBuffer(&buffer, Int.self)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBufferFRBBT_ : $@thin (@inout Builtin.UnsafeValueBuffer) -> ()
+// CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBufferFRBBT_ : $@convention(thin) (@inout Builtin.UnsafeValueBuffer) -> ()
 // CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    dealloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer

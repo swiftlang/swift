@@ -1563,11 +1563,13 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   auto fnTy = FunctionType::get(inputTy, outputTy, extInfo);
   // If the type is a block or C function pointer, it must be representable in
   // ObjC.
-  switch (extInfo.getRepresentation()) {
+  switch (auto rep = extInfo.getRepresentation()) {
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
     if (!TC.isRepresentableInObjC(DC, fnTy)) {
-      TC.diagnose(repr->getStartLoc(), diag::objc_block_invalid);
+      TC.diagnose(repr->getStartLoc(), diag::objc_convention_invalid,
+                  rep == AnyFunctionType::Representation::Block
+                    ? StringRef("block") : StringRef("c"));
     }
     break;
 

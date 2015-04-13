@@ -8,24 +8,24 @@ import Builtin
 import Swift
 import SwiftShims
 
-sil @_TFCSs18_EmptyArrayStorage32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> ()
+sil @_TFCSs18_EmptyArrayStorage32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> ()
 
-// sil @_TFCSs24_ContiguousArrayStorage132_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> ()
+// sil @_TFCSs24_ContiguousArrayStorage132_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> ()
 
-sil @_TFCSs27_ContiguousArrayStorageBase32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> ()
+sil @_TFCSs27_ContiguousArrayStorageBase32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> ()
 
 // CHECK: sil [fragile] @_TFCSs27_ContiguousArrayStorageBase25withUnsafeBufferOfObjectsfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_Q_
-sil [fragile] @_TFCSs27_ContiguousArrayStorageBase25withUnsafeBufferOfObjectsfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_Q_ : $@cc(method) @thin <R> (@out R, @owned @callee_owned (@out R, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () {
+sil [fragile] @_TFCSs27_ContiguousArrayStorageBase25withUnsafeBufferOfObjectsfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_Q_ : $@convention(method) <R> (@out R, @owned @callee_owned (@out R, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () {
 bb0(%0 : $*R, %1 : $@callee_owned (@out R, UnsafeBufferPointer<AnyObject>) -> (), %2 : $_ContiguousArrayStorageBase):
   %3 = alloc_stack $Optional<R>                   // users: %9, %12, %13, %15, %20, %26, %33, %42, %50, %54
   checked_cast_br [exact] %2 : $_ContiguousArrayStorageBase to $_EmptyArrayStorage, bb1, bb2 // id: %4
 
 bb1(%5 : $_EmptyArrayStorage):                    // Preds: bb0
   // function_ref Swift._EmptyArrayStorage._withVerbatimBridgedUnsafeBuffer (Swift._EmptyArrayStorage)<A>((Swift.UnsafeBufferPointer<Swift.AnyObject>) -> A) -> Swift.Optional<A>
-  %6 = function_ref @_TFCSs18_EmptyArrayStorage32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> () // user: %9
+  %6 = function_ref @_TFCSs18_EmptyArrayStorage32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> () // user: %9
   strong_retain %1 : $@callee_owned (@out R, UnsafeBufferPointer<AnyObject>) -> () // id: %7
   strong_retain %2 : $_ContiguousArrayStorageBase // id: %8
-  %9 = apply %6<R>(%3#1, %1, %5) : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> ()
+  %9 = apply %6<R>(%3#1, %1, %5) : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> ()
   br bb3                                          // id: %10
 
 bb2:                                              // Preds: bb0
@@ -58,10 +58,10 @@ bb7:                                              // Preds: bb2
 
 bb8(%29 : $_ContiguousArrayStorageBase):          // Preds: bb7
   // function_ref Swift._ContiguousArrayStorageBase._withVerbatimBridgedUnsafeBuffer (Swift._ContiguousArrayStorageBase)<A>((Swift.UnsafeBufferPointer<Swift.AnyObject>) -> A) -> Swift.Optional<A>
-  %30 = function_ref @_TFCSs27_ContiguousArrayStorageBase32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %33
+  %30 = function_ref @_TFCSs27_ContiguousArrayStorageBase32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %33
   strong_retain %1 : $@callee_owned (@out R, UnsafeBufferPointer<AnyObject>) -> () // id: %31
   strong_retain %2 : $_ContiguousArrayStorageBase // id: %32
-  %33 = apply %30<R>(%3#1, %1, %29) : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> ()
+  %33 = apply %30<R>(%3#1, %1, %29) : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> ()
   br bb3                                          // id: %34
 
 bb9:                                              // Preds: bb7
@@ -74,8 +74,8 @@ bb10(%37 : $()):                                  // Preds: bb11 bb13
 bb11(%39 : $_EmptyArrayStorage):                  // Preds: bb9
   strong_retain %39 : $_EmptyArrayStorage         // id: %40
   // function_ref Swift._EmptyArrayStorage._withVerbatimBridgedUnsafeBuffer (Swift._EmptyArrayStorage)<A>((Swift.UnsafeBufferPointer<Swift.AnyObject>) -> A) -> Swift.Optional<A>
-  %41 = function_ref @_TFCSs18_EmptyArrayStorage32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> () // user: %42
-  %42 = apply %41<R>(%3#1, %1, %39) : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> () // user: %43
+  %41 = function_ref @_TFCSs18_EmptyArrayStorage32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> () // user: %42
+  %42 = apply %41<R>(%3#1, %1, %39) : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _EmptyArrayStorage) -> () // user: %43
   br bb10(%42 : $())                              // id: %43
 
 bb12:                                             // Preds: bb9
@@ -87,14 +87,14 @@ bb13(%45 : $()):                                  // Preds: bb14 bb15
 bb14(%47 : $_ContiguousArrayStorageBase):         // Preds: bb12
   strong_retain %47 : $_ContiguousArrayStorageBase // id: %48
   // function_ref Swift._ContiguousArrayStorageBase._withVerbatimBridgedUnsafeBuffer (Swift._ContiguousArrayStorageBase)<A>((Swift.UnsafeBufferPointer<Swift.AnyObject>) -> A) -> Swift.Optional<A>
-  %49 = function_ref @_TFCSs27_ContiguousArrayStorageBase32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %50
-  %50 = apply %49<R>(%3#1, %1, %47) : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %51
+  %49 = function_ref @_TFCSs27_ContiguousArrayStorageBase32_withVerbatimBridgedUnsafeBufferfS_U__FFGVSs19UnsafeBufferPointerPSs9AnyObject__Q_GSqQ__ : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %50
+  %50 = apply %49<R>(%3#1, %1, %47) : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %51
   br bb13(%50 : $())                              // id: %51
 
 bb15:                                             // Preds: bb12
   strong_retain %2 : $_ContiguousArrayStorageBase // id: %52
-  %53 = class_method %2 : $_ContiguousArrayStorageBase, #_ContiguousArrayStorageBase._withVerbatimBridgedUnsafeBuffer!1 : _ContiguousArrayStorageBase -> <R> (@noescape UnsafeBufferPointer<AnyObject> -> R) -> R? , $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %54
-  %54 = apply %53<R>(%3#1, %1, %2) : $@cc(method) @thin <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %55
+  %53 = class_method %2 : $_ContiguousArrayStorageBase, #_ContiguousArrayStorageBase._withVerbatimBridgedUnsafeBuffer!1 : _ContiguousArrayStorageBase -> <R> (@noescape UnsafeBufferPointer<AnyObject> -> R) -> R? , $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %54
+  %54 = apply %53<R>(%3#1, %1, %2) : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @owned @callee_owned (@out τ_0_0, UnsafeBufferPointer<AnyObject>) -> (), @guaranteed _ContiguousArrayStorageBase) -> () // user: %55
   br bb13(%54 : $())                              // id: %55
 }
 

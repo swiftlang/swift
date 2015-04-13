@@ -92,12 +92,12 @@ struct StructWithMutatingMethod {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TFV26inout_deshadow_integration24StructWithMutatingMethod14mutatingMethodfRS0_FT_T_ : $@cc(method) @thin (@inout StructWithMutatingMethod) -> () {
+// CHECK-LABEL: sil hidden @_TFV26inout_deshadow_integration24StructWithMutatingMethod14mutatingMethodfRS0_FT_T_ : $@convention(method) (@inout StructWithMutatingMethod) -> () {
 // CHECK-NOT: alloc_box
 // CHECK-NOT: alloc_stack
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @_TFV26inout_deshadow_integration24StructWithMutatingMethod28testStandardLibraryOperatorsfRS0_FT_T_ : $@cc(method) @thin (@inout StructWithMutatingMethod) -> () {
+// CHECK-LABEL: sil hidden @_TFV26inout_deshadow_integration24StructWithMutatingMethod28testStandardLibraryOperatorsfRS0_FT_T_ : $@convention(method) (@inout StructWithMutatingMethod) -> () {
 // CHECK-NOT: alloc_box $StructWithMutatingMethod
 // CHECK-NOT: alloc_stack $StructWithMutatingMethod
 // CHECK: }

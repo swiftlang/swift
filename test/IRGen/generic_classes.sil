@@ -122,13 +122,13 @@ class RootGeneric<T> {
 
   func bas()
 }
-sil @_TFC15generic_classes11RootGenericD : $@cc(method) @thin <T> (RootGeneric<T>) -> ()
+sil @_TFC15generic_classes11RootGenericD : $@convention(method) <T> (RootGeneric<T>) -> ()
 
-sil @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_ : $@cc(method) @thin <T> (@guaranteed RootGeneric<T>) -> ()
+sil @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_ : $@convention(method) <T> (@guaranteed RootGeneric<T>) -> ()
 
-sil @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ : $@cc(method) @thin <T> (@guaranteed RootGeneric<T>) -> ()
+sil @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_ : $@convention(method) <T> (@guaranteed RootGeneric<T>) -> ()
 
-sil @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ : $@cc(method) @thin <T> (@guaranteed RootGeneric<T>) -> ()
+sil @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_ : $@convention(method) <T> (@guaranteed RootGeneric<T>) -> ()
 
 sil_vtable RootGeneric {
   #RootGeneric.foo!1: _TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_
@@ -144,7 +144,7 @@ class RootGenericFixedLayout<T> {
   init()
 }
 sil_vtable RootGenericFixedLayout {}
-sil @_TFC15generic_classes22RootGenericFixedLayoutD : $@cc(method) @thin <T> (RootGenericFixedLayout<T>) -> ()
+sil @_TFC15generic_classes22RootGenericFixedLayoutD : $@convention(method) <T> (RootGenericFixedLayout<T>) -> ()
 
 class RootNonGeneric {
   var x : UInt8
@@ -154,7 +154,7 @@ class RootNonGeneric {
   init()
 }
 sil_vtable RootNonGeneric {}
-sil @_TFC15generic_classes14RootNonGenericD : $@cc(method) @thin (RootNonGeneric) -> ()
+sil @_TFC15generic_classes14RootNonGenericD : $@convention(method) (RootNonGeneric) -> ()
 
 class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   var w : B
@@ -165,13 +165,13 @@ class GenericInheritsGeneric<A, B> : RootGeneric<A> {
 
   override init()
 }
-sil @_TFC15generic_classes22GenericInheritsGenericD : $@cc(method) @thin <T,U> (GenericInheritsGeneric<T,U>) -> ()
+sil @_TFC15generic_classes22GenericInheritsGenericD : $@convention(method) <T,U> (GenericInheritsGeneric<T,U>) -> ()
 
-sil @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_ : $@cc(method) @thin <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
+sil @_TFC15generic_classes22GenericInheritsGeneric7zippityU___fGS0_Q_Q0__FT_T_ : $@convention(method) <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
 
-sil @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_ : $@cc(method) @thin <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
+sil @_TFC15generic_classes22GenericInheritsGeneric3dooU___fGS0_Q_Q0__FT_T_ : $@convention(method) <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
 
-sil @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_ : $@cc(method) @thin <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
+sil @_TFC15generic_classes22GenericInheritsGeneric3dahU___fGS0_Q_Q0__FT_T_ : $@convention(method) <A, B> (@guaranteed GenericInheritsGeneric<A, B>) -> ()
 
 sil_vtable GenericInheritsGeneric {
   #RootGeneric.foo!1: _TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_
@@ -188,7 +188,7 @@ class GenericInheritsNonGeneric<C> : RootNonGeneric {
   override init()
 }
 sil_vtable GenericInheritsNonGeneric {}
-sil @_TFC15generic_classes25GenericInheritsNonGenericD : $@cc(method) @thin <T> (GenericInheritsNonGeneric<T>) -> ()
+sil @_TFC15generic_classes25GenericInheritsNonGenericD : $@convention(method) <T> (GenericInheritsNonGeneric<T>) -> ()
 
 // rdar://18067671
 class RecursiveGenericInheritsGeneric<A, B> : RootGeneric<A> {
@@ -202,7 +202,7 @@ class RecursiveGenericInheritsGeneric<A, B> : RootGeneric<A> {
   override init()
 }
 sil_vtable RecursiveGenericInheritsGeneric {}
-sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@cc(method) @thin <T,U> (RecursiveGenericInheritsGeneric<T,U>) -> ()
+sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@convention(method) <T,U> (RecursiveGenericInheritsGeneric<T,U>) -> ()
 
 
 // CHECK: define [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc

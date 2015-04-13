@@ -14,8 +14,8 @@ func variadicSecond(x: Int, y: Int...) {}
 var x = 0
 // CHECK: [[X_ADDR:%.*]] = global_addr @_Tv20scalar_to_tuple_args1xSi : $*Int
 // CHECK: [[INOUT_WITH_DEFAULTS:%.*]] = function_ref @_TF20scalar_to_tuple_args17inoutWithDefaultsFTRSi1ySi1zSi_T_
-// CHECK: [[DEFAULT_Y:%.*]] = apply {{.*}} : $@thin () -> Int
-// CHECK: [[DEFAULT_Z:%.*]] = apply {{.*}} : $@thin () -> Int
+// CHECK: [[DEFAULT_Y:%.*]] = apply {{.*}} : $@convention(thin) () -> Int
+// CHECK: [[DEFAULT_Z:%.*]] = apply {{.*}} : $@convention(thin) () -> Int
 // CHECK: apply [[INOUT_WITH_DEFAULTS]]([[X_ADDR]], [[DEFAULT_Y]], [[DEFAULT_Z]])
 inoutWithDefaults(&x)
 
@@ -27,8 +27,8 @@ inoutWithCallerSideDefaults(&x)
 
 // CHECK: [[SCALAR_WITH_DEFAULTS:%.*]] = function_ref @_TF20scalar_to_tuple_args18scalarWithDefaultsFTSi1ySi1zSi_T_
 // CHECK: [[X:%.*]] = load [[X_ADDR]]
-// CHECK: [[DEFAULT_Y:%.*]] = apply {{.*}} : $@thin () -> Int
-// CHECK: [[DEFAULT_Z:%.*]] = apply {{.*}} : $@thin () -> Int
+// CHECK: [[DEFAULT_Y:%.*]] = apply {{.*}} : $@convention(thin) () -> Int
+// CHECK: [[DEFAULT_Z:%.*]] = apply {{.*}} : $@convention(thin) () -> Int
 // CHECK: apply [[SCALAR_WITH_DEFAULTS]]([[X]], [[DEFAULT_Y]], [[DEFAULT_Z]])
 scalarWithDefaults(x)
 
@@ -42,8 +42,8 @@ scalarWithCallerSideDefaults(x)
 // CHECK: [[TUPLE_WITH_DEFAULTS:%.*]] = function_ref @_TF20scalar_to_tuple_args17tupleWithDefaultsFT1xTSiSi_1ySi1zSi_T_
 // CHECK: [[X1:%.*]] = load [[X_ADDR]]
 // CHECK: [[X2:%.*]] = load [[X_ADDR]]
-// CHECK: [[DEFAULT_Y:%.*]] = apply {{.*}} : $@thin () -> Int
-// CHECK: [[DEFAULT_Z:%.*]] = apply {{.*}} : $@thin () -> Int
+// CHECK: [[DEFAULT_Y:%.*]] = apply {{.*}} : $@convention(thin) () -> Int
+// CHECK: [[DEFAULT_Z:%.*]] = apply {{.*}} : $@convention(thin) () -> Int
 // CHECK: apply [[TUPLE_WITH_DEFAULTS]]([[X1]], [[X2]], [[DEFAULT_Y]], [[DEFAULT_Z]])
 tupleWithDefaults(x: (x,x))
 

@@ -37,10 +37,10 @@ struct AnArray<T> : _ObjectiveCBridgeable {
 }
 
 sil [semantics "convertFromObjectiveC"] @bridgeFromObjectiveC :
-  $@thin <τ_0_0> (@owned AnNSArray) -> @owned AnArray<τ_0_0>
+  $@convention(thin) <τ_0_0> (@owned AnNSArray) -> @owned AnArray<τ_0_0>
 
 sil [semantics "convertToObjectiveC"] @bridgeToObjectiveC:
-  $@cc(method) @thin <τ_0_0> (@owned AnArray<τ_0_0>) -> @owned AnNSArray
+  $@convention(method) <τ_0_0> (@owned AnArray<τ_0_0>) -> @owned AnNSArray
 
 // CHECK-LABEL: sil @bridge_from_to_owned
 // CHECK-NOT: apply
@@ -50,14 +50,14 @@ sil [semantics "convertToObjectiveC"] @bridgeToObjectiveC:
 // CHECK-NOT: apply
 // CHECK: return
 
-sil @bridge_from_to_owned : $@thin (@owned AnNSArray) -> @owned AnNSArray {
+sil @bridge_from_to_owned : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : $AnNSArray):
-  %1 = function_ref @bridgeFromObjectiveC : $@thin <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
-  %2 = apply %1<AnyObject>(%0) : $@thin <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %2 = apply %1<AnyObject>(%0) : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
   retain_value %2 : $AnArray<AnyObject>
   release_value %2 : $AnArray<AnyObject>
-  %3 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
-  %4 = apply %3<AnyObject>(%2) : $@cc(method) @thin <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %4 = apply %3<AnyObject>(%2) : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
   return %4 : $AnNSArray
 }
 
@@ -69,22 +69,22 @@ bb0(%0 : $AnNSArray):
 // CHECK-NOT: apply
 // CHECK: return
 
-sil @bridge_to_from_owned : $@thin (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
+sil @bridge_to_from_owned : $@convention(thin) (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
 bb0(%0 : $AnArray<AnyObject>):
-  %1 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
-  %2 = apply %1<AnyObject>(%0) : $@cc(method) @thin <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %1 = function_ref @bridgeToObjectiveC : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %2 = apply %1<AnyObject>(%0) : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
   strong_retain %2 : $AnNSArray
   strong_release %2 : $AnNSArray
-  %3 = function_ref @bridgeFromObjectiveC : $@thin <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
-  %4 = apply %3<AnyObject>(%2) : $@thin <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %3 = function_ref @bridgeFromObjectiveC : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %4 = apply %3<AnyObject>(%2) : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
   return %4 : $AnArray<AnyObject>
 }
 
 sil [semantics "convertFromObjectiveC"] @bridgeFromObjectiveCGuaranteed :
-  $@thin <τ_0_0> (@guaranteed AnNSArray) -> @owned AnArray<τ_0_0>
+  $@convention(thin) <τ_0_0> (@guaranteed AnNSArray) -> @owned AnArray<τ_0_0>
 
 sil [semantics "convertToObjectiveC"] @bridgeToObjectiveCGuaranteed:
-  $@cc(method) @thin <τ_0_0> (@guaranteed AnArray<τ_0_0>) -> @owned AnNSArray
+  $@convention(method) <τ_0_0> (@guaranteed AnArray<τ_0_0>) -> @owned AnNSArray
 
 // CHECK-LABEL: sil @bridge_from_to_guaranteed
 // CHECK-NOT: apply
@@ -94,13 +94,13 @@ sil [semantics "convertToObjectiveC"] @bridgeToObjectiveCGuaranteed:
 // CHECK-NOT: apply
 // CHECK: return
 
-sil @bridge_from_to_guaranteed : $@thin (@owned AnNSArray) -> @owned AnNSArray {
+sil @bridge_from_to_guaranteed : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : $AnNSArray):
-  %1 = function_ref @bridgeFromObjectiveCGuaranteed : $@thin <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
-  %2 = apply %1<AnyObject>(%0) : $@thin <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  %1 = function_ref @bridgeFromObjectiveCGuaranteed : $@convention(thin) <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  %2 = apply %1<AnyObject>(%0) : $@convention(thin) <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
   release_value %0 : $AnNSArray
-  %3 = function_ref @bridgeToObjectiveCGuaranteed : $@cc(method) @thin <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
-  %4 = apply %3<AnyObject>(%2) : $@cc(method) @thin <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %3 = function_ref @bridgeToObjectiveCGuaranteed : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %4 = apply %3<AnyObject>(%2) : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
   release_value %2 : $AnArray<AnyObject>
   return %4 : $AnNSArray
 }
@@ -113,13 +113,13 @@ bb0(%0 : $AnNSArray):
 // CHECK-NOT: apply
 // CHECK: return
 
-sil @bridge_to_from_guaranteed : $@thin (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
+sil @bridge_to_from_guaranteed : $@convention(thin) (@owned AnArray<AnyObject>) -> @owned AnArray<AnyObject>{
 bb0(%0 : $AnArray<AnyObject>):
-  %1 = function_ref @bridgeToObjectiveCGuaranteed : $@cc(method) @thin <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
-  %2 = apply %1<AnyObject>(%0) : $@cc(method) @thin <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %1 = function_ref @bridgeToObjectiveCGuaranteed : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
+  %2 = apply %1<AnyObject>(%0) : $@convention(method) <AnyObject> (@guaranteed AnArray<AnyObject>) -> @owned AnNSArray
   release_value %0 : $AnArray<AnyObject>
-  %3 = function_ref @bridgeFromObjectiveCGuaranteed : $@thin <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
-  %4 = apply %3<AnyObject>(%2) : $@thin <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  %3 = function_ref @bridgeFromObjectiveCGuaranteed : $@convention(thin) <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
+  %4 = apply %3<AnyObject>(%2) : $@convention(thin) <AnyObject> (@guaranteed AnNSArray) -> @owned AnArray<AnyObject>
   release_value %2 : $AnNSArray
   return %4 : $AnArray<AnyObject>
 }
@@ -131,14 +131,14 @@ struct Unbridged {
 // CHECK: apply
 // CHECK: apply
 // CHECK: return
-sil @failing_bridge_from_to_owned : $@thin (@owned AnNSArray) -> @owned AnNSArray {
+sil @failing_bridge_from_to_owned : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : $AnNSArray):
-  %1 = function_ref @bridgeFromObjectiveC : $@thin <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
-  %2 = apply %1<Unbridged>(%0) : $@thin <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
+  %2 = apply %1<Unbridged>(%0) : $@convention(thin) <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
   retain_value %2 : $AnArray<Unbridged>
   release_value %2 : $AnArray<Unbridged>
-  %3 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
-  %4 = apply %3<Unbridged>(%2) : $@cc(method) @thin <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
+  %4 = apply %3<Unbridged>(%2) : $@convention(method) <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
   return %4 : $AnNSArray
 }
 
@@ -147,14 +147,14 @@ bb0(%0 : $AnNSArray):
 // CHECK: apply
 // CHECK: return
 
-sil @failing_bridge_from_to_owned_generic : $@thin <T>(@owned AnNSArray) -> @owned AnNSArray {
+sil @failing_bridge_from_to_owned_generic : $@convention(thin) <T>(@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : $AnNSArray):
-  %1 = function_ref @bridgeFromObjectiveC : $@thin <T2> (@owned AnNSArray) -> @owned AnArray<T2>
-  %2 = apply %1<T>(%0) : $@thin <T2> (@owned AnNSArray) -> @owned AnArray<T2>
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <T2> (@owned AnNSArray) -> @owned AnArray<T2>
+  %2 = apply %1<T>(%0) : $@convention(thin) <T2> (@owned AnNSArray) -> @owned AnArray<T2>
   retain_value %2 : $AnArray<T>
   release_value %2 : $AnArray<T>
-  %3 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <T2> (@owned AnArray<T2>) -> @owned AnNSArray
-  %4 = apply %3<T>(%2) : $@cc(method) @thin <T> (@owned AnArray<T>) -> @owned AnNSArray
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <T2> (@owned AnArray<T2>) -> @owned AnNSArray
+  %4 = apply %3<T>(%2) : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
   return %4 : $AnNSArray
 }
 
@@ -163,13 +163,13 @@ bb0(%0 : $AnNSArray):
 // CHECK: apply
 // CHECK: return
 
-sil @failing_bridge_from_to_owned_recursive_type : $@thin (@owned AnNSArray) -> @owned AnNSArray {
+sil @failing_bridge_from_to_owned_recursive_type : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : $AnNSArray):
-  %1 = function_ref @bridgeFromObjectiveC : $@thin <T> (@owned AnNSArray) -> @owned AnArray<T>
-  %2 = apply %1<AnArray<Unbridged>>(%0) : $@thin <T> (@owned AnNSArray) -> @owned AnArray<T>
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <T> (@owned AnNSArray) -> @owned AnArray<T>
+  %2 = apply %1<AnArray<Unbridged>>(%0) : $@convention(thin) <T> (@owned AnNSArray) -> @owned AnArray<T>
   retain_value %2 : $AnArray<AnArray<Unbridged>>
   release_value %2 : $AnArray<AnArray<Unbridged>>
-  %3 = function_ref @bridgeToObjectiveC : $@cc(method) @thin <T> (@owned AnArray<T>) -> @owned AnNSArray
-  %4 = apply %3<AnArray<Unbridged>>(%2) : $@cc(method) @thin <T> (@owned AnArray<T>) -> @owned AnNSArray
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
+  %4 = apply %3<AnArray<Unbridged>>(%2) : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
   return %4 : $AnNSArray
 }

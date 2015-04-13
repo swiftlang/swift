@@ -14,7 +14,7 @@ class TrivialDestructor {
   deinit { }
 }
 
-sil @_TFC4main17TrivialDestructorD : $@cc(method) @thin (@owned TrivialDestructor) -> () {
+sil @_TFC4main17TrivialDestructorD : $@convention(method) (@owned TrivialDestructor) -> () {
 bb0(%0 : $TrivialDestructor):
   // Alloc/Dealloc stack should not disrupt elimination of the
   // alloc_ref.
@@ -40,8 +40,8 @@ bb0(%0 : $TrivialDestructor):
   return %7 : $()
 }
 
-sil @ptr_user : $@thin (Builtin.NativeObject) -> ()
-sil @int_user : $@thin (Builtin.Int32) -> ()
+sil @ptr_user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @int_user : $@convention(thin) (Builtin.Int32) -> ()
 
 ///////////
 // Tests //
@@ -49,11 +49,11 @@ sil @int_user : $@thin (Builtin.Int32) -> ()
 
 // Trivial case. Remove the alloc_ref.
 //
-// CHECK-LABEL: sil @trivial_destructor_trivial : $@thin () -> () {
+// CHECK-LABEL: sil @trivial_destructor_trivial : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @trivial_destructor_trivial : $@thin () -> () {
+sil @trivial_destructor_trivial : $@convention(thin) () -> () {
   %0 = alloc_ref $TrivialDestructor
   strong_release %0 : $TrivialDestructor
   %1 = tuple()
@@ -62,7 +62,7 @@ sil @trivial_destructor_trivial : $@thin () -> () {
 
 // We load/use a pointer from the alloc_ref, do nothing.
 //
-// CHECK-LABEL: sil @trivial_destructor_load : $@thin () -> () {
+// CHECK-LABEL: sil @trivial_destructor_load : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_ref
 // CHECK-NEXT: ref_element_addr
@@ -73,12 +73,12 @@ sil @trivial_destructor_trivial : $@thin () -> () {
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @trivial_destructor_load : $@thin () -> () {
+sil @trivial_destructor_load : $@convention(thin) () -> () {
   %0 = alloc_ref $TrivialDestructor
   %1 = ref_element_addr %0 : $TrivialDestructor, #TrivialDestructor.int
   %2 = load %1 : $*Builtin.Int32
-  %3 = function_ref @int_user : $@thin (Builtin.Int32) -> ()
-  apply %3 (%2) : $@thin (Builtin.Int32) -> ()
+  %3 = function_ref @int_user : $@convention(thin) (Builtin.Int32) -> ()
+  apply %3 (%2) : $@convention(thin) (Builtin.Int32) -> ()
   strong_release %0 : $TrivialDestructor
   %4 = tuple()
   return %4 : $()
@@ -86,12 +86,12 @@ sil @trivial_destructor_load : $@thin () -> () {
 
 // We store into the alloc_ref, eliminate it!
 //
-// CHECK-LABEL: sil @trivial_destructor_store_into : $@thin () -> () {
+// CHECK-LABEL: sil @trivial_destructor_store_into : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @trivial_destructor_store_into : $@thin () -> () {
+sil @trivial_destructor_store_into : $@convention(thin) () -> () {
   %0 = alloc_ref $TrivialDestructor
   %1 = ref_element_addr %0 : $TrivialDestructor, #TrivialDestructor.int
   %2 = integer_literal $Builtin.Int32, 5
@@ -112,7 +112,7 @@ sil @trivial_destructor_store_into : $@thin () -> () {
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @trivial_destructor_store_ptr : $@thin (@inout Builtin.RawPointer) -> () {
+sil @trivial_destructor_store_ptr : $@convention(thin) (@inout Builtin.RawPointer) -> () {
 bb0(%0 : $*Builtin.RawPointer):
   %1 = alloc_ref $TrivialDestructor
   %2 = ref_element_addr %1 : $TrivialDestructor, #TrivialDestructor.int
@@ -125,22 +125,22 @@ bb0(%0 : $*Builtin.RawPointer):
 
 // We are returning the alloc_ref, do nothing.
 //
-// CHECK-LABEL: sil @trivial_destructor_return_value_use : $@thin () -> TrivialDestructor {
+// CHECK-LABEL: sil @trivial_destructor_return_value_use : $@convention(thin) () -> TrivialDestructor {
 // CHECK: bb0
 // CHECK-NEXT: alloc_ref
 // CHECK-NEXT: return
-sil @trivial_destructor_return_value_use : $@thin () -> TrivialDestructor {
+sil @trivial_destructor_return_value_use : $@convention(thin) () -> TrivialDestructor {
   %0 = alloc_ref $TrivialDestructor
   return %0 : $TrivialDestructor
 }
 
 // Retains/releases on the alloc_ref can be ignored.
 //
-// CHECK-LABEL: sil @trivial_destructor_refcount_inst_on_value : $@thin () -> () {
+// CHECK-LABEL: sil @trivial_destructor_refcount_inst_on_value : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @trivial_destructor_refcount_inst_on_value : $@thin () -> () {
+sil @trivial_destructor_refcount_inst_on_value : $@convention(thin) () -> () {
   %0 = alloc_ref $TrivialDestructor
   strong_retain %0 : $TrivialDestructor
   strong_release %0 : $TrivialDestructor
@@ -151,7 +151,7 @@ sil @trivial_destructor_refcount_inst_on_value : $@thin () -> () {
 
 // Retains/Releases on a different value in the use list implies abort.
 //
-// CHECK-LABEL: sil @trivial_destructor_refcount_inst_on_diff_value : $@thin (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @trivial_destructor_refcount_inst_on_diff_value : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_ref
 // CHECK-NEXT: ref_element_addr
@@ -161,7 +161,7 @@ sil @trivial_destructor_refcount_inst_on_value : $@thin () -> () {
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @trivial_destructor_refcount_inst_on_diff_value : $@thin (Builtin.NativeObject) -> () {
+sil @trivial_destructor_refcount_inst_on_diff_value : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_ref $TrivialDestructor
   %2 = ref_element_addr %1 : $TrivialDestructor, #TrivialDestructor.ptr
@@ -188,7 +188,7 @@ class NonTrivialDestructor {
   deinit { }
 }
 
-sil @_TFC4main17NonTrivialDestructorD : $@cc(method) @thin (@owned NonTrivialDestructor) -> () {
+sil @_TFC4main17NonTrivialDestructorD : $@convention(method) (@owned NonTrivialDestructor) -> () {
 bb0(%0 : $NonTrivialDestructor):
   %1 = ref_element_addr %0 : $NonTrivialDestructor, #NonTrivialDestructor.ptr
   %2 = load %1 : $*Builtin.NativeObject
@@ -201,13 +201,13 @@ bb0(%0 : $NonTrivialDestructor):
 // Make sure that a ref count operation on a different value in the
 // destructor disrupts the algorithm.
 //
-// CHECK-LABEL: sil @non_trivial_destructor_refcount_on_different_value : $@thin () -> () {
+// CHECK-LABEL: sil @non_trivial_destructor_refcount_on_different_value : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_ref
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @non_trivial_destructor_refcount_on_different_value : $@thin () -> () {
+sil @non_trivial_destructor_refcount_on_different_value : $@convention(thin) () -> () {
   %0 = alloc_ref $NonTrivialDestructor
   strong_release %0 : $NonTrivialDestructor
   %1 = tuple()
@@ -222,7 +222,7 @@ class NonTrivialDestructor2 {
 }
 
 // Test if dealloc_ref on a different value disrupts the algorithm.
-sil @_TFC4main17NonTrivialDestructor2D : $@cc(method) @thin (@owned NonTrivialDestructor2) -> () {
+sil @_TFC4main17NonTrivialDestructor2D : $@convention(method) (@owned NonTrivialDestructor2) -> () {
 bb0(%0 : $NonTrivialDestructor2):
   %1 = ref_element_addr %0 : $NonTrivialDestructor2, #NonTrivialDestructor2.ptr
   %2 = load %1 : $*NonTrivialDestructor
@@ -232,13 +232,13 @@ bb0(%0 : $NonTrivialDestructor2):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil @non_trivial_destructor_deallocref_on_different_value : $@thin () -> () {
+// CHECK-LABEL: sil @non_trivial_destructor_deallocref_on_different_value : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_ref
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @non_trivial_destructor_deallocref_on_different_value : $@thin () -> () {
+sil @non_trivial_destructor_deallocref_on_different_value : $@convention(thin) () -> () {
   %0 = alloc_ref $NonTrivialDestructor
   strong_release %0 : $NonTrivialDestructor
   %1 = tuple()
@@ -253,24 +253,24 @@ class NonTrivialDestructor3 {
 }
 
 // Make sure a non-builtin apply disrupts the algorithm.
-sil @_TFC4main17NonTrivialDestructor3D : $@cc(method) @thin (@owned NonTrivialDestructor3) -> () {
+sil @_TFC4main17NonTrivialDestructor3D : $@convention(method) (@owned NonTrivialDestructor3) -> () {
 bb0(%0 : $NonTrivialDestructor3):
   %1 = ref_element_addr %0 : $NonTrivialDestructor3, #NonTrivialDestructor3.ptr
   %2 = load %1 : $*Builtin.NativeObject
-  %3 = function_ref @ptr_user : $@thin (Builtin.NativeObject) -> ()
-  apply %3 (%2) : $@thin (Builtin.NativeObject) -> ()
+  %3 = function_ref @ptr_user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %3 (%2) : $@convention(thin) (Builtin.NativeObject) -> ()
   dealloc_ref %0 : $NonTrivialDestructor3
   %4 = tuple()
   return %4 : $()
 }
 
-// CHECK-LABEL: sil @non_trivial_destructor_unknown_apply : $@thin () -> () {
+// CHECK-LABEL: sil @non_trivial_destructor_unknown_apply : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_ref
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @non_trivial_destructor_unknown_apply : $@thin () -> () {
+sil @non_trivial_destructor_unknown_apply : $@convention(thin) () -> () {
   %0 = alloc_ref $NonTrivialDestructor
   strong_release %0 : $NonTrivialDestructor
   %1 = tuple()
@@ -285,41 +285,41 @@ class NonTrivialObjCDestructor {
 }
 
 // Make sure we do not handle objc_methods
-sil @_TFC4main17NonTrivialObjCDestructorD : $@cc(objc_method) @thin (@owned NonTrivialObjCDestructor) -> () {
+sil @_TFC4main17NonTrivialObjCDestructorD : $@convention(objc_method) (@owned NonTrivialObjCDestructor) -> () {
 bb0(%0 : $NonTrivialObjCDestructor):
   dealloc_ref %0 : $NonTrivialObjCDestructor
   %1 = tuple()
   return %1 : $()
 }
 
-// CHECK-LABEL: sil @non_trivial_destructor_objc_destructor : $@thin () -> () {
+// CHECK-LABEL: sil @non_trivial_destructor_objc_destructor : $@convention(thin) () -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_ref
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @non_trivial_destructor_objc_destructor : $@thin () -> () {
+sil @non_trivial_destructor_objc_destructor : $@convention(thin) () -> () {
   %0 = alloc_ref $NonTrivialObjCDestructor
   strong_release %0 : $NonTrivialObjCDestructor
   %1 = tuple()
   return %1 : $()
 }
 
-// CHECK-LABEL: sil @non_trivial_destructor_on_stack : $@thin () -> () {
+// CHECK-LABEL: sil @non_trivial_destructor_on_stack : $@convention(thin) () -> () {
 // CHECK: alloc_stack
 // CHECK: return
-sil @non_trivial_destructor_on_stack : $@thin () -> () {
+sil @non_trivial_destructor_on_stack : $@convention(thin) () -> () {
   %0 = alloc_stack $NonTrivialDestructor
   dealloc_stack %0#0 : $*@local_storage NonTrivialDestructor
   %1 = tuple()
   return %1 : $()
 }
 
-// CHECK-LABEL: sil @trivial_destructor_on_stack : $@thin () -> () {
+// CHECK-LABEL: sil @trivial_destructor_on_stack : $@convention(thin) () -> () {
 // CHECK-NOT: alloc_stack
 // CHECK-NOT: dealloc_stack
 // CHECK: return
-sil @trivial_destructor_on_stack : $@thin () -> () {
+sil @trivial_destructor_on_stack : $@convention(thin) () -> () {
   %0 = alloc_stack $Int
   destroy_addr %0#1 : $*Int
   dealloc_stack %0#0 : $*@local_storage Int
@@ -330,9 +330,9 @@ sil @trivial_destructor_on_stack : $@thin () -> () {
 // If we have an instruction that mayTrap that uses the alloc_ref, we can't
 // eliminate it.
 //
-// CHECK-LABEL: sil @trivial_destructor_may_trap : $@thin () -> () {
+// CHECK-LABEL: sil @trivial_destructor_may_trap : $@convention(thin) () -> () {
 // CHECK: alloc_ref
-sil @trivial_destructor_may_trap : $@thin () -> () {
+sil @trivial_destructor_may_trap : $@convention(thin) () -> () {
   %0 = alloc_ref $TrivialDestructor
   %1 = unconditional_checked_cast %0 : $TrivialDestructor to $AnyObject
   strong_release %0 : $TrivialDestructor

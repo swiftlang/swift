@@ -10,28 +10,28 @@ enum X {
   case twotransp
 }
 
-sil @_TTWO5test21XSs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb : $@cc(witness_method) @thin (@in X, @in X, @thick X.Type) -> Bool {
+sil @_TTWO5test21XSs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb : $@convention(witness_method) (@in X, @in X, @thick X.Type) -> Bool {
 bb0(%0 : $*X, %1 : $*X, %2 : $@thick X.Type):
   %3 = load %0 : $*X                             
   %4 = load %1 : $*X                             
  
-  %5 = function_ref @_TF5test2oi2eeFTOS_1XS0__Sb : $@thin (X, X) -> Bool
-  %6 = apply %5(%3, %4) : $@thin (X, X) -> Bool  
+  %5 = function_ref @_TF5test2oi2eeFTOS_1XS0__Sb : $@convention(thin) (X, X) -> Bool
+  %6 = apply %5(%3, %4) : $@convention(thin) (X, X) -> Bool  
   return %6 : $Bool                              
 }
 
 
-sil @_TTWO5test21XSs8HashableS_FS1_g9hashValueSi : $@cc(witness_method) @thin (@inout X) -> Int {
+sil @_TTWO5test21XSs8HashableS_FS1_g9hashValueSi : $@convention(witness_method) (@inout X) -> Int {
 bb0(%0 : $*X):
   %1 = load %0 : $*X                             
  
-  %2 = function_ref @_TFO5test21Xg9hashValueSi : $@cc(method) @thin (X) -> Int
-  %3 = apply %2(%1) : $@cc(method) @thin (X) -> Int
+  %2 = function_ref @_TFO5test21Xg9hashValueSi : $@convention(method) (X) -> Int
+  %3 = apply %2(%1) : $@convention(method) (X) -> Int
   return %3 : $Int                               
 }
 
-sil @_TF5test2oi2eeFTOS_1XS0__Sb : $@thin (X, X) -> Bool
-sil @_TFO5test21Xg9hashValueSi : $@cc(method) @thin (X) -> Int
+sil @_TF5test2oi2eeFTOS_1XS0__Sb : $@convention(thin) (X, X) -> Bool
+sil @_TFO5test21Xg9hashValueSi : $@convention(method) (X) -> Int
 
 // CHECK-LABEL: sil_witness_table X: Equatable module
 // CHECK: method #Equatable."=="!1: @_TTWO5test21XSs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb

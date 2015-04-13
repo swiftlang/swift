@@ -13,10 +13,10 @@ class C {
 
 // CHECK: [[C:%C6vtable1C]] = type <{ %swift.refcounted }>
 
-sil @_TFC6vtable1CCfMS0_FT_S0_ : $@thin (@thick C.Type) -> @owned C
-sil @_TFC6vtable1CcfMS0_FT_S0_ : $@cc(method) @thin (@owned C) -> @owned C
-sil @_TFC6vtable1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject
-sil @_TFC6vtable1CD : $@cc(method) @thin (@owned C) -> ()
+sil @_TFC6vtable1CCfMS0_FT_S0_ : $@convention(thin) (@thick C.Type) -> @owned C
+sil @_TFC6vtable1CcfMS0_FT_S0_ : $@convention(method) (@owned C) -> @owned C
+sil @_TFC6vtable1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
+sil @_TFC6vtable1CD : $@convention(method) (@owned C) -> ()
 
 // CHECK-objc: @_TMdC6vtable1C = global [[C_METADATA_T:{.*\* }]] {
 // CHECK-objc: void ([[C]]*)* @_TFC6vtable1CD,

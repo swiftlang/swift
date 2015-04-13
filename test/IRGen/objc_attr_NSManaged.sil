@@ -31,34 +31,34 @@ sil_vtable X {}
 @objc class SwiftGizmo : Gizmo {
   @objc @NSManaged var x: X
 }
-sil @_TToFC19objc_attr_NSManaged1XcfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned X) -> @owned X {
+sil @_TToFC19objc_attr_NSManaged1XcfMS0_FT_S0_ : $@convention(objc_method) (@owned X) -> @owned X {
 bb0(%0 : $X):
   return %0 : $X
 }
 
-sil @_TToFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TToFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_ : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @_TToFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__ : $@cc(objc_method) @thin (Int, @owned SwiftGizmo) -> @owned SwiftGizmo! {
+sil @_TToFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__ : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo! {
 bb0(%0 : $Int, %1 : $SwiftGizmo):
   unreachable
 }
 
-sil @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_ : $@cc(method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_ : $@convention(method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_S0_ : $@cc(method) @thin (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_S0_ : $@convention(method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Int, %1 : $SwiftGizmo):
   return %1 : $SwiftGizmo
 }
 
-sil @_TFC19objc_attr_NSManaged10SwiftGizmoD : $@cc(method) @thin (@owned SwiftGizmo) -> ()
+sil @_TFC19objc_attr_NSManaged10SwiftGizmoD : $@convention(method) (@owned SwiftGizmo) -> ()
 
-sil @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__ : $@cc(method) @thin (Int, @owned SwiftGizmo) -> Int
+sil @_TFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT7bellsOnSi_GSQS0__ : $@convention(method) (Int, @owned SwiftGizmo) -> Int
 
 /* FIXME: sil_vtable parser picks the wrong 'init' overload. rdar://problem/19572342 */
 sil_vtable SwiftGizmo {

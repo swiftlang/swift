@@ -77,7 +77,7 @@ func generic_metatypes<T>(x: T)
 
 // rdar://16610078
 
-// CHECK-LABEL: sil hidden @_TF9metatypes30existential_metatype_from_thinFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
+// CHECK-LABEL: sil hidden @_TF9metatypes30existential_metatype_from_thinFT_PMPS_3Any_ : $@convention(thin) () -> @thick Any.Type
 // CHECK:      [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick Any.Type
@@ -86,7 +86,7 @@ func existential_metatype_from_thin() -> Any.Type {
   return SomeStruct.self
 }
 
-// CHECK-LABEL: sil hidden @_TF9metatypes36existential_metatype_from_thin_valueFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
+// CHECK-LABEL: sil hidden @_TF9metatypes36existential_metatype_from_thin_valueFT_PMPS_3Any_ : $@convention(thin) () -> @thick Any.Type
 // CHECK:      [[T0:%.*]] = function_ref @_TFV9metatypes10SomeStructCfMS0_FT_S0_
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])

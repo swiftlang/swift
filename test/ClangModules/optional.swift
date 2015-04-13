@@ -11,7 +11,7 @@ class A {
   @objc func foo() -> String? {
     return ""
   }
-// CHECK:    sil hidden @_TToFC8optional1A3foofS0_FT_GSqSS_ : $@cc(objc_method) @thin (A) -> @autoreleased Optional<NSString>
+// CHECK:    sil hidden @_TToFC8optional1A3foofS0_FT_GSqSS_ : $@convention(objc_method) (A) -> @autoreleased Optional<NSString>
 // CHECK:      [[T0:%.*]] = function_ref @_TFC8optional1A3foofS0_FT_GSqSS_
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]](%0)
 // CHECK-NEXT: strong_release
@@ -39,7 +39,7 @@ class A {
 // CHECK-NEXT: autorelease_return [[T0]]
 
   @objc func bar(#x : String?) {}
-// CHECK:    sil hidden @_TToFC8optional1A3barfS0_FT1xGSqSS__T_ : $@cc(objc_method) @thin (Optional<NSString>, A) -> ()
+// CHECK:    sil hidden @_TToFC8optional1A3barfS0_FT1xGSqSS__T_ : $@convention(objc_method) (Optional<NSString>, A) -> ()
 // CHECK:      [[TMP_OPTSTR:%.*]] = alloc_stack $Optional<String>
 // CHECK-NEXT: [[TMP_OPTNSSTR:%.*]] = alloc_stack $Optional<NSString>
 // CHECK-NEXT: store {{.*}} to [[TMP_OPTNSSTR]]#1

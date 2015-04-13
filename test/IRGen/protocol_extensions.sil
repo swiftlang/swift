@@ -14,26 +14,26 @@ extension P1 {
 }
 
 // CHECK-LABEL: define hidden void @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_
-sil hidden @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@cc(method) @thin <Self where Self : P1> (@in Self) -> () {
+sil hidden @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@convention(method) <Self where Self : P1> (@in Self) -> () {
 bb0(%0 : $*Self):
   debug_value_addr %0 : $*Self  // let self       // id: %1
-  %2 = witness_method $Self, #P1.reqP1a!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> () // user: %3
-  %3 = apply %2<Self>(%0) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
+  %2 = witness_method $Self, #P1.reqP1a!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> () // user: %3
+  %3 = apply %2<Self>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Self                        // id: %4
   %5 = tuple ()                                   // user: %6
   return %5 : $()                                 // id: %6
 }
 
 // CHECK-LABEL: define void @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_
-sil @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_ : $@cc(method) @thin <Self where Self : P1> (@in Self) -> () {
+sil @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_ : $@convention(method) <Self where Self : P1> (@in Self) -> () {
 bb0(%0 : $*Self):
   debug_value_addr %0 : $*Self  // let self       // id: %1
   // function_ref protocol_extensions.P1.extP1a <A : protocol_extensions.P1>(protocol_extensions.P1.Self)() -> ()
-  %2 = function_ref @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> () // user: %5
+  %2 = function_ref @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> () // user: %5
   %3 = alloc_stack $Self                          // users: %4, %5, %6
   copy_addr %0 to [initialization] %3#1 : $*Self  // id: %4
   // CHECK: call void @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_
-  %5 = apply %2<Self>(%3#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> ()
+  %5 = apply %2<Self>(%3#1) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> ()
   dealloc_stack %3#0 : $*@local_storage Self      // id: %6
   destroy_addr %0 : $*Self                        // id: %7
   %8 = tuple ()                                   // user: %9

@@ -19,8 +19,8 @@ var MyVar = 3
 // CHECK: let MyConst: Int
 // CHECK: var MyVar: Int
 
-// CHECK-DAG: sil hidden [fragile] [global_init] @_TF11global_initau7MyConstSi : $@thin () -> Builtin.RawPointer
-// CHECK-DAG: sil hidden [fragile] [global_init] @_TF11global_initau5MyVarSi : $@thin () -> Builtin.RawPointer
+// CHECK-DAG: sil hidden [fragile] [global_init] @_TF11global_initau7MyConstSi : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-DAG: sil hidden [fragile] [global_init] @_TF11global_initau5MyVarSi : $@convention(thin) () -> Builtin.RawPointer
 
 func getGlobals() -> Int {
   return MyVar + MyConst

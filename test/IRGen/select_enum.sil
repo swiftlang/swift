@@ -8,7 +8,7 @@ enum SinglePayloadSingleEmpty {
 }
 
 // CHECK-LABEL: define void @select_enum_SinglePayloadSingleEmpty(%O11select_enum24SinglePayloadSingleEmpty*)
-sil @select_enum_SinglePayloadSingleEmpty : $@thin (@in SinglePayloadSingleEmpty) -> () {
+sil @select_enum_SinglePayloadSingleEmpty : $@convention(thin) (@in SinglePayloadSingleEmpty) -> () {
 bb0(%0 : $*SinglePayloadSingleEmpty):
   %1 = load %0 : $*SinglePayloadSingleEmpty
   // CHECK: [[PAYLOAD1:%[0-9]+]] = load [[WORD_TY:(i32|i64)]], [[WORD_TY:(i32|i64)]]*
@@ -51,7 +51,7 @@ enum MyOptional<T> {
 }
 
 
-sil @select_enum_TwoCasesNoPayload :$ @thin (@in TwoCasesNoPayload, @in MyOptional<TwoCasesNoPayload>) -> () {
+sil @select_enum_TwoCasesNoPayload :$ @convention(thin) (@in TwoCasesNoPayload, @in MyOptional<TwoCasesNoPayload>) -> () {
 bb0(%0 : $*TwoCasesNoPayload, %10 : $*MyOptional<TwoCasesNoPayload>):
 // CHECK: [[PAYLOAD1:%[0-9]+]] = load i1, i1*
   %1 = load %0 : $*TwoCasesNoPayload

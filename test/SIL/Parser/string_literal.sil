@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt %s -verify
 
-sil @test : $@thin () -> () {
+sil @test : $@convention(thin) () -> () {
 bb0:
   %1 = string_literal utf8 "\u{0B}"
   %6 = tuple ()                                   // user: %7

@@ -52,8 +52,8 @@ func «+»(a: Int, b: Int) -> Int { return a + b }
 
 // Curried function entry points mangle in terms of their original types, not
 // their uncurried private SIL types.
-// CHECK-LABEL: sil hidden @_TF8mangling7curriedfT1aSi_FT1bSS_T_ : $@thin (@owned String, Int) -> ()
-// CHECK-LABEL: sil shared @_TF8mangling7curriedFT1aSi_FT1bSS_T_ : $@thin (Int) -> @owned @callee_owned (@owned String) -> ()
+// CHECK-LABEL: sil hidden @_TF8mangling7curriedfT1aSi_FT1bSS_T_ : $@convention(thin) (@owned String, Int) -> ()
+// CHECK-LABEL: sil shared @_TF8mangling7curriedFT1aSi_FT1bSS_T_ : $@convention(thin) (Int) -> @owned @callee_owned (@owned String) -> ()
 func curried(#a: Int)(b: String) {}
 var _ = curried(a: 1)
 
@@ -112,12 +112,12 @@ struct HasVarInit {
 // auto_closures should not collide with the equivalent non-auto_closure
 // function type.
 
-// CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fKT_Si_T_ : $@thin (@owned @callee_owned () -> Int) -> () {
+// CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fKT_Si_T_ : $@convention(thin) (@owned @callee_owned () -> Int) -> () {
 func autoClosureOverload(@autoclosure #f: () -> Int) {}
-// CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fFT_Si_T_ : $@thin (@owned @callee_owned () -> Int) -> () {
+// CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fFT_Si_T_ : $@convention(thin) (@owned @callee_owned () -> Int) -> () {
 func autoClosureOverload(#f: () -> Int) {}
 
-// CHECK-LABEL: sil hidden @_TF8mangling24autoClosureOverloadCallsFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF8mangling24autoClosureOverloadCallsFT_T_ : $@convention(thin) () -> () {
 func autoClosureOverloadCalls() {
   // CHECK: function_ref @_TF8mangling19autoClosureOverloadFT1fKT_Si_T_
   autoClosureOverload(f: 1)
@@ -134,9 +134,9 @@ protocol HasAssocType {
   typealias Assoc
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling4fooAUS_12HasAssocType_U__FT_T_ : $@thin <T where T : HasAssocType> () -> ()
+// CHECK-LABEL: sil hidden @_TF8mangling4fooAUS_12HasAssocType_U__FT_T_ : $@convention(thin) <T where T : HasAssocType> () -> ()
 func fooA<T: HasAssocType>() {}
-// CHECK-LABEL: sil hidden @_TF8mangling4fooBUS_12HasAssocType_US_9AssocReqt__FT_T_ : $@thin <T where T : HasAssocType, T.Assoc : AssocReqt> () -> ()
+// CHECK-LABEL: sil hidden @_TF8mangling4fooBUS_12HasAssocType_US_9AssocReqt__FT_T_ : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> () -> ()
 func fooB<T: HasAssocType where T.Assoc: AssocReqt>() {}
 
 // CHECK-LABEL: sil hidden @_TZF8manglingoi2qqFTSiSi_T_
@@ -157,30 +157,30 @@ struct InstanceAndClassProperty {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling6curry1FT_T_ : $@thin () -> ()
+// CHECK-LABEL: sil hidden @_TF8mangling6curry1FT_T_ : $@convention(thin) () -> ()
 func curry1() {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@thin () -> (Int, @error _ErrorType)
+// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@convention(thin) () -> (Int, @error _ErrorType)
 func bar() throws -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@thin () -> @error _ErrorType
+// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@convention(thin) () -> @error _ErrorType
 func curry1Throws() throws {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@thin () -> (@owned @callee_owned () -> (), @error _ErrorType)
+// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> (), @error _ErrorType)
 func curry2Throws() throws -> () -> () {
   return curry1
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@thin () -> @owned @callee_owned () -> @error _ErrorType
+// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@convention(thin) () -> @owned @callee_owned () -> @error _ErrorType
 func curry3() -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@thin () -> (@owned @callee_owned () -> @error _ErrorType, @error _ErrorType)
+// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> @error _ErrorType, @error _ErrorType)
 func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }

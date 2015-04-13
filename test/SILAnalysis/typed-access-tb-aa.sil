@@ -242,7 +242,7 @@ import Builtin
 // CHECK: (1):   %13 = alloc_box $Builtin.FPIEEE64
 // CHECK: NoAlias
 
-sil @builtin_test : $@thin () -> () {
+sil @builtin_test : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $Builtin.RawPointer
   %1 = alloc_box $Builtin.NativeObject
@@ -355,7 +355,7 @@ struct STest_S3 {
   var c : STest_C1
 }
 
-sil @struct_tests : $@thin () -> () {
+sil @struct_tests : $@convention(thin) () -> () {
 
   %0 = alloc_box $STest_S1
   %1 = alloc_box $STest_S2
@@ -467,7 +467,7 @@ enum ETest_E3 {
   case Unknown
 }
 
-sil @enum_tests : $@thin () -> () {
+sil @enum_tests : $@convention(thin) () -> () {
   %0 = alloc_box $ETest_S1
   %1 = alloc_box $ETest_S2
   %2 = alloc_box $ETest_E1
@@ -659,7 +659,7 @@ class CTest_C3 : CTest_C1 {
 
 protocol AnyObject {}
 
-sil @class_tests : $@thin () -> () {
+sil @class_tests : $@convention(thin) () -> () {
   %0 = alloc_box $CTest_C1
   %1 = alloc_box $CTest_C2
   %2 = alloc_box $CTest_C3
@@ -800,7 +800,7 @@ enum TTest_E1 {
 // CHECK: (1):   %11 = alloc_box $Builtin.FPIEEE32
 // CHECK: NoAlias
 
-sil @tuple_tests : $@thin () -> () {
+sil @tuple_tests : $@convention(thin) () -> () {
   %0 = alloc_box $(Builtin.RawPointer, Builtin.Int64)
   %1 = alloc_box $(TTest_S1, Builtin.Int64)
   %2 = alloc_box $(TTest_E1, Builtin.Int64)

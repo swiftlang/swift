@@ -5,7 +5,7 @@ enum Either<T, U> { // expected-error{{unimplemented}}
   case Right(T)
 }
 
-sil @switch_either : $@thin <T, U> (@in Either<T, U>) -> () {
+sil @switch_either : $@convention(thin) <T, U> (@in Either<T, U>) -> () {
 entry(%x : $*Either<T, U>):
   switch_enum_addr %x : $*Either<T, U>, case #Either.Left!enumelt.1: left, case #Either.Right!enumelt.1: right
 left:

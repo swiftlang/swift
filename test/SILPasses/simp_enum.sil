@@ -16,7 +16,7 @@ enum SimpleEnum {
 //CHECK: return
 
 // main.test_union_1 (E : main.SimpleEnum) -> main.SimpleEnum
-sil @_TF4main12test_union_1FT1EOS_10SimpleEnum_S0_ : $@thin (SimpleEnum) -> SimpleEnum {
+sil @_TF4main12test_union_1FT1EOS_10SimpleEnum_S0_ : $@convention(thin) (SimpleEnum) -> SimpleEnum {
 bb0(%0 : $SimpleEnum):
   %1 = alloc_stack $SimpleEnum  // var E          // users: %16, %2
   store %0 to %1#1 : $*SimpleEnum                 // id: %2

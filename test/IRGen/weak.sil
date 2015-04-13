@@ -17,7 +17,7 @@ import Swift
 
 class C {}
 sil_vtable C {}
-sil @_TFC4weak1CD : $@cc(method) @thin (C) -> ()
+sil @_TFC4weak1CD : $@convention(method) (C) -> ()
 
 protocol P : class {
   func explode()
@@ -32,7 +32,7 @@ struct A {
 // stride 8
 // CHECK: @_TWVV4weak1A = {{.*}} i8* inttoptr (i64 8 to i8*), i8* inttoptr (i64 1114119 to i8*), i8* inttoptr (i64 8 to i8*)]
 
-sil @test_weak_load_store : $@thin (@inout A, Optional<C>) -> () {
+sil @test_weak_load_store : $@convention(thin) (@inout A, Optional<C>) -> () {
 bb0(%0 : $*A, %1 : $Optional<C>):
   %2 = struct_element_addr %0 : $*A, #A.x
   %3 = load_weak %2 : $*@sil_weak Optional<C>
@@ -55,7 +55,7 @@ struct B {
   weak var x : P?
 }
 
-sil @test_weak_load_store_proto : $@thin (@inout B, Optional<P>) -> () {
+sil @test_weak_load_store_proto : $@convention(thin) (@inout B, Optional<P>) -> () {
 bb0(%0 : $*B, %1 : $Optional<P>):
   %2 = struct_element_addr %0 : $*B, #B.x
   %3 = load_weak %2 : $*@sil_weak Optional<P>
@@ -79,7 +79,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
 // CHECK: [[RECOMPUTED_TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
 // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* [[RECOMPUTED_TMPOBJ]])
 
-sil @test_weak_alloc_stack : $@thin (Optional<P>) -> () {
+sil @test_weak_alloc_stack : $@convention(thin) (Optional<P>) -> () {
 bb0(%0 : $Optional<P>):
   %1 = alloc_stack $@sil_weak Optional<P>
   store_weak %0 to [initialization] %1#1 : $*@sil_weak Optional<P>

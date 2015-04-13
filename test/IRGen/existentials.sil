@@ -11,7 +11,7 @@ import gizmo
 
 // rdar://16621578
 
-sil @init_opaque_existential : $@thin <T where T : Gizmo> (@out protocol<>, @owned T) -> () {
+sil @init_opaque_existential : $@convention(thin) <T where T : Gizmo> (@out protocol<>, @owned T) -> () {
 bb0(%0 : $*protocol<>, %1 : $T):
   %2 = init_existential_addr %0 : $*protocol<>, $T
   store %1 to %2 : $*T
@@ -26,7 +26,7 @@ bb0(%0 : $*protocol<>, %1 : $T):
 // CHECK-NEXT:    store [[GIZMO]]* %1, [[GIZMO]]** [[T1]], align 8
 // CHECK-NEXT:    ret void
 
-sil @take_opaque_existential : $@thin (@out protocol<>, @in protocol <>) -> () {
+sil @take_opaque_existential : $@convention(thin) (@out protocol<>, @in protocol <>) -> () {
 bb0(%0 : $*protocol<>, %1 : $*protocol<>):
   copy_addr [take] %1 to [initialization] %0 : $*protocol<>
   %3 = tuple ()
@@ -55,7 +55,7 @@ bb0(%0 : $*protocol<>, %1 : $*protocol<>):
 
 // CHECK-DAG: define %objc_object* @init_existential_objc_to_objc(%objc_object*) {
 // CHECK:       ret %objc_object* %0
-sil @init_existential_objc_to_objc : $@thin (@owned OP2) -> @owned OP {
+sil @init_existential_objc_to_objc : $@convention(thin) (@owned OP2) -> @owned OP {
 entry(%o : $OP2):
   %a = init_existential_ref %o : $OP2 : $OP2, $OP
   return %a : $OP
@@ -64,7 +64,7 @@ entry(%o : $OP2):
 protocol CP: class {}
 
 // CHECK-DAG: define { %objc_object*, i8** } @class_existential_unowned(%objc_object*, i8**) {
-sil @class_existential_unowned : $@thin (@owned CP) -> @owned CP {
+sil @class_existential_unowned : $@convention(thin) (@owned CP) -> @owned CP {
 entry(%s : $CP):
   %u = ref_to_unowned %s : $CP to $@sil_unowned CP
   // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_unknownWeakRetain to void (%objc_object*)*)(%objc_object* %0)
@@ -89,7 +89,7 @@ entry(%s : $CP):
 }
 
 // CHECK-DAG: define void @class_existential_weak({ %swift.weak, i8** }* noalias sret, i128)
-sil @class_existential_weak : $@thin (@out @sil_weak CP?, @owned CP?) -> () {
+sil @class_existential_weak : $@convention(thin) (@out @sil_weak CP?, @owned CP?) -> () {
 entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[V:%.*]] = alloca { %swift.weak, i8** }
   %v = alloc_stack $@sil_weak CP?

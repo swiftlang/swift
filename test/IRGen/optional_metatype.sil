@@ -17,7 +17,7 @@ import gizmo
 // armv7-LABEL:  define void @optional_objc_metatype(i32)
 // armv7:           icmp eq i32 %0, 0
 
-sil @optional_objc_metatype : $@thin (Optional<@objc_metatype Gizmo.Type>) -> () {
+sil @optional_objc_metatype : $@convention(thin) (Optional<@objc_metatype Gizmo.Type>) -> () {
 bb0(%0 : $Optional<@objc_metatype Gizmo.Type>):
   switch_enum %0 : $Optional<@objc_metatype Gizmo.Type>, case #Optional.Some!enumelt.1: some, case #Optional.None!enumelt: none
 some(%m : $@objc_metatype Gizmo.Type):
@@ -37,7 +37,7 @@ cont:
 // armv7-LABEL:  define void @optional_swift_metatype(i32)
 // armv7:            icmp eq i32 %0, 0
 
-sil @optional_swift_metatype : $@thin (Optional<@thick Gizmo.Type>) -> () {
+sil @optional_swift_metatype : $@convention(thin) (Optional<@thick Gizmo.Type>) -> () {
 bb0(%0 : $Optional<@thick Gizmo.Type>):
   switch_enum %0 : $Optional<@thick Gizmo.Type>, case #Optional.Some!enumelt.1: some, case #Optional.None!enumelt: none
 some(%m : $@thick Gizmo.Type):

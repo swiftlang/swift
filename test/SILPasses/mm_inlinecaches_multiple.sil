@@ -14,13 +14,13 @@ class Foo {
 class Bar : Foo {
 }
 
-sil @_TFC8testcase3Foo4pingfS0_FT_T_ : $@cc(method) @thin (@guaranteed Foo) -> () {
+sil @_TFC8testcase3Foo4pingfS0_FT_T_ : $@convention(method) (@guaranteed Foo) -> () {
 bb0(%0 : $Foo):
   %2 = tuple ()                                   // user: %3
   return %2 : $()                                 // id: %3
 }
 
-sil @_TFC8testcase3FoocfMS0_FT_S0_ : $@cc(method) @thin (@owned Foo) -> @owned Foo {
+sil @_TFC8testcase3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo {
 bb0(%0 : $Foo):
   return %0 : $Foo                                // id: %1
 }
@@ -29,10 +29,10 @@ bb0(%0 : $Foo):
 //CHECK-LABEL: @_TF8testcase7my_mainFCS_3FooT_
 //CHECK-NOT: checked_cast_br [exact] %0 : $Foo to $Foo
 //CHECK: return
-sil @_TF8testcase7my_mainFCS_3FooT_ : $@thin (@owned Foo) -> () {
+sil @_TF8testcase7my_mainFCS_3FooT_ : $@convention(thin) (@owned Foo) -> () {
 bb0(%0 : $Foo):
-  %1 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> () , $@cc(method) @thin (@guaranteed Foo) -> () // user: %2
-  %2 = apply %1(%0) : $@cc(method) @thin (@guaranteed Foo) -> ()
+  %1 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> () , $@convention(method) (@guaranteed Foo) -> () // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Foo) -> ()
   %3 = tuple ()                                   // user: %4
   return %3 : $()                                 // id: %4
 }

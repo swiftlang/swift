@@ -11,10 +11,10 @@ class Foo {
   func ping()
 }
 
-sil @_TFC8testcase3Foo4pingfS0_FT_T_ : $@cc(method) @thin (@guaranteed Foo) -> ()
-sil @_TFC8testcase3FoocfMS0_FT_S0_ : $@cc(method) @thin (@owned Foo) -> @owned Foo
+sil @_TFC8testcase3Foo4pingfS0_FT_T_ : $@convention(method) (@guaranteed Foo) -> ()
+sil @_TFC8testcase3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo
 
-sil @_TF8testcase7my_mainFCS_3FooT_ : $@thin (@owned Foo) -> () {
+sil @_TF8testcase7my_mainFCS_3FooT_ : $@convention(thin) (@owned Foo) -> () {
 bb0(%0 : $Foo):
 
 //CHECK: checked_cast_br [exact] %0 : $Foo to $Foo
@@ -24,8 +24,8 @@ bb0(%0 : $Foo):
 
 //CHECK: class_method
 //CHECK-NEXT: apply
-  %1 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> () , $@cc(method) @thin (@guaranteed Foo) -> () // user: %2
-  %2 = apply %1(%0) : $@cc(method) @thin (@guaranteed Foo) -> ()
+  %1 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> () , $@convention(method) (@guaranteed Foo) -> () // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Foo) -> ()
   %3 = tuple ()                                   // user: %4
   return %3 : $()                                 // id: %4
 }
@@ -41,14 +41,14 @@ class C {
 }
 
 // CHECK-LABEL: sil @_TZFC4spec1C3foofMS0_FT_T_
-sil @_TZFC4spec1C3foofMS0_FT_T_ : $@thin (@thick C.Type) -> () {
+sil @_TZFC4spec1C3foofMS0_FT_T_ : $@convention(thin) (@thick C.Type) -> () {
 bb0(%0 : $@thick C.Type):
   %2 = tuple ()
   return %2 : $()
 }
 
 // CHECK-LABEL: sil @_TZFC4spec1C3barfMS0_FT_T_
-sil @_TZFC4spec1C3barfMS0_FT_T_ : $@thin (@thick C.Type) -> () {
+sil @_TZFC4spec1C3barfMS0_FT_T_ : $@convention(thin) (@thick C.Type) -> () {
   // CHECK: bb0
 bb0(%0 : $@thick C.Type):
   // CHECK-NOT: class_method
@@ -60,10 +60,10 @@ bb0(%0 : $@thick C.Type):
   // CHECK: apply [[REF]]
   // CHECK: br bb1
   // CHECK: bb3
-  // CHECK: [[METHOD:%.*]] = class_method %0 : $@thick C.Type, #C.foo!1 : C.Type -> () -> () , $@thin (@thick C.Type) -> ()
+  // CHECK: [[METHOD:%.*]] = class_method %0 : $@thick C.Type, #C.foo!1 : C.Type -> () -> () , $@convention(thin) (@thick C.Type) -> ()
   // CHECK: apply [[METHOD]]
-  %2 = class_method %0 : $@thick C.Type, #C.foo!1 : C.Type -> () -> () , $@thin (@thick C.Type) -> ()
-  %3 = apply %2(%0) : $@thin (@thick C.Type) -> ()
+  %2 = class_method %0 : $@thick C.Type, #C.foo!1 : C.Type -> () -> () , $@convention(thin) (@thick C.Type) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@thick C.Type) -> ()
   %4 = tuple ()
   return %4 : $()
 }

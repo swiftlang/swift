@@ -9,7 +9,7 @@ import Foundation
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3foo{{.*}} : $@cc(method) @thin (@owned @callee_owned (Int) -> Int, Int, @guaranteed Foo) -> Int
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3foo{{.*}} : $@convention(method) (@owned @callee_owned (Int) -> Int, Int, @guaranteed Foo) -> Int
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], %1, %2)
   dynamic func foo(f: Int -> Int, x: Int) -> Int {
     return f(x)
@@ -19,7 +19,7 @@ import Foundation
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb_dCSo8NSString_aS__XFo_oSS_oSS_
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bar{{.*}} : $@cc(method) @thin (@owned @callee_owned (@owned String) -> @owned String, @owned String, @guaranteed Foo) -> @owned String
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bar{{.*}} : $@convention(method) (@owned @callee_owned (@owned String) -> @owned String, @owned String, @guaranteed Foo) -> @owned String
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, %2)
   dynamic func bar(f: String -> String, x: String) -> String {
     return f(x)
@@ -29,14 +29,14 @@ import Foundation
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb_dGSqCSo8NSString__aGSqS___XFo_oGSqSS__oGSqSS__
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bas{{.*}} : $@cc(method) @thin (@owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>, @owned Optional<String>, @guaranteed Foo) -> @owned Optional<String>
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo3bas{{.*}} : $@convention(method) (@owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>, @owned Optional<String>, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, %2)
   dynamic func bas(f: String? -> String?, x: String?) -> String? {
     return f(x)
   }
 
-  // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si : $@cc(objc_method) @thin (@cc(cdecl) @thin (Int) -> Int, Int, Foo) -> Int
-  // CHECK:       bb0([[F:%.*]] : $@cc(cdecl) @thin (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : $Foo):
+  // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si : $@convention(objc_method) (@convention(c) (Int) -> Int, Int, Foo) -> Int
+  // CHECK:       bb0([[F:%.*]] : $@convention(c) (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : $Foo):
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si
   // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[SELF]])
   dynamic func cFunctionPointer(fp: @convention(c) Int -> Int, x: Int) -> Int {
@@ -55,7 +55,7 @@ import Foundation
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[BLOCK_THUNK]]([[BLOCK]])
   // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @_TTRXFo_oSS_oSS_XFo_iSS_iSS_
   // CHECK:         [[REABSTRACT:%.*]] = partial_apply [[REABSTRACT_THUNK]]([[BRIDGED]])
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo7optFunc{{.*}} : $@cc(method) @thin (@owned Optional<String -> String>, @owned String, @guaranteed Foo) -> @owned Optional<String>
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo7optFunc{{.*}} : $@convention(method) (@owned Optional<String -> String>, @owned String, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]
   dynamic func optFunc(f: (String -> String)?, x: String) -> String? {
     return f?(x)
@@ -64,7 +64,7 @@ import Foundation
   // CHECK-LABEL: sil hidden @_TFC20objc_blocks_bridging3Foo19optCFunctionPointerfS0_FTGSqcSSSS_1xSS_GSqSS_
   // CHECK:         [[OPT_BUF:%.*]] = alloc_stack $Optional<@convention(c) String -> String>
   // CHECK:         [[FP_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]
-  // CHECK:         load [[FP_BUF]] : $*@cc(cdecl) @thin (NSString) -> @autoreleased NSString
+  // CHECK:         load [[FP_BUF]] : $*@convention(c) (NSString) -> @autoreleased NSString
   dynamic func optCFunctionPointer(fp: (@convention(c) String -> String)?, x: String) -> String? {
     return fp?(x)
   }
@@ -97,7 +97,7 @@ func callBlocks(x: Foo,
   // CHECK: [[H_BLOCK:%.*]] = copy_block [[H_STACK_BLOCK]]
   // CHECK: apply [[BAS]]([[H_BLOCK]]
 
-  // CHECK: [[G_BLOCK:%.*]] = copy_block {{%.*}} : $@cc(cdecl) @objc_block (NSString) -> @autoreleased NSString
+  // CHECK: [[G_BLOCK:%.*]] = copy_block {{%.*}} : $@convention(block) (NSString) -> @autoreleased NSString
   // CHECK: [[SLOT:%.*]] = init_enum_data_addr [[OPTIONAL:%[0-9]+]]
   // CHECK: store [[G_BLOCK]] to [[SLOT]]
   // CHECK: inject_enum_addr [[OPTIONAL]]

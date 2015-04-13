@@ -11,7 +11,7 @@ import Swift
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_ssub : $@thin (Int32) -> Int32 {
+sil @tst_ssub : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int1, -1
@@ -27,7 +27,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_usub : $@thin (UInt32) -> UInt32 {
+sil @tst_usub : $@convention(thin) (UInt32) -> UInt32 {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32.value
   %2 = integer_literal $Builtin.Int1, -1
@@ -43,7 +43,7 @@ bb0(%0 : $UInt32):
 // CHECK: %1 = integer_literal $Builtin.Int32, 1
 // CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_sdiv : $@thin (Int32) -> Int32 {
+sil @tst_sdiv : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = struct_extract %0 : $Int32, #Int32.value
@@ -56,7 +56,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int32, 1
 // CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_udiv : $@thin (UInt32) -> UInt32 {
+sil @tst_udiv : $@convention(thin) (UInt32) -> UInt32 {
 bb0(%0 : $UInt32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = struct_extract %0 : $UInt32, #UInt32.value
@@ -69,7 +69,7 @@ bb0(%0 : $UInt32):
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_srem : $@thin (Int32) -> Int32 {
+sil @tst_srem : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = struct_extract %0 : $Int32, #Int32.value
@@ -82,7 +82,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $UInt32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_urem : $@thin (UInt32) -> UInt32 {
+sil @tst_urem : $@convention(thin) (UInt32) -> UInt32 {
 bb0(%0 : $UInt32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = struct_extract %0 : $UInt32, #UInt32.value
@@ -93,7 +93,7 @@ bb0(%0 : $UInt32):
 
 // CHECK-LABEL: sil @tst_and 
 // CHECK: return %0
-sil @tst_and : $@thin (Int32) -> Int32 {
+sil @tst_and : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = builtin "and_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
@@ -103,7 +103,7 @@ bb0(%0 : $Int32):
 
 // CHECK-LABEL: sil @tst_or 
 // CHECK: return %0
-sil @tst_or : $@thin (Int32) -> Int32 {
+sil @tst_or : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = builtin "or_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
@@ -115,7 +115,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int32, 0
 // CHECK: %2 = struct $Int32 (%1 : $Builtin.Int32)
 // CHECK: return %2
-sil @tst_xor : $@thin (Int32) -> Int32 {
+sil @tst_xor : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = builtin "xor_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
@@ -127,7 +127,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_eq : $@thin (Int32) -> Bool {
+sil @tst_icmp_eq : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = builtin "cmp_eq_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -139,7 +139,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_ne : $@thin (Int32) -> Bool {
+sil @tst_icmp_ne : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = builtin "cmp_ne_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -151,7 +151,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_sle : $@thin (Int32) -> Bool {
+sil @tst_icmp_sle : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = builtin "cmp_sle_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -163,7 +163,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_sge : $@thin (Int32) -> Bool {
+sil @tst_icmp_sge : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = builtin "cmp_sge_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -175,7 +175,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_slt : $@thin (Int32) -> Bool {
+sil @tst_icmp_slt : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = builtin "cmp_slt_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -187,7 +187,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_sgt : $@thin (Int32) -> Bool {
+sil @tst_icmp_sgt : $@convention(thin) (Int32) -> Bool {
 bb0(%0 : $Int32):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = builtin "cmp_sgt_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -199,7 +199,7 @@ bb0(%0 : $Int32):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_ule : $@thin (UInt32) -> Bool {
+sil @tst_icmp_ule : $@convention(thin) (UInt32) -> Bool {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32.value
   %2 = builtin "cmp_ule_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -211,7 +211,7 @@ bb0(%0 : $UInt32):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_uge : $@thin (UInt32) -> Bool {
+sil @tst_icmp_uge : $@convention(thin) (UInt32) -> Bool {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32.value
   %2 = builtin "cmp_uge_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -223,7 +223,7 @@ bb0(%0 : $UInt32):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_ult : $@thin (UInt32) -> Bool {
+sil @tst_icmp_ult : $@convention(thin) (UInt32) -> Bool {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32.value
   %2 = builtin "cmp_ult_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -235,7 +235,7 @@ bb0(%0 : $UInt32):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_icmp_ugt : $@thin (UInt32) -> Bool {
+sil @tst_icmp_ugt : $@convention(thin) (UInt32) -> Bool {
 bb0(%0 : $UInt32):
   %1 = struct_extract %0 : $UInt32, #UInt32.value
   %2 = builtin "cmp_ugt_Int32"(%1 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -247,7 +247,7 @@ bb0(%0 : $UInt32):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_fcmp_ueq : $@thin (Float) -> Bool {
+sil @tst_fcmp_ueq : $@convention(thin) (Float) -> Bool {
 bb0(%0 : $Float):
   %1 = struct_extract %0 : $Float, #Float.value
   %2 = builtin "fcmp_ueq_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
@@ -259,7 +259,7 @@ bb0(%0 : $Float):
 // CHECK: %1 = integer_literal $Builtin.Int1, 0
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_fcmp_one : $@thin (Float) -> Bool {
+sil @tst_fcmp_one : $@convention(thin) (Float) -> Bool {
 bb0(%0 : $Float):
   %1 = struct_extract %0 : $Float, #Float.value
   %2 = builtin "fcmp_one_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
@@ -271,7 +271,7 @@ bb0(%0 : $Float):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_fcmp_ule : $@thin (Float) -> Bool {
+sil @tst_fcmp_ule : $@convention(thin) (Float) -> Bool {
 bb0(%0 : $Float):
   %1 = struct_extract %0 : $Float, #Float.value
   %2 = builtin "fcmp_ule_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
@@ -283,7 +283,7 @@ bb0(%0 : $Float):
 // CHECK: %1 = integer_literal $Builtin.Int1, -1
 // CHECK: %2 = struct $Bool (%1 : $Builtin.Int1)
 // CHECK: return %2
-sil @tst_fcmp_uge : $@thin (Float) -> Bool {
+sil @tst_fcmp_uge : $@convention(thin) (Float) -> Bool {
 bb0(%0 : $Float):
   %1 = struct_extract %0 : $Float, #Float.value
   %2 = builtin "fcmp_uge_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1

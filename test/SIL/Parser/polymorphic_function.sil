@@ -11,13 +11,13 @@ public protocol mmStreamable {
   func writeTo<Target : mmOutputStreamType>(inout target: Target)
 }
 
-// CHECK-LABEL: sil @test : $@thin () -> () {
+// CHECK-LABEL: sil @test : $@convention(thin) () -> () {
 sil @test : $() -> () {
 bb0:
   %281 = alloc_stack $mmStreamable
   %282 = open_existential_addr %281#1 : $*mmStreamable to $*@opened("01234567-89ab-cdef-0123-000000000000") mmStreamable
   // CHECK: witness_method $@opened({{.*}}) mmStreamable, #mmStreamable.writeTo!1
-  %293 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") mmStreamable, #mmStreamable.writeTo!1, %282 : $*@opened("01234567-89ab-cdef-0123-000000000000") mmStreamable : $@thin @cc(witness_method) @callee_owned <T_0_0, T_1_0 where T_0_0 : mmStreamable, T_1_0 : mmOutputStreamType> (@inout T_1_0, @inout T_0_0) -> ()
+  %293 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") mmStreamable, #mmStreamable.writeTo!1, %282 : $*@opened("01234567-89ab-cdef-0123-000000000000") mmStreamable : $@convention(witness_method) @callee_owned <T_0_0, T_1_0 where T_0_0 : mmStreamable, T_1_0 : mmOutputStreamType> (@inout T_1_0, @inout T_0_0) -> ()
   dealloc_stack %281#0 : $*@local_storage mmStreamable
   %1 = tuple ()
   return %1 : $()

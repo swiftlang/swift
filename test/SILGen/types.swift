@@ -4,14 +4,14 @@ class C {
   var member: Int = 0
 
   // Methods have method calling convention.
-  // CHECK-LABEL: sil hidden @_TFC5types1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, @guaranteed C) -> () {
+  // CHECK-LABEL: sil hidden @_TFC5types1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, @guaranteed C) -> () {
   func foo(#x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
 
     // CHECK-NOT: strong_retain
     // CHECK: [[FN:%[0-9]+]] = class_method %1 : $C, #C.member!setter.1
-    // CHECK: apply [[FN]](%0, %1) : $@cc(method) @thin (Int, @guaranteed C) -> ()
+    // CHECK: apply [[FN]](%0, %1) : $@convention(method) (Int, @guaranteed C) -> ()
     // CHECK-NOT: strong_release
 
 
@@ -21,7 +21,7 @@ class C {
 struct S {
   var member: Int
 
-  // CHECK-LABEL: sil hidden  @{{.*}}foo{{.*}} : $@cc(method) @thin (Int, @inout S) -> ()
+  // CHECK-LABEL: sil hidden  @{{.*}}foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
   mutating
   func foo(var #x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):

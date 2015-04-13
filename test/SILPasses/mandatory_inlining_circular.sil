@@ -3,24 +3,24 @@
 import Builtin
 import Swift
 
-sil [transparent] @test_circular_foo : $@thin (Float32) -> Float32 {
+sil [transparent] @test_circular_foo : $@convention(thin) (Float32) -> Float32 {
 bb0(%0 : $Float32):
-  %3 = function_ref @test_circular_bar : $@thin (Float32) -> Float32
-  %5 = apply %3(%0) : $@thin (Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
+  %3 = function_ref @test_circular_bar : $@convention(thin) (Float32) -> Float32
+  %5 = apply %3(%0) : $@convention(thin) (Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
   return %5 : $Float32
 }
 
-sil [transparent] @test_circular_bar : $@thin (Float32) -> Float32 {
+sil [transparent] @test_circular_bar : $@convention(thin) (Float32) -> Float32 {
 bb0(%0 : $Float32):
-  %3 = function_ref @test_circular_baz : $@thin (Float32) -> Float32
-  %5 = apply %3(%0) : $@thin (Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
+  %3 = function_ref @test_circular_baz : $@convention(thin) (Float32) -> Float32
+  %5 = apply %3(%0) : $@convention(thin) (Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
   return %5 : $Float32
 }
 
-sil [transparent] @test_circular_baz : $@thin (Float32) -> Float32 {
+sil [transparent] @test_circular_baz : $@convention(thin) (Float32) -> Float32 {
 bb0(%0 : $Float32):
-  %3 = function_ref @test_circular_foo : $@thin (Float32) -> Float32
-  %5 = apply %3(%0) : $@thin (Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
+  %3 = function_ref @test_circular_foo : $@convention(thin) (Float32) -> Float32
+  %5 = apply %3(%0) : $@convention(thin) (Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}} expected-note 2 {{while inlining here}}
   return %5 : $Float32
 }
 

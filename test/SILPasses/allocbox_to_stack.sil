@@ -89,15 +89,15 @@ bb1(%0 : $Int):
 
 
 
-sil @callee : $@thin (@inout Int) -> ()
+sil @callee : $@convention(thin) (@inout Int) -> ()
 
 // CHECK-LABEL: sil @inout_nocapture
-sil @inout_nocapture : $@thin () -> Int {
+sil @inout_nocapture : $@convention(thin) () -> Int {
 bb0:
   // CHECK: alloc_stack
   %1 = alloc_box $Int
-  %6 = function_ref @callee : $@thin (@inout Int) -> ()
-  %7 = apply %6(%1#1) : $@thin (@inout Int) -> ()
+  %6 = function_ref @callee : $@convention(thin) (@inout Int) -> ()
+  %7 = apply %6(%1#1) : $@convention(thin) (@inout Int) -> ()
   %8 = load %1#1 : $*Int
   %9 = strong_release %1#0 : $Builtin.NativeObject
   %10 = address_to_pointer %1#1 : $*Int to $Builtin.RawPointer
@@ -111,15 +111,15 @@ bb0:
 protocol P {
 }
 
-sil @returns_protocol : $@thin (@out P) -> ()
+sil @returns_protocol : $@convention(thin) (@out P) -> ()
 
 // CHECK-LABEL: sil @test_indirect_return
-sil @test_indirect_return : $@thin () -> () {
+sil @test_indirect_return : $@convention(thin) () -> () {
 bb0:
   // CHECK: alloc_stack
-  %1 = function_ref @returns_protocol : $@thin (@out P) -> ()
+  %1 = function_ref @returns_protocol : $@convention(thin) (@out P) -> ()
   %2 = alloc_box $P
-  %3 = apply %1(%2#1) : $@thin (@out P) -> ()
+  %3 = apply %1(%2#1) : $@convention(thin) (@out P) -> ()
   %5 = strong_release %2#0 : $Builtin.NativeObject
   %0 = tuple ()
   %6 = return %0 : $()
@@ -149,14 +149,14 @@ protocol LogicValue {
 }
 
 // CHECK-LABEL: @protocols
-sil @protocols : $@thin (@in LogicValue, @thin Bool.Type) -> Bool {
+sil @protocols : $@convention(thin) (@in LogicValue, @thin Bool.Type) -> Bool {
 bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
   %2 = alloc_box $LogicValue
 // CHECK:  %2 = alloc_stack $LogicValue
   copy_addr [take] %0 to [initialization] %2#1 : $*LogicValue
   %6 = open_existential_addr %2#1 : $*LogicValue to $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue
-  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") LogicValue, #LogicValue.getLogicValue!1, %6 : $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue : $@thin @cc(witness_method) @callee_owned <T: LogicValue> (@inout T) -> Bool
-  %8 = apply %7<@opened("01234567-89ab-cdef-0123-000000000000") LogicValue>(%6) : $@thin @cc(witness_method) @callee_owned <T: LogicValue> (@inout T) -> Bool
+  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") LogicValue, #LogicValue.getLogicValue!1, %6 : $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue : $@convention(witness_method) @callee_owned <T: LogicValue> (@inout T) -> Bool
+  %8 = apply %7<@opened("01234567-89ab-cdef-0123-000000000000") LogicValue>(%6) : $@convention(witness_method) @callee_owned <T: LogicValue> (@inout T) -> Bool
   strong_release %2#0 : $Builtin.NativeObject
 // CHECK:  destroy_addr %2#1 : $*LogicValue
 // CHECK-NEXT:  dealloc_stack %2#0 : $*@local_storage LogicValue
@@ -169,7 +169,7 @@ bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
 class Generic<T> {}
 
 // CHECK-LABEL: sil @dealloc_box
-sil @dealloc_box : $@thin <T> () -> () {
+sil @dealloc_box : $@convention(thin) <T> () -> () {
 bb0:  // CHECK-NEXT: bb0:
       // CHECK-NEXT: alloc_stack
   %1 = alloc_box $Generic<T>
@@ -188,20 +188,20 @@ enum SomeUnion {
 
 
 
-sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@thin (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion 
-sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin (@thick SomeClass.Type) -> @owned SomeClass 
+sil @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion 
+sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass 
 
 // CHECK-LABEL: sil @union_test
-sil @union_test : $@thin () -> () {
+sil @union_test : $@convention(thin) () -> () {
 bb0:
 // CHECK: [[UNION:%.*]] = alloc_stack
   %1 = alloc_box $SomeUnion
-  %2 = function_ref @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@thin (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %7
+  %2 = function_ref @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %7
   %3 = metatype $@thin SomeUnion.Type
-  %4 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin (@thick SomeClass.Type) -> @owned SomeClass // user: %6
+  %4 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass // user: %6
   %5 = metatype $@thick SomeClass.Type
-  %6 = apply %4(%5) : $@thin (@thick SomeClass.Type) -> @owned SomeClass
-  %7 = apply %2(%6, %3) : $@thin (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+  %6 = apply %4(%5) : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
+  %7 = apply %2(%6, %3) : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
   store %7 to %1#1 : $*SomeUnion
   strong_release %1#0 : $Builtin.NativeObject
   %10 = tuple ()
@@ -212,7 +212,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @multiple_release_test
-sil @multiple_release_test : $@thin (Bool) -> Bool {
+sil @multiple_release_test : $@convention(thin) (Bool) -> Bool {
 bb0(%0 : $Bool):
   %1 = alloc_box $Bool
   store %0 to %1#1 : $*Bool
@@ -237,7 +237,7 @@ bb0(%0 : $Bool):
 // on each path.
 //
 // CHECK-LABEL: sil @box_reachable_from_release_test
-sil @box_reachable_from_release_test : $@thin () -> () {
+sil @box_reachable_from_release_test : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK: alloc_stack
 bb0:
@@ -261,7 +261,7 @@ bb3:
 
 
 
-sil @useSomeClass : $@thin (@owned SomeClass) -> ()
+sil @useSomeClass : $@convention(thin) (@owned SomeClass) -> ()
 
 
 // <rdar://problem/16382973> DI misses destroy_addr because allocbox_to_stack isn't preserving mark_uninitialized invariants
@@ -270,7 +270,7 @@ sil @useSomeClass : $@thin (@owned SomeClass) -> ()
 // make sure to use the MUI result for the destroy addr.
 
 // CHECK-LABEL: sil @test_mui
-sil @test_mui : $@thin (Builtin.Int1) -> () {
+sil @test_mui : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   %2 = alloc_box $SomeClass
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack
@@ -279,15 +279,15 @@ bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
 
 bb1:
-  %7 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin (@thick SomeClass.Type) -> @owned SomeClass // user: %6
+  %7 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass // user: %6
   %8 = metatype $@thick SomeClass.Type
-  %9 = apply %7(%8) : $@thin (@thick SomeClass.Type) -> @owned SomeClass
+  %9 = apply %7(%8) : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
 
   assign %9 to %3 : $*SomeClass
-  %11 = function_ref @useSomeClass : $@thin (@owned SomeClass) -> ()
+  %11 = function_ref @useSomeClass : $@convention(thin) (@owned SomeClass) -> ()
   %12 = load %3 : $*SomeClass
   strong_retain %12 : $SomeClass
-  %14 = apply %11(%12) : $@thin (@owned SomeClass) -> ()
+  %14 = apply %11(%12) : $@convention(thin) (@owned SomeClass) -> ()
   
   strong_release %2#0 : $Builtin.NativeObject
   // CHECK: destroy_addr [[MUI]]
@@ -308,7 +308,7 @@ bb3:
 
 // CHECK-LABEL: sil @_TF6struct5applyFT1fFT_Si_Si
 // struct.apply (f : () -> Swift.Int) -> Swift.Int
-sil @_TF6struct5applyFT1fFT_Si_Si : $@thin (@owned @callee_owned () -> Int) -> Int {
+sil @_TF6struct5applyFT1fFT_Si_Si : $@convention(thin) (@owned @callee_owned () -> Int) -> Int {
 bb0(%0 : $@callee_owned () -> Int):
   debug_value %0 : $@callee_owned () -> Int  // let f // id: %1
   strong_retain %0 : $@callee_owned () -> Int     // id: %2
@@ -319,7 +319,7 @@ bb0(%0 : $@callee_owned () -> Int):
 
 // CHECK-LABEL: sil @_TF6struct6escapeFT1fFT_Si_FT_Si
 // struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
-sil @_TF6struct6escapeFT1fFT_Si_FT_Si : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
+sil @_TF6struct6escapeFT1fFT_Si_FT_Si : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
 bb0(%0 : $@callee_owned () -> Int):
   debug_value %0 : $@callee_owned () -> Int  // let f // id: %1
   return %0 : $@callee_owned () -> Int            // id: %2
@@ -327,21 +327,21 @@ bb0(%0 : $@callee_owned () -> Int):
 
 // CHECK-LABEL: sil @_TF6struct8useStackFT1tSi_T_
 // struct.useStack (t : Swift.Int) -> ()
-sil @_TF6struct8useStackFT1tSi_T_ : $@thin (Int) -> () {
+sil @_TF6struct8useStackFT1tSi_T_ : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   debug_value %0 : $Int  // let t                 // id: %1
   // CHECK: alloc_stack
   %2 = alloc_box $Int  // var s                   // users: %3, %6, %7, %7, %9
   store %0 to %2#1 : $*Int                        // id: %3
   // function_ref struct.apply (f : () -> Swift.Int) -> Swift.Int
-  %4 = function_ref @_TF6struct5applyFT1fFT_Si_Si : $@thin (@owned @callee_owned () -> Int) -> Int // user: %8
+  %4 = function_ref @_TF6struct5applyFT1fFT_Si_Si : $@convention(thin) (@owned @callee_owned () -> Int) -> Int // user: %8
   // CHECK: [[FUNC:%[a-zA-Z0-9]+]] = function_ref @_TTSf0d_n___TFF6struct8useStackFT1tSi_T_U_FT_Si
   // function_ref struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-  %5 = function_ref @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int // user: %7
+  %5 = function_ref @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int // user: %7
   strong_retain %2#0 : $Builtin.NativeObject     // id: %6
   // CHECK: [[PA:%[a-zA-Z0-9]+]] = partial_apply [[FUNC]]
-  %7 = partial_apply %5(%2#0, %2#1) : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int // user: %8
-  %8 = apply %4(%7) : $@thin (@owned @callee_owned () -> Int) -> Int
+  %7 = partial_apply %5(%2#0, %2#1) : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int // user: %8
+  %8 = apply %4(%7) : $@convention(thin) (@owned @callee_owned () -> Int) -> Int
   strong_release %2#0 : $Builtin.NativeObject    // id: %9
   %10 = tuple ()                                  // user: %11
   return %10 : $()                                // id: %11
@@ -350,12 +350,12 @@ bb0(%0 : $Int):
 // CHECK-LABEL: sil shared @_TTSf0d_n___TFF6struct8useStackFT1tSi_T_U_FT_Si
 // CHECK-LABEL: sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int {
+sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int {
 bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
-  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
+  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %4 = apply %2<Int>(%3#1, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
   %5 = load %3#1 : $*Int                          // user: %8
   dealloc_stack %3#0 : $*@local_storage Int       // id: %6
   strong_release %0 : $Builtin.NativeObject      // id: %7
@@ -363,23 +363,23 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
 }
 
 // Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
-sil [transparent] @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+sil [transparent] @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
 
 // CHECK-LABEL: sil @_TF6struct6useBoxFT1tSi_T_
 // struct.useBox (t : Swift.Int) -> ()
-sil @_TF6struct6useBoxFT1tSi_T_ : $@thin (Int) -> () {
+sil @_TF6struct6useBoxFT1tSi_T_ : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   debug_value %0 : $Int  // let t                 // id: %1
   // CHECK: alloc_box
   %2 = alloc_box $Int  // var s                   // users: %3, %6, %7, %7, %10
   store %0 to %2#1 : $*Int                        // id: %3
   // function_ref struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
-  %4 = function_ref @_TF6struct6escapeFT1fFT_Si_FT_Si : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %8
+  %4 = function_ref @_TF6struct6escapeFT1fFT_Si_FT_Si : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %8
   // function_ref struct.(useBox (t : Swift.Int) -> ()).(closure #1)
-  %5 = function_ref @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int // user: %7
+  %5 = function_ref @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int // user: %7
   strong_retain %2#0 : $Builtin.NativeObject     // id: %6
-  %7 = partial_apply %5(%2#0, %2#1) : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int // user: %8
-  %8 = apply %4(%7) : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %9
+  %7 = partial_apply %5(%2#0, %2#1) : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int // user: %8
+  %8 = apply %4(%7) : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %9
   %9 = apply %8() : $@callee_owned () -> Int
   strong_release %2#0 : $Builtin.NativeObject    // id: %10
   %11 = tuple ()                                  // user: %12
@@ -388,12 +388,12 @@ bb0(%0 : $Int):
 
 // CHECK-LABEL: sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si
 // struct.(useBox (t : Swift.Int) -> ()).(closure #1)
-sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int {
+sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int {
 bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
-  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
+  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %4 = apply %2<Int>(%3#1, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
   %5 = load %3#1 : $*Int                          // user: %8
   dealloc_stack %3#0 : $*@local_storage Int       // id: %6
   strong_release %0 : $Builtin.NativeObject      // id: %7
@@ -401,25 +401,25 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
 }
 
 // CHECK-LABEL: sil @closure
-sil @closure : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+sil @closure : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
 
 // CHECK-LABEL: sil @no_final_release
-sil @no_final_release : $@thin (Int) -> Bool {
+sil @no_final_release : $@convention(thin) (Int) -> Bool {
 bb0(%0 : $Int):
   %1 = alloc_box $Int
   store %0 to %1#1 : $*Int
   // function_ref main.(newFoo (Swift.Int) -> Swift.Bool).(modify #1) (())()
-  %3 = function_ref @closure : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+  %3 = function_ref @closure : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
   strong_retain %1#0 : $Builtin.NativeObject
-  %5 = partial_apply %3(%1#0, %1#1) : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+  %5 = partial_apply %3(%1#0, %1#1) : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
   strong_retain %5 : $@callee_owned () -> ()
   %7 = apply %5() : $@callee_owned () -> ()
   strong_release %5 : $@callee_owned () -> ()
   unreachable
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] @mightApply : $@thin <U where U : P> (@owned @callee_owned (@out U) -> ()) -> ()
-sil [transparent] [fragile] @mightApply : $@thin <U where U : P> (@owned @callee_owned (@out U) -> ()) -> () {
+// CHECK-LABEL: sil [transparent] [fragile] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned (@out U) -> ()) -> ()
+sil [transparent] [fragile] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned (@out U) -> ()) -> () {
 // CHECK: bb0
 bb0(%0 : $@callee_owned (@out U) -> ()):
   debug_value %0 : $@callee_owned (@out U) -> ()
@@ -435,23 +435,23 @@ bb0(%0 : $@callee_owned (@out U) -> ()):
 }
 
 // CHECK-LABEL: sil @callWithAutoclosure
-sil @callWithAutoclosure : $@thin <T where T : P> (@in T) -> () {
+sil @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK-NEXT: bb0
 bb0(%0 : $*T):
   // CHECK: [[STACK:%[0-9a-zA-Z_]+]] = alloc_stack $T
   // CHECK: debug_value_addr
   debug_value_addr %0 : $*T
   // CHECK: function_ref @mightApply
-  %2 = function_ref @mightApply : $@thin <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
-  %3 = function_ref @closure_to_specialize : $@thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
+  %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
+  %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
   // CHECK-NOT: alloc_box
   %4 = alloc_box $T
   // CHECK: copy_addr %0 to [initialization] [[STACK]]#1 : $*T
   copy_addr %0 to [initialization] %4#1 : $*T
   // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @_TTSf0n_d_n__closure_to_specialize
   // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]]#1)
-  %6 = partial_apply %3<T>(%4#0, %4#1) : $@thin <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
-  %7 = apply %2<T>(%6) : $@thin <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
+  %6 = partial_apply %3<T>(%4#0, %4#1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
+  %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned (@out τ_0_0) -> ()) -> ()
   // CHECK: destroy_addr [[STACK]]#1 : $*T
   destroy_addr %0 : $*T
   %9 = tuple ()
@@ -460,8 +460,8 @@ bb0(%0 : $*T):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil shared @_TTSf0n_d_n__closure_to_specialize : $@thin <T where T : P> (@out T, @inout T) -> ()
-sil shared @closure_to_specialize : $@thin <T where T : P> (@out T, @owned Builtin.NativeObject, @inout T) -> () {
+// CHECK-LABEL: sil shared @_TTSf0n_d_n__closure_to_specialize : $@convention(thin) <T where T : P> (@out T, @inout T) -> ()
+sil shared @closure_to_specialize : $@convention(thin) <T where T : P> (@out T, @owned Builtin.NativeObject, @inout T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T, %1 : $Builtin.NativeObject, %2 : $*T):
 // CHECK-NEXT: copy_addr
@@ -490,7 +490,7 @@ struct S<T : Count> {
 }
 
 // CHECK-LABEL: sil [noinline] @inner
-sil [noinline] @inner : $@thin (@owned @callee_owned () -> Bool) -> Bool {
+sil [noinline] @inner : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool {
 // CHECK: bb0
 bb0(%0 : $@callee_owned () -> Bool):
   debug_value %0 : $@callee_owned () -> Bool
@@ -502,7 +502,7 @@ bb0(%0 : $@callee_owned () -> Bool):
 }
 
 // CHECK-LABEL: sil [noinline] @outer
-sil [noinline] @outer : $@thin (@owned @callee_owned () -> Bool) -> Bool {
+sil [noinline] @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool {
 // CHECK: bb0
 bb0(%0 : $@callee_owned () -> Bool):
   debug_value %0 : $@callee_owned () -> Bool
@@ -514,52 +514,52 @@ bb0(%0 : $@callee_owned () -> Bool):
 }
 
 // CHECK-LABEL: sil @get
-sil @get : $@cc(method) @thin <T where T : Count> (@in S<T>) -> Int
+sil @get : $@convention(method) <T where T : Count> (@in S<T>) -> Int
 
 // CHECK-LABEL: sil shared @specialized
-sil shared @specialized : $@cc(method) @thin (Int, @in S<Q>) -> Bool {
+sil shared @specialized : $@convention(method) (Int, @in S<Q>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $*S<Q>):
   debug_value %0 : $Int
   debug_value_addr %1 : $*S<Q>
-  %4 = function_ref @outer : $@thin (@owned @callee_owned () -> Bool) -> Bool
-  %5 = function_ref @closure1 : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
+  %5 = function_ref @closure1 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
   %6 = alloc_box $S<Q>
   copy_addr %1 to [initialization] %6#1 : $*S<Q>
-  %8 = partial_apply %5<Q>(%0, %6#0, %6#1) : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
-  %9 = apply %4(%8) : $@thin (@owned @callee_owned () -> Bool) -> Bool
+  %8 = partial_apply %5<Q>(%0, %6#0, %6#1) : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %9 = apply %4(%8) : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   destroy_addr %1 : $*S<Q>
 // CHECK: return
   return %9 : $Bool
 }
 
 // CHECK-LABEL: sil @unspecialized
-sil @unspecialized : $@cc(method) @thin <T where T : Count> (Int, @in S<T>) -> Bool {
+sil @unspecialized : $@convention(method) <T where T : Count> (Int, @in S<T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $*S<T>):
   debug_value %0 : $Int
   debug_value_addr %1 : $*S<T>
-  %4 = function_ref @outer : $@thin (@owned @callee_owned () -> Bool) -> Bool
-  %5 = function_ref @closure1 : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %4 = function_ref @outer : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
+  %5 = function_ref @closure1 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
   %6 = alloc_box $S<T>
   copy_addr %1 to [initialization] %6#1 : $*S<T>
-  %8 = partial_apply %5<T>(%0, %6#0, %6#1) : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
-  %9 = apply %4(%8) : $@thin (@owned @callee_owned () -> Bool) -> Bool
+  %8 = partial_apply %5<T>(%0, %6#0, %6#1) : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %9 = apply %4(%8) : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   destroy_addr %1 : $*S<T>
 // CHECK: return
   return %9 : $Bool
 }
 
 // CHECK-LABEL: sil shared @closure1
-sil shared @closure1 : $@thin <T where T : Count> (Int, @owned Builtin.NativeObject, @inout S<T>) -> Bool {
+sil shared @closure1 : $@convention(thin) <T where T : Count> (Int, @owned Builtin.NativeObject, @inout S<T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*S<T>):
-  %3 = function_ref @inner : $@thin (@owned @callee_owned () -> Bool) -> Bool
-  %4 = function_ref @closure2 : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %3 = function_ref @inner : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
+  %4 = function_ref @closure2 : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
   %5 = alloc_box $S<T>
   copy_addr %2 to [initialization] %5#1 : $*S<T>
-  %7 = partial_apply %4<T>(%0, %5#0, %5#1) : $@thin <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
-  %8 = apply %3(%7) : $@thin (@owned @callee_owned () -> Bool) -> Bool
+  %7 = partial_apply %4<T>(%0, %5#0, %5#1) : $@convention(thin) <τ_0_0 where τ_0_0 : Count> (Int, @owned Builtin.NativeObject, @inout S<τ_0_0>) -> Bool
+  %8 = apply %3(%7) : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
   strong_release %1 : $Builtin.NativeObject
 // CHECK: return
   return %8 : $Bool
@@ -571,15 +571,15 @@ bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*S<T>):
 // CHECK-NOT: bb1
 
 // CHECK-LABEL: sil shared @closure2
-sil shared @closure2 : $@thin <T where T : Count> (Int, @owned Builtin.NativeObject, @inout S<T>) -> Bool {
+sil shared @closure2 : $@convention(thin) <T where T : Count> (Int, @owned Builtin.NativeObject, @inout S<T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*S<T>):
-  %3 = function_ref @binary : $@thin (Int, Int) -> Bool
+  %3 = function_ref @binary : $@convention(thin) (Int, Int) -> Bool
   %4 = alloc_stack $S<T>
   copy_addr %2 to [initialization] %4#1 : $*S<T>
-  %6 = function_ref @get : $@cc(method) @thin <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
-  %7 = apply %6<T>(%4#1) : $@cc(method) @thin <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
-  %8 = apply %3(%0, %7) : $@thin (Int, Int) -> Bool
+  %6 = function_ref @get : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
+  %7 = apply %6<T>(%4#1) : $@convention(method) <τ_0_0 where τ_0_0 : Count> (@in S<τ_0_0>) -> Int
+  %8 = apply %3(%0, %7) : $@convention(thin) (Int, Int) -> Bool
   dealloc_stack %4#0 : $*@local_storage S<T>
   strong_release %1 : $Builtin.NativeObject
 // CHECK: return
@@ -587,20 +587,20 @@ bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*S<T>):
 }
 
 // CHECK-LABEL: sil [transparent] [fragile] @binary
-sil [transparent] [fragile] @binary : $@thin (Int, Int) -> Bool
+sil [transparent] [fragile] @binary : $@convention(thin) (Int, Int) -> Bool
 
 // CHECK-LABEL: sil @destroy_stack_value_after_closure
-sil @destroy_stack_value_after_closure : $@thin <T> (@out T, @in T) -> () {
+sil @destroy_stack_value_after_closure : $@convention(thin) <T> (@out T, @in T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T, %1 : $*T):
   // CHECK: [[STACK:%.*]] = alloc_stack
   // CHECK: copy_addr %1 to [initialization] [[STACK]]#1
   // CHECK: [[APPLIED:%.*]] = function_ref
-  %3 = function_ref @applied : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout τ_0_0) -> ()
+  %3 = function_ref @applied : $@convention(thin) <τ_0_0> (@owned Builtin.NativeObject, @inout τ_0_0) -> ()
   %4 = alloc_box $T
   copy_addr %1 to [initialization] %4#1 : $*T
   // CHECK: [[PARTIAL:%.*]] = partial_apply [[APPLIED]]<T>([[STACK]]#1)
-  %6 = partial_apply %3<T>(%4#0, %4#1) : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout τ_0_0) -> ()
+  %6 = partial_apply %3<T>(%4#0, %4#1) : $@convention(thin) <τ_0_0> (@owned Builtin.NativeObject, @inout τ_0_0) -> ()
   // CHECK: debug_value [[PARTIAL]]
   debug_value %6 : $@callee_owned () -> ()
   // CHECK: strong_retain [[PARTIAL]]
@@ -617,19 +617,19 @@ bb0(%0 : $*T, %1 : $*T):
   return %13 : $()
 }
 
-sil @applied : $@thin <T> (@owned Builtin.NativeObject, @inout T) -> () {
+sil @applied : $@convention(thin) <T> (@owned Builtin.NativeObject, @inout T) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $*T):
-  %2 = function_ref @consume : $@thin <τ_0_0> (@in τ_0_0) -> ()
+  %2 = function_ref @consume : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %3 = alloc_stack $T
   copy_addr %1 to [initialization] %3#1 : $*T
-  %5 = apply %2<T>(%3#1) : $@thin <τ_0_0> (@in τ_0_0) -> ()
+  %5 = apply %2<T>(%3#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %3#0 : $*@local_storage T
   strong_release %0 : $Builtin.NativeObject
   %8 = tuple ()
   return %8 : $()
 }
 
-sil hidden [noinline] @consume : $@thin <T> (@in T) -> () {
+sil hidden [noinline] @consume : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T
   destroy_addr %0 : $*T

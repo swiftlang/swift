@@ -6,8 +6,8 @@ sil_stage raw
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil @_TF9optional3fooFT1fGSqFT_T___T_ : $@thin (@owned Optional<() -> ()>) -> ()
-sil @_TF9optional3fooFT1fGSqFT_T___T_ : $@thin (@owned Optional<() -> ()>) -> () {
+// CHECK-LABEL: sil @_TF9optional3fooFT1fGSqFT_T___T_ : $@convention(thin) (@owned Optional<() -> ()>) -> ()
+sil @_TF9optional3fooFT1fGSqFT_T___T_ : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 bb0(%0 : $Optional<() -> ()>):
   %1 = alloc_box $Optional<() -> ()> 
   store %0 to %1#1 : $*Optional<() -> ()>
@@ -16,9 +16,9 @@ bb0(%0 : $Optional<() -> ()>):
   %5 = alloc_stack $Optional<() -> ()>
   copy_addr %1#1 to [initialization] %5#1 : $*Optional<() -> ()>
   // function_ref Swift._doesOptionalHaveValue <A>(v : @inout Swift.Optional<A>) -> Builtin.Int1
-  %7 = function_ref @_TFSs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
-  // CHECK: apply %{{[0-9]+}}<() -> ()>(%{{[0-9]+}}#1) : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
-  %8 = apply %7<() -> ()>(%5#1) : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+  %7 = function_ref @_TFSs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+  // CHECK: apply %{{[0-9]+}}<() -> ()>(%{{[0-9]+}}#1) : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+  %8 = apply %7<() -> ()>(%5#1) : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
   br bb1
 
 bb1:
@@ -28,9 +28,9 @@ bb1:
   br bb3
 
 bb3:
-  %27 = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@thin <τ_0_0> (@out Optional<τ_0_0>) -> ()
-  // CHECK: apply %{{[0-9]+}}<()>(%{{[0-9]+}}#1) : $@thin <τ_0_0> (@out Optional<τ_0_0>) -> ()
-  %28 = apply %27<()>(%3#1) : $@thin <τ_0_0> (@out Optional<τ_0_0>) -> ()
+  %27 = function_ref @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
+  // CHECK: apply %{{[0-9]+}}<()>(%{{[0-9]+}}#1) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
+  %28 = apply %27<()>(%3#1) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()
   br bb4
 
 bb4:
@@ -41,5 +41,5 @@ bb4:
   return %33 : $()
 }
 
-sil [transparent] @_TFSs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@thin <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
-sil [transparent] @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@thin <τ_0_0> (@out Optional<τ_0_0>) -> ()
+sil [transparent] @_TFSs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
+sil [transparent] @_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>) -> ()

@@ -8,7 +8,7 @@
   optional subscript (i: Int) -> Int { get }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}optionalMethodGeneric{{.*}} : $@thin <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @{{.*}}optionalMethodGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalMethodGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: bb0([[T:%[0-9]+]] : $T):
   // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
@@ -21,7 +21,7 @@ func optionalMethodGeneric<T : P1>(var #t : T) {
   var methodRef = t.method
 }
 
-// CHECK-LABEL: sil hidden @_TF17protocol_optional23optionalPropertyGenericUS_2P1__FT1tQ__T_ : $@thin <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @_TF17protocol_optional23optionalPropertyGenericUS_2P1__FT1tQ__T_ : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalPropertyGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: bb0([[T:%[0-9]+]] : $T):
   // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
@@ -34,7 +34,7 @@ func optionalPropertyGeneric<T : P1>(var #t : T) {
   var propertyRef = t.prop
 }
 
-// CHECK-LABEL: sil hidden @_TF17protocol_optional24optionalSubscriptGenericUS_2P1__FT1tQ__T_ : $@thin <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @_TF17protocol_optional24optionalSubscriptGenericUS_2P1__FT1tQ__T_ : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalSubscriptGeneric<T : P1>(var #t : T) {
   // CHECK-NEXT: bb0([[T:%[0-9]+]] : $T):
   // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
@@ -45,7 +45,7 @@ func optionalSubscriptGeneric<T : P1>(var #t : T) {
   // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
   // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK-NEXT: [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
-  // CHECK-NEXT: [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+  // CHECK-NEXT: [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   // CHECK-NEXT: alloc_stack $Optional<Int>
   // CHECK-NEXT: dynamic_method_br [[T]] : $T, #P1.subscript!getter.1.foreign
   var subscriptRef = t[5]

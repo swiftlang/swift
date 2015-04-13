@@ -1247,20 +1247,20 @@ class infer_instanceVar1 {
   @objc var var_FunctionTypeReturn5_: () -> () -> String // no-error
 
 
-  var var_BlockFunctionType1: @objc_block () -> ()
-// CHECK-LABEL: @objc var var_BlockFunctionType1: @objc_block () -> ()
+  var var_BlockFunctionType1: @convention(block) () -> ()
+// CHECK-LABEL: @objc var var_BlockFunctionType1: @convention(block) () -> ()
 
-  @objc var var_BlockFunctionType1_: @objc_block () -> () // no-error
+  @objc var var_BlockFunctionType1_: @convention(block) () -> () // no-error
 
   var var_ArrayType1: [AnyObject]
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType1: [AnyObject]
 
   @objc var var_ArrayType1_: [AnyObject] // no-error
 
-  var var_ArrayType2: [@objc_block AnyObject -> AnyObject] // no-error
-  // CHECK-LABEL: {{^}}  @objc var var_ArrayType2: [@objc_block AnyObject -> AnyObject]
+  var var_ArrayType2: [@convention(block) AnyObject -> AnyObject] // no-error
+  // CHECK-LABEL: {{^}}  @objc var var_ArrayType2: [@convention(block) AnyObject -> AnyObject]
 
-  @objc var var_ArrayType2_: [@objc_block AnyObject -> AnyObject] // no-error
+  @objc var var_ArrayType2_: [@convention(block) AnyObject -> AnyObject] // no-error
 
   var var_ArrayType3: [PlainStruct]
   // CHECK-LABEL: {{^}}  var var_ArrayType3: [PlainStruct]
@@ -1709,8 +1709,8 @@ struct NotObjCStruct {}
   func zangImplicit(f: (NotObjCEnum, NotObjCStruct) -> ()) {}
 }
 
-typealias GoodBlock = @objc_block Int -> ()
-typealias BadBlock = @objc_block NotObjCEnum -> () // expected-error{{@objc_block type is not representable in Objective-C}}
+typealias GoodBlock = @convention(block) Int -> ()
+typealias BadBlock = @convention(block) NotObjCEnum -> () // expected-error{{@convention(block) type is not representable in Objective-C}}
 
 
 @objc class AccessControl {

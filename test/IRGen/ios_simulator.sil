@@ -8,7 +8,7 @@
 class C {}
 sil_vtable C {}
 
-sil @_TFC13ios_simulator1CD : $@cc(method) @thin (@owned C) -> () {
+sil @_TFC13ios_simulator1CD : $@convention(method) (@owned C) -> () {
 bb0(%0 : $C):
   %1 = tuple ()
   return %1 : $()
@@ -20,7 +20,7 @@ bb0(%0 : $C):
 class G<T> {}
 sil_vtable G {}
 
-sil @_TFC13ios_simulator1GD : $@cc(method) @thin <T> (@owned G<T>) -> () {
+sil @_TFC13ios_simulator1GD : $@convention(method) <T> (@owned G<T>) -> () {
 bb0(%0 : $G<T>):
   %1 = tuple ()
   return %1 : $()

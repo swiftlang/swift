@@ -16,7 +16,7 @@ struct A {
 }
 
 // CHECK-LABEL: sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_
-sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_ : $@cc(method) @thin (A, @owned X) -> @owned X {
+sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_ : $@convention(method) (A, @owned X) -> @owned X {
 bb0(%0 : $A, %1 : $X):
   %2 = alloc_box $X
   %3 = alloc_box $A
@@ -25,11 +25,11 @@ bb0(%0 : $A, %1 : $X):
   store %5 to %2#1 : $*X
   %7 = load %2#1 : $*X
   strong_retain %7 : $X
-  // CHECK: class_method [volatile] %{{[0-9]+}} : $X, #X.init!initializer.1.foreign : X.Type -> (a1: A, a2: A) -> X , $@cc(objc_method) @thin (A, A, @owned X) -> @owned X
-  %9 = class_method [volatile] %7 : $X, #X.init!initializer.1.foreign : X.Type -> (a1: A, a2: A) -> X , $@cc(objc_method) @thin (A, A, @owned X) -> @owned X
+  // CHECK: class_method [volatile] %{{[0-9]+}} : $X, #X.init!initializer.1.foreign : X.Type -> (a1: A, a2: A) -> X , $@convention(objc_method) (A, A, @owned X) -> @owned X
+  %9 = class_method [volatile] %7 : $X, #X.init!initializer.1.foreign : X.Type -> (a1: A, a2: A) -> X , $@convention(objc_method) (A, A, @owned X) -> @owned X
   %10 = load %3#1 : $*A
   %11 = load %3#1 : $*A
-  %12 = apply %9(%10, %11, %7) : $@cc(objc_method) @thin (A, A, @owned X) -> @owned X
+  %12 = apply %9(%10, %11, %7) : $@convention(objc_method) (A, A, @owned X) -> @owned X
   assign %12 to %2#1 : $*X
   strong_release %3#0 : $Builtin.NativeObject
   %15 = load %2#1 : $*X

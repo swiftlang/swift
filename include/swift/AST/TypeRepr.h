@@ -114,7 +114,7 @@ private:
 
 /// \brief A type with attributes.
 /// \code
-///   @thin Foo
+///   @convention(thin) Foo
 /// \endcode
 class AttributedTypeRepr : public TypeRepr {
   // FIXME: TypeAttributes isn't a great use of space.

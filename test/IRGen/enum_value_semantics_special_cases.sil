@@ -113,8 +113,8 @@ sil_vtable C {}
 class D {}
 sil_vtable D {}
 
-sil @_TFC34enum_value_semantics_special_cases1CD : $@cc(method) @thin (C) -> ()
-sil @_TFC34enum_value_semantics_special_cases1DD : $@cc(method) @thin (D) -> ()
+sil @_TFC34enum_value_semantics_special_cases1CD : $@convention(method) (C) -> ()
+sil @_TFC34enum_value_semantics_special_cases1DD : $@convention(method) (D) -> ()
 
 enum AllRefcounted {
   case Ref(Builtin.NativeObject)

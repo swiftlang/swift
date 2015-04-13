@@ -5,7 +5,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil [semantics "no_inline_plz"] @callee_func : $@thin () -> Int32 {
+sil [semantics "no_inline_plz"] @callee_func : $@convention(thin) () -> Int32 {
 bb0:
   %0 = integer_literal $Builtin.Int32, 3           // user: %1
   %1 = struct $Int32 (%0 : $Builtin.Int32)         // user: %2
@@ -16,15 +16,15 @@ bb0:
 //CHECK: function_ref
 //CHECK: apply
 //CHECK-NEXT: ret
-sil @caller_func : $@thin () -> Int32 {
+sil @caller_func : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = function_ref @callee_func : $@thin () -> Int32 // user: %1
-  %1 = apply %0() : $@thin () -> Int32                // user: %2
+  %0 = function_ref @callee_func : $@convention(thin) () -> Int32 // user: %1
+  %1 = apply %0() : $@convention(thin) () -> Int32                // user: %2
   return %1 : $Int32                                  // id: %2
 }
 
 // A function annocated with the @effects(readonly) attribute.
-sil [readonly] @callee_func2 : $@thin () -> Int32 {
+sil [readonly] @callee_func2 : $@convention(thin) () -> Int32 {
 bb0:
   %0 = integer_literal $Builtin.Int32, 3           // user: %1
   %1 = struct $Int32 (%0 : $Builtin.Int32)         // user: %2
@@ -35,10 +35,10 @@ bb0:
 //CHECK: function_ref
 //CHECK: apply
 //CHECK-NEXT: ret
-sil @caller_func1 : $@thin () -> Int32 {
+sil @caller_func1 : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = function_ref @callee_func2 : $@thin () -> Int32 // user: %1
-  %1 = apply %0() : $@thin () -> Int32                 // user: %2
+  %0 = function_ref @callee_func2 : $@convention(thin) () -> Int32 // user: %1
+  %1 = apply %0() : $@convention(thin) () -> Int32                 // user: %2
   return %1 : $Int32                                   // id: %2
 }
 

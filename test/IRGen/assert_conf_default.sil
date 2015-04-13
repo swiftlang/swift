@@ -4,7 +4,7 @@
 
 import Builtin
 
-sil @remove_assert_configuration : $@thin () -> Builtin.Int32 {
+sil @remove_assert_configuration : $@convention(thin) () -> Builtin.Int32 {
   %1 = builtin "assert_configuration"() : $Builtin.Int32
   return %1 : $Builtin.Int32
 }

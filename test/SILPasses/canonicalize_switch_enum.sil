@@ -16,10 +16,10 @@ enum GenE<T> {
 	case C(T)
 }
 
-sil @external_f : $@thin () -> ()
+sil @external_f : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil @test_switch_enum
-sil @test_switch_enum : $@thin (E) -> Int32 {
+sil @test_switch_enum : $@convention(thin) (E) -> Int32 {
 bb0(%0 : $E):
   // CHECK: switch_enum %0 : $E, case #E.A!enumelt: bb1, case #E.B!enumelt: bb2, case #E.C!enumelt: bb3
   switch_enum %0 : $E, case #E.A!enumelt: bb1, case #E.B!enumelt: bb2, default bb3
@@ -29,8 +29,8 @@ bb1:
   br bb4(%2 : $Builtin.Int32)
 
 bb2:
-  %21 = function_ref @external_f : $@thin () -> ()
-  %22 = apply %21() : $@thin () -> ()
+  %21 = function_ref @external_f : $@convention(thin) () -> ()
+  %22 = apply %21() : $@convention(thin) () -> ()
   %23 = integer_literal $Builtin.Int32, 20
   br bb4(%23 : $Builtin.Int32)
 
@@ -44,7 +44,7 @@ bb4(%8 : $Builtin.Int32):
 }
 
 // CHECK-LABEL: sil @test_switch_enum_addr
-sil @test_switch_enum_addr : $@thin <T> (@in GenE<T>) -> Int32 {
+sil @test_switch_enum_addr : $@convention(thin) <T> (@in GenE<T>) -> Int32 {
 bb0(%0 : $*GenE<T>):
   %1 = alloc_stack $GenE<T>
   copy_addr %0 to [initialization] %1#1 : $*GenE<T>
@@ -72,7 +72,7 @@ bb4(%11 : $Builtin.Int32):
 }
 
 // CHECK-LABEL: sil @test_no_replace
-sil @test_no_replace : $@thin (@inout E) -> Int32 {
+sil @test_no_replace : $@convention(thin) (@inout E) -> Int32 {
 bb0(%0 : $*E):
   %1 = load %0 : $*E
   // CHECK: switch_enum %1 : $E, case #E.A!enumelt: bb1, default bb2
@@ -83,8 +83,8 @@ bb1:
   br bb3(%3 : $Builtin.Int32)
 
 bb2:
-  %21 = function_ref @external_f : $@thin () -> ()
-  %22 = apply %21() : $@thin () -> ()
+  %21 = function_ref @external_f : $@convention(thin) () -> ()
+  %22 = apply %21() : $@convention(thin) () -> ()
   %5 = integer_literal $Builtin.Int32, 30
   br bb3(%5 : $Builtin.Int32)
 

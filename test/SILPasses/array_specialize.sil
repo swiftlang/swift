@@ -23,16 +23,16 @@ class MyClass {
 
 /// We need to split the loop exit edge from bb1 to bb3 before updating ssa form
 /// after cloning.
-sil @clone_switch_enum_exit : $@thin (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+sil @clone_switch_enum_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
 bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
   %3 = load %0 : $*MyArray<MyClass>
   br bb1
 
 bb1:
-  %2 = function_ref @arrayPropertyIsNative : $@cc(method) @thin (@owned MyArray<MyClass>) -> Bool
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
   %4 = load %1 : $*MyBool
   retain_value %3 : $MyArray<MyClass>
-  %5 = apply %2(%3) : $@cc(method) @thin (@owned MyArray<MyClass>) -> Bool
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
   switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb3, case #MyBool.True!enumelt: bb2
 
 bb2:
@@ -46,7 +46,7 @@ bb4:
   return %4 : $MyBool
 }
 
-sil public_external [semantics "array.props.isNative"] @arrayPropertyIsNative : $@cc(method) @thin (@owned MyArray<MyClass>) -> Bool {
+sil public_external [semantics "array.props.isNative"] @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool {
 bb0(%0: $MyArray<MyClass>):
   unreachable
 }

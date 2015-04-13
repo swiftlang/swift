@@ -4,7 +4,7 @@ import Builtin
 import Swift
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
-sil @fold_add_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @fold_add_with_overflow_zeros : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
  %0 = integer_literal $Builtin.Int64, 0
  %18 = builtin "int_sadd_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
@@ -18,7 +18,7 @@ bb0(%x : $Builtin.Int64):
 }
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
-sil @fold_add_with_overflow_zeros2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @fold_add_with_overflow_zeros2 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
  %0 = integer_literal $Builtin.Int64, 0
  %18 = builtin "int_sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %x : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
@@ -32,7 +32,7 @@ bb0(%x : $Builtin.Int64):
 }
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
-sil @fold_sub_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @fold_sub_with_overflow_zeros : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
  %0 = integer_literal $Builtin.Int64, 0
  %18 = builtin "int_ssub_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
@@ -46,7 +46,7 @@ bb0(%x : $Builtin.Int64):
 }
 
 // Simplify arithmetic where one operand is a zero and the other is not a constant
-sil @fold_mul_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @fold_mul_with_overflow_zeros : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
  %0 = integer_literal $Builtin.Int64, 0
  %18 = builtin "int_smul_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
@@ -60,7 +60,7 @@ bb0(%x : $Builtin.Int64):
 }
 
 // Simplify arithmetic where one operand is a one and the other is not a constant
-sil @fold_mul_with_overflow_ones : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @fold_mul_with_overflow_ones : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%x : $Builtin.Int64):
  %0 = integer_literal $Builtin.Int64, 1
  %18 = builtin "int_smul_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
@@ -73,7 +73,7 @@ bb0(%x : $Builtin.Int64):
 }
 
 // Simplify trunc(zext(x)) -> x
-sil @fold_trunc_zext : $@thin (Builtin.Word) -> Builtin.Word {
+sil @fold_trunc_zext : $@convention(thin) (Builtin.Word) -> Builtin.Word {
 bb0(%x : $Builtin.Word):
   %78 = builtin "zextOrBitCast_Word_Int64"(%x : $Builtin.Word) : $Builtin.Int64 // user: %80
   %80 = builtin "truncOrBitCast_Int64_Word"(%78 : $Builtin.Int64) : $Builtin.Word // users: %81, %85
@@ -85,7 +85,7 @@ bb0(%x : $Builtin.Word):
 }
 
 // Simplify trunc(sext(x)) -> x
-sil @fold_trunc_sext : $@thin (Builtin.Word) -> Builtin.Word {
+sil @fold_trunc_sext : $@convention(thin) (Builtin.Word) -> Builtin.Word {
 bb0(%x : $Builtin.Word):
   %78 = builtin "sextOrBitCast_Word_Int64"(%x : $Builtin.Word) : $Builtin.Int64 // user: %80
   %80 = builtin "truncOrBitCast_Int64_Word"(%78 : $Builtin.Int64) : $Builtin.Word // users: %81, %85
@@ -106,7 +106,7 @@ enum SortaOptional1 {
   case Nope, Yup(IntClass)
 }
 
-sil @rewrap_optional_1 : $@thin (@owned SortaOptional1) -> @owned SortaOptional1 {
+sil @rewrap_optional_1 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional1 {
 bb0(%0 : $SortaOptional1):
   switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt.1: bb1, case #SortaOptional1.Nope!enumelt: bb2
 
@@ -127,7 +127,7 @@ enum SortaOptional2 {
   case Nope, Yup(IntClass)
 }
 
-sil @rewrap_optional_2 : $@thin (@owned SortaOptional1) -> @owned SortaOptional2 {
+sil @rewrap_optional_2 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional2 {
 bb0(%0 : $SortaOptional1):
   switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt.1: bb1, case #SortaOptional1.Nope!enumelt: bb2
 
@@ -154,7 +154,7 @@ case Third
 }
 
 // CHECK-LABEL: sil @do_not_use_switch_enum_operand
-sil @do_not_use_switch_enum_operand : $@cc(method) @thin (Builtin.Word, Ternary) -> Ternary {
+sil @do_not_use_switch_enum_operand : $@convention(method) (Builtin.Word, Ternary) -> Ternary {
 bb0(%0 : $Builtin.Word, %1 : $Ternary):
 // CHECK: bb0
 // CHECK-NEXT: switch_enum %1 : $Ternary, case #Ternary.Second!enumelt: [[FIRST:bb[0-9a-zA-Z]+]], default [[SECOND:bb[0-9a-zA-Z]+]]
@@ -181,7 +181,7 @@ bb3(%11 : $Ternary):
 // CHECK-LABEL: sil @simplify_xor1
 // CHECK-NEXT: bb0
 // CHECK-NEXT: return %0 : $Builtin.Int32
-sil @simplify_xor1 : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+sil @simplify_xor1 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
   %3 = builtin "xor_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
@@ -192,7 +192,7 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-LABEL: sil @simplify_xor2
 // CHECK-NEXT: bb0
 // CHECK-NEXT: return %1 : $Builtin.Int32
-sil @simplify_xor2 : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+sil @simplify_xor2 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
   %3 = builtin "xor_Int32"(%2 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int32
@@ -204,7 +204,7 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-NEXT: bb0
 // xor(b, xor (a, b)) -> a
 // CHECK-NEXT: return %0 : $Builtin.Int32
-sil @simplify_xor3 : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+sil @simplify_xor3 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
   %3 = builtin "xor_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32

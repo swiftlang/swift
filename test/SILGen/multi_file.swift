@@ -2,20 +2,20 @@
 
 // CHECK-LABEL: sil hidden @_TF10multi_file12rdar16016713
 func rdar16016713(r: Range) {
-  // CHECK: [[LIMIT:%[0-9]+]] = function_ref @_TFV10multi_file5Rangeg5limitSi : $@cc(method) @thin (Range) -> Int
-  // CHECK: {{%[0-9]+}} = apply [[LIMIT]]({{%[0-9]+}}) : $@cc(method) @thin (Range) -> Int
+  // CHECK: [[LIMIT:%[0-9]+]] = function_ref @_TFV10multi_file5Rangeg5limitSi : $@convention(method) (Range) -> Int
+  // CHECK: {{%[0-9]+}} = apply [[LIMIT]]({{%[0-9]+}}) : $@convention(method) (Range) -> Int
   println(r.limit)
 }
 
 // CHECK-LABEL: sil hidden @_TF10multi_file26lazyPropertiesAreNotStored
 func lazyPropertiesAreNotStored(var container: LazyContainer) {
-  // CHECK: {{%[0-9]+}} = function_ref @_TFV10multi_file13LazyContainerg7lazyVarSi : $@cc(method) @thin (@inout LazyContainer) -> Int
+  // CHECK: {{%[0-9]+}} = function_ref @_TFV10multi_file13LazyContainerg7lazyVarSi : $@convention(method) (@inout LazyContainer) -> Int
   println(container.lazyVar)
 }
 
 // CHECK-LABEL: sil hidden @_TF10multi_file29lazyRefPropertiesAreNotStored
 func lazyRefPropertiesAreNotStored(container: LazyContainerClass) {
-  // CHECK: {{%[0-9]+}} = class_method %0 : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : LazyContainerClass -> () -> Int , $@cc(method) @thin (@guaranteed LazyContainerClass) -> Int
+  // CHECK: {{%[0-9]+}} = class_method %0 : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : LazyContainerClass -> () -> Int , $@convention(method) (@guaranteed LazyContainerClass) -> Int
   println(container.lazyVar)
 }
 
@@ -43,5 +43,5 @@ class HasComputedProperty: ProtocolWithProperty {
     set {}
   }
 }
-// CHECK-LABEL: sil hidden [transparent] @_TFC10multi_file19HasComputedPropertym3fooSi : $@cc(method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasComputedProperty) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasComputedProperty, @thick HasComputedProperty.Type) -> ()>) {
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC10multi_file19HasComputedPropertyS_20ProtocolWithPropertyS_FS1_m3fooSi : $@cc(witness_method) @thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasComputedProperty) -> (Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasComputedProperty, @thick HasComputedProperty.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10multi_file19HasComputedPropertym3fooSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasComputedProperty) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasComputedProperty, @thick HasComputedProperty.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC10multi_file19HasComputedPropertyS_20ProtocolWithPropertyS_FS1_m3fooSi : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasComputedProperty) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasComputedProperty, @thick HasComputedProperty.Type) -> ()>) {

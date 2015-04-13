@@ -23,13 +23,13 @@ public struct S2 {
 // CHECK: %V18static_initializer2S2 = type <{ %VSs5Int32, %VSs5Int32, %V18static_initializer1S }>
 // CHECK: %V18static_initializer1S = type <{ %VSs5Int32 }>
 
-sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@thin () -> ()
+sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
 // CHECK: @_Tv2ch1xSi = global %VSs5Int32 <{ i32 2 }>, align 4
 
-sil_global @_Tv6nested1xVS_2S2 : $S2, @globalinit_func1 : $@thin () -> ()
+sil_global @_Tv6nested1xVS_2S2 : $S2, @globalinit_func1 : $@convention(thin) () -> ()
 // CHECK: @_Tv6nested1xVS_2S2 = global %V18static_initializer2S2 <{ %VSs5Int32 <{ i32 2 }>, %VSs5Int32 <{ i32 3 }>, %V18static_initializer1S <{ %VSs5Int32 <{ i32 4 }> }> }>, align 4
 
-sil private @globalinit_func0 : $@thin () -> () {
+sil private @globalinit_func0 : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Int32
   %1 = integer_literal $Builtin.Int32, 2
@@ -42,7 +42,7 @@ bb0:
 // CHECK-LABEL: define i8* @_TF2cha1xSi() {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret i8* bitcast (%VSs5Int32* @_Tv2ch1xSi to i8*)
-sil [global_init] @_TF2cha1xSi : $@thin () -> Builtin.RawPointer {
+sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Int32
   %1 = address_to_pointer %0 : $*Int32 to $Builtin.RawPointer
@@ -53,14 +53,14 @@ bb0:
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load i32, i32* getelementptr inbounds (%VSs5Int32, %VSs5Int32* @_Tv2ch1xSi, i32 0, i32 0)
 // CHECK-NEXT: ret
-sil @_TF2ch1fFT_Si : $@thin () -> Int32 {
+sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Int32
   %1 = load %0 : $*Int32
   return %1 : $Int32
 }
 
-sil private @globalinit_func1 : $@thin () -> () {
+sil private @globalinit_func1 : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @_Tv6nested1xVS_2S2 : $*S2
   %1 = integer_literal $Builtin.Int32, 2
@@ -79,7 +79,7 @@ bb0:
 // CHECK-LABEL: define i8* @_TF6nesteda1xVS_2S2() {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret i8* bitcast (%V18static_initializer2S2* @_Tv6nested1xVS_2S2 to i8*)
-sil [global_init] @_TF6nesteda1xVS_2S2 : $@thin () -> Builtin.RawPointer {
+sil [global_init] @_TF6nesteda1xVS_2S2 : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %0 = global_addr @_Tv6nested1xVS_2S2 : $*S2
   %1 = address_to_pointer %0 : $*S2 to $Builtin.RawPointer
@@ -91,7 +91,7 @@ bb0:
 // CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 0, i32 0)
 // CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 1, i32 0)
 // CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 2, i32 0, i32 0)
-sil @_TF6nested1fFT_VS_2S2 : $@thin () -> S2 {
+sil @_TF6nested1fFT_VS_2S2 : $@convention(thin) () -> S2 {
 bb0:
   %0 = global_addr @_Tv6nested1xVS_2S2 : $*S2
   %1 = load %0 : $*S2

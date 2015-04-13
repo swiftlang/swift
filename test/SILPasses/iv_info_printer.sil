@@ -14,7 +14,7 @@ import Swift
 // CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Int32, Builtin.Int1), 0
 // CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Int32
 
-sil @for_loop : $@thin (Int32) -> Int32 {
+sil @for_loop : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 0
   br bb1(%1 : $Builtin.Int32, %1 : $Builtin.Int32)
@@ -50,7 +50,7 @@ bb3:
 // CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Int32, Builtin.Int1), 0
 // CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Int32
 
-sil @for_in_loop : $@thin (Int32) -> Int32 {
+sil @for_in_loop : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = struct_extract %0 : $Int32, #Int32.value
@@ -85,7 +85,7 @@ bb3:
 // CHECK: IV:   {{.*}} = tuple_extract [[ADD]] : $(Builtin.Int32, Builtin.Int1), 0
 // CHECK: with header:   [[ARG]] = argument of bb1 : $Builtin.Int32
 
-sil @copy_iv : $@thin (Int32, Int32) -> () {
+sil @copy_iv : $@convention(thin) (Int32, Int32) -> () {
 bb0(%0 : $Int32, %1 : $Int32):
   %2 = struct_extract %0 : $Int32, #Int32.value
   %3 = integer_literal $Builtin.Int32, 2

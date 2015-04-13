@@ -10,7 +10,7 @@ import Swift
 // CHECK:  call void @llvm.trap()
 // CHECK: }
 
-sil hidden @test_cond_fail : $@thin (Int32) -> Int32 {
+sil hidden @test_cond_fail : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %2 = integer_literal $Builtin.Int32, 1
   %3 = struct_extract %0 : $Int32, #Int32.value

@@ -10,10 +10,10 @@ sil_global private @globalinit_token11 : $Builtin.Word
 
 sil_global private @globalinit_token120 : $Builtin.Word
 
-sil @globalinit_func11 :  $@thin () -> ()
+sil @globalinit_func11 :  $@convention(thin) () -> ()
 
 //CHECK: sil @a_method_to_simplify
-sil @a_method_to_simplify : $@thin (Builtin.RawPointer, @owned Builtin.NativeObject, Builtin.Int32) -> Builtin.RawPointer {
+sil @a_method_to_simplify : $@convention(thin) (Builtin.RawPointer, @owned Builtin.NativeObject, Builtin.Int32) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
   %4 = struct $UnsafeMutablePointer<UInt8> (%0 : $Builtin.RawPointer) // user: %37
   strong_retain %1 : $Builtin.NativeObject       // id: %5
@@ -22,8 +22,8 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
   %8 = integer_literal $Builtin.Int1, 0           // user: %23
   %10 = global_addr @globalinit_token11 : $*Builtin.Word // user: %11
   %11 = address_to_pointer %10 : $*Builtin.Word to $Builtin.RawPointer // user: %14
-  %12 = function_ref @globalinit_func11 : $@thin () -> () // users: %26, %13
-  %13 = thin_to_thick_function %12 : $@thin () -> () to $@callee_owned () -> () // user: %14
+  %12 = function_ref @globalinit_func11 : $@convention(thin) () -> () // users: %26, %13
+  %13 = thin_to_thick_function %12 : $@convention(thin) () -> () to $@callee_owned () -> () // user: %14
   %14 = builtin "once"(%11 : $Builtin.RawPointer, %13 : $@callee_owned () -> ()) : $()
   %15 = alloc_stack $Int32                        // users: %38, %40, %41
   %16 = struct_element_addr %15#1 : $*Int32, #Int32.value // users: %28, %17
@@ -37,7 +37,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
 bb1:                                              // Preds: bb0
   %24 = global_addr @globalinit_token11 : $*Builtin.Word // user: %25
   %25 = address_to_pointer %24 : $*Builtin.Word to $Builtin.RawPointer // user: %27
-  %26 = thin_to_thick_function %12 : $@thin () -> () to $@callee_owned () -> () // user: %27
+  %26 = thin_to_thick_function %12 : $@convention(thin) () -> () to $@callee_owned () -> () // user: %27
   %27 = builtin "once"(%25 : $Builtin.RawPointer, %26 : $@callee_owned () -> ()) : $()
   %28 = load %16 : $*Builtin.Int32                // user: %30
 // CHECK: [[VAR_21:%[0-9]+]] = builtin "and_Int32"
@@ -66,7 +66,7 @@ bb3(%35 : $()):                                   // Preds: bb2
 //CHECK: bb2:
 //CHECK-NEXT: tuple ()
 //CHECK-NEXT: return
-sil @remove_dead_args: $@thin (Int32) -> () {
+sil @remove_dead_args: $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 37
   %3 = struct_extract %0 : $Int32, #Int32.value
@@ -97,7 +97,7 @@ class A {}
 //CHECK: bb1([[VAR:%[0-9]+]] : $A)
 //CHECK-NOT: [[VAR]]
 //CHECK: return
-sil @no_remove_mandatory_dead_args : $@thin (@owned AnyObject) -> Int32 {
+sil @no_remove_mandatory_dead_args : $@convention(thin) (@owned AnyObject) -> Int32 {
 bb0(%0 : $AnyObject):
   checked_cast_br %0 : $AnyObject to $A, bb1, bb2 // id: %3
 
@@ -122,7 +122,7 @@ enum X {
 }
 
 // CHECK-LABEL: simplify_switch_include_args
-sil @simplify_switch_include_args : $@thin (Int32, Int32) -> Int32 {
+sil @simplify_switch_include_args : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
 // CHECK: return %0 : $Int32
   %2 = tuple (%0 : $Int32, %1 : $Int32)               // user: %3
@@ -155,7 +155,7 @@ bb7(%16 : $Int32):                                // Preds: bb2 bb4 bb6
 }
 
 // CHECK-LABEL: simplify_switch_dont_include_args
-sil @simplify_switch_dont_include_args : $@thin (Int32, Int32) -> Int32 {
+sil @simplify_switch_dont_include_args : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
   %2 = tuple (%0 : $Int32, %1 : $Int32)               // user: %3
   %3 = enum $X, #X.B!enumelt.1, %2 : $(Int32, Int32)  // user: %4
@@ -181,7 +181,7 @@ bb5:                                              // Preds: bb0
 }
 
 // CHECK-LABEL: simplify_switch_dont_include_args_nested
-sil @simplify_switch_dont_include_args_nested : $@thin (Int32, Int32, X) -> Int32 {
+sil @simplify_switch_dont_include_args_nested : $@convention(thin) (Int32, Int32, X) -> Int32 {
 // CHECK: bb0
 // CHECK: switch_enum %2
 bb0(%0 : $Int32, %1 : $Int32, %2 : $X):
@@ -223,7 +223,7 @@ bb8(%20 : $Int32):
 }
 
 // CHECK-LABEL: simplify_switch_wrong_args
-sil @simplify_switch_wrong_args : $@thin (Int32, Int32, X, Builtin.Int1) -> Int32 {
+sil @simplify_switch_wrong_args : $@convention(thin) (Int32, Int32, X, Builtin.Int1) -> Int32 {
 // CHECK: bb0
 // CHECK: switch_enum %2
 bb0(%0 : $Int32, %1 : $Int32, %2 : $X, %24 : $Builtin.Int1):
@@ -275,7 +275,7 @@ enum EA {
 
 
 // CHECK-LABEL: fold_unreachable_terminators1
-sil @fold_unreachable_terminators1 : $@thin (EA) -> () {
+sil @fold_unreachable_terminators1 : $@convention(thin) (EA) -> () {
 // CHECK: bb0
 // CHECK-NEXT: [[VAL:%[a-zA-Z0-9]+]] = tuple ()
 // CHECK-NEXT: return [[VAL]]
@@ -306,7 +306,7 @@ bb7:
 }
 
 // CHECK-LABEL: fold_unreachable_terminators2
-sil @fold_unreachable_terminators2 : $@thin (EA) -> Int32 {
+sil @fold_unreachable_terminators2 : $@convention(thin) (EA) -> Int32 {
 // CHECK: bb0
 bb0(%0 : $EA):
 // CHECK-NEXT:  [[VAL:%[a-zA-Z0-9]+]] = unchecked_enum_data %0 : $EA, #EA.cB!enumelt.1 // user: %2
@@ -333,7 +333,7 @@ bb6:
 }
 
 // CHECK-LABEL: simplify_switch_to_select_enum
-sil @simplify_switch_to_select_enum : $@thin (X) -> Bool {
+sil @simplify_switch_to_select_enum : $@convention(thin) (X) -> Bool {
 bb0(%0 : $X):
 // CHECK: bb0
 // CHECK: [[TRUE:%.*]] = integer_literal {{.*}} -1
@@ -363,12 +363,12 @@ bb4(%20 : $Builtin.Int1):                         // Preds: bb1 bb2 bb3
 }
 
 
-sil @external_f :  $@thin () -> ()
+sil @external_f :  $@convention(thin) () -> ()
 
 // Check that switch_enum to select_enum conversion does not
 // take place in a peresence of side-effects.
 // CHECK-LABEL: simplify_switch_to_select_enum_with_side_effects
-sil @simplify_switch_to_select_enum_with_side_effects : $@thin (X) -> Int32 {
+sil @simplify_switch_to_select_enum_with_side_effects : $@convention(thin) (X) -> Int32 {
 bb0(%0 : $X):
 // CHECK: bb0
 // CHECK-NOT: select_enum
@@ -382,8 +382,8 @@ bb1:                                              // Preds: bb0
 
 bb2:                                              // Preds: bb0
   // This BB contains a side-effect. Therefore switch_enum cannot be eliminated.
-  %11 = function_ref @external_f :  $@thin () -> ()
-  %12 = apply %11() : $@thin () -> ()
+  %11 = function_ref @external_f :  $@convention(thin) () -> ()
+  %12 = apply %11() : $@convention(thin) () -> ()
   %13 = integer_literal $Builtin.Int32, 2
   br bb4(%13 : $Builtin.Int32)
 
@@ -406,7 +406,7 @@ enum E {
 }
 
 // CHECK-LABEL: sil @simplify_switch_enum_pred_no_arg
-sil @simplify_switch_enum_pred_no_arg : $@thin (E) -> Builtin.Int1 {
+sil @simplify_switch_enum_pred_no_arg : $@convention(thin) (E) -> Builtin.Int1 {
 bb0(%0 : $E):
 // CHECK-LABEL: bb0
 // CHECK: switch_enum %0 : $E, case #E.Nope!enumelt: bb1, case #E.Yup!enumelt.1: bb2
@@ -431,7 +431,7 @@ bb4(%3 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil @same_destination_unused_arg
-sil @same_destination_unused_arg : $@thin (Optional<Int32>) -> Optional<Int32> {
+sil @same_destination_unused_arg : $@convention(thin) (Optional<Int32>) -> Optional<Int32> {
 bb0(%0 : $Optional<Int32>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
@@ -463,7 +463,7 @@ public enum Numbers {
 // CHECK_WITH_CODEMOTION-NOT: switch_enum
 // CHECK_WITH_CODEMOTION: select_enum
 // CHECK_WITH_CODEMOTION: return
-sil @FormSelectEnumFromTwoSelectSwitches : $@thin (Numbers) -> Int32 {
+sil @FormSelectEnumFromTwoSelectSwitches : $@convention(thin) (Numbers) -> Int32 {
 bb0(%0 : $Numbers):
   debug_value %0 : $Numbers  // let e             // id: %1
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %2
@@ -540,7 +540,7 @@ bb20(%34 : $Builtin.Int32):                       // Preds: bb2 bb5 bb11 bb14 bb
 // CHECK_WITH_CODEMOTION-NOT: switch_enum
 // CHECK_WITH_CODEMOTION: select_enum
 // CHECK_WITH_CODEMOTION: return
-sil @FormSelectEnumIntResult : $@thin (Numbers) -> Int32 {
+sil @FormSelectEnumIntResult : $@convention(thin) (Numbers) -> Int32 {
 bb0(%0 : $Numbers):
   debug_value %0 : $Numbers  // let e             // id: %1
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, case #Numbers.Fourth!enumelt: bb6, default bb8 // id: %2
@@ -588,7 +588,7 @@ bb11(%21 : $Builtin.Int32):                       // Preds: bb2 bb5 bb7 bb10
 // CHECK_WITH_CODEMOTION-NOT: switch_enum
 // CHECK_WITH_CODEMOTION: select_enum
 // CHECK_WITH_CODEMOTION: return
-sil @FormSelectEnumBoolResult : $@thin (Numbers) -> Bool {
+sil @FormSelectEnumBoolResult : $@convention(thin) (Numbers) -> Bool {
 bb0(%0 : $Numbers):
   debug_value %0 : $Numbers  // let e             // id: %1
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %2
@@ -629,7 +629,7 @@ bb9(%17 : $Builtin.Int1):                         // Preds: bb2 bb5 bb8
 // CHECK_WITH_CODEMOTION: switch_enum
 // CHECK_WITH_CODEMOTION-NOT: select_enum
 // CHECK_WITH_CODEMOTION: return
-sil @DontFormSelectEnumBoolResult : $@thin (Numbers, Bool) -> Bool {
+sil @DontFormSelectEnumBoolResult : $@convention(thin) (Numbers, Bool) -> Bool {
 bb0(%0 : $Numbers, %1 : $Bool):
   debug_value %0 : $Numbers  // let e             // id: %2
   %2 = struct_extract %1 : $Bool, #Bool.value

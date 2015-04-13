@@ -6,40 +6,40 @@
 
 sil_stage canonical
 
-sil private @foo : $@thin () -> () {
+sil private @foo : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @bar : $@thin () -> ()
-  %1 = apply %0() : $@thin () -> ()
+  %0 = function_ref @bar : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
   return %1 : $()
 }
 
-sil public_external @bar : $@thin () -> () {
-bb0:
-  %1 = tuple ()
-  return %1 : $()
-}
-
-sil shared @baz : $@thin () -> () {
-bb0:
-  %0 = function_ref @bar : $@thin () -> ()
-  %1 = apply %0() : $@thin () -> ()
-  return %1 : $()
-}
-
-sil shared @qux : $@thin () -> () {
+sil public_external @bar : $@convention(thin) () -> () {
 bb0:
   %1 = tuple ()
   return %1 : $()
 }
 
-sil hidden @fred : $@thin () -> () {
+sil shared @baz : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @qux : $@thin () -> ()
-  %1 = apply %0() : $@thin () -> ()
+  %0 = function_ref @bar : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
   return %1 : $()
 }
 
-sil @frieda : $@thin () -> () {
+sil shared @qux : $@convention(thin) () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil hidden @fred : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @qux : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  return %1 : $()
+}
+
+sil @frieda : $@convention(thin) () -> () {
 bb0:
   %1 = tuple ()
   return %1 : $()

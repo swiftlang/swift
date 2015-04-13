@@ -10,14 +10,14 @@ protocol DefCon {
 
 
 // CHECK-LABEL: define void @defcon(%swift.opaque* noalias sret, %swift.type*, %swift.type* %T, i8** %T.DefCon) {
-sil @defcon : $@thin <T: DefCon> (@out T, @thick T.Type) -> () {
+sil @defcon : $@convention(thin) <T: DefCon> (@out T, @thick T.Type) -> () {
 entry(%0: $*T, %1: $@thick T.Type):
 
   // CHECK-i386:   [[WITNESS:%.*]] = load i8*, i8** %T.DefCon, align 4
   // CHECK-x86_64: [[WITNESS:%.*]] = load i8*, i8** %T.DefCon, align 8
   // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, %swift.type*)*
   // CHECK: call void [[METHOD]]
-  %m = witness_method $T, #DefCon.init!allocator.1 : $@thin @cc(witness_method) <U: DefCon> (@out U, @thick U.Type) -> ()
-  %z = apply %m<T>(%0, %1) : $@thin @cc(witness_method) <V: DefCon> (@out V, @thick V.Type) -> ()
+  %m = witness_method $T, #DefCon.init!allocator.1 : $@convention(witness_method) <U: DefCon> (@out U, @thick U.Type) -> ()
+  %z = apply %m<T>(%0, %1) : $@convention(witness_method) <V: DefCon> (@out V, @thick V.Type) -> ()
   return %z : $()
 }

@@ -98,29 +98,29 @@ class X {
   @objc subscript (i : Int) -> Int { get }
 }
 
-// CHECK: sil @dynamic_lookup_br : $@thin (AnyObject, Builtin.Int1) -> () {
+// CHECK: sil @dynamic_lookup_br : $@convention(thin) (AnyObject, Builtin.Int1) -> () {
 // CHECK: bb0(
 // CHECK:   cond_br %1, bb1, bb4
 // CHECK: bb1:
 // CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb3, bb2
 // CHECK: bb2:
 // CHECK:   br bb8
-// CHECK: bb3({{.*}} : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ())
-// CHECK:   br bb7({{.*}} : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ())
+// CHECK: bb3({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
+// CHECK:   br bb7({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
 // CHECK: bb4:
 // CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb6, bb5
 // CHECK: bb5:
 // CHECK:   br bb8
-// CHECK: bb6({{.*}} : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
-// CHECK:   br bb7({{.*}} : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ())
-// CHECK: bb7({{.*}} : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
+// CHECK: bb6({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+// CHECK:   br bb7({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
+// CHECK: bb7({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
 // CHECK:   br bb9
 // CHECK: bb8:
 // CHECK:   br bb9
 // CHECK: bb9:
 // CHECK:   return
 
-sil @dynamic_lookup_br : $@thin (AnyObject, Builtin.Int1) -> () {
+sil @dynamic_lookup_br : $@convention(thin) (AnyObject, Builtin.Int1) -> () {
 bb0(%0 : $AnyObject, %10: $Builtin.Int1):
   cond_br %10, lookup1, lookup2
 
@@ -144,7 +144,7 @@ lookup2:
   %27 = unchecked_ref_cast %26 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
   dynamic_method_br %27 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
 
-bb1(%8 : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
+bb1(%8 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
   br bb3
 
 bb2:
@@ -183,7 +183,7 @@ class ParentNode : Node {
 // CHECK: bb9:
 // CHECK:   return
 
-sil @test_checked_cast_br : $@cc(method) @thin (@owned Node, Builtin.Int1) -> () {
+sil @test_checked_cast_br : $@convention(method) (@owned Node, Builtin.Int1) -> () {
 bb0(%0 : $Node, %2 : $Builtin.Int1):
   cond_br %2, ccb1, ccb2
 

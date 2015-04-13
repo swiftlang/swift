@@ -12,9 +12,9 @@ sil_vtable Foo {}
 
 sil @_TFC10objc_block3FooD : $Foo -> ()
 
-sil @call_block : $@thin (@cc(cdecl) @objc_block Foo -> Foo, Foo) -> Foo {
-entry(%b : $@cc(cdecl) @objc_block Foo -> Foo, %x : $Foo):
-  %y = apply %b(%x) : $@cc(cdecl) @objc_block Foo -> Foo
+sil @call_block : $@convention(thin) (@convention(block) Foo -> Foo, Foo) -> Foo {
+entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):
+  %y = apply %b(%x) : $@convention(block) Foo -> Foo
   return %y : $Foo
 }
 // CHECK-LABEL: define %C10objc_block3Foo* @call_block(%objc_block*, %C10objc_block3Foo*) {
@@ -28,12 +28,12 @@ entry(%b : $@cc(cdecl) @objc_block Foo -> Foo, %x : $Foo):
 // CHECK:         ret %C10objc_block3Foo* %7
 // CHECK:       }
 
-sil @generic : $@thin <T> (@in T) -> ()
+sil @generic : $@convention(thin) <T> (@in T) -> ()
 
-sil @generic_with_block : $@thin (@in @cc(cdecl) @objc_block () -> ()) -> () {
-entry(%b : $*@cc(cdecl) @objc_block () -> ()):
-  %f = function_ref @generic : $@thin <T> (@in T) -> ()
-  %z = apply %f<@objc_block () -> ()>(%b) : $@thin <T> (@in T) -> ()
+sil @generic_with_block : $@convention(thin) (@in @convention(block) () -> ()) -> () {
+entry(%b : $*@convention(block) () -> ()):
+  %f = function_ref @generic : $@convention(thin) <T> (@in T) -> ()
+  %z = apply %f<@convention(block) () -> ()>(%b) : $@convention(thin) <T> (@in T) -> ()
   return %z : $()
 }
 

@@ -9,18 +9,18 @@ import Swift
   @objc func ping()
 }
 
-sil @_TFC4main1X4pingfS0_FT_T_ : $@cc(method) @thin (@owned X) -> ()
-sil @_TFC4main1XcfMS0_FT_S0_ : $@cc(method) @thin (@owned X) -> @owned X
+sil @_TFC4main1X4pingfS0_FT_T_ : $@convention(method) (@owned X) -> ()
+sil @_TFC4main1XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X
 
 // CHECK-LABEL: _TFC4main1X4pingfS0_FT_T_
 // CHECK-NOT: checked_cast_br identical
 // CHECK: return
-sil @_TF4main1fFCS_1XT_ : $@thin (@owned X) -> () {
+sil @_TF4main1fFCS_1XT_ : $@convention(thin) (@owned X) -> () {
 bb0(%0 : $X):
   debug_value %0 : $X  // let x                   // id: %1
   strong_retain %0 : $X                           // id: %2
-  %3 = class_method [volatile] %0 : $X, #X.ping!1.foreign : X -> () -> () , $@cc(objc_method) @thin (X) -> () // user: %4
-  %4 = apply %3(%0) : $@cc(objc_method) @thin (X) -> ()
+  %3 = class_method [volatile] %0 : $X, #X.ping!1.foreign : X -> () -> () , $@convention(objc_method) (X) -> () // user: %4
+  %4 = apply %3(%0) : $@convention(objc_method) (X) -> ()
   strong_release %0 : $X                          // id: %5
   strong_release %0 : $X                          // id: %6
   %7 = tuple ()                                   // user: %8

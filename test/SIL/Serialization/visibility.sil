@@ -7,10 +7,10 @@ import Builtin
 // positive/negative checks to simplify things.
 
 // NEG-CHECK-NOT: sil_global private @private_global : $Builtin.Word
-// NEG-CHECK-NOT: sil private @private_function : $@thin () -> ()
-// NEG-CHECK-NOT: sil @references_private_global : $@thin () -> () {
-// NEG-CHECK-NOT: sil @references_private_function : $@thin () -> () {
-// NEG-CHECK-NOT: sil private @private_function_test : $@thin () -> ()
+// NEG-CHECK-NOT: sil private @private_function : $@convention(thin) () -> ()
+// NEG-CHECK-NOT: sil @references_private_global : $@convention(thin) () -> () {
+// NEG-CHECK-NOT: sil @references_private_function : $@convention(thin) () -> () {
+// NEG-CHECK-NOT: sil private @private_function_test : $@convention(thin) () -> ()
 
 // Check Global Variables.
 // CHECK: sil_global shared [fragile] @shared_global : $Builtin.Word
@@ -18,237 +18,237 @@ import Builtin
 // CHECK: sil_global hidden [fragile] @hidden_global : $Builtin.Word
 
 // Check that all functions are defined/declared appropriately.
-// CHECK-NOT: sil [fragile] @public_external_function_test : $@thin () -> () {
-// CHECK: sil [fragile] @public_external_function_test : $@thin () -> ()
-// CHECK: sil hidden [fragile] @hidden_function_test : $@thin () -> () {
-// CHECK: sil [fragile] @references_public_function : $@thin () -> () {
-// CHECK: sil [fragile] @references_shared_function : $@thin () -> () {
-// CHECK: sil [fragile] @references_hidden_function : $@thin () -> () {
-// CHECK: sil [fragile] @references_private_function : $@thin () -> ()
-// CHECK: sil [fragile] @references_public_global : $@thin () -> () {
-// CHECK: sil [fragile] @references_shared_global : $@thin () -> () {
-// CHECK: sil [fragile] @references_hidden_global : $@thin () -> () {
-// CHECK: sil [fragile] @references_private_global : $@thin () -> ()
-// CHECK: sil hidden_external [fragile] @hidden_external_function_test : $@thin () -> ()
-// CHECK: sil [fragile] @public_function_test : $@thin () -> () {
-// CHECK: sil [fragile] @public_function : $@thin () -> () {
-// CHECK: sil hidden [fragile] @hidden_function : $@thin () -> () {
-// CHECK-NOT: sil shared_external [fragile] @shared_external_function_test : $@thin () -> ()
-// CHECK: sil shared [fragile] @shared_external_function_test : $@thin () -> ()
+// CHECK-NOT: sil [fragile] @public_external_function_test : $@convention(thin) () -> () {
+// CHECK: sil [fragile] @public_external_function_test : $@convention(thin) () -> ()
+// CHECK: sil hidden [fragile] @hidden_function_test : $@convention(thin) () -> () {
+// CHECK: sil [fragile] @references_public_function : $@convention(thin) () -> () {
+// CHECK: sil [fragile] @references_shared_function : $@convention(thin) () -> () {
+// CHECK: sil [fragile] @references_hidden_function : $@convention(thin) () -> () {
+// CHECK: sil [fragile] @references_private_function : $@convention(thin) () -> ()
+// CHECK: sil [fragile] @references_public_global : $@convention(thin) () -> () {
+// CHECK: sil [fragile] @references_shared_global : $@convention(thin) () -> () {
+// CHECK: sil [fragile] @references_hidden_global : $@convention(thin) () -> () {
+// CHECK: sil [fragile] @references_private_global : $@convention(thin) () -> ()
+// CHECK: sil hidden_external [fragile] @hidden_external_function_test : $@convention(thin) () -> ()
+// CHECK: sil [fragile] @public_function_test : $@convention(thin) () -> () {
+// CHECK: sil [fragile] @public_function : $@convention(thin) () -> () {
+// CHECK: sil hidden [fragile] @hidden_function : $@convention(thin) () -> () {
+// CHECK-NOT: sil shared_external [fragile] @shared_external_function_test : $@convention(thin) () -> ()
+// CHECK: sil shared [fragile] @shared_external_function_test : $@convention(thin) () -> ()
 
 sil_global private [fragile] @private_global : $Builtin.Word
 sil_global [fragile] @public_global : $Builtin.Word
 sil_global shared [fragile] @shared_global : $Builtin.Word
 sil_global hidden [fragile] @hidden_global : $Builtin.Word
 
-sil private [fragile] @private_function : $@thin () -> () {
+sil private [fragile] @private_function : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 0
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_private_global : $@thin () -> () {
+sil [fragile] @references_private_global : $@convention(thin) () -> () {
   %0 = global_addr @private_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_private_function : $@thin () -> () {
-  %0 = function_ref @private_function : $@thin () -> ()
+sil [fragile] @references_private_function : $@convention(thin) () -> () {
+  %0 = function_ref @private_function : $@convention(thin) () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil shared [fragile] @shared_function : $@thin () -> () {
+sil shared [fragile] @shared_function : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 1
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_shared_global : $@thin () -> () {
+sil [fragile] @references_shared_global : $@convention(thin) () -> () {
   %0 = global_addr @shared_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_shared_function : $@thin () -> () {
-  %0 = function_ref @shared_function : $@thin () -> ()
+sil [fragile] @references_shared_function : $@convention(thin) () -> () {
+  %0 = function_ref @shared_function : $@convention(thin) () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil hidden [fragile] @hidden_function : $@thin () -> () {
+sil hidden [fragile] @hidden_function : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 2
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_hidden_global : $@thin () -> () {
+sil [fragile] @references_hidden_global : $@convention(thin) () -> () {
   %0 = global_addr @hidden_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_hidden_function : $@thin () -> () {
-  %0 = function_ref @hidden_function : $@thin () -> ()
+sil [fragile] @references_hidden_function : $@convention(thin) () -> () {
+  %0 = function_ref @hidden_function : $@convention(thin) () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil [fragile] @public_function : $@thin () -> () {
+sil [fragile] @public_function : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 4
   %1 = tuple()
   return %1 : $()
 }
 
-sil [fragile] @references_public_global : $@thin () -> () {
+sil [fragile] @references_public_global : $@convention(thin) () -> () {
   %0 = global_addr @public_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_public_function : $@thin () -> () {
-  %0 = function_ref @public_function : $@thin () -> ()
+sil [fragile] @references_public_function : $@convention(thin) () -> () {
+  %0 = function_ref @public_function : $@convention(thin) () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil private [fragile] @private_function_test : $@thin () -> () {
-  %0 = function_ref @references_public_function : $@thin () -> ()
-  %1 = function_ref @references_shared_function : $@thin () -> ()
-  %2 = function_ref @references_hidden_function : $@thin () -> ()
-  %3 = function_ref @references_private_function : $@thin () -> ()
-  %4 = function_ref @references_public_global : $@thin () -> ()
-  %5 = function_ref @references_shared_global : $@thin () -> ()
-  %6 = function_ref @references_hidden_global : $@thin () -> ()
-  %7 = function_ref @references_private_global : $@thin () -> ()
-  apply %0() : $@thin () -> ()
-  apply %1() : $@thin () -> ()
-  apply %2() : $@thin () -> ()
-  apply %3() : $@thin () -> ()
-  apply %4() : $@thin () -> ()
-  apply %5() : $@thin () -> ()
-  apply %6() : $@thin () -> ()
-  apply %7() : $@thin () -> ()
+sil private [fragile] @private_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
   %8 = tuple()
   return %8 : $()
 }
 
-sil shared [fragile] @shared_function_test : $@thin () -> () {
-  %0 = function_ref @references_public_function : $@thin () -> ()
-  %1 = function_ref @references_shared_function : $@thin () -> ()
-  %2 = function_ref @references_hidden_function : $@thin () -> ()
-  %3 = function_ref @references_private_function : $@thin () -> ()
-  %4 = function_ref @references_public_global : $@thin () -> ()
-  %5 = function_ref @references_shared_global : $@thin () -> ()
-  %6 = function_ref @references_hidden_global : $@thin () -> ()
-  %7 = function_ref @references_private_global : $@thin () -> ()
-  apply %0() : $@thin () -> ()
-  apply %1() : $@thin () -> ()
-  apply %2() : $@thin () -> ()
-  apply %3() : $@thin () -> ()
-  apply %4() : $@thin () -> ()
-  apply %5() : $@thin () -> ()
-  apply %6() : $@thin () -> ()
-  apply %7() : $@thin () -> ()
+sil shared [fragile] @shared_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
   %8 = tuple()
   return %8 : $()
 }
 
-sil hidden [fragile] @hidden_function_test : $@thin () -> () {
-  %0 = function_ref @references_public_function : $@thin () -> ()
-  %1 = function_ref @references_shared_function : $@thin () -> ()
-  %2 = function_ref @references_hidden_function : $@thin () -> ()
-  %3 = function_ref @references_private_function : $@thin () -> ()
-  %4 = function_ref @references_public_global : $@thin () -> ()
-  %5 = function_ref @references_shared_global : $@thin () -> ()
-  %6 = function_ref @references_hidden_global : $@thin () -> ()
-  %7 = function_ref @references_private_global : $@thin () -> ()
-  apply %0() : $@thin () -> ()
-  apply %1() : $@thin () -> ()
-  apply %2() : $@thin () -> ()
-  apply %3() : $@thin () -> ()
-  apply %4() : $@thin () -> ()
-  apply %5() : $@thin () -> ()
-  apply %6() : $@thin () -> ()
-  apply %7() : $@thin () -> ()
+sil hidden [fragile] @hidden_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
   %8 = tuple()
   return %8 : $()
 }
 
-sil [fragile] @public_function_test : $@thin () -> () {
-  %0 = function_ref @references_public_function : $@thin () -> ()
-  %1 = function_ref @references_shared_function : $@thin () -> ()
-  %2 = function_ref @references_hidden_function : $@thin () -> ()
-  %3 = function_ref @references_private_function : $@thin () -> ()
-  %4 = function_ref @references_public_global : $@thin () -> ()
-  %5 = function_ref @references_shared_global : $@thin () -> ()
-  %6 = function_ref @references_hidden_global : $@thin () -> ()
-  %7 = function_ref @references_private_global : $@thin () -> ()
-  apply %0() : $@thin () -> ()
-  apply %1() : $@thin () -> ()
-  apply %2() : $@thin () -> ()
-  apply %3() : $@thin () -> ()
-  apply %4() : $@thin () -> ()
-  apply %5() : $@thin () -> ()
-  apply %6() : $@thin () -> ()
-  apply %7() : $@thin () -> ()
+sil [fragile] @public_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
   %8 = tuple()
   return %8 : $()
 }
 
-sil hidden_external [fragile] @hidden_external_function_test : $@thin () -> () {
-  %0 = function_ref @references_public_function : $@thin () -> ()
-  %1 = function_ref @references_shared_function : $@thin () -> ()
-  %2 = function_ref @references_hidden_function : $@thin () -> ()
-  %3 = function_ref @references_private_function : $@thin () -> ()
-  %4 = function_ref @references_public_global : $@thin () -> ()
-  %5 = function_ref @references_shared_global : $@thin () -> ()
-  %6 = function_ref @references_hidden_global : $@thin () -> ()
-  %7 = function_ref @references_private_global : $@thin () -> ()
-  apply %0() : $@thin () -> ()
-  apply %1() : $@thin () -> ()
-  apply %2() : $@thin () -> ()
-  apply %3() : $@thin () -> ()
-  apply %4() : $@thin () -> ()
-  apply %5() : $@thin () -> ()
-  apply %6() : $@thin () -> ()
-  apply %7() : $@thin () -> ()
+sil hidden_external [fragile] @hidden_external_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
   %8 = tuple()
   return %8 : $()
 }
 
-sil public_external [fragile] @public_external_function_test : $@thin () -> () {
-  %0 = function_ref @references_public_function : $@thin () -> ()
-  %1 = function_ref @references_shared_function : $@thin () -> ()
-  %2 = function_ref @references_hidden_function : $@thin () -> ()
-  %3 = function_ref @references_private_function : $@thin () -> ()
-  %4 = function_ref @references_public_global : $@thin () -> ()
-  %5 = function_ref @references_shared_global : $@thin () -> ()
-  %6 = function_ref @references_hidden_global : $@thin () -> ()
-  %7 = function_ref @references_private_global : $@thin () -> ()
-  apply %0() : $@thin () -> ()
-  apply %1() : $@thin () -> ()
-  apply %2() : $@thin () -> ()
-  apply %3() : $@thin () -> ()
-  apply %4() : $@thin () -> ()
-  apply %5() : $@thin () -> ()
-  apply %6() : $@thin () -> ()
-  apply %7() : $@thin () -> ()
+sil public_external [fragile] @public_external_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
   %8 = tuple()
   return %8 : $()
 }
 
-sil shared_external [fragile] @shared_external_function_test : $@thin () -> () {
-  %0 = function_ref @references_public_function : $@thin () -> ()
-  %1 = function_ref @references_shared_function : $@thin () -> ()
-  %2 = function_ref @references_hidden_function : $@thin () -> ()
-  %3 = function_ref @references_private_function : $@thin () -> ()
-  %4 = function_ref @references_public_global : $@thin () -> ()
-  %5 = function_ref @references_shared_global : $@thin () -> ()
-  %6 = function_ref @references_hidden_global : $@thin () -> ()
-  %7 = function_ref @references_private_global : $@thin () -> ()
-  apply %0() : $@thin () -> ()
-  apply %1() : $@thin () -> ()
-  apply %2() : $@thin () -> ()
-  apply %3() : $@thin () -> ()
-  apply %4() : $@thin () -> ()
-  apply %5() : $@thin () -> ()
-  apply %6() : $@thin () -> ()
-  apply %7() : $@thin () -> ()
+sil shared_external [fragile] @shared_external_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
   %8 = tuple()
   return %8 : $()
 }

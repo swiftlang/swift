@@ -10,7 +10,7 @@ sil_stage canonical
 // CHECK-LABEL: Loops in  simple_loop_with_enum
 // CHECK: Loop at depth 1 containing: bb1<header>,bb3,bb2,bb4<exiting>,bb5<latch>
 
-sil @simple_loop_with_enum : $@thin () -> () {
+sil @simple_loop_with_enum : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int32, 0
   %1 = integer_literal $Builtin.Int32, 1000
@@ -49,7 +49,7 @@ bb6:
 // CHECK-LABEL: Loops in simple_loop
 // CHECK:  Loop at depth 1 containing: bb1<header><exiting>,bb2<latch>
 
-sil @simple_loop : $@thin () -> () {
+sil @simple_loop : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int32, 0
   %1 = integer_literal $Builtin.Int32, 1000
@@ -79,7 +79,7 @@ bb3:
 // CHECK: Loop at depth 1 containing: bb1<header><exiting>,bb2,bb4,bb5,bb6<latch>
 // CHECK:    Loop at depth 2 containing: bb4<header><exiting>,bb5<latch>
 
-sil @nested_loop : $@thin () -> () {
+sil @nested_loop : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int32, 0
   %1 = integer_literal $Builtin.Int32, 1000

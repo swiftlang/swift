@@ -8,7 +8,7 @@ import Swift
 // This function needs to be removed.
 // CHECK-NOT: @remove_me
 
-sil private @remove_me : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil private @remove_me : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %2 = integer_literal $Builtin.Int1, 0
   %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)

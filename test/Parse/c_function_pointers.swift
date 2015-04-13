@@ -27,13 +27,13 @@ if true {
   // Can't convert a closure value to a C function pointer
   let global2 = global
   let f: @convention(c) () -> Int = global2 // expected-error{{can only be formed from a reference to a 'func' or a literal closure}}
-  let globalBlock: @objc_block () -> Int = global
+  let globalBlock: @convention(block) () -> Int = global
   let g: @convention(c) () -> Int = globalBlock // expected-error{{can only be formed from a reference to a 'func' or a literal closure}}
 
   // Can convert a function pointer to a block or closure, or assign to another
   // C function pointer
   let h: @convention(c) () -> Int = a
-  let i: @objc_block () -> Int = a
+  let i: @convention(block) () -> Int = a
   let j: () -> Int = a
 
   // Can't convert a C function pointer from a method.

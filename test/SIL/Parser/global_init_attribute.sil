@@ -12,7 +12,7 @@ import Swift
 // CHECK-LABEL: g.MyVar.unsafeMutableAddressor : Swift.Int
 // CHECK-NEXT: sil [global_init] @_TF1gau5MyVarSi
 
-sil [global_init] @_TF1gau5MyVarSi : $@thin () -> Builtin.RawPointer {
+sil [global_init] @_TF1gau5MyVarSi : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %b = alloc_box $Int
   %p = address_to_pointer %b#1 : $*Int to $Builtin.RawPointer

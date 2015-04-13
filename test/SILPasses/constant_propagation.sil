@@ -20,7 +20,7 @@ struct UInt64 {
 }
 
 // Compute an expression using a chain of arithmetic with overflow instructions: 2 * (2 + 3) - 3
-sil @fold_arithmetic_with_overflow : $@thin () -> Builtin.Int64 {
+sil @fold_arithmetic_with_overflow : $@convention(thin) () -> Builtin.Int64 {
 bb0:
  %0 = integer_literal $Builtin.Int64, 2
  %110 = integer_literal $Builtin.Int64, 3
@@ -42,7 +42,7 @@ bb0:
 }
 
 // Fold casts. (This test assumes that DCE does not run, otherwise the unreachable blocks will get removed.)
-sil @fold_trunc : $@thin () -> Builtin.Int64 {
+sil @fold_trunc : $@convention(thin) () -> Builtin.Int64 {
 bb0:
  %0 = integer_literal $Builtin.Int128, 22
  %2 = builtin "trunc_Int128_Int64"(%0 : $Builtin.Int128) : $Builtin.Int64
@@ -69,7 +69,7 @@ bb4(%100 : $Builtin.Int64):
 // CHECK: integer_literal $Builtin.Int64, 24
 }
 
-sil @test_tuple_extract_folding : $@thin () -> Builtin.Int64 {
+sil @test_tuple_extract_folding : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 5
   %1 = integer_literal $Builtin.Int1, 0
@@ -83,7 +83,7 @@ bb0:
 // CHECK-NEXT: }
 }
 
-sil @test_struct_extract_folding_first : $@thin () -> Builtin.Int64 {
+sil @test_struct_extract_folding_first : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 2
   %1 = struct $Int64 (%0 : $Builtin.Int64)
@@ -101,7 +101,7 @@ struct TwoValueStruct {
   var b : Builtin.Int64
 }
 
-sil @test_struct_extract_folding_second : $@thin () -> Builtin.Int64 {
+sil @test_struct_extract_folding_second : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 2
   %1 = integer_literal $Builtin.Int64, 20
@@ -132,7 +132,7 @@ bb0:
 // CHECK-NEXT: }
 }
 
-sil @testChainingCCP : $@thin () -> Builtin.Int1 {
+sil @testChainingCCP : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %2 = integer_literal $Builtin.Int64, 0
   %3 = struct $Int64 (%2 : $Builtin.Int64)
@@ -147,7 +147,7 @@ bb0:
 // CHECK-NEXT: }
 }
 
-sil @testDivision : $@thin () -> Builtin.Int8 {
+sil @testDivision : $@convention(thin) () -> Builtin.Int8 {
 bb0:
   %1 = integer_literal $Builtin.Int8, 6
   %2 = integer_literal $Builtin.Int8, 3
@@ -161,7 +161,7 @@ bb0:
 // CHECK-NEXT: }
 }
 
-sil @testRem : $@thin () -> Builtin.Int64 {
+sil @testRem : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %1 = integer_literal $Builtin.Int64, 10
   %2 = integer_literal $Builtin.Int64, 2
@@ -175,7 +175,7 @@ bb0:
 // CHECK-NEXT: }
 }
 
-sil @testFoldingIntBinaryPredicates : $@thin () -> () {
+sil @testFoldingIntBinaryPredicates : $@convention(thin) () -> () {
 bb0:
   %1 = integer_literal $Builtin.Int1, 1
   %2 = integer_literal $Builtin.Int1, 0
@@ -198,7 +198,7 @@ bb0:
 }
 
 // fold_binary_bitwise
-sil @fold_binary_bitwise : $@thin () -> Builtin.Int64 {
+sil @fold_binary_bitwise : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 1          // users: %7, %6, %5
   %1 = integer_literal $Builtin.Int64, 0          // users: %7, %6, %5
@@ -216,7 +216,7 @@ bb0:
 }
 
 // fold_shifts
-sil @fold_shifts : $@thin () -> Builtin.Int64 {
+sil @fold_shifts : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, -32        // users: %9, %8
   %1 = integer_literal $Builtin.Int64, 32         // users: %11, %10
@@ -241,7 +241,7 @@ bb0:
 }
 
 // fold_float_operations
-sil @fold_float_operations : $@thin () -> Builtin.FPIEEE64 {
+sil @fold_float_operations : $@convention(thin) () -> Builtin.FPIEEE64 {
 bb0:
   %4 = float_literal $Builtin.FPIEEE64, 0x402E4CCCCCCCCCCD // 15.15
   %11 = float_literal $Builtin.FPIEEE64, 0x400A666666666666 // 3.2999999999999998 // user: %12
@@ -262,7 +262,7 @@ bb0:
 
 // rdar://15729207 - Verify that constant folding doesn't leave around obviously
 // dead cond_fail instructions.
-sil @fold_condfail_instructions : $@thin () -> Int64 {
+sil @fold_condfail_instructions : $@convention(thin) () -> Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int2048, 1        // user: %2
   %2 = builtin "s_to_s_checked_trunc_Int2048_Int64"(%0 : $Builtin.Int2048) : $(Builtin.Int64, Builtin.Int1) // user: %3
@@ -294,8 +294,8 @@ bb0:
 // from the worklist. If we don't the following (reduced) test case will blow
 // up.
 
-// CHECK-LABEL: sil @properly_handle_eliminated_instructions_in_worklist : $@cc(method) @thin (Bool, @inout UInt) -> () {
-sil @properly_handle_eliminated_instructions_in_worklist : $@cc(method) @thin (Bool, @inout UInt) -> () {
+// CHECK-LABEL: sil @properly_handle_eliminated_instructions_in_worklist : $@convention(method) (Bool, @inout UInt) -> () {
+sil @properly_handle_eliminated_instructions_in_worklist : $@convention(method) (Bool, @inout UInt) -> () {
 bb0(%0 : $Bool, %1 : $*UInt):
   %2 = load %1 : $*UInt
   %3 = integer_literal $Builtin.Int2048, 1
@@ -352,7 +352,7 @@ bb0(%0 : $Bool, %1 : $*UInt):
 // CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ([[INT1]] : $Builtin.Int1, [[INT2]] : $Builtin.Int32, [[INT3]] : $Builtin.Int64)
 // CHECK-NEXT: return [[TUPLE]]
 // CHECK-NEXT: }
-sil @constant_expect_hint : $@thin () -> (Builtin.Int1, Builtin.Int32, Builtin.Int64) {
+sil @constant_expect_hint : $@convention(thin) () -> (Builtin.Int1, Builtin.Int32, Builtin.Int64) {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
   %1 = integer_literal $Builtin.Int32, 5
@@ -370,7 +370,7 @@ bb0:
   return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
 }
 
-// CHECK-LABEL: sil @constant_fold_indexing_inst_of_0 : $@thin (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
+// CHECK-LABEL: sil @constant_fold_indexing_inst_of_0 : $@convention(thin) (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
 // CHECK: bb0
 // CHECK-NEXT: pointer_to_address
 // CHECK-NEXT: pointer_to_address
@@ -378,7 +378,7 @@ bb0:
 // CHECK-NEXT: load
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @constant_fold_indexing_inst_of_0 : $@thin (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
+sil @constant_fold_indexing_inst_of_0 : $@convention(thin) (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
 bb0(%0 : $Builtin.RawPointer):
   %1 = integer_literal $Builtin.Word, 0
   %2 = pointer_to_address %0 : $Builtin.RawPointer to $*Builtin.Int8
@@ -396,7 +396,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT: [[I:%[0-9]+]] = integer_literal $Builtin.Word, 27
 // CHECK-NEXT: return [[I]]
 // CHECK-NEXT: }
-sil @constant_assume_non_negative : $@thin () -> Builtin.Word {
+sil @constant_assume_non_negative : $@convention(thin) () -> Builtin.Word {
   %0 = integer_literal $Builtin.Word, 27
   %1 = builtin "assumeNonNegative_Word"(%0 : $Builtin.Word) : $Builtin.Word
   return %0 : $Builtin.Word

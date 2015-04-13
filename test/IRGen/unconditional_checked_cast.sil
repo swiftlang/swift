@@ -21,7 +21,7 @@ sil_vtable D {}
 // CHECK-NEXT: store %C26unconditional_checked_cast1D* [[DOWNCASTINPUTPTR]], %C26unconditional_checked_cast1D** {{%[0-9]+}}, align 8
 // CHECK-NEXT: ret void
 
-sil @downcast_test : $@thin (@out D, @inout C) -> () {
+sil @downcast_test : $@convention(thin) (@out D, @inout C) -> () {
 bb0(%0 : $*D, %1 : $*C):
   %a = load %1 : $*C
   %2 = unconditional_checked_cast %a : $C to $D

@@ -7,7 +7,7 @@ sil_stage canonical
 struct Foo {}
 class Bar<T, U, V> {}
 sil_vtable Bar {}
-sil @_TFC19sil_witness_methods3BarD : $@cc(method) @thin <T,U,V> (Bar<T,U,V>) -> ()
+sil @_TFC19sil_witness_methods3BarD : $@convention(method) <T,U,V> (Bar<T,U,V>) -> ()
 
 struct X {}
 struct Y {}
@@ -20,7 +20,7 @@ protocol P {
 }
 
 // CHECK-LABEL: define %swift.type* @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo*, %swift.type* %Self)
-sil @concrete_type_concrete_method_witness : $@thin @cc(witness_method) (@in Foo) -> @thick Foo.Type {
+sil @concrete_type_concrete_method_witness : $@convention(witness_method) (@in Foo) -> @thick Foo.Type {
 entry(%x : $*Foo):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
@@ -36,7 +36,7 @@ entry(%x : $*Foo):
 // CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[V0]], i64 11
 // CHECK:         %V = load %swift.type*, %swift.type** [[V1]], align 8
-sil @generic_type_concrete_method_witness : $@thin @cc(witness_method) <T, U, V> (@in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
+sil @generic_type_concrete_method_witness : $@convention(witness_method) <T, U, V> (@in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
 entry(%x : $*Bar<T, U, V>):
   %t = metatype $@thick T.Type
   %u = metatype $@thick U.Type
@@ -49,7 +49,7 @@ entry(%x : $*Bar<T, U, V>):
 // TODO: %Self Type arg is redundant for static method witness
 
 // CHECK-LABEL: define %swift.type* @concrete_type_concrete_static_method_witness(%swift.type*, %swift.type* %Self)
-sil @concrete_type_concrete_static_method_witness : $@thin @cc(witness_method) (@thick Foo.Type) -> @thick Foo.Type {
+sil @concrete_type_concrete_static_method_witness : $@convention(witness_method) (@thick Foo.Type) -> @thick Foo.Type {
 entry(%x : $@thick Foo.Type):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
@@ -65,7 +65,7 @@ entry(%x : $@thick Foo.Type):
 // CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[V0]], i64 11
 // CHECK:         %V = load %swift.type*, %swift.type** [[V1]], align 8
-sil @generic_type_concrete_static_method_witness : $@thin @cc(witness_method) <T, U, V> (@thick Bar<T, U, V>.Type) -> @thick Bar<T, U, V>.Type {
+sil @generic_type_concrete_static_method_witness : $@convention(witness_method) <T, U, V> (@thick Bar<T, U, V>.Type) -> @thick Bar<T, U, V>.Type {
 entry(%x : $@thick Bar<T, U, V>.Type):
   %t = metatype $@thick T.Type
   %u = metatype $@thick U.Type
@@ -78,14 +78,14 @@ entry(%x : $@thick Bar<T, U, V>.Type):
 // TODO: %Self Type arg is redundant for class method witness
 
 // CHECK-LABEL: define %swift.type* @concrete_type_generic_method_witness(%swift.opaque*, %swift.type* %Z, %V19sil_witness_methods3Foo*, %swift.type* %Self)
-sil @concrete_type_generic_method_witness : $@thin @cc(witness_method) <Z> (@in Z, @in Foo) -> @thick Foo.Type {
+sil @concrete_type_generic_method_witness : $@convention(witness_method) <Z> (@in Z, @in Foo) -> @thick Foo.Type {
 entry(%z : $*Z, %x : $*Foo):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
 // CHECK-LABEL: define %swift.type* @generic_type_generic_method_witness(%swift.opaque*, %swift.type* %Z, %C19sil_witness_methods3Bar**, %swift.type* %Self)
-sil @generic_type_generic_method_witness : $@thin @cc(witness_method) <T, U, V, Z> (@in Z, @in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
+sil @generic_type_generic_method_witness : $@convention(witness_method) <T, U, V, Z> (@in Z, @in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
 entry(%z : $*Z, %x : $*Bar<T, U, V>):
   %t = metatype $@thick T.Type
   %u = metatype $@thick U.Type
@@ -96,14 +96,14 @@ entry(%z : $*Z, %x : $*Bar<T, U, V>):
 }
 
 // CHECK-LABEL: define %swift.type* @concrete_type_generic_static_method_witness(%swift.opaque*, %swift.type* %Z, %swift.type*, %swift.type* %Self)
-sil @concrete_type_generic_static_method_witness : $@thin @cc(witness_method) <Z> (@in Z, @thick Foo.Type) -> @thick Foo.Type {
+sil @concrete_type_generic_static_method_witness : $@convention(witness_method) <Z> (@in Z, @thick Foo.Type) -> @thick Foo.Type {
 entry(%z : $*Z, %x : $@thick Foo.Type):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
 // CHECK-LABEL: define %swift.type* @generic_type_generic_static_method_witness(%swift.opaque*, %swift.type* %Z, %swift.type*, %swift.type* %Self)
-sil @generic_type_generic_static_method_witness : $@thin @cc(witness_method) <T, U, V, Z> (@in Z, @thick Bar<T, U, V>.Type) -> @thick Bar<T, U, V>.Type {
+sil @generic_type_generic_static_method_witness : $@convention(witness_method) <T, U, V, Z> (@in Z, @thick Bar<T, U, V>.Type) -> @thick Bar<T, U, V>.Type {
 entry(%z : $*Z, %x : $@thick Bar<T, U, V>.Type):
   %t = metatype $@thick T.Type
   %u = metatype $@thick U.Type
@@ -119,8 +119,8 @@ sil @call_concrete_witness : $(Foo) -> () {
 entry(%x : $Foo):
   %m = alloc_stack $Foo
   store %x to %m#1 : $*Foo
-  %w = function_ref @concrete_type_concrete_method_witness : $@thin @cc(witness_method) (@in Foo) -> @thick Foo.Type
-  %z = apply %w(%m#1) : $@thin @cc(witness_method) (@in Foo) -> @thick Foo.Type
+  %w = function_ref @concrete_type_concrete_method_witness : $@convention(witness_method) (@in Foo) -> @thick Foo.Type
+  %z = apply %w(%m#1) : $@convention(witness_method) (@in Foo) -> @thick Foo.Type
   dealloc_stack %m#0 : $*@local_storage Foo
   return undef : $()
 }
@@ -130,7 +130,7 @@ entry(%x : $Foo):
 sil @call_concrete_static_witness : $() -> () {
 entry:
   %m = metatype $@thick Foo.Type
-  %w = function_ref @concrete_type_concrete_static_method_witness : $@thin @cc(witness_method) (@thick Foo.Type) -> @thick Foo.Type
-  %z = apply %w(%m) : $@thin @cc(witness_method) (@thick Foo.Type) -> @thick Foo.Type
+  %w = function_ref @concrete_type_concrete_static_method_witness : $@convention(witness_method) (@thick Foo.Type) -> @thick Foo.Type
+  %z = apply %w(%m) : $@convention(witness_method) (@thick Foo.Type) -> @thick Foo.Type
   return undef : $()
 }

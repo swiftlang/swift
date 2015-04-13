@@ -8,7 +8,7 @@ enum TestEnum {
 }
 
 // CHECK-LABEL: testit
-sil @testit : $@thin () -> () {
+sil @testit : $@convention(thin) () -> () {
 bb0:
   %i0 = integer_literal $Builtin.Int1, 0
   %i1 = integer_literal $Builtin.Int1, -1
@@ -28,8 +28,8 @@ bb1:
   cond_br %x1, bb2, bb3
 
 bb2:
-  %6 = function_ref @writeEnum: $@thin (@inout TestEnum) -> ()
-  %7 = apply %6(%0#1) : $@thin (@inout TestEnum) -> ()
+  %6 = function_ref @writeEnum: $@convention(thin) (@inout TestEnum) -> ()
+  %7 = apply %6(%0#1) : $@convention(thin) (@inout TestEnum) -> ()
   br bb1
 
 bb3:
@@ -38,4 +38,4 @@ bb3:
   return %9 : $()
 }
 
-sil @writeEnum: $@thin (@inout TestEnum) -> ()
+sil @writeEnum: $@convention(thin) (@inout TestEnum) -> ()

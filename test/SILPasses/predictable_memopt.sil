@@ -5,7 +5,7 @@ import Swift
 
 
 // CHECK-LABEL: sil @simple_reg_promotion
-sil @simple_reg_promotion : $@thin (Int) -> Int {
+sil @simple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
   %1 = alloc_box $Int
   store %0 to %1#1 : $*Int
@@ -22,7 +22,7 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
 
 
 // CHECK-LABEL: sil @tuple_reg_promotion
-sil @tuple_reg_promotion : $@thin (Int) -> Int {
+sil @tuple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
   %1 = alloc_box $(Int, Int)
   
@@ -47,7 +47,7 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
 }
 
 
-sil @takes_Int_inout : $@thin (@inout Int) -> ()
+sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 
 
 
@@ -59,7 +59,7 @@ sil @takes_Int_inout : $@thin (@inout Int) -> ()
 //  return (t,a)
 //}
 // CHECK-LABEL: sil @used_by_inout
-sil @used_by_inout : $@thin (Int) -> (Int, Int) {
+sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
   // This alloc_stack can't be removed since it is used by a inout call.
   // CHECK: %1 = alloc_box $Int
@@ -68,8 +68,8 @@ bb0(%0 : $Int):
   
   // This load should be eliminated.
   %3 = load %1#1 : $*Int
-  %5 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
-  %6 = apply %5(%1#1) : $@thin (@inout Int) -> ()
+  %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
+  %6 = apply %5(%1#1) : $@convention(thin) (@inout Int) -> ()
   
   // This load is needed in case the callee modifies the allocation.
   // CHECK: [[RES:%[0-9]+]] = load
@@ -89,25 +89,25 @@ struct AddressOnlyStruct {
 }
 
 /// returns_generic_struct - This returns a struct by reference.
-sil @returns_generic_struct : $@thin (@out AddressOnlyStruct) -> ()
+sil @returns_generic_struct : $@convention(thin) (@out AddressOnlyStruct) -> ()
 
 
 
-sil @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-sil @closure0 : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
+sil @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
 
 
 // CHECK-LABEL: sil @closure_test2
-sil @closure_test2 : $@thin (Int) -> Int {
+sil @closure_test2 : $@convention(thin) (Int) -> Int {
 bb0(%1 : $Int):
   %0 = alloc_box $Int
   store %1 to %0#1 : $*Int  // CHECK: store
 
-  %5 = function_ref @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+  %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
   strong_retain %0#0 : $Builtin.NativeObject
-  %8 = partial_apply %6(%0#0, %0#1) : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
-  %9 = apply %5(%8) : $@thin (@callee_owned () -> ()) -> ()
+  %8 = partial_apply %6(%0#0, %0#1) : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
+  %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
   strong_release %0#0 : $Builtin.NativeObject
 
   store %1 to %0#1 : $*Int // CHECK: store
@@ -121,11 +121,11 @@ bb0(%1 : $Int):
 
 class SomeClass {}
 
-sil @getSomeClass : $@thin () -> @owned SomeClass
+sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
 
 
 // CHECK-LABEL: sil @assign_test_trivial
-sil @assign_test_trivial : $@thin (Int) -> Int {
+sil @assign_test_trivial : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = alloc_box $Int
 
@@ -150,7 +150,7 @@ var int_global : Int
 
 
 // CHECK-LABEL: sil @promote_alloc_stack
-sil @promote_alloc_stack : $@thin (Int32) -> Builtin.Int32 {
+sil @promote_alloc_stack : $@convention(thin) (Int32) -> Builtin.Int32 {
 bb0(%0 : $Int32):
   %5 = integer_literal $Builtin.Int32, 1
   // CHECK: [[IL:%[0-9]+]] = integer_literal
@@ -169,7 +169,7 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: sil @copy_addr_to_load
-sil @copy_addr_to_load : $@thin (Int) -> Int {
+sil @copy_addr_to_load : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):               // CHECK: bb0(%0 : $Int):
   %1 = alloc_stack $Int
   store %0 to %1#1 : $*Int
@@ -202,7 +202,7 @@ bb0(%0 : $Bool):  // CHECK: bb0(%0 :
 }
 
 // CHECK-LABEL: sil @cross_block_load_promotion
-sil @cross_block_load_promotion : $@thin (Int) -> Int {
+sil @cross_block_load_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = alloc_stack $Int
   store %0 to %1#1 : $*Int
@@ -224,16 +224,16 @@ bb5:
 }
 
 struct XYStruct { var x, y : Int }
-sil @init_xy_struct : $@thin () -> XYStruct
+sil @init_xy_struct : $@convention(thin) () -> XYStruct
 
 
 // CHECK-LABEL: sil @cross_block_load_promotion_struct
-sil @cross_block_load_promotion_struct : $@thin (Int, Int) -> Int {
+sil @cross_block_load_promotion_struct : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %2 : $Int):
   %1 = alloc_stack $XYStruct
   
-  %7 = function_ref @init_xy_struct : $@thin () -> XYStruct
-  %9 = apply %7() : $@thin () -> XYStruct
+  %7 = function_ref @init_xy_struct : $@convention(thin) () -> XYStruct
+  %9 = apply %7() : $@convention(thin) () -> XYStruct
   store %9 to %1#1 : $*XYStruct
 
   %11 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.y
@@ -259,12 +259,12 @@ bb5:                                              // Preds: bb4
 }
 
 // CHECK-LABEL: sil @cross_block_load_promotion_struct2
-sil @cross_block_load_promotion_struct2 : $@thin (Int, Int) -> Int {
+sil @cross_block_load_promotion_struct2 : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %2 : $Int):
   %1 = alloc_stack $XYStruct
   
-  %7 = function_ref @init_xy_struct : $@thin () -> XYStruct
-  %9 = apply %7() : $@thin () -> XYStruct
+  %7 = function_ref @init_xy_struct : $@convention(thin) () -> XYStruct
+  %9 = apply %7() : $@convention(thin) () -> XYStruct
   store %9 to %1#1 : $*XYStruct
 
   %11 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.x
@@ -291,7 +291,7 @@ bb5:                                              // Preds: bb4
 
 
 // CHECK-LABEL: sil @destroy_addr
-sil @destroy_addr : $@cc(method) @thin (@owned SomeClass) -> @owned SomeClass {
+sil @destroy_addr : $@convention(method) (@owned SomeClass) -> @owned SomeClass {
 bb0(%0 : $SomeClass):
   %1 = alloc_stack $SomeClass
   %2 = tuple ()
@@ -310,15 +310,15 @@ bb0(%0 : $SomeClass):
 protocol P {}
 class C : P {}
 
-sil @use : $@thin (@in P) -> ()
+sil @use : $@convention(thin) (@in P) -> ()
 
 // rdar://15492647
 // CHECK-LABEL: sil @destroy_addr_removed
-sil @destroy_addr_removed : $@thin () -> () {
+sil @destroy_addr_removed : $@convention(thin) () -> () {
 bb0:
   %3 = alloc_stack $SomeClass
-  %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
-  %9 = apply %f() : $@thin () -> @owned SomeClass
+  %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %9 = apply %f() : $@convention(thin) () -> @owned SomeClass
   // CHECK: [[CVAL:%[0-9]+]] = apply
 
   assign %9 to %3#1 : $*SomeClass
@@ -345,7 +345,7 @@ sil @init_existential_crash : $() -> () {
 
 // <rdar://problem/17755462> Predictable memory opts removes refcount operation
 // CHECK-LABEL: sil @dead_allocation_1
-sil @dead_allocation_1 : $@thin (Optional<AnyObject>) -> () {
+sil @dead_allocation_1 : $@convention(thin) (Optional<AnyObject>) -> () {
   bb0(%0 : $Optional<AnyObject>):
 // CHECK: retain_value %0
   %1 = alloc_stack $Optional<AnyObject>
@@ -360,7 +360,7 @@ sil @dead_allocation_1 : $@thin (Optional<AnyObject>) -> () {
 }
 
 // CHECK-LABEL: sil @dead_allocation_2
-sil @dead_allocation_2 : $@thin (Optional<AnyObject>) -> () {
+sil @dead_allocation_2 : $@convention(thin) (Optional<AnyObject>) -> () {
   bb0(%0 : $Optional<AnyObject>):
 // CHECK: retain_value %0
 // CHECK-NOT: alloc_stack

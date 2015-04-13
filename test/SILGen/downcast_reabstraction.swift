@@ -13,7 +13,7 @@ func condFunctionFromAny(x: Any) {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF22downcast_reabstraction21uncondFunctionFromAnyFP_T_ : $@thin (@in protocol<>) -> () {
+// CHECK-LABEL: sil hidden @_TF22downcast_reabstraction21uncondFunctionFromAnyFP_T_ : $@convention(thin) (@in protocol<>) -> () {
 // CHECK:         unconditional_checked_cast_addr take_always protocol<> in [[IN:%.*]]#1 : $*protocol<> to () -> () in [[OUT:%.*]]#1 : $*@callee_owned (@out (), @in ()) -> ()
 // CHECK:         [[ORIG_VAL:%.*]] = load [[OUT]]#1
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @_TTRXFo_iT__iT__XFo__dT__

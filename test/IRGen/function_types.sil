@@ -16,9 +16,9 @@ sil_stage canonical
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
 // CHECK-NEXT:  }
-sil @thin_func_value : $@thin (@thin () -> ()) -> @thin () -> () {
-entry(%x : $@thin () -> ()):
-  return %x : $@thin () -> ()
+sil @thin_func_value : $@convention(thin) (@convention(thin) () -> ()) -> @convention(thin) () -> () {
+entry(%x : $@convention(thin) () -> ()):
+  return %x : $@convention(thin) () -> ()
 }
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @thick_func_value(i8*, %swift.refcounted*) {
@@ -29,7 +29,7 @@ entry(%x : $@thin () -> ()):
 // CHECK-NEXT:    %3 = insertvalue { i8*, %swift.refcounted* } %2, %swift.refcounted* %1, 1
 // CHECK-NEXT:    ret { i8*, %swift.refcounted* } %3
 // CHECK-NEXT:  }
-sil @thick_func_value : $@thin (@owned () -> ()) -> @owned () -> () {
+sil @thick_func_value : $@convention(thin) (@owned () -> ()) -> @owned () -> () {
 entry(%x : $() -> ()):
   strong_retain %x : $() -> ()
   strong_release %x : $() -> ()
@@ -40,24 +40,24 @@ entry(%x : $() -> ()):
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
 // CHECK-NEXT:  }
-sil @thin_witness_value : $@thin (@thin @cc(witness_method) () -> ()) -> @thin @cc(witness_method) () -> () {
-entry(%x : $@thin @cc(witness_method) () -> ()):
-  return %x : $@thin @cc(witness_method) () -> ()
+sil @thin_witness_value : $@convention(thin) (@convention(witness_method) () -> ()) -> @convention(witness_method) () -> () {
+entry(%x : $@convention(witness_method) () -> ()):
+  return %x : $@convention(witness_method) () -> ()
 }
 
 struct X {}
 
-sil @out_void_return : $@thin (@out X) -> ()
+sil @out_void_return : $@convention(thin) (@out X) -> ()
 
 // CHECK-LABEL: define void @use_void_return_value(%V14function_types1X* noalias sret) {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    call void @out_void_return(%V14function_types1X* noalias sret %0)
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
-sil @use_void_return_value : $@thin (@out X) -> () {
+sil @use_void_return_value : $@convention(thin) (@out X) -> () {
 entry(%x : $*X):
-  %f = function_ref @out_void_return : $@thin (@out X) -> ()
-  %z = apply %f(%x) : $@thin (@out X) -> ()
+  %f = function_ref @out_void_return : $@convention(thin) (@out X) -> ()
+  %z = apply %f(%x) : $@convention(thin) (@out X) -> ()
   return %z : $()
 }
 
@@ -67,7 +67,7 @@ entry(%x : $*X):
 // CHECK-NEXT:  ret i1 %2
 // CHECK-NEXT:  }
 
-sil @test_is_nonnull_function : $@thin (() -> ()) -> Builtin.Int1 {
+sil @test_is_nonnull_function : $@convention(thin) (() -> ()) -> Builtin.Int1 {
 bb0(%0 : $() -> ()):
   %3 = is_nonnull %0 : $() -> ()
   return %3 : $Builtin.Int1                                 // id: %5
@@ -76,17 +76,17 @@ bb0(%0 : $() -> ()):
 // CHECK-LABEL: define i8* @test_function_to_pointer(i8*)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
-sil @test_function_to_pointer : $@thin (@thin () -> ()) -> Builtin.RawPointer {
-bb0(%0 : $@thin () -> ()):
-  %1 = thin_function_to_pointer %0 : $@thin () -> () to $Builtin.RawPointer
+sil @test_function_to_pointer : $@convention(thin) (@convention(thin) () -> ()) -> Builtin.RawPointer {
+bb0(%0 : $@convention(thin) () -> ()):
+  %1 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
 }
 
 // CHECK-LABEL: define i8* @test_pointer_to_function(i8*)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
-sil @test_pointer_to_function : $@thin (Builtin.RawPointer) -> @thin () -> () {
+sil @test_pointer_to_function : $@convention(thin) (Builtin.RawPointer) -> @convention(thin) () -> () {
 bb0(%0 : $Builtin.RawPointer):
-  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@thin () -> ()
-  return %1 : $@thin () -> ()
+  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
+  return %1 : $@convention(thin) () -> ()
 }

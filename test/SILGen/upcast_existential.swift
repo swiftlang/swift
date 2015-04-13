@@ -9,7 +9,7 @@ func makePQ() -> protocol<P,Q> { return X() }
 
 func useP(x: P) { }
 
-// CHECK-LABEL: sil hidden @_TF18upcast_existential5PQtoPFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF18upcast_existential5PQtoPFT_T_ : $@convention(thin) () -> () {
 func PQtoP() {
   // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr [[PQ:%.*]]#1 : $*protocol<P, Q> to $*[[OPENED_TYPE:@opened(.*) protocol<P, Q>]]
   // CHECK: [[P_PAYLOAD:%.*]] = init_existential_addr [[P:%.*]]#1 : $*P, $[[OPENED_TYPE]]

@@ -20,13 +20,13 @@ final class MD5 : Hash {
   @objc deinit 
 }
 
-sil @_TFC4main4HashcfMS0_FT_S0_ : $@cc(method) @thin (@owned Hash) -> @owned Hash
-sil @_TFC4main4HashCfMS0_FT_S0_ : $@thin (@thick Hash.Type) -> @owned Hash
+sil @_TFC4main4HashcfMS0_FT_S0_ : $@convention(method) (@owned Hash) -> @owned Hash
+sil @_TFC4main4HashCfMS0_FT_S0_ : $@convention(thin) (@thick Hash.Type) -> @owned Hash
 
 // main.Hash.update (main.Hash)() -> ()
-sil @_TFC4main4Hash6updatefS0_FT_T_ : $@cc(method) @thin (@guaranteed Hash) -> () {
+sil @_TFC4main4Hash6updatefS0_FT_T_ : $@convention(method) (@guaranteed Hash) -> () {
 bb0(%0 : $Hash):
-  %1 = class_method %0 : $Hash, #Hash.hash!1 : Hash -> () -> () , $@cc(method) @thin (@guaranteed Hash) -> () // user: %9
+  %1 = class_method %0 : $Hash, #Hash.hash!1 : Hash -> () -> () , $@convention(method) (@guaranteed Hash) -> () // user: %9
   checked_cast_br [exact] %0 : $Hash to $MD5, bb2, bb3 // id: %2
 
 bb1:                                              // Preds: bb2 bb3
@@ -37,17 +37,17 @@ bb2(%5 : $MD5):                                   // Preds: bb0
   br bb1                                          // id: %8
 
 bb3:                                              // Preds: bb0
-  %9 = apply %1(%0) : $@cc(method) @thin (@guaranteed Hash) -> ()
+  %9 = apply %1(%0) : $@convention(method) (@guaranteed Hash) -> ()
   br bb1                                          // id: %10
 }
 
-sil @_TFC4main4Hash4hashfS0_FT_T_ : $@cc(method) @thin (@guaranteed Hash) -> ()
-sil @_TFC4main4Hashd : $@cc(method) @thin (@owned Hash) -> @owned Builtin.NativeObject
-sil @_TFC4main4HashD : $@cc(method) @thin (@owned Hash) -> ()
-sil @_TFC4main3MD5cfMS0_FT_S0_ : $@cc(method) @thin (@owned MD5) -> @owned MD5
-sil @_TFC4main3MD5CfMS0_FT_S0_ : $@thin (@thick MD5.Type) -> @owned MD5
-sil @_TFC4main3MD5d : $@cc(method) @thin (@owned MD5) -> @owned Builtin.NativeObject
-sil @_TFC4main3MD5D : $@cc(method) @thin (@owned MD5) -> ()
+sil @_TFC4main4Hash4hashfS0_FT_T_ : $@convention(method) (@guaranteed Hash) -> ()
+sil @_TFC4main4Hashd : $@convention(method) (@owned Hash) -> @owned Builtin.NativeObject
+sil @_TFC4main4HashD : $@convention(method) (@owned Hash) -> ()
+sil @_TFC4main3MD5cfMS0_FT_S0_ : $@convention(method) (@owned MD5) -> @owned MD5
+sil @_TFC4main3MD5CfMS0_FT_S0_ : $@convention(thin) (@thick MD5.Type) -> @owned MD5
+sil @_TFC4main3MD5d : $@convention(method) (@owned MD5) -> @owned Builtin.NativeObject
+sil @_TFC4main3MD5D : $@convention(method) (@owned MD5) -> ()
 
 sil_vtable Hash {
   #Hash.init!initializer.1: _TFC4main4HashcfMS0_FT_S0_	// main.Hash.init (main.Hash.Type)() -> main.Hash

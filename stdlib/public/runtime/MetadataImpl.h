@@ -359,7 +359,7 @@ struct PointerPointerBox : NativeBox<void**> {
 };
 
 /// A box implementation class for unmanaged function pointers.
-/// @thin functions have this layout, as do the first elements of
+/// @convention(thin) functions have this layout, as do the first elements of
 /// Swift thick functions.
 struct FunctionPointerBox : NativeBox<void*> {
   static constexpr unsigned numExtraInhabitants =

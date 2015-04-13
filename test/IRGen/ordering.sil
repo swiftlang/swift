@@ -7,24 +7,24 @@
 
 sil_stage canonical
 
-sil @foo : $@thin () -> () {
+sil @foo : $@convention(thin) () -> () {
 bb0:
   // In a simple module-appending scheme where we emitted SIL
   // functions in order, this function reference would cause
   // @baz to be created immediately following @foo because we
   // won't yet have created the declaration for @bar.
-  %0 = function_ref @baz : $@thin () -> ()
-  %1 = apply %0() : $@thin () -> ()
+  %0 = function_ref @baz : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
   return %1 : $()
 }
 
-sil @bar : $@thin () -> () {
+sil @bar : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
 }
 
-sil @baz : $@thin () -> () {
+sil @baz : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()

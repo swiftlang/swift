@@ -102,7 +102,7 @@ func physical_struct_lvalue(c: Int) {
     r.y = a
 
    // CHECK: [[FN:%[0-9]+]] = class_method %0 : $Ref, #Ref.y!setter.1
-   // CHECK: apply [[FN]](%1, %0) : $@cc(method) @thin (Int, @guaranteed Ref) -> ()
+   // CHECK: apply [[FN]](%1, %0) : $@convention(method) (Int, @guaranteed Ref) -> ()
    // CHECK: strong_release %0 : $Ref
   }
 
@@ -112,13 +112,13 @@ func physical_struct_lvalue(c: Int) {
     r.y = a
    // strong_retain %0 : $RefSubclass
    // CHECK: [[R_SUP:%[0-9]+]] = upcast %0 : $RefSubclass to $Ref
-   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : Ref -> (Int) -> () , $@cc(method) @thin (Int, @guaranteed Ref) -> ()
+   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : Ref -> (Int) -> () , $@convention(method) (Int, @guaranteed Ref) -> ()
    // CHECK: apply [[FN]](%1, [[R_SUP]]) :
    // CHECK: strong_release [[R_SUP]]
     r.w = a
 
    // CHECK: [[FN:%[0-9]+]] = class_method %0 : $RefSubclass, #RefSubclass.w!setter.1
-   // CHECK: apply [[FN]](%1, %0) : $@cc(method) @thin (Int, @guaranteed RefSubclass) -> ()
+   // CHECK: apply [[FN]](%1, %0) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
   }
   
 
@@ -191,11 +191,11 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[VAL_REF_VAL_PROP_TEMP:%.*]] = alloc_stack $Val
   // CHECK: [[T0:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_TEMP]]#1 : $*Val to $Builtin.RawPointer
-  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : Ref -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, (@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ())?)
+  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : Ref -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, (@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ())?)
   // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]]#1, [[VAL_REF]])
-  // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 0
+  // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 0
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Val
-  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 1  
+  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>), 1  
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load [[VAL_REF_VAL_PROP_MAT]]
@@ -212,8 +212,8 @@ func logical_struct_in_reftype_set(inout value: Val, z1: Int) {
   // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals7z_tupleT
   // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]])
   // -- writeback to val.ref.val_prop
-  // CHECK: switch_enum [[OPT_CALLBACK]] : $Optional<@thin (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
-  // CHECK: [[WRITEBACK]]([[CALLBACK:%.*]] : $@thin (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> ()):
+  // CHECK: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Ref, @thick Ref.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
+  // CHECK: [[WRITEBACK]]([[CALLBACK:%.*]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Ref, @thick Ref.Type) -> ()):
   // CHECK: [[REF_MAT:%.*]] = alloc_stack $Ref
   // CHECK: store [[VAL_REF]] to [[REF_MAT]]#1
   // CHECK: [[T0:%.*]] = metatype $@thick Ref.Type
@@ -336,7 +336,7 @@ func physical_inout(var x: Int) {
 func val_subscript_get(v: Val, i: Int) -> Float {
   return v[i]
   // CHECK: [[SUBSCRIPT_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg9subscript
-  // CHECK: [[RET:%[0-9]+]] = apply [[SUBSCRIPT_GET_METHOD]]([[I]], [[VVAL]]) : $@cc(method) @thin (Int, @guaranteed Val)
+  // CHECK: [[RET:%[0-9]+]] = apply [[SUBSCRIPT_GET_METHOD]]([[I]], [[VVAL]]) : $@convention(method) (Int, @guaranteed Val)
   // CHECK: return [[RET]]
 }
 
@@ -430,13 +430,13 @@ struct StaticProperty {
 }
 
 // CHECK-LABEL: sil hidden @_TF10properties10static_get
-// CHECK:   function_ref @_TZFV10properties14StaticPropertyg3foo{{.*}} : $@thin (@thin StaticProperty.Type) -> Int
+// CHECK:   function_ref @_TZFV10properties14StaticPropertyg3foo{{.*}} : $@convention(thin) (@thin StaticProperty.Type) -> Int
 func static_get() -> Int {
   return StaticProperty.foo
 }
 
 // CHECK-LABEL: sil hidden @_TF10properties10static_set
-// CHECK:   function_ref @_TZFV10properties14StaticPropertys3foo{{.*}} : $@thin (Int, @thin StaticProperty.Type) -> ()
+// CHECK:   function_ref @_TZFV10properties14StaticPropertys3foo{{.*}} : $@convention(thin) (Int, @thin StaticProperty.Type) -> ()
 func static_set(x: Int) {
   StaticProperty.foo = x
 }
@@ -459,13 +459,13 @@ struct DidSetWillSetTests {
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
       // CHECK-NEXT: [[FIELDPTR:%.*]] = struct_element_addr [[SELFBOX]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [[FIELDPTR]] : $*Int
-      // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@thin (Int) -> ()
+      // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       takeInt(newA)
 
       // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
-      // CHECK-NEXT: apply [[TAKEINTFN]](%0) : $@thin (Int) -> ()
+      // CHECK-NEXT: apply [[TAKEINTFN]](%0) : $@convention(thin) (Int) -> ()
       // CHECK-NEXT: copy_addr [[SELFBOX]]#1 to %1 : $*DidSetWillSetTests
     }
 
@@ -483,13 +483,13 @@ struct DidSetWillSetTests {
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [[AADDR]] : $*Int
-      // CHECK-NEXT: apply %5([[A]]) : $@thin (Int) -> ()
+      // CHECK-NEXT: apply %5([[A]]) : $@convention(thin) (Int) -> ()
 
       a = zero  // reassign, but don't infinite loop.
 
       // CHECK-NEXT: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
       // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @_TF10propertiesau4zero
-      // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@thin () -> Builtin.RawPointer
+      // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
       // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to $*Int
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: copy_addr [[ZEROADDR]] to [[AADDR]] : $*Int
@@ -527,12 +527,12 @@ struct DidSetWillSetTests {
 
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
   // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @_TFV10properties18DidSetWillSetTestsw1a
-  // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[SELFBOX]]#1) : $@cc(method) @thin (Int, @inout DidSetWillSetTests) -> ()
+  // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[SELFBOX]]#1) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
   // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT: assign %0 to [[AADDR]] : $*Int
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
-  // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @_TFV10properties18DidSetWillSetTestsW1a{{.*}} : $@cc(method) @thin (Int, @inout DidSetWillSetTests) -> ()
-  // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[SELFBOX]]#1) : $@cc(method) @thin (Int, @inout DidSetWillSetTests) -> ()
+  // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @_TFV10properties18DidSetWillSetTestsW1a{{.*}} : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+  // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[SELFBOX]]#1) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
 
   // CHECK-NEXT: copy_addr [[SELFBOX]]#1 to %1 : $*DidSetWillSetTests
 
@@ -556,7 +556,7 @@ var global_observing_property : Int = zero {
 }
 
 // The property is initialized with "zero".
-// CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@thin () -> () {
+// CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@convention(thin) () -> () {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT: %0 = global_addr @_Tv10properties25global_observing_propertySi : $*Int
 // CHECK: properties.zero.unsafeMutableAddressor
@@ -704,7 +704,7 @@ class DerivedProperty : BaseProperty {
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
 // CHECK:  // function_ref properties.BaseProperty.x.getter
 // CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1x
-// CHECK:  apply [[FN]]([[BASEPTR]]) : $@cc(method) @thin (@guaranteed BaseProperty) -> Int // user: %7
+// CHECK:  apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int // user: %7
 
 
 // <rdar://problem/16411449> ownership qualifiers don't work with non-mutating struct property
@@ -941,7 +941,7 @@ func testRedundantRetains() {
   a.field = 4  // no retain/release of a necessary here.
 }
 
-// CHECK-LABEL: sil hidden @_TF10properties20testRedundantRetainsFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil hidden @_TF10properties20testRedundantRetainsFT_T_ : $@convention(thin) () -> () {
 // CHECK: [[A:%[0-9]+]] = apply
 // CHECK-NOT: strong_retain
 // CHECK: strong_release [[A]] : $RedundantRetains
@@ -963,7 +963,7 @@ func addressOnlyNonmutatingProperty<T>(x: AddressOnlyNonmutatingSet<T>)
   x.prop = 0
   return x.prop
 }
-// CHECK-LABEL: sil hidden @_TF10properties30addressOnlyNonmutatingPropertyU__FGVS_25AddressOnlyNonmutatingSetQ__Si : $@thin <T> (@in AddressOnlyNonmutatingSet<T>) -> Int {
+// CHECK-LABEL: sil hidden @_TF10properties30addressOnlyNonmutatingPropertyU__FGVS_25AddressOnlyNonmutatingSetQ__Si : $@convention(thin) <T> (@in AddressOnlyNonmutatingSet<T>) -> Int {
 // CHECK:         [[SET:%.*]] = function_ref @_TFV10properties25AddressOnlyNonmutatingSets4propSi
 // CHECK:         apply [[SET]]<T>({{%.*}}, [[TMP:%.*]]#1)
 // CHECK:         destroy_addr [[TMP]]

@@ -10,7 +10,7 @@ import Swift
 // CHECK-LABEL: sil @test_and1
 // CHECK: %1 = integer_literal $Builtin.Int64, 0
 // CHECK: return %1
-sil @test_and1 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_and1 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 0
   %2 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
@@ -20,7 +20,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-LABEL: sil @test_and2
 // CHECK: bb0(%0 : $Builtin.Int64):
 // CHECK: return %0
-sil @test_and2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_and2 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, -1
   %2 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
@@ -31,7 +31,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK: %1 = integer_literal $Builtin.Int64, 32
 // CHECK: %2 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
 // CHECK: return %2
-sil @test_and3 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_and3 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 288
   %2 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
@@ -43,7 +43,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-LABEL: sil @test_and4
 // CHECK: %1 = integer_literal $Builtin.Int64, 0
 // CHECK: return %1
-sil @test_and4 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_and4 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 18
   %2 = builtin "and_Int64"(%1 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64
@@ -55,7 +55,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-LABEL: sil @test_or1
 // CHECK: bb0(%0 : $Builtin.Int64):
 // CHECK: return %0
-sil @test_or1 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_or1 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 0
   %2 = builtin "or_Int64"(%1 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64
@@ -65,7 +65,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-LABEL: sil @test_or2
 // CHECK: %1 = integer_literal $Builtin.Int64, -1
 // CHECK: return %1
-sil @test_or2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_or2 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, -1
   %2 = builtin "or_Int64"(%1 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64
@@ -76,7 +76,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK: %1 = integer_literal $Builtin.Int64, 291
 // CHECK: %2 = builtin "or_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
 // CHECK: return %2
-sil @test_or3 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_or3 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 288
   %2 = builtin "or_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
@@ -88,7 +88,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-LABEL: sil @test_or4
 // CHECK: %1 = integer_literal $Builtin.Int64, -1
 // CHECK: return %1
-sil @test_or4 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_or4 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, -4
   %2 = builtin "or_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
@@ -100,7 +100,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-LABEL: sil @test_xor1
 // CHECK: bb0(%0 : $Builtin.Int64):
 // CHECK: return %0
-sil @test_xor1 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_xor1 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 0
   %2 = builtin "xor_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
@@ -111,7 +111,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK: %1 = integer_literal $Builtin.Int64, -1
 // CHECK: %2 = builtin "xor_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
 // CHECK: return %2
-sil @test_xor2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_xor2 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, -1
   %2 = builtin "xor_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
@@ -122,7 +122,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK: %1 = integer_literal $Builtin.Int64, 259
 // CHECK: %2 = builtin "xor_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
 // CHECK: return %2
-sil @test_xor3 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_xor3 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 288
   %2 = builtin "xor_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
@@ -134,7 +134,7 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-LABEL: sil @test_xor4
 // CHECK: bb0(%0 : $Builtin.Int64):
 // CHECK: return %0
-sil @test_xor4 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+sil @test_xor4 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 18
   %2 = builtin "xor_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64

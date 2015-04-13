@@ -8,18 +8,18 @@ struct ConformingAssoc : AssocReqt {
   func requiredMethod()
 }
 
-sil @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (ConformingAssoc) -> () {
+sil @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@convention(method) (ConformingAssoc) -> () {
 bb0(%0 : $ConformingAssoc):
   debug_value %0 : $ConformingAssoc
   %2 = tuple ()
   return %2 : $()
 }
 
-sil @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout ConformingAssoc) -> () {
+sil @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method) (@inout ConformingAssoc) -> () {
 bb0(%0 : $*ConformingAssoc):
   %1 = load %0 : $*ConformingAssoc
-  %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (ConformingAssoc) -> ()
-  %3 = apply %2(%1) : $@cc(method) @thin (ConformingAssoc) -> ()
+  %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@convention(method) (ConformingAssoc) -> ()
+  %3 = apply %2(%1) : $@convention(method) (ConformingAssoc) -> ()
   return %3 : $()
 }
 

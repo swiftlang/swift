@@ -1065,15 +1065,15 @@ void Remangler::mangleImplFunctionType(Node *node) {
 
 void Remangler::mangleImplFunctionAttribute(Node *node) {
   StringRef text = node->getText();
-  if (text == "@objc_block") {
+  if (text == "@convention(block)") {
     Out << "Cb";
-  } else if (text == "@cc(cdecl)") {
+  } else if (text == "@convention(c)") {
     Out << "Cc";
-  } else if (text == "@cc(method)") {
+  } else if (text == "@convention(method)") {
     Out << "Cm";
-  } else if (text == "@cc(objc_method)") {
+  } else if (text == "@convention(objc_method)") {
     Out << "CO";
-  } else if (text == "@cc(witness_method)") {
+  } else if (text == "@convention(witness_method)") {
     Out << "Cw";
   } else if (text == "@noreturn") {
     Out << "CN";
@@ -1155,7 +1155,7 @@ void Remangler::mangleMetatypeRepresentation(Node *node) {
     Out << 't';
   } else if (text == "@thick") {
     Out << 'T';
-  } else if (text == "@objc") {
+  } else if (text == "@objc_metatype") {
     Out << 'o';
   } else {
     unreachable("bad metatype representation");

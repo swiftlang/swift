@@ -2400,27 +2400,22 @@ public:
       case SILFunctionType::Representation::Thick:
         break;
       case SILFunctionType::Representation::Thin:
-        //Printer << "@convention(thin) ";
-        Printer << "@thin ";
+        Printer << "@convention(thin) ";
         break;
       case SILFunctionType::Representation::Block:
-        //Printer << "@convention(block) ";
-        Printer << "@objc_block ";
+        Printer << "@convention(block) ";
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "@convention(c) ";
         break;
       case SILFunctionType::Representation::Method:
-        //Printer << "@convention(method) ";
-        Printer << "@cc(method) @thin ";
+        Printer << "@convention(method) ";
         break;
       case SILFunctionType::Representation::ObjCMethod:
-        //Printer << "@convention(objc_method) ";
-        Printer << "@cc(objc_method) @thin ";
+        Printer << "@convention(objc_method) ";
         break;
       case SILFunctionType::Representation::WitnessMethod:
-        //Printer << "@convention(witness_method) ";
-        Printer << "@cc(witness_method) @thin ";
+        Printer << "@convention(witness_method) ";
         break;
       }
     }
@@ -2439,28 +2434,22 @@ public:
       case SILFunctionType::Representation::Thick:
         break;
       case SILFunctionType::Representation::Thin:
-        //Printer << "@convention(thin) ";
-        Printer << "@thin ";
+        Printer << "@convention(thin) ";
         break;
       case SILFunctionType::Representation::Block:
-        //Printer << "@convention(block) ";
-        Printer << "@cc(cdecl) @objc_block ";
+        Printer << "@convention(block) ";
         break;
       case SILFunctionType::Representation::CFunctionPointer:
-        //Printer << "@convention(c) ";
-        Printer << "@cc(cdecl) @thin ";
+        Printer << "@convention(c) ";
         break;
       case SILFunctionType::Representation::Method:
-        //Printer << "@convention(method) ";
-        Printer << "@cc(method) @thin ";
+        Printer << "@convention(method) ";
         break;
       case SILFunctionType::Representation::ObjCMethod:
-        //Printer << "@convention(objc_method) ";
-        Printer << "@cc(objc_method) @thin ";
+        Printer << "@convention(objc_method) ";
         break;
       case SILFunctionType::Representation::WitnessMethod:
-        //Printer << "@convention(witness_method) ";
-        Printer << "@cc(witness_method) @thin ";
+        Printer << "@convention(witness_method) ";
         break;
       }
     }

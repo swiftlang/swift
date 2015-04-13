@@ -5,16 +5,16 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil @create_error : $@thin () -> @owned _ErrorType {
+sil @create_error : $@convention(thin) () -> @owned _ErrorType {
 entry:
   unreachable
 }
 
 // CHECK: define void @throws(%swift.refcounted*, %swift.error**) {
-sil @throws : $@thin () -> @error _ErrorType {
+sil @throws : $@convention(thin) () -> @error _ErrorType {
   // CHECK: [[T0:%.*]] = call %swift.error* @create_error()
-  %0 = function_ref @create_error : $@thin () -> @owned _ErrorType
-  %1 = apply %0() : $@thin () -> @owned _ErrorType
+  %0 = function_ref @create_error : $@convention(thin) () -> @owned _ErrorType
+  %1 = apply %0() : $@convention(thin) () -> @owned _ErrorType
 
   // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
   // CHECK-NEXT: ret void
@@ -22,7 +22,7 @@ sil @throws : $@thin () -> @error _ErrorType {
 }
 
 // CHECK: define void @doesnt_throw(%swift.refcounted*, %swift.error**) {
-sil @doesnt_throw : $@thin () -> @error _ErrorType {
+sil @doesnt_throw : $@convention(thin) () -> @error _ErrorType {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
   // CHECK-NEXT: entry:
@@ -31,10 +31,10 @@ sil @doesnt_throw : $@thin () -> @error _ErrorType {
   return %0 : $()
 }
 
-sil @try_apply_helper : $@thin (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType)
+sil @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType)
 
 // CHECK: define void @try_apply(%objc_object*)
-sil @try_apply : $@thin (@owned AnyObject) -> () {
+sil @try_apply : $@convention(thin) (@owned AnyObject) -> () {
 entry(%0 : $AnyObject):
   // CHECK:      [[ERRORSLOT:%.*]] = alloca %swift.error*, align
   // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
@@ -44,8 +44,8 @@ entry(%0 : $AnyObject):
   // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
   // CHECK-NEXT: [[T0:%.*]] = icmp ne %swift.error* [[ERR]], null
   // CHECK-NEXT: br i1 [[T0]],
-  %1 = function_ref @try_apply_helper : $@thin (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType)
-  try_apply %1(%0) : $@thin (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType),
+  %1 = function_ref @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType)
+  try_apply %1(%0) : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType),
     normal bb1, error bb2
 
 // CHECK:      [[T0:%.*]] = phi %objc_object* [ [[RESULT]],

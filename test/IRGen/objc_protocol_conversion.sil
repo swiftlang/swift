@@ -18,7 +18,7 @@ import ObjectiveC
 // CHECK:         ret %CSo8Protocol* %1
 // CHECK:       }
 
-sil @protocol_conversion : $@thin () -> @owned Protocol {
+sil @protocol_conversion : $@convention(thin) () -> @owned Protocol {
 entry:
   %p = objc_protocol #OP : $Protocol
   return %p : $Protocol
@@ -27,7 +27,7 @@ entry:
 // The Protocol class has been hidden in newer ObjC APIs, so when we need its
 // metadata, we treat it like a foreign class.
 // CHECK-LABEL: define %swift.type* @protocol_metatype()
-sil @protocol_metatype : $@thin () -> @thick Protocol.Type {
+sil @protocol_metatype : $@convention(thin) () -> @thick Protocol.Type {
 entry:
   // CHECK: call %swift.type* @swift_getForeignTypeMetadata
   %t = metatype $@thick Protocol.Type

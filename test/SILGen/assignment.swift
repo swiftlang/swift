@@ -14,7 +14,7 @@ var a = A()
 class D { var child: C = C() }
 
 // Verify that the LHS is formally evaluated before the RHS.
-// CHECK: sil hidden @_TF10assignment5test1FT_T_ : $@thin () -> () {
+// CHECK: sil hidden @_TF10assignment5test1FT_T_ : $@convention(thin) () -> () {
 func test1() {
   // CHECK: [[CTOR:%.*]] = function_ref @_TFC10assignment1DCfMS0_FT_S0_
   // CHECK: [[T0:%.*]] = metatype $@thick D.Type

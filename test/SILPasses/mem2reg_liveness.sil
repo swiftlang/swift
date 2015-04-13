@@ -3,11 +3,11 @@
 import Builtin
 import Swift
 
-sil @_TSs5printFT3valSi_T_ : $@thin (Int64) -> ()
+sil @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
 
 // CHECK-LABEL: sil @liveness0
 // CHECK-NOT: alloc_stack
-sil @liveness0 : $@thin (Int64) -> () {
+sil @liveness0 : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var x               // users: %39, %2
   store %0 to %1#1 : $*Int64                      // id: %2
@@ -40,7 +40,7 @@ bb3:                                              // Preds: bb1
 
 bb4:                                              // Preds: bb3 bb2
   // function_ref  
-  %25 = function_ref @_TSs5printFT3valSi_T_ : $@thin (Int64) -> () // user: %36
+  %25 = function_ref @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %36
   %26 = load %8#1 : $*Int64                       // user: %30
   %27 = integer_literal $Builtin.Int64, 2         // user: %31
   %28 = integer_literal $Builtin.Int1, -1         // user: %31
@@ -50,7 +50,7 @@ bb4:                                              // Preds: bb3 bb2
   %33 = tuple_extract %31 : $(Builtin.Int64, Builtin.Int1), 1 // user: %35
   %34 = struct $Int64 (%32 : $Builtin.Int64)      // user: %36
   cond_fail %33 : $Builtin.Int1                   // id: %35
-  %36 = apply %25(%34) : $@thin (Int64) -> ()
+  %36 = apply %25(%34) : $@convention(thin) (Int64) -> ()
   dealloc_stack %8#0 : $*@local_storage Int64     // id: %37
   br bb5                                          // id: %38
 

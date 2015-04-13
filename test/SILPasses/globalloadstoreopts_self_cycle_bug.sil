@@ -20,7 +20,7 @@ final class NewHalfOpenRangeGenerator : NewRangeGenerator1 {
 
 // CHECK-LABEL: sil @test
 // LICM-LABEL: sil @test
-sil @test : $@thin () -> () {
+sil @test : $@convention(thin) () -> () {
 bb0:
   // CHECK: [[ID1:%[0-9]+]] = integer_literal $Builtin.Int32, 0
   // CHECK: [[ID2:%[0-9]+]] = struct $Int32 ([[ID1]]

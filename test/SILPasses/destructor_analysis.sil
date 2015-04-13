@@ -27,19 +27,19 @@ struct MyInt {
 
 // CHECK-LABEL: sil @handle_recursive_types
 
-sil @handle_recursive_types : $@cc(cdecl) @thin () -> () {
+sil @handle_recursive_types : $@convention(c) () -> () {
 bb0:
   %17 = metatype $@thin ArrayOf<Foo>.Type
-  %18 = function_ref @array_init : $@thin (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
-  %19 = apply %18(%17) : $@thin (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
-  %25 = function_ref @array_get_count : $@cc(method) @thin (@owned ArrayOf<Foo>) -> MyInt
+  %18 = function_ref @array_init : $@convention(thin) (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
+  %19 = apply %18(%17) : $@convention(thin) (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
+  %25 = function_ref @array_get_count : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt
   retain_value %19 : $ArrayOf<Foo>
-  %27 = apply %25(%19) : $@cc(method) @thin (@owned ArrayOf<Foo>) -> MyInt
+  %27 = apply %25(%19) : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt
   %28 = tuple ()
   release_value %19 : $ArrayOf<Foo>
   return %28 : $()
 }
 
-sil [fragile] [semantics "array.init"] @array_init : $@thin (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
+sil [fragile] [semantics "array.init"] @array_init : $@convention(thin) (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
 
-sil [fragile] [semantics "array.get_count"] @array_get_count : $@cc(method) @thin (@owned ArrayOf<Foo>) -> MyInt
+sil [fragile] [semantics "array.get_count"] @array_get_count : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt

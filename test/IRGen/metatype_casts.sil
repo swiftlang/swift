@@ -8,7 +8,7 @@ import Swift
 // CHECK-LABEL: define void @archetype_metatype_cast
 // CHECK:         %0 = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %T, %swift.type* %U)
 // CHECK:         %1 = icmp ne %swift.type* %0, null
-sil @archetype_metatype_cast : $@thin <T, U> () -> () {
+sil @archetype_metatype_cast : $@convention(thin) <T, U> () -> () {
 entry:
   %0 = metatype $@thick T.Type
   checked_cast_br %0 : $@thick T.Type to $@thick U.Type, yes, no
@@ -27,7 +27,7 @@ protocol P {}
 // CHECK-LABEL: define void @existential_archetype_metatype_cast(%swift.type*, i8**, %swift.type* %T)
 // CHECK:         [[T0:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %0, %swift.type* %T)
 // CHECK:         [[T1:%.*]] = icmp ne %swift.type* [[T0]], null
-sil @existential_archetype_metatype_cast : $@thin <T> (@thick P.Type) -> () {
+sil @existential_archetype_metatype_cast : $@convention(thin) <T> (@thick P.Type) -> () {
 entry(%0 : $@thick P.Type):
   checked_cast_br %0 : $@thick P.Type to $@thick T.Type, yes, no
 yes(%1 : $@thick T.Type):
@@ -47,7 +47,7 @@ sil_vtable SomeClass {}
 // CHECK:         %1 = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* %1
 // CHECK:       }
-sil @metatype_object_conversion : $@thin (@objc_metatype SomeClass.Type) -> @owned AnyObject {
+sil @metatype_object_conversion : $@convention(thin) (@objc_metatype SomeClass.Type) -> @owned AnyObject {
 entry(%m : $@objc_metatype SomeClass.Type):
   %o = objc_metatype_to_object %m : $@objc_metatype SomeClass.Type to $AnyObject
   return %o : $AnyObject
@@ -59,7 +59,7 @@ protocol SomeClassProtocol : class {}
 // CHECK:         [[T0:%.*]] = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* [[T0]]
 // CHECK:       }
-sil @existential_metatype_object_conversion : $@thin (@objc_metatype SomeClassProtocol.Type) -> @owned AnyObject {
+sil @existential_metatype_object_conversion : $@convention(thin) (@objc_metatype SomeClassProtocol.Type) -> @owned AnyObject {
 entry(%m : $@objc_metatype SomeClassProtocol.Type):
   %o = objc_existential_metatype_to_object %m : $@objc_metatype SomeClassProtocol.Type to $AnyObject
   return %o : $AnyObject
@@ -72,7 +72,7 @@ sil_vtable OtherClass {}
 // CHECK:         [[T0:%.*]] = bitcast %C14metatype_casts9SomeClass* %0 to %swift.type**
 // CHECK:         [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]]
 // CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], getelementptr {{.*}} @_TMdC14metatype_casts10OtherClass
-sil @value_metatype_cast : $@thin (SomeClass) -> () {
+sil @value_metatype_cast : $@convention(thin) (SomeClass) -> () {
 entry(%0 : $SomeClass):
   %1 = value_metatype $@thick SomeClass.Type, %0 : $SomeClass
   checked_cast_br [exact] %1 : $@thick SomeClass.Type to $@thick OtherClass.Type, yes, no

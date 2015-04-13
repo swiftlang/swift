@@ -6,7 +6,7 @@ import Builtin
 
 // Various tests for SIL that doesn't happen to appear in dominance order.
 
-sil @test0 : $@thin () -> (Builtin.Int8) {
+sil @test0 : $@convention(thin) () -> (Builtin.Int8) {
 bb0:
   br bb1
 bb2:
@@ -24,7 +24,7 @@ bb1:
 // CHECK:   }
 
 // Just don't crash on this one.
-sil @test1 : $@thin () -> (Builtin.Int8) {
+sil @test1 : $@convention(thin) () -> (Builtin.Int8) {
 bb0:
   br bb2
 bb1:

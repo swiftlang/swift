@@ -18,7 +18,7 @@ import Swift
 //CHECK: place_phi
 //CHECK-NOT: alloc_stack
 
-sil @place_phi : $@thin (Int64) -> Int64 {
+sil @place_phi : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var v               // users: %45, %2
   store %0 to %1#1 : $*Int64                      // id: %2
@@ -95,7 +95,7 @@ bb8:                                              // Preds: bb6
 
 //CHECK: @func_loop
 //CHECK-NOT: alloc_stack
-sil @func_loop: $@thin (Int64) -> Int64 {
+sil @func_loop: $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var c               // users: %28, %2
   store %0 to %1#1 : $*Int64                      // id: %2
@@ -151,7 +151,7 @@ bb3:                                              // Preds: bb1
 //CHECK-NOT: alloc_stack
 //CHECK-NOT: dealloc_stack
 //CHECK: return
-sil @high_nest : $@thin (Int64) -> Int64 {
+sil @high_nest : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64): 
   %1 = alloc_stack $Int64  // var c               // users: %114, %2
   store %0 to %1#1 : $*Int64                      // id: %2
@@ -324,7 +324,7 @@ bb34:                                             // Preds: bb33 bb0
 
 //CHECK:simple_if
 //CHECK-NOT: alloc_stack
-sil @simple_if : $@thin (Int64) -> Int64 {
+sil @simple_if : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var c               // users: %17, %2
   store %0 to %1#1 : $*Int64                      // id: %2
@@ -364,7 +364,7 @@ enum X {
 //CHECK: @test_switch
 //CHECK-NOT: alloc_stack
 //CHECK-NOT: dealloc_stack
-sil @test_switch: $@thin (Int64, X) -> Int64 {
+sil @test_switch: $@convention(thin) (Int64, X) -> Int64 {
 bb0(%0 : $Int64, %1 : $X):
   %2 = alloc_stack $Int64  // var xi              // users: %28, %4
   %3 = alloc_stack $X  // var c                   // users: %27, %5

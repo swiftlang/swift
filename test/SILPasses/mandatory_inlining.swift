@@ -174,14 +174,14 @@ func test_let_auto_closure_with_value_capture(let x: Bool) -> Bool {
 
 class C {}
 
-// CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining25class_constrained_genericU__FQ_GSqPMPSs9AnyObject__ : $@thin <T where T : C> (@owned T) -> Optional<AnyObject.Type>
+// CHECK-LABEL: sil hidden [transparent] @_TF18mandatory_inlining25class_constrained_genericU__FQ_GSqPMPSs9AnyObject__ : $@convention(thin) <T where T : C> (@owned T) -> Optional<AnyObject.Type>
 @transparent
 func class_constrained_generic<T : C>(o: T) -> AnyClass? {
   // CHECK: return
   return T.self
 }
 
-// CHECK-LABEL: sil hidden @_TF18mandatory_inlining6invokeFCS_1CT_ : $@thin (@owned C) -> () {
+// CHECK-LABEL: sil hidden @_TF18mandatory_inlining6invokeFCS_1CT_ : $@convention(thin) (@owned C) -> () {
 func invoke(c: C) {
   // CHECK-NOT: function_ref @_TF18mandatory_inlining25class_constrained_genericU__FQ_GSqPMPSs9AnyObject__
   // CHECK-NOT: apply

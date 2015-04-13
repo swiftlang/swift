@@ -12,7 +12,7 @@ protocol P {
 }
 
 // CHECK-LABEL: define void @_TF12dynamic_self23testExistentialDispatchFT1pPS_1P__T_
-sil @_TF12dynamic_self23testExistentialDispatchFT1pPS_1P__T_ : $@thin (@in P) -> () {
+sil @_TF12dynamic_self23testExistentialDispatchFT1pPS_1P__T_ : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   debug_value_addr %0 : $*P  // let p             // id: %1
   %2 = alloc_stack $P                             // users: %3, %4, %12

@@ -662,8 +662,8 @@ extern "C" const ExtraInhabitantsValueWitnessTable _TWVBO; // Builtin.UnknownObj
 // The () -> () table can be used for arbitrary function types.
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVFT_T_;     // () -> ()
 
-// The @thin () -> () table can be used for arbitrary thin function types.
-extern "C" const ExtraInhabitantsValueWitnessTable _TWVXfT_T_;     // @thin () -> ()
+// The @convention(thin) () -> () table can be used for arbitrary thin function types.
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVXfT_T_;     // @convention(thin) () -> ()
 
 // The () table can be used for arbitrary empty types.
 extern "C" const ValueWitnessTable _TWVT_;        // ()

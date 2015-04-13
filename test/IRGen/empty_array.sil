@@ -20,7 +20,7 @@ import Builtin
 // CHECK-64:         %1 = bitcast %swift.opaque* %0 to i8*
 // CHECK-64:         %2 = getelementptr inbounds i8, i8* %1, i64 0
 
-sil @empty_array : $@thin (@in ()) -> () {
+sil @empty_array : $@convention(thin) (@in ()) -> () {
 entry(%0 : $*()):
   %1 = integer_literal $Builtin.Word, 1
   %2 = index_addr %0 : $*(), %1 : $Builtin.Word

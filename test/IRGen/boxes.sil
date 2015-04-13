@@ -17,7 +17,7 @@ sil_stage canonical
 // CHECK:         [[OWNER:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 0
 // CHECK:         [[DATA:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 1
 // CHECK:         call void @swift_deallocBox(%swift.refcounted* [[OWNER]], %swift.type* %T)
-sil @generic_box_alloc_dealloc : $@thin <T> () -> () {
+sil @generic_box_alloc_dealloc : $@convention(thin) <T> () -> () {
 entry:
   %b = alloc_box $T
   dealloc_box $T, %b#0 : $Builtin.NativeObject
@@ -31,7 +31,7 @@ entry:
 // CHECK-64-LABEL: define void @fixed_box_alloc_dealloc()
 // CHECK-64:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata, %swift.full_heapmetadata* @metadata, i32 0, i32 2), i64 24, i64 7)
 // CHECK-64:         call void @swift_deallocObject(%swift.refcounted* [[BOX]], i64 24, i64 7)
-sil @fixed_box_alloc_dealloc : $@thin () -> () {
+sil @fixed_box_alloc_dealloc : $@convention(thin) () -> () {
 entry:
   %b = alloc_box $Builtin.Word
   dealloc_box $Builtin.Word, %b#0 : $Builtin.NativeObject
@@ -44,7 +44,7 @@ entry:
 // CHECK-NOT:     swift_deallocBox
 // CHECK-NOT:     swift_deallocObject
 // CHECK:         ret void
-sil @empty_box_alloc_dealloc : $@thin () -> () {
+sil @empty_box_alloc_dealloc : $@convention(thin) () -> () {
 entry:
   %b = alloc_box $()
   dealloc_box $(), %b#0 : $Builtin.NativeObject

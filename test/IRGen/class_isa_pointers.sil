@@ -22,10 +22,10 @@ sil_vtable Purebred {}
 // CHECK:         [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_PTR]]
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
-sil @purebred_method : $@thin (@owned Purebred) -> () {
+sil @purebred_method : $@convention(thin) (@owned Purebred) -> () {
 entry(%0 : $Purebred):
-  %m = class_method %0 : $Purebred, #Purebred.method!1 : Purebred -> () -> (), $@cc(method) @thin (@guaranteed Purebred) -> ()
-  %z = apply %m(%0) : $@cc(method) @thin (@guaranteed Purebred) -> ()
+  %m = class_method %0 : $Purebred, #Purebred.method!1 : Purebred -> () -> (), $@convention(method) (@guaranteed Purebred) -> ()
+  %z = apply %m(%0) : $@convention(method) (@guaranteed Purebred) -> ()
   return %z : $()
 }
 
@@ -46,24 +46,24 @@ sil_vtable Mongrel {}
 // CHECK:         [[ISA:%.*]] = inttoptr i64 [[T3]] to %swift.type*
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
-sil @mongrel_method : $@thin (@owned Mongrel) -> () {
+sil @mongrel_method : $@convention(thin) (@owned Mongrel) -> () {
 entry(%0 : $Mongrel):
-  %m = class_method %0 : $Mongrel, #Mongrel.method!1 : Mongrel -> () -> (), $@cc(method) @thin (@guaranteed Mongrel) -> ()
-  %z = apply %m(%0) : $@cc(method) @thin (@guaranteed Mongrel) -> ()
+  %m = class_method %0 : $Mongrel, #Mongrel.method!1 : Mongrel -> () -> (), $@convention(method) (@guaranteed Mongrel) -> ()
+  %z = apply %m(%0) : $@convention(method) (@guaranteed Mongrel) -> ()
   return %z : $()
 }
 
 // ObjC stubs expected by ObjC metadata emission
 
-sil private @_TToFC18class_isa_pointers7Mongrel6methodfS0_FT_T_ : $@thin @cc(objc_method) (Purebred) -> () {
+sil private @_TToFC18class_isa_pointers7Mongrel6methodfS0_FT_T_ : $@convention(objc_method) (Purebred) -> () {
 entry(%0 : $Purebred):
   unreachable
 }
-sil private @_TToFC18class_isa_pointers7MongrelcfMS0_FT7bellsOnSi_GSQS0__ : $@thin @cc(objc_method) (Int, Purebred) -> () {
+sil private @_TToFC18class_isa_pointers7MongrelcfMS0_FT7bellsOnSi_GSQS0__ : $@convention(objc_method) (Int, Purebred) -> () {
 entry(%0 : $Int, %1 : $Purebred):
   unreachable
 }
-sil private @_TToFC18class_isa_pointers7MongrelcfMS0_FT_S0_ : $@thin @cc(objc_method) (Purebred) -> () {
+sil private @_TToFC18class_isa_pointers7MongrelcfMS0_FT_S0_ : $@convention(objc_method) (Purebred) -> () {
 entry(%0 : $Purebred):
   unreachable
 }

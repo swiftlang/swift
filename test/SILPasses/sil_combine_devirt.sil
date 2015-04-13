@@ -23,26 +23,26 @@ class Foo {
 //CHECK: _TF4main4mainFT_T_
 //CHECK: function_ref @_TFC4main3Foo3getfS0_FT_Si
 //CHECK: return
-sil @_TF4main4mainFT_T_ : $@thin () -> () {
+sil @_TF4main4mainFT_T_ : $@convention(thin) () -> () {
 bb0:
   // function_ref swift
-  %0 = function_ref @_TSs5printFT3valSi_T_ : $@thin (Int32) -> () // user: %8
+  %0 = function_ref @_TSs5printFT3valSi_T_ : $@convention(thin) (Int32) -> () // user: %8
   %1 = integer_literal $Builtin.Int32, 3          // user: %2
   %2 = struct $Int32 (%1 : $Builtin.Int32)        // user: %5
   %3 = alloc_ref $Foo                             // users: %6, %7, %4
   %4 = ref_element_addr %3 : $Foo, #Foo.m_val     // user: %5
   store %2 to %4 : $*Int32                        // id: %5
-  %6 = class_method %3 : $Foo, #Foo.get!1 : Foo -> () -> Int32 , $@cc(method) @thin (@guaranteed Foo) -> Int32 // user: %7
-  %7 = apply %6(%3) : $@cc(method) @thin (@guaranteed Foo) -> Int32 // user: %8
-  %8 = apply %0(%7) : $@thin (Int32) -> ()
+  %6 = class_method %3 : $Foo, #Foo.get!1 : Foo -> () -> Int32 , $@convention(method) (@guaranteed Foo) -> Int32 // user: %7
+  %7 = apply %6(%3) : $@convention(method) (@guaranteed Foo) -> Int32 // user: %8
+  %8 = apply %0(%7) : $@convention(thin) (Int32) -> ()
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
 }
 
-sil @_TSs5printFT3valSi_T_ : $@thin (Int32) -> ()
+sil @_TSs5printFT3valSi_T_ : $@convention(thin) (Int32) -> ()
 
 // main.Foo.get (main.Foo)() -> Swift.Int32
-sil @_TFC4main3Foo3getfS0_FT_Si : $@cc(method) @thin (@guaranteed Foo) -> Int32 {
+sil @_TFC4main3Foo3getfS0_FT_Si : $@convention(method) (@guaranteed Foo) -> Int32 {
 bb0(%0 : $Foo):
   %1 = ref_element_addr %0 : $Foo, #Foo.m_val     // user: %2
   %2 = load %1 : $*Int32                          // user: %4

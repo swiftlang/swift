@@ -10,11 +10,11 @@ import Swift
 // CHECK-LABEL: sil @main
 // CHECK: bb0({{.*}}):
 // CHECK: function_ref @_TTSg5Bi32____TFVSs9ContainerCU__fMGS_Q__FT_GS_Q__
-// CHECK: function_ref @_TTSg5Bi32____TFVSs9Container11doSomethingU__fGS_Q__FT_T_ : $@cc(method) @thin (Container<Builtin.Int32>) -> ()
+// CHECK: function_ref @_TTSg5Bi32____TFVSs9Container11doSomethingU__fGS_Q__FT_T_ : $@convention(method) (Container<Builtin.Int32>) -> ()
 
-// CHECK-LABEL: sil shared [fragile] @_TTSg5Bi32____TFVSs9ContainerCU__fMGS_Q__FT_GS_Q__ : $@thin (@thin Container<Builtin.Int32>.Type) -> Container<Builtin.Int32> {
+// CHECK-LABEL: sil shared [fragile] @_TTSg5Bi32____TFVSs9ContainerCU__fMGS_Q__FT_GS_Q__ : $@convention(thin) (@thin Container<Builtin.Int32>.Type) -> Container<Builtin.Int32> {
 
-// CHECK-LABEL: sil shared [fragile] @_TTSg5Bi32____TFVSs9Container11doSomethingU__fGS_Q__FT_T_ : $@cc(method) @thin (Container<Builtin.Int32>) -> () {
+// CHECK-LABEL: sil shared [fragile] @_TTSg5Bi32____TFVSs9Container11doSomethingU__fGS_Q__FT_T_ : $@convention(method) (Container<Builtin.Int32>) -> () {
 
 var c = Container<Int>()
 c.doSomething()

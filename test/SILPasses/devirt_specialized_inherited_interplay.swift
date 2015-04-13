@@ -8,7 +8,7 @@
 // *NOTE* If something like templated protocols is ever implemented this file
 // needs to be updated.
 
-// CHECK-LABEL: sil @_TF38devirt_specialized_inherited_interplay6driverFT_T_ : $@thin () -> () {
+// CHECK-LABEL: sil @_TF38devirt_specialized_inherited_interplay6driverFT_T_ : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK-NEXT: alloc_ref $A3<S>
 // CHECK-NEXT: alloc_ref $A4<S>
@@ -18,31 +18,31 @@
 // CHECK-NEXT: alloc_ref $B3<S>
 // CHECK-NEXT: alloc_ref $B4<S>
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown0 : $@thin () -> ()
+// CHECK-NEXT: function_ref @unknown0 : $@convention(thin) () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown1 : $@thin () -> ()
+// CHECK-NEXT: function_ref @unknown1 : $@convention(thin) () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown2 : $@thin () -> ()
+// CHECK-NEXT: function_ref @unknown2 : $@convention(thin) () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown3 : $@thin () -> ()
+// CHECK-NEXT: function_ref @unknown3 : $@convention(thin) () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown4 : $@thin () -> ()
+// CHECK-NEXT: function_ref @unknown4 : $@convention(thin) () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown5 : $@thin () -> ()
+// CHECK-NEXT: function_ref @unknown5 : $@convention(thin) () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown6 : $@thin () -> ()
+// CHECK-NEXT: function_ref @unknown6 : $@convention(thin) () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply

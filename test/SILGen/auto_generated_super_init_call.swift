@@ -12,7 +12,7 @@ class SomeDerivedClass : Parent {
 
   override init() {
     y = 42
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT_S0_ : $@cc(method) @thin (@owned SomeDerivedClass) -> @owned SomeDerivedClass
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT_S0_ : $@convention(method) (@owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: integer_literal $Builtin.Int2048, 42
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]] : $*SomeDerivedClass
 // CHECK-NEXT: [[PARENT:%[0-9]+]] = upcast [[SELFLOAD]] : $SomeDerivedClass to $Parent
@@ -25,8 +25,8 @@ class SomeDerivedClass : Parent {
   
   init(x: Int) {
     y = x
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1xSi_S0_ : $@cc(method) @thin (Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass
-// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1xSi_S0_ : $@convention(method) (Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass
+// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@convention(method) (@owned Parent) -> @owned Parent
   }
 
   init(b: Bool) {
@@ -39,8 +39,8 @@ class SomeDerivedClass : Parent {
     return
 // Check that we are emittng the super.init expr into the epilog block.
     
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb_S0_ : $@cc(method) @thin (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
-// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb_S0_ : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NEXT: apply
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: store
@@ -59,8 +59,8 @@ class SomeDerivedClass : Parent {
     }
       
     super.init()
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb1iSi_S0_ : $@cc(method) @thin (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
-// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb1iSi_S0_ : $@convention(method) (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NOT: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
 // CHECK: return
   }
@@ -69,7 +69,7 @@ class SomeDerivedClass : Parent {
 // Check that we do call super.init.
 class HasNoIVars : Parent {
   override init() {
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call10HasNoIVarscfMS0_FT_S0_ : $@cc(method) @thin (@owned HasNoIVars) -> @owned HasNoIVars
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call10HasNoIVarscfMS0_FT_S0_ : $@convention(method) (@owned HasNoIVars) -> @owned HasNoIVars
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
   }
 }
@@ -94,7 +94,7 @@ class ChildOfParentWithNoExplicitInit : ParentWithNoExplicitInit {
   override init() {
     y = 10
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call31ChildOfParentWithNoExplicitInitcfMS0_FT_S0_
-// CHECK: function_ref @_TFC30auto_generated_super_init_call24ParentWithNoExplicitInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned ParentWithNoExplicitInit) -> @owned ParentWithNoExplicitInit
+// CHECK: function_ref @_TFC30auto_generated_super_init_call24ParentWithNoExplicitInitcfMS0_FT_S0_ : $@convention(method) (@owned ParentWithNoExplicitInit) -> @owned ParentWithNoExplicitInit
   }
 }
 
@@ -108,7 +108,7 @@ class ChildOfParentWithNoExplicitInit2 : ParentWithNoExplicitInit2 {
   override init() {
     y = 10
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call32ChildOfParentWithNoExplicitInit2cfMS0_FT_S0_
-// CHECK: function_ref @_TFC30auto_generated_super_init_call25ParentWithNoExplicitInit2cfMS0_FT_S0_ : $@cc(method) @thin (@owned ParentWithNoExplicitInit2) -> @owned ParentWithNoExplicitInit2   
+// CHECK: function_ref @_TFC30auto_generated_super_init_call25ParentWithNoExplicitInit2cfMS0_FT_S0_ : $@convention(method) (@owned ParentWithNoExplicitInit2) -> @owned ParentWithNoExplicitInit2   
   }
 }
 
@@ -122,7 +122,7 @@ class ParentWithNoDefaultInit {
 class ChildOfParentWithNoDefaultInit : ParentWithNoDefaultInit {
   var y: Int
   init() {
-// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call30ChildOfParentWithNoDefaultInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned ChildOfParentWithNoDefaultInit) -> @owned ChildOfParentWithNoDefaultInit
+// CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call30ChildOfParentWithNoDefaultInitcfMS0_FT_S0_ : $@convention(method) (@owned ChildOfParentWithNoDefaultInit) -> @owned ChildOfParentWithNoDefaultInit
 // CHECK: bb0
 // CHECK-NOT: apply
 // CHECK: return

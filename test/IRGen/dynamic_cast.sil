@@ -20,7 +20,7 @@ struct S {
 // CHECK: [[INT:%Si]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
 
 // CHECK-LABEL: define void @testUnconditional0(
-sil @testUnconditional0 : $@thin (@in P) -> () {
+sil @testUnconditional0 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
@@ -39,7 +39,7 @@ bb0(%0 : $*P):
 // CHECK:       call %swift.type* @swift_getExistentialTypeMetadata(
 
 // CHECK-LABEL: define void @testUnconditional1(
-sil @testUnconditional1 : $@thin (@in P) -> () {
+sil @testUnconditional1 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
@@ -55,7 +55,7 @@ bb0(%0 : $*P):
 }
 
 // CHECK-LABEL: define void @testUnconditional2(
-sil @testUnconditional2 : $@thin (@in P) -> () {
+sil @testUnconditional2 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
@@ -71,7 +71,7 @@ bb0(%0 : $*P):
 }
 
 // CHECK-LABEL: define void @testConditional0(
-sil @testConditional0 : $@thin (@in P) -> () {
+sil @testConditional0 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
@@ -91,7 +91,7 @@ bb2:
 }
 
 // CHECK-LABEL: define void @testConditional1(
-sil @testConditional1 : $@thin (@in P) -> () {
+sil @testConditional1 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
@@ -111,7 +111,7 @@ bb2:
 }
 
 // CHECK-LABEL: define void @testConditional2(
-sil @testConditional2 : $@thin (@in P) -> () {
+sil @testConditional2 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*

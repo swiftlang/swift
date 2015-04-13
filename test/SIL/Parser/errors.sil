@@ -35,14 +35,14 @@ bb0:
   %1 = function_ref @wrong_type : $() -> ((), ())  // expected-note {{prior reference was here}}
 }
 
-sil @wrong_type : $() -> () {  // expected-error {{value 'wrong_type' defined with mismatching type '() -> ((), ())' (expected '@thin () -> ()')}}
+sil @wrong_type : $() -> () {  // expected-error {{value 'wrong_type' defined with mismatching type '() -> ((), ())' (expected '@convention(thin) () -> ()')}}
 bb0:
   %1 = tuple ()
 }
 
 sil_stage nonsense // expected-error {{expected 'raw' or 'canonical' after 'sil_stage'}}
 
-sil @missing_type : $@thin (Int) -> () {
+sil @missing_type : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   br bb3(%0) // expected-error {{expected ':' before type in SIL value reference}}
   // FIXME: The next error is unexpected.

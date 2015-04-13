@@ -20,7 +20,7 @@ enum MyEnum {
 // CHECK: load
 // CHECK: load
 // CHECK: return
-sil @testit : $@cc(method) @thin (MyEnum) -> Builtin.FPIEEE64 {
+sil @testit : $@convention(method) (MyEnum) -> Builtin.FPIEEE64 {
 bb0(%0 : $MyEnum):
   %x1 = alloc_stack $MyEnum
   store %0 to %x1#1 : $*MyEnum

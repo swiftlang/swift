@@ -12,25 +12,25 @@ class C {}
 
 sil_vtable C {}
 
-sil @_TFC21autorelease_optimized1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject {
+sil @_TFC21autorelease_optimized1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2
   return %1 : $Builtin.NativeObject              // id: %2
 }
 
-sil public_external @foo : $@thin (@owned C) -> @autoreleased C
-sil public_external @bar : $@thin (@owned C) -> ()
+sil public_external @foo : $@convention(thin) (@owned C) -> @autoreleased C
+sil public_external @bar : $@convention(thin) (@owned C) -> ()
 
-sil @baz : $@thin (@owned C) -> () {
+sil @baz : $@convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
-  %1 = function_ref @foo : $@thin (@owned C) -> @autoreleased C
-  %2 = apply %1(%0) : $@thin (@owned C) -> @autoreleased C
+  %1 = function_ref @foo : $@convention(thin) (@owned C) -> @autoreleased C
+  %2 = apply %1(%0) : $@convention(thin) (@owned C) -> @autoreleased C
   strong_retain_autoreleased %2 : $C
 
 // This call is just so that we won't tail-call
   // objc_retainAutoreleasedReturnValue, which complicates the test.
-  %3 = function_ref @bar : $@thin (@owned C) -> ()
-  apply %3(%2) : $@thin (@owned C) -> ()
+  %3 = function_ref @bar : $@convention(thin) (@owned C) -> ()
+  apply %3(%2) : $@convention(thin) (@owned C) -> ()
   %5 = tuple ()
   return %5 : $()
 }

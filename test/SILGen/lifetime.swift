@@ -118,7 +118,7 @@ func reftype_func_with_arg(x: Ref) -> Ref {}
 // CHECK-LABEL: sil hidden @_TF8lifetime14reftype_returnFT_CS_3Ref
 func reftype_return() -> Ref {
     return reftype_func()
-    // CHECK: [[RF:%[0-9]+]] = function_ref @_TF8lifetime12reftype_funcFT_CS_3Ref : $@thin () -> @owned Ref
+    // CHECK: [[RF:%[0-9]+]] = function_ref @_TF8lifetime12reftype_funcFT_CS_3Ref : $@convention(thin) () -> @owned Ref
     // CHECK-NOT: release
     // CHECK: [[RET:%[0-9]+]] = apply [[RF]]()
     // CHECK-NOT: release
@@ -150,7 +150,7 @@ func reftype_inout_arg(inout a: Ref) {
 // CHECK-LABEL: sil hidden @_TF8lifetime26reftype_call_ignore_returnFT_T_
 func reftype_call_ignore_return() {
     reftype_func()
-    // CHECK: = function_ref @_TF8lifetime12reftype_funcFT_CS_3Ref : $@thin () -> @owned Ref
+    // CHECK: = function_ref @_TF8lifetime12reftype_funcFT_CS_3Ref : $@convention(thin) () -> @owned Ref
     // CHECK-NEXT: [[R:%[0-9]+]] = apply
     // CHECK: release [[R]]
     // CHECK: return
@@ -160,7 +160,7 @@ func reftype_call_ignore_return() {
 func reftype_call_store_to_local() {
     var a = reftype_func()
     // CHECK: [[A:%[0-9]+]] = alloc_box $Ref
-    // CHECK: = function_ref @_TF8lifetime12reftype_funcFT_CS_3Ref : $@thin () -> @owned Ref
+    // CHECK: = function_ref @_TF8lifetime12reftype_funcFT_CS_3Ref : $@convention(thin) () -> @owned Ref
     // CHECK-NEXT: [[R:%[0-9]+]] = apply
     // CHECK-NOT: retain [[R]]
     // CHECK: store [[R]] to [[A]]
@@ -229,7 +229,7 @@ struct Aleph {
   var b:Val
 
   // -- loadable value constructor:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@thin (@owned Ref, Val, @thin Aleph.Type) -> @owned Aleph
+  // CHECK-LABEL: sil hidden @_TFV8lifetime5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (@owned Ref, Val, @thin Aleph.Type) -> @owned Aleph
   // CHECK-NEXT: bb0([[A:%.*]] : $Ref, [[B:%.*]] : $Val, {{%.*}} : $@thin Aleph.Type):
   // CHECK-NEXT:   [[RET:%.*]] = struct $Aleph ([[A]] : {{.*}}, [[B]] : {{.*}})
   // CHECK-NEXT:   return [[RET]]
@@ -251,7 +251,7 @@ struct Daleth {
   var c:Unloadable
 
   // -- address-only value constructor:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime6DalethCfMS0_FT1aVS_5Aleph1bVS_4Beth1cPS_10Unloadable__S0_ : $@thin (@out Daleth, @owned Aleph, @owned Beth, @in Unloadable, @thin Daleth.Type) -> () {
+  // CHECK-LABEL: sil hidden @_TFV8lifetime6DalethCfMS0_FT1aVS_5Aleph1bVS_4Beth1cPS_10Unloadable__S0_ : $@convention(thin) (@out Daleth, @owned Aleph, @owned Beth, @in Unloadable, @thin Daleth.Type) -> () {
   // CHECK: bb0([[THIS:%.*]] : $*Daleth, [[A:%.*]] : $Aleph, [[B:%.*]] : $Beth, [[C:%.*]] : $*Unloadable, {{%.*}} : $@thin Daleth.Type):
   // CHECK-NEXT:   [[A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.a
   // CHECK-NEXT:   store [[A]] to [[A_ADDR]]
@@ -265,7 +265,7 @@ struct Daleth {
 
 class He {
   // -- default initializer:
-  // CHECK-LABEL: sil hidden @_TFC8lifetime2HecfMS0_FT_S0_ : $@cc(method) @thin (@owned He) -> @owned He {
+  // CHECK-LABEL: sil hidden @_TFC8lifetime2HecfMS0_FT_S0_ : $@convention(method) (@owned He) -> @owned He {
   // CHECK: bb0([[THIS:%.*]] : $He):
   // CHECK-NEXT: debug_value
   // CHECK-NEXT: mark_uninitialized
@@ -273,11 +273,11 @@ class He {
   // CHECK: }
 
   // -- default allocator:
-  // CHECK-LABEL: sil hidden @_TFC8lifetime2HeCfMS0_FT_S0_ : $@thin (@thick He.Type) -> @owned He {
+  // CHECK-LABEL: sil hidden @_TFC8lifetime2HeCfMS0_FT_S0_ : $@convention(thin) (@thick He.Type) -> @owned He {
   // CHECK-NEXT: bb0({{%.*}} : $@thick He.Type):
   // CHECK-NEXT:   [[THIS:%.*]] = alloc_ref $He
   // CHECK-NEXT:   // function_ref lifetime.He.init
-  // CHECK-NEXT:   [[INIT:%.*]] = function_ref @_TFC8lifetime2HecfMS0_FT_S0_ : $@cc(method) @thin (@owned He) -> @owned He
+  // CHECK-NEXT:   [[INIT:%.*]] = function_ref @_TFC8lifetime2HecfMS0_FT_S0_ : $@convention(method) (@owned He) -> @owned He
   // CHECK-NEXT:   [[THIS1:%.*]] = apply [[INIT]]([[THIS]])
   // CHECK-NEXT:   return [[THIS1]]
   // CHECK-NEXT: }
@@ -289,7 +289,7 @@ struct Waw {
   var b:Val
 
   // -- loadable value initializer with tuple destructuring:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime3WawCfMS0_FT1aTCS_3RefVS_3Val_1bS2__S0_ : $@thin (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
+  // CHECK-LABEL: sil hidden @_TFV8lifetime3WawCfMS0_FT1aTCS_3RefVS_3Val_1bS2__S0_ : $@convention(thin) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
   // CHECK-NEXT: bb0([[A0:%.*]] : $Ref, [[A1:%.*]] : $Val, [[B:%.*]] : $Val, {{%.*}} : $@thin Waw.Type):
   // CHECK-NEXT:   [[A:%.*]] = tuple ([[A0]] : {{.*}}, [[A1]] : {{.*}})
   // CHECK-NEXT:   [[RET:%.*]] = struct $Waw ([[A]] : {{.*}}, [[B]] : {{.*}})
@@ -301,7 +301,7 @@ struct Zayin {
   var b:Unloadable
 
   // -- address-only value initializer with tuple destructuring:
-  // CHECK-LABEL: sil hidden @_TFV8lifetime5ZayinCfMS0_FT1aTPS_10Unloadable_VS_3Val_1bPS1___S0_ : $@thin (@out Zayin, @in Unloadable, Val, @in Unloadable, @thin Zayin.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TFV8lifetime5ZayinCfMS0_FT1aTPS_10Unloadable_VS_3Val_1bPS1___S0_ : $@convention(thin) (@out Zayin, @in Unloadable, Val, @in Unloadable, @thin Zayin.Type) -> ()
   // CHECK-NEXT: bb0([[THIS:%.*]] : $*Zayin, [[A0:%.*]] : $*Unloadable, [[A1:%.*]] : $Val, [[B:%.*]] : $*Unloadable, {{%.*}} : $@thin Zayin.Type):
   // CHECK-NEXT:   [[THIS_A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Zayin, #Zayin.a
   // CHECK-NEXT:   [[THIS_A0_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 0
@@ -339,7 +339,7 @@ class RefWithProp {
   var aleph_prop: Aleph { get {} set {} }
 }
 
-// CHECK-LABEL: sil hidden @_TF8lifetime23logical_lvalue_lifetimeFTCS_11RefWithPropSiVS_3Val_T_ : $@thin (@owned RefWithProp, Int, Val) -> () {
+// CHECK-LABEL: sil hidden @_TF8lifetime23logical_lvalue_lifetimeFTCS_11RefWithPropSiVS_3Val_T_ : $@convention(thin) (@owned RefWithProp, Int, Val) -> () {
 func logical_lvalue_lifetime(var r: RefWithProp, var i: Int, var v: Val) {
   // CHECK: [[RADDR:%[0-9]+]] = alloc_box $RefWithProp
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
@@ -349,7 +349,7 @@ func logical_lvalue_lifetime(var r: RefWithProp, var i: Int, var v: Val) {
   r.int_prop = i
   // CHECK: [[R1:%[0-9]+]] = load [[RADDR]]
   // CHECK: strong_retain [[R1]]
-  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : RefWithProp -> (Int) -> () , $@cc(method) @thin (Int, @guaranteed RefWithProp) -> ()
+  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : RefWithProp -> (Int) -> () , $@convention(method) (Int, @guaranteed RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
   // CHECK: strong_release [[R1]]
 
@@ -389,12 +389,12 @@ class Foo<T> {
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
     // initialization for y
-    // CHECK: [[INTCTOR:%[0-9]+]] = function_ref @_TFSiCfMSiFT_Si : $@thin (@thin Int.Type) -> Int
+    // CHECK: [[INTCTOR:%[0-9]+]] = function_ref @_TFSiCfMSiFT_Si : $@convention(thin) (@thin Int.Type) -> Int
     // CHECK: [[INTMETA:%[0-9]+]] = metatype $@thin Int.Type
     // CHECK: [[INTVAL:%[0-9]+]] = apply [[INTCTOR]]([[INTMETA]])
 
     x = bar()
-    // CHECK: function_ref @_TF8lifetime3barFT_Si : $@thin () -> Int
+    // CHECK: function_ref @_TF8lifetime3barFT_Si : $@convention(thin) () -> Int
     // CHECK: [[THIS_X:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.x
     // CHECK: assign {{.*}} to [[THIS_X]]
 
@@ -458,15 +458,15 @@ class Foo<T> {
   }
 
   // Deallocating destructor for Foo.
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooD : $@cc(method) @thin <T> (@owned Foo<T>) -> ()
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooD : $@convention(method) <T> (@owned Foo<T>) -> ()
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $Foo<T>):
-  // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_TFC8lifetime3Food : $@cc(method) @thin <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
-  // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[SELF]]) : $@cc(method) @thin <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_TFC8lifetime3Food : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = unchecked_ref_cast [[RESULT_SELF]] : $Builtin.NativeObject to $Foo<T>
   // CHECK-NEXT:   dealloc_ref [[SELF]] : $Foo<T>
   // CHECK-NEXT:   [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT:   return [[RESULT]] : $()
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3Food : $@cc(method) @thin <T> (@guaranteed Foo<T>) -> @owned Builtin.NativeObject
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3Food : $@convention(method) <T> (@guaranteed Foo<T>) -> @owned Builtin.NativeObject
 
   deinit {
     // CHECK: bb0([[THIS:%[0-9]+]] : $Foo<T>):
@@ -604,7 +604,7 @@ struct Bas<T> {
 
 class B { init(y:Int) {} }
 class D : B {
-  // CHECK-LABEL: sil hidden @_TFC8lifetime1Dc{{.*}} : $@cc(method) @thin (Int, Int, @owned D) -> @owned D
+  // CHECK-LABEL: sil hidden @_TFC8lifetime1Dc{{.*}} : $@convention(method) (Int, Int, @owned D) -> @owned D
   // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $D):
   init(var x:Int, var y:Int) {
     // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box $D

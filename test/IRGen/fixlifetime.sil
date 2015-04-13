@@ -22,7 +22,7 @@ struct Agg {
   var f : F
 }
 
-sil @test : $@thin (C, P, @callee_owned () -> (), Agg) -> () {
+sil @test : $@convention(thin) (C, P, @callee_owned () -> (), Agg) -> () {
 bb0(%0 : $C, %1 : $P, %2 : $@callee_owned () -> (), %3 : $Agg):
   fix_lifetime %0 : $C
   fix_lifetime %1 : $P

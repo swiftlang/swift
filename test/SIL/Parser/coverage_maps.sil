@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt %s -module-name=coverage_maps -verify | %target-sil-opt -verify -module-name=coverage_maps | FileCheck %s
 
-sil @someFunction : $@thin () -> () {
+sil @someFunction : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()

@@ -68,7 +68,7 @@ sil_vtable C {}
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[OBJ_PTR:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* %0 to [[REF]]*
 // CHECK-NEXT: ret [[REF]]* [[OBJ_PTR]]
-sil @_TFC5class1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject {
+sil @_TFC5class1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2
   return %1 : $Builtin.NativeObject              // id: %2
@@ -76,13 +76,13 @@ bb0(%0 : $C):
 
 // Deallocating destructor
 // CHECK: define void @_TFC5class1CD([[C_CLASS]]*)
-sil @_TFC5class1CD : $@cc(method) @thin (@owned C) -> () {
+sil @_TFC5class1CD : $@convention(method) (@owned C) -> () {
 bb0(%0 : $C):
   // CHECK-NEXT: entry
   // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = call [[REF]]* @_TFC5class1Cd([[C_CLASS]]* %0)
   // CHECK-NEXT: [[SELF_OBJ:%[a-zA-Z0-9]+]] = bitcast [[REF]]* [[SELF]] to [[C_CLASS]]*
-  %1 = function_ref @_TFC5class1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject // user: %2
-  %2 = apply %1(%0) : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject // user: %3
+  %1 = function_ref @_TFC5class1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %3
   %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $C // user: %4
   // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* [[SELF_OBJ]] to [[REF]]*
   // CHECK-NEXT: call void @swift_deallocClassInstance([[REF]]* [[SELF]], i64 16, i64 7)
@@ -114,13 +114,13 @@ class D {
   func multiply(#x : Builtin.Int8)(y : Builtin.Int16) -> Builtin.Int32
 }
 
-sil @_TFC5class1DD : $@cc(method) @thin (@owned D) -> () {
+sil @_TFC5class1DD : $@convention(method) (@owned D) -> () {
 bb0(%0 : $D):
   %1 = tuple ()
   return %1 : $()
 }
 
-sil hidden @_TFC5class1D8multiplyfS0_fT1xBi8__FT1yBi16__Bi32_ : $@cc(method) @thin (Builtin.Int16, Builtin.Int8, @guaranteed D) -> Builtin.Int32 {
+sil hidden @_TFC5class1D8multiplyfS0_fT1xBi8__FT1yBi16__Bi32_ : $@convention(method) (Builtin.Int16, Builtin.Int8, @guaranteed D) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int16, %1 : $Builtin.Int8, %2 : $D):
   %3 = integer_literal $Builtin.Int32, 0
   return %3 : $Builtin.Int32
@@ -131,7 +131,7 @@ sil_vtable D {
 }
 
 // CHECK-LABEL: define %C5class1C* @alloc_ref_dynamic(%swift.type*)
-sil @alloc_ref_dynamic : $@thin (@thick C.Type) -> @owned C {
+sil @alloc_ref_dynamic : $@convention(thin) (@thick C.Type) -> @owned C {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8*
   // CHECK:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[META_PTR]], i32 48
@@ -151,7 +151,7 @@ bb0(%0 : $@thick C.Type):
 // CHECK:         %1 = bitcast %C5class1C* %0 to %objc_object*
 // CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
 // CHECK:         ret %C5class1C* %0
-sil @autorelease : $@thin (@owned C) -> @autoreleased C {
+sil @autorelease : $@convention(thin) (@owned C) -> @autoreleased C {
 entry(%c : $C):
   autorelease_value %c : $C
   return %c : $C
@@ -161,7 +161,7 @@ entry(%c : $C):
 // CHECK:         %1 = inttoptr i64 %0 to %objc_object*
 // CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
 // CHECK:         ret i64 %0
-sil @autorelease_optional : $@thin (@owned C?) -> @autoreleased C? {
+sil @autorelease_optional : $@convention(thin) (@owned C?) -> @autoreleased C? {
 entry(%c : $C?):
   autorelease_value %c : $C?
   return %c : $C?
@@ -174,9 +174,9 @@ class RequiredBase: NonRequiredBase {
   required override init()
 }
 
-sil public_external @init_NonRequiredBase : $@thin @cc(method) (@owned NonRequiredBase) -> @owned NonRequiredBase
-sil public_external @alloc_RequiredBase : $@thin (@thick RequiredBase.Type) -> @owned RequiredBase
-sil public_external @init_RequiredBase : $@thin @cc(method) (@owned RequiredBase) -> @owned RequiredBase
+sil public_external @init_NonRequiredBase : $@convention(method) (@owned NonRequiredBase) -> @owned NonRequiredBase
+sil public_external @alloc_RequiredBase : $@convention(thin) (@thick RequiredBase.Type) -> @owned RequiredBase
+sil public_external @init_RequiredBase : $@convention(method) (@owned RequiredBase) -> @owned RequiredBase
 
 sil_vtable NonRequiredBase {
   #NonRequiredBase.init!initializer.1: init_NonRequiredBase
@@ -199,7 +199,7 @@ class ClassConstrainedGenericField<T: ClassConstraint> {
 }
 sil_vtable ClassConstrainedGenericField {}
 
-sil @fixed_class_generic_field : $@thin (@owned ClassConstrainedGenericField<ClassConstraintConformance>) -> @owned ClassConstraintConformance {
+sil @fixed_class_generic_field : $@convention(thin) (@owned ClassConstrainedGenericField<ClassConstraintConformance>) -> @owned ClassConstraintConformance {
 entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
   %a = ref_element_addr %x : $ClassConstrainedGenericField<ClassConstraintConformance>, #ClassConstrainedGenericField.field
   %b = load %a : $*ClassConstraintConformance

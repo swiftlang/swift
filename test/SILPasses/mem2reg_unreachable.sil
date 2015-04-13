@@ -7,7 +7,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil @_TF4main3fooFT1xSi1ySi_Si : $@thin (Int32, Int32) -> Int32 {
+sil @_TF4main3fooFT1xSi1ySi_Si : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
   debug_value %0 : $Int32  // let x               // id: %2
   debug_value %1 : $Int32  // let y               // id: %3

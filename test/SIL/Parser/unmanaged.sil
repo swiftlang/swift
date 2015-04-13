@@ -1,7 +1,7 @@
 // RUN: %target-sil-opt %s -verify
 
 import Swift
-sil @test : $@thin <U where U : AnyObject> (@inout Optional<U>) -> () {
+sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {
 bb0(%1 : $*Optional<U>):
   %17 = load %1 : $*Optional<U>
   %18 = ref_to_unmanaged %17 : $Optional<U> to $@sil_unmanaged Optional<U>

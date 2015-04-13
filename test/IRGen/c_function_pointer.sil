@@ -5,15 +5,15 @@
 import Swift
 
 // CHECK-LABEL: define void @c_function_pointer(void ()*)
-sil @c_function_pointer : $@thin @cc(cdecl) (CFunctionPointer<() -> ()>) -> () {
+sil @c_function_pointer : $@convention(c) (CFunctionPointer<() -> ()>) -> () {
 entry(%f : $CFunctionPointer<() -> ()>):
   return undef : $()
 }
 
 // CHECK-LABEL: define void @call_with_c_function_pointer(i8*)
-sil @call_with_c_function_pointer : $@thin (CFunctionPointer<() -> ()>) -> () {
+sil @call_with_c_function_pointer : $@convention(thin) (CFunctionPointer<() -> ()>) -> () {
 entry(%f : $CFunctionPointer<() -> ()>):
-  %c = function_ref @c_function_pointer : $@thin @cc(cdecl) (CFunctionPointer<() -> ()>) -> ()
-  %z = apply %c(%f) : $@thin @cc(cdecl) (CFunctionPointer<() -> ()>) -> ()
+  %c = function_ref @c_function_pointer : $@convention(c) (CFunctionPointer<() -> ()>) -> ()
+  %z = apply %c(%f) : $@convention(c) (CFunctionPointer<() -> ()>) -> ()
   return %z : $()
 }

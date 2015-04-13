@@ -18,12 +18,12 @@ sil_stage canonical
 import CoreCooling
 import Swift
 
-sil public_external @generic_function : $@thin <T where T : AnyObject> (@owned T) -> ()
+sil public_external @generic_function : $@convention(thin) <T where T : AnyObject> (@owned T) -> ()
 
-sil @call_generic : $@thin (@owned CCRefrigerator) -> () {
+sil @call_generic : $@convention(thin) (@owned CCRefrigerator) -> () {
 bb0(%0 : $CCRefrigerator):
-  %1 = function_ref @generic_function : $@thin <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
-  %2 = apply %1<CCRefrigeratorRef>(%0) : $@thin <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
+  %1 = function_ref @generic_function : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
+  %2 = apply %1<CCRefrigeratorRef>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> (@owned τ_0_0) -> ()
   %3 = tuple ()
   return %3 : $()
 }

@@ -6,7 +6,7 @@ import Foundation
 
 final class Foo {
   @objc func foo() {}
-  // CHECK-LABEL: sil hidden @_TToFC10objc_final3Foo3foofS0_FT_T_ : $@cc(objc_method) @thin (Foo) -> ()
+  // CHECK-LABEL: sil hidden @_TToFC10objc_final3Foo3foofS0_FT_T_ : $@convention(objc_method) (Foo) -> ()
 
   @objc var prop: Int = 0
   // CHECK-LABEL: sil hidden [transparent] @_TToFC10objc_final3Foog4propSi

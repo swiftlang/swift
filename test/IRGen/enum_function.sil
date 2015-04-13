@@ -6,14 +6,14 @@ sil_stage canonical
 
 import Swift
 
-sil hidden @test_helper : $@thin () -> () {
+sil hidden @test_helper : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
 }
 
 // CHECK:  define hidden void @test1(i128)
-sil hidden @test1 : $@thin (@owned Optional<() -> ()>) -> () {
+sil hidden @test1 : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 bb0(%0 : $Optional<() -> ()>):
   // CHECK: [[T0:%.*]] = trunc i128 [[FN:%0]] to i64
   // CHECK: [[T1:%.*]] = zext i64 [[T0]] to i128
@@ -54,8 +54,8 @@ bb1(%1 : $@callee_owned (@out (), @in ()) -> ()):
   br bb3
 
 bb2:
-  %4 = function_ref @test_helper : $@thin () -> ()
-  apply %4() : $@thin () -> ()
+  %4 = function_ref @test_helper : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
   // CHECK: call void @test_helper()
   // CHECK: br label [[CONT]]
   br bb3

@@ -16,7 +16,7 @@ import Swift
 //CHECK-NOT: builtin
 //CHECK-NOT: cond_fail
 //CHECK: return
-sil @simply_arith : $@thin (Int32, Int32) -> Int32 {
+sil @simply_arith : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
   debug_value %0 : $Int32  // let x                 // id: %2
   debug_value %1 : $Int32  // let y                 // id: %3

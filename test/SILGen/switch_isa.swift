@@ -36,7 +36,7 @@ func testSwitchEnumOnExistential(value: Any) {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF10switch_isa27testSwitchEnumOnExistentialFP_T_ : $@thin (@in protocol<>) -> ()
+// CHECK-LABEL: sil hidden @_TF10switch_isa27testSwitchEnumOnExistentialFP_T_ : $@convention(thin) (@in protocol<>) -> ()
 // CHECK:   checked_cast_addr_br copy_on_success protocol<> in {{%.*}} : $*protocol<> to Foo
 // CHECK:   checked_cast_addr_br copy_on_success protocol<> in {{%.*}} : $*protocol<> to Bar<Int>
 // CHECK:   checked_cast_addr_br copy_on_success protocol<> in {{%.*}} : $*protocol<> to Bar<Foo>

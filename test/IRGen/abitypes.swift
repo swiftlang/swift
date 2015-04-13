@@ -311,7 +311,7 @@ class Foo {
     // x86_64-macosx: call void @_TFC8abitypes3Foo13testArchetype{{.*}}(%objc_object* [[OBJCPTR]], %C8abitypes3Foo* %{{.*}})
   }
 
-  dynamic func foo(x: @objc_block (Int) -> Int) -> Int {
+  dynamic func foo(x: @convention(block) (Int) -> Int) -> Int {
     // FIXME: calling blocks is currently unimplemented
     // return x(5)
     return 1

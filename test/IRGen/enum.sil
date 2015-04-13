@@ -265,16 +265,16 @@ enum NoPayloads {
   case z
 }
 
-sil @a : $@thin () -> ()
-sil @b : $@thin () -> ()
-sil @c : $@thin () -> ()
-sil @d : $@thin () -> ()
-sil @e : $@thin () -> ()
-sil @f : $@thin () -> ()
+sil @a : $@convention(thin) () -> ()
+sil @b : $@convention(thin) () -> ()
+sil @c : $@convention(thin) () -> ()
+sil @d : $@convention(thin) () -> ()
+sil @e : $@convention(thin) () -> ()
+sil @f : $@convention(thin) () -> ()
 
 
 // CHECK: define void @no_payload_switch(i2) {
-sil @no_payload_switch : $@thin (NoPayloads) -> () {
+sil @no_payload_switch : $@convention(thin) (NoPayloads) -> () {
 // CHECK: entry:
 entry(%u : $NoPayloads):
 // CHECK:   switch i2 %0, label %[[DFLT:[0-9]+]] [
@@ -290,22 +290,22 @@ entry(%u : $NoPayloads):
 // CHECK:   call void @a()
 // CHECK:   br label %[[END:[0-9]+]]
 x_dest:
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
   br end
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   call void @b()
 // CHECK:   br label %[[END]]
 y_dest:
-  %b = function_ref @b : $@thin () -> ()
-  apply %b() : $@thin () -> ()
+  %b = function_ref @b : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
   br end
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   call void @c()
 // CHECK:   br label %[[END]]
 z_dest:
-  %c = function_ref @c : $@thin () -> ()
-  apply %c() : $@thin () -> ()
+  %c = function_ref @c : $@convention(thin) () -> ()
+  apply %c() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[END]]
@@ -316,7 +316,7 @@ end:
 }
 
 // CHECK: define void @no_payload_switch_indirect(%O4enum10NoPayloads*) {
-sil @no_payload_switch_indirect : $@thin (@inout NoPayloads) -> () {
+sil @no_payload_switch_indirect : $@convention(thin) (@inout NoPayloads) -> () {
 entry(%u : $*NoPayloads):
 // CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O4enum10NoPayloads, %O4enum10NoPayloads* %0, i32 0, i32 0
 // CHECK:   [[TAG:%.*]] = load i2, i2* [[TAG_ADDR]]
@@ -388,7 +388,7 @@ enum NoPayloads2 {
 }
 
 // CHECK: define void @no_payload_switch_2(i3) {
-sil @no_payload_switch_2 : $@thin (NoPayloads2) -> () {
+sil @no_payload_switch_2 : $@convention(thin) (NoPayloads2) -> () {
 // CHECK: entry:
 entry(%u : $NoPayloads2):
 // CHECK:   switch i3 %0, label %[[DEFAULT_DEST:[0-9]+]] [
@@ -399,16 +399,16 @@ entry(%u : $NoPayloads2):
 // CHECK: ; <label>:[[U_DEST]]
 u_dest:
 // CHECK:   call void @a()
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
 // CHECK:   br label %[[END:[0-9]+]]
   br end
 
 // CHECK: ; <label>:[[DEFAULT_DEST]]
 default_dest:
 // CHECK:   call void @b()
-  %b = function_ref @b : $@thin () -> ()
-  apply %b() : $@thin () -> ()
+  %b = function_ref @b : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
 // CHECK:   br label %[[END]]
   br end
 
@@ -435,7 +435,7 @@ enum SinglePayloadNoXI2 {
 }
 
 // CHECK: define void @single_payload_no_xi_switch(i64, i1) {
-sil @single_payload_no_xi_switch : $@thin (SinglePayloadNoXI2) -> () {
+sil @single_payload_no_xi_switch : $@convention(thin) (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
 // CHECK:   switch i1 %1, label %[[DFLT:[0-9]+]] [
@@ -459,48 +459,48 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:   call void @a()
 // CHECK:   br label %[[END:[0-9]+]]
 x_dest:
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   call void @b()
 // CHECK:   br label %[[END]]
 y_dest:
-  %b = function_ref @b : $@thin () -> ()
-  apply %b() : $@thin () -> ()
+  %b = function_ref @b : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   call void @c()
 // CHECK:   br label %[[END]]
 z_dest:
-  %c = function_ref @c : $@thin () -> ()
-  apply %c() : $@thin () -> ()
+  %c = function_ref @c : $@convention(thin) () -> ()
+  apply %c() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[W_DEST]]
 // CHECK:   call void @a()
 // CHECK:   br label %[[END:[0-9]+]]
 w_dest:
-  %d = function_ref @a : $@thin () -> ()
-  apply %d() : $@thin () -> ()
+  %d = function_ref @a : $@convention(thin) () -> ()
+  apply %d() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[V_DEST]]
 // CHECK:   call void @b()
 // CHECK:   br label %[[END]]
 v_dest:
-  %e = function_ref @b : $@thin () -> ()
-  apply %e() : $@thin () -> ()
+  %e = function_ref @b : $@convention(thin) () -> ()
+  apply %e() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[U_DEST]]
 // CHECK:   call void @c()
 // CHECK:   br label %[[END]]
 u_dest:
-  %f = function_ref @c : $@thin () -> ()
-  apply %f() : $@thin () -> ()
+  %f = function_ref @c : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[END]]
@@ -511,7 +511,7 @@ end:
 }
 
 // CHECK: define void @single_payload_no_xi_switch_arg(i64, i1) {
-sil @single_payload_no_xi_switch_arg : $@thin (SinglePayloadNoXI2) -> () {
+sil @single_payload_no_xi_switch_arg : $@convention(thin) (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
 // CHECK:   switch i1 %1, label %[[DFLT:[0-9]+]] [
@@ -539,24 +539,24 @@ entry(%u : $SinglePayloadNoXI2):
 x_dest(%u2 : $Builtin.Int64):
 // CHECK:   call void @a()
 // CHECK:   br label %[[END]]
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 y_dest:
 // CHECK:   call void @b()
 // CHECK:   br label %[[END]]
-  %b = function_ref @b : $@thin () -> ()
-  apply %b() : $@thin () -> ()
+  %b = function_ref @b : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 z_dest:
 // CHECK:   call void @c()
 // CHECK:   br label %[[END]]
-  %c = function_ref @c : $@thin () -> ()
-  apply %c() : $@thin () -> ()
+  %c = function_ref @c : $@convention(thin) () -> ()
+  apply %c() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[END]]
@@ -642,7 +642,7 @@ enum AggregateSinglePayload {
 }
 
 // CHECK-LABEL: define void @aggregate_single_payload_unpack(i128, i1) {
-sil @aggregate_single_payload_unpack : $@thin (AggregateSinglePayload) -> () {
+sil @aggregate_single_payload_unpack : $@convention(thin) (AggregateSinglePayload) -> () {
 entry(%u : $AggregateSinglePayload):
   switch_enum %u : $AggregateSinglePayload, case #AggregateSinglePayload.x!enumelt.1: x_dest, default end
 
@@ -664,7 +664,7 @@ end:
 // CHECK:  %5 = insertvalue { i64, i64 } undef, i64 %2, 0
 // CHECK:  %6 = insertvalue { i64, i64 } %5, i64 %4, 1
 // CHECK:  ret { i64, i64 } %6
-sil @aggregate_single_payload_unsafe_unpack : $@thin (AggregateSinglePayload) -> (Builtin.Int64, Builtin.Int64) {
+sil @aggregate_single_payload_unsafe_unpack : $@convention(thin) (AggregateSinglePayload) -> (Builtin.Int64, Builtin.Int64) {
 entry(%u : $AggregateSinglePayload):
   %x = unchecked_enum_data %u : $AggregateSinglePayload, #AggregateSinglePayload.x!enumelt.1
   return %x : $(Builtin.Int64, Builtin.Int64)
@@ -698,7 +698,7 @@ enum AggregateSinglePayload2 {
 }
 
 // CHECK: define void @aggregate_single_payload_unpack_2(i256) {
-sil @aggregate_single_payload_unpack_2 : $@thin (AggregateSinglePayload2) -> () {
+sil @aggregate_single_payload_unpack_2 : $@convention(thin) (AggregateSinglePayload2) -> () {
 entry(%u : $AggregateSinglePayload2):
   switch_enum %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!enumelt.1: x_dest, default end
 
@@ -745,7 +745,7 @@ enum AggregateSinglePayload3 {
 }
 
 // CHECK-LABEL: define void @aggregate_single_payload_unpack_3(i128) {
-sil @aggregate_single_payload_unpack_3 : $@thin (AggregateSinglePayload3) -> () {
+sil @aggregate_single_payload_unpack_3 : $@convention(thin) (AggregateSinglePayload3) -> () {
 entry(%u : $AggregateSinglePayload3):
   switch_enum %u : $AggregateSinglePayload3, case #AggregateSinglePayload3.x!enumelt.1: x_dest, default end
 
@@ -793,7 +793,7 @@ enum SinglePayloadSpareBit {
 }
 
 // CHECK: define void @single_payload_spare_bit_switch(i64) {
-sil @single_payload_spare_bit_switch : $@thin (SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_switch : $@convention(thin) (SinglePayloadSpareBit) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadSpareBit):
 // CHECK:  switch i64 %0, label %[[X_DEST:[0-9]+]] [
@@ -807,24 +807,24 @@ entry(%u : $SinglePayloadSpareBit):
 // CHECK: ; <label>:[[X_DEST]]
 x_dest:
 // CHECK:   call void @a()
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
 // CHECK:   br label %[[END:[0-9]+]]
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 y_dest:
 // CHECK:   call void @b()
-  %b = function_ref @b : $@thin () -> ()
-  apply %b() : $@thin () -> ()
+  %b = function_ref @b : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
 // CHECK:   br label %[[END]]
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 z_dest:
 // CHECK:   call void @c()
-  %c = function_ref @c : $@thin () -> ()
-  apply %c() : $@thin () -> ()
+  %c = function_ref @c : $@convention(thin) () -> ()
+  apply %c() : $@convention(thin) () -> ()
 // CHECK:   br label %[[END]]
   br end
 
@@ -836,7 +836,7 @@ end:
 }
 
 // CHECK: define void @single_payload_spare_bit_switch_arg(i64) {
-sil @single_payload_spare_bit_switch_arg : $@thin (SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_switch_arg : $@convention(thin) (SinglePayloadSpareBit) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadSpareBit):
 // CHECK:  switch i64 %0, label %[[X_PREDEST:[0-9]+]] [
@@ -854,24 +854,24 @@ entry(%u : $SinglePayloadSpareBit):
 // CHECK:   {{%.*}} = phi i63 [ [[TRUNC_PAYLOAD]], %[[X_PREDEST]] ]
 x_dest(%u2 : $Builtin.Int63):
 // CHECK:   call void @a()
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
 // CHECK:   br label %[[END:[0-9]+]]
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 y_dest:
 // CHECK:   call void @b()
-  %b = function_ref @b : $@thin () -> ()
-  apply %b() : $@thin () -> ()
+  %b = function_ref @b : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
 // CHECK:   br label %[[END]]
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 z_dest:
 // CHECK:   call void @c()
-  %c = function_ref @c : $@thin () -> ()
-  apply %c() : $@thin () -> ()
+  %c = function_ref @c : $@convention(thin) () -> ()
+  apply %c() : $@convention(thin) () -> ()
 // CHECK:   br label %[[END]]
   br end
 
@@ -882,7 +882,7 @@ end:
   return %x : $()
 }
 
-sil @single_payload_spare_bit_switch_indirect : $@thin (@inout SinglePayloadSpareBit) -> () {
+sil @single_payload_spare_bit_switch_indirect : $@convention(thin) (@inout SinglePayloadSpareBit) -> () {
 entry(%u : $*SinglePayloadSpareBit):
 // CHECK:  [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i64*
 // CHECK:  [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
@@ -893,8 +893,8 @@ entry(%u : $*SinglePayloadSpareBit):
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i63*
 x_dest:
   %u2 = unchecked_take_enum_data_addr %u : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
   br end
 
 y_dest:
@@ -1037,11 +1037,11 @@ end:
 class C {}
 sil_vtable C {}
 
-sil @_TFC4enum1CD : $@cc(method) @thin (C) -> ()
+sil @_TFC4enum1CD : $@convention(method) (C) -> ()
 
 @objc class OC {}
 sil_vtable OC {}
-sil hidden @_TToFC4enum2OCcfMS0_FT_S0_ : $@thin (OC) -> OC {
+sil hidden @_TToFC4enum2OCcfMS0_FT_S0_ : $@convention(thin) (OC) -> OC {
 entry(%x : $OC):
   return %x : $OC
 }
@@ -1319,7 +1319,7 @@ sil @dynamic_single_payload_empty_payload_inject_no_payload : $() -> DynamicSing
 // CHECK: <label>
 // CHECK:   call void %destroy
 // CHECK: <label>
-sil @dynamic_single_payload_generic_destroy : $@thin <T> (@in DynamicSinglePayload<T>) -> () {
+sil @dynamic_single_payload_generic_destroy : $@convention(thin) <T> (@in DynamicSinglePayload<T>) -> () {
 entry(%x : $*DynamicSinglePayload<T>):
   destroy_addr %x : $*DynamicSinglePayload<T>
   %z = tuple ()
@@ -1366,40 +1366,40 @@ entry(%u : $MultiPayloadNoSpareBits):
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   phi i64 [ %0, %[[X_PREDEST]] ]
 x_dest(%x : $Builtin.Int64):
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   phi i32 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
 y_dest(%y : $Builtin.Int32):
-  %b = function_ref @b : $@thin () -> ()
-  apply %b() : $@thin () -> ()
+  %b = function_ref @b : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   phi i63 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
 z_dest(%z : $Builtin.Int63):
-  %c = function_ref @c : $@thin () -> ()
-  apply %c() : $@thin () -> ()
+  %c = function_ref @c : $@convention(thin) () -> ()
+  apply %c() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[A_DEST]]
 a_dest:
-  %d = function_ref @d : $@thin () -> ()
-  apply %d() : $@thin () -> ()
+  %d = function_ref @d : $@convention(thin) () -> ()
+  apply %d() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[B_DEST]]
 b_dest:
-  %e = function_ref @e : $@thin () -> ()
-  apply %e() : $@thin () -> ()
+  %e = function_ref @e : $@convention(thin) () -> ()
+  apply %e() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[C_DEST]]
 c_dest:
-  %f = function_ref @f : $@thin () -> ()
-  apply %f() : $@thin () -> ()
+  %f = function_ref @f : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
   br end
 
 end:
@@ -1610,40 +1610,40 @@ entry(%u : $MultiPayloadOneSpareBit):
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
 x_dest(%x : $Builtin.Int62):
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   phi i63 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
 y_dest(%y : $Builtin.Int63):
-  %b = function_ref @b : $@thin () -> ()
-  apply %b() : $@thin () -> ()
+  %b = function_ref @b : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
 z_dest(%z : $Builtin.Int61):
-  %c = function_ref @c : $@thin () -> ()
-  apply %c() : $@thin () -> ()
+  %c = function_ref @c : $@convention(thin) () -> ()
+  apply %c() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[A_DEST]]
 a_dest:
-  %d = function_ref @d : $@thin () -> ()
-  apply %d() : $@thin () -> ()
+  %d = function_ref @d : $@convention(thin) () -> ()
+  apply %d() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[B_DEST]]
 b_dest:
-  %e = function_ref @e : $@thin () -> ()
-  apply %e() : $@thin () -> ()
+  %e = function_ref @e : $@convention(thin) () -> ()
+  apply %e() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[C_DEST]]
 c_dest:
-  %f = function_ref @f : $@thin () -> ()
-  apply %f() : $@thin () -> ()
+  %f = function_ref @f : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
   br end
 
 end:
@@ -1897,40 +1897,40 @@ entry(%u : $MultiPayloadTwoSpareBits):
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
 x_dest(%x : $Builtin.Int62):
-  %a = function_ref @a : $@thin () -> ()
-  apply %a() : $@thin () -> ()
+  %a = function_ref @a : $@convention(thin) () -> ()
+  apply %a() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Y_DEST]]
 // CHECK:   phi i60 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
 y_dest(%y : $Builtin.Int60):
-  %b = function_ref @b : $@thin () -> ()
-  apply %b() : $@thin () -> ()
+  %b = function_ref @b : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[Z_DEST]]
 // CHECK:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
 z_dest(%z : $Builtin.Int61):
-  %c = function_ref @c : $@thin () -> ()
-  apply %c() : $@thin () -> ()
+  %c = function_ref @c : $@convention(thin) () -> ()
+  apply %c() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[A_DEST]]
 a_dest:
-  %d = function_ref @d : $@thin () -> ()
-  apply %d() : $@thin () -> ()
+  %d = function_ref @d : $@convention(thin) () -> ()
+  apply %d() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[B_DEST]]
 b_dest:
-  %e = function_ref @e : $@thin () -> ()
-  apply %e() : $@thin () -> ()
+  %e = function_ref @e : $@convention(thin) () -> ()
+  apply %e() : $@convention(thin) () -> ()
   br end
 
 // CHECK: ; <label>:[[C_DEST]]
 c_dest:
-  %f = function_ref @f : $@thin () -> ()
-  apply %f() : $@thin () -> ()
+  %f = function_ref @f : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
   br end
 
 end:
@@ -2067,7 +2067,7 @@ entry:
 class D {}
 sil_vtable D {}
 
-sil @_TFC4enum1DD : $@cc(method) @thin (D) -> ()
+sil @_TFC4enum1DD : $@convention(method) (D) -> ()
 
 enum MultiPayloadClasses {
   case x(C)
@@ -2397,7 +2397,7 @@ struct ContainsUnownedObjC {
 // CHECK-LABEL: define {{.*}} @optional_unowned() {
 // CHECK-64:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
 // CHECK-32:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
-sil @optional_unowned : $@thin () -> (Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>) {
+sil @optional_unowned : $@convention(thin) () -> (Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>) {
 entry:
   %a = enum $Optionable<ContainsUnowned>, #Optionable.None!enumelt
   %b = enum $Optionable<Optionable<ContainsUnowned>>, #Optionable.None!enumelt
@@ -2407,7 +2407,7 @@ entry:
 // CHECK-LABEL: define {{.*}} @optional_unowned_objc() {
 // CHECK-64:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
 // CHECK-32:      ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
-sil @optional_unowned_objc : $@thin () -> (Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>) {
+sil @optional_unowned_objc : $@convention(thin) () -> (Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>) {
 entry:
   %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.None!enumelt
   %b = enum $Optionable<Optionable<ContainsUnownedObjC>>, #Optionable.None!enumelt

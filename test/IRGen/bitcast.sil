@@ -26,7 +26,7 @@ sil_vtable C {}
 // CHECK-x86_64:         [[VALUE:%.*]] = load i64, i64* [[VALUE_BUF]], align 8
 // CHECK-x86_64:         ret i64 [[VALUE]]
 // CHECK-x86_64:       }
-sil @bitcast_trivial: $@thin (C) -> Int {
+sil @bitcast_trivial: $@convention(thin) (C) -> Int {
 entry(%c : $C):
   %i = unchecked_trivial_bit_cast %c : $C to $Int
   return %i : $Int
@@ -49,7 +49,7 @@ entry(%c : $C):
 // CHECK-x86_64:         [[VALUE:%.*]] = load i64, i64* [[VALUE_BUF]], align 8
 // CHECK-x86_64:         ret i64 [[VALUE]]
 // CHECK-x86_64:       }
-sil @bitcast_ref: $@thin (C) -> Optional<C> {
+sil @bitcast_ref: $@convention(thin) (C) -> Optional<C> {
 entry(%c : $C):
   %o = unchecked_ref_bit_cast %c : $C to $Optional<C>
   return %o : $Optional<C>

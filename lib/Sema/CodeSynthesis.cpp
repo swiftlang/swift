@@ -389,7 +389,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   auto optCallbackType = TC.getOptionalType(loc, callbackType);
   if (!optCallbackType) optCallbackType = callbackType;
 
-  // The accessor returns (Builtin.RawPointer, (@thin (...) -> ())?),
+  // The accessor returns (Builtin.RawPointer, (@convention(thin) (...) -> ())?),
   // where the first pointer is the materialized address and the
   // second is an optional callback.
   TupleTypeElt retElts[] = {
