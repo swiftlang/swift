@@ -28,6 +28,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -1277,7 +1278,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
-    TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn,
+    TAK_objc_block, TAK_cc, TAK_convention, TAK_thin, TAK_noreturn,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape
   };
 
@@ -1303,10 +1304,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     for (auto silOnlyAttr : {TAK_thin, TAK_thick}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
-    // TODO: Pick a real syntax for C function pointers.
-    // For now admit @cc(cdecl) as a syntax for C function pointers.
-    if (!Context.LangOpts.EnableCFunctionPointers)
-      checkUnsupportedAttr(TAK_cc);
+    checkUnsupportedAttr(TAK_cc);
   }
   
   bool hasFunctionAttr = false;
@@ -1347,52 +1345,127 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // TODO: Coalesce the representation attributes into a single 'convention'
       // attribute.
       SILFunctionType::Representation rep;
-      if (thin)
-        rep = SILFunctionType::Representation::Thin;
-      else if (block)
-        rep = SILFunctionType::Representation::Block;
-      else
-        rep = SILFunctionType::Representation::Thick;
-      
-      if (attrs.hasCC()) {
-        if (attrs.getAbstractCC() == "cdecl") {
-          if (rep == SILFunctionType::Representation::Thin)
-            rep = SILFunctionType::Representation::CFunctionPointer;
-          else if (rep == SILFunctionType::Representation::Block)
-            /* OK */;
-          else
+
+      if (attrs.hasConvention()) {
+        // SIL exposes a greater number of conventions than Swift source.
+        auto parsedRep =
+          llvm::StringSwitch<Optional<SILFunctionType::Representation>>
+            (attrs.getConvention())
+            .Case("thick", SILFunctionType::Representation::Thick)
+            .Case("block", SILFunctionType::Representation::Block)
+            .Case("thin", SILFunctionType::Representation::Thin)
+            .Case("c", SILFunctionType::Representation::CFunctionPointer)
+            .Case("method", SILFunctionType::Representation::Method)
+            .Case("objc_method", SILFunctionType::Representation::ObjCMethod)
+            .Case("witness_method", SILFunctionType::Representation::WitnessMethod)
+            .Default(None);
+        if (!parsedRep) {
+          TC.diagnose(attrs.getLoc(TAK_convention),
+                      diag::unsupported_sil_convention, attrs.getConvention());
+          rep = SILFunctionType::Representation::Thin;
+        } else {
+          rep = *parsedRep;
+        }
+        
+        // Don't allow both @convention and the old representation attrs.
+        if (attrs.has(TAK_thin)) {
+          TC.diagnose(attrs.getLoc(TAK_thin),
+                      diag::convention_with_deprecated_representation_attribute,
+                      "thin");
+        }
+        if (attrs.has(TAK_objc_block)) {
+          TC.diagnose(attrs.getLoc(TAK_objc_block),
+                      diag::convention_with_deprecated_representation_attribute,
+                      "objc_block");
+        }
+        if (attrs.has(TAK_cc)) {
+          TC.diagnose(attrs.getLoc(TAK_cc),
+                      diag::convention_with_deprecated_representation_attribute,
+                      "cc");
+        }
+      } else {
+        // Handle the old attributes.
+        // TODO: Warning and fixit to migrate.
+        if (thin)
+          rep = SILFunctionType::Representation::Thin;
+        else if (block)
+          rep = SILFunctionType::Representation::Block;
+        else
+          rep = SILFunctionType::Representation::Thick;
+
+        if (attrs.hasDeprecatedCC()) {
+          if (attrs.getDeprecatedCC() == "cdecl") {
+            if (rep == SILFunctionType::Representation::Thin)
+              rep = SILFunctionType::Representation::CFunctionPointer;
+            else if (rep == SILFunctionType::Representation::Block)
+              /* OK */;
+            else
+              TC.diagnose(attrs.getLoc(TAK_cc),
+                          diag::unsupported_cc_representation_combo);
+          } else if (attrs.getDeprecatedCC() == "method"
+                     && rep == SILFunctionType::Representation::Thin) {
+            rep = SILFunctionType::Representation::Method;
+          } else if (attrs.getDeprecatedCC() == "objc_method"
+                    && rep == SILFunctionType::Representation::Thin) {
+            rep = SILFunctionType::Representation::ObjCMethod;
+          } else if (attrs.getDeprecatedCC() == "witness_method"
+                    && rep == SILFunctionType::Representation::Thin) {
+            rep = SILFunctionType::Representation::WitnessMethod;
+          } else {
             TC.diagnose(attrs.getLoc(TAK_cc),
                         diag::unsupported_cc_representation_combo);
-        } else if (attrs.getAbstractCC() == "method"
-                   && rep == SILFunctionType::Representation::Thin) {
-          rep = SILFunctionType::Representation::Method;
-        } else if (attrs.getAbstractCC() == "objc_method"
-                  && rep == SILFunctionType::Representation::Thin) {
-          rep = SILFunctionType::Representation::ObjCMethod;
-        } else if (attrs.getAbstractCC() == "witness_method"
-                  && rep == SILFunctionType::Representation::Thin) {
-          rep = SILFunctionType::Representation::WitnessMethod;
-        } else {
-          TC.diagnose(attrs.getLoc(TAK_cc),
-                      diag::unsupported_cc_representation_combo);
+          }
         }
       }
       
       // Resolve the function type directly with these attributes.
       SILFunctionType::ExtInfo extInfo(rep,
                                        attrs.has(TAK_noreturn));
-          
+      
       ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     } else {
+      if (attrs.hasDeprecatedCC())
+        TC.diagnose(attrs.getLoc(TAK_cc), diag::attribute_not_supported);
+
       FunctionType::Representation rep;
-      if (thin)
-        rep = FunctionType::Representation::Thin;
-      else if (block)
-        rep = FunctionType::Representation::Block;
-      else if (attrs.hasCC() && attrs.getAbstractCC() == "cdecl")
-        rep = FunctionType::Representation::CFunctionPointer;
-      else
-        rep = FunctionType::Representation::Swift;
+      if (attrs.hasConvention()) {
+        auto parsedRep =
+          llvm::StringSwitch<Optional<FunctionType::Representation>>
+            (attrs.getConvention())
+            .Case("swift", FunctionType::Representation::Swift)
+            .Case("block", FunctionType::Representation::Block)
+            .Case("thin", FunctionType::Representation::Thin)
+            .Case("c", FunctionType::Representation::CFunctionPointer)
+            .Default(None);
+        if (!parsedRep) {
+          TC.diagnose(attrs.getLoc(TAK_convention),
+                      diag::unsupported_convention, attrs.getConvention());
+          rep = FunctionType::Representation::Swift;
+        } else {
+          rep = *parsedRep;
+        }
+        
+        // Don't allow both @convention and the old representation attrs.
+        if (attrs.has(TAK_thin)) {
+          TC.diagnose(attrs.getLoc(TAK_thin),
+                      diag::convention_with_deprecated_representation_attribute,
+                      "thin");
+        }
+        if (attrs.has(TAK_objc_block)) {
+          TC.diagnose(attrs.getLoc(TAK_objc_block),
+                      diag::convention_with_deprecated_representation_attribute,
+                      "objc_block");
+        }
+      } else {
+        // Handle the old attributes.
+        // TODO: Warning and fixit to migrate.
+        if (thin)
+          rep = FunctionType::Representation::Thin;
+        else if (block)
+          rep = FunctionType::Representation::Block;
+        else
+          rep = FunctionType::Representation::Swift;
+      }
       
       // Resolve the function type directly with these attributes.
       FunctionType::ExtInfo extInfo(rep,
@@ -1406,8 +1479,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     for (auto i : FunctionAttrs)
       attrs.clearAttribute(i);
-    attrs.cc = None;
-
+    attrs.deprecatedCC = None;
+    attrs.convention = None;
   } else if (hasFunctionAttr) {
     for (auto i : FunctionAttrs) {
       if (attrs.has(i)) {

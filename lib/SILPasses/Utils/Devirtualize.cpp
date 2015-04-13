@@ -536,7 +536,7 @@ SILInstruction *swift::tryDevirtualizeApply(ApplyInst *AI) {
   ///
   /// \code
   /// %XX = alloc_ref $Foo
-  /// %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
+  /// %YY = class_method %XX : $Foo, #Foo.get!1 : $@convention(method)...
   /// \endcode
   ///
   ///  or

@@ -39,7 +39,7 @@ import Foundation
   // CHECK:       bb0([[F:%.*]] : $@cc(cdecl) @thin (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : $Foo):
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si
   // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[SELF]])
-  dynamic func cFunctionPointer(fp: @cc(cdecl) Int -> Int, x: Int) -> Int {
+  dynamic func cFunctionPointer(fp: @convention(c) Int -> Int, x: Int) -> Int {
     fp(x)
   }
 
@@ -62,10 +62,10 @@ import Foundation
   }
 
   // CHECK-LABEL: sil hidden @_TFC20objc_blocks_bridging3Foo19optCFunctionPointerfS0_FTGSqcSSSS_1xSS_GSqSS_
-  // CHECK:         [[OPT_BUF:%.*]] = alloc_stack $Optional<@cc(cdecl) String -> String>
+  // CHECK:         [[OPT_BUF:%.*]] = alloc_stack $Optional<@convention(c) String -> String>
   // CHECK:         [[FP_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]
   // CHECK:         load [[FP_BUF]] : $*@cc(cdecl) @thin (NSString) -> @autoreleased NSString
-  dynamic func optCFunctionPointer(fp: (@cc(cdecl) String -> String)?, x: String) -> String? {
+  dynamic func optCFunctionPointer(fp: (@convention(c) String -> String)?, x: String) -> String? {
     return fp?(x)
   }
 }

@@ -1034,6 +1034,14 @@ ERROR(cc_attribute_expected_name,attribute_parsing,none,
 ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
       "expected ')' after calling convention name for 'cc' attribute", ())
 
+// convention
+ERROR(convention_attribute_expected_lparen,attribute_parsing,none,
+      "expected '(' after 'convention' attribute", ())
+ERROR(convention_attribute_expected_name,attribute_parsing,none,
+      "expected convention name identifier in 'convention' attribute", ())
+ERROR(convention_attribute_expected_rparen,attribute_parsing,none,
+      "expected ')' after convention name for 'convention' attribute", ())
+
 // objc
 ERROR(attr_objc_missing_colon,attribute_parsing,none,
       "missing ':' after selector piece in @objc attribute", ())

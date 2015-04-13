@@ -1307,6 +1307,30 @@ bb3:
   return %4 : $()
 }
 
+sil @thin_convention : $@convention(thin) () -> ()
+sil @c_convention : $@convention(c) () -> ()
+sil @method_convention : $@convention(method) (Int) -> ()
+sil @objc_method_convention : $@convention(objc_method) (Int) -> ()
+sil @witness_method_convention : $@convention(witness_method) (Int) -> ()
+
+// CHECK-LABEL: sil @conventions : $@thin (() -> (), @thin () -> (), @cc(cdecl) @thin () -> (), @cc(cdecl) @objc_block () -> (), @cc(method) @thin () -> (), @cc(objc_method) @thin () -> (), @cc(witness_method) @thin () -> ()) -> () {
+sil @conventions : $@convention(thin) (@convention(thick) () -> (),
+                                       @convention(thin) () -> (),
+                                       @convention(c) () -> (),
+                                       @convention(block) () -> (),
+                                       @convention(method) () -> (),
+                                       @convention(objc_method) () -> (),
+                                       @convention(witness_method) () -> ()) -> () {
+entry(%0 : $@convention(thick) () -> (),
+      %1 : $@convention(thin) () -> (),
+      %2 : $@convention(c) () -> (),
+      %3 : $@convention(block) () -> (),
+      %4 : $@convention(method) () -> (),
+      %5 : $@convention(objc_method) () -> (),
+      %6 : $@convention(witness_method) () -> ()):
+  return undef : $()
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
 // CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_

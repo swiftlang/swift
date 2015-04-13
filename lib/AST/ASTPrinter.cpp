@@ -2405,8 +2405,7 @@ public:
         Printer << "@objc_block ";
         break;
       case SILFunctionType::Representation::CFunctionPointer:
-        //Printer << "@convention(c) ";
-        Printer << "@cc(cdecl) ";
+        Printer << "@convention(c) ";
         break;
       case SILFunctionType::Representation::Method:
         //Printer << "@convention(method) ";

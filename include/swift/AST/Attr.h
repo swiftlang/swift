@@ -204,8 +204,8 @@ public:
   /// AtLoc - This is the location of the first '@' in the attribute specifier.
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
-  // TODO: Replace "cc" attribute with proper convention attribute.
-  Optional<StringRef> cc = None;
+  Optional<StringRef> deprecatedCC = None;
+  Optional<StringRef> convention = None;
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
@@ -249,8 +249,11 @@ public:
     return true;
   }
   
-  bool hasCC() const { return cc.hasValue(); }
-  StringRef getAbstractCC() const { return *cc; }
+  bool hasDeprecatedCC() const { return deprecatedCC.hasValue(); }
+  StringRef getDeprecatedCC() const { return *deprecatedCC; }
+
+  bool hasConvention() const { return convention.hasValue(); }
+  StringRef getConvention() const { return *convention; }
   
   bool hasOwnership() const { return getOwnership() != Ownership::Strong; }
   Ownership getOwnership() const {

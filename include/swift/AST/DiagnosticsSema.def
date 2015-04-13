@@ -1771,6 +1771,12 @@ ERROR(objc_block_cannot_be_thin,attribute_parsing,none,
       "@objc_block function type cannot be @thin", ())
 ERROR(attribute_not_supported,attribute_parsing,none,
       "this attribute is not supported", ())
+ERROR(convention_with_deprecated_representation_attribute,attribute_parsing,none,
+      "@convention attribute cannot be used with deprecated @%0 attribute",
+      (StringRef))
+ERROR(unsupported_convention,type_parsing,none,
+      "convention '%0' not supported", (StringRef))
+
 
 // SIL
 ERROR(sil_local_storage_nested, decl_parsing,none,
@@ -1790,6 +1796,8 @@ ERROR(sil_function_multiple_error_results,type_parsing,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_cc_representation_combo,type_parsing,none,
       "cc unsupported with this sil representation", ())
+ERROR(unsupported_sil_convention,type_parsing,none,
+      "convention '%0' not supported in SIL", (StringRef))
 
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,type_parsing,none,

@@ -31,7 +31,7 @@
 #endif
 
 // Type attributes
-//TYPE_ATTR(convention)
+TYPE_ATTR(convention)
 TYPE_ATTR(noreturn)
 
 // SIL-specific attributes
