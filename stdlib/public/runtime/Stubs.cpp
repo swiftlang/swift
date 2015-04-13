@@ -363,6 +363,14 @@ extern "C" const char *_swift_stdlib_strtof_clocale(
     nptr, outResult, HUGE_VALF, strtof_l);
 }
 
+extern "C" void _swift_stdlib_flockfile_stdout() {
+  flockfile(stdout);
+}
+
+extern "C" void _swift_stdlib_funlockfile_stdout() {
+  funlockfile(stdout);
+}
+
 extern "C" int _swift_stdlib_putc_stderr(int C) {
   return putc(C, stderr);
 }

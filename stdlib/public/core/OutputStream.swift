@@ -16,8 +16,17 @@ import SwiftShims // for putchar
 // Input/Output interfaces
 //===----------------------------------------------------------------------===//
 
+public protocol _OutputStreamDefaultsType {}
+extension _OutputStreamDefaultsType {
+  final public mutating func _lock() {}
+  final public mutating func _unlock() {}
+}
+
 /// A target of text streaming operations.
-public protocol OutputStreamType {
+public protocol OutputStreamType : _OutputStreamDefaultsType {
+  mutating func _lock()
+  mutating func _unlock()
+
   /// Append the given `string` to this stream.
   mutating func write(string: String)
 }
@@ -89,37 +98,26 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
   // Checking the mirror kind is not a good way to implement this, but we don't
   // have a more expressive reflection API now.
   if mirror is _TupleMirror {
-    print("(", &target)
+    target.write("(")
     var first = true
     for i in 0..<mirror.count {
       if first {
         first = false
       } else {
-        print(", ", &target)
+        target.write(", ")
       }
       var (label, elementMirror) = mirror[i]
       var elt = elementMirror.value
-      // FIXME: uncomment for a compiler crash:
-      //_adHocPrint(elt, &target)
-      // workaround:
       print(elt, &target)
     }
-    print(")", &target)
+    target.write(")")
     return
   }
   print(mirror.summary, &target)
 }
 
-/// Writes the textual representation of `value` into the stream `target`.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference: `Streamable`,
-/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
 @inline(never)
-public func print<T, TargetStream : OutputStreamType>(
+public func _print_unlocked<T, TargetStream : OutputStreamType>(
     value: T, inout target: TargetStream
 ) {
   if let streamableObject? = value as? Streamable {
@@ -140,6 +138,23 @@ public func print<T, TargetStream : OutputStreamType>(
   _adHocPrint(value, &target)
 }
 
+/// Writes the textual representation of `value` into the stream `target`.
+///
+/// The textual representation is obtained from the `value` using its protocol
+/// conformances, in the following order of preference: `Streamable`,
+/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+@inline(never)
+public func print<T, TargetStream : OutputStreamType>(
+    value: T, inout target: TargetStream
+) {
+  target._lock()
+  _print_unlocked(value, &target)
+  target._unlock()
+}
+
 /// Writes the textual representation of `value` and a newline character into
 /// the stream `target`.
 ///
@@ -153,8 +168,10 @@ public func print<T, TargetStream : OutputStreamType>(
 public func println<T, TargetStream : OutputStreamType>(
     value: T, inout target: TargetStream
 ) {
-  print(value, &target)
+  target._lock()
+  _print_unlocked(value, &target)
   target.write("\n")
+  target._unlock()
 }
 
 /// Writes the textual representation of `value` into the standard output.
@@ -168,8 +185,10 @@ public func println<T, TargetStream : OutputStreamType>(
 @inline(never)
 @semantics("stdlib_binary_only")
 public func print<T>(value: T) {
-  var stdoutStream = _Stdout()
-  print(value, &stdoutStream)
+  var target = _Stdout()
+  target._lock()
+  _print_unlocked(value, &target)
+  target._unlock()
 }
 
 /// Writes the textual representation of `value` and a newline character into
@@ -184,17 +203,21 @@ public func print<T>(value: T) {
 @inline(never)
 @semantics("stdlib_binary_only")
 public func println<T>(value: T) {
-  var stdoutStream = _Stdout()
-  print(value, &stdoutStream)
-  stdoutStream.write("\n")
+  var target = _Stdout()
+  target._lock()
+  _print_unlocked(value, &target)
+  target.write("\n")
+  target._unlock()
 }
 
 /// Writes a single newline character into the standard output.
 @inline(never)
 @semantics("stdlib_binary_only")
 public func println() {
-  var stdoutStream = _Stdout()
-  stdoutStream.write("\n")
+  var target = _Stdout()
+  target._lock()
+  target.write("\n")
+  target._unlock()
 }
 
 /// Returns the result of `print`\ 'ing `x` into a `String`
@@ -235,19 +258,8 @@ public func toDebugString<T>(x: T) -> String {
 // `debugPrint`
 //===----------------------------------------------------------------------===//
 
-/// Write to `target` the textual representation of `x` most suitable
-/// for debugging.
-///
-/// * If `T` conforms to `CustomDebugStringConvertible`, write
-///   `x.debugDescription`
-/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write
-///   `x.description`
-/// * Otherwise, if `T` conforms to `Streamable`, write `x`
-/// * Otherwise, fall back to a default textual representation.
-///
-/// See also: `debugPrintln(x, &target)`
 @inline(never)
-public func debugPrint<T, TargetStream : OutputStreamType>(
+public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
     value: T, inout target: TargetStream
 ) {
   if let debugPrintableObject? = value as? CustomDebugStringConvertible {
@@ -269,6 +281,26 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 }
 
 /// Write to `target` the textual representation of `x` most suitable
+/// for debugging.
+///
+/// * If `T` conforms to `CustomDebugStringConvertible`, write
+///   `x.debugDescription`
+/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write
+///   `x.description`
+/// * Otherwise, if `T` conforms to `Streamable`, write `x`
+/// * Otherwise, fall back to a default textual representation.
+///
+/// See also: `debugPrintln(x, &target)`
+@inline(never)
+public func debugPrint<T, TargetStream : OutputStreamType>(
+    value: T, inout target: TargetStream
+) {
+  target._lock()
+  _debugPrint_unlocked(value, &target)
+  target._unlock()
+}
+
+/// Write to `target` the textual representation of `x` most suitable
 /// for debugging, followed by a newline.
 ///
 /// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
@@ -281,8 +313,10 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 public func debugPrintln<T, TargetStream : OutputStreamType>(
     x: T, inout target: TargetStream
 ) {
-  debugPrint(x, &target)
+  target._lock()
+  _debugPrint_unlocked(x, &target)
   target.write("\n")
+  target._unlock()
 }
 
 /// Write to the console the textual representation of `x` most suitable
@@ -296,8 +330,10 @@ public func debugPrintln<T, TargetStream : OutputStreamType>(
 /// See also: `debugPrintln(x)`
 @inline(never)
 public func debugPrint<T>(x: T) {
-  var stdoutStream = _Stdout()
-  debugPrint(x, &stdoutStream)
+  var target = _Stdout()
+  target._lock()
+  _debugPrint_unlocked(x, &target)
+  target._unlock()
 }
 
 /// Write to the console the textual representation of `x` most suitable
@@ -311,9 +347,11 @@ public func debugPrint<T>(x: T) {
 /// See also: `debugPrint(x)`
 @inline(never)
 public func debugPrintln<T>(x: T) {
-  var stdoutStream = _Stdout()
-  debugPrint(x, &stdoutStream)
-  stdoutStream.write("\n")
+  var target = _Stdout()
+  target._lock()
+  _debugPrint_unlocked(x, &target)
+  target.write("\n")
+  target._unlock()
 }
 
 //===----------------------------------------------------------------------===//
@@ -321,6 +359,14 @@ public func debugPrintln<T>(x: T) {
 //===----------------------------------------------------------------------===//
 
 internal struct _Stdout : OutputStreamType {
+  mutating func _lock() {
+    _swift_stdlib_flockfile_stdout()
+  }
+
+  mutating func _unlock() {
+    _swift_stdlib_funlockfile_stdout()
+  }
+
   mutating func write(string: String) {
     // FIXME: buffering?
     // It is important that we use stdio routines in order to correctly

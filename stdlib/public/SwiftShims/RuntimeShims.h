@@ -86,6 +86,9 @@ const char *_swift_stdlib_strtod_clocale(const char *nptr, double *outResult);
 /// overflow.
 const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
 
+void _swift_stdlib_flockfile_stdout(void);
+void _swift_stdlib_funlockfile_stdout(void);
+
 int _swift_stdlib_putc_stderr(int C);
 
 __swift_size_t _swift_stdlib_getHardwareConcurrency();
