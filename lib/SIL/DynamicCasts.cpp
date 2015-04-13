@@ -130,6 +130,13 @@ classifyDynamicCastToProtocol(CanType source,
   if (auto *CD = source.getClassOrBoundGenericClass()) {
     if (canClassOrSuperclassesHaveExtensions(CD, isWholeModuleOpts))
       return DynamicCastFeasibility::MaySucceed;
+    // Derived types may conform to the protocol.
+    if (!CD->isFinal()) {
+      // TODO: If it is a private type or internal type and we
+      // can prove that there are no derived types conforming to a
+      // protocol, then we can still return WillFail.
+      return DynamicCastFeasibility::MaySucceed;
+    }
   }
 
   // If the source type is private or target protocol is private,
