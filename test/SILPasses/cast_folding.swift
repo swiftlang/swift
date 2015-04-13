@@ -62,8 +62,6 @@ public protocol CP2: class {}
 // and it cannot be extended elsewhere as it is private
 private class D: CP1 {}
 
-private final class F: CP1 {}
-
 // Class E implements both class protocols at once
 class E: CP1, CP2 {}
 
@@ -670,8 +668,10 @@ func test27() -> Bool {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test28_1FT_Sb
-// CHECK: checked_cast
-// CHECK: return
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1 
 @inline(never)
 func test28_1() -> Bool {
     return cast28(D.self)
@@ -685,16 +685,6 @@ func test28_1() -> Bool {
 @inline(never)
 func test28_2() -> Bool {
     return cast28(E.self)
-}
-
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding8test28_3FT_Sb
-// CHECK: bb0
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
-@inline(never)
-func test28_3() -> Bool {
-    return cast28(F.self)
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test29FT_Sb
