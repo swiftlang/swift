@@ -25,6 +25,8 @@ import ObjectiveC
 // CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* __null_unspecified (* __null_unspecified)(NSInteger (* __null_unspecified)(NSInteger)))(NSInteger))input;
 // CHECK-NEXT: @property (nonatomic, copy) NSInteger (^ __nullable savedBlock)(NSInteger);
 // CHECK-NEXT: @property (nonatomic) NSInteger (* __null_unspecified savedFunctionPointer)(NSInteger);
+// CHECK-NEXT: @property (nonatomic) NSInteger (* __nonnull savedFunctionPointer2)(NSInteger);
+// CHECK-NEXT: @property (nonatomic) NSInteger (* __nullable savedFunctionPointer3)(NSInteger);
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Callbacks {
@@ -65,5 +67,7 @@ import ObjectiveC
   }
 
   var savedBlock: (Int -> Int)?
-  @objc var savedFunctionPointer: CFunctionPointer<Int -> Int> = nil
+  var savedFunctionPointer: CFunctionPointer<Int -> Int> = nil
+  var savedFunctionPointer2: @convention(c) Int -> Int = { $0 }
+  var savedFunctionPointer3: (@convention(c) Int -> Int)? = { $0 }
 }

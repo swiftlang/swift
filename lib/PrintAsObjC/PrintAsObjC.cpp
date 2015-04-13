@@ -446,8 +446,16 @@ private:
             nominal == ctx.getStringDecl()) {
           os << ", copy";
         }
-      } else if (copyTy->is<FunctionType>()) {
-        os << ", copy";
+      } else if (auto fnTy = copyTy->getAs<FunctionType>()) {
+        switch (fnTy->getRepresentation()) {
+        case FunctionTypeRepresentation::Block:
+        case FunctionTypeRepresentation::Swift:
+          os << ", copy";
+          break;
+        case FunctionTypeRepresentation::Thin:
+        case FunctionTypeRepresentation::CFunctionPointer:
+          break;
+        }
       }
     }
 
