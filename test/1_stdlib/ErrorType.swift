@@ -136,6 +136,9 @@ ErrorTypeTests.test("NSError-to-enum bridging") {
 
     expectEqual(cocoaCode, NSFileNoSuchFileError)
 
+    let cocoaCode2: Int? = (ns as? _NSCocoaError)?.code
+    expectEqual(cocoaCode2, NSFileNoSuchFileError)
+
     let isNoSuchFileError: Bool
     switch e {
     case _NSCocoaError.NSFileNoSuchFileError:
@@ -145,6 +148,7 @@ ErrorTypeTests.test("NSError-to-enum bridging") {
     }
 
     expectTrue(isNoSuchFileError)
+
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }

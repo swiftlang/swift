@@ -146,6 +146,8 @@ __attribute__((availability(macosx,introduced=10.9)))
 @end
 
 @interface NSError : NSObject
+@property (readonly) NSString *domain;
+@property (readonly) NSInteger code;
 @end
 
 @interface NSString : NSObject <NSSecureCoding, NSCopying>

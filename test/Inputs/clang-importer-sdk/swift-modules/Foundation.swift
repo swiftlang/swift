@@ -162,3 +162,5 @@ extension CGFloat : _ObjectiveCBridgeable {
     return true
   }
 }
+
+extension NSError: _ErrorType {}
