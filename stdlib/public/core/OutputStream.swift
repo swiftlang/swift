@@ -108,7 +108,7 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
       }
       var (label, elementMirror) = mirror[i]
       var elt = elementMirror.value
-      print(elt, &target)
+      debugPrint(elt, &target)
     }
     target.write(")")
     return

@@ -793,18 +793,18 @@ func test_TuplePrinting() {
   printedIs(tuple5, "(42, ►3◀︎)")
 
   var tuple6 = ([123: 123], (1, 2, "3"))
-  printedIs(tuple6, "([123: 123], (1, 2, 3))")
+  printedIs(tuple6, "([123: 123], (1, 2, \"3\"))")
 
   var arrayOfTuples1 =
       [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
          WithoutDescription(5)) ]
-  printedIs(arrayOfTuples1, "[(1, two, ►3◀︎, ►4◀︎, a.WithoutDescription)]")
+  printedIs(arrayOfTuples1, "[(1, \"two\", ►3◀︎, ►4◀︎, a.WithoutDescription)]")
 
   var arrayOfTuples2 =
       [ (1, "two", WithoutDescription(3)),
         (11, "twenty-two", WithoutDescription(33)),
         (111, "two hundred twenty-two", WithoutDescription(333)) ]
-  printedIs(arrayOfTuples2, "[(1, two, a.WithoutDescription), (11, twenty-two, a.WithoutDescription), (111, two hundred twenty-two, a.WithoutDescription)]")
+  printedIs(arrayOfTuples2, "[(1, \"two\", a.WithoutDescription), (11, \"twenty-two\", a.WithoutDescription), (111, \"two hundred twenty-two\", a.WithoutDescription)]")
 
   println("test_TuplePrinting done")
 }
