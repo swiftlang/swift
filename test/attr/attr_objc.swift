@@ -1771,4 +1771,35 @@ class ClassThrows1 {
 
   // CHECK: @objc func methodReturnsArray() throws -> [String]
   @objc func methodReturnsArray() throws -> [String] { return [String]() }
+
+  // Errors
+
+  @objc func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil } // expected-error{{throwing method cannot be marked @objc because it returns a value of optional type 'Class_ObjC1?'; 'nil' indicates failure to Objective-C}}
+
+  @objc func methodReturnsOptionalArray() throws -> [String]? { return nil } // expected-error{{throwing method cannot be marked @objc because it returns a value of optional type '[String]?'; 'nil' indicates failure to Objective-C}}
+
+  @objc func methodReturnsInt() throws -> Int { return 0 } // expected-error{{throwing method cannot be marked @objc because it returns a value of type 'Int'; return 'Void' or a type that bridges to an Objective-C class}}
+
+  @objc func methodAcceptsThrowingFunc(fn: (String) throws -> Int) { }
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2{{throwing function types cannot be represented in Objective-C}}
+}
+
+@objc class ImplicitClassThrows1 {
+  // CHECK: @objc func methodReturnsVoid() throws
+  func methodReturnsVoid() throws { }
+
+  // CHECK: @objc func methodReturnsObjCClass() throws -> Class_ObjC1
+  func methodReturnsObjCClass() throws -> Class_ObjC1 {
+    return Class_ObjC1()
+  }
+
+  // CHECK: @objc func methodReturnsBridged() throws -> String
+  func methodReturnsBridged() throws -> String { return String() }
+
+  // CHECK: @objc func methodReturnsArray() throws -> [String]
+  func methodReturnsArray() throws -> [String] { return [String]() }
+
+  // CHECK: {{^}} func methodReturnsOptionalObjCClass() throws -> Class_ObjC1?
+  func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil }
 }

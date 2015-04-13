@@ -22,6 +22,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExprHandle.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
@@ -2359,6 +2360,45 @@ bool TypeChecker::isCIntegerType(const DeclContext *DC, Type T) {
   return CIntegerTypes.count(T->getCanonicalType());
 }
 
+AnyFunctionType *TypeChecker::isUnparenthesizedTrailingClosure(Type type) {
+  if (isa<ParenType>(type.getPointer()))
+    return nullptr;
+
+  // Only consider the rvalue type.
+  type = type->getRValueType();
+
+  // Look through one level of optionality.
+  if (auto objectType = type->getAnyOptionalObjectType())
+    type = objectType;
+
+  // Is it a function type?
+  return type->getAs<AnyFunctionType>();
+}
+
+/// Determines whether the given type is bridged to an Objective-C class type.
+static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
+  // Simple case: bridgeable object types.
+  if (type->isBridgeableObjectType())
+    return true;
+
+  // Determine whether this type is bridged to Objective-C.
+  ASTContext &ctx = type->getASTContext();
+  Optional<Type> bridged = ctx.getBridgedToObjC(dc, false, type,
+                                                ctx.getLazyResolver());
+  if (!bridged)
+    return false;
+
+  // Check whether we're bridging to a class.
+  auto classDecl = (*bridged)->getClassOrBoundGenericClass();
+  if (!classDecl)
+    return false;
+
+  // Allow anything that isn't bridged to NSNumber.
+  // FIXME: This feels like a hack, but we don't have the right predicate
+  // anywhere.
+  return classDecl->getName().str() != "NSNumber";
+}
+
 bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                                         ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
@@ -2462,6 +2502,114 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
 
   if (checkObjCInGenericContext(*this, AFD, Diagnose))
     return false;
+
+  // Throwing functions must map to a particular error convention.
+  if (AFD->isBodyThrowing()) {
+    DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
+    Type resultType = cast<FuncDecl>(AFD)->getResultType();
+    ForeignErrorConvention::Kind kind;
+    CanType errorResultType;
+    Type optOptionalType;
+    SourceLoc throwsLoc = cast<FuncDecl>(AFD)->getThrowsLoc();
+    if (resultType->isVoid()) {
+      // Functions that return nothing (void) can be throwing; they indicate
+      // failure with a 'false' result.
+      kind = ForeignErrorConvention::ZeroResult;
+      errorResultType = Context.getBoolDecl()
+                          ->getDeclaredInterfaceType()->getCanonicalType();
+    } else if (!resultType->getAnyOptionalObjectType() &&
+               isBridgedToObjectiveCClass(dc, resultType)) {
+      // Functions that return a (non-optional) type bridged to Objective-C
+      // can be throwing; they indicate failure with a nil result.
+      kind = ForeignErrorConvention::NilResult;
+    } else if ((optOptionalType = resultType->getAnyOptionalObjectType()) &&
+               isBridgedToObjectiveCClass(dc, optOptionalType)) {
+      // Cannot return an optional bridged type, because 'nil' is reserved
+      // to indicate failure. Call this out in a separate diagnostic.
+      if (Diagnose) {
+        diagnose(AFD->getLoc(),
+                 diag::objc_invalid_on_throwing_optional_result,
+                 getObjCDiagnosticAttrKind(Reason),
+                 resultType)
+          .highlight(throwsLoc);
+        describeObjCReason(*this, AFD, Reason);
+      }
+      return false;
+    } else {
+      // Other result types are not permitted.
+      if (Diagnose) {
+        diagnose(AFD->getLoc(),
+                 diag::objc_invalid_on_throwing_result,
+                 getObjCDiagnosticAttrKind(Reason),
+                 resultType)
+          .highlight(throwsLoc);
+        describeObjCReason(*this, AFD, Reason);
+      }
+      return false;
+    }
+
+    // The error type is always AutoreleasingUnsafeMutablePointer<NSError?>.
+    Type errorParameterType = getNSErrorType(dc);
+    errorParameterType = OptionalType::get(errorParameterType);
+    errorParameterType
+      = BoundGenericType::get(
+          Context.getAutoreleasingUnsafeMutablePointerDecl(),
+          nullptr,
+          errorParameterType);
+
+    // Determine the parameter index at which the error will go, skipping
+    // over all trailing closures.
+    unsigned errorParameterIndex;
+    const Pattern *paramPattern = AFD->getBodyParamPatterns()[1];
+    if (auto *tuple = dyn_cast<TuplePattern>(paramPattern)) {
+      errorParameterIndex = tuple->getNumElements();
+      while (errorParameterIndex > 0 &&
+             isUnparenthesizedTrailingClosure(
+               tuple->getElement(errorParameterIndex - 1).getPattern()
+                 ->getType()))
+        --errorParameterIndex;
+    } else {
+      auto paren = cast<ParenPattern>(paramPattern);
+      errorParameterIndex
+        = isUnparenthesizedTrailingClosure(paren->getSubPattern()->getType())
+            ? 0 : 1;
+    }
+
+    // Form the error convention.
+    Optional<ForeignErrorConvention> errorConvention;
+    CanType canErrorParameterType = errorParameterType->getCanonicalType();
+    switch (kind) {
+    case ForeignErrorConvention::ZeroResult:
+      errorConvention = ForeignErrorConvention::getZeroResult(
+                          errorParameterIndex,
+                          ForeignErrorConvention::IsNotOwned,
+                          canErrorParameterType,
+                          errorResultType);
+      break;
+
+    case ForeignErrorConvention::NonZeroResult:
+      errorConvention = ForeignErrorConvention::getNonZeroResult(
+                          errorParameterIndex,
+                          ForeignErrorConvention::IsNotOwned,
+                          canErrorParameterType,
+                          errorResultType);
+      break;
+
+    case ForeignErrorConvention::NilResult:
+      errorConvention = ForeignErrorConvention::getNilResult(
+                          errorParameterIndex,
+                          ForeignErrorConvention::IsNotOwned,
+                          canErrorParameterType);
+      break;
+
+    case ForeignErrorConvention::NonNilError:
+      errorConvention = ForeignErrorConvention::getNilResult(
+                          errorParameterIndex,
+                          ForeignErrorConvention::IsNotOwned,
+                          canErrorParameterType);
+      break;
+    }
+  }
 
   return true;
 }
@@ -2708,6 +2856,9 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     if (!Result->isVoid() && !isRepresentableInObjC(DC, Result))
       return false;
 
+    if (FT->getExtInfo().throws())
+      return false;
+
     return true;
   }
 
@@ -2824,7 +2975,13 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     return;
   }
 
-  if (T->is<FunctionType>()) {
+  if (auto fnTy = T->getAs<FunctionType>()) {
+    if (fnTy->getExtInfo().throws() ) {
+      diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
+        .highlight(TypeRange);
+      return;
+    }
+
     diagnose(TypeRange.Start, diag::not_objc_function_type_param)
       .highlight(TypeRange);
     return;

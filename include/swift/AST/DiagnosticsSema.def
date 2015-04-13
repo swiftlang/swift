@@ -1881,6 +1881,8 @@ NOTE(not_objc_generic_type_param,sema_objc,none,
 NOTE(not_objc_function_type_param,sema_objc,none,
      "function types cannot be represented in Objective-C unless their "
      "parameters and returns can be", ())
+NOTE(not_objc_function_type_throwing,sema_objc,none,
+      "throwing function types cannot be represented in Objective-C", ())
 NOTE(objc_inferring_on_objc_protocol_member,sema_objc,none,
      "inferring '@objc' because the declaration is a member of "
      "an '@objc' protocol", ())
@@ -1905,6 +1907,16 @@ ERROR(objc_invalid_on_func_result_type,sema_objc,none,
 ERROR(objc_invalid_on_foreign_class,sema_objc,none,
       "method cannot be marked %" OBJC_ATTR_SELECT "0 because Core Foundation "
       "types are not classes in Objective-C", (unsigned))
+ERROR(objc_invalid_on_throwing_optional_result,sema_objc,none,
+      "throwing method cannot be marked %" OBJC_ATTR_SELECT "0 because "
+      "it returns a value of optional type %1; 'nil' indicates failure to "
+      "Objective-C",
+      (unsigned, Type))
+ERROR(objc_invalid_on_throwing_result,sema_objc,none,
+      "throwing method cannot be marked %" OBJC_ATTR_SELECT "0 because "
+      "it returns a value of type %1; return 'Void' or a type that bridges "
+      "to an Objective-C class",
+      (unsigned, Type))
 
 #undef OBJC_ATTR_SELECT
 

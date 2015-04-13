@@ -4268,26 +4268,18 @@ public:
           // suppress this warning by adding parentheses.
           auto paramType = fields[i-1].getPattern()->getType();
 
-          if (!isa<ParenType>(paramType.getPointer())) {
-            // Look through lvalue-ness.
-            paramType = paramType->getRValueType();
-
-            // Look through optionality.
-            if (auto objectType = paramType->getAnyOptionalObjectType())
-              paramType = objectType;
-
-            if (auto funcTy = paramType->getAs<AnyFunctionType>()) {
-              // If we saw any default arguments before this, complain.
-              // This doesn't apply to autoclosures.
-              if (anyDefaultArguments && !funcTy->getExtInfo().isAutoClosure()) {
-                TC.diagnose(fields[i-1].getPattern()->getStartLoc(),
-                            diag::non_trailing_closure_before_default_args)
-                .highlight(SourceRange(fields[i].getPattern()->getStartLoc(),
-                                       fields[n-1].getPattern()->getEndLoc()));
-              }
-
-              break;
+          if (auto *funcTy = TypeChecker::isUnparenthesizedTrailingClosure(
+                               paramType)) {
+            // If we saw any default arguments before this, complain.
+            // This doesn't apply to autoclosures.
+            if (anyDefaultArguments && !funcTy->getExtInfo().isAutoClosure()) {
+              TC.diagnose(fields[i-1].getPattern()->getStartLoc(),
+                          diag::non_trailing_closure_before_default_args)
+              .highlight(SourceRange(fields[i].getPattern()->getStartLoc(),
+                                     fields[n-1].getPattern()->getEndLoc()));
             }
+
+            break;
           }
 
           // If we have a default argument, keep going.
