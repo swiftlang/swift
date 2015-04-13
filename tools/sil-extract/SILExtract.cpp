@@ -198,6 +198,7 @@ int main(int argc, char **argv) {
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
+  CI.getSILOptions().EnableGuaranteedSelf = true;
 
   if (CI.setup(Invocation))
     return 1;

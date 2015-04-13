@@ -283,7 +283,7 @@ RemoveRuntimeAsserts("remove-runtime-asserts",
 static llvm::cl::opt<bool>
 EnableGuaranteedSelf("enable-guaranteed-self",
                      llvm::cl::Hidden,
-                     llvm::cl::init(false),
+                     llvm::cl::init(true),
                      llvm::cl::desc("Enable guaranteed self"));
 
 static llvm::cl::opt<bool>
