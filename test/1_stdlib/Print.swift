@@ -545,6 +545,8 @@ struct StructVeryPrintable : CustomStringConvertible, CustomDebugStringConvertib
   }
 }
 
+struct EmptyStructWithoutDescription {}
+
 struct WithoutDescription {
   let x: Int
 
@@ -552,6 +554,19 @@ struct WithoutDescription {
     self.x = x
   }
 }
+
+struct ValuesWithoutDescription<T, U, V> {
+  let t: T
+  let u: U
+  let v: V
+
+  init(_ t: T, _ u: U, _ v: V) {
+    self.t = t
+    self.u = u
+    self.v = v
+  }
+}
+
 
 class ClassPrintable : CustomStringConvertible, ProtocolUnrelatedToPrinting {
   let x: Int
@@ -798,13 +813,13 @@ func test_TuplePrinting() {
   var arrayOfTuples1 =
       [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
          WithoutDescription(5)) ]
-  printedIs(arrayOfTuples1, "[(1, \"two\", ►3◀︎, ►4◀︎, a.WithoutDescription)]")
+  printedIs(arrayOfTuples1, "[(1, \"two\", ►3◀︎, ►4◀︎, a.WithoutDescription(x: 5))]")
 
   var arrayOfTuples2 =
       [ (1, "two", WithoutDescription(3)),
         (11, "twenty-two", WithoutDescription(33)),
         (111, "two hundred twenty-two", WithoutDescription(333)) ]
-  printedIs(arrayOfTuples2, "[(1, \"two\", a.WithoutDescription), (11, \"twenty-two\", a.WithoutDescription), (111, \"two hundred twenty-two\", a.WithoutDescription)]")
+  printedIs(arrayOfTuples2, "[(1, \"two\", a.WithoutDescription(x: 3)), (11, \"twenty-two\", a.WithoutDescription(x: 33)), (111, \"two hundred twenty-two\", a.WithoutDescription(x: 333))]")
 
   println("test_TuplePrinting done")
 }
@@ -813,8 +828,18 @@ test_TuplePrinting()
 
 func test_ArbitraryStructPrinting() {
   var arrayOfArbitraryStructs =
-      [ WithoutDescription(1), WithoutDescription(2), WithoutDescription(3) ]
-  printedIs(arrayOfArbitraryStructs, "[a.WithoutDescription, a.WithoutDescription, a.WithoutDescription]")
+    [ WithoutDescription(1), WithoutDescription(2), WithoutDescription(3) ]
+  printedIs(
+    arrayOfArbitraryStructs,
+    "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]")
+
+  printedIs(
+    EmptyStructWithoutDescription(),
+    "a.EmptyStructWithoutDescription()")
+
+  printedIs(
+    ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]),
+    "a.ValuesWithoutDescription<Swift.Double, Swift.String, Swift.Array<Swift.Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])")
 
   println("test_ArbitraryStructPrinting done")
 }
@@ -843,7 +868,7 @@ func test_StringInterpolation() {
   assertEquals("nan", "\(0 / 0.0)")
 
   assertEquals("<[►1◀︎, ►2◀︎, ►3◀︎]>", "<\([ StructPrintable(1), StructPrintable(2), StructPrintable(3) ])>")
-  assertEquals("a.WithoutDescription", "\(WithoutDescription(1))")
+  assertEquals("a.WithoutDescription(x: 1)", "\(WithoutDescription(1))")
 
   println("test_StringInterpolation done")
 }

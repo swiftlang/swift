@@ -220,8 +220,10 @@ mirrors.test("PlaygroundQuickLook") {
   // String(reflecting: ).
   struct X {}
   switch PlaygroundQuickLook(reflecting: X()) {
-  case .Text(let text) where text.hasSuffix(".(X #1)"): break;
-  default: expectTrue(false)
+  case .Text(let text):
+    expectTrue(text.hasSuffix(".(X #1)()")) { text }
+  default:
+    expectTrue(false)
   }
   struct Y : CustomDebugStringConvertible {
     var debugDescription: String { return "Why?" }

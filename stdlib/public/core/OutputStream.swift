@@ -113,6 +113,24 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
     target.write(")")
     return
   }
+  if mirror is _StructMirror {
+    print(mirror.summary, &target)
+    target.write("(")
+    var first = true
+    for i in 0..<mirror.count {
+      if first {
+        first = false
+      } else {
+        target.write(", ")
+      }
+      var (label, elementMirror) = mirror[i]
+      print(label, &target)
+      target.write(": ")
+      debugPrint(elementMirror.value, &target)
+    }
+    target.write(")")
+    return
+  }
   print(mirror.summary, &target)
 }
 
