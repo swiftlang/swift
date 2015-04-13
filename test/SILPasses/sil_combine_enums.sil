@@ -34,8 +34,8 @@ bb1:                                              // Preds: bb0
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7#0 : $*@local_storage Optional<SomeClass> // id: %13
   release_value %5 : $Optional<SomeClass>         // id: %14
-  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@owned SomeClass) -> Int // user: %16
-  %16 = apply %15(%12) : $@cc(method) @thin (@owned SomeClass) -> Int // user: %20
+  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@guaranteed SomeClass) -> Int // user: %16
+  %16 = apply %15(%12) : $@cc(method) @thin (@guaranteed SomeClass) -> Int // user: %20
   %17 = load %0#1 : $*Optional<SomeClass>         // user: %18
   release_value %17 : $Optional<SomeClass>        // id: %18
   dealloc_stack %0#0 : $*@local_storage Optional<SomeClass> // id: %19
@@ -72,8 +72,8 @@ bb1:
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7#0 : $*@local_storage Optional<SomeClass>
   release_value %5 : $Optional<SomeClass>
-  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@owned SomeClass) -> Int
-  %16 = apply %15(%12) : $@cc(method) @thin (@owned SomeClass) -> Int
+  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@guaranteed SomeClass) -> Int
+  %16 = apply %15(%12) : $@cc(method) @thin (@guaranteed SomeClass) -> Int
   %17 = load %0#1 : $*Optional<SomeClass>
   release_value %17 : $Optional<SomeClass>
   dealloc_stack %0#0 : $*@local_storage Optional<SomeClass>
@@ -166,8 +166,8 @@ bb0(%0 : $Optional<SomeClass>):
 
 bb1:
   %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.Some!enumelt.1
-  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@owned SomeClass) -> Int
-  %7 = apply %6(%5) : $@cc(method) @thin (@owned SomeClass) -> Int
+  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@guaranteed SomeClass) -> Int
+  %7 = apply %6(%5) : $@cc(method) @thin (@guaranteed SomeClass) -> Int
   fix_lifetime %5 : $SomeClass
   strong_release %5 : $SomeClass
   return %7 : $Int
@@ -194,8 +194,8 @@ bb0(%0 : $Optional<SomeClass>):
 
 bb1:
   %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.Some!enumelt.1
-  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@owned SomeClass) -> Int
-  %7 = apply %6(%5) : $@cc(method) @thin (@owned SomeClass) -> Int
+  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@guaranteed SomeClass) -> Int
+  %7 = apply %6(%5) : $@cc(method) @thin (@guaranteed SomeClass) -> Int
   fix_lifetime %5 : $SomeClass
   strong_release %5 : $SomeClass
   return %7 : $Int

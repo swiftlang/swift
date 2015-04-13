@@ -18,8 +18,8 @@ bb0(%0 : $Int64, %1 : $ABC):
   return %1 : $ABC                                // id: %38
 }
 
-sil @_TFC4main3ABC6memberfS0_FT_T_ : $@cc(method) @thin (@owned ABC) -> ()
-sil @_TFC4main3ABC7member2fS0_FT_T_ : $@cc(method) @thin (@owned ABC) -> ()
+sil @_TFC4main3ABC6memberfS0_FT_T_ : $@cc(method) @thin (@guaranteed ABC) -> ()
+sil @_TFC4main3ABC7member2fS0_FT_T_ : $@cc(method) @thin (@guaranteed ABC) -> ()
 sil @_TFC4main3ABCCfMS0_FT1ySi_S0_ : $@thin (Int64, @thick ABC.Type) -> @owned ABC
 
 //CHECK:@_TF4main3fooFT_T_
@@ -34,12 +34,10 @@ bb0:
   // function_ref main.ABC.init (main.ABC.Type)(y : Swift.Int64) -> main.ABC
   %3 = function_ref @_TFC4main3ABCcfMS0_FT1ySi_S0_ : $@cc(method) @thin (Int64, @owned ABC) -> @owned ABC // user: %4
   %4 = apply %3(%1, %2) : $@cc(method) @thin (Int64, @owned ABC) -> @owned ABC // users: %7, %6, %5, %10, %9, %8, %11
-  strong_retain %4 : $ABC                         // id: %5
-  %6 = class_method %4 : $ABC, #ABC.member!1 : ABC -> () -> () , $@cc(method) @thin (@owned ABC) -> () // user: %7
-  %7 = apply %6(%4) : $@cc(method) @thin (@owned ABC) -> ()
-  strong_retain %4 : $ABC                         // id: %8
-  %9 = class_method %4 : $ABC, #ABC.member2!1 : ABC -> () -> () , $@cc(method) @thin (@owned ABC) -> () // user: %10
-  %10 = apply %9(%4) : $@cc(method) @thin (@owned ABC) -> ()
+  %6 = class_method %4 : $ABC, #ABC.member!1 : ABC -> () -> () , $@cc(method) @thin (@guaranteed ABC) -> () // user: %7
+  %7 = apply %6(%4) : $@cc(method) @thin (@guaranteed ABC) -> ()
+  %9 = class_method %4 : $ABC, #ABC.member2!1 : ABC -> () -> () , $@cc(method) @thin (@guaranteed ABC) -> () // user: %10
+  %10 = apply %9(%4) : $@cc(method) @thin (@guaranteed ABC) -> ()
   strong_release %4 : $ABC                        // id: %11
   %12 = tuple ()                                  // user: %13
   return %12 : $()                                // id: %13

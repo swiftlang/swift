@@ -87,8 +87,8 @@ bb0:
 
 // The load of %1 is removed, and its uses replaced with the Foo argument
 // CHECK-NEXT: strong_retain {{.*}} : $Foo
-// CHECK-NEXT: [[METHOD_FOO:%.*]] = class_method {{.*}} : $Foo, #Foo.foo!1 : Foo -> () -> Int , $@cc(method) @thin (@owned Foo) -> Int
-// CHECK-NEXT: [[APPLY_FOO:%.*]] = apply [[METHOD_FOO]]({{.*}}) : $@cc(method) @thin (@owned Foo) -> Int
+// CHECK-NEXT: [[METHOD_FOO:%.*]] = class_method {{.*}} : $Foo, #Foo.foo!1 : Foo -> () -> Int , $@cc(method) @thin (@guaranteed Foo) -> Int
+// CHECK-NEXT: [[APPLY_FOO:%.*]] = apply [[METHOD_FOO]]({{.*}}) : $@cc(method) @thin (@guaranteed Foo) -> Int
 
 // The struct_element_addr of %3 followed by a load is replaced by a struct_extract of the Baz argument
 // CHECK-NEXT: [[EXTRACT_BAZ_X:%.*]] = struct_extract {{.*}} : $Baz, #Baz.x
@@ -114,8 +114,8 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Foo, %2 : $Builtin.NativeObject, %3 : $*B
   %7 = function_ref @dummy_func : $@thin (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@cc(method) @thin (@owned Foo) -> Int
-  %11 = apply %10(%8) : $@cc(method) @thin (@owned Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@cc(method) @thin (@guaranteed Foo) -> Int
+  %11 = apply %10(%8) : $@cc(method) @thin (@guaranteed Foo) -> Int
   %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load %12 : $*Int
   %14 = load %5 : $*Int
@@ -154,8 +154,8 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Foo):
   %7 = function_ref @dummy_func : $@thin (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
-  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@cc(method) @thin (@owned Foo) -> Int
-  %11 = apply %10(%8) : $@cc(method) @thin (@owned Foo) -> Int
+  %10 = class_method %8 : $Foo, #Foo.foo!1 : Foo -> () -> Int, $@cc(method) @thin (@guaranteed Foo) -> Int
+  %11 = apply %10(%8) : $@cc(method) @thin (@guaranteed Foo) -> Int
   %12 = function_ref @mutate_foo : $@thin (@inout Foo) -> ()
   %13 = apply %12(%1) : $@thin (@inout Foo) -> ()
   strong_release %0 : $Builtin.NativeObject

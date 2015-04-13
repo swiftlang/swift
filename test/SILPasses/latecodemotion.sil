@@ -606,7 +606,7 @@ bb1:
 // CHECK-NOT: strong_retain
   %17 = load %0 : $*Test
   strong_retain %17 : $Test
-  %19 = class_method %17 : $Test, #Test.testing!1 : Test -> () -> UInt64 , $@cc(method) @thin (@owned Test) -> UInt64
+  %19 = class_method %17 : $Test, #Test.testing!1 : Test -> () -> UInt64 , $@cc(method) @thin (@guaranteed Test) -> UInt64
   %20 = load %7 : $*UInt64
   checked_cast_br [exact] %17 : $Test to $Test, bb3, bb4
 bb2:
@@ -624,11 +624,11 @@ bb4:
 // CHECK: bb4:
 // CHECK: strong_retain
 // CHECK: apply
-  %65 = apply %19(%17) : $@cc(method) @thin (@owned Test) -> UInt64
+  %65 = apply %19(%17) : $@cc(method) @thin (@guaranteed Test) -> UInt64
   br bb2
 }
 
-sil @virtual_callee : $@cc(method) @thin (@owned Test) -> UInt64
+sil @virtual_callee : $@cc(method) @thin (@guaranteed Test) -> UInt64
 sil_vtable Test {
   #Test.testing!1: virtual_callee
 }

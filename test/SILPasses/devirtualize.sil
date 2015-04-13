@@ -24,14 +24,14 @@ bb0:
   %1 = alloc_ref $Bar                             // user: %2
   store %1 to %0 : $*Bar                          // id: %2
   %3 = load %0 : $*Bar                            // users: %6, %5, %4
-  strong_retain %1 : $Bar                         // id: %4
-  %5 = class_method %1 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@cc(method) @thin (@owned Bar) -> () // user: %6
-  %6 = apply %5(%1) : $@cc(method) @thin (@owned Bar) -> ()
+  %5 = class_method %1 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@cc(method) @thin (@guaranteed Bar) -> () // user: %6
+  %6 = apply %5(%1) : $@cc(method) @thin (@guaranteed Bar) -> ()
+  release_value %1 : $Bar
   %7 = tuple ()                                   // user: %8
   return %7 : $()                                 // id: %8
 }
 
-sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@owned Bar) -> ()
+sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@guaranteed Bar) -> ()
 
 sil_vtable Bar {
   #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
@@ -44,15 +44,15 @@ private class Node {
 }
 
 // CHECK-LABEL: sil private @class_method_apply
-sil private @class_method_apply : $@cc(method) @thin (@owned Node) -> Int {
+sil private @class_method_apply : $@cc(method) @thin (@guaranteed Node) -> Int {
 bb0(%0 : $Node):
   // CHECK: strong_retain %0
   strong_retain %0 : $Node
   // CHECK-NOT: class_method %0
   // CHECK: [[FUNC:%.*]] = function_ref @transparent_target
-  %3 = class_method %0 : $Node, #Node.index!getter.1 : Node -> () -> Int , $@cc(method) @thin (@owned Node) -> Int
+  %3 = class_method %0 : $Node, #Node.index!getter.1 : Node -> () -> Int , $@cc(method) @thin (@guaranteed Node) -> Int
   // CHECK: [[RESULT:%.*]] = apply [[FUNC]](%0)
-  %4 = apply %3(%0) : $@cc(method) @thin (@owned Node) -> Int
+  %4 = apply %3(%0) : $@cc(method) @thin (@guaranteed Node) -> Int
   // CHECK: strong_release %0
   strong_release %0 : $Node
   // return [[RESULT]]
@@ -60,11 +60,10 @@ bb0(%0 : $Node):
 }
 
 // CHECK-LABEL: sil private [transparent] @transparent_target
-sil private [transparent] @transparent_target : $@cc(method) @thin (@owned Node) -> Int {
+sil private [transparent] @transparent_target : $@cc(method) @thin (@guaranteed Node) -> Int {
 bb0(%0 : $Node):
   %2 = ref_element_addr %0 : $Node, #Node.index
   %3 = load %2 : $*Int
-  strong_release %0 : $Node
   // CHECK: return
   return %3 : $Int
 }

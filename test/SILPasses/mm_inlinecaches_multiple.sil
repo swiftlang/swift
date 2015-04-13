@@ -14,9 +14,8 @@ class Foo {
 class Bar : Foo {
 }
 
-sil @_TFC8testcase3Foo4pingfS0_FT_T_ : $@cc(method) @thin (@owned Foo) -> () {
+sil @_TFC8testcase3Foo4pingfS0_FT_T_ : $@cc(method) @thin (@guaranteed Foo) -> () {
 bb0(%0 : $Foo):
-  strong_release %0 : $Foo                        // id: %1
   %2 = tuple ()                                   // user: %3
   return %2 : $()                                 // id: %3
 }
@@ -32,8 +31,8 @@ bb0(%0 : $Foo):
 //CHECK: return
 sil @_TF8testcase7my_mainFCS_3FooT_ : $@thin (@owned Foo) -> () {
 bb0(%0 : $Foo):
-  %1 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> () , $@cc(method) @thin (@owned Foo) -> () // user: %2
-  %2 = apply %1(%0) : $@cc(method) @thin (@owned Foo) -> ()
+  %1 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> () , $@cc(method) @thin (@guaranteed Foo) -> () // user: %2
+  %2 = apply %1(%0) : $@cc(method) @thin (@guaranteed Foo) -> ()
   %3 = tuple ()                                   // user: %4
   return %3 : $()                                 // id: %4
 }

@@ -26,7 +26,7 @@ class Bar {
   @objc func foo_objc()
 }
 
-sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@owned Bar) -> ()
+sil @_TFC4main3Bar3foofS0_FT_T_ : $@cc(method) @thin (@guaranteed Bar) -> ()
 sil @_TFC4main3Bar3foo_objcfS0_FT_T_ : $@cc(objc_method) @thin (Bar) -> ()
 
 sil_vtable Bar {
@@ -42,8 +42,8 @@ bb0(%0 : $Int32, %25: $Bar):
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30#0 : $Builtin.NativeObject, %30#1 : $*Bool)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar, %31 : $Builtin.NativeObject, %32 : $*Bool):
-  %24 = class_method %26 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@cc(method) @thin (@owned Bar) -> () // user: %6
-  %27 = apply %24(%25) : $@cc(method) @thin (@owned Bar) -> ()
+  %24 = class_method %26 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@cc(method) @thin (@guaranteed Bar) -> () // user: %6
+  %27 = apply %24(%25) : $@cc(method) @thin (@guaranteed Bar) -> ()
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %8, bb3, bb2

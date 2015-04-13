@@ -21,10 +21,10 @@ class D : C {
   override func ping(x: Builtin.Int32) -> Builtin.Int32
 }
 
-sil @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_ : $@cc(method) @thin (Builtin.Int32, @owned A) -> Builtin.Int32
-sil @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_ : $@cc(method) @thin (Builtin.Int32, @owned B) -> Builtin.Int32
-sil @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_ : $@cc(method) @thin (Builtin.Int32, @owned C) -> Builtin.Int32
-sil @_TFC25polymorphic_inline_caches1D4pingfS0_FBi32_Bi32_ : $@cc(method) @thin (Builtin.Int32, @owned D) -> Builtin.Int32
+sil @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_ : $@cc(method) @thin (Builtin.Int32, @guaranteed A) -> Builtin.Int32
+sil @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_ : $@cc(method) @thin (Builtin.Int32, @guaranteed B) -> Builtin.Int32
+sil @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_ : $@cc(method) @thin (Builtin.Int32, @guaranteed C) -> Builtin.Int32
+sil @_TFC25polymorphic_inline_caches1D4pingfS0_FBi32_Bi32_ : $@cc(method) @thin (Builtin.Int32, @guaranteed D) -> Builtin.Int32
 
 // CHECK-LABEL: sil @_TF25polymorphic_inline_caches3fooFTCS_1ABi32__Bi32_
 sil @_TF25polymorphic_inline_caches3fooFTCS_1ABi32__Bi32_ : $@thin (@owned A, Builtin.Int32) -> Builtin.Int32 {
@@ -33,9 +33,9 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
 // CHECK-NOT: strong_retain %0
   strong_retain %0 : $A
 // CHECK-NOT: class_method
-  %5 = class_method %0 : $A, #A.ping!1 : A -> (Builtin.Int32) -> Builtin.Int32 , $@cc(method) @thin (Builtin.Int32, @owned A) -> Builtin.Int32
+  %5 = class_method %0 : $A, #A.ping!1 : A -> (Builtin.Int32) -> Builtin.Int32 , $@cc(method) @thin (Builtin.Int32, @guaranteed A) -> Builtin.Int32
   // CHECK-NOT: apply
-  %6 = apply %5(%1, %0) : $@cc(method) @thin (Builtin.Int32, @owned A) -> Builtin.Int32
+  %6 = apply %5(%1, %0) : $@cc(method) @thin (Builtin.Int32, @guaranteed A) -> Builtin.Int32
   // CHECK: checked_cast_br [exact] %0 : $A to $B, bb2, bb3
   // CHECK: bb1
   strong_release %0 : $A
@@ -104,9 +104,9 @@ public final class G : E {
   override init()
 }
 
-sil [noinline] @_TFC5casts1E3foofS0_FT_T_ : $@cc(method) @thin (@owned E) -> ()
-sil [noinline] @_TFC5casts1F3foofS0_FT_T_ : $@cc(method) @thin (@owned F) -> ()
-sil [noinline] @_TFC5casts1G3foofS0_FT_T_ : $@cc(method) @thin (@owned G) -> ()
+sil [noinline] @_TFC5casts1E3foofS0_FT_T_ : $@cc(method) @thin (@guaranteed E) -> ()
+sil [noinline] @_TFC5casts1F3foofS0_FT_T_ : $@cc(method) @thin (@guaranteed F) -> ()
+sil [noinline] @_TFC5casts1G3foofS0_FT_T_ : $@cc(method) @thin (@guaranteed G) -> ()
 
 // CHECK-LABEL: sil [noinline] @_TF5casts18unchecked_ref_castFBoT_
 sil [noinline] @_TF5casts18unchecked_ref_castFBoT_ : $@thin (@owned Builtin.NativeObject) -> () {
@@ -117,8 +117,8 @@ bb0(%0 : $Builtin.NativeObject):
   // CHECK: [[CAST:%.*]] = unchecked_ref_cast %0 : $Builtin.NativeObject to $E
   %3 = unchecked_ref_cast %0 : $Builtin.NativeObject to $E
   // CHECK-NOT: class_method
-  %4 = class_method %3 : $E, #E.foo!1 : E -> () -> () , $@cc(method) @thin (@owned E) -> ()
-  %5 = apply %4(%3) : $@cc(method) @thin (@owned E) -> ()
+  %4 = class_method %3 : $E, #E.foo!1 : E -> () -> () , $@cc(method) @thin (@guaranteed E) -> ()
+  %5 = apply %4(%3) : $@cc(method) @thin (@guaranteed E) -> ()
   strong_release %0 : $Builtin.NativeObject
   %7 = tuple ()
   return %7 : $()
@@ -155,8 +155,8 @@ bb0(%0 : $E):
   // CHECK: [[CAST:%.*]] = unchecked_ref_bit_cast %0 : $E to $F
   %3 = unchecked_ref_bit_cast %0 : $E to $F
   // CHECK-NOT: class_method
-  %4 = class_method %3 : $F, #F.foo!1 : F -> () -> () , $@cc(method) @thin (@owned F) -> ()
-  %5 = apply %4(%3) : $@cc(method) @thin (@owned F) -> ()
+  %4 = class_method %3 : $F, #F.foo!1 : F -> () -> () , $@cc(method) @thin (@guaranteed F) -> ()
+  %5 = apply %4(%3) : $@cc(method) @thin (@guaranteed F) -> ()
   strong_release %0 : $E
   %7 = tuple ()
   return %7 : $()

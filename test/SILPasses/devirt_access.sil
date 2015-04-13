@@ -17,17 +17,17 @@ class K {
 //CHECK: function_ref @_TFC4test1K4pongfS0_FT_Si
 //CHECK-NEXT: apply
 //CHECK-NEXT: return
-sil @_TFC4test1K4pingfS0_FT_Si : $@cc(method) @thin (@owned K) -> Int {
+sil @_TFC4test1K4pingfS0_FT_Si : $@cc(method) @thin (@guaranteed K) -> Int {
 bb0(%0 : $K):
-  %1 = class_method %0 : $K, #K.pong!1 : K -> () -> Int , $@cc(method) @thin (@owned K) -> Int // user: %2
-  %2 = apply %1(%0) : $@cc(method) @thin (@owned K) -> Int // user: %3
+  %1 = class_method %0 : $K, #K.pong!1 : K -> () -> Int , $@cc(method) @thin (@guaranteed K) -> Int // user: %2
+  %2 = apply %1(%0) : $@cc(method) @thin (@guaranteed K) -> Int // user: %3
   return %2 : $Int                                // id: %3
 }
 
-sil @_TFC5test21K4pongfS0_FT_Si : $@cc(method) @thin (@owned K) -> Int
-sil @_TFC4test1K4pongfS0_FT_Si : $@cc(method) @thin (@owned K) -> Int
-sil @_TFC4test1Kd : $@cc(method) @thin (@owned K) -> @owned Builtin.NativeObject
-sil @_TFC4test1KD : $@cc(method) @thin (@owned K) -> ()
+sil @_TFC5test21K4pongfS0_FT_Si : $@cc(method) @thin (@guaranteed K) -> Int
+sil @_TFC4test1K4pongfS0_FT_Si : $@cc(method) @thin (@guaranteed K) -> Int
+sil @_TFC4test1Kd : $@cc(method) @thin (@guaranteed K) -> @owned Builtin.NativeObject
+sil @_TFC4test1KD : $@cc(method) @thin (@guaranteed K) -> ()
 sil @_TFC4test1KcfMS0_FT_S0_ : $@cc(method) @thin (@owned K) -> @owned K
 sil @_TFC4test1KCfMS0_FT_S0_ : $@thin (@thick K.Type) -> @owned K
 
@@ -65,24 +65,24 @@ class B : A
   override init()
 }
 
-sil @_TFC14devirt_access21X4pingfS0_FT_Si : $@cc(method) @thin (@owned X) -> Int 
+sil @_TFC14devirt_access21X4pingfS0_FT_Si : $@cc(method) @thin (@guaranteed X) -> Int 
 sil public_external [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int 
-sil @_TFC14devirt_access21Xd : $@cc(method) @thin (@owned X) -> @owned Builtin.NativeObject 
-sil @_TFC14devirt_access21XD : $@cc(method) @thin (@owned X) -> () 
+sil @_TFC14devirt_access21Xd : $@cc(method) @thin (@guaranteed X) -> @owned Builtin.NativeObject 
+sil @_TFC14devirt_access21XD : $@cc(method) @thin (@guaranteed X) -> () 
 sil @_TFC14devirt_access21XcfMS0_FT_S0_ : $@cc(method) @thin (@owned X) -> @owned X 
 sil @_TFC14devirt_access21XCfMS0_FT_S0_ : $@thin (@thick X.Type) -> @owned X 
-sil @_TFC14devirt_access21Yd : $@cc(method) @thin (@owned Y) -> @owned Builtin.NativeObject 
-sil @_TFC14devirt_access21YD : $@cc(method) @thin (@owned Y) -> () 
+sil @_TFC14devirt_access21Yd : $@cc(method) @thin (@guaranteed Y) -> @owned Builtin.NativeObject 
+sil @_TFC14devirt_access21YD : $@cc(method) @thin (@guaranteed Y) -> () 
 sil @_TFC14devirt_access21YcfMS0_FT_S0_ : $@cc(method) @thin (@owned Y) -> @owned Y 
 sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@thin (@thick Y.Type) -> @owned Y 
-sil @_TFC14devirt_access21A4pingfS0_FT_Si : $@cc(method) @thin (@owned A) -> Int 
-sil @_TFC14devirt_access21Ad : $@cc(method) @thin (@owned A) -> @owned Builtin.NativeObject 
-sil @_TFC14devirt_access21AD : $@cc(method) @thin (@owned A) -> () 
+sil @_TFC14devirt_access21A4pingfS0_FT_Si : $@cc(method) @thin (@guaranteed A) -> Int 
+sil @_TFC14devirt_access21Ad : $@cc(method) @thin (@guaranteed A) -> @owned Builtin.NativeObject 
+sil @_TFC14devirt_access21AD : $@cc(method) @thin (@guaranteed A) -> () 
 sil @_TFC14devirt_access21AcfMS0_FT_S0_ : $@cc(method) @thin (@owned A) -> @owned A 
 sil @_TFC14devirt_access21ACfMS0_FT_S0_ : $@thin (@thick A.Type) -> @owned A 
-sil @_TFC14devirt_access21B4pingfS0_FT_Si : $@cc(method) @thin (@owned B) -> Int 
-sil @_TFC14devirt_access21Bd : $@cc(method) @thin (@owned B) -> @owned Builtin.NativeObject 
-sil @_TFC14devirt_access21BD : $@cc(method) @thin (@owned B) -> () 
+sil @_TFC14devirt_access21B4pingfS0_FT_Si : $@cc(method) @thin (@guaranteed B) -> Int 
+sil @_TFC14devirt_access21Bd : $@cc(method) @thin (@guaranteed B) -> @owned Builtin.NativeObject 
+sil @_TFC14devirt_access21BD : $@cc(method) @thin (@guaranteed B) -> () 
 sil @_TFC14devirt_access21BcfMS0_FT_S0_ : $@cc(method) @thin (@owned B) -> @owned B 
 sil @_TFC14devirt_access21BCfMS0_FT_S0_ : $@thin (@thick B.Type) -> @owned B 
 
@@ -94,8 +94,8 @@ sil @Case1 : $@thin (@owned X) -> Int {
 bb0(%0 : $X):
   debug_value %0 : $X  // let a                   // id: %1
   strong_retain %0 : $X                           // id: %2
-  %3 = class_method %0 : $X, #X.ping!1 : X -> () -> Int , $@cc(method) @thin (@owned X) -> Int // user: %4
-  %4 = apply %3(%0) : $@cc(method) @thin (@owned X) -> Int // user: %6
+  %3 = class_method %0 : $X, #X.ping!1 : X -> () -> Int , $@cc(method) @thin (@guaranteed X) -> Int // user: %4
+  %4 = apply %3(%0) : $@cc(method) @thin (@guaranteed X) -> Int // user: %6
   strong_release %0 : $X                          // id: %5
   return %4 : $Int                                // id: %6
 }
@@ -109,8 +109,8 @@ bb0(%0 : $Y):
   debug_value %0 : $Y  // let a                   // id: %1
   strong_retain %0 : $Y                           // id: %2
   %3 = upcast %0 : $Y to $X                       // users: %4, %5
-  %4 = class_method %3 : $X, #X.ping!1 : X -> () -> Int , $@cc(method) @thin (@owned X) -> Int // user: %5
-  %5 = apply %4(%3) : $@cc(method) @thin (@owned X) -> Int // user: %7
+  %4 = class_method %3 : $X, #X.ping!1 : X -> () -> Int , $@cc(method) @thin (@guaranteed X) -> Int // user: %5
+  %5 = apply %4(%3) : $@cc(method) @thin (@guaranteed X) -> Int // user: %7
   strong_release %0 : $Y                          // id: %6
   return %5 : $Int                                // id: %7
 }
@@ -122,8 +122,8 @@ sil @Case3 : $@thin (@owned A) -> Int {
 bb0(%0 : $A):
   debug_value %0 : $A  // let a                   // id: %1
   strong_retain %0 : $A                           // id: %2
-  %3 = class_method %0 : $A, #A.ping!1 : A -> () -> Int , $@cc(method) @thin (@owned A) -> Int // user: %4
-  %4 = apply %3(%0) : $@cc(method) @thin (@owned A) -> Int // user: %6
+  %3 = class_method %0 : $A, #A.ping!1 : A -> () -> Int , $@cc(method) @thin (@guaranteed A) -> Int // user: %4
+  %4 = apply %3(%0) : $@cc(method) @thin (@guaranteed A) -> Int // user: %6
   strong_release %0 : $A                          // id: %5
   return %4 : $Int                                // id: %6
 }
@@ -135,8 +135,8 @@ sil @Case4 : $@thin (@owned B) -> Int {
 bb0(%0 : $B):
   debug_value %0 : $B  // let a                   // id: %1
   strong_retain %0 : $B                           // id: %2
-  %3 = class_method %0 : $B, #B.ping!1 : B -> () -> Int , $@cc(method) @thin (@owned B) -> Int // user: %4
-  %4 = apply %3(%0) : $@cc(method) @thin (@owned B) -> Int // user: %6
+  %3 = class_method %0 : $B, #B.ping!1 : B -> () -> Int , $@cc(method) @thin (@guaranteed B) -> Int // user: %4
+  %4 = apply %3(%0) : $@cc(method) @thin (@guaranteed B) -> Int // user: %6
   strong_release %0 : $B                          // id: %5
   return %4 : $Int                                // id: %6
 }

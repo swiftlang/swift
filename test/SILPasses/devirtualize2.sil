@@ -35,14 +35,14 @@ bb0:
   store %6 to %0 : $*Bar                          // id: %7
   %8 = load %0 : $*Bar                            // users: %11, %10, %9
   strong_retain %6 : $Bar                         // id: %9
-  %10 = class_method %6 : $Bar, #Bar.ping!1 : Bar -> () -> () , $@cc(method) @thin (@owned Bar) -> () // user: %11
-  %11 = apply %10(%8) : $@cc(method) @thin (@owned Bar) -> ()
+  %10 = class_method %6 : $Bar, #Bar.ping!1 : Bar -> () -> () , $@cc(method) @thin (@guaranteed Bar) -> () // user: %11
+  %11 = apply %10(%8) : $@cc(method) @thin (@guaranteed Bar) -> ()
   %12 = tuple ()                                  // user: %13
   return %12 : $()                                // id: %13
 }
 
-sil @_TFC4main3Bar4pingfS0_FT_T_ : $@cc(method) @thin (@owned Bar) -> ()
-sil @_TFC4main3Foo4pingfS0_FT_T_ : $@cc(method) @thin (@owned Foo) -> ()
+sil @_TFC4main3Bar4pingfS0_FT_T_ : $@cc(method) @thin (@guaranteed Bar) -> ()
+sil @_TFC4main3Foo4pingfS0_FT_T_ : $@cc(method) @thin (@guaranteed Foo) -> ()
 
 sil_vtable Bar {
   #Bar.ping!1: _TFC4main3Bar4pingfS0_FT_T_

@@ -18,12 +18,13 @@ class MD5 : Hash {
 
 sil @_TFC4test3MD5cfMS0_FT_S0_ : $@cc(method) @thin (@owned MD5) -> @owned MD5 {
 bb0(%0 : $MD5):
+  release_value %0 : $MD5
   return %0 : $MD5
 }
 
-sil @_TFC4test3MD54hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@owned MD5) -> ()
-sil @_TFC4test4Hash4hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@owned Hash) -> ()
-sil @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@cc(method) @thin (@owned Hash) -> ()
+sil @_TFC4test3MD54hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@guaranteed MD5) -> ()
+sil @_TFC4test4Hash4hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@guaranteed Hash) -> ()
+sil @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@cc(method) @thin (@guaranteed Hash) -> ()
 
 // CHECK-LABEL: @_TF4test8testHashFT_T_
 sil @_TF4test8testHashFT_T_ : $@thin () -> () {
@@ -35,10 +36,10 @@ bb0:
   strong_retain %2 : $MD5
   %69 = upcast %2 : $MD5 to $Hash
   strong_retain %69 : $Hash
-  // CHECK: function_ref @_TFC4test3MD54hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@owned MD5) -> ()
-  // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@cc(method) @thin (@owned MD5) -> ()
-  %134 = class_method %69 : $Hash, #Hash.hash!1 : Hash -> () -> () , $@cc(method) @thin (@owned Hash) -> ()
-  %135 = apply %134(%69) : $@cc(method) @thin (@owned Hash) -> ()
+  // CHECK: function_ref @_TFC4test3MD54hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@guaranteed MD5) -> ()
+  // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@cc(method) @thin (@guaranteed MD5) -> ()
+  %134 = class_method %69 : $Hash, #Hash.hash!1 : Hash -> () -> () , $@cc(method) @thin (@guaranteed Hash) -> ()
+  %135 = apply %134(%69) : $@cc(method) @thin (@guaranteed Hash) -> ()
   strong_release %2 : $MD5
   %17 = tuple ()
   return %17 : $()
@@ -53,8 +54,8 @@ bb0:
   %61 = upcast %21 : $MD5 to $Hash 
   // CHECK-DISABLED: function_ref @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@cc(method) @thin (@owned Hash) -> ()
   // CHECK-DISABLED: apply {{%[0-9]+}}({{%[0-9]+}}) : $@cc(method) @thin (@owned Hash) -> ()
-  %62 = class_method %61 : $Hash, #Hash.update!1 : Hash -> () -> () , $@cc(method) @thin (@owned Hash) -> ()
-  %135 = apply %62(%61) : $@cc(method) @thin (@owned Hash) -> ()
+  %62 = class_method %61 : $Hash, #Hash.update!1 : Hash -> () -> () , $@cc(method) @thin (@guaranteed Hash) -> ()
+  %135 = apply %62(%61) : $@cc(method) @thin (@guaranteed Hash) -> ()
   %17 = tuple ()
   // CHECK: return
   return %17 : $()
@@ -86,26 +87,23 @@ class E : D {
 }
 
 // CHECK-LABEL: sil @_TFC1b1C4doItfS0_FT_T_
-sil @_TFC1b1C4doItfS0_FT_T_ : $@cc(method) @thin (@owned C) -> () {
+sil @_TFC1b1C4doItfS0_FT_T_ : $@cc(method) @thin (@guaranteed C) -> () {
 bb0(%0 : $C):
-  strong_release %0 : $C
   %2 = tuple ()
   return %2 : $()
 }
 
 // CHECK-LABEL: sil @_TFC1b1D4doItfS0_FT_T_
-sil @_TFC1b1D4doItfS0_FT_T_ : $@cc(method) @thin (@owned D) -> () {
+sil @_TFC1b1D4doItfS0_FT_T_ : $@cc(method) @thin (@guaranteed D) -> () {
 bb0(%0 : $D):
-  strong_release %0 : $D
   %2 = tuple ()
   return %2 : $()
 }
 
 
 // CHECK-LABEL: sil @_TFC1b1E4doItfS0_FT_T_
-sil @_TFC1b1E4doItfS0_FT_T_ : $@cc(method) @thin (@owned E) -> () {
+sil @_TFC1b1E4doItfS0_FT_T_ : $@cc(method) @thin (@guaranteed E) -> () {
 bb0(%0 : $E):
-  strong_release %0 : $E
   %2 = tuple ()
   return %2 : $()
 }
@@ -117,8 +115,8 @@ bb0:
   %0 = alloc_ref $E
   %1 = upcast %0 : $E to $C
   %2 = unconditional_checked_cast %1 : $C to $D
-  %3 = class_method %2 : $D, #D.doIt!1 : D -> () -> () , $@cc(method) @thin (@owned D) -> ()
-  %4 = apply %3(%2) : $@cc(method) @thin (@owned D) -> ()
+  %3 = class_method %2 : $D, #D.doIt!1 : D -> () -> () , $@cc(method) @thin (@guaranteed D) -> ()
+  %4 = apply %3(%2) : $@cc(method) @thin (@guaranteed D) -> ()
   %5 = tuple ()
 // CHECK: return
   return %5 : $()

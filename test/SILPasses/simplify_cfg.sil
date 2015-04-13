@@ -876,14 +876,14 @@ class Derived : Base {
 class Final : Derived {
 }
 
-sil @_TFC3ccb4Base5innerfS0_FT_T_ : $@cc(method) @thin (@owned Base) -> ()
-sil @_TFC3ccb4Base6middlefS0_FT_T_ : $@cc(method) @thin (@owned Base) -> ()
+sil @_TFC3ccb4Base5innerfS0_FT_T_ : $@cc(method) @thin (@guaranteed Base) -> ()
+sil @_TFC3ccb4Base6middlefS0_FT_T_ : $@cc(method) @thin (@guaranteed Base) -> ()
 
 // CHECK-LABEL: sil @redundant_checked_cast_br
-sil @redundant_checked_cast_br : $@cc(method) @thin (@owned Base) -> () {
+sil @redundant_checked_cast_br : $@cc(method) @thin (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@cc(method) @thin (@owned Base) -> ()
-  %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@cc(method) @thin (@owned Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@cc(method) @thin (@guaranteed Base) -> ()
+  %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@cc(method) @thin (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
 
@@ -894,10 +894,10 @@ bb1:
 
 bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
-  %7 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@cc(method) @thin (@owned Base) -> ()
+  %7 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@cc(method) @thin (@guaranteed Base) -> ()
 // CHECK-NOT: checked_cast_br
   checked_cast_br [exact] %0 : $Base to $Base, bb3, bb5
-// CHECK: [[INNER:%.*]] = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@cc(method) @thin (@owned Base) -> ()
+// CHECK: [[INNER:%.*]] = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@cc(method) @thin (@guaranteed Base) -> ()
 // CHECK: apply [[INNER]]
 // CHECK: br bb1
 
@@ -906,8 +906,8 @@ bb3(%9 : $Base):
 // CHECK-NOT: function-ref
 // CHECK: apply [[METHOD]]
 
-  %10 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@cc(method) @thin (@owned Base) -> ()
-  %11 = apply %10(%0) : $@cc(method) @thin (@owned Base) -> ()
+  %10 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@cc(method) @thin (@guaranteed Base) -> ()
+  %11 = apply %10(%0) : $@cc(method) @thin (@guaranteed Base) -> ()
   br bb4
 
 bb4:
@@ -915,23 +915,23 @@ bb4:
   br bb6(%13 : $())
 
 bb5:
-  %15 = apply %7(%0) : $@cc(method) @thin (@owned Base) -> ()
+  %15 = apply %7(%0) : $@cc(method) @thin (@guaranteed Base) -> ()
   br bb4
 
 bb6(%17 : $()):
   br bb1
 
 bb7:
-  %19 = apply %1(%0) : $@cc(method) @thin (@owned Base) -> ()
+  %19 = apply %1(%0) : $@cc(method) @thin (@guaranteed Base) -> ()
   br bb1
 }
 
 
 // CHECK-LABEL: sil @not_redundant_checked_cast_br
-sil @not_redundant_checked_cast_br : $@cc(method) @thin (@owned Base) -> () {
+sil @not_redundant_checked_cast_br : $@cc(method) @thin (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@cc(method) @thin (@owned Base) -> ()
-  %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@cc(method) @thin (@owned Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@cc(method) @thin (@guaranteed Base) -> ()
+  %1 = class_method %0 : $Base, #Base.middle!1 : Base -> () -> () , $@cc(method) @thin (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to $Base, bb2, bb7
 
@@ -942,14 +942,14 @@ bb1:
 
 bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@cc(method) @thin (@owned Base) -> ()
-  %7 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@cc(method) @thin (@owned Base) -> ()
+// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@cc(method) @thin (@guaranteed Base) -> ()
+  %7 = class_method %0 : $Base, #Base.inner!1 : Base -> () -> () , $@cc(method) @thin (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Derived
   checked_cast_br [exact] %0 : $Base to $Derived, bb3, bb5
 
 bb3(%9 : $Derived):
-  %10 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@cc(method) @thin (@owned Base) -> ()
-  %11 = apply %10(%0) : $@cc(method) @thin (@owned Base) -> ()
+  %10 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@cc(method) @thin (@guaranteed Base) -> ()
+  %11 = apply %10(%0) : $@cc(method) @thin (@guaranteed Base) -> ()
   br bb4
 
 bb4:
@@ -957,14 +957,14 @@ bb4:
   br bb6(%13 : $())
 
 bb5:
-  %15 = apply %7(%0) : $@cc(method) @thin (@owned Base) -> ()
+  %15 = apply %7(%0) : $@cc(method) @thin (@guaranteed Base) -> ()
   br bb4
 
 bb6(%17 : $()):
   br bb1
 
 bb7:
-  %19 = apply %1(%0) : $@cc(method) @thin (@owned Base) -> ()
+  %19 = apply %1(%0) : $@cc(method) @thin (@guaranteed Base) -> ()
   br bb1
 }
 

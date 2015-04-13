@@ -54,10 +54,9 @@ bb0(%0 : $*S):
 }
 
 // CHECK-LABEL: class_target
-sil [always_inline] @class_target : $@cc(method) @thin (@owned C) -> Builtin.Int1 {
+sil [always_inline] @class_target : $@cc(method) @thin (@guaranteed C) -> Builtin.Int1 {
 bb0(%0 : $C):
   %1 = integer_literal $Builtin.Int1, -1
-  strong_release %0 : $C
   return %1 : $Builtin.Int1
 }
 
@@ -65,14 +64,12 @@ bb0(%0 : $C):
 sil [always_inline] [thunk] @class_witness : $@cc(witness_method) @thin (@in_guaranteed C) -> Builtin.Int1 {
 // CHECK: bb0
 bb0(%0 : $*C):
-  // CHECK: [[LOADED:%.*]] = load %0
+  // CHECK-NOT: load
   %1 = load %0 : $*C
-  // CHECK: strong_retain [[LOADED]]
-  strong_retain %1 : $C
   // CHECK-NOT: class_method
-  %3 = class_method %1 : $C, #C.foo!1 : C -> () -> Builtin.Int1 , $@cc(method) @thin (@owned C) -> Builtin.Int1
+  %3 = class_method %1 : $C, #C.foo!1 : C -> () -> Builtin.Int1 , $@cc(method) @thin (@guaranteed C) -> Builtin.Int1
   // CHECK-NOT: apply
-  %4 = apply %3(%1) : $@cc(method) @thin (@owned C) -> Builtin.Int1
+  %4 = apply %3(%1) : $@cc(method) @thin (@guaranteed C) -> Builtin.Int1
   // CHECK: [[ONE:%.*]] = integer_literal $Builtin.Int1, -1
   // CHECK: return [[ONE]]
   return %4 : $Builtin.Int1

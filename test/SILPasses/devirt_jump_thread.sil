@@ -24,32 +24,28 @@ public class FooClass {
 }
 
 // devirt_jump_thread.FooClass.value.getter : Swift.Int32
-sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClassg5valueSi : $@cc(method) @thin (@owned FooClass) -> Int32 {
+sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClassg5valueSi : $@cc(method) @thin (@guaranteed FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   %1 = ref_element_addr %0 : $FooClass, #FooClass.value // user: %2
   %2 = load %1 : $*Int32                            // user: %4
-  strong_release %0 : $FooClass                   // id: %3
   return %2 : $Int32                                // id: %4
 }
 
 // devirt_jump_thread.FooClass.value.setter : Swift.Int32
-sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClasss5valueSi : $@cc(method) @thin (Int32, @owned FooClass) -> () {
+sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClasss5valueSi : $@cc(method) @thin (Int32, @guaranteed FooClass) -> () {
 bb0(%0 : $Int32, %1 : $FooClass):
   %2 = ref_element_addr %1 : $FooClass, #FooClass.value // user: %3
   store %0 to %2 : $*Int32                          // id: %3
-  strong_release %1 : $FooClass                   // id: %4
   %5 = tuple ()                                   // user: %6
   return %5 : $()                                 // id: %6
 }
 
 // devirt_jump_thread.FooClass.foo (devirt_jump_thread.FooClass)(Swift.Int32) -> Swift.Int32
-sil [noinline] @_TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 {
+sil [noinline] @_TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 {
 bb0(%0 : $Int32, %1 : $FooClass):
   // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
   %2 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %3
   %3 = apply %2(%0, %1) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %6
-  fix_lifetime %1 : $FooClass                     // id: %4
-  strong_release %1 : $FooClass                   // id: %5
   return %3 : $Int32                                // id: %6
 }
 
@@ -77,7 +73,7 @@ bb0(%0 : $Int32, %1 : $FooClass):
 // CHECK: br bb1
 // CHECK: }
 // devirt_jump_thread.jumpthread_checked_cast_br (devirt_jump_thread.FooClass) -> Swift.Int32
-sil @_TF18devirt_jump_thread26jumpthread_checked_cast_brFCS_8FooClassSi : $@thin (@owned FooClass) -> Int32 {
+sil @_TF18devirt_jump_thread26jumpthread_checked_cast_brFCS_8FooClassSi : $@thin (@guaranteed FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   %1 = integer_literal $Builtin.Int32, 2           // user: %2
   %2 = struct $Int32 (%1 : $Builtin.Int32)           // users: %37, %43, %48, %54
@@ -127,9 +123,9 @@ bb5(%34 : $FooClass):                             // Preds: bb0
   br bb1(%37 : $Int32)                              // id: %40
 
 bb6:                                              // Preds: bb0
-  %41 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %43
+  %41 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %43
   strong_retain %0 : $FooClass                    // id: %42
-  %43 = apply %41(%2, %0) : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %44
+  %43 = apply %41(%2, %0) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %44
   br bb1(%43 : $Int32)                              // id: %44
 
 bb7(%45 : $FooClass):                             // Preds: bb1
@@ -142,9 +138,9 @@ bb7(%45 : $FooClass):                             // Preds: bb1
   br bb2(%48 : $Int32)                              // id: %51
 
 bb8:                                              // Preds: bb1
-  %52 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %54
+  %52 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %54
   strong_retain %0 : $FooClass                    // id: %53
-  %54 = apply %52(%2, %0) : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %55
+  %54 = apply %52(%2, %0) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %55
   br bb2(%54 : $Int32)                              // id: %55
 
 bb9(%56 : $FooClass):                             // Preds: bb2
@@ -157,9 +153,9 @@ bb9(%56 : $FooClass):                             // Preds: bb2
   br bb3(%59 : $Int32)                              // id: %62
 
 bb10:                                             // Preds: bb2
-  %63 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %65
+  %63 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %65
   strong_retain %0 : $FooClass                    // id: %64
-  %65 = apply %63(%15, %0) : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %66
+  %65 = apply %63(%15, %0) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %66
   br bb3(%65 : $Int32)                              // id: %66
 
 bb11(%67 : $FooClass):                            // Preds: bb3
@@ -171,8 +167,8 @@ bb11(%67 : $FooClass):                            // Preds: bb3
   br bb4(%69 : $Int32)                              // id: %72
 
 bb12:                                             // Preds: bb3
-  %73 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %74
-  %74 = apply %73(%24, %0) : $@cc(method) @thin (Int32, @owned FooClass) -> Int32 // user: %75
+  %73 = class_method %0 : $FooClass, #FooClass.foo!1 : FooClass -> (Int32) -> Int32 , $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %74
+  %74 = apply %73(%24, %0) : $@cc(method) @thin (Int32, @guaranteed FooClass) -> Int32 // user: %75
   br bb4(%74 : $Int32)                              // id: %75
 }
 
@@ -189,7 +185,7 @@ bb12:                                             // Preds: bb3
 // CHECK: br bb1
 // CHECK }
 // devirt_jump_thread.double (devirt_jump_thread.FooClass) -> Swift.Int32
-sil @_TF18devirt_jump_thread6doubleFCS_8FooClassSi : $@thin (@owned FooClass) -> Int32 {
+sil @_TF18devirt_jump_thread6doubleFCS_8FooClassSi : $@thin (@guaranteed FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
 
@@ -213,9 +209,9 @@ bb3(%14 : $FooClass):                             // Preds: bb0
   br bb1(%16 : $Int32)                              // id: %17
 
 bb4:                                              // Preds: bb0
-  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %20
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %20
   strong_retain %0 : $FooClass                    // id: %19
-  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %21
+  %20 = apply %18(%0) : $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %21
   br bb1(%20 : $Int32)                              // id: %21
 
 bb5(%22 : $FooClass):                             // Preds: bb1
@@ -225,8 +221,8 @@ bb5(%22 : $FooClass):                             // Preds: bb1
   br bb2(%24 : $Int32)                              // id: %26
 
 bb6:                                              // Preds: bb1
-  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %28
-  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %29
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %28
+  %28 = apply %27(%0) : $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %29
   br bb2(%28 : $Int32)                              // id: %29
 }
 
@@ -242,7 +238,7 @@ bb6:                                              // Preds: bb1
 // CHECK: checked_cast_br
 // CHECK: bb2(%{{.*}} : $Int32):
 // CHECK }
-sil @_TF18devirt_jump_thread6dont_jump_thread_alloc_stackFCS_8FooClassSi : $@thin (@owned FooClass) -> Int32 {
+sil @_TF18devirt_jump_thread6dont_jump_thread_alloc_stackFCS_8FooClassSi : $@thin (@guaranteed FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
 
@@ -268,20 +264,18 @@ bb3(%14 : $FooClass):                             // Preds: bb0
   br bb1(%16 : $Int32)                              // id: %17
 
 bb4:                                              // Preds: bb0
-  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %20
-  strong_retain %0 : $FooClass                    // id: %19
-  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %21
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %20
+  %20 = apply %18(%0) : $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %21
   br bb1(%20 : $Int32)                              // id: %21
 
 bb5(%22 : $FooClass):                             // Preds: bb1
   %23 = ref_element_addr %22 : $FooClass, #FooClass.value // user: %24
   %24 = load %23 : $*Int32                          // user: %26
-  strong_release %22 : $FooClass                  // id: %25
   br bb2(%24 : $Int32)                              // id: %26
 
 bb6:                                              // Preds: bb1
-  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %28
-  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %29
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %28
+  %28 = apply %27(%0) : $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %29
   br bb2(%28 : $Int32)                              // id: %29
 }
 
@@ -298,7 +292,7 @@ bb6:                                              // Preds: bb1
 // CHECK: checked_cast_br
 // CHECK: bb2(%{{.*}} : $Int32):
 // CHECK }
-sil @_TF18devirt_jump_thread6dont_jump_thread_objc_methodFCS_8FooClassSi : $@thin (@owned FooClass) -> Int32 {
+sil @_TF18devirt_jump_thread6dont_jump_thread_objc_methodFCS_8FooClassSi : $@thin (@guaranteed FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   %100 = alloc_ref $Bar
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
@@ -324,9 +318,9 @@ bb3(%14 : $FooClass):                             // Preds: bb0
   br bb1(%16 : $Int32)                              // id: %17
 
 bb4:                                              // Preds: bb0
-  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %20
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %20
   strong_retain %0 : $FooClass                    // id: %19
-  %20 = apply %18(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %21
+  %20 = apply %18(%0) : $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %21
   br bb1(%20 : $Int32)                              // id: %21
 
 bb5(%22 : $FooClass):                             // Preds: bb1
@@ -336,8 +330,8 @@ bb5(%22 : $FooClass):                             // Preds: bb1
   br bb2(%24 : $Int32)                              // id: %26
 
 bb6:                                              // Preds: bb1
-  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@owned FooClass) -> Int32 // user: %28
-  %28 = apply %27(%0) : $@cc(method) @thin (@owned FooClass) -> Int32 // user: %29
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : FooClass -> () -> Int32 , $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %28
+  %28 = apply %27(%0) : $@cc(method) @thin (@guaranteed FooClass) -> Int32 // user: %29
   br bb2(%28 : $Int32)                              // id: %29
 }
 
