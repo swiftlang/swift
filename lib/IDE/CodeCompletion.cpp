@@ -1614,8 +1614,8 @@ public:
     addMethodImpl();
   }
 
-  void addConstructorCall(const ConstructorDecl *CD,
-                          DeclVisibilityKind Reason) {
+  void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
+                          Identifier addName = Identifier()) {
     foundFunction(CD);
     Type MemberType = getTypeOfMember(CD);
     AnyFunctionType *ConstructorType = nullptr;
@@ -1631,10 +1631,13 @@ public:
           getSemanticContext(CD, Reason));
       Builder.setAssociatedDecl(CD);
       if (IsSuperRefExpr) {
+        assert(addName.empty());
         assert(isa<ConstructorDecl>(CurrDeclContext) &&
                "can call super.init only inside a constructor");
         addLeadingDot(Builder);
         Builder.addTextChunk("init");
+      } else if (!addName.empty()) {
+        Builder.addTextChunk(addName.str());
       }
 
       if (MemberType->is<ErrorType>()) {
@@ -1658,6 +1661,24 @@ public:
     if (ConstructorType && hasInterestingDefaultValues(ConstructorType))
       addConstructorImpl(/*includeDefaultArgs*/ false);
     addConstructorImpl();
+  }
+
+  void addConstructorCallsForType(Type type, Identifier name,
+                                  DeclVisibilityKind Reason) {
+    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr)
+      return;
+
+    assert(CurrDeclContext);
+    SmallVector<ValueDecl *, 16> initializers;
+    if (CurrDeclContext->lookupQualified(type, Ctx.Id_init, NL_QualifiedDefault,
+                                         TypeResolver.get(), initializers)) {
+      for (auto *init : initializers) {
+        if (init->isPrivateStdlibDecl(/*whitelistProtocols*/ false) ||
+            AvailabilityAttr::isUnavailable(init))
+          continue;
+        addConstructorCall(cast<ConstructorDecl>(init), Reason, name);
+      }
+    }
   }
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
@@ -1850,16 +1871,22 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
+        addConstructorCallsForType(NTD->getType(), NTD->getName(), Reason);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
         addTypeAliasRef(TAD, Reason);
+        addConstructorCallsForType(TAD->getUnderlyingType(), TAD->getName(),
+                                   Reason);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
+        for (auto *protocol : GP->getProtocols())
+          addConstructorCallsForType(protocol->getType(), GP->getName(),
+                                     Reason);
         return;
       }
 
@@ -1906,16 +1933,22 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addNominalTypeRef(NTD, Reason);
+        addConstructorCallsForType(NTD->getType(), NTD->getName(), Reason);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
         addTypeAliasRef(TAD, Reason);
+        addConstructorCallsForType(TAD->getUnderlyingType(), TAD->getName(),
+                                   Reason);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
+        for (auto *protocol : GP->getProtocols())
+          addConstructorCallsForType(protocol->getType(), GP->getName(),
+                                     Reason);
         return;
       }
 
@@ -2890,14 +2923,18 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (Lookup.RequestedCachedResults) {
     // Create helpers for result caching.
     auto &SwiftContext = P.Context;
+
+    // Use the current SourceFile as the DeclContext so that we can use it to
+    // perform qualified lookup, and to get the correct visibility for
+    // @testable imports.
     const SourceFile &SF = P.SF;
+
     auto FillCacheCallback =
         [&SwiftContext, &SF](CodeCompletionCacheImpl &Cache,
                              const CodeCompletionCacheImpl::Key &K,
                              const Module *TheModule) {
       auto V = Cache.getResultSinkFor(K);
-      CompletionLookup Lookup(V->Sink, SwiftContext,
-                              K.ForTestableLookup ? &SF : nullptr);
+      CompletionLookup Lookup(V->Sink, SwiftContext, &SF);
       Lookup.getVisibleDeclsOfModule(TheModule, K.AccessPath,
                                      K.ResultsHaveLeadingDot);
       Cache.storeResults(K, V);

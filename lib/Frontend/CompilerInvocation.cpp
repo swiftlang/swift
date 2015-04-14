@@ -623,7 +623,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableAccessControl
       = A->getOption().matches(OPT_enable_access_control);
   }
-  
+
+  Opts.CodeCompleteInitsInPostfixExpr |=
+      Args.hasArg(OPT_code_complete_inits_in_postfix_expr);
+
   if (auto A = Args.getLastArg(OPT_enable_target_os_checking,
                                OPT_disable_target_os_checking)) {
     Opts.EnableTargetOSChecking

@@ -147,6 +147,9 @@ def disable_access_control : Flag<["-"], "disable-access-control">,
 def enable_access_control : Flag<["-"], "enable-access-control">,
   HelpText<"Respect access control restrictions">;
 
+def code_complete_inits_in_postfix_expr : Flag<["-"], "code-complete-inits-in-postfix-expr">,
+  HelpText<"Include initializers when completing a postfix expression">;
+
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;
 

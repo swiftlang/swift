@@ -119,6 +119,10 @@ namespace swift {
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
+    /// Whether to include initializers when code-completing a postfix
+    /// expression.
+    bool CodeCompleteInitsInPostfixExpr = false;
+
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
