@@ -18,11 +18,13 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -677,6 +679,38 @@ namespace {
       if (!D->getCaptureInfo().empty()) {
         OS << " ";
         D->getCaptureInfo().print(OS);
+      }
+
+      if (auto fec = D->getForeignErrorConvention()) {
+        OS << " foreign_error=";
+        bool wantResultType = false;
+        switch (fec->getKind()) {
+        case ForeignErrorConvention::ZeroResult:
+          OS << "zero";
+          wantResultType = true;
+          break;
+
+        case ForeignErrorConvention::NonZeroResult:
+          OS << "nonzero";
+          wantResultType = true;
+          break;
+
+        case ForeignErrorConvention::NilResult:
+          OS << "nil";
+          break;
+
+        case ForeignErrorConvention::NonNilError:
+          OS << "nonnil";
+          break;
+        }
+
+        OS << ((fec->isErrorOwned() == ForeignErrorConvention::IsOwned)
+                ? ",owned"
+                : ",unowned");
+        OS << ",param=" << llvm::utostr(fec->getErrorParameterIndex());
+        OS << ",paramtype=" << fec->getErrorParameterType().getString();
+        if (wantResultType)
+          OS << ",resulttype=" << fec->getResultType().getString();
       }
     }
 

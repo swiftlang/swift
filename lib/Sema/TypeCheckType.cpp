@@ -2401,8 +2401,13 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   return classDecl->getName().str() != "NSNumber";
 }
 
-bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
-                                        ObjCReason Reason) {
+bool TypeChecker::isRepresentableInObjC(
+       const AbstractFunctionDecl *AFD,
+       ObjCReason Reason,
+       Optional<ForeignErrorConvention> &errorConvention) {
+  // Clear out the error convention. It will be added later if needed.
+  errorConvention = None;
+
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
   bool Diagnose = (Reason != ObjCReason::DontDiagnose);
@@ -2578,7 +2583,6 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
     }
 
     // Form the error convention.
-    Optional<ForeignErrorConvention> errorConvention;
     CanType canErrorParameterType = errorParameterType->getCanonicalType();
     switch (kind) {
     case ForeignErrorConvention::ZeroResult:

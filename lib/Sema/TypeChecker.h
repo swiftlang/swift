@@ -1252,7 +1252,8 @@ public:
 
   bool isCIntegerType(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
-                             ObjCReason Reason);
+                             ObjCReason Reason,
+                             Optional<ForeignErrorConvention> &errorConvention);
   bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
   bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
   bool isTriviallyRepresentableInObjC(const DeclContext *DC, Type T);

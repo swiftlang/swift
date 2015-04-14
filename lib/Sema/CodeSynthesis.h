@@ -18,6 +18,10 @@
 #ifndef SWIFT_TYPECHECKING_CODESYNTHESIS_H
 #define SWIFT_TYPECHECKING_CODESYNTHESIS_H
 
+#include "swift/AST/ForeignErrorConvention.h"
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/Optional.h"
+
 namespace swift {
 
 class AbstractFunctionDecl;
@@ -37,7 +41,8 @@ class TypeChecker;
 // These are implemented in TypeCheckDecl.cpp.
 void makeFinal(ASTContext &ctx, ValueDecl *D);
 void makeDynamic(ASTContext &ctx, ValueDecl *D);
-void markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC);
+void markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC,
+                Optional<ForeignErrorConvention> errorConvention = None);
 Type configureImplicitSelf(TypeChecker &tc,
                            AbstractFunctionDecl *func,
                            GenericParamList *&outerGenericParams);

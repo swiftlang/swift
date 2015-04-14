@@ -26,6 +26,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -2421,7 +2422,8 @@ static void checkBridgedFunctions(TypeChecker &TC) {
 
 /// Mark the given declarations as being Objective-C compatible (or
 /// not) as appropriate.
-void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC) {
+void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC,
+                       Optional<ForeignErrorConvention> errorConvention){
   D->setIsObjC(isObjC);
   
   if (isObjC) {
@@ -2461,6 +2463,19 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC) {
                                                       true));
             }
           }
+
+          // If the overridden method has a foreign error convention, adopt it.
+          // Set the foreign error convention for a throwing method.
+          if (auto baseErrorConvention
+              = baseMethod->getForeignErrorConvention()) {
+            errorConvention = baseErrorConvention;
+          }
+        }
+
+        // Attach the foreign error convention.
+        if (method->isBodyThrowing()) {
+          assert(errorConvention && "Missing error convention");
+          method->setForeignErrorConvention(*errorConvention);
         }
 
         classDecl->recordObjCMethod(method);
@@ -4241,10 +4256,12 @@ public:
           FD->getAttrs().add(new (TC.Context) DynamicAttr(/*implicit*/ true));
       }
 
+      Optional<ForeignErrorConvention> errorConvention;
       if (isObjC &&
-          (FD->isInvalid() || !TC.isRepresentableInObjC(FD, reason)))
+          (FD->isInvalid() || !TC.isRepresentableInObjC(FD, reason,
+                                                        errorConvention)))
         isObjC = false;
-      markAsObjC(TC, FD, isObjC);
+      markAsObjC(TC, FD, isObjC, errorConvention);
     }
     
     inferDynamic(TC.Context, FD);
@@ -5560,10 +5577,13 @@ public:
         reason = ObjCReason::MemberOfObjCProtocol;
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
                     isImplicitlyObjC(CD, /*allowImplicit=*/true);
+
+      Optional<ForeignErrorConvention> errorConvention;
       if (isObjC &&
-          (CD->isInvalid() || !TC.isRepresentableInObjC(CD, reason)))
+          (CD->isInvalid() ||
+           !TC.isRepresentableInObjC(CD, reason, errorConvention)))
         isObjC = false;
-      markAsObjC(TC, CD, isObjC);
+      markAsObjC(TC, CD, isObjC, errorConvention);
     }
 
     // If this initializer overrides a 'required' initializer, it must itself
