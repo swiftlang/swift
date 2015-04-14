@@ -668,7 +668,7 @@ static ConstructorDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
   DeclName initName(C, C.Id_init, { C.Id_NilLiteral });
   auto initDecl = new (C) ConstructorDecl(initName, SourceLoc(), OTK_None,
                                           SourceLoc(), selfParam, methodParam,
-                                          nullptr, optionSetDecl);
+                                          nullptr, SourceLoc(), optionSetDecl);
   initDecl->setImplicit();
   initDecl->setAccessibility(Accessibility::Public);
 
@@ -732,7 +732,7 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   auto *ctorDecl = new (C) ConstructorDecl(name, optionSetDecl->getLoc(),
                                            OTK_None, SourceLoc(),
                                            selfPattern, methodParam,
-                                           nullptr, optionSetDecl);
+                                           nullptr, SourceLoc(), optionSetDecl);
   ctorDecl->setImplicit();
   ctorDecl->setAccessibility(Accessibility::Public);
 
@@ -800,7 +800,7 @@ static ConstructorDecl *makeEnumRawValueConstructor(EnumDecl *enumDecl) {
   auto *ctorDecl = new (C) ConstructorDecl(name, enumDecl->getLoc(),
                                            OTK_Optional, SourceLoc(),
                                            selfPattern, paramPattern,
-                                           nullptr, enumDecl);
+                                           nullptr, SourceLoc(), enumDecl);
   ctorDecl->setImplicit();
   ctorDecl->setAccessibility(Accessibility::Public);
 
@@ -1384,7 +1384,7 @@ namespace {
         new (context) ConstructorDecl(name, structDecl->getLoc(),
                                       OTK_None, SourceLoc(),
                                       selfPattern, paramPattern,
-                                      nullptr, structDecl);
+                                      nullptr, SourceLoc(), structDecl);
       
       // Set the constructor's type.
       auto fnTy = FunctionType::get(emptyTy, selfType);
@@ -1483,7 +1483,7 @@ namespace {
         new (context) ConstructorDecl(name, structDecl->getLoc(),
                                       OTK_None, SourceLoc(),
                                       selfPattern, paramPattern,
-                                      nullptr, structDecl);
+                                      nullptr, SourceLoc(), structDecl);
 
       // Set the constructor's type.
       auto fnTy = FunctionType::get(paramTy, selfType);
@@ -3261,7 +3261,8 @@ namespace {
       // Create the actual constructor.
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(objcMethod,
                       name, SourceLoc(), failability, SourceLoc(), selfPat, 
-                      bodyPatterns.back(), /*GenericParams=*/nullptr, dc);
+                      bodyPatterns.back(), /*GenericParams=*/nullptr,
+                      SourceLoc(), dc);
 
       // Make the constructor declaration immediately visible in its
       // class or protocol type.

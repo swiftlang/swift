@@ -49,7 +49,8 @@ Type configureImplicitSelf(TypeChecker &tc,
 void configureConstructorType(ConstructorDecl *ctor,
                               GenericParamList *outerGenericParams,
                               Type selfType,
-                              Type argType);
+                              Type argType,
+                              bool throws);
 bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.

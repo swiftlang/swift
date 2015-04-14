@@ -759,6 +759,8 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
     if (auto FD = dyn_cast<FuncDecl>(func))
       info = info.withThrows(FD->getThrowsLoc().isValid());
+    else if (auto CD = dyn_cast<ConstructorDecl>(func))
+      info = info.withThrows(CD->getThrowsLoc().isValid());
 
     // FIXME: We shouldn't even get here if the function isn't locally generic
     // to begin with, but fixing that requires a lot of reengineering for local

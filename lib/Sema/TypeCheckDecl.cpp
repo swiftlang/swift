@@ -1597,7 +1597,8 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
 void swift::configureConstructorType(ConstructorDecl *ctor,
                                      GenericParamList *outerGenericParams,
                                      Type selfType,
-                                     Type argType) {
+                                     Type argType,
+                                     bool throws) {
   Type fnType;
   Type allocFnType;
   Type initFnType;
@@ -1610,12 +1611,15 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
   argType = argType->getRelabeledType(ctor->getASTContext(), 
                                       ctor->getFullName().getArgumentNames());
 
+  auto extInfo = AnyFunctionType::ExtInfo().withThrows(throws);
+
   if (GenericParamList *innerGenericParams = ctor->getGenericParams()) {
     innerGenericParams->setOuterParameters(outerGenericParams);
     fnType = PolymorphicFunctionType::get(argType, resultType,
-                                          innerGenericParams);
+                                          innerGenericParams,
+                                          extInfo);
   } else {
-    fnType = FunctionType::get(argType, resultType);
+    fnType = FunctionType::get(argType, resultType, extInfo);
   }
   Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
   if (outerGenericParams) {
@@ -5522,7 +5526,8 @@ public:
       CD->setInvalid();
     } else {
       configureConstructorType(CD, outerGenericParams, SelfTy, 
-                               CD->getBodyParamPatterns()[1]->getType());
+                               CD->getBodyParamPatterns()[1]->getType(),
+                               CD->getThrowsLoc().isValid());
     }
 
     validateAttributes(TC, CD);

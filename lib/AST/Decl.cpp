@@ -3527,10 +3527,11 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  SourceLoc FailabilityLoc,
                                  Pattern *SelfBodyParam, Pattern *BodyParams,
                                  GenericParamList *GenericParams,
+                                 SourceLoc throwsLoc,
                                  DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name,
                          ConstructorLoc, 2, GenericParams),
-    FailabilityLoc(FailabilityLoc) 
+    FailabilityLoc(FailabilityLoc), ThrowsLoc(throwsLoc)
 {
   setBodyParams(SelfBodyParam, BodyParams);
   

@@ -1941,7 +1941,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   Pattern *selfPat = buildImplicitSelfParameter(Loc, decl);
   auto *ctor = new (context) ConstructorDecl(name, Loc, OTK_None, SourceLoc(),
                                              selfPat, pattern,
-                                             nullptr, decl);
+                                             nullptr, SourceLoc(), decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -2197,7 +2197,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                         superclassCtor->getFailability(),
                                         SourceLoc(),
                                         selfBodyPattern, bodyParamPatterns,
-                                        nullptr, classDecl);
+                                        nullptr, SourceLoc(), classDecl);
   ctor->setImplicit();
   ctor->setAccessibility(std::min(classDecl->getFormalAccess(),
                                   superclassCtor->getFormalAccess()));
@@ -2215,9 +2215,11 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Set the type of the initializer.
   configureConstructorType(ctor, outerGenericParams, selfType, 
-                           bodyParamPatterns->getType());
+                           bodyParamPatterns->getType(),
+                           superclassCtor->isBodyThrowing());
   if (superclassCtor->isObjC()) {
-    markAsObjC(tc, ctor, true);
+    auto errorConvention = superclassCtor->getForeignErrorConvention();
+    markAsObjC(tc, ctor, true, errorConvention);
 
     // Inherit the @objc name from the superclass initializer, if it
     // has one.

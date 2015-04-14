@@ -2512,12 +2512,37 @@ bool TypeChecker::isRepresentableInObjC(
   // Throwing functions must map to a particular error convention.
   if (AFD->isBodyThrowing()) {
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
-    Type resultType = cast<FuncDecl>(AFD)->getResultType();
+    SourceLoc throwsLoc;
+    Type resultType;
+
+    const ConstructorDecl *ctor = nullptr;
+    if (auto func = dyn_cast<FuncDecl>(AFD)) {
+      resultType = func->getResultType();
+      throwsLoc = func->getThrowsLoc();
+    } else {
+      ctor = cast<ConstructorDecl>(AFD);
+      throwsLoc = ctor->getThrowsLoc();
+    }
+
     ForeignErrorConvention::Kind kind;
     CanType errorResultType;
     Type optOptionalType;
-    SourceLoc throwsLoc = cast<FuncDecl>(AFD)->getThrowsLoc();
-    if (resultType->isVoid()) {
+    if (ctor) {
+      // Initializers always use the nil result convention.
+      kind = ForeignErrorConvention::NilResult;
+
+      // Only non-failing initializers can throw.
+      if (ctor->getFailability() != OTK_None) {
+        if (Diagnose) {
+          diagnose(AFD->getLoc(), diag::objc_invalid_on_failing_init,
+                   getObjCDiagnosticAttrKind(Reason))
+            .highlight(throwsLoc);
+          describeObjCReason(*this, AFD, Reason);
+        }
+
+        return false;
+      }
+    } else if (resultType->isVoid()) {
       // Functions that return nothing (void) can be throwing; they indicate
       // failure with a 'false' result.
       kind = ForeignErrorConvention::ZeroResult;

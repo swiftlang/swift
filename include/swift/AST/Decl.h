@@ -5275,6 +5275,9 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The location of the '!' or '?' for a failable initializer.
   SourceLoc FailabilityLoc;
 
+  // Location of the 'throws' token.
+  SourceLoc ThrowsLoc;
+
   Pattern *BodyParams[2];
 
   /// The type of the initializing constructor.
@@ -5295,7 +5298,8 @@ public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   OptionalTypeKind Failability, SourceLoc FailabilityLoc,
                   Pattern *SelfBodyParam, Pattern *BodyParams,
-                  GenericParamList *GenericParams, DeclContext *Parent);
+                  GenericParamList *GenericParams, 
+                  SourceLoc throwsLoc, DeclContext *Parent);
 
   void setBodyParams(Pattern *selfPattern, Pattern *bodyParams);
 
@@ -5416,6 +5420,9 @@ public:
 
   /// Retrieve the location of the '!' or '?' in a failable initializer.
   SourceLoc getFailabilityLoc() const { return FailabilityLoc; }
+
+  /// Retrieve the location of the 'throws' keyword, if present.
+  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
 
   /// Whether the implementation of this method is a stub that traps at runtime.
   bool hasStubImplementation() const {

@@ -2124,7 +2124,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclName name(ctx, ctx.Id_init, argNames);
     auto ctor = createDecl<ConstructorDecl>(name, SourceLoc(), failability,
                                             SourceLoc(), /*bodyParams=*/nullptr,
-                                            nullptr, genericParams, parent);
+                                            nullptr, genericParams, SourceLoc(),
+                                            parent);
     declOrOffset = ctor;
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {

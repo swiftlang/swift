@@ -1918,6 +1918,10 @@ ERROR(objc_invalid_on_throwing_result,sema_objc,none,
       "it returns a value of type %1; return 'Void' or a type that bridges "
       "to an Objective-C class",
       (unsigned, Type))
+ERROR(objc_invalid_on_failing_init,sema_objc,none,
+      "a failable and throwing initializer cannot be marked "
+      "%" OBJC_ATTR_SELECT "0 because 'nil' indicates failure to Objective-C",
+      (unsigned))
 
 #undef OBJC_ATTR_SELECT
 

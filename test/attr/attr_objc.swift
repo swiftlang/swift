@@ -1773,6 +1773,9 @@ class ClassThrows1 {
   // CHECK: @objc func methodReturnsArray() throws -> [String]
   @objc func methodReturnsArray() throws -> [String] { return [String]() }
 
+  // CHECK: @objc init(degrees: Double) throws
+  @objc init(degrees: Double) throws { }
+
   // Errors
 
   @objc func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil } // expected-error{{throwing method cannot be marked @objc because it returns a value of optional type 'Class_ObjC1?'; 'nil' indicates failure to Objective-C}}
@@ -1784,7 +1787,12 @@ class ClassThrows1 {
   @objc func methodAcceptsThrowingFunc(fn: (String) throws -> Int) { }
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{throwing function types cannot be represented in Objective-C}}
+
+  @objc init?(radians: Double) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
+
+  @objc init!(string: String) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
 }
+
 
 // CHECK-DUMP-LABEL: class_decl "ImplicitClassThrows1"
 @objc class ImplicitClassThrows1 {
@@ -1810,6 +1818,10 @@ class ClassThrows1 {
   // CHECK: @objc func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int)
   // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=zero,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int) throws { }
+
+  // CHECK: @objc init(degrees: Double) throws
+  // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=nil,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>
+  init(degrees: Double) throws { }
 }
 
 // CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"

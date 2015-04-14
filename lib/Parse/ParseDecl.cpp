@@ -4598,13 +4598,19 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return nullptr;
   }
 
+  // Parse 'throws'.
+  SourceLoc throwsLoc;
+  if (Tok.is(tok::kw_throws))
+    throwsLoc = consumeToken();
+
   auto *SelfPattern = buildImplicitSelfParameter(ConstructorLoc,CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
                                            SelfPattern, BodyPattern,
-                                           GenericParams, CurDeclContext);
+                                           GenericParams, throwsLoc,
+                                           CurDeclContext);
   
   CtorInitializerKind initKind = CtorInitializerKind::Designated;
   if (Attributes.hasAttribute<ConvenienceAttr>())

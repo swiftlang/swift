@@ -442,6 +442,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
                                           selfParam,
                                           rawParam,
                                           nullptr,
+                                          SourceLoc(),
                                           enumDecl);
   
   initDecl->setImplicit();
