@@ -890,10 +890,6 @@ public:
                                        std::function<bool(Type)> convertToType,
                                        bool suppressDiagnostics);
 
-  /// Determine whether the given type is an unparenthesized trailing closure
-  /// type, which is used in the type checker to identify cases where
-  static AnyFunctionType *isUnparenthesizedTrailingClosure(Type type);
-
   /// Retrieves the Objective-C type to which the given value type is
   /// bridged.
   ///

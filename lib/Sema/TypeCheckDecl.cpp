@@ -4056,6 +4056,22 @@ public:
     return false;
   }
 
+  /// Determine whether this is an unparenthesized closure type.
+  static AnyFunctionType *isUnparenthesizedTrailingClosure(Type type) {
+    if (isa<ParenType>(type.getPointer()))
+      return nullptr;
+
+    // Only consider the rvalue type.
+    type = type->getRValueType();
+
+    // Look through one level of optionality.
+    if (auto objectType = type->getAnyOptionalObjectType())
+      type = objectType;
+
+    // Is it a function type?
+    return type->getAs<AnyFunctionType>();
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass) {
       if (FD->hasBody()) {
@@ -4290,8 +4306,7 @@ public:
           // suppress this warning by adding parentheses.
           auto paramType = fields[i-1].getPattern()->getType();
 
-          if (auto *funcTy = TypeChecker::isUnparenthesizedTrailingClosure(
-                               paramType)) {
+          if (auto *funcTy = isUnparenthesizedTrailingClosure(paramType)) {
             // If we saw any default arguments before this, complain.
             // This doesn't apply to autoclosures.
             if (anyDefaultArguments && !funcTy->getExtInfo().isAutoClosure()) {

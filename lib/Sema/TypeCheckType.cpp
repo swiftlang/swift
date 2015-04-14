@@ -27,6 +27,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -2362,21 +2363,6 @@ bool TypeChecker::isCIntegerType(const DeclContext *DC, Type T) {
   return CIntegerTypes.count(T->getCanonicalType());
 }
 
-AnyFunctionType *TypeChecker::isUnparenthesizedTrailingClosure(Type type) {
-  if (isa<ParenType>(type.getPointer()))
-    return nullptr;
-
-  // Only consider the rvalue type.
-  type = type->getRValueType();
-
-  // Look through one level of optionality.
-  if (auto objectType = type->getAnyOptionalObjectType())
-    type = objectType;
-
-  // Is it a function type?
-  return type->getAs<AnyFunctionType>();
-}
-
 /// Determines whether the given type is bridged to an Objective-C class type.
 static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   // Simple case: bridgeable object types.
@@ -2399,6 +2385,19 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   // FIXME: This feels like a hack, but we don't have the right predicate
   // anywhere.
   return classDecl->getName().str() != "NSNumber";
+}
+
+/// Determine whether this is a trailing closure type.
+static AnyFunctionType *isTrailingClosure(Type type) {
+  // Only consider the rvalue type.
+  type = type->getRValueType();
+
+  // Look through one level of optionality.
+  if (auto objectType = type->getAnyOptionalObjectType())
+    type = objectType;
+
+  // Is it a function type?
+  return type->getAs<AnyFunctionType>();
 }
 
 bool TypeChecker::isRepresentableInObjC(
@@ -2566,22 +2565,51 @@ bool TypeChecker::isRepresentableInObjC(
             errorParameterType);
     }
 
-    // Determine the parameter index at which the error will go, skipping
-    // over all trailing closures.
+    // Determine the parameter index at which the error will go.
     unsigned errorParameterIndex;
-    const Pattern *paramPattern = AFD->getBodyParamPatterns()[1];
-    if (auto *tuple = dyn_cast<TuplePattern>(paramPattern)) {
-      errorParameterIndex = tuple->getNumElements();
-      while (errorParameterIndex > 0 &&
-             isUnparenthesizedTrailingClosure(
-               tuple->getElement(errorParameterIndex - 1).getPattern()
-                 ->getType()))
-        --errorParameterIndex;
-    } else {
-      auto paren = cast<ParenPattern>(paramPattern);
-      errorParameterIndex
-        = isUnparenthesizedTrailingClosure(paren->getSubPattern()->getType())
-            ? 0 : 1;
+    bool foundErrorParameterIndex = false;
+
+    // If there is an explicit @objc attribute with a name, look for
+    // the "error" selector piece.
+    if (auto objc = AFD->getAttrs().getAttribute<ObjCAttr>()) {
+      if (auto objcName = objc->getName()) {
+        auto selectorPieces = objcName->getSelectorPieces();
+        for (unsigned i = selectorPieces.size(); i > 0; --i) {
+          // If the selector piece is "error", this is the location of
+          // the error parameter.
+          auto piece = selectorPieces[i-1];
+          if (piece == Context.Id_error) {
+            errorParameterIndex = i-1;
+            foundErrorParameterIndex = true;
+            break;
+          }
+
+          // If the first selector piece ends with "Error", it's here.
+          if (i == 1 && camel_case::getLastWord(piece.str()) == "Error") {
+            errorParameterIndex = i-1;
+            foundErrorParameterIndex = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // If the selector did not provide an index for the error, find
+    // the last parameter that is not a trailing closure.
+    if (!foundErrorParameterIndex) {
+      const Pattern *paramPattern = AFD->getBodyParamPatterns()[1];
+      if (auto *tuple = dyn_cast<TuplePattern>(paramPattern)) {
+        errorParameterIndex = tuple->getNumElements();
+        while (errorParameterIndex > 0 &&
+               isTrailingClosure(
+                 tuple->getElement(errorParameterIndex - 1).getPattern()
+                   ->getType()))
+          --errorParameterIndex;
+      } else {
+        auto paren = cast<ParenPattern>(paramPattern);
+        errorParameterIndex
+          = isTrailingClosure(paren->getSubPattern()->getType()) ? 0 : 1;
+      }
     }
 
     // Form the error convention.
