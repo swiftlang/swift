@@ -37,6 +37,7 @@ set(SWIFTLIB_ESSENTIAL
   Character.swift
   CocoaArray.swift
   Collection.swift
+  CollectionAlgorithms.swift.gyb
   CompilerProtocols.swift
   Concatenate.swift.gyb
   ContiguousArrayBuffer.swift
@@ -69,7 +70,6 @@ set(SWIFTLIB_ESSENTIAL
   OutputStream.swift
   Pointer.swift
   Policy.swift
-  ProtocolExtensions.swift.gyb
   REPL.swift
   Range.swift
   RangeMirrors.swift.gyb
@@ -78,6 +78,7 @@ set(SWIFTLIB_ESSENTIAL
   Repeat.swift
   Reverse.swift.gyb
   Runtime.swift.gyb
+  SequenceAlgorithms.swift.gyb
   ShadowProtocols.swift
   Shims.swift
   Sort.swift.gyb

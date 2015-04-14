@@ -1,4 +1,4 @@
-//===--- ProtocolExtensions.swift.gyb -------------------------------------===//
+//===--- SequenceAlgorithms.swift.gyb -------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -450,78 +450,4 @@ extension SequenceType {
 
 // FIXME: we could have an overload on collections that returns a collection
 // and preserves the index kind.  Zip2 is only a sequence.
-
-//===----------------------------------------------------------------------===//
-// isEmpty
-//===----------------------------------------------------------------------===//
-
-extension CollectionType {
-  // FIXME: dynamic dispatch for Set and Dictionary.
-  final public var _prext_isEmpty: Bool {
-    return startIndex == endIndex
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// first
-//===----------------------------------------------------------------------===//
-
-extension CollectionType {
-  final public var _prext_first: Generator.Element? {
-    return _prext_isEmpty ? nil : self[startIndex]
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// find()
-//===----------------------------------------------------------------------===//
-
-extension CollectionType where Self.${GElement} : Equatable {
-  /// Returns the first index where `value` appears in `self` or `nil` if
-  /// `value` is not found.
-  ///
-  /// Complexity: O(\ `self.count()`\ )
-  final public func _prext_find(element: ${GElement}) -> Index? {
-    // FIXME: dynamic dispatch for Set and Dictionary.
-    // FIXME: _prext_indices
-    for i in indices(self) {
-      if self[i] == element {
-        return i
-      }
-    }
-    return nil
-  }
-}
-
-extension CollectionType {
-  /// Returns the first index where `predicate` returns `true` for the
-  /// corresponding value, or `nil` if such value is not found.
-  ///
-  /// Complexity: O(\ `self.count()`\ )
-  final public func _prext_find(
-    @noescape predicate: (${GElement}) -> Bool
-  ) -> Index? {
-    for i in indices(self) {
-      if predicate(self[i]) {
-        return i
-      }
-    }
-    return nil
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// indices()
-//===----------------------------------------------------------------------===//
-
-extension CollectionType {
-  /// Return the range of valid index values.
-  ///
-  /// The result's `endIndex` is the same as that of `self`.  Because
-  /// `Range` is half-open, iterating the values of the result produces
-  /// all valid subscript arguments for `self`, omitting its `endIndex`.
-  final public var _prext_indices: Range<Index> {
-    return Range(start: startIndex, end: endIndex)
-  }
-}
 
