@@ -83,7 +83,7 @@ class A {
 
 }
 
-private class B {
+private final class B {
 }
 
 public class C {
