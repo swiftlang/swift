@@ -19,6 +19,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
@@ -2029,6 +2030,19 @@ struct ASTNodeBase {};
       // line up with the archetypes.
       if (auto genericTy = interfaceTy->getAs<GenericFunctionType>()) {
         checkGenericRequirements(AFD, AFD, genericTy);
+      }
+
+      // Throwing @objc methods must have a foreign error convention.
+      if (AFD->isObjC() &&
+          static_cast<bool>(AFD->getForeignErrorConvention())
+            != AFD->isBodyThrowing()) {
+        if (AFD->isBodyThrowing())
+          Out << "@objc method throws but does not have a foreign error "
+              << "convention";
+        else
+          Out << "@objc method has a foreign error convention but does not "
+              << "throw";
+        abort();
       }
 
       verifyCheckedBase(AFD);
