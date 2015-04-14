@@ -14,6 +14,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Comment.h"
 #include "swift/Basic/Version.h"
@@ -206,14 +207,13 @@ private:
     os << "};\n";
   }
 
-  StringRef printSingleMethodParam(StringRef selectorString,
-                                   const Pattern *param,
-                                   const clang::ParmVarDecl *clangParam,
-                                   bool isNSUIntegerSubscript) {
-    StringRef firstPiece, restOfSelector;
-    std::tie(firstPiece, restOfSelector) = selectorString.split(':');
-    os << firstPiece << ":(";
-    if ((isNSUIntegerSubscript && restOfSelector.empty()) ||
+  void printSingleMethodParam(StringRef selectorPiece,
+                              const Pattern *param,
+                              const clang::ParmVarDecl *clangParam,
+                              bool isNSUIntegerSubscript,
+                              bool isLastPiece) {
+    os << selectorPiece << ":(";
+    if ((isNSUIntegerSubscript && isLastPiece) ||
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
@@ -225,8 +225,6 @@ private:
       os << "_";
     else
       os << cast<NamedPattern>(param)->getBodyName();
-
-    return restOfSelector;
   }
 
   template <typename T>
@@ -273,11 +271,36 @@ private:
     Type rawMethodTy = AFD->getType()->castTo<AnyFunctionType>()->getResult();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
 
+    // A foreign error convention can affect the result type as seen in
+    // Objective-C.
+    Optional<ForeignErrorConvention> errorConvention
+      = AFD->getForeignErrorConvention();
+    Type resultTy = methodTy->getResult();
+    if (errorConvention) {
+      switch (errorConvention->getKind()) {
+      case ForeignErrorConvention::ZeroResult:
+      case ForeignErrorConvention::NonZeroResult:
+        // The error convention provides the result type.
+        resultTy = errorConvention->getResultType();
+        break;
+
+      case ForeignErrorConvention::NilResult:
+        // Errors are propagated via 'nil' returns.
+        resultTy = OptionalType::get(resultTy);
+        break;
+
+      case ForeignErrorConvention::NonNilError:
+        break;
+      }
+    }
+
     // Constructors and methods returning DynamicSelf return
-    // instancetype.
+    // instancetype.    
     if (isa<ConstructorDecl>(AFD) ||
         (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelf())) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
+      if (errorConvention && errorConvention->stripsResultOptionality()) {
+        printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
+      } else if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
         printNullability(ctor->getFailability(),
                          NullabilityPrintKind::ContextSensitive);
       } else {
@@ -289,13 +312,13 @@ private:
       }
 
       os << "instancetype";
-    } else if (methodTy->getResult()->isVoid() &&
+    } else if (resultTy->isVoid() &&
                AFD->getAttrs().hasAttribute<IBActionAttr>()) {
       os << "IBAction";
     } else if (clangMethod && isNSUInteger(clangMethod->getReturnType())) {
       os << "NSUInteger";
     } else {
-      print(methodTy->getResult(), OTK_None);
+      print(resultTy, OTK_None);
     }
 
     os << ")";
@@ -304,46 +327,70 @@ private:
     assert(bodyPatterns.size() == 2 && "not an ObjC-compatible method");
 
     llvm::SmallString<128> selectorBuf;
-    StringRef selectorString = AFD->getObjCSelector().getString(selectorBuf);
+    ArrayRef<Identifier> selectorPieces
+      = AFD->getObjCSelector().getSelectorPieces();
+    const TuplePattern *paramTuple
+      = dyn_cast<TuplePattern>(bodyPatterns.back());
+    const ParenPattern *paramParen
+      = dyn_cast<ParenPattern>(bodyPatterns.back());
+    assert((paramTuple || paramParen) && "Bad body parameters?");
+    unsigned paramIndex = 0;
+    for (unsigned i = 0, n = selectorPieces.size(); i != n; ++i) {
+      if (i > 0) os << ' ';
 
-    if (isa<ConstructorDecl>(AFD) &&
-        cast<ConstructorDecl>(AFD)->isObjCZeroParameterWithLongSelector()) {
-      os << selectorString;
-      selectorString = "";
-    } else if (isa<ParenPattern>(bodyPatterns.back())) {
-      // One argument.
-      auto bodyPattern = bodyPatterns.back()->getSemanticsProvidingPattern();
-      auto clangParam = clangMethod ? clangMethod->parameters()[0] : nullptr;
-      selectorString = printSingleMethodParam(selectorString, bodyPattern,
-                                              clangParam,
-                                              isNSUIntegerSubscript);
+      // Retrieve the selector piece.
+      StringRef piece = selectorPieces[i].empty() ? StringRef("")
+                                                  : selectorPieces[i].str();
 
-    } else {
-      const TuplePattern *bodyParams = cast<TuplePattern>(bodyPatterns.back());
-      if (bodyParams->getNumElements() == 0) {
-        // Zero arguments.
-        os << selectorString;
-        selectorString = "";
-      } else {
-        // Two or more arguments, or one argument with name and type.
-        auto clangParams = clangMethod ? clangMethod->parameters() : None;
-        auto printNextParam = [&] (const TuplePatternElt &param) {
-          auto pattern = param.getPattern();
-          pattern = pattern->getSemanticsProvidingPattern();
-          const clang::ParmVarDecl *clangParam = nullptr;
-          if (!clangParams.empty()) {
-            clangParam = clangParams.front();
-            clangParams = clangParams.slice(1);
-          }
-          selectorString = printSingleMethodParam(selectorString, pattern,
-                                                  clangParam,
-                                                  isNSUIntegerSubscript);
-        };
-        interleave(bodyParams->getElements(), printNextParam,
-                   [this] { os << " "; });
+      // If we have an error convention and this is the error
+      // parameter, print it.
+      if (errorConvention && i == errorConvention->getErrorParameterIndex()) {
+        os << piece << ":(";
+        print(errorConvention->getErrorParameterType(), OTK_None);
+        os << ")error";
+        continue;
       }
+
+      // Zero-parameter initializers with a long selector.
+      if (isa<ConstructorDecl>(AFD) &&
+          cast<ConstructorDecl>(AFD)->isObjCZeroParameterWithLongSelector()) {
+        os << piece;
+        continue;
+      }
+
+      // Single-parameter methods.
+      if (paramParen) {
+        assert(paramIndex == 0);
+        auto clangParam = clangMethod ? clangMethod->parameters()[0] : nullptr;
+        printSingleMethodParam(piece,
+                               paramParen->getSemanticsProvidingPattern(),
+                               clangParam,
+                               isNSUIntegerSubscript,
+                               i == n-1);
+        paramIndex = 1;
+        continue;
+      }
+
+      // Zero-parameter methods.
+      if (paramTuple->getNumElements() == 0) {
+        assert(paramIndex == 0);
+        os << piece;
+        paramIndex = 1;
+        continue;
+      }
+
+      // Multi-parameter methods.
+      const clang::ParmVarDecl *clangParam = nullptr;
+      if (clangMethod)
+        clangParam = clangMethod->parameters()[paramIndex];
+
+      const TuplePatternElt &param = paramTuple->getElements()[paramIndex];
+      auto pattern = param.getPattern()->getSemanticsProvidingPattern();
+      printSingleMethodParam(piece, pattern, clangParam,
+                             isNSUIntegerSubscript,
+                             i == n-1);
+      ++paramIndex;
     }
-    assert(selectorString.empty());
 
     // Swift designated initializers are Objective-C designated initializers.
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
