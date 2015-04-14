@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 192; // Last change: foreign error convention
+const uint16_t VERSION_MINOR = 191; // Last change: consolidate function type representations
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -114,15 +114,6 @@ enum class FunctionTypeRepresentation : uint8_t {
   CFunctionPointer,
 };
 using FunctionTypeRepresentationField = BCFixed<4>;
-
-enum class ForeignErrorConventionKind : uint8_t {
-  ZeroResult,
-  NonZeroResult,
-  NilResult,
-  NonNilError,
-};
-
-using ForeignErrorConventionKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -1207,15 +1198,6 @@ namespace decls_block {
     // *at all*, this is an index into the decl table.
     DeclContextIDField,
     BCFixed<1> // is a decl
-  >;
-
-  using ForeignErrorConventionLayout = BCRecordLayout<
-    FOREIGN_ERROR_CONVENTION,
-    ForeignErrorConventionKindField,  // kind
-    BCFixed<1>,                       // owned
-    BCVBR<4>,                         // error parameter index
-    TypeIDField,                      // error parameter type
-    TypeIDField                       // result type
   >;
 
   using AbstractClosureExprLayout = BCRecordLayout<

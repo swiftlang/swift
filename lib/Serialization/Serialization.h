@@ -263,9 +263,6 @@ private:
   /// Writes out a declaration attribute.
   void writeDeclAttribute(const DeclAttribute *DA);
 
-  /// Writes out a foreign error convention.
-  void writeForeignErrorConvention(const ForeignErrorConvention &fec);
-
   /// Writes the given decl.
   void writeDecl(const Decl *D);
 
