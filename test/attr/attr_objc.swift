@@ -1840,6 +1840,15 @@ class ThrowsRedecl1 {
 
   @objc func method3(x: Int, error: Int, closure: Int -> Int) { }  // expected-note{{declared here}}
   @objc func method3(x: Int, closure: Int -> Int) throws { } // expected-error{{with Objective-C selector 'method3:error:closure:'}}
+
+  @objc(initWithError:) func initMethod1(error: Int) { } // expected-note{{declared here}}
+  @objc init() throws { } // expected-error{{with Objective-C selector 'initWithError:'}}
+
+  @objc(initWithString:error:) func initMethod2(string: String, error: Int) { } // expected-note{{declared here}}
+  @objc init(string: String) throws { } // expected-error{{with Objective-C selector 'initWithString:error:'}}
+
+  @objc(initWithError:fn:) func initMethod3(error: Int, fn: Int -> Int) { } // expected-note{{declared here}}
+  @objc init(fn: Int -> Int) throws { } // expected-error{{with Objective-C selector 'initWithError:fn:'}}
 }
 
 class ThrowsObjCName {

@@ -5010,9 +5010,6 @@ public:
   /// return type.
   DynamicSelfType *getDynamicSelfInterface() const;
 
-  /// Given that this is an Objective-C method declaration, get its selector.
-  ObjCSelector getObjCSelector(LazyResolver *resolver = nullptr) const;
-
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
   }
@@ -5313,9 +5310,6 @@ public:
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
 
-  /// Given that this is an Objective-C method declaration, get its selector.
-  ObjCSelector getObjCSelector() const;
-
   /// Get the type of the initializing constructor.
   Type getInitializerType() const { return InitializerType; }
   void setInitializerType(Type t) { InitializerType = t; }
@@ -5488,11 +5482,6 @@ public:
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
-
-  /// Retrieve the Objective-C selector associated with the destructor.
-  ///
-  /// This is always "dealloc".
-  ObjCSelector getObjCSelector() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;

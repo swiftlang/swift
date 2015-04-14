@@ -3329,13 +3329,128 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
 
 ObjCSelector AbstractFunctionDecl::getObjCSelector(
                LazyResolver *resolver) const {
-  if (auto func = dyn_cast<FuncDecl>(this))
-    return func->getObjCSelector(resolver);
-  if (auto ctor = dyn_cast<ConstructorDecl>(this))
-    return ctor->getObjCSelector();
-  if (auto dtor = dyn_cast<DestructorDecl>(this))
-    return dtor->getObjCSelector();
-  llvm_unreachable("Unhandled AbstractFunctionDecl subclass");
+  // If there is an @objc attribute with a name, use that name.
+  auto objc = getAttrs().getAttribute<ObjCAttr>();
+  if (objc) {
+    if (auto name = objc->getName())
+      return *name;
+  }
+
+  auto &ctx = getASTContext();
+  auto argNames = getFullName().getArgumentNames();
+
+  auto func = dyn_cast<FuncDecl>(this);
+  if (func) {
+    // For a getter or setter, go through the variable or subscript decl.
+    if (func->isGetterOrSetter()) {
+      auto asd = cast<AbstractStorageDecl>(func->getAccessorStorageDecl());
+      return func->isGetter() ? asd->getObjCGetterSelector(resolver)
+                              : asd->getObjCSetterSelector(resolver);
+    }
+  }
+
+  // Deinitializers are always called "dealloc".
+  if (isa<DestructorDecl>(this)) {
+    return ObjCSelector(ctx, 0, ctx.Id_dealloc);
+  }
+
+
+  // If this is a zero-parameter initializer with a long selector
+  // name, form that selector.
+  auto ctor = dyn_cast<ConstructorDecl>(this);
+  if (ctor && ctor->isObjCZeroParameterWithLongSelector()) {
+    Identifier firstName = argNames[0];
+    llvm::SmallString<16> scratch;
+    scratch += "init";
+
+    // If the first argument name doesn't start with a preposition, add "with".
+    if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
+          == PK_None) {
+      camel_case::appendSentenceCase(scratch, "With");
+    }
+
+    camel_case::appendSentenceCase(scratch, firstName.str());
+    return ObjCSelector(ctx, 0, ctx.getIdentifier(scratch));
+  }
+
+  // The number of selector pieces we'll have.
+  Optional<ForeignErrorConvention> errorConvention
+    = getForeignErrorConvention();
+  unsigned numSelectorPieces
+    = argNames.size() + (errorConvention.hasValue() ? 1 : 0);
+
+  // If we have no arguments, it's a nullary selector.
+  if (numSelectorPieces == 0) {
+    return ObjCSelector(ctx, 0, getName());
+  }
+
+ // If it's a unary selector with no name for the first argument, we're done.
+  if (numSelectorPieces == 1 && argNames.size() == 1 && argNames[0].empty()) {
+    return ObjCSelector(ctx, 1, getName());
+  }
+
+  /// Collect the selector pieces.
+  SmallVector<Identifier, 4> selectorPieces;
+  selectorPieces.reserve(numSelectorPieces);
+  bool didStringManipulation = false;
+  unsigned argIndex = 0;
+  for (unsigned piece = 0; piece != numSelectorPieces; ++piece) {
+    if (piece > 0) {
+      // If we have an error convention that inserts an error parameter
+      // here, add "error".
+      if (errorConvention &&
+          piece == errorConvention->getErrorParameterIndex()) {
+        selectorPieces.push_back(ctx.Id_error);
+        continue;
+      }
+
+      // Selector pieces beyond the first are simple.
+      selectorPieces.push_back(argNames[argIndex++]);
+      continue;
+    }
+
+    // For the first selector piece, attach either the first parameter
+    // or "WithError" to the base name, if appropriate.
+    auto firstPiece = getName();
+    llvm::SmallString<32> scratch;
+    scratch += firstPiece.str();
+    if (errorConvention && piece == errorConvention->getErrorParameterIndex()) {
+      // The error is first; append "WithError".
+      camel_case::appendSentenceCase(scratch, "WithError");
+
+      firstPiece = ctx.getIdentifier(scratch);
+      didStringManipulation = true;
+    } else if (!argNames[argIndex].empty()) {
+      // If the first argument name doesn't start with a preposition, and the
+      // method name doesn't end with a preposition, add "with".
+      auto firstName = argNames[argIndex++];
+      if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
+            == PK_None &&
+          getPrepositionKind(camel_case::getLastWord(firstPiece.str()))
+            == PK_None) {
+        camel_case::appendSentenceCase(scratch, "With");
+      }
+
+      camel_case::appendSentenceCase(scratch, firstName.str());
+      firstPiece = ctx.getIdentifier(scratch);
+      didStringManipulation = true;
+    } else {
+      ++argIndex;
+    }
+
+    selectorPieces.push_back(firstPiece);
+  }
+  assert(argIndex == argNames.size());
+
+  // Form the result.
+  auto result = ObjCSelector(ctx, selectorPieces.size(), selectorPieces);
+
+  // If we did any string manipulation, cache the result. We don't want to
+  // do that again.
+  if (didStringManipulation && objc)
+    const_cast<ObjCAttr *>(objc)->setName(result, /*implicit=*/true);
+
+  return result;
 }
 
 bool AbstractFunctionDecl::isObjCInstanceMethod() const {
@@ -3613,106 +3728,6 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
   return DynamicSelfType::get(extType, getASTContext());
 }
 
-/// Produce the selector for this "Objective-C method" in the given buffer.
-ObjCSelector FuncDecl::getObjCSelector(LazyResolver *resolver) const {
-  // For a getter or setter, go through the variable or subscript decl.
-  if (isGetterOrSetter()) {
-    auto asd = cast<AbstractStorageDecl>(getAccessorStorageDecl());
-    return isGetter() ? asd->getObjCGetterSelector(resolver)
-                      : asd->getObjCSetterSelector(resolver);
-  }
-
-  // If there is an @objc attribute with a name, use that name.
-  auto objc = getAttrs().getAttribute<ObjCAttr>();
-  if (objc) {
-    if (auto name = objc->getName())
-      return *name;
-  }
-
-  // We should always have exactly two levels of argument pattern.
-  auto argNames = getFullName().getArgumentNames();
-  auto &ctx = getASTContext();
-
-  // The number of selector pieces we'll have.
-  Optional<ForeignErrorConvention> errorConvention
-    = getForeignErrorConvention();
-  unsigned numSelectorPieces
-    = argNames.size() + (errorConvention.hasValue() ? 1 : 0);
-
-  // If we have no arguments, it's a nullary selector.
-  if (numSelectorPieces == 0) {
-    return ObjCSelector(ctx, 0, getName());
-  }
-
- // If it's a unary selector with no name for the first argument, we're done.
-  if (numSelectorPieces == 1 && argNames.size() == 1 && argNames[0].empty()) {
-    return ObjCSelector(ctx, 1, getName());
-  }
-
-  /// Collect the selector pieces.
-  SmallVector<Identifier, 4> selectorPieces;
-  selectorPieces.reserve(numSelectorPieces);
-  bool didStringManipulation = false;
-  unsigned argIndex = 0;
-  for (unsigned piece = 0; piece != numSelectorPieces; ++piece) {
-    if (piece > 0) {
-      // If we have an error convention that inserts an error parameter
-      // here, add "error".
-      if (errorConvention &&
-          piece == errorConvention->getErrorParameterIndex()) {
-        selectorPieces.push_back(ctx.Id_error);
-        continue;
-      }
-
-      // Selector pieces beyond the first are simple.
-      selectorPieces.push_back(argNames[argIndex++]);
-      continue;
-    }
-
-    // For the first selector piece, attach either the first parameter
-    // or "WithError" to the base name, if appropriate.
-    auto firstPiece = getName();
-    llvm::SmallString<32> scratch;
-    scratch += firstPiece.str();
-    if (errorConvention && piece == errorConvention->getErrorParameterIndex()) {
-      // The error is first; append "WithError".
-      camel_case::appendSentenceCase(scratch, "WithError");
-
-      firstPiece = ctx.getIdentifier(scratch);
-      didStringManipulation = true;
-    } else if (!argNames[argIndex].empty()) {
-      // If the first argument name doesn't start with a preposition, and the
-      // method name doesn't end with a preposition, add "with".
-      auto firstName = argNames[argIndex++];
-      if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
-            == PK_None &&
-          getPrepositionKind(camel_case::getLastWord(firstPiece.str()))
-            == PK_None) {
-        camel_case::appendSentenceCase(scratch, "With");
-      }
-
-      camel_case::appendSentenceCase(scratch, firstName.str());
-      firstPiece = ctx.getIdentifier(scratch);
-      didStringManipulation = true;
-    } else {
-      ++argIndex;
-    }
-
-    selectorPieces.push_back(firstPiece);
-  }
-  assert(argIndex == argNames.size());
-
-  // Form the result.
-  auto result = ObjCSelector(ctx, selectorPieces.size(), selectorPieces);
-
-  // If we did any string manipulation, cache the result. We don't want to
-  // do that again.
-  if (didStringManipulation && objc)
-    const_cast<ObjCAttr *>(objc)->setName(result, /*implicit=*/true);
-
-  return result;
-}
-
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc StartLoc = getStartLoc();
   if (StartLoc.isInvalid()) return SourceRange();
@@ -3796,78 +3811,6 @@ Type ConstructorDecl::getResultType() const {
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
   return ArgTy;
-}
-
-ObjCSelector ConstructorDecl::getObjCSelector() const {
-  // If there is an @objc attribute with a name, use that name.
-  auto objc = getAttrs().getAttribute<ObjCAttr>();
-  if (objc) {
-    if (auto name = objc->getName())
-      return *name;
-  }
-
-  auto &ctx = getASTContext();
-
-  // If there are no parameters, this is just 'init()'.
-  auto argNames = getFullName().getArgumentNames();
-  if (argNames.size() == 0)
-    return ObjCSelector(ctx, 0, ctx.Id_init);
-
-  // The first field is special: we uppercase the name.
-  bool didStringManipulation = false;
-  SmallVector<Identifier, 4> selectorPieces;
-  auto firstName = argNames[0];
-  if (firstName.empty())
-    selectorPieces.push_back(ctx.Id_init);
-  else {
-    llvm::SmallString<16> scratch;
-    scratch += "init";
-
-    // If the first argument name doesn't start with a preposition, add "with".
-    if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
-          == PK_None) {
-      camel_case::appendSentenceCase(scratch, "With");
-    }
-
-    camel_case::appendSentenceCase(scratch, firstName.str());
-    selectorPieces.push_back(ctx.getIdentifier(scratch));
-    didStringManipulation = true;
-  }
-
-  // If we have just one field, check whether this is actually a
-  // nullary selector that we mapped to a single-element initializer to catch
-  // the name after "init".
-  const TuplePattern *tuple = nullptr;
-  if (argNames.size() == 1 && 
-      (tuple = dyn_cast<TuplePattern>(getBodyParamPatterns()[1]))) {
-    const auto &elt = tuple->getElement(0);
-    auto pattern = elt.getPattern()->getSemanticsProvidingPattern();
-    if (pattern->hasType()) {
-      if (pattern->getType()->isEqual(TupleType::getEmpty(ctx))) {
-        auto result = ObjCSelector(ctx, 0, selectorPieces[0]);
-
-        // Cache the name in the 'objc' attribute. We don't want to perform
-        // string manipulation again.
-        if (objc)
-          const_cast<ObjCAttr *>(objc)->setName(result, /*implicit=*/true);
-        return result;
-      }
-    } else {
-      // If we couldn't check the type, don't cache the result.
-      didStringManipulation = false;
-    }
-  }
-
-  // For every remaining element, add a selector component.
-  selectorPieces.append(argNames.begin() + 1, argNames.end());
-  auto result = ObjCSelector(ctx, selectorPieces.size(), selectorPieces);
-
-  // Cache the name in the 'objc' attribute. We don't want to perform
-  // string manipulation again.
-  if (objc && didStringManipulation)
-    const_cast<ObjCAttr *>(objc)->setName(result, /*implicit=*/true);
-
-  return result;
 }
 
 Type ConstructorDecl::getInitializerInterfaceType() {
@@ -3995,11 +3938,6 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   }
 
   return Kind;
-}
-
-ObjCSelector DestructorDecl::getObjCSelector() const {
-  auto &ctx = getASTContext();
-  return ObjCSelector(ctx, 0, ctx.Id_dealloc);
 }
 
 SourceRange DestructorDecl::getSourceRange() const {
