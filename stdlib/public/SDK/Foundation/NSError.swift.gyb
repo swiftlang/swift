@@ -17,6 +17,19 @@ extension CFError : _ErrorType {
   }
 }
 
+// An error value to use when an Objective-C API indicates error
+// but produces a nil error object.
+public enum _GenericObjCError : _ErrorType {
+  case NilError
+}
+
+/// An intrinsic used by the runtime to create an error when an
+/// Objective-C API indicates failure but produces a nil error.
+@asmname("_swift_allocNilObjCError")
+func _allocNilObjCError() -> _ErrorType {
+  return _GenericObjCError.NilError
+}
+
 /// An internal protocol to represent Swift error enums that map to standard
 /// Cocoa NSError domains.
 public protocol _ObjectiveCBridgeableErrorType : _ErrorType {

@@ -1028,6 +1028,10 @@ public:
                                         SILFunctionTypeRepresentation srcRep,
                                         CanType nativeTy);
 
+  /// Convert a bridged error type to the native Swift ErrorType
+  /// representation.  The value may be optional.
+  ManagedValue emitBridgedToNativeError(SILLocation loc, ManagedValue v);
+
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr
   /// is nil, and leaving the insertion point on the success branch.
@@ -1053,6 +1057,7 @@ public:
                          CanType substResultType,
                          bool transparent,
                          Optional<SILFunctionTypeRepresentation> overrideRep,
+                         const Optional<ForeignErrorConvention> &foreignError,
                          SGFContext evalContext);
 
   ManagedValue emitApplyOfDefaultArgGenerator(SILLocation loc,
@@ -1078,6 +1083,7 @@ public:
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       SILResultInfo exnResult);
+  void emitTryApplyErrorBranch(SILLocation loc, ManagedValue error);
 
   /// Emit a dynamic member reference.
   RValue emitDynamicMemberRefExpr(DynamicMemberRefExpr *e, SGFContext c);
@@ -1312,6 +1318,10 @@ public:
   /// (without going through getters or setters).
   LValue emitDirectIVarLValue(SILLocation loc, ManagedValue base, VarDecl *var,
                               AccessKind accessKind);
+
+  ManagedValue emitLValueToPointer(SILLocation loc, LValue &&lvalue,
+                                   CanType pointerType, PointerTypeKind ptrKind,
+                                   AccessKind accessKind);
   
   /// Return forwarding substitutions for the archetypes in the current
   /// function.

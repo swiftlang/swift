@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
@@ -1815,7 +1816,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   return emitApply(loc, fnRef, defaultArgsOwner.getSubstitutions(),
                    {}, substFnType,
                    origResultType, resultType,
-                   generator.isTransparent(), None, C);
+                   generator.isTransparent(), None, None, C);
 }
 
 RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
@@ -2025,24 +2026,10 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
     assert(outerFields[i].hasInit() &&
            "no default initializer in non-scalar field of scalar-to-tuple?!");
     if (auto defaultArgOwner = element.dyn_cast<ConcreteDeclRef>()) {
-      SILDeclRef generator
-        = SILDeclRef::getDefaultArgGenerator(defaultArgOwner.getDecl(), i);
-      auto fnRef = SGF.emitFunctionRef(E, generator);
       auto resultType = outerFields[i].getType()->getCanonicalType();
-      
-      auto fnType = fnRef.getType().castTo<SILFunctionType>();
-      auto substFnType = fnType->substGenericArgs(SGF.SGM.M,
-                                   SGF.SGM.M.getSwiftModule(),
-                                   defaultArgOwner.getSubstitutions());
-      auto origResultType = AbstractionPattern(
-        defaultArgOwner.getDecl()->getType()->getCanonicalType());
-      
-      auto apply = SGF.emitApply(E, fnRef, defaultArgOwner.getSubstitutions(),
-                                 {}, substFnType,
-                                 origResultType, resultType,
-                                 generator.isTransparent(),
-                                 None,
-                                 SGFContext());
+      auto apply =
+        SGF.emitApplyOfDefaultArgGenerator(E, defaultArgOwner.getDecl(), i,
+                                           resultType, SGFContext());
 
       result.addElement(SGF, apply, resultType, E);
       continue;
@@ -3351,7 +3338,20 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
   // Get the original lvalue.
   LValue lv = SGF.emitLValue(cast<InOutExpr>(E->getSubExpr())->getSubExpr(),
                              accessKind);
-  
+
+  auto ptr = SGF.emitLValueToPointer(E, std::move(lv),
+                                     E->getType()->getCanonicalType(),
+                                     pointerKind, accessKind);
+  return RValue(SGF, E, ptr);
+}
+
+/// Convert an l-value to a pointer type: unsafe, unsafe-mutable, or
+/// autoreleasing-unsafe-mutable.
+ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
+                                                 LValue &&lv,
+                                                 CanType pointerType,
+                                                 PointerTypeKind pointerKind,
+                                                 AccessKind accessKind) {
   switch (pointerKind) {
   case PTK_UnsafeMutablePointer:
   case PTK_UnsafePointer:
@@ -3373,25 +3373,25 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
     break;
   }
   }
-  
+
   // Get the lvalue address as a raw pointer.
   SILValue address =
-    SGF.emitAddressOfLValue(E, std::move(lv), accessKind).getUnmanagedValue();
-  address = SGF.B.createAddressToPointer(E, address,
-                               SILType::getRawPointerType(SGF.getASTContext()));
+    emitAddressOfLValue(loc, std::move(lv), accessKind).getUnmanagedValue();
+  address = B.createAddressToPointer(loc, address,
+                               SILType::getRawPointerType(getASTContext()));
   
   // Disable nested writeback scopes for any calls evaluated during the
   // conversion intrinsic.
-  InOutConversionScope scope(SGF);
+  InOutConversionScope scope(*this);
   
   // Invoke the conversion intrinsic.
-  auto &Ctx = SGF.getASTContext();
-  FuncDecl *converter = Ctx.getConvertInOutToPointerArgument(nullptr);
-  Substitution sub = SGF.getPointerSubstitution(E->getType(),
+  FuncDecl *converter =
+    getASTContext().getConvertInOutToPointerArgument(nullptr);
+  Substitution sub = getPointerSubstitution(pointerType,
                           converter->getGenericParams()->getAllArchetypes()[0]);
-  auto result = SGF.emitApplyOfLibraryIntrinsic(E, converter, sub,
-                                        ManagedValue::forUnmanaged(address), C);
-  return RValue(SGF, E, result);
+  return emitApplyOfLibraryIntrinsic(loc, converter, sub,
+                                     ManagedValue::forUnmanaged(address),
+                                     SGFContext());
 }
 RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
                                               SGFContext C) {

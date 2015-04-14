@@ -527,6 +527,7 @@ class TypeConverter {
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   Optional<CanType> BridgedType##Ty;
 #include "swift/SIL/BridgedTypes.def"
+  Optional<CanType> BridgedTypeErrorType;
 
   const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
   const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
@@ -773,6 +774,7 @@ public:
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
+  CanType getErrorTypeType() { return get_ErrorTypeType(); }
 
   /// Get the linkage for a protocol conformance's witness table.
   static SILLinkage getLinkageForProtocolConformance(

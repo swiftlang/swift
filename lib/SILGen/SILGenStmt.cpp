@@ -739,16 +739,22 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
+  emitTryApplyErrorBranch(loc, emitManagedRValueWithCleanup(exn));
 
+  return destBB;
+}
+
+/// Emit an error-propagation branch with a managed error value as if
+/// from a try_apply instruction.
+void SILGenFunction::emitTryApplyErrorBranch(SILLocation loc,
+                                             ManagedValue exn) {
   if (ThrowDest.isValid()) {
     FullExpr scope(Cleanups, CleanupLocation::get(loc));
-    emitThrow(loc, emitManagedRValueWithCleanup(exn));
+    emitThrow(loc, exn);
   } else {
     SGM.diagnose(loc, diag::unhandled_throw_from_apply);
     B.createUnreachable(loc);
   }
-
-  return destBB;
 }
 
 void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV) {

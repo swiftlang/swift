@@ -1025,6 +1025,10 @@ public var NSMaxYEdge: NSRectEdge {
 
 public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 
+@asmname("swift_convertNSErrorToErrorType")
+public // COMPILER_INTRINSIC
+func _convertNSErrorToErrorType(string: NSError?) -> _ErrorType
+
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods
 //===----------------------------------------------------------------------===//

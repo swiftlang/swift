@@ -373,8 +373,12 @@ public:
     }
   }
 
+  bool isPopped() const {
+    return (gen == nullptr);
+  }
+
   void pop() {
-    assert(gen && "popping an already-popped writeback scope!");
+    assert(!isPopped() && "popping an already-popped writeback scope!");
     popImpl();
     gen = nullptr;
   }

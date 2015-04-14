@@ -19,6 +19,7 @@
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
@@ -466,7 +467,8 @@ public:
     }
   }
   
-  std::tuple<ManagedValue, CanSILFunctionType, bool>
+  std::tuple<ManagedValue, CanSILFunctionType,
+             Optional<ForeignErrorConvention>, bool>
   getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
     ManagedValue mv;
     bool transparent = isTransparent;
@@ -595,8 +597,14 @@ public:
     CanSILFunctionType substFnType =
       getSubstFunctionType(gen.SGM, mv.getType().castTo<SILFunctionType>(),
                            constantInfo.LoweredType, level, constant);
+
+    Optional<ForeignErrorConvention> foreignError;
+    if (constant && constant->isForeign) {
+      foreignError = cast<AbstractFunctionDecl>(constant->getDecl())
+                       ->getForeignErrorConvention();
+    }
     
-    return std::make_tuple(mv, substFnType, transparent);
+    return std::make_tuple(mv, substFnType, foreignError, transparent);
   }
   
   ArrayRef<Substitution> getSubstitutions() const {
@@ -1572,6 +1580,180 @@ static SILValue emitRawApply(SILGenFunction &gen,
   return result;
 }
 
+static std::pair<ManagedValue, ManagedValue>
+emitForeignErrorArgument(SILGenFunction &gen,
+                         SILLocation loc,
+                         SILParameterInfo errorParameter) {
+  // We assume that there's no interesting reabstraction here.
+  auto errorPtrType = errorParameter.getType();
+
+  PointerTypeKind ptrKind;
+  auto errorType = CanType(errorPtrType->getAnyPointerElementType(ptrKind));
+  auto &errorTL = gen.getTypeLowering(errorType);
+
+  // Allocate a temporary.
+  SILValue errorTemp =
+    gen.emitTemporaryAllocation(loc, errorTL.getLoweredType());
+
+  // Nil-initialize it.
+  gen.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);
+
+  // Enter a cleanup to destroy the value there.
+  auto managedErrorTemp = gen.emitManagedBufferWithCleanup(errorTemp, errorTL);
+
+  // Create the appropriate pointer type.
+  LValue lvalue = LValue::forAddress(ManagedValue::forLValue(errorTemp),
+                                     AbstractionPattern(errorType),
+                                     errorType);
+  auto pointerValue = gen.emitLValueToPointer(loc, std::move(lvalue),
+                                              errorPtrType, ptrKind,
+                                              AccessKind::ReadWrite);
+
+  return {managedErrorTemp, pointerValue};
+}
+
+/// Step out of the current control flow to emit a foreign error block,
+/// which loads from the error slot and jumps to the error slot.
+static void emitForeignErrorBlock(SILGenFunction &gen, SILLocation loc,
+                                  SILBasicBlock *errorBB,
+                                  ManagedValue errorSlot) {
+  SavedInsertionPoint savedIP(gen, errorBB, FunctionSection::Postmatter);
+
+  // Load the error (taking responsibility for it).  In theory, this
+  // is happening within conditional code, so we need to be only
+  // conditionally claiming the value.  In practice, claiming it
+  // unconditionally is fine because we want to assume it's nil in the
+  // other path.
+  SILValue errorV = gen.B.createLoad(loc, errorSlot.forward(gen));
+  ManagedValue error = gen.emitManagedRValueWithCleanup(errorV);
+
+  // Turn the error into an ErrorType value.
+  error = gen.emitBridgedToNativeError(loc, error);
+
+  // Propagate.
+  gen.emitTryApplyErrorBranch(loc, error);
+}
+
+/// Unwrap a value of a wrapped integer type to get at the juicy
+/// Builtin.IntegerN value within.
+static SILValue emitUnwrapIntegerResult(SILGenFunction &gen,
+                                        SILLocation loc,
+                                        SILValue value) {
+  while (!value.getType().is<BuiltinIntegerType>()) {
+    auto structDecl = value.getType().getStructOrBoundGenericStruct();
+    assert(structDecl && "value for error result wasn't of struct type!");
+    assert(std::next(structDecl->getStoredProperties().begin())
+             == structDecl->getStoredProperties().end());
+    auto property = *structDecl->getStoredProperties().begin();
+    value = gen.B.createStructExtract(loc, value, property);
+  }
+
+  return value;
+}
+
+/// Perform a foreign error check by testing whether the call result is zero.
+/// The call result is otherwise ignored.
+static ManagedValue
+emitResultIsZeroErrorCheck(SILGenFunction &gen, SILLocation loc,
+                           ManagedValue result, ManagedValue errorSlot,
+                           bool zeroIsError) {
+  SILValue resultValue =
+    emitUnwrapIntegerResult(gen, loc, result.getUnmanagedValue());
+  SILValue zero =
+    gen.B.createIntegerLiteral(loc, resultValue.getType(), 0);
+
+  ASTContext &ctx = gen.getASTContext();
+  SILValue resultIsError =
+    gen.B.createBuiltin(loc, ctx.getIdentifier(zeroIsError ? "cmp_eq" : "cmp_ne"),
+                        SILType::getBuiltinIntegerType(1, ctx),
+                        {}, {resultValue, zero});
+
+  SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
+  SILBasicBlock *contBB = gen.createBasicBlock();
+  gen.B.createCondBranch(loc, resultIsError, errorBB, contBB);
+
+  emitForeignErrorBlock(gen, loc, errorBB, errorSlot);
+
+  gen.B.emitBlock(contBB);
+  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
+}
+
+/// Perform a foreign error check by testing whether the call result is nil.
+static ManagedValue
+emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
+                          ManagedValue origResult, ManagedValue errorSlot) {
+  // Take local ownership of the optional result value.
+  SILValue optionalResult = origResult.forward(gen);
+
+  OptionalTypeKind optKind;
+  SILType resultObjectType =
+    optionalResult.getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
+
+  ASTContext &ctx = gen.getASTContext();
+
+  // Switch on the optional result.
+  SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
+  SILBasicBlock *contBB = gen.createBasicBlock();
+  gen.B.createSwitchEnum(loc, optionalResult, /*default*/ nullptr,
+                         { { ctx.getOptionalSomeDecl(optKind), contBB },
+                           { ctx.getOptionalNoneDecl(optKind), errorBB } });
+
+  // Emit the error block.
+  emitForeignErrorBlock(gen, loc, errorBB, errorSlot);
+
+  // In the continuation block, take ownership of the now non-optional
+  // result value.
+  gen.B.emitBlock(contBB);
+  SILValue objectResult = contBB->createBBArg(resultObjectType);
+  return gen.emitManagedRValueWithCleanup(objectResult);
+}
+
+/// Perform a foreign error check by testing whether the error was nil.
+static ManagedValue
+emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
+                            ManagedValue origResult, ManagedValue errorSlot) {
+  SILValue optionalError = gen.B.createLoad(loc, errorSlot.getValue());
+
+  OptionalTypeKind optKind;
+  optionalError.getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
+
+  ASTContext &ctx = gen.getASTContext();
+
+  // Switch on the optional error.
+  SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
+  SILBasicBlock *contBB = gen.createBasicBlock();
+  gen.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
+                         { { ctx.getOptionalSomeDecl(optKind), errorBB },
+                           { ctx.getOptionalNoneDecl(optKind), contBB } });
+
+  // Emit the error block.  Just be lazy and reload the error there.
+  emitForeignErrorBlock(gen, loc, errorBB, errorSlot);
+
+  // Return the result.
+  return origResult;
+}
+
+/// Perform a foreign error check.
+static ManagedValue
+emitForeignErrorCheck(SILGenFunction &gen, SILLocation loc,
+                      ManagedValue result, ManagedValue errorSlot,
+                      const ForeignErrorConvention &foreignError) {
+  // All of this is autogenerated.
+  loc.markAutoGenerated();
+
+  switch (foreignError.getKind()) {
+  case ForeignErrorConvention::ZeroResult:
+    return emitResultIsZeroErrorCheck(gen, loc, result, errorSlot, true);
+  case ForeignErrorConvention::NonZeroResult:
+    return emitResultIsZeroErrorCheck(gen, loc, result, errorSlot, false);
+  case ForeignErrorConvention::NilResult:
+    return emitResultIsNilErrorCheck(gen, loc, result, errorSlot);
+  case ForeignErrorConvention::NonNilError:
+    return emitErrorIsNonNilErrorCheck(gen, loc, result, errorSlot);
+  }
+  llvm_unreachable("bad foreign error convention kind");
+}
+
 /// Emit a function application, assuming that the arguments have been
 /// lowered appropriately for the abstraction level but that the
 /// result does need to be turned back into something matching a
@@ -1586,6 +1768,7 @@ ManagedValue SILGenFunction::emitApply(
                             CanType substResultType,
                             bool transparent,
                             Optional<SILFunctionTypeRepresentation> overrideRep,
+                      const Optional<ForeignErrorConvention> &foreignError,
                             SGFContext evalContext) {
   auto &formalResultTL = getTypeLowering(substResultType);
   auto loweredFormalResultType = formalResultTL.getLoweredType();
@@ -1665,6 +1848,24 @@ ManagedValue SILGenFunction::emitApply(
                        " returns_inner_pointer?!");
     }
   }
+
+  // If there's an foreign error parameter, fill it in.
+  Optional<WritebackScope> errorTempWriteback;
+  ManagedValue errorTemp;
+  if (foreignError) {
+    // Error-temporary emission may need writeback.
+    errorTempWriteback.emplace(*this);
+
+    auto errorParamIndex = foreignError->getErrorParameterIndex();
+    auto errorParam =
+      substFnType->getParametersWithoutIndirectResult()[errorParamIndex];
+
+    // This is pretty evil.
+    auto &errorArgSlot = const_cast<ManagedValue&>(args[errorParamIndex]);
+
+    std::tie(errorTemp, errorArgSlot)
+      = emitForeignErrorArgument(*this, loc, errorParam);
+  }
   
   // Emit the raw application.
   SILValue scalarResult = emitRawApply(*this, loc, fn, subs, args,
@@ -1676,6 +1877,7 @@ ManagedValue SILGenFunction::emitApply(
   if (emittedIntoContext) {
     assert(substFnType->hasIndirectResult());
     assert(!hasAbsDiffs);
+    assert(!foreignError);
     auto managedBuffer =
       manageBufferForExprResult(resultAddr, formalResultTL, evalContext);
 
@@ -1699,6 +1901,7 @@ ManagedValue SILGenFunction::emitApply(
   // If the expected result is an address, manage the result address.
   if (formalResultTL.isAddressOnly()) {
     assert(resultAddr);
+    assert(!foreignError);
     auto managedActualResult =
       emitManagedBufferWithCleanup(resultAddr, actualResultTL);
 
@@ -1716,6 +1919,7 @@ ManagedValue SILGenFunction::emitApply(
 
   // If we got an indirect result, emit a take out of the result address.
   if (substFnType->hasIndirectResult()) {
+    assert(!foreignError);
     managedScalar = emitLoad(loc, resultAddr, actualResultTL,
                              SGFContext(), IsTake);
 
@@ -1748,6 +1952,15 @@ ManagedValue SILGenFunction::emitApply(
                                                  actualResultTL);
   }
 
+  // If there was a foreign error convention, consider it.
+  if (foreignError) {
+    // Force immediate writeback to the error temporary.
+    errorTempWriteback.reset();
+
+    managedScalar = emitForeignErrorCheck(*this, loc, managedScalar,
+                                          errorTemp, *foreignError);
+  }
+
   // Fast path: no abstraction differences or bridging.
   if (!hasAbsDiffs) return managedScalar;
 
@@ -1774,7 +1987,7 @@ ManagedValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
   assert(!fnType->isPolymorphic());
   return emitApply(loc, fn, {}, args, fnType,
                    AbstractionPattern(resultType), resultType,
-                   transparent, overrideRep, SGFContext());
+                   transparent, overrideRep, None, SGFContext());
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
@@ -1966,6 +2179,7 @@ namespace {
   class ArgEmitter {
     SILGenFunction &SGF;
     SILFunctionTypeRepresentation Rep;
+    const Optional<ForeignErrorConvention> &ForeignError;
     ArrayRef<SILParameterInfo> ParamInfos;
     SmallVectorImpl<ManagedValue> &Args;
 
@@ -1979,12 +2193,19 @@ namespace {
                ArrayRef<SILParameterInfo> paramInfos,
                SmallVectorImpl<ManagedValue> &args,
                SmallVectorImpl<InOutArgument> &inoutArgs,
+               const Optional<ForeignErrorConvention> &foreignError,
                Optional<ArgSpecialDestArray> specialDests = None)
-      : SGF(SGF), Rep(Rep), ParamInfos(paramInfos),
+      : SGF(SGF), Rep(Rep), ForeignError(foreignError), ParamInfos(paramInfos),
         Args(args), InOutArguments(inoutArgs), SpecialDests(specialDests) {
       assert(!specialDests || specialDests->size() == paramInfos.size());
     }
 
+    void emitTopLevel(ArgumentSource &&arg, AbstractionPattern origParamType) {
+      emit(std::move(arg), origParamType);
+      maybeEmitForeignErrorArgument();
+    }
+
+  private:
     void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
       // If it was a tuple in the original type, the parameters will
       // have been exploded.
@@ -2010,6 +2231,9 @@ namespace {
 
       // Okay, everything else will be passed as a single value, one
       // way or another.
+
+      // Adjust for the foreign-error argument if necessary.
+      maybeEmitForeignErrorArgument();
 
       // The substituted parameter type.  Might be different from the
       // substituted argument type by abstraction and/or bridging.
@@ -2058,7 +2282,6 @@ namespace {
       emitDirect(std::move(arg), loweredSubstArgType, origParamType, param);
     }
 
-  private:
     SILParameterInfo claimNextParameter() {
       assert(!ParamInfos.empty());
       auto param = ParamInfos.front();
@@ -2252,6 +2475,22 @@ namespace {
       Args.push_back(value);
     }
 
+    void maybeEmitForeignErrorArgument() {
+      if (!ForeignError ||
+          ForeignError->getErrorParameterIndex() != Args.size())
+        return;
+
+      SILParameterInfo param = claimNextParameter();
+      ArgSpecialDest *specialDest = claimNextSpecialDest();
+
+      assert(param.getConvention() == ParameterConvention::Direct_Unowned);
+      assert(!specialDest && "special dest for error argument?");
+      (void) param; (void) specialDest;
+
+      // Leave a placeholder in the position.
+      Args.push_back(ManagedValue::forInContext());
+    }
+
     struct EmissionContexts {
       /// The context for emitting the r-value.
       SGFContext ForEmission;
@@ -2350,6 +2589,17 @@ void ArgEmitter::emitShuffle(Expr *inner,
       AbstractionPattern origEltType =
         origParamType.getTupleElementType(outerIndex);
       unsigned numParams = getFlattenedValueCount(origEltType, substEltType);
+
+      // Skip the foreign-error parameter.
+      assert((!ForeignError ||
+              ForeignError->getErrorParameterIndex() <= nextParamIndex ||
+              ForeignError->getErrorParameterIndex() >= nextParamIndex + numParams)
+             && "error parameter falls within shuffled range?");
+      if (numParams && // Don't skip it twice if there's an empty tuple.
+          ForeignError &&
+          ForeignError->getErrorParameterIndex() == nextParamIndex) {
+        nextParamIndex++;
+      }
 
       // Grab the parameter infos corresponding to this tuple element
       // (but don't drop them from ParamInfos yet).
@@ -2465,9 +2715,10 @@ void ArgEmitter::emitShuffle(Expr *inner,
   SmallVector<ManagedValue, 8> innerArgs;
   SmallVector<InOutArgument, 2> innerInOutArgs;
   ArgEmitter(SGF, Rep, innerParams, innerArgs, innerInOutArgs,
+             /*foreign error*/ None,
              (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
                                 : Optional<ArgSpecialDestArray>()))
-    .emit(ArgumentSource(inner), innerOrigParamType);
+    .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
 
   // Make a second pass to split the inner arguments correctly.
   {  
@@ -2504,9 +2755,12 @@ void ArgEmitter::emitShuffle(Expr *inner,
     int innerIndex = elementMapping[outerIndex];
     if (innerIndex >= 0) {
       auto &extent = innerExtents[innerIndex];
+      auto numArgs = extent.Args.size();
+
+      maybeEmitForeignErrorArgument();
 
       // Drop N parameters off of ParamInfos.
-      ParamInfos = ParamInfos.slice(extent.Args.size());
+      ParamInfos = ParamInfos.slice(numArgs);
 
       // Move the appropriate inner arguments over as outer arguments.
       Args.append(extent.Args.begin(), extent.Args.end());
@@ -2627,13 +2881,15 @@ namespace {
     ArrayRef<SILParameterInfo> Params;
     SILFunctionTypeRepresentation Rep;
 
-    ParamLowering(CanSILFunctionType fnType) :
-      Params(fnType->getParametersWithoutIndirectResult()),
-      Rep(fnType->getRepresentation()) {}
+    ParamLowering(CanSILFunctionType fnType)
+      : Params(fnType->getParametersWithoutIndirectResult()),
+        Rep(fnType->getRepresentation()) {}
 
     ArrayRef<SILParameterInfo>
-    claimParams(AbstractionPattern origParamType, CanType substParamType) {
+    claimParams(AbstractionPattern origParamType, CanType substParamType,
+                const Optional<ForeignErrorConvention> &foreignError) {
       unsigned count = getFlattenedValueCount(origParamType, substParamType);
+      if (foreignError) count++;
       assert(count <= Params.size());
       auto result = Params.slice(Params.size() - count, count);
       Params = Params.slice(0, Params.size() - count);
@@ -2682,11 +2938,14 @@ namespace {
     
     void emit(SILGenFunction &gen, AbstractionPattern origParamType,
               ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
-              SmallVectorImpl<InOutArgument> &inoutArgs) && {
-      auto params = lowering.claimParams(origParamType, getSubstArgType());
+              SmallVectorImpl<InOutArgument> &inoutArgs,
+              const Optional<ForeignErrorConvention> &foreignError) && {
+      auto params = lowering.claimParams(origParamType, getSubstArgType(),
+                                         foreignError);
 
-      ArgEmitter emitter(gen, lowering.Rep, params, args, inoutArgs);
-      emitter.emit(std::move(ArgValue), origParamType);
+      ArgEmitter emitter(gen, lowering.Rep, params, args, inoutArgs,
+                         foreignError);
+      emitter.emitTopLevel(std::move(ArgValue), origParamType);
     }
 
     ArgumentSource &&forward() && {
@@ -2700,24 +2959,19 @@ namespace {
     std::vector<CallSite> uncurriedSites;
     std::vector<CallSite> extraSites;
     Callee callee;
-    Optional<WritebackScope> initialWritebackScope;
+    WritebackScope InitialWritebackScope;
     unsigned uncurries;
     bool applied;
     
   public:
-    CallEmission(SILGenFunction &gen, Callee &&callee)
+    CallEmission(SILGenFunction &gen, Callee &&callee,
+                 WritebackScope &&writebackScope)
       : gen(gen),
         callee(std::move(callee)),
+        InitialWritebackScope(std::move(writebackScope)),
         uncurries(callee.getNaturalUncurryLevel() + 1),
         applied(false)
     {}
-    
-    CallEmission(SILGenFunction &gen, Callee &&callee,
-                 WritebackScope &&writebackScope)
-      : CallEmission(gen, std::move(callee))
-    {
-      initialWritebackScope.emplace(std::move(writebackScope));
-    }
     
     void addCallSite(CallSite &&site) {
       assert(!applied && "already applied!");
@@ -2755,6 +3009,7 @@ namespace {
 
       CanSILFunctionType substFnType;
       ManagedValue mv;
+      Optional<ForeignErrorConvention> foreignError;
       bool transparent;
 
       AbstractionPattern origFormalType(callee.getOrigFormalType());
@@ -2768,7 +3023,7 @@ namespace {
           .castTo<SILFunctionType>();
         transparent = false; // irrelevant
       } else {
-        std::tie(mv, substFnType, transparent) =
+        std::tie(mv, substFnType, foreignError, transparent) =
           callee.getAtUncurryLevel(gen, uncurryLevel);
       }
 
@@ -2788,6 +3043,7 @@ namespace {
 
         assert(uncurriedSites.size() == 1);
         CanFunctionType formalApplyType = cast<FunctionType>(formalType);
+        assert(!formalApplyType->getExtInfo().throws());
         SILLocation uncurriedLoc = uncurriedSites[0].Loc;
         claimNextParamClause(origFormalType);
         claimNextParamClause(formalType);
@@ -2812,7 +3068,12 @@ namespace {
         args.reserve(uncurriedSites.size());
         {
           ParamLowering paramLowering(substFnType);
-       
+
+          assert(!foreignError ||
+                 uncurriedSites.size() == 1 ||
+                 (uncurriedSites.size() == 2 &&
+                  substFnType->hasSelfParam()));
+
           // Collect the arguments to the uncurried call.
           for (auto &site : uncurriedSites) {
             AbstractionPattern origParamType =
@@ -2821,8 +3082,12 @@ namespace {
             claimNextParamClause(formalType);
             uncurriedLoc = site.Loc;
             args.push_back({});
+
             std::move(site).emit(gen, origParamType, paramLowering,
-                                 args.back(), inoutArgs);
+                                 args.back(), inoutArgs,
+                                 &site == &uncurriedSites.back()
+                                   ? foreignError
+                                   : static_cast<decltype(foreignError)>(None));
           }
         }
         assert(uncurriedLoc);
@@ -2848,6 +3113,7 @@ namespace {
                                  origFormalType,
                                  uncurriedSites.back().getSubstResultType(),
                                  transparent, None,
+                                 foreignError,
                                  uncurriedContext);
         } else if (specializedEmitter->isLateEmitter()) {
           auto emitter = specializedEmitter->getLateEmitter();
@@ -2872,14 +3138,14 @@ namespace {
           result = gen.emitManagedRValueWithCleanup(resultVal);
         }
       }
-      
-      // End the initial writeback scope, if any.
-      initialWritebackScope.reset();
+
+      // End the initial writeback scope.
+      InitialWritebackScope.pop();
       
       // If there are remaining call sites, apply them to the result function.
       // Each chained call gets its own writeback scope.
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
-        WritebackScope scope(gen);
+        WritebackScope writebackScope(gen);
 
         auto substFnType = result.getType().castTo<SILFunctionType>();
         ParamLowering paramLowering(substFnType);
@@ -2887,12 +3153,17 @@ namespace {
         SmallVector<ManagedValue, 4> siteArgs;
         SmallVector<InOutArgument, 2> inoutArgs;
 
+        // TODO: foreign errors for block or function pointer values?
+        assert(substFnType->hasErrorResult() ||
+               !cast<FunctionType>(formalType)->getExtInfo().throws());
+        foreignError = None;
+
         // The result function has already been reabstracted to the substituted
         // type, so use the substituted formal type as the abstraction pattern
         // for argument passing now.
         AbstractionPattern origParamType(claimNextParamClause(formalType));
         std::move(extraSites[i]).emit(gen, origParamType, paramLowering,
-                                      siteArgs, inoutArgs);
+                                      siteArgs, inoutArgs, foreignError);
         if (!inoutArgs.empty()) {
           beginInOutFormalAccesses(gen, inoutArgs, siteArgs);
         }
@@ -2900,10 +3171,10 @@ namespace {
         SGFContext context = i == size - 1 ? C : SGFContext();
         SILLocation loc = extraSites[i].Loc;
         result = gen.emitApply(loc, result, {}, siteArgs,
-                           substFnType,
-                           origFormalType,
-                           extraSites[i].getSubstResultType(),
-                           false, None, context);
+                               substFnType,
+                               origFormalType,
+                               extraSites[i].getSubstResultType(),
+                               false, None, foreignError, context);
       }
       
       return result;
@@ -2917,6 +3188,7 @@ namespace {
         uncurriedSites(std::move(e.uncurriedSites)),
         extraSites(std::move(e.extraSites)),
         callee(std::move(e.callee)),
+        InitialWritebackScope(std::move(e.InitialWritebackScope)),
         uncurries(e.uncurries),
         applied(e.applied) {
       e.applied = true;
@@ -2985,16 +3257,19 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
 
   ManagedValue mv;
   CanSILFunctionType substFnType;
+  Optional<ForeignErrorConvention> foreignError;
   bool transparent;
-  std::tie(mv, substFnType, transparent) = callee.getAtUncurryLevel(*this, 0);
+  std::tie(mv, substFnType, foreignError, transparent)
+    = callee.getAtUncurryLevel(*this, 0);
 
+  assert(!foreignError);
   assert(substFnType->getExtInfo().getLanguage()
            == SILFunctionLanguage::Swift);
 
   return emitApply(loc, mv, subs, args, substFnType,
                    AbstractionPattern(origFormalType.getResult()),
                    substFormalType.getResult(),
-                   transparent, None, ctx);
+                   transparent, None, None, ctx);
 }
 
 /// Allocate an uninitialized array of a given size, returning the array
@@ -3261,12 +3536,15 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
                 ArgumentSource &&selfValue,
                 bool isSuper, bool isDirectUse,
                 RValue &&subscripts, SGFContext c) {
+  // Scope any further writeback just within this operation.
+  WritebackScope writebackScope(*this);
+
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
-  CallEmission emission(*this, std::move(getter));
+  CallEmission emission(*this, std::move(getter), std::move(writebackScope));
   // Self ->
   if (selfValue) {
     emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
@@ -3296,12 +3574,15 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
                                      ArgumentSource &&selfValue,
                                      bool isSuper, bool isDirectUse,
                                      RValue &&subscripts, RValue &&setValue) {
+  // Scope any further writeback just within this operation.
+  WritebackScope writebackScope(*this);
+
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
   CanAnyFunctionType accessType = setter.getSubstFormalType();
 
-  CallEmission emission(*this, std::move(setter));
+  CallEmission emission(*this, std::move(setter), std::move(writebackScope));
   // Self ->
   if (selfValue) {
     emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
@@ -3342,6 +3623,8 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                               bool isSuper, bool isDirectUse,
                               RValue &&subscripts, SILValue buffer,
                               SILValue callbackStorage) {
+  // Scope any further writeback just within this operation.
+  WritebackScope writebackScope(*this);
 
   Callee callee = emitSpecializedAccessorFunctionRef(*this, loc,
                                                      materializeForSet,
@@ -3349,7 +3632,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                                      isSuper, isDirectUse);
   CanAnyFunctionType accessType = callee.getSubstFormalType();
 
-  CallEmission emission(*this, std::move(callee));
+  CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
   if (selfValue) {
     emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
@@ -3410,6 +3693,8 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                       ArgumentSource &&selfValue,
                       bool isSuper, bool isDirectUse,
                       RValue &&subscripts, SILType addressType) {
+  // Scope any further writeback just within this operation.
+  WritebackScope writebackScope(*this);
 
   Callee callee =
     emitSpecializedAccessorFunctionRef(*this, loc, addressor,
@@ -3417,7 +3702,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                                        isSuper, isDirectUse);
   CanAnyFunctionType accessType = callee.getSubstFormalType();
 
-  CallEmission emission(*this, std::move(callee));
+  CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
   if (selfValue) {
     emission.addCallSite(loc, std::move(selfValue), accessType.getResult());

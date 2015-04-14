@@ -562,3 +562,18 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
   }
   llvm_unreachable("bad CC");
 }
+
+ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
+                                                  ManagedValue bridgedError) {
+  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getNSErrorToErrorTypeFn());
+  auto bridgeFnType = bridgeFn.getType().castTo<SILFunctionType>();
+  auto nativeErrorType = bridgeFnType->getResult().getSILType();
+  assert(bridgeFnType->getResult().getConvention() == ResultConvention::Owned);
+  assert(bridgeFnType->getParameters()[0].getConvention()
+           == ParameterConvention::Direct_Owned);
+
+  SILValue nativeError = B.createApply(loc, bridgeFn, bridgeFn.getType(),
+                                       nativeErrorType, {},
+                                       bridgedError.forward(*this));
+  return emitManagedRValueWithCleanup(nativeError);
+}

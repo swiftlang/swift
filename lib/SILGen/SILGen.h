@@ -81,6 +81,7 @@ public:
   Optional<SILDeclRef> NSSetToSetFn;
   Optional<SILDeclRef> BoolToObjCBoolFn;
   Optional<SILDeclRef> ObjCBoolToBoolFn;
+  Optional<SILDeclRef> NSErrorToErrorTypeFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
   
@@ -286,6 +287,7 @@ public:
   SILDeclRef getNSSetToSetFn();
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
+  SILDeclRef getNSErrorToErrorTypeFn();
   
   /// Report a diagnostic.
   template<typename...T, typename...U>
