@@ -1835,5 +1835,7 @@ class ThrowsObjCName {
 
   @objc(method5WithError:x:closure:) func method5(x: Int, closure: Int -> Int) throws { }
 
-  @objc(method6) func method6() throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has one parameter}}
+  @objc(method6) func method6() throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
+
+  @objc(method7) func method7(x: Int) throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
 }

@@ -7013,7 +7013,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                       numArgumentNames, 
                       numArgumentNames != 1,
                       numParameters,
-                      numParameters != 1);
+                      numParameters != 1,
+                      func->isBodyThrowing());
           D->getAttrs().add(
             ObjCAttr::createUnnamed(TC.Context,
                                     objcAttr->AtLoc,

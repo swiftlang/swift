@@ -1845,8 +1845,9 @@ ERROR(objc_name_subscript,sema_objc,none,
 ERROR(objc_name_func_mismatch,sema_objc,none,
       "'@objc' %select{initializer|method}0 name provides "
       "%select{one argument name|names for %1 arguments}2, but "
-      "%select{initializer|method}0 has %select{one parameter|%3 parameters}4", 
-      (bool, unsigned, bool, unsigned, bool))
+      "%select{initializer|method}0 has %select{one parameter|%3 parameters}4"
+      "%select{| (%select{|including }4the error parameter)}5",
+      (bool, unsigned, bool, unsigned, bool, bool))
 
 #define OBJC_ATTR_SELECT "select{@objc|@IBOutlet|@NSManaged|dynamic}"
 
