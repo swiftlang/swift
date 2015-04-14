@@ -1,5 +1,5 @@
-// RUN: %swift -parse -verify -target x86_64-apple-macosx10.10 -enable-experimental-availability-checking %clang-importer-sdk -I %S/Inputs/custom-modules %s
-// RUN: not %swift -parse -target x86_64-apple-macosx10.10 -enable-experimental-availability-checking %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %swift -parse -verify -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s
+// RUN: not %swift -parse -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // REQUIRES: OS=macosx
 

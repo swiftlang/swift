@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-availability-checking %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 // REQUIRES: OS=macosx
 

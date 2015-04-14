@@ -140,10 +140,14 @@ import Foundation
 func isOSAtLeast(major: Int, minor: Int, patch: Int = 0) -> Bool {
   let vers = (majorVersion: major, minorVersion: minor, patchVersion: patch)
   // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
-  let procInfo: AnyObject = NSProcessInfo.processInfo()
-  return procInfo.isOperatingSystemAtLeastVersion?(
+  if #available(iOS >= 8.0, OSX >= 10.10, *) {
+    let procInfo: AnyObject = NSProcessInfo.processInfo()
+    return procInfo.isOperatingSystemAtLeastVersion(
                     NSOperatingSystemVersion(vers)
-                  ) == true
+                    )
+  }
+
+  return false
 }
 
 func expectTagged(s: NSString, expected: Bool) -> NSString {

@@ -550,7 +550,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // in the AST.
   (void) TC.getStdlibModule(&SF);
 
-  if (Ctx.LangOpts.EnableExperimentalAvailabilityChecking ) {
+  if (!Ctx.LangOpts.DisableAvailabilityChecking ) {
     // Build the type refinement hierarchy for the primary
     // file before type checking.
     TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
@@ -1309,7 +1309,7 @@ bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
 Optional<UnavailabilityReason>
 TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
                                           const DeclContext *referenceDC) {
-  if (!Context.LangOpts.EnableExperimentalAvailabilityChecking) {
+  if (Context.LangOpts.DisableAvailabilityChecking) {
     return None;
   }
 

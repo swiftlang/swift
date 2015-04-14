@@ -559,7 +559,7 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   // We only diagnose potentially unavailability here if availability checking
   // is turned on, but we are not treating unavailable symbols as having
   // optional type.
-  if (!TC.getLangOpts().EnableExperimentalAvailabilityChecking ||
+  if (TC.getLangOpts().DisableAvailabilityChecking ||
       TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
     return false;
   }
@@ -668,7 +668,7 @@ private:
       return;
     }
 
-    if (!TC.getLangOpts().EnableExperimentalAvailabilityChecking ||
+    if (TC.getLangOpts().DisableAvailabilityChecking ||
         TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
       return;
     }

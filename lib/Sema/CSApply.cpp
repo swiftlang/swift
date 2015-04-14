@@ -5229,7 +5229,7 @@ Expr *
 ExprRewriter::convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
                                            SourceLoc declRefLoc,
                                            const UnavailabilityReason &reason) {
-  assert(cs.TC.getLangOpts().EnableExperimentalAvailabilityChecking);
+  assert(!cs.TC.getLangOpts().DisableAvailabilityChecking);
 
   if (!cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
     // If the unavailable as optional feature is not enabled, we do not perform
@@ -5248,7 +5248,7 @@ void
 ExprRewriter::diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
                                                   SourceRange referenceRange) {
   if (choice.isPotentiallyUnavailable()) {
-    assert(cs.TC.getLangOpts().EnableExperimentalAvailabilityChecking);
+    assert(!cs.TC.getLangOpts().DisableAvailabilityChecking);
     cs.TC.diagnosePotentialUnavailability(choice.getDecl(), referenceRange, dc,
                                           choice.getReasonUnavailable(cs));
   }

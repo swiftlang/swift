@@ -178,9 +178,9 @@ def enable_dynamic_value_type_layout :
 def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
   HelpText<"Enable experimental 'switch' pattern matching features">;
 
-def enable_experimental_availability_checking : Flag<["-"],
-  "enable-experimental-availability-checking">,
-  HelpText<"Enable experimental checking for API availability">;
+def disable_availability_checking : Flag<["-"],
+  "disable-availability-checking">,
+  HelpText<"Disable checking for potentially unavailable APIs">;
 
 def enable_experimental_unavailable_as_optional : Flag<["-"],
   "enable-experimental-unavailable-as-optional">,

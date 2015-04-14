@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional -primary-file %s %S/Inputs/availability_optionals_other.swift | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-unavailable-as-optional -primary-file %s %S/Inputs/availability_optionals_other.swift | FileCheck %s
 
 // REQUIRES: OS=macosx
 

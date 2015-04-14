@@ -5160,7 +5160,7 @@ public:
       TC.diagnose(override, diag::override_unavailable, override->getName());
     }
     
-    if (TC.getLangOpts().EnableExperimentalAvailabilityChecking) {
+    if (!TC.getLangOpts().DisableAvailabilityChecking) {
       diagnoseOverrideForAvailability(TC, override, base);
     }
 

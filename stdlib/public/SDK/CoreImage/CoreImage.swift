@@ -14,6 +14,8 @@ import Foundation
 @exported import CoreImage  // Clang module
 
 extension CIFilter {
+  @availability(iOS, introduced=8.0)
+  @availability(OSX, introduced=10.10)
   convenience init?(
     name: String!, elements: (NSCopying, AnyObject)...
   ) {

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift %clang-importer-sdk -I %S/Inputs/custom-modules -enable-experimental-availability-checking
+// RUN: %target-parse-verify-swift %clang-importer-sdk -I %S/Inputs/custom-modules
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop

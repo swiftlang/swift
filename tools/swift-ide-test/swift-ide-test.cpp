@@ -691,7 +691,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
                             bool RunTypeChecker) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
-  Invocation.getLangOptions().EnableExperimentalAvailabilityChecking = true;
+  Invocation.getLangOptions().DisableAvailabilityChecking = false;
 
   CompilerInstance CI;
 
@@ -782,7 +782,7 @@ static int doDumpAPI(const CompilerInvocation &InitInvok,
                      StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
-  Invocation.getLangOptions().EnableExperimentalAvailabilityChecking = true;
+  Invocation.getLangOptions().DisableAvailabilityChecking = false;
 
   CompilerInstance CI;
 

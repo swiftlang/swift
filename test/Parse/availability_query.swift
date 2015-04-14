@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-experimental-availability-checking
+// RUN: %target-parse-verify-swift
 
 // REQUIRES: OS=macosx
 

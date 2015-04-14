@@ -22,7 +22,9 @@ import Foundation
 // CHECK-10_10: @"OBJC_CLASS_$_NSUserNotificationAction" = external global %objc_class
 
 func testObjCClass() {
-  let action = NSUserNotificationAction()
+  if #available(OSX >= 10.10, *) {
+    let action = NSUserNotificationAction()
+  }
 }
 
 func testGlobalVariable() {

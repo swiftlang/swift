@@ -28,6 +28,8 @@ extension CIFilter {
     return self.apply(k, arguments: args, options: dict as [NSObject: AnyObject])
   }
 
+  @availability(iOS, introduced=8.0)
+  @availability(OSX, introduced=10.10)
   convenience init(name: String!,
                    elements: (NSCopying, AnyObject)...) {
     var dict =  NSMutableDictionary()

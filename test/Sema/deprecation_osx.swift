@@ -1,5 +1,5 @@
-// RUN: %swift -parse -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules - %s -verify
-// RUN: %swift -parse -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules - %s -verify
+// RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 //
 // This test requires a target of OS X 10.10 or later to test deprecation
 // diagnostics because (1) we only emit deprecation warnings if a symbol is

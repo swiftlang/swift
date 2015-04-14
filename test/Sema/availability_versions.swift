@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift -enable-experimental-availability-checking
-// RUN: not %target-swift-frontend -parse -enable-experimental-availability-checking %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %target-parse-verify-swift
+// RUN: not %target-swift-frontend -parse %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // REQUIRES: OS=macosx
 

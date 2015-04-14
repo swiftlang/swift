@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -parse -primary-file %s %S/Inputs/availability_versions_optionals_other.swift -verify -enable-experimental-availability-checking -enable-experimental-unavailable-as-optional
+// RUN: %swift -target x86_64-apple-macosx10.9 -parse -primary-file %s %S/Inputs/availability_versions_optionals_other.swift -verify -enable-experimental-unavailable-as-optional
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop

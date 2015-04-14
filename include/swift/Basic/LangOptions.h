@@ -73,8 +73,8 @@ namespace swift {
     /// \brief Enable experimental "switch" pattern-matching features.
     bool EnableExperimentalPatterns = false;
 
-    /// \brief Enable experimental API availability checking.
-    bool EnableExperimentalAvailabilityChecking = false;
+    /// \brief Disable API availability checking.
+    bool DisableAvailabilityChecking = false;
     
     /// \brief Enable experimental treatment of potentially unavailable
     /// symbols as optionals.

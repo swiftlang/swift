@@ -747,7 +747,7 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
 }
 
 void AttributeChecker::visitAvailabilityAttr(AvailabilityAttr *attr) {
-  if (!TC.getLangOpts().EnableExperimentalAvailabilityChecking)
+  if (TC.getLangOpts().DisableAvailabilityChecking)
     return;
 
   if (!attr->isActivePlatform(TC.Context) || !attr->Introduced.hasValue())

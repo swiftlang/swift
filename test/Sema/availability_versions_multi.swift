@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -parse -primary-file %s %S/Inputs/availability_multi_other.swift -verify -enable-experimental-availability-checking
+// RUN: %swift -target x86_64-apple-macosx10.9 -parse -primary-file %s %S/Inputs/availability_multi_other.swift -verify
 // REQUIRES: OS=macosx
 // This test requires a minimum deployment target of exactly OS X 10.9 to properly
 // check availability_multi_other.swift
