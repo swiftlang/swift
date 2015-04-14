@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass="External Defs To Decls" -emit-ir %s | FileCheck %s
 
 sil_stage canonical
 

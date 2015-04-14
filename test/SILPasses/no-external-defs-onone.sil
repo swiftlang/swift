@@ -1,0 +1,41 @@
+// RUN: %target-swift-frontend -module-name=test -Onone -emit-ir %s | FileCheck %s
+
+// CHECK-DAG: define linkonce_odr hidden void @shared_external_test()
+// CHECK-DAG: declare void @public_external_test()
+// CHECK-DAG: declare hidden void @hidden_external_test()
+// CHECK-NOT: public_external_unused_test
+
+
+sil public_external @public_external_test : $@thin () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil hidden_external @hidden_external_test : $@thin () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil shared_external @shared_external_test : $@thin () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil public_external @public_external_unused_test : $@thin () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil public @use_all_symbols : $@thin () -> () {
+  %0 = function_ref @public_external_test : $@thin () -> ()
+  %1 = function_ref @hidden_external_test : $@thin () -> ()
+  %2 = function_ref @shared_external_test : $@thin () -> ()
+
+  apply %0() : $@thin () -> ()
+  apply %1() : $@thin () -> ()
+  apply %2() : $@thin () -> ()
+
+  %24 = tuple()
+  return %24 : $()
+}
+

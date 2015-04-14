@@ -31,6 +31,9 @@ namespace swift {
   /// \brief Run all the SIL performance optimization passes on \p M.
   void runSILOptimizationPasses(SILModule &M);
 
+  /// \brief Run all SIL passes for -Onone on module \p M.
+  void runSILPassesForOnone(SILModule &M);
+
   void runSILOptimizationPassesWithFileSpecification(SILModule &Module,
                                                      StringRef FileName);
 
