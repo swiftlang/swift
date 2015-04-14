@@ -103,7 +103,7 @@ if true {
 // CHECK-NEXT: deallocated
 // CHECK-NEXT: deallocated
 
-#if os(OSX) || os(iOS)
+#if os(OSX) || os(iOS) || os(tvOS)
 
 import Foundation
 

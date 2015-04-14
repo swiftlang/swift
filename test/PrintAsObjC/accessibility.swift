@@ -43,7 +43,7 @@ import AppKit
 @NSApplicationMain
 @objc class AppDelegate : NSApplicationDelegate {}
 
-#elseif os(iOS)
+#elseif os(iOS) || os(tvOS)
 import UIKit
 
 @UIApplicationMain

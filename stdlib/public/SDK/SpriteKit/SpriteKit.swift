@@ -4,7 +4,7 @@
 
 #if os(OSX)
 public typealias SKColor = NSColor
-#elseif os(iOS)
+#elseif os(iOS) || os(tvOS)
 public typealias SKColor = UIColor
 #endif
 

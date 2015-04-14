@@ -18,7 +18,7 @@ typealias OSColor = NSColor
 typealias OSBezierPath = NSBezierPath
 #endif
 
-#if os(iOS)
+#if os(iOS) || os(tvOS)
 import UIKit
 
 typealias OSImage = UIImage

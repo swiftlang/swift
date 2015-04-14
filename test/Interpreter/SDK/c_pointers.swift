@@ -9,7 +9,7 @@ import Foundation
 import AppKit
 typealias XXColor = NSColor
 #endif
-#if os(iOS)
+#if os(iOS) || os(tvOS)
 import UIKit
 typealias XXColor = UIColor
 #endif

@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir | FileCheck -check-prefix=%target-cpu-%target-os %s
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
+// UNSUPPORTED: OS=tvos
 // XFAIL: linux
 
 import gadget

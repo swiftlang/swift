@@ -1137,7 +1137,7 @@ NSStringAPIs.test("smallestEncoding") {
 func getHomeDir() -> String {
 #if os(OSX)
   return String.fromCString(getpwuid(getuid()).memory.pw_dir)!
-#elseif os(iOS)
+#elseif os(iOS) || os(tvOS)
   // getpwuid() returns null in sandboxed apps under iOS simulator.
   return NSHomeDirectory()
 #else

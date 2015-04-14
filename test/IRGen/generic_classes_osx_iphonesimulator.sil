@@ -2,6 +2,7 @@
 
 // REQUIRES: CPU=x86_64
 // UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=tvos
 
 // rdar://15806697 - use null pointers for &_objc_empty_vtable in the simulator
 //

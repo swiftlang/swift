@@ -21,7 +21,7 @@ func f(c: NSColor) {
   println("colortastic")
 }
 #endif
-#if os(iOS)
+#if os(iOS) || os(tvOS)
 func f(c: UIColor) {
   println("colortastic")
 }

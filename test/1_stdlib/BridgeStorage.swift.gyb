@@ -163,6 +163,9 @@ func expectTagged(s: NSString, expected: Bool) -> NSString {
 #if os(iOS)
   // NSTaggedPointerString is enabled starting in iOS 9.0.
   osSupportsTaggedStrings = isOSAtLeast(9,0)
+#elseif os(tvOS)
+  // NSTaggedPointerString is supported in all versions of TVOS.
+  osSupportsTaggedStrings = true
 #elseif os(OSX)
   // NSTaggedPointerString is enabled starting in OS X 10.10.
   osSupportsTaggedStrings = isOSAtLeast(10,10)
