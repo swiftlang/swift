@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Swift
 import SwiftShims
 
 /// Returns `Character`\ s read from standard input through the end of the
