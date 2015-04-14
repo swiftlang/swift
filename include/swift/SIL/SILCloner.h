@@ -1223,6 +1223,15 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *inst) {
   OpenedExistentialSubs[archetypeTy] 
     = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
 
+  if (!inst->getOperand().getType().canUseExistentialRepresentation(
+          inst->getModule(), ExistentialRepresentation::Class)) {
+    doPostProcess(inst, getBuilder().createOpenExistentialMetatype(
+                            getOpLocation(inst->getLoc()),
+                            getOpValue(inst->getOperand()),
+                            getOpType(inst->getType())));
+    return;
+  }
+
   doPostProcess(inst,
     getBuilder().createOpenExistentialRef(getOpLocation(inst->getLoc()),
                                           getOpValue(inst->getOperand()),
