@@ -66,7 +66,7 @@ public protocol _SequenceType {
 ///
 /// Its requirements are inherited by `SequenceType` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _Sequence_Type : _SequenceType {
+public protocol _Sequence_Type : _SequenceType, _SequenceDefaultsType {
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
   typealias Generator : GeneratorType
@@ -77,6 +77,25 @@ public protocol _Sequence_Type : _SequenceType {
   ///
   /// Complexity: O(1)
   func generate() -> Generator
+}
+
+public protocol _SequenceDefaultsType {
+  /// A type that provides the *sequence*\ 's iteration interface and
+  /// encapsulates its iteration state.
+  typealias Generator : GeneratorType
+
+  /// Return a *generator* over the elements of this *sequence*.  The
+  /// *generator*\ 's next element is the first element of the
+  /// sequence.
+  ///
+  /// Complexity: O(1)
+  func generate() -> Generator
+}
+
+extension _SequenceDefaultsType {
+}
+
+extension _SequenceDefaultsType {
 }
 
 /// A type that can be iterated with a `for`\ ...\ `in` loop.

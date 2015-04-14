@@ -494,16 +494,23 @@ extension ${Self} : _ArrayType {
 
   /// `true` if and only if the `${Self}` is empty
   public var isEmpty: Bool {
-    return count == 0
+    // FIXME(prext): remove this function when protocol extensions land.
+    return self._prext_isEmpty
   }
   
   /// The first element, or `nil` if the array is empty
   public var first: Element? {
-    return Swift.first(self)
+    // FIXME(prext): remove this function when protocol extensions land.
+    return self._prext_first
   }
   
   /// The last element, or `nil` if the array is empty
   public var last: Element? {
+    // FIXME(prext): remove this function when protocol extensions land.
+
+    // FIXME: we can't use the commented-out code because the optimizer
+    // crashes.  <rdar://problem/20514925> Optimizer crashes [...]
+    // return self._prext_last
     return Swift.last(self)
   }
   
@@ -656,7 +663,8 @@ extension ${Self} : _ArrayType {
   /// `combine(combine(...combine(combine(initial, self[0]),
   /// self[1]),...self[count-2]), self[count-1])`.
   public func reduce<U>(initial: U, @noescape combine: (U, T) -> U) -> U {
-    return Swift.reduce(self, initial, combine)
+    // FIXME(prext): remove this function when protocol extensions land.
+    return self._prext_reduce(initial, combine: combine)
   }
 
   /// Sort `self` in-place according to `isOrderedBefore`.  Requires:
@@ -684,34 +692,28 @@ extension ${Self} : _ArrayType {
   /// Return ${a_Self} containing the results of calling
   /// `transform(x)` on each element `x` of `self`
   public func map<U>(transform: (T) -> U) -> ${Self}<U> {
-    // Should call Swift.map here, but there's a compiler bug:
-    // <rdar://problem/19763792> Calling Swift.map from Array.map causes
-    // Assertion failed: UnresolvedDot in wrong phase
-    return ${Self}<U>(lazy(self).map(transform))
+    // FIXME(prext): remove this function when protocol extensions land.
+    return ${Self}<U>(self._prext_map(transform))
   }
 
   /// Return ${a_Self} containing the results of calling
   /// `transform(x)` on each element `x` of `self` and flattening the result.
   public func flatMap<U>(@noescape transform: (T) -> ${Self}<U>) -> ${Self}<U> {
-    var result: ${Self}<U> = []
-    for element in self {
-      result.extend(transform(element))
-    }
-    return result
+    // FIXME(prext): remove this function when protocol extensions land.
+    return ${Self}<U>(self._prext_flatMap(transform))
   }
 
   /// A ${Self} containing the elements of `self` in reverse order
   public func reverse() -> ${Self} {
-    return ${Self}(lazy(self).reverse())
+    // FIXME(prext): remove this function when protocol extensions land.
+    return ${Self}(self._prext_reverse())
   }
 
   /// Return ${a_Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
   public func filter(includeElement: (T) -> Bool) -> ${Self} {
-    // Should call Swift.filter() here, but there's a compiler bug:
-    // <rdar://problem/19763792> Calling Swift.map from Array.map causes
-    // Assertion failed: UnresolvedDot in wrong phase
-    return ${Self}(lazy(self).filter(includeElement))
+    // FIXME(prext): remove this function when protocol extensions land.
+    return self._prext_filter(includeElement)
   }
 }
 

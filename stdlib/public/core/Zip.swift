@@ -15,7 +15,8 @@
 /// underlying sequence.
 public func zip<S0: SequenceType, S1: SequenceType>(
   s0: S0, s1: S1) -> Zip2<S0, S1> {
-  return Zip2(s0, s1)
+  // FIXME(prext): remove this function when protocol extensions land.
+  return s0._prext_zip(s1)
 }
 
 /// A generator for the `Zip2` sequence
@@ -37,14 +38,31 @@ public struct ZipGenerator2<
   /// since the copy was made, and no preceding call to `self.next()`
   /// has returned `nil`.
   public mutating func next() -> Element? {
+    // The next() function needs to track if it has reached the end.  If we
+    // didn't, and the first sequence is shorter than the second, then, when we
+    // have already exhausted the second sequence, on every subsequent call to
+    // next() we would consume and discard one additional element from the
+    // first sequence, even though next() return nil.
+
+    if reachedEnd {
+      return nil
+    }
+
     var e0 = baseStreams.0.next()
-    if e0 == nil { return .None }
+    if e0 == nil {
+      reachedEnd = true
+      return nil
+    }
     var e1 = baseStreams.1.next()
-    if e1 ==  nil { return .None }
+    if e1 ==  nil {
+      reachedEnd = true
+      return nil
+    }
     return .Some((e0!, e1!))
   }
 
-  var baseStreams : (E0,E1)
+  var baseStreams: (E0, E1)
+  var reachedEnd: Bool = false
 }
 
 /// A sequence of pairs built out of two underlying sequences, where

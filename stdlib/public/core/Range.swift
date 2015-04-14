@@ -241,6 +241,7 @@ extension Range {
   /// Return an array containing the results of calling
   /// `transform(x)` on each element `x` of `self`.
   public func map<U>(transform: (T)->U) -> [U] {
-    return Swift.map(self, transform)
+    // FIXME(prext): remove this function when protocol extensions land.
+    return self._prext_map(transform)
   }
 }

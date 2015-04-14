@@ -16,12 +16,8 @@ public func minElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
   -> R.Generator.Element {
-  var g = elements.generate()
-  var result = g.next()!  
-  for e in GeneratorSequence(g) {
-    if e < result { result = e }
-  }
-  return result
+  // FIXME(prext): remove this function when protocol extensions land.
+  return elements._prext_minElement()!
 }
 
 /// Returns the maximum element in `elements`.  Requires:
@@ -30,12 +26,8 @@ public func maxElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
   -> R.Generator.Element {
-  var g = elements.generate()
-  var result = g.next()!
-  for e in GeneratorSequence(g) {
-    if e > result { result = e }
-  }
-  return result
+  // FIXME(prext): remove this function when protocol extensions land.
+  return elements._prext_maxElement()!
 }
 
 /// Returns the first index where `value` appears in `domain` or `nil` if
@@ -45,12 +37,8 @@ public func maxElement<
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, value: C.Generator.Element) -> C.Index? {
-  for i in indices(domain) {
-    if domain[i] == value {
-      return i
-    }
-  }
-  return nil
+  // FIXME(prext): remove this function when protocol extensions land.
+  return domain._prext_find(value)
 }
 
 /// Return the lesser of `x` and `y`
@@ -167,16 +155,8 @@ public func startsWith<
     S0.Generator.Element : Equatable
 >(s: S0, prefix: S1) -> Bool
 {
-  var prefixGenerator = prefix.generate()
-
-  for e0 in s {
-    var e1 = prefixGenerator.next()
-    if e1 == nil { return true }
-    if e0 != e1! {
-      return false
-    }
-  }
-  return prefixGenerator.next() != nil ? false : true
+  // FIXME(prext): remove this function when protocol extensions land.
+  return s._prext_startsWith(prefix)
 }
 
 /// Return true iff `s` begins with elements equivalent to those of
@@ -192,16 +172,8 @@ public func startsWith<
   @noescape isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
   -> Bool
 {
-  var prefixGenerator = prefix.generate()
-
-  for e0 in s {
-    var e1 = prefixGenerator.next()
-    if e1 == nil { return true }
-    if !isEquivalent(e0, e1!) {
-      return false
-    }
-  }
-  return prefixGenerator.next() != nil ? false : true
+  // FIXME(prext): remove this function when protocol extensions land.
+  return s._prext_startsWith(prefix, isEquivalent: isEquivalent)
 }
 
 /// The `GeneratorType` for `EnumerateSequence`.  `EnumerateGenerator`
@@ -290,7 +262,8 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
 public func enumerate<Seq : SequenceType>(
   base: Seq
 ) -> EnumerateSequence<Seq> {
-  return EnumerateSequence(base)
+  // FIXME(prext): remove this function when protocol extensions land.
+  return base._prext_enumerate()
 }
 
 /// Return `true` iff `a1` and `a2` contain the same elements in the
@@ -300,22 +273,9 @@ public func equal<
   where
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Equatable
->(a1: S1, a2: S2) -> Bool
-{
-  var g1 = a1.generate()
-  var g2 = a2.generate()
-  while true {
-    var e1 = g1.next()
-    var e2 = g2.next()
-    if (e1 != nil) && (e2 != nil) {
-      if e1! != e2! {
-        return false
-      }
-    }
-    else {
-      return (e1 == nil) == (e2 == nil)
-    }
-  }
+>(a1: S1, a2: S2) -> Bool {
+  // FIXME(prext): remove this function when protocol extensions land.
+  return a1._prext_equalElements(a2)
 }
 
 /// Return true iff `a1` and `a2` contain equivalent elements, using
@@ -328,22 +288,9 @@ public func equal<
     S1.Generator.Element == S2.Generator.Element
 >(a1: S1, a2: S2,
   @noescape isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
-  -> Bool
-{
-  var g1 = a1.generate()
-  var g2 = a2.generate()
-  while true {
-    var e1 = g1.next()
-    var e2 = g2.next()
-    if (e1 != nil) && (e2 != nil) {
-      if !isEquivalent(e1!, e2!) {
-        return false
-      }
-    }
-    else {
-      return (e1 == nil) == (e2 == nil)
-    }
-  }
+  -> Bool {
+  // FIXME(prext): remove this function when protocol extensions land.
+  return a1._prext_equalElements(a2, isEquivalent: isEquivalent)
 }
 
 /// Return true iff a1 precedes a2 in a lexicographical ("dictionary")
@@ -354,26 +301,8 @@ public func lexicographicalCompare<
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Comparable>(
   a1: S1, a2: S2) -> Bool {
-  var g1 = a1.generate()
-  var g2 = a2.generate()
-  while true {
-    var e1_ = g1.next()
-    var e2_ = g2.next()
-    if let e1? = e1_ {
-      if let e2? = e2_ {
-        if e1 < e2 {
-          return true
-        }
-        if e2 < e1 {
-          return false
-        }
-        continue // equivalent
-      }
-      return false
-    }
-
-    return e2_ != nil
-  }
+  // FIXME(prext): remove this function when protocol extensions land.
+  return a1._prext_lexicographicalCompare(a2)
 }
 
 /// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
@@ -391,44 +320,24 @@ public func lexicographicalCompare<
   @noescape isOrderedBefore less: (S1.Generator.Element, S1.Generator.Element)
   -> Bool
 ) -> Bool {
-  var g1 = a1.generate()
-  var g2 = a2.generate()
-  while true {
-    var e1_ = g1.next()
-    var e2_ = g2.next()
-    if let e1? = e1_ {
-      if let e2? = e2_ {
-        if less(e1, e2) {
-          return true
-        }
-        if less(e2, e1) {
-          return false
-        }
-        continue // equivalent
-      }
-      return false
-    }
-    return e2_ != nil
-  }
+  // FIXME(prext): remove this function when protocol extensions land.
+  return a1._prext_lexicographicalCompare(a2, isOrderedBefore: less)
 }
 
 /// Return `true` iff an element in `seq` satisfies `predicate`.
 public func contains<
   S : SequenceType, L : BooleanType
 >(seq: S, @noescape predicate: (S.Generator.Element) -> L) -> Bool {
-  for a in seq {
-    if predicate(a) {
-      return true
-    }
-  }
-  return false
+  // FIXME(prext): remove this function when protocol extensions land.
+  return seq._prext_contains({ predicate($0).boolValue })
 }
 
 /// Return `true` iff `x` is in `seq`.
 public func contains<
   S : SequenceType where S.Generator.Element : Equatable
 >(seq: S, x: S.Generator.Element) -> Bool {
-  return contains(seq, { $0 == x })
+  // FIXME(prext): remove this function when protocol extensions land.
+  return seq._prext_contains(x)
 }
 
 /// Return the result of repeatedly calling `combine` with an
@@ -437,9 +346,6 @@ public func contains<
 public func reduce<S : SequenceType, U>(
   sequence: S, initial: U, @noescape combine: (U, S.Generator.Element) -> U
 ) -> U {
-  var result = initial
-  for element in sequence {
-    result = combine(result, element)
-  }
-  return result
+  // FIXME(prext): remove this function when protocol extensions land.
+  return sequence._prext_reduce(initial, combine: combine)
 }

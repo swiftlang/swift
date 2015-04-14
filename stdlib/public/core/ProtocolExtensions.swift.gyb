@@ -1,0 +1,527 @@
+//===--- ProtocolExtensions.swift.gyb -------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+
+# We know we will eventually get a SequenceType.Element type.  Define
+# a shorthand that we can use today.
+GElement = "Generator.Element"
+
+}%
+
+//===----------------------------------------------------------------------===//
+// enumerate()
+//===----------------------------------------------------------------------===//
+
+extension SequenceType {
+  /// Return a lazy `SequenceType` containing pairs (*n*, *x*), where
+  /// *n*\ s are consecutive `Int`\ s starting at zero, and *x*\ s are
+  /// the elements of `base`::
+  ///
+  ///   > for (n, c) in enumerate("Swift") { println("\(n): '\(c)'" ) }
+  ///   0: 'S'
+  ///   1: 'w'
+  ///   2: 'i'
+  ///   3: 'f'
+  ///   4: 't'
+  final public func _prext_enumerate() -> EnumerateSequence<Self> {
+    return EnumerateSequence(self)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// minElement(), maxElement()
+//===----------------------------------------------------------------------===//
+
+% # Generate two versions: with explicit predicates and with
+% # a Comparable requirement.
+% for preds in [ True, False ]:
+
+extension SequenceType ${"" if preds else "where Self.Generator.Element : Comparable"} {
+
+  /// Returns the minimum element in `self`.
+  ///
+  /// Complexity: O(count(elements))
+%   if preds:
+  ///
+  /// Requires: `isOrderedBefore` is a `strict weak ordering
+  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+  /// over `self`."""
+%   end
+  final public func _prext_minElement(
+%   if preds:
+    @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+%   end
+  ) -> ${GElement}? {
+    var g = generate()
+    if var result? = g.next() {
+      for e in GeneratorSequence(g) {
+%   if preds:
+        if isOrderedBefore(e, result) { result = e }
+%   else:
+        if e < result { result = e }
+%   end
+      }
+      return result
+    }
+    return nil
+  }
+
+  /// Returns the maximum element in `self`.
+  ///
+  /// Complexity: O(count(elements))
+%   if preds:
+  ///
+  /// Requires: `isOrderedBefore` is a `strict weak ordering
+  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+  /// over `self`."""
+%   end
+  final public func _prext_maxElement(
+%   if preds:
+    @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+%   end
+  ) -> ${GElement}? {
+    var g = generate()
+    if var result? = g.next() {
+      for e in GeneratorSequence(g) {
+%   if preds:
+        if isOrderedBefore(result, e) { result = e }
+%   else:
+        if e > result { result = e }
+%   end
+      }
+      return result
+    }
+    return nil
+  }
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// startsWith()
+//===----------------------------------------------------------------------===//
+
+% # Generate two versions: with explicit predicates and with
+% # an Equatable requirement.
+% for preds in [ True, False ]:
+
+extension SequenceType ${"" if preds else "where Self.Generator.Element : Equatable"} {
+
+%   if preds:
+  /// Return true iff `s` begins with elements equivalent to those of
+  /// `prefix`, using `isEquivalent` as the equivalence test.
+  ///
+  /// Requires: `isEquivalent` is an `equivalence relation
+  /// <http://en.wikipedia.org/wiki/Equivalence_relation>`_
+%   else:
+  /// Return true iff the the initial elements of `s` are equal to `prefix`.
+%   end
+  final public func _prext_startsWith<
+    S : SequenceType where S.${GElement} == ${GElement}
+  >(
+    prefix: S${"," if preds else ""}
+%   if preds:
+    @noescape isEquivalent: (${GElement}, ${GElement}) -> Bool
+%   end
+    ) -> Bool {
+    var prefixGenerator = prefix.generate()
+    for e0 in self {
+      if let e1? = prefixGenerator.next() {
+        if ${"!isEquivalent(e0, e1)" if preds else "e0 != e1"} {
+          return false
+        }
+      }
+      else {
+        return true
+      }
+    }
+    return prefixGenerator.next() != nil ? false : true
+  }
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// equalElements()
+//===----------------------------------------------------------------------===//
+
+% # Generate two versions: with explicit predicates and with
+% # an Equatable requirement.
+% for preds in [ True, False ]:
+
+extension SequenceType ${"" if preds else "where Self.Generator.Element : Equatable"} {
+
+%   if preds:
+  /// Return true iff `a1` and `a2` contain equivalent elements, using
+  /// `isEquivalent` as the equivalence test.
+  ///
+  /// Requires: `isEquivalent` is an `equivalence relation
+  /// <http://en.wikipedia.org/wiki/Equivalence_relation>`_
+%   else:
+  /// Return `true` iff `self` and `s` contain the same elements in the
+  /// same order.
+%   end
+  final public func _prext_equalElements<
+    S : SequenceType where S.${GElement} == ${GElement}
+  >(
+    s: S${"," if preds else ""}
+%   if preds:
+    @noescape isEquivalent: (${GElement}, ${GElement}) -> Bool
+%   end
+  ) -> Bool {
+    var g1 = self.generate()
+    var g2 = s.generate()
+    while true {
+      switch (g1.next(), g2.next()) {
+      case let (e1?, e2?):
+%   if preds:
+        if !isEquivalent(e1, e2) {
+%   else:
+        if e1 != e2 {
+%   end
+          return false
+        }
+      case (_?, nil),
+           (nil, _?):
+        return false
+      case (nil, nil):
+        return true
+      }
+    }
+  }
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// lexicographicalCompare()
+//===----------------------------------------------------------------------===//
+
+% # Generate two versions: with explicit predicates and with
+% # Comparable requirement.
+% for preds in [ True, False ]:
+
+%   if preds:
+/// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
+/// ordering, using `isOrderedBefore` as the comparison between elements.
+///
+/// Requires: isOrderedBefore` is a `strict weak ordering
+/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// over the elements of `a1` and `a2`.
+%   else:
+/// Return true iff a1 precedes a2 in a lexicographical ("dictionary")
+/// ordering, using "<" as the comparison between elements.
+%   end
+extension SequenceType ${"" if preds else "where Self.Generator.Element : Comparable"} {
+  final public func _prext_lexicographicalCompare<
+    S : SequenceType where S.${GElement} == ${GElement}
+  >(
+    s: S${"," if preds else ""}
+%   if preds:
+    @noescape isOrderedBefore less: (${GElement}, ${GElement}) -> Bool
+%   end
+  ) -> Bool {
+    var g1 = self.generate()
+    var g2 = s.generate()
+    while true {
+      if let e1? = g1.next() {
+        if let e2? = g2.next() {
+          if ${"less(e1, e2)" if preds else "e1 < e2"} {
+            return true
+          }
+          if ${"less(e2, e1)" if preds else "e2 < e1"} {
+            return false
+          }
+          continue // equivalent
+        }
+        return false
+      }
+
+      return g2.next() != nil
+    }
+  }
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// contains()
+//===----------------------------------------------------------------------===//
+
+extension SequenceType where Self.Generator.Element : Equatable {
+  /// Return `true` iff `x` is in `self`.
+  final public func _prext_contains(element: ${GElement}) -> Bool {
+    // FIXME: dynamic dispatch for Set and Dictionary.
+    for e in self {
+      if e == element {
+        return true
+      }
+    }
+    return false
+  }
+}
+
+extension SequenceType {
+  /// Return `true` iff an element in `self` satisfies `predicate`.
+  final public func _prext_contains(
+    @noescape predicate: (${GElement}) -> Bool
+  ) -> Bool {
+    for e in self {
+      if predicate(e) {
+        return true
+      }
+    }
+    return false
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// reduce()
+//===----------------------------------------------------------------------===//
+
+extension SequenceType {
+  /// Return the result of repeatedly calling `combine` with an
+  /// accumulated value initialized to `initial` and each element of
+  /// `self`, in turn, i.e. return
+  /// `combine(combine(...combine(combine(initial, self[0]),
+  /// self[1]),...self[count-2]), self[count-1])`.
+  final public func _prext_reduce<T>(
+    initial: T, @noescape combine: (T, ${GElement}) -> T
+  ) -> T {
+    var result = initial
+    for element in self {
+      result = combine(result, element)
+    }
+    return result
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// reverse()
+//===----------------------------------------------------------------------===//
+
+extension SequenceType {
+  /// Return an `Array` containing the elements of `self` in reverse
+  /// order.
+  final public func _prext_reverse() -> [${GElement}] {
+    // FIXME(performance): optimize to 1 pass?  But Array(self) can be
+    // optimized to a memcpy() sometimes.  Those cases are usually collections,
+    // though.
+    var result = Array(self)
+    let count = result.count
+    for i in 0..<count/2 {
+      swap(&result[i], &result[count - i - 1])
+    }
+    return result
+  }
+}
+
+extension CollectionType where Self.Index : BidirectionalIndexType {
+  /// Return a lazy `CollectionType` containing the elements of `self`
+  /// in reverse order.
+  final public func _prext_reverse() -> BidirectionalReverseView<Self> {
+    return BidirectionalReverseView(self)
+  }
+}
+
+extension CollectionType where Self.Index : RandomAccessIndexType {
+  /// Return a lazy `CollectionType` containing the elements of `self`
+  /// in reverse order.
+  final public func _prext_reverse() -> RandomAccessReverseView<Self> {
+    return RandomAccessReverseView(self)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// filter()
+//===----------------------------------------------------------------------===//
+
+// We would like to make filter() a protocol requirement, and dynamically
+// dispatched, but Swift generics don't allow us to express this.
+// rdar://20477576
+
+extension SequenceType {
+  /// Return an `Array` containing the elements of `self`,
+  /// in order, that satisfy the predicate `includeElement`.
+  final public func _prext_filter(
+    @noescape includeElement: (${GElement}) -> Bool
+  ) -> [${GElement}] {
+    var result: [${GElement}] = []
+    for e in self {
+      if includeElement(e) {
+        result.append(e)
+      }
+    }
+    return result
+  }
+}
+
+extension RangeReplaceableCollectionType {
+  /// Return an `Array` containing the elements of `self`,
+  /// in order, that satisfy the predicate `includeElement`.
+  final public func _prext_filter(
+    @noescape includeElement: (${GElement}) -> Bool
+  ) -> Self {
+    var result = Self()
+    for e in self {
+      if includeElement(e) {
+        result.append(e)
+      }
+    }
+    return result
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// map()
+//===----------------------------------------------------------------------===//
+
+extension SequenceType {
+  /// Return an `Array` containing the results of mapping `transform`
+  /// over `self`.
+  final public func _prext_map<T>(
+    @noescape transform: (${GElement}) -> T
+  ) -> [T] {
+    var result: [T] = []
+    result.reserveCapacity(underestimateCount(self))
+    for element in self {
+      result.append(transform(element))
+    }
+    return result
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// flatMap()
+//===----------------------------------------------------------------------===//
+
+extension SequenceType {
+  /// Return an `Array` containing the results of mapping `transform`
+  /// over `self` and flattening the result.
+  final public func _prext_flatMap<S : SequenceType>(
+    @noescape transform: (${GElement}) -> S
+  ) -> [S.${GElement}] {
+    var result: [S.${GElement}] = []
+    for element in self {
+      result.extend(transform(element))
+    }
+    return result
+  }
+}
+
+extension SequenceType {
+  /// Return an `Array` containing the non-nil results of mapping `transform`
+  /// over `self`.
+  final public func _prext_flatMap<T>(
+    @noescape transform: (${GElement}) -> T?
+  ) -> [T] {
+    var result: [T] = []
+    for element in self {
+      if let newElement? = transform(element) {
+        result.append(newElement)
+      }
+    }
+    return result
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// zip()
+//===----------------------------------------------------------------------===//
+
+extension SequenceType {
+  /// Returns a sequence of pairs built out of two underlying sequences,
+  /// where the elements of the `i`\ th pair are the `i`\ th elements
+  /// of each underlying sequence.
+  final public func _prext_zip<S : SequenceType>(s: S) -> Zip2<Self, S> {
+    return Zip2(self, s)
+  }
+}
+
+// FIXME: we could have an overload on collections that returns a collection
+// and preserves the index kind.  Zip2 is only a sequence.
+
+//===----------------------------------------------------------------------===//
+// isEmpty
+//===----------------------------------------------------------------------===//
+
+extension CollectionType {
+  // FIXME: dynamic dispatch for Set and Dictionary.
+  final public var _prext_isEmpty: Bool {
+    return startIndex == endIndex
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// first
+//===----------------------------------------------------------------------===//
+
+extension CollectionType {
+  final public var _prext_first: Generator.Element? {
+    return _prext_isEmpty ? nil : self[startIndex]
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// find()
+//===----------------------------------------------------------------------===//
+
+extension CollectionType where Self.${GElement} : Equatable {
+  /// Returns the first index where `value` appears in `self` or `nil` if
+  /// `value` is not found.
+  ///
+  /// Complexity: O(\ `self.count()`\ )
+  final public func _prext_find(element: ${GElement}) -> Index? {
+    // FIXME: dynamic dispatch for Set and Dictionary.
+    // FIXME: _prext_indices
+    for i in indices(self) {
+      if self[i] == element {
+        return i
+      }
+    }
+    return nil
+  }
+}
+
+extension CollectionType {
+  /// Returns the first index where `predicate` returns `true` for the
+  /// corresponding value, or `nil` if such value is not found.
+  ///
+  /// Complexity: O(\ `self.count()`\ )
+  final public func _prext_find(
+    @noescape predicate: (${GElement}) -> Bool
+  ) -> Index? {
+    for i in indices(self) {
+      if predicate(self[i]) {
+        return i
+      }
+    }
+    return nil
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// indices()
+//===----------------------------------------------------------------------===//
+
+extension CollectionType {
+  /// Return the range of valid index values.
+  ///
+  /// The result's `endIndex` is the same as that of `self`.  Because
+  /// `Range` is half-open, iterating the values of the result produces
+  /// all valid subscript arguments for `self`, omitting its `endIndex`.
+  final public var _prext_indices: Range<Index> {
+    return Range(start: startIndex, end: endIndex)
+  }
+}
+

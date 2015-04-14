@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// FIXME(prext): remove this file when protocol extensions land.
+
 var n = [2, 3, 5, 7, 11]
 var s = ["two", "three", "five", "seven", "eleven", "thirteen"]
 

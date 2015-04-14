@@ -253,7 +253,8 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)/t
 }
 
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/Collection") {
-  let ablPtrWrapper = AudioBufferList.allocate(maximumBuffers: 16)
+  var ablPtrWrapper = AudioBufferList.allocate(maximumBuffers: 16)
+  expectType(UnsafeMutableAudioBufferListPointer.self, &ablPtrWrapper)
 
   var expected: [AudioBuffer] = []
   for i in 0..<16 {
@@ -265,7 +266,9 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/Collection") {
     expected.append(audioBuffer)
   }
 
-  checkCollection(expected, ablPtrWrapper, SourceLocStack().withCurrentLoc())
+  // FIXME: use checkMutableRandomAccessCollection, when we have that function.
+  checkRandomAccessCollection(
+    expected, ablPtrWrapper, SourceLocStack().withCurrentLoc())
   free(ablPtrWrapper.unsafeMutablePointer)
 }
 

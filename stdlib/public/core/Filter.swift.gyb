@@ -172,7 +172,8 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
 public func filter<S : SequenceType>(
   source: S, includeElement: (S.Generator.Element) -> Bool
 ) -> [S.Generator.Element] {
-  return lazy(source).filter(includeElement).array
+  // FIXME(prext): remove this function when protocol extensions land.
+  return source._prext_filter(includeElement)
 }
 
 % traversals = ('Forward', 'Bidirectional', 'RandomAccess')
@@ -200,6 +201,7 @@ extension ${Self} {
 public func filter<C : CollectionType>(
   source: C, includeElement: (C.Generator.Element)->Bool
 ) -> FilterCollectionView<C> {
+  // FIXME(prext): remove this function when protocol extensions land.
   return FilterCollectionView(_base: source, _include: includeElement)
 }
 */

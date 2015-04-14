@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift | FileCheck %s
 
+// FIXME(prext): remove this file when protocol extensions land.
+
 // CHECK: testing...
 println("testing...")
 

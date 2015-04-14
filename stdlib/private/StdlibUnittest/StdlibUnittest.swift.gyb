@@ -25,9 +25,9 @@ import ObjectiveC
 #endif
 
 public struct SourceLoc {
-  let file: String
-  let line: UWord
-  let comment: String?
+  public let file: String
+  public let line: UWord
+  public let comment: String?
 
   public init(_ file: String, _ line: UWord, comment: String? = nil) {
     self.file = file
@@ -135,13 +135,15 @@ public func expectEqual<T>(
 public func expectNotEqual<T : Equatable>(
     expected: T, actual: T,
     stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   if expected == actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
     println("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
 }
@@ -150,11 +152,13 @@ public func expectNotEqual<T : Equatable>(
 // <rdar://problem/17015923> Array->NSArray implicit conversion insanity
 public func expectOptionalEqual<T : Equatable>(
     expected: T, actual: T?,
+    stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if (actual == nil) || expected != actual! {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
     println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
     println()
@@ -163,12 +167,14 @@ public func expectOptionalEqual<T : Equatable>(
 
 public func expectEqual<T : Equatable>(
     expected: T?, actual: T?,
+    stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if (actual == nil) != (expected == nil)
     || actual != nil && expected! != actual! {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
     println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
     println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
     println()
@@ -182,8 +188,7 @@ public func expectEqual<T : Equatable>(
 %    ('<T : Equatable>', '_UnitTestArray<T>'),
 %    ('<T : Equatable>', 'ArraySlice<T>'),
 %    ('<T : Equatable>', 'Array<T>'),
-%    ('<T, U : Equatable>', 'Dictionary<T, U>'),
-%    ('<T : ForwardIndexType>', 'T')]:
+%    ('<T, U : Equatable>', 'Dictionary<T, U>')]:
 
 public func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
@@ -219,12 +224,14 @@ public func expectEqualSequence${Generic}(
 
 func _expectNotEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   if expected == actual {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     println("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
 }
@@ -247,27 +254,35 @@ public func expectOptionalEqual${Generic}(
 %for ComparableType in ['Int']:
 
 public func expectLE(
-    expected: ${ComparableType}, actual: ${ComparableType},
-    file: String = __FILE__, line: UWord = __LINE__
+  expected: ${ComparableType}, actual: ${ComparableType},
+  stackTrace: SourceLocStack? = nil,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
 ) {
   if !(expected <= actual) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
     println("expected: \"\(expected)\"")
     println("actual: \"\(actual)\"")
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
 }
 
 public func expectGE(
-    expected: ${ComparableType}, actual: ${ComparableType},
-    file: String = __FILE__, line: UWord = __LINE__
+  expected: ${ComparableType}, actual: ${ComparableType},
+  stackTrace: SourceLocStack? = nil,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
 ) {
   if !(expected >= actual) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
     println("expected: \"\(expected)\"")
     println("actual: \"\(actual)\"")
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
 }
@@ -361,7 +376,8 @@ public func expectFalse(
 public func expectEmpty<T>(
     value: Optional<T>,
     stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
 ) {
   if value != nil {
     _anyExpectFailed = true
@@ -369,6 +385,7 @@ public func expectEmpty<T>(
     _printStackTrace(stackTrace)
     println("expected optional to be empty")
     println("actual: \"\(value)\"")
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
     println()
   }
 }
@@ -1341,6 +1358,19 @@ public func checkComparable<T : Comparable>(
     collectMoreInfo: collectMoreInfo)
 }
 
+public struct CollectionMisuseResiliencyChecks {
+  public var callNextOnExhaustedGenerator: Bool = true
+
+  public static var all: CollectionMisuseResiliencyChecks {
+    return CollectionMisuseResiliencyChecks()
+  }
+
+  public static var none: CollectionMisuseResiliencyChecks {
+    return CollectionMisuseResiliencyChecks(
+      callNextOnExhaustedGenerator: false)
+  }
+}
+
 // Generate two overloads: one for _UnitTestArray (which will get
 // picked up when the caller passes a literal), and another that
 // accepts any appropriate Collection type.
@@ -1351,10 +1381,14 @@ public func checkComparable<T : Comparable>(
 
 public func checkGenerator<
   G : GeneratorType, ${genericParam}
-  where ${Element} == G.Element, ${Element} : Equatable
+  where ${Element} == G.Element
 >(
-    expected: ${Expected},
-    generator: G, stackTrace: SourceLocStack
+  expected: ${Expected},
+  generator: G,
+  sameValue: (${Element}, ${Element}) -> Bool,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  stackTrace: SourceLocStack,
+  collectMoreInfo: (()->String)? = nil
 ) {
   // Copying a `GeneratorType` is allowed.
   var mutableGen = generator
@@ -1362,73 +1396,322 @@ public func checkGenerator<
   while let e? = mutableGen.next() {
     actual.append(e)
   }
-  expectEqualSequence(expected, actual, stackTrace: stackTrace.withCurrentLoc())
+  expectEqualSequence(
+    expected, actual, sameValue,
+    stackTrace: stackTrace.withCurrentLoc(),
+    collectMoreInfo: collectMoreInfo)
 
-  // Having returned `.None` once, a `GeneratorType` should not generate more
-  // elements.
-  for i in 0..<10 {
-    expectEmpty(mutableGen.next(), stackTrace: stackTrace.withCurrentLoc())
+  if resiliencyChecks.callNextOnExhaustedGenerator {
+    // Having returned `.None` once, a `GeneratorType` should not generate more
+    // elements.
+    for i in 0..<10 {
+      expectEmpty(
+        mutableGen.next(),
+        stackTrace: stackTrace.withCurrentLoc(),
+        collectMoreInfo: collectMoreInfo)
+    }
   }
+}
+
+public func checkGenerator<
+  G : GeneratorType, ${genericParam}
+  where ${Element} == G.Element, ${Element} : Equatable
+>(
+  expected: ${Expected},
+  generator: G,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  stackTrace: SourceLocStack,
+  collectMoreInfo: (()->String)? = nil
+) {
+  checkGenerator(
+    expected, generator, { $0 == $1 },
+    resiliencyChecks: resiliencyChecks,
+    stackTrace.withCurrentLoc(),
+    collectMoreInfo: collectMoreInfo)
 }
 
 public func checkSequence<
   ${genericParam}, S : SequenceType
-    where S.Generator.Element == ${Element}, ${Element} : Equatable
+  where S.Generator.Element == ${Element}
 >(
   expected: ${Expected},
-  sequence: S, stackTrace: SourceLocStack
+  sequence: S,
+  sameValue: (${Element}, ${Element}) -> Bool,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  stackTrace: SourceLocStack,
+  collectMoreInfo: (()->String)? = nil
 ) {
   let expectedCount: Int = numericCast(count(expected))
-  checkGenerator(expected, sequence.generate(), stackTrace.withCurrentLoc())
-  expectGE(expectedCount, underestimateCount(sequence))
+  checkGenerator(
+    expected, sequence.generate(), sameValue,
+    resiliencyChecks: resiliencyChecks,
+    stackTrace.withCurrentLoc())
+  expectGE(
+    expectedCount, underestimateCount(sequence),
+    stackTrace: stackTrace.withCurrentLoc(),
+    collectMoreInfo: collectMoreInfo)
 }
 
-public func checkCollection<
-    ${genericParam}, C : CollectionType
-  where C.Generator.Element == ${Element}, ${Element} : Equatable
+public func checkSequence<
+  ${genericParam}, S : SequenceType
+  where S.Generator.Element == ${Element}
 >(
-      expected: ${Expected},
-      collection: C, stackTrace: SourceLocStack
+  expected: ${Expected},
+  sequence: S,
+  sameValue: (${Element}, ${Element}) -> Bool,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  checkSequence(
+    expected, sequence, sameValue,
+    resiliencyChecks: resiliencyChecks,
+    SourceLocStack().with(SourceLoc(file, line)),
+    collectMoreInfo: collectMoreInfo)
+}
+
+public func checkSequence<
+  ${genericParam}, S : SequenceType
+  where S.Generator.Element == ${Element}, ${Element} : Equatable
+>(
+  expected: ${Expected},
+  sequence: S,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  stackTrace: SourceLocStack,
+  collectMoreInfo: (()->String)? = nil
+) {
+  checkSequence(
+    expected, sequence, { $0 == $1 },
+    resiliencyChecks: resiliencyChecks,
+    stackTrace.withCurrentLoc(),
+    collectMoreInfo: collectMoreInfo)
+}
+
+public func checkSequence<
+  ${genericParam}, S : SequenceType
+  where S.Generator.Element == ${Element}, ${Element} : Equatable
+>(
+  expected: ${Expected},
+  sequence: S,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  checkSequence(
+    expected, sequence, { $0 == $1 },
+    resiliencyChecks: resiliencyChecks,
+    SourceLocStack().with(SourceLoc(file, line)),
+    collectMoreInfo: collectMoreInfo)
+}
+
+%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+
+public func check${traversal}Collection<
+  ${genericParam}, C : CollectionType
+  where
+  C.Generator.Element == ${Element},
+  C.Index : ${traversal}IndexType
+>(
+  expected: ${Expected},
+  collection: C,
+  sameValue: (${Element}, ${Element}) -> Bool,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  stackTrace: SourceLocStack,
+  collectMoreInfo: (()->String)? = nil
 ) {
   // A `CollectionType` is a multi-pass `SequenceType`.
   for i in 0..<3 {
-    checkSequence(expected, collection, stackTrace.withCurrentLoc())
+    checkSequence(
+      expected, collection, sameValue,
+      resiliencyChecks: resiliencyChecks,
+      stackTrace.withCurrentLoc(),
+      collectMoreInfo: collectMoreInfo)
   }
 
-  expectEqual(count(expected).toIntMax(), count(collection).toIntMax(),
-      stackTrace: stackTrace.withCurrentLoc())
+  let expectedArray = Array(expected)
+
+  expectEqual(
+    count(expectedArray).toIntMax(),
+    count(collection).toIntMax(),
+    stackTrace: stackTrace.withCurrentLoc(),
+    collectMoreInfo: collectMoreInfo)
 
   for i in 0..<3 {
-    let startIndex = collection.startIndex
-    let endIndex = collection.endIndex
+    if true {
+      let startIndex = collection.startIndex
+      let endIndex = collection.endIndex
 
-    var actual: _UnitTestArray<${Element}> = []
-    var index = collection.startIndex
-    while index != collection.endIndex {
-      // Iteration should not change `startIndex` or `endIndex`.
-      expectEqual(startIndex, collection.startIndex)
-      expectEqual(endIndex, collection.endIndex)
-
-      actual.append(collection[index])
-      ++index
+      for i in indices(collection) {
+        expectEqual(startIndex, collection.startIndex,
+          stackTrace: stackTrace.withCurrentLoc()) {
+          "Iteration should not change startIndex"
+        }
+        expectEqual(endIndex, collection.endIndex,
+          stackTrace: stackTrace.withCurrentLoc()) {
+          "Iteration should not change endIndex"
+        }
+      }
     }
 
-    expectEqualSequence(
-      expected, actual, stackTrace: stackTrace.withCurrentLoc())
+    var allIndices: [C.Index] = []
+    for i in indices(collection) {
+      allIndices.append(i)
+    }
+
+    if count(expectedArray) >= 2 {
+      for i in 0..<allIndices.count-1 {
+        var successor1 = allIndices[i].successor()
+        var successor2 = allIndices[i]
+        successor2++
+        var successor3 = allIndices[i]
+        ++successor3
+        for s in [ successor1, successor2, successor3 ] {
+          expectEqual(
+            allIndices[i + 1], s,
+            stackTrace: stackTrace.withCurrentLoc())
+          expectEqual(
+            expectedArray[i + 1],
+            collection[s],
+            sameValue,
+            stackTrace: stackTrace.withCurrentLoc())
+        }
+      }
+%   if traversal == "Bidirectional":
+      for i in 1..<allIndices.count {
+        var predecessor1 = allIndices[i].predecessor()
+        var predecessor2 = allIndices[i]
+        predecessor2--
+        var predecessor3 = allIndices[i]
+        --predecessor3
+        for p in [ predecessor1, predecessor2, predecessor3 ] {
+          expectEqual(
+            allIndices[i - 1], p,
+            stackTrace: stackTrace.withCurrentLoc())
+          expectEqual(
+            expectedArray[i - 1], collection[p],
+            sameValue,
+            stackTrace: stackTrace.withCurrentLoc())
+        }
+      }
+      for i in 1..<allIndices.count {
+        var index = allIndices[i]
+        --index
+        ++index
+        expectEqual(
+          allIndices[i], index,
+          stackTrace: stackTrace.withCurrentLoc())
+        expectEqual(
+          expectedArray[i], collection[index],
+          sameValue,
+          stackTrace: stackTrace.withCurrentLoc())
+      }
+%   end
+    }
+
+    if true {
+      var allIndices2: [C.Index] = []
+      for i in indices(collection) {
+        allIndices2.append(i)
+      }
+
+      expectEqualSequence(
+        allIndices, allIndices2,
+        stackTrace: stackTrace.withCurrentLoc()) {
+        "iteration should not invalidate indices"
+      }
+
+      expectEqualSequence(
+        expectedArray,
+        allIndices._prext_map { collection[$0] },
+        sameValue,
+        stackTrace: stackTrace.withCurrentLoc())
+      expectEqualSequence(
+        expectedArray,
+        allIndices2._prext_map { collection[$0] },
+        sameValue,
+        stackTrace: stackTrace.withCurrentLoc())
+    }
   }
+
+  // FIXME: more checks for bidirectional and random access collections.
 }
 
-public func checkSliceableWithBidirectionalIndex<
-    ${genericParam}, S : Sliceable
-      where S.Generator.Element == ${Element},
-        S.SubSlice.Generator.Element == ${Element},
-        S.Index : BidirectionalIndexType,
-        ${Element} : Equatable
+public func check${traversal}Collection<
+  ${genericParam}, C : CollectionType
+  where
+  C.Generator.Element == ${Element},
+  C.Index : ${traversal}IndexType
 >(
-    expected: ${Expected}, 
-    sliceable: S, stackTrace: SourceLocStack) {
+  expected: ${Expected},
+  collection: C,
+  sameValue: (${Element}, ${Element}) -> Bool,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  check${traversal}Collection(
+    expected, collection, sameValue,
+    resiliencyChecks: resiliencyChecks,
+    SourceLocStack().with(SourceLoc(file, line)),
+    collectMoreInfo: collectMoreInfo)
+}
+
+public func check${traversal}Collection<
+  ${genericParam}, C : CollectionType
+  where
+  C.Generator.Element == ${Element},
+  C.Index : ${traversal}IndexType,
+  ${Element} : Equatable
+>(
+  expected: ${Expected},
+  collection: C,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  stackTrace: SourceLocStack,
+  collectMoreInfo: (()->String)? = nil
+) {
+  check${traversal}Collection(
+    expected, collection, { $0 == $1 },
+    resiliencyChecks: resiliencyChecks,
+    stackTrace.withCurrentLoc(),
+    collectMoreInfo: collectMoreInfo)
+}
+
+public func check${traversal}Collection<
+  ${genericParam}, C : CollectionType
+  where
+  C.Generator.Element == ${Element},
+  C.Index : ${traversal}IndexType,
+  ${Element} : Equatable
+>(
+  expected: ${Expected},
+  collection: C,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  check${traversal}Collection(
+    expected, collection, { $0 == $1 },
+    resiliencyChecks: resiliencyChecks,
+    SourceLocStack().with(SourceLoc(file, line)),
+    collectMoreInfo: collectMoreInfo)
+}
+
+% end
+
+public func checkSliceableWithBidirectionalIndex<
+  ${genericParam}, S : Sliceable
+  where
+  S.Generator.Element == ${Element},
+  S.SubSlice.Generator.Element == ${Element},
+  S.Index : BidirectionalIndexType,
+  S.SubSlice.Index : BidirectionalIndexType,
+  ${Element} : Equatable
+>(
+  expected: ${Expected}, 
+  sliceable: S, stackTrace: SourceLocStack
+) {
   // A `Sliceable` is a `CollectionType`.
-  checkCollection(expected, sliceable, stackTrace.withCurrentLoc())
+  checkBidirectionalCollection(expected, sliceable, stackTrace.withCurrentLoc())
 
   let expectedArray = _UnitTestArray(expected)
   
@@ -1450,7 +1733,8 @@ public func checkSliceableWithBidirectionalIndex<
       }
       let expectedSlice = expectedArray[startNumericIndex..<endNumericIndex]
       let slice = sliceable[start..<end]
-      checkCollection(expectedSlice, slice, stackTrace.withCurrentLoc())
+      checkBidirectionalCollection(
+        expectedSlice, slice, stackTrace.withCurrentLoc())
 
       if end != sliceable.endIndex {
         ++end
@@ -1547,6 +1831,25 @@ public func expectEqualSequence<
   expectEqualSequence(
     expected, actual, { $0 == $1 }, stackTrace: stackTrace,
     file: file, line: line, collectMoreInfo: collectMoreInfo)
+}
+
+public func expectEqualSequence<
+  Expected : SequenceType,
+  Actual : SequenceType,
+  T : Equatable,
+  U : Equatable
+  where Expected.Generator.Element == Actual.Generator.Element,
+     Expected.Generator.Element == (T, U)
+>(
+    expected: Expected, actual: Actual,
+    stackTrace: SourceLocStack? = nil,
+    file: String = __FILE__, line: UWord = __LINE__,
+    collectMoreInfo: (()->String)? = nil
+) {
+  expectEqualSequence(
+    expected, actual, { $0.0 == $1.0 && $0.1 == $1.1 },
+    stackTrace: stackTrace, file: file, line: line,
+    collectMoreInfo: collectMoreInfo)
 }
 
 public func expectEqualSequence<
@@ -1901,26 +2204,26 @@ public func ~> <T> (
 
 public struct MinimalForwardIndex : ForwardIndexType {
   public init(position: Int, endIndex: Int) {
-    self._position = position
-    self._endIndex = endIndex
+    self.position = position
+    self.endIndex = endIndex
   }
 
   public init(position: Int, startIndex _: Int, endIndex: Int) {
-    self._position = position
-    self._endIndex = endIndex
+    self.position = position
+    self.endIndex = endIndex
   }
 
   public func successor() -> MinimalForwardIndex {
-    expectNotEqual(_endIndex, _position)
-    return MinimalForwardIndex(position: _position + 1, endIndex: _endIndex)
+    expectNotEqual(endIndex, position)
+    return MinimalForwardIndex(position: position + 1, endIndex: endIndex)
   }
 
-  internal var _position: Int
-  internal var _endIndex: Int
+  public let position: Int
+  public let endIndex: Int
 }
 
 public func == (lhs: MinimalForwardIndex, rhs: MinimalForwardIndex) -> Bool {
-  return lhs._position == rhs._position
+  return lhs.position == rhs.position
 }
 
 //===----------------------------------------------------------------------===//
@@ -1929,33 +2232,33 @@ public func == (lhs: MinimalForwardIndex, rhs: MinimalForwardIndex) -> Bool {
 
 public struct MinimalBidirectionalIndex : BidirectionalIndexType {
   public init(position: Int, startIndex: Int, endIndex: Int) {
-    self._position = position
-    self._startIndex = startIndex
-    self._endIndex = endIndex
+    self.position = position
+    self.startIndex = startIndex
+    self.endIndex = endIndex
   }
 
   public func successor() -> MinimalBidirectionalIndex {
-    expectNotEqual(_endIndex, _position)
+    expectNotEqual(endIndex, position)
     return MinimalBidirectionalIndex(
-      position: _position + 1, startIndex: _startIndex, endIndex: _endIndex)
+      position: position + 1, startIndex: startIndex, endIndex: endIndex)
   }
 
   public func predecessor() -> MinimalBidirectionalIndex {
-    expectNotEqual(_startIndex, _position)
+    expectNotEqual(startIndex, position)
     return MinimalBidirectionalIndex(
-      position: _position - 1, startIndex: _startIndex, endIndex: _endIndex)
+      position: position - 1, startIndex: startIndex, endIndex: endIndex)
   }
 
-  internal var _position: Int
-  internal var _startIndex: Int
-  internal var _endIndex: Int
+  public let position: Int
+  public let startIndex: Int
+  public let endIndex: Int
 }
 
 public func == (
   lhs: MinimalBidirectionalIndex,
   rhs: MinimalBidirectionalIndex
 ) -> Bool {
-  return lhs._position == rhs._position
+  return lhs.position == rhs.position
 }
 
 //===----------------------------------------------------------------------===//
@@ -1964,46 +2267,46 @@ public func == (
 
 public struct MinimalRandomAccessIndex : RandomAccessIndexType {
   public init(position: Int, startIndex: Int, endIndex: Int) {
-    self._position = position
-    self._startIndex = startIndex
-    self._endIndex = endIndex
+    self.position = position
+    self.startIndex = startIndex
+    self.endIndex = endIndex
   }
 
   public func successor() -> MinimalRandomAccessIndex {
-    expectNotEqual(_endIndex, _position)
+    expectNotEqual(endIndex, position)
     return MinimalRandomAccessIndex(
-      position: _position + 1, startIndex: _startIndex, endIndex: _endIndex)
+      position: position + 1, startIndex: startIndex, endIndex: endIndex)
   }
 
   public func predecessor() -> MinimalRandomAccessIndex {
-    expectNotEqual(_startIndex, _position)
+    expectNotEqual(startIndex, position)
     return MinimalRandomAccessIndex(
-      position: _position - 1, startIndex: _startIndex, endIndex: _endIndex)
+      position: position - 1, startIndex: startIndex, endIndex: endIndex)
   }
 
   public func distanceTo(other: MinimalRandomAccessIndex) -> Int {
-    return other._position - _position
+    return other.position - position
   }
 
   public func advancedBy(n: Int) -> MinimalRandomAccessIndex {
-    expectNotEqual(_endIndex, _position)
-    let newPosition = _position + n
-    expectLE(_startIndex, newPosition)
-    expectGE(_endIndex, newPosition)
+    expectNotEqual(endIndex, position)
+    let newPosition = position + n
+    expectLE(startIndex, newPosition)
+    expectGE(endIndex, newPosition)
     return MinimalRandomAccessIndex(
-      position: newPosition, startIndex: _startIndex, endIndex: _endIndex)
+      position: newPosition, startIndex: startIndex, endIndex: endIndex)
   }
 
-  internal var _position: Int
-  internal var _startIndex: Int
-  internal var _endIndex: Int
+  public let position: Int
+  public let startIndex: Int
+  public let endIndex: Int
 }
 
 public func == (
   lhs: MinimalRandomAccessIndex,
   rhs: MinimalRandomAccessIndex
 ) -> Bool {
-  return lhs._position == rhs._position
+  return lhs.position == rhs.position
 }
 
 //===----------------------------------------------------------------------===//
@@ -2014,20 +2317,20 @@ public func == (
 %  Self = 'Minimal%sCollection' % traversal
 %  Index = 'Minimal%sIndex' % traversal
 
-/// A minimal implementation of CollectionType with extra checks.
+/// A minimal implementation of `CollectionType` with extra checks.
 public struct ${Self}<T> : CollectionType {
   public init<S : SequenceType where S.Generator.Element == T>(
     _ s: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
-    self._data = Array(s)
+    self._elements = Array(s)
 
     switch underestimatedCount {
     case .Precise:
-      self.underestimatedCount = _data.count
+      self.underestimatedCount = _elements.count
 
     case .Overestimate:
-      self.underestimatedCount = _data.count * 3 + 5
+      self.underestimatedCount = _elements.count * 3 + 5
 
     case .Value(let count):
       self.underestimatedCount = count
@@ -2035,25 +2338,151 @@ public struct ${Self}<T> : CollectionType {
   }
 
   public func generate() -> MinimalGenerator<T> {
-    return MinimalGenerator(_data)
+    return MinimalGenerator(_elements)
   }
 
   public var startIndex: ${Index} {
-    return ${Index}(position: 0, startIndex: 0, endIndex: _data.endIndex)
+    return ${Index}(
+      position: 0,
+      startIndex: 0,
+      endIndex: _elements.endIndex)
   }
 
   public var endIndex: ${Index} {
     return ${Index}(
-      position: _data.endIndex, startIndex: 0, endIndex: _data.endIndex)
+      position: _elements.endIndex,
+      startIndex: 0,
+      endIndex: _elements.endIndex)
   }
 
   public subscript(i: ${Index}) -> T {
-    return _data[i._position]
+    return _elements[i.position]
   }
 
   public var underestimatedCount: Int
 
-  internal let _data: [T]
+  internal let _elements: [T]
+}
+
+public func ~> <T> (
+  c: ${Self}<T>, _: (_UnderestimateCount, ())
+) -> Int {
+  return c.underestimatedCount
+}
+
+%end
+
+//===----------------------------------------------------------------------===//
+// Minimal***RangeReplaceableCollectionType
+//===----------------------------------------------------------------------===//
+
+%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%  Self = 'Minimal%sRangeReplaceableCollectionType' % traversal
+%  Index = 'Minimal%sIndex' % traversal
+
+/// A minimal implementation of `RangeReplaceableCollectionType` with extra
+/// checks.
+public struct ${Self}<T> : RangeReplaceableCollectionType {
+
+  public init<S : SequenceType where S.Generator.Element == T>(
+    _ s: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    self.elements = Array(s)
+
+    switch underestimatedCount {
+    case .Precise:
+      self.underestimatedCount = elements.count
+
+    case .Overestimate:
+      self.underestimatedCount = elements.count * 3 + 5
+
+    case .Value(let count):
+      self.underestimatedCount = count
+    }
+  }
+
+  public init() {
+    self.underestimatedCount = 0
+    self.elements = []
+  }
+
+  public func generate() -> MinimalGenerator<T> {
+    return MinimalGenerator(elements)
+  }
+
+  public var startIndex: ${Index} {
+    return ${Index}(
+      position: 0,
+      startIndex: 0,
+      endIndex: elements.endIndex)
+  }
+
+  public var endIndex: ${Index} {
+    return ${Index}(
+      position: elements.endIndex,
+      startIndex: 0,
+      endIndex: elements.endIndex)
+  }
+
+  public subscript(i: ${Index}) -> T {
+    return elements[i.position]
+  }
+
+  public mutating func reserveCapacity(n: Int) {
+    elements.reserveCapacity(n)
+    reservedCapacity = max(reservedCapacity, n)
+  }
+
+  public mutating func append(x: T) {
+    elements.append(x)
+  }
+
+  public mutating func extend<
+    S : SequenceType where S.Generator.Element == T
+  >(newElements: S) {
+    elements.extend(newElements)
+  }
+
+  public mutating func replaceRange<
+    C : CollectionType where C.Generator.Element == T
+  >(
+    subRange: Range<${Index}>, with newElements: C
+  ) {
+    elements.replaceRange(
+      subRange.startIndex.position..<subRange.endIndex.position,
+      with: newElements)
+  }
+
+  public mutating func insert(newElement: T, atIndex i: ${Index}) {
+    elements.insert(newElement, atIndex: i.position)
+  }
+
+  public mutating func splice<
+    S : CollectionType where S.Generator.Element == T
+  >(newElements: S, atIndex i: ${Index}) {
+    elements.splice(newElements, atIndex: i.position)
+  }
+
+  public mutating func removeAtIndex(i: ${Index}) -> T {
+    return elements.removeAtIndex(i.position)
+  }
+
+  public mutating func removeRange(subRange: Range<${Index}>) {
+    elements.removeRange(
+      subRange.startIndex.position..<subRange.endIndex.position
+    )
+  }
+
+  public mutating func removeAll(keepCapacity: Bool = false) {
+    // Ignore the value of `keepCapacity`.
+    elements.removeAll(keepCapacity: false)
+  }
+
+  public var underestimatedCount: Int
+  public var reservedCapacity: Int = 0
+
+  public var elements: [T]
 }
 
 public func ~> <T> (

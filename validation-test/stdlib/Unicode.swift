@@ -2168,7 +2168,9 @@ class NonContiguousNSString : NSString {
 
 func checkUTF8View(expected: [UInt8], subject: String,
     stackTrace: SourceLocStack) {
-  checkCollection(expected, subject.utf8, stackTrace.withCurrentLoc())
+  checkForwardCollection(
+    expected, subject.utf8,
+    stackTrace.withCurrentLoc())
 }
 
 func checkUTF16View(expected: [UInt16], subject: String,

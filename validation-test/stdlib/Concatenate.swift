@@ -32,13 +32,13 @@ let expected = ContiguousArray(0..<8)
 
 for (expected, source) in samples {
   ConcatenateTests.test("forward-\(source)") {
-    checkCollection(
+    checkBidirectionalCollection(
       expected,
       _lazyConcatenate(source),
       SourceLocStack().withCurrentLoc())
   }
   ConcatenateTests.test("reverse-\(source)") {
-    checkCollection(
+    checkBidirectionalCollection(
       ContiguousArray(lazy(expected).reverse()),
       _lazyConcatenate(source).reverse(),
       SourceLocStack().withCurrentLoc())

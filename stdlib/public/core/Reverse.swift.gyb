@@ -16,9 +16,9 @@
 public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
   source: C
 ) -> [C.Generator.Element] {
-  return lazy(source).reverse().array
+  // FIXME(prext): remove this function when protocol extensions land.
+  return Array(source._prext_reverse())
 }
-
 
 % for traversal in ('Bidirectional', 'RandomAccess'):
 %   View = '%sReverseView' % traversal

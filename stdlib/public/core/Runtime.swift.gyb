@@ -252,6 +252,16 @@ public final class _stdlib_AtomicInt {
   public func addAndFetch(operand: Int) -> Int {
     return fetchAndAdd(operand) + operand
   }
+
+  public func compareExchange(inout #expected: Int, desired: Int) -> Bool {
+    var expectedVar = expected
+    let result = _stdlib_atomicCompareExchangeStrongInt(
+      object: _valuePtr,
+      expected: &expectedVar,
+      desired: desired)
+    expected = expectedVar
+    return result
+  }
 }
 
 //===----------------------------------------------------------------------===//

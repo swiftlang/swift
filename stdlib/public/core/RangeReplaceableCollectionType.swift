@@ -27,7 +27,7 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   /// `subRange.endIndex == self.endIndex` and `isEmpty(newElements)`,
   /// O(\ `count(self)` + `count(newElements)`\ ) otherwise.
   mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == Self.Generator.Element
+    C : CollectionType where C.Generator.Element == Self.Generator.Element
   >(
     subRange: Range<Index>, with newElements: C
   )

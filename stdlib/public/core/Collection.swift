@@ -66,6 +66,12 @@ public protocol _CollectionType : _SequenceType {
   subscript(_i: Index) -> _Element {get}
 }
 
+public protocol _CollectionDefaultsType : _CollectionType {
+}
+
+extension _CollectionDefaultsType {
+}
+
 /// A multi-pass *sequence* with addressable positions.
 ///
 /// Positions are represented by an associated `Index` type.  Whereas
@@ -80,13 +86,15 @@ public protocol _CollectionType : _SequenceType {
 ///   for i in startIndex..<endIndex {
 ///     let x = self[i]
 ///   }
-public protocol CollectionType : _CollectionType, SequenceType {
+public protocol CollectionType
+  : _CollectionType, _CollectionDefaultsType, SequenceType {
+
   /// Access the element indicated by `position`.
   ///
   /// Requires: `position` indicates a valid position in `self` and
   /// `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get}
-  
+
   // Do not use this operator directly; call `count(x)` instead
   func ~> (_:Self, _:(_Count, ())) -> Index.Distance
 }
@@ -124,12 +132,14 @@ public func ~> <T : _CollectionType, R>(
 
 /// Returns `true` iff `x` is empty.
 public func isEmpty<C: CollectionType>(x: C) -> Bool {
-  return x.startIndex == x.endIndex
+  // FIXME(prext): remove this function when protocol extensions land.
+  return x._prext_isEmpty
 }
 
 /// Returns the first element of `x`, or `nil` if `x` is empty.
 public func first<C: CollectionType>(x: C) -> C.Generator.Element? {
-  return isEmpty(x) ? nil : x[x.startIndex]
+  // FIXME(prext): remove this function when protocol extensions land.
+  return x._prext_first
 }
 
 /// Returns the last element of `x`, or `nil` if `x` is empty.
@@ -213,7 +223,8 @@ public struct IndexingGenerator<
 /// all valid subscript arguments for `x`, omitting its `endIndex`.
 public func indices<
     C : CollectionType>(x: C) -> Range<C.Index> {
-  return Range(start: x.startIndex, end: x.endIndex)
+  // FIXME(prext): remove this function when protocol extensions land.
+  return x._prext_indices
 }
 
 /// A *generator* that adapts a *collection* `C` and any *sequence* of
