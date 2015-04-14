@@ -364,21 +364,27 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
 clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   auto &clangCtx = getClangASTContext();
 
+  enum FunctionPointerKind {
+    Block, CFunctionPointer,
+  };
+  
+  FunctionPointerKind kind;
+
   switch (type->getRepresentation()) {
   case SILFunctionType::Representation::Block:
-    // OK.
+    kind = Block;
     break;
   
   case SILFunctionType::Representation::CFunctionPointer:
-    // TODO
-    llvm_unreachable("GenClangType for C function pointers not implemented");
+    kind = CFunctionPointer;
+    break;
   
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::WitnessMethod:
-    llvm_unreachable("not an ObjC-compatible block");
+    llvm_unreachable("not an ObjC-compatible function");
   }
   
   // Convert the return and parameter types.
@@ -414,8 +420,16 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   // Build the Clang function type.
   clang::FunctionProtoType::ExtProtoInfo defaultEPI;
   auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, defaultEPI);
-  auto blockTy = clangCtx.getBlockPointerType(fnTy);
-  return clangCtx.getCanonicalType(blockTy);
+  clang::QualType ptrTy;
+  
+  switch (kind) {
+  case Block:
+    ptrTy = clangCtx.getBlockPointerType(fnTy);
+    break;
+  case CFunctionPointer:
+    ptrTy = clangCtx.getPointerType(fnTy);
+  }
+  return clangCtx.getCanonicalType(ptrTy);
 }
 
 clang::CanQualType GenClangType::visitSILBlockStorageType(CanSILBlockStorageType type) {
