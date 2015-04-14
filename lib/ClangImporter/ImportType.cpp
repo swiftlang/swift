@@ -1273,29 +1273,35 @@ static bool isBlockParameter(const clang::ParmVarDecl *param) {
 
 static bool isErrorOutParameter(const clang::ParmVarDecl *param,
                          ForeignErrorConvention::IsOwned_t &isErrorOwned) {
-  if (auto ptrType = param->getType()->getAs<clang::PointerType>()) {
-    auto pointeeType = ptrType->getPointeeType();
-    if (auto ifaceType = pointeeType->getAs<clang::ObjCInterfaceType>()) {
-      if (ifaceType->getDecl()->getName() == "NSError") {
-        switch (pointeeType.getObjCLifetime()) {
-        case clang::Qualifiers::OCL_None:
-          llvm_unreachable("not in ARC?");
+  clang::QualType type = param->getType();
 
-        case clang::Qualifiers::OCL_ExplicitNone:
-        case clang::Qualifiers::OCL_Autoreleasing:
-          isErrorOwned = ForeignErrorConvention::IsNotOwned;
-          return true;
+  // Must be a pointer.
+  auto ptrType = type->getAs<clang::PointerType>();
+  if (!ptrType) return false;
+  type = ptrType->getPointeeType();
 
-        case clang::Qualifiers::OCL_Weak:
-          // We just don't know how to handle this.
-          return false;
+  // For NSError**, take ownership from the qualifier.
+  if (auto objcPtrType = type->getAs<clang::ObjCObjectPointerType>()) {
+    auto iface = objcPtrType->getInterfaceDecl();
+    if (iface && iface->getName() == "NSError") {
+      switch (type.getObjCLifetime()) {
+      case clang::Qualifiers::OCL_None:
+        llvm_unreachable("not in ARC?");
 
-        case clang::Qualifiers::OCL_Strong:
-          isErrorOwned = ForeignErrorConvention::IsOwned;
-          return false;
-        }
-        llvm_unreachable("bad error ownership");
+      case clang::Qualifiers::OCL_ExplicitNone:
+      case clang::Qualifiers::OCL_Autoreleasing:
+        isErrorOwned = ForeignErrorConvention::IsNotOwned;
+        return true;
+
+      case clang::Qualifiers::OCL_Weak:
+        // We just don't know how to handle this.
+        return false;
+
+      case clang::Qualifiers::OCL_Strong:
+        isErrorOwned = ForeignErrorConvention::IsOwned;
+        return false;
       }
+      llvm_unreachable("bad error ownership");
     }
   }
   return false;

@@ -231,6 +231,11 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
       genericParams = &pft->getGenericParams();
     }
 
+    // The uncurried function calls all of the intermediate function
+    // levels and so throws if any of them do.
+    if (t->getExtInfo().throws())
+      extInfo = extInfo.withThrows();
+
     if (uncurryLevel-- == 0)
       break;
     t = cast<AnyFunctionType>(t.getResult());

@@ -752,6 +752,11 @@ void SILGenFunction::emitTryApplyErrorBranch(SILLocation loc,
     FullExpr scope(Cleanups, CleanupLocation::get(loc));
     emitThrow(loc, exn);
   } else {
+    // Claim the exception so that the cleanup doesn't end being
+    // emitted in the normal control flow (which we're likely to
+    // resume after this).
+    exn.forward(*this);
+
     SGM.diagnose(loc, diag::unhandled_throw_from_apply);
     B.createUnreachable(loc);
   }
