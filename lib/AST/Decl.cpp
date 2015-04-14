@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/TypeLoc.h"
@@ -3631,44 +3632,77 @@ ObjCSelector FuncDecl::getObjCSelector(LazyResolver *resolver) const {
   auto argNames = getFullName().getArgumentNames();
   auto &ctx = getASTContext();
 
+  // The number of selector pieces we'll have.
+  Optional<ForeignErrorConvention> errorConvention
+    = getForeignErrorConvention();
+  unsigned numSelectorPieces
+    = argNames.size() + (errorConvention.hasValue() ? 1 : 0);
+
   // If we have no arguments, it's a nullary selector.
-  if (argNames.size() == 0) {
+  if (numSelectorPieces == 0) {
     return ObjCSelector(ctx, 0, getName());
   }
 
-  // If it's a unary selector with no name for the first argument, we're done.
-  if (argNames.size() == 1 && argNames[0].empty()) {
+ // If it's a unary selector with no name for the first argument, we're done.
+  if (numSelectorPieces == 1 && argNames.size() == 1 && argNames[0].empty()) {
     return ObjCSelector(ctx, 1, getName());
   }
 
-  // Attach the first parameter name to the base name.
-  auto firstPiece = getName();
+  /// Collect the selector pieces.
+  SmallVector<Identifier, 4> selectorPieces;
+  selectorPieces.reserve(numSelectorPieces);
   bool didStringManipulation = false;
-  llvm::SmallString<32> scratch;
-  scratch += firstPiece.str();
-  auto firstName = argNames[0];
-  if (!firstName.empty()) {
-    // If the first argument name doesn't start with a preposition, and the
-    // method name doesn't end with a preposition, add "with".
-    if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
-          == PK_None &&
-        getPrepositionKind(camel_case::getLastWord(firstPiece.str()))
-          == PK_None) {
-      camel_case::appendSentenceCase(scratch, "With");
+  unsigned argIndex = 0;
+  for (unsigned piece = 0; piece != numSelectorPieces; ++piece) {
+    if (piece > 0) {
+      // If we have an error convention that inserts an error parameter
+      // here, add "error".
+      if (errorConvention &&
+          piece == errorConvention->getErrorParameterIndex()) {
+        selectorPieces.push_back(ctx.Id_error);
+        continue;
+      }
+
+      // Selector pieces beyond the first are simple.
+      selectorPieces.push_back(argNames[argIndex++]);
+      continue;
     }
 
-    camel_case::appendSentenceCase(scratch, firstName.str());
-    firstPiece = ctx.getIdentifier(scratch);
-    didStringManipulation = true;
-  }
+    // For the first selector piece, attach either the first parameter
+    // or "WithError" to the base name, if appropriate.
+    auto firstPiece = getName();
+    llvm::SmallString<32> scratch;
+    scratch += firstPiece.str();
+    if (errorConvention && piece == errorConvention->getErrorParameterIndex()) {
+      // The error is first; append "WithError".
+      camel_case::appendSentenceCase(scratch, "WithError");
 
-  // For every element beyond the first, add a selector component.
-  SmallVector<Identifier, 4> argumentNames;
-  argumentNames.push_back(firstPiece);
-  argumentNames.append(argNames.begin() + 1, argNames.end());
+      firstPiece = ctx.getIdentifier(scratch);
+      didStringManipulation = true;
+    } else if (!argNames[argIndex].empty()) {
+      // If the first argument name doesn't start with a preposition, and the
+      // method name doesn't end with a preposition, add "with".
+      auto firstName = argNames[argIndex++];
+      if (getPrepositionKind(camel_case::getFirstWord(firstName.str()))
+            == PK_None &&
+          getPrepositionKind(camel_case::getLastWord(firstPiece.str()))
+            == PK_None) {
+        camel_case::appendSentenceCase(scratch, "With");
+      }
+
+      camel_case::appendSentenceCase(scratch, firstName.str());
+      firstPiece = ctx.getIdentifier(scratch);
+      didStringManipulation = true;
+    } else {
+      ++argIndex;
+    }
+
+    selectorPieces.push_back(firstPiece);
+  }
+  assert(argIndex == argNames.size());
 
   // Form the result.
-  auto result = ObjCSelector(ctx, argumentNames.size(), argumentNames);
+  auto result = ObjCSelector(ctx, selectorPieces.size(), selectorPieces);
 
   // If we did any string manipulation, cache the result. We don't want to
   // do that again.

@@ -1818,3 +1818,22 @@ class ClassThrows1 {
   // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=zero,unowned,param=2,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   override func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: ((Int) -> Int), fn3: ((Int) -> Int)) throws { }
 }
+
+class ThrowsRedecl1 {
+  @objc func method1(x: Int, error: Class_ObjC1) { } // expected-note{{declared here}}
+  @objc func method1(x: Int) throws { } // expected-error{{with Objective-C selector 'method1:error:'}}
+
+  @objc func method2WithError(x: Int) { } // expected-note{{declared here}}
+  @objc func method2() throws { } // expected-error{{with Objective-C selector 'method2WithError:'}}
+
+  @objc func method3(x: Int, error: Int, closure: Int -> Int) { }  // expected-note{{declared here}}
+  @objc func method3(x: Int, closure: Int -> Int) throws { } // expected-error{{with Objective-C selector 'method3:error:closure:'}}
+}
+
+class ThrowsObjCName {
+  @objc(method4:closure:error:) func method4(x: Int, closure: Int -> Int) throws { }
+
+  @objc(method5WithError:x:closure:) func method5(x: Int, closure: Int -> Int) throws { }
+
+  @objc(method6) func method6() throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has one parameter}}
+}

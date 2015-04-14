@@ -2557,12 +2557,14 @@ bool TypeChecker::isRepresentableInObjC(
 
     // The error type is always AutoreleasingUnsafeMutablePointer<NSError?>.
     Type errorParameterType = getNSErrorType(dc);
-    errorParameterType = OptionalType::get(errorParameterType);
-    errorParameterType
-      = BoundGenericType::get(
-          Context.getAutoreleasingUnsafeMutablePointerDecl(),
-          nullptr,
-          errorParameterType);
+    if (errorParameterType) {
+      errorParameterType = OptionalType::get(errorParameterType);
+      errorParameterType
+        = BoundGenericType::get(
+            Context.getAutoreleasingUnsafeMutablePointerDecl(),
+            nullptr,
+            errorParameterType);
+    }
 
     // Determine the parameter index at which the error will go, skipping
     // over all trailing closures.
@@ -2583,7 +2585,9 @@ bool TypeChecker::isRepresentableInObjC(
     }
 
     // Form the error convention.
-    CanType canErrorParameterType = errorParameterType->getCanonicalType();
+    CanType canErrorParameterType;
+    if (errorParameterType)
+      canErrorParameterType = errorParameterType->getCanonicalType();
     switch (kind) {
     case ForeignErrorConvention::ZeroResult:
       errorConvention = ForeignErrorConvention::getZeroResult(

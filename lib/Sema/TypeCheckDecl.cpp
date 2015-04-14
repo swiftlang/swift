@@ -2437,6 +2437,20 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC,
         // If we are overriding another method, make sure the
         // selectors line up.
         if (auto baseMethod = method->getOverriddenDecl()) {
+          // If the overridden method has a foreign error convention,
+          // adopt it.  Set the foreign error convention for a
+          // throwing method.  Note that the foreign error convention
+          // affects the selector, so we perform this first.
+          if (method->isBodyThrowing()) {
+            if (auto baseErrorConvention
+                  = baseMethod->getForeignErrorConvention()) {
+              errorConvention = baseErrorConvention;
+            }
+
+            assert(errorConvention && "Missing error convention");
+            method->setForeignErrorConvention(*errorConvention);
+          }
+
           ObjCSelector baseSelector = baseMethod->getObjCSelector(&TC);
           if (baseSelector != method->getObjCSelector(&TC)) {
             // The selectors differ. If the method's selector was
@@ -2463,17 +2477,8 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC,
                                                       true));
             }
           }
-
-          // If the overridden method has a foreign error convention, adopt it.
-          // Set the foreign error convention for a throwing method.
-          if (auto baseErrorConvention
-              = baseMethod->getForeignErrorConvention()) {
-            errorConvention = baseErrorConvention;
-          }
-        }
-
-        // Attach the foreign error convention.
-        if (method->isBodyThrowing()) {
+        } else if (method->isBodyThrowing()) {
+          // Attach the foreign error convention.
           assert(errorConvention && "Missing error convention");
           method->setForeignErrorConvention(*errorConvention);
         }
@@ -6995,6 +7000,10 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
           numParameters = tuple->getNumElements();
         else
           numParameters = 1;
+
+        // A throwing method has an error parameter.
+        if (func->isBodyThrowing())
+          ++numParameters;
 
         unsigned numArgumentNames = objcName->getNumArgs();
         if (numArgumentNames != numParameters) {
