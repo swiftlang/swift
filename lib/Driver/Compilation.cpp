@@ -108,6 +108,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   SmallVector<const Job *, 16> InitialOutOfDateCommands;
   auto MinPreviousBuildTime = llvm::sys::TimeValue::MaxTime();
   unsigned InitialBlockingCount = State.BlockingCommands.size();
+  (void)InitialBlockingCount;
 
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
