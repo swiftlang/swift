@@ -14,9 +14,40 @@
 //
 //===----------------------------------------------------------------------===//
 
+public protocol _RangeReplaceableCollectionDefaultsType
+  : ExtensibleCollectionType {
+
+  /// Append `x` to `self`.
+  ///
+  /// Applying `successor()` to the index of the new element yields
+  /// `self.endIndex`.
+  ///
+  /// Complexity: amortized O(1).
+  mutating func append(x: Self.Generator.Element)
+}
+
+extension _RangeReplaceableCollectionDefaultsType {
+  /// Return a collection of the same type, containing the elements
+  /// of `self`, in order, that satisfy the predicate `includeElement`.
+  final public func _prext_filter(
+    @noescape includeElement: (Generator.Element) -> Bool
+  ) -> Self {
+    var result = Self()
+    for e in self {
+      if includeElement(e) {
+        result.append(e)
+      }
+    }
+    return result
+  }
+}
+
+
 /// A *collection* that supports replacement of an arbitrary subRange
 /// of elements with the elements of another collection.
-public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
+public protocol RangeReplaceableCollectionType
+  : ExtensibleCollectionType, _RangeReplaceableCollectionDefaultsType {
+
   //===--- Fundamental Requirements ---------------------------------------===//
 
   /// Replace the given `subRange` of elements with `newElements`.
@@ -93,6 +124,12 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   ///
   ///   Swift.removeAll(&self, keepCapacity: keepCapacity)
   mutating func removeAll(#keepCapacity: Bool /*= false*/)
+
+  /// Return a collection of the same type, containing the elements
+  /// of `self`, in order, that satisfy the predicate `includeElement`.
+  func _prext_filter(
+    @noescape includeElement: (Generator.Element) -> Bool
+  ) -> Self
 }
 
 /// Insert `newElement` into `x` at index `i`.

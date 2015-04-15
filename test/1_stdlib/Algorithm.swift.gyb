@@ -1500,7 +1500,27 @@ let filterTests = [
   ),
 ]
 
-SequenceTypeAlgorithms.test("filter/SequenceType") {
+func callStaticSequenceFilter(
+  sequence: MinimalSequence<OpaqueValue<Int>>,
+  @noescape includeElement: (OpaqueValue<Int>) -> Bool
+) -> [OpaqueValue<Int>] {
+  var result = sequence._prext_filter(includeElement)
+  expectType([OpaqueValue<Int>].self, &result)
+  return result
+}
+
+func callGenericSequenceFilter<S : SequenceType>(
+  sequence: S,
+  @noescape includeElement: (S.Generator.Element) -> Bool
+) -> [S.Generator.Element] {
+  var result = sequence._prext_filter(includeElement)
+  expectType(Array<S.Generator.Element>.self, &result)
+  return result
+}
+
+% for dispatch in [ 'Static', 'Generic' ]:
+
+SequenceTypeAlgorithms.test("filter/SequenceType/${dispatch}") {
   expectEqual(0, LifetimeTracked.instances)
   for test in filterTests {
     for underestimateCountBehavior in [
@@ -1513,7 +1533,7 @@ SequenceTypeAlgorithms.test("filter/SequenceType") {
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-      var result = s._prext_filter {
+      var result = call${dispatch}SequenceFilter(s) {
         (element) in
         _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled
@@ -1533,44 +1553,198 @@ SequenceTypeAlgorithms.test("filter/SequenceType") {
   expectEqual(0, LifetimeTracked.instances)
 }
 
-SequenceTypeAlgorithms.test("filter/RangeReplaceableCollectionType") {
+% end
+
+func callGenericCollectionFilter<C : RangeReplaceableCollectionType>(
+  collection: C,
+  @noescape includeElement: (C.Generator.Element) -> Bool
+) -> C {
+  var result = collection._prext_filter(includeElement)
+  expectType(C.self, &result)
+  return result
+}
+
+% for Implementation in [ 'Default', 'Custom' ]:
+%   CollectionType = 'RangeReplaceableCollectionWith%sFilterMethod' % Implementation
+
+struct ${CollectionType} : RangeReplaceableCollectionType {
+
+%   if Implementation == 'Custom':
+  static var timesFilterWasCalled = 0
+%   end
+
+  var elements: [OpaqueValue<Int>]
+  var reservedCapacity: Int = 0
+
+  init() {
+    self.elements = []
+  }
+
+  init(_ elements: [OpaqueValue<Int>]) {
+    self.elements = elements
+  }
+
+  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+    return MinimalSequence<OpaqueValue<Int>>(elements).generate()
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: 0,
+      startIndex: 0,
+      endIndex: elements.endIndex)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: elements.endIndex,
+      startIndex: 0,
+      endIndex: elements.endIndex)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    return OpaqueValue(i.position + 1)
+  }
+
+  mutating func reserveCapacity(n: Int) {
+    elements.reserveCapacity(n)
+    reservedCapacity = max(reservedCapacity, n)
+  }
+
+  mutating func append(x: OpaqueValue<Int>) {
+    elements.append(x)
+  }
+
+  mutating func extend<
+    S : SequenceType where S.Generator.Element == OpaqueValue<Int>
+  >(newElements: S) {
+    expectUnreachable()
+  }
+
+  mutating func replaceRange<
+    C : CollectionType where C.Generator.Element == OpaqueValue<Int>
+  >(
+    subRange: Range<MinimalForwardIndex>, with newElements: C
+  ) {
+    expectUnreachable()
+  }
+
+  mutating func insert(
+    newElement: OpaqueValue<Int>, atIndex i: MinimalForwardIndex
+  ) {
+    expectUnreachable()
+  }
+
+  mutating func splice<
+    S : CollectionType where S.Generator.Element == OpaqueValue<Int>
+  >(newElements: S, atIndex i: MinimalForwardIndex) {
+    expectUnreachable()
+  }
+
+  mutating func removeAtIndex(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    expectUnreachable()
+    return OpaqueValue(0xffff)
+  }
+
+  mutating func removeRange(subRange: Range<MinimalForwardIndex>) {
+    expectUnreachable()
+  }
+
+  mutating func removeAll(keepCapacity: Bool = false) {
+    expectUnreachable()
+  }
+
+%   if Implementation == 'Custom':
+
+  public func _prext_filter(
+    @noescape includeElement: (OpaqueValue<Int>) -> Bool
+  ) -> ${CollectionType} {
+    ++RangeReplaceableCollectionWithCustomFilterMethod.timesFilterWasCalled
+    return ${CollectionType}(elements._prext_filter(includeElement))
+  }
+
+%   end
+}
+
+% end
+
+% for (CollectionType, CollectionKind) in [
+%   ('MinimalForwardRangeReplaceableCollectionType<OpaqueValue<Int>>', 'Minimal'),
+%   ('RangeReplaceableCollectionWithDefaultFilterMethod', 'DefaultImplementation'),
+%   ('RangeReplaceableCollectionWithCustomFilterMethod', 'CustomImplementation'),
+%   ('Array<OpaqueValue<Int>>', 'StdlibArray'),
+%   ('ContiguousArray<OpaqueValue<Int>>', 'StdlibArray'),
+%   ('ArraySlice<OpaqueValue<Int>>', 'StdlibArray')
+% ]:
+
+%   for dispatch in [ 'Static', 'Generic' ]:
+
+%     if dispatch == 'Static':
+
+func callStaticCollectionFilter(
+  collection: ${CollectionType},
+  @noescape includeElement: (OpaqueValue<Int>) -> Bool
+) -> ${CollectionType} {
+  var result = collection._prext_filter(includeElement)
+  expectType(${CollectionType}.self, &result)
+  return result
+}
+
+%     end
+
+SequenceTypeAlgorithms.test("filter/RangeReplaceableCollectionType/${CollectionType}/${dispatch}") {
   expectEqual(0, LifetimeTracked.instances)
   for test in filterTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Overestimate,
       UnderestimateCountBehavior.Value(0)
     ] {
-      let s = MinimalForwardRangeReplaceableCollectionType<OpaqueValue<Int>>(
+%     if CollectionKind == 'Minimal':
+      let s = ${CollectionType}(
         test.sequence.map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
+%     else:
+      let s = ${CollectionType}(
+        test.sequence.map { OpaqueValue($0) })
+%     end
+%     if CollectionKind == 'CustomImplementation':
+      RangeReplaceableCollectionWithCustomFilterMethod.timesFilterWasCalled = 0
+%     end
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-      var result = s._prext_filter {
+      var result = call${dispatch}CollectionFilter(s) {
         (element) in
         _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled
         return test.includeElement(element.value)
       }
-      expectType(
-        MinimalForwardRangeReplaceableCollectionType<OpaqueValue<Int>>.self,
-        &result)
+      expectType(${CollectionType}.self, &result)
       expectEqual(
         test.expected, result._prext_map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
+%     if CollectionKind == 'CustomImplementation':
+      expectEqual(
+        1,
+        RangeReplaceableCollectionWithCustomFilterMethod.timesFilterWasCalled)
+%     end
       expectEqual(test.sequence, s._prext_map { $0.value }) {
         "collection should not be consumed"
       }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "filter() should be eager and should only call its predicate once per element"
       }
-      expectGE(2 * count(result), result.reservedCapacity) {
+      expectGE(2 * count(result), result.${'capacity' if CollectionKind == 'StdlibArray' else 'reservedCapacity'}) {
         "filter() should not reserve capacity (it does not know how much the predicate will filter out)"
       }
     }
   }
   expectEqual(0, LifetimeTracked.instances)
 }
+
+%   end
+
+% end
 
 //===----------------------------------------------------------------------===//
 // map()

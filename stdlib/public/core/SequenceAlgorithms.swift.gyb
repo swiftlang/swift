@@ -364,22 +364,6 @@ extension SequenceType {
   }
 }
 
-extension RangeReplaceableCollectionType {
-  /// Return a collection of the same type, containing the elements
-  /// of `self`, in order, that satisfy the predicate `includeElement`.
-  final public func _prext_filter(
-    @noescape includeElement: (${GElement}) -> Bool
-  ) -> Self {
-    var result = Self()
-    for e in self {
-      if includeElement(e) {
-        result.append(e)
-      }
-    }
-    return result
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // map()
 //===----------------------------------------------------------------------===//
