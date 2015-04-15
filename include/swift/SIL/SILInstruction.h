@@ -3723,6 +3723,10 @@ public:
   ApplySite(PartialApplyInst *inst) : Inst(inst) {}
   ApplySite(TryApplyInst *inst) : Inst(inst) {}
 
+  SILModule &getModule() const {
+    return Inst->getModule();
+  }
+
   static ApplySite isa(ValueBase *inst) {
     return (classof(inst) ? ApplySite(inst) : ApplySite());
   }

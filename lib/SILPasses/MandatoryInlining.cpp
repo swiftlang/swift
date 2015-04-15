@@ -201,7 +201,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
 /// In the case that a non-null value is returned, FullArgs contains effective
 /// argument operands for the callee function.
 static SILFunction *
-getCalleeFunction(ApplyInst* AI, bool &IsThick,
+getCalleeFunction(FullApplySite AI, bool &IsThick,
                   SmallVectorImpl<SILValue>& CaptureArgs,
                   SmallVectorImpl<SILValue>& FullArgs,
                   PartialApplyInst *&PartialApply,
@@ -211,9 +211,9 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
   CaptureArgs.clear();
   FullArgs.clear();
 
-  for (const auto &Arg : AI->getArguments())
+  for (const auto &Arg : AI.getArguments())
     FullArgs.push_back(Arg);
-  SILValue CalleeValue = AI->getCallee();
+  SILValue CalleeValue = AI.getCallee();
 
   if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
@@ -298,7 +298,7 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
   // If CalleeFunction is a declaration, see if we can load it. If we fail to
   // load it, bail.
   if (CalleeFunction->empty()
-      && !AI->getModule().linkFunction(CalleeFunction, Mode))
+      && !AI.getModule().linkFunction(CalleeFunction, Mode))
     return nullptr;
   return CalleeFunction;
 }
