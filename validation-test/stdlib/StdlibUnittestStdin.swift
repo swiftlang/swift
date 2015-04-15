@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 
 import StdlibUnittest
-#if os(OSX) || os(iOS)
+#if os(OSX) || os(iOS) || os(tvOS)
 import Darwin
 #elseif os(Linux)
 import Glibc
