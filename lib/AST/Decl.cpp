@@ -1619,7 +1619,7 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   return false;
 }
 
-ArrayRef<ValueDecl *> ValueDecl::getConformances() {
+ArrayRef<ValueDecl *> ValueDecl::getConformances() const {
   if (!conformsToProtocolRequirement())
     return ArrayRef<ValueDecl *>();
 

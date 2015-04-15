@@ -2353,7 +2353,7 @@ public:
   }
 
   /// Returns the protocol requirements that this decl conforms to.
-  ArrayRef<ValueDecl *> getConformances();
+  ArrayRef<ValueDecl *> getConformances() const;
 
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified

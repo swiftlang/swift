@@ -1158,8 +1158,11 @@ void ASTContext::recordConformingDecl(ValueDecl *ConformingD,
   }
 }
 
-ArrayRef<ValueDecl *> ASTContext::getConformances(const ValueDecl *D) {
-  return ConformingDeclMap[D];
+ArrayRef<ValueDecl *> ASTContext::getConformances(const ValueDecl *D) const {
+  auto It = ConformingDeclMap.find(D);
+  if (It != ConformingDeclMap.end())
+    return It->second;
+  return {};
 }
 
 Module *ASTContext::getLoadedModule(

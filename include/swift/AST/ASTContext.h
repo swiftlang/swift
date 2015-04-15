@@ -675,7 +675,7 @@ public:
   void recordConformingDecl(ValueDecl *ConformingD, ValueDecl *ConformanceD);
 
   /// Returns the protocol requirement decls for a conforming decl.
-  ArrayRef<ValueDecl *> getConformances(const ValueDecl *D);
+  ArrayRef<ValueDecl *> getConformances(const ValueDecl *D) const;
   
   /// \brief Retrieve the substitutions for a bound generic type, if known.
   Optional<ArrayRef<Substitution>>
