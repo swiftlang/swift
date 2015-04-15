@@ -611,34 +611,42 @@ namespace {
         return;
       }
 
+      switch (outputType.getConvention()) {
       // Direct translation is relatively easy.
-      if (!outputType.isIndirect()) {
+      case ParameterConvention::Direct_Owned:
+      case ParameterConvention::Direct_Unowned:
+      case ParameterConvention::Direct_Deallocating:
+      case ParameterConvention::Direct_Guaranteed: {
         auto output = translatePrimitive(origType, substType, input);
         assert(output.getType() == outputType.getSILType());
         Outputs.push_back(output);
         return;
       }
 
-      // Otherwise, we're using one of the indirect conventions.
+      case ParameterConvention::Indirect_Out:
+        llvm_unreachable("Unsupported translation");
 
-      // If it's inout, we need writeback.
-      if (outputType.isIndirectInOut()) {
+      case ParameterConvention::Indirect_Inout: {
+        // If it's inout, we need writeback.
         llvm::errs() << "inout writeback in abstraction difference thunk "
                         "not yet implemented\n";
-        llvm::errs() << "input value "; input.getValue().dump();
+        llvm::errs() << "input value ";
+        input.getValue().dump();
         llvm::errs() << "output type " << outputType.getSILType() << "\n";
         abort();
       }
+      case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Guaranteed: {
+        // We need to translate into a temporary.
+        auto &outputTL = SGF.getTypeLowering(outputType.getSILType());
+        auto temp = SGF.emitTemporary(Loc, outputTL);
+        translateSingleInto(origType, substType, input, *temp.get());
+        Outputs.push_back(temp->getManagedAddress());
+        return;
+      }
+      }
 
-      // Otherwise, we need to translate into a temporary.
-      assert(outputType.getConvention() == ParameterConvention::Indirect_In ||
-             outputType.getConvention() ==
-                 ParameterConvention::Indirect_In_Guaranteed);
-
-      auto &outputTL = SGF.getTypeLowering(outputType.getSILType());
-      auto temp = SGF.emitTemporary(Loc, outputTL);
-      translateSingleInto(origType, substType, input, *temp.get());
-      Outputs.push_back(temp->getManagedAddress());
+      llvm_unreachable("Covered switch isn't covered?!");
     }
 
     /// Translate a single value and initialize the given temporary with it.
