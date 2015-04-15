@@ -92,6 +92,8 @@ namespace {
     ///
     /// \param type The witness type.
     ///
+    /// \param typeDecl The decl the witness type came from; can be null.
+    ///
     /// \param fromDC The DeclContext from which this associated type was
     /// computed, which may be different from the context associated with the
     /// protocol conformance.
@@ -99,7 +101,7 @@ namespace {
     /// \param wasDeducedOrDefaulted Whether this witness was deduced or
     /// defaulted (rather than being explicitly provided).
     void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
-                           DeclContext *fromDC,
+                           TypeDecl *typeDecl, DeclContext *fromDC,
                            bool wasDeducedOrDefaulted);
 
     /// Resolve a (non-type) witness via name lookup.
@@ -1563,7 +1565,7 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
 
   // Record the associated type deductions.
   for (auto deduction : match.AssociatedTypeDeductions) {
-    recordTypeWitness(deduction.first, deduction.second,
+    recordTypeWitness(deduction.first, deduction.second, nullptr,
                       witness.getDecl()->getDeclContext(), true);
   }
 }
@@ -1596,6 +1598,7 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
 
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
+                                           TypeDecl *typeDecl,
                                            DeclContext *fromDC,
                                            bool wasDeducedOrDefaulted) {
   // If the declaration context from which the type witness was determined
@@ -1636,6 +1639,9 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   // Note whether this witness was deduced or defaulted.
   if (wasDeducedOrDefaulted)
     Conformance->addDefaultDefinition(assocType);
+
+  if (typeDecl)
+    TC.Context.recordConformingDecl(typeDecl, assocType);
 }
 
 namespace {
@@ -2301,7 +2307,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
-    recordTypeWitness(assocType, viable.front().second,
+    recordTypeWitness(assocType, viable.front().second, viable.front().first,
                       viable.front().first->getDeclContext(), false);
     return ResolveWitnessResult::Success;
   }
@@ -2392,7 +2398,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDefault(
   } 
   
   // Fill in the type witness and declare success.
-  recordTypeWitness(assocType, defaultType, DC, true);
+  recordTypeWitness(assocType, defaultType, nullptr, DC, true);
   return ResolveWitnessResult::Success;
 }
 
@@ -2417,7 +2423,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDerivation(
     return ResolveWitnessResult::ExplicitFailed;
   }
 
-  auto derivedType = cast<TypeDecl>(derived)->getDeclaredType();
+  auto derivedTypeDecl = cast<TypeDecl>(derived);
+  auto derivedType = derivedTypeDecl->getDeclaredType();
   if (checkTypeWitness(TC, DC, assocType, derivedType)) {
     // FIXME: give more detail here?
     TC.diagnose(Loc, diag::protocol_derivation_is_broken,
@@ -2426,7 +2433,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaDerivation(
   } 
   
   // Fill in the type witness and declare success.
-  recordTypeWitness(assocType, derivedType, DC, true);
+  recordTypeWitness(assocType, derivedType, derivedTypeDecl, DC, true);
   return ResolveWitnessResult::Success;
 }
 
