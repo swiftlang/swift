@@ -879,6 +879,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
       
   case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::ErrorObject:
     assert(false && "not type metadata");
     break;
   }
@@ -926,6 +927,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
       
   case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::ErrorObject:
     assert(false && "not type metadata");
     break;
   }

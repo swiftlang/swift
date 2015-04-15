@@ -26,15 +26,20 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
-#include <CoreFoundation/CoreFoundation.h>
-#include <CoreFoundation/CFRuntime.h>
-#include <objc/objc.h>
 #include <atomic>
+#if SWIFT_OBJC_INTEROP
+# include <CoreFoundation/CoreFoundation.h>
+# include <CoreFoundation/CFRuntime.h>
+# include <objc/objc.h>
+#endif
 
 namespace swift {
 
-/// A mockery of the physical layout of NSError and CFError.
-struct NSErrorLayout {
+#if SWIFT_OBJC_INTEROP
+
+/// When ObjC interop is enabled, SwiftError uses an NSError-layout-compatible
+/// header.
+struct SwiftErrorHeader {
   // CFError has a CF refcounting header. NSError reserves a word after the
   // 'isa' in order to be layout-compatible.
   CFRuntimeBase base;
@@ -48,8 +53,16 @@ struct NSErrorLayout {
 static_assert(sizeof(CFRuntimeBase) == sizeof(void*) * 2,
               "size of CFRuntimeBase changed");
 
+#else
+
+/// When ObjC interop is disabled, SwiftError uses a normal Swift heap object
+/// header.
+using SwiftErrorHeader = HeapObject;
+
+#endif
+
 /// The layout of the Swift ErrorType box.
-struct SwiftError : NSErrorLayout {
+struct SwiftError : SwiftErrorHeader {
   // By inheriting OpaqueNSError, the SwiftError structure reserves enough
   // space within itself to lazily emplace an NSError instance, and gets
   // Core Foundation's refcounting scheme.
@@ -94,9 +107,13 @@ struct SwiftError : NSErrorLayout {
              const_cast<const SwiftError *>(this)->getValue());
   }
   
+#if SWIFT_OBJC_INTEROP
   // True if the object is really an NSError or CFError instance.
   // The type and errorConformance fields don't exist in an NSError.
   bool isPureNSError() const;
+#else
+  bool isPureNSError() const { return false; }
+#endif
   
   /// Get the type of the contained value.
   const Metadata *getType() const;
@@ -135,6 +152,12 @@ extern "C" void swift_getErrorValue(const SwiftError *errorObject,
                                     void **scratch,
                                     ErrorValueResult *out);
 
+/// Retain and release SwiftError boxes.
+extern "C" SwiftError *swift_errorRetain(SwiftError *object);
+extern "C" void swift_errorRelease(SwiftError *object);
+
+#if SWIFT_OBJC_INTEROP
+
 /// Initialize an ErrorType box to make it usable as an NSError instance.
 extern "C" id swift_bridgeErrorTypeToNSError(SwiftError *errorObject);
 
@@ -142,11 +165,6 @@ extern "C" id swift_bridgeErrorTypeToNSError(SwiftError *errorObject);
 /// ErrorType box.
 extern "C" SwiftError *swift_convertNSErrorToErrorType(id errorObject);
 
-/// Retain and release SwiftError boxes.
-extern "C" SwiftError *swift_errorRetain(SwiftError *object);
-extern "C" void swift_errorRelease(SwiftError *object);
-
-#if SWIFT_OBJC_INTEROP
 /// Attempt to dynamically cast an NSError instance to a Swift ErrorType
 /// implementation using the _ObjectiveCBridgeableErrorType protocol.
 ///
@@ -159,6 +177,7 @@ bool tryDynamicCastNSErrorToValue(OpaqueValue *dest,
 
 /// Get the NSError Objective-C class.
 Class getNSErrorClass();
+
 #endif
 
 } // namespace swift

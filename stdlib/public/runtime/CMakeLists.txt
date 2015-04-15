@@ -54,6 +54,7 @@ endif()
 add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Casting.cpp
   Demangle.cpp
+  ErrorObject.cpp
   GlobalObjects.cpp
   HeapObject.cpp
   KnownMetadata.cpp

@@ -1869,10 +1869,14 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
   // Use special representation for special protocols.
   switch (special) {
   case SpecialProtocol::ErrorType:
+#if SWIFT_OBJC_INTEROP
     // ErrorType always has a single-ObjC-refcounted representation.
-    // TODO: Without ObjC interop, could be native-refcounted.
     return &_TWVBO;
-    
+#else
+    // Without ObjC interop, ErrorType is native-refcounted.
+    return &_TWVBo;
+#endif
+      
   // Other existentials use standard representation.
   case SpecialProtocol::AnyObject:
   case SpecialProtocol::None:
@@ -2214,6 +2218,7 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::Metatype:
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::ErrorObject:
     return nullptr;
   }
 }
@@ -2252,6 +2257,7 @@ Metadata::getClassObject() const {
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::ErrorObject:
     return nullptr;
   }
 }

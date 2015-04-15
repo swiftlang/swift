@@ -79,6 +79,9 @@ enum class MetadataKind : uintptr_t {
   /// A heap-allocated local variable.
   HeapLocalVariable = 64,
 
+  /// A native error object.
+  ErrorObject = 65,
+
   /// Anything greater than this is a class isa pointer.
   MetadataKind_Last = HeapLocalVariable,
 };

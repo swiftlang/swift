@@ -848,6 +848,7 @@ public:
     case MetadataKind::Metatype:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::HeapLocalVariable:
+    case MetadataKind::ErrorObject:
       return false;
     }
     assert(false && "not a metadata kind");
@@ -873,6 +874,7 @@ public:
     case MetadataKind::ThinFunction:
     case MetadataKind::PolyFunction:
     case MetadataKind::HeapLocalVariable:
+    case MetadataKind::ErrorObject:
       return false;
     }
     assert(false && "not a metadata kind");

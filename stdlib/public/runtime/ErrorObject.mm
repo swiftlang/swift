@@ -102,7 +102,7 @@ static BoxPair::Return
 _swift_allocError_(const Metadata *type,
                    const WitnessTable *errorConformance) {
   auto TheSwiftNativeNSError = getSwiftNativeNSErrorClass();
-  assert(class_getInstanceSize(TheSwiftNativeNSError) == sizeof(NSErrorLayout)
+  assert(class_getInstanceSize(TheSwiftNativeNSError) == sizeof(SwiftErrorHeader)
          && "NSError layout changed!");
   
   // Determine the extra allocated space necessary to carry the value.
@@ -114,7 +114,7 @@ _swift_allocError_(const Metadata *type,
   unsigned alignMask = type->getValueWitnesses()->getAlignmentMask();
 
   size_t alignmentPadding = -sizeof(SwiftError) & alignMask;
-  size_t totalExtraSize = sizeof(SwiftError) - sizeof(NSErrorLayout)
+  size_t totalExtraSize = sizeof(SwiftError) - sizeof(SwiftErrorHeader)
     + alignmentPadding + size;
   size_t valueOffset = alignmentPadding + sizeof(SwiftError);
   
@@ -365,6 +365,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   case MetadataKind::ThinFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Opaque:
   case MetadataKind::PolyFunction:
