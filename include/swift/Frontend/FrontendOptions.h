@@ -81,8 +81,8 @@ public:
   /// the name of the last specified file is taken.
   std::vector<std::string> OutputFilenames;
 
-  /// An arbitrary module to import and make implicitly visible.
-  std::string ImplicitImportModuleName;
+  /// A list of arbitrary modules to import and make implicitly visible.
+  std::vector<std::string> ImplicitImportModuleNames;
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;

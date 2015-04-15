@@ -274,19 +274,23 @@ void CompilerInstance::performSema() {
     assert(importedHeaderModule);
   }
 
-  Module *importModule = nullptr;
-  if (!options.ImplicitImportModuleName.empty()) {
-    if (Lexer::isIdentifier(options.ImplicitImportModuleName)) {
-      auto moduleID = Context->getIdentifier(options.ImplicitImportModuleName);
-      importModule = Context->getModule(std::make_pair(moduleID, SourceLoc()));
-    } else {
-      Diagnostics.diagnose(SourceLoc(), diag::error_bad_module_name,
-                           options.ImplicitImportModuleName, false);
+  SmallVector<Module *, 4> importModules;
+  if (!options.ImplicitImportModuleNames.empty()) {
+    for (auto &ImplicitImportModuleName : options.ImplicitImportModuleNames) {
+      if (Lexer::isIdentifier(ImplicitImportModuleName)) {
+        auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
+        Module *importModule = Context->getModule(std::make_pair(moduleID,
+                                                                 SourceLoc()));
+        importModules.push_back(importModule);
+      } else {
+        Diagnostics.diagnose(SourceLoc(), diag::error_bad_module_name,
+                             ImplicitImportModuleName, false);
+      }
     }
   }
 
   auto addAdditionalInitialImports = [&](SourceFile *SF) {
-    if (!underlying && !importedHeaderModule && !importModule)
+    if (!underlying && !importedHeaderModule && importModules.empty())
       return;
 
     using ImportPair =
@@ -298,8 +302,11 @@ void CompilerInstance::performSema() {
     if (importedHeaderModule)
       additionalImports.push_back({ { /*accessPath=*/{}, importedHeaderModule },
                                     SourceFile::ImportFlags::Exported });
-    if (importModule)
-      additionalImports.push_back({ { /*accessPath=*/{}, importModule }, {} });
+    if (!importModules.empty()) {
+      for (auto &importModule : importModules) {
+        additionalImports.push_back({ { /*accessPath=*/{}, importModule }, {} });
+      }
+    }
 
     SF->addImports(additionalImports);
   };
