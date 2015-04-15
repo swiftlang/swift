@@ -43,7 +43,7 @@ static bool seemsUseful(SILInstruction *I) {
     return true;
 
   if (isa<ReturnInst>(I) || isa<AutoreleaseReturnInst>(I) ||
-      isa<UnreachableInst>(I))
+      isa<UnreachableInst>(I) || isa<ThrowInst>(I))
     return true;
 
   if (debugValuesPropagateLiveness() &&
@@ -243,6 +243,10 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
       markValueLive(FalseArgs[ArgIndex].getDef());
     }
 
+    break;
+  }
+  case ValueKind::TryApplyInst: {
+    assert(ArgIndex == 0 && "Expect a single argument!");
     break;
   }
   }
