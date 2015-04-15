@@ -52,12 +52,11 @@ static ApplySite replaceWithSpecializedFunction(ApplySite AI,
 }
 
 ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
-                                             SILFunction **NewFunction,
+                                             SILFunction *&NewFunction,
                              llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
-  if (NewFunction)
-    *NewFunction = nullptr;
-  assert(NewApplies.empty() && "Expected no new applies in vector yet!");
+  NewFunction = nullptr;
 
+  assert(NewApplies.empty() && "Expected no new applies in vector yet!");
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
 
   auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
@@ -113,9 +112,7 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
                                         ClonedName, Apply,
                                         Collector.getCallback());
     NewApplies = Collector.getFullApplies();
-
-    if (NewFunction)
-      *NewFunction = NewF;
+    NewFunction = NewF;
   }
 
   return replaceWithSpecializedFunction(Apply, NewF);

@@ -28,7 +28,7 @@
 namespace swift {
 
 ApplySite trySpecializeApplyOfGeneric(ApplySite Apply,
-                                      SILFunction **NewFunction,
+                                      SILFunction *&NewFunction,
                               llvm::SmallVectorImpl<FullApplySite> &NewApplies);
 
 } // end namespace swift

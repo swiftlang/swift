@@ -92,8 +92,7 @@ GenericSpecializer::specializeApplyInstGroup(
   llvm::SmallVector<FullApplySite, 4> NewApplies;
   CallGraphEditor Editor(CG);
   for (auto AI : ApplyGroup) {
-    auto Specialized = trySpecializeApplyOfGeneric(AI, &NewFunction,
-                                                   NewApplies);
+    auto Specialized = trySpecializeApplyOfGeneric(AI, NewFunction, NewApplies);
     if (Specialized) {
       // We need to add a call graph node first if there was a new
       // function created, so that if we notify the call graph of the
