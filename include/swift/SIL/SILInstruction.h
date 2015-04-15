@@ -3854,17 +3854,6 @@ public:
     return (classof(inst) ? FullApplySite(inst) : FullApplySite());
   }
 
-#define FOREACH_IMPL_RETURN(OPERATION) do {                             \
-    switch (Inst->getKind()) {                                          \
-    case ValueKind::ApplyInst:                                          \
-      return cast<ApplyInst>(Inst)->OPERATION;                          \
-    case ValueKind::TryApplyInst:                                       \
-      return cast<TryApplyInst>(Inst)->OPERATION;                       \
-    default:                                                            \
-      llvm_unreachable("not a full apply instruction!");                \
-    }                                                                   \
-  } while(0)
-
   bool hasIndirectResult() const {
     return getSubstCalleeType()->hasIndirectResult();
   }
@@ -3879,7 +3868,6 @@ public:
       return getArguments().slice(1);
     return getArguments();
   }
-#undef FOREACH_IMPL_RETURN
 
   static FullApplySite getFromOpaqueValue(void *p) {
     return FullApplySite(p);
