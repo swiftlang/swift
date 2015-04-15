@@ -169,7 +169,7 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
     unsigned nextProtocolIndex = 0;
     for (auto protocol : archetype->getConformsTo()) {
       LocalTypeData key = (LocalTypeData) nextProtocolIndex++;
-      if (!requiresProtocolWitnessTable(protocol))
+      if (!requiresProtocolWitnessTable(IGF.IGM, protocol))
         continue;
       llvm::Value *wtable = claimNext(IGF.IGM.WitnessTablePtrTy);
       IGF.setUnscopedLocalTypeData(CanType(archetype), key, wtable);
@@ -1542,7 +1542,9 @@ namespace {
         // Count the protocol conformances that require witness tables.
         unsigned count = std::count_if(archetype->getConformsTo().begin(),
                                        archetype->getConformsTo().end(),
-               [](ProtocolDecl *p) { return requiresProtocolWitnessTable(p); });
+               [&](ProtocolDecl *p) {
+                 return requiresProtocolWitnessTable(IGM, p);
+               });
         addConstantInt32(count);
       }
       // };
@@ -4449,7 +4451,7 @@ namespace {
         .withClassConstraint(Protocol->requiresClass()
                                ? ProtocolClassConstraint::Class
                                : ProtocolClassConstraint::Any)
-        .withNeedsWitnessTable(requiresProtocolWitnessTable(Protocol))
+        .withNeedsWitnessTable(requiresProtocolWitnessTable(IGM, Protocol))
         .withSpecialProtocol(getSpecialProtocolID(Protocol));
       
       Fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,

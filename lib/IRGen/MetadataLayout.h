@@ -71,7 +71,7 @@ public:
     for (auto archetype : generics.getAllArchetypes()) {
       asImpl().beginGenericWitnessTables(archetype, args...);
       for (auto protocol : archetype->getConformsTo()) {
-        if (requiresProtocolWitnessTable(protocol))
+        if (requiresProtocolWitnessTable(IGM, protocol))
           asImpl().addGenericWitnessTable(archetype, protocol, args...);
       }
       asImpl().endGenericWitnessTables(archetype, args...);

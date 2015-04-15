@@ -190,7 +190,7 @@ namespace {
       // really a structural guarantee we can rely on here.
       for (auto baseProto : protocol->getInheritedProtocols(nullptr)) {
         // ObjC protocols do not have witnesses.
-        if (!requiresProtocolWitnessTable(baseProto))
+        if (!requiresProtocolWitnessTable(IGM, baseProto))
           continue;
 
         asDerived().addOutOfLineBaseProtocol(baseProto);
@@ -319,7 +319,7 @@ namespace {
       Entries.push_back(
                       WitnessTableEntry::forAssociatedType(ty, getNextIndex()));
       for (auto *proto : ty->getConformingProtocols(nullptr))
-        if (requiresProtocolWitnessTable(proto))
+        if (requiresProtocolWitnessTable(IGM, proto))
           ++NumWitnesses;
     }
 
@@ -3108,7 +3108,7 @@ namespace {
 
       // FIXME: Add static witness tables for type conformances.
       for (auto protocol : ty->getConformingProtocols(nullptr)) {
-        if (!requiresProtocolWitnessTable(protocol))
+        if (!requiresProtocolWitnessTable(IGM, protocol))
           continue;
 
         auto &entry = SILEntries.front();
@@ -3232,7 +3232,7 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
 
   // If not, lay out the protocol's witness table, if it needs one.
   WitnessTableLayout layout(IGM);
-  if (requiresProtocolWitnessTable(protocol))
+  if (requiresProtocolWitnessTable(IGM, protocol))
     layout.visit(protocol);
 
   // Create a ProtocolInfo object from the layout.
@@ -3501,7 +3501,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
 
     // ObjC protocols need no layout or witness table info. All dispatch is done
     // through objc_msgSend.
-    if (!requiresProtocolWitnessTable(protocol))
+    if (!requiresProtocolWitnessTable(IGM, protocol))
       continue;
 
     // Find the protocol layout.
@@ -3587,7 +3587,7 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
   spareBits.append(baseTI.getSpareBits());
 
   for (auto protocol : protocols) {
-    if (!requiresProtocolWitnessTable(protocol))
+    if (!requiresProtocolWitnessTable(IGM, protocol))
       continue;
 
     // Find the protocol layout.
@@ -3672,7 +3672,7 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
   unsigned wtableI = 0;
   for (unsigned i = 0, e = archetype->getConformsTo().size(); i != e; ++i) {
     auto proto = archetype->getConformsTo()[i];
-    if (!requiresProtocolWitnessTable(proto)) continue;
+    if (!requiresProtocolWitnessTable(IGM, proto)) continue;
     auto wtable = wtables[wtableI++];
     if (setNames) {
       wtable->setName(Twine(archetype->getFullName()) + "." +
@@ -4317,7 +4317,7 @@ EmitPolymorphicParameters::emitWithSourcesBound(Explosion &in) {
     // Collect all the witness tables.
     SmallVector<llvm::Value *, 8> wtables;
     for (auto protocol : contextTy->getConformsTo()) {
-      if (!requiresProtocolWitnessTable(protocol))
+      if (!requiresProtocolWitnessTable(IGF.IGM, protocol))
         continue;
 
       llvm::Value *wtable;
@@ -4494,7 +4494,7 @@ Size NecessaryBindings::getBufferSize(IRGenModule &IGM) const {
   for (auto type : Types) {
     numPointers++;
     for (auto proto : type->getConformsTo())
-      if (requiresProtocolWitnessTable(proto))
+      if (requiresProtocolWitnessTable(IGM, proto))
         numPointers++;
   }
 
@@ -4526,7 +4526,7 @@ void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer) const {
     // Load the witness tables for the archetype's protocol constraints.
     for (unsigned protocolI : indices(archetype->getConformsTo())) {
       auto protocol = archetype->getConformsTo()[protocolI];
-      if (!requiresProtocolWitnessTable(protocol))
+      if (!requiresProtocolWitnessTable(IGF.IGM, protocol))
         continue;
       Address witnessSlot = IGF.Builder.CreateConstArrayGEP(buffer, metadataI,
                                                       IGF.IGM.getPointerSize());
@@ -4567,7 +4567,7 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
     // store them in the slot.
     for (unsigned protocolI : indices(archetype->getConformsTo())) {
       auto protocol = archetype->getConformsTo()[protocolI];
-      if (!requiresProtocolWitnessTable(protocol))
+      if (!requiresProtocolWitnessTable(IGF.IGM, protocol))
         continue;
       Address witnessSlot = IGF.Builder.CreateConstArrayGEP(buffer, metadataI,
                                                       IGF.IGM.getPointerSize());
@@ -4593,7 +4593,7 @@ void NecessaryBindings::addArchetype(CanArchetypeType type) {
 llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         CanArchetypeType archetype,
                                         ProtocolDecl *proto) {
-  assert(requiresProtocolWitnessTable(proto) &&
+  assert(requiresProtocolWitnessTable(IGF.IGM, proto) &&
          "looking up witness table for protocol that doesn't have one");
 
   auto &archTI = getArchetypeInfo(IGF, archetype,
@@ -4623,7 +4623,7 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
                                     IGF.getTypeInfoForLowered(archetype));
 
     for (auto proto : archetypeProtos) {
-      if (!requiresProtocolWitnessTable(proto))
+      if (!requiresProtocolWitnessTable(IGF.IGM, proto))
         continue;
 
       ProtocolPath path(IGF.IGM, archTI.getStoredProtocols(), proto);
@@ -4642,7 +4642,7 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
   assert(archetypeProtos.size() == sub.getConformances().size());
   for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
     auto proto = archetypeProtos[j];
-    if (!requiresProtocolWitnessTable(proto))
+    if (!requiresProtocolWitnessTable(IGF.IGM, proto))
       continue;
 
     auto &protoI = IGF.IGM.getProtocolInfo(proto);
@@ -4777,7 +4777,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       auto protocol = protocols[i];
 
       // Skip this if the protocol doesn't require a witness table.
-      if (!requiresProtocolWitnessTable(protocol))
+      if (!requiresProtocolWitnessTable(IGF.IGM, protocol))
         continue;
 
       // Skip this if it's fulfilled by the source.
@@ -4864,7 +4864,7 @@ namespace {
         // Pass each signature requirement that needs a witness table
         // separately (unless fulfilled).
         for (auto protocol : arch->getConformsTo()) {
-          if (!requiresProtocolWitnessTable(protocol))
+          if (!requiresProtocolWitnessTable(IGM, protocol))
             continue;
 
           if (!Fulfillments.count(FulfillmentKey(depTy, protocol)))
@@ -4921,7 +4921,7 @@ static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
                                             ProtocolEntry protoEntry,
                                             ProtocolConformance *conformance) {
   auto proto = protoEntry.getProtocol();
-  assert(requiresProtocolWitnessTable(proto)
+  assert(requiresProtocolWitnessTable(IGF.IGM, proto)
          && "protocol does not have witness tables?!");
 
   // If the source type is an archetype and we don't have concrete conformance
@@ -4962,7 +4962,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   assert(destProtocols.size() == conformances.size() &&
          "mismatched protocol conformances");
   for (unsigned i = 0, size = destProtocols.size(); i < size; ++i)
-    if (requiresProtocolWitnessTable(destProtocols[i]))
+    if (requiresProtocolWitnessTable(IGF.IGM, destProtocols[i]))
       witnessConformances.push_back(conformances[i]);
 
   assert(protocols.size() == witnessConformances.size() &&
@@ -5466,6 +5466,7 @@ irgen::emitExistentialMetatypeProjection(IRGenFunction &IGF,
   return value;
 }
 
-bool irgen::requiresProtocolWitnessTable(ProtocolDecl *protocol) {
-  return !protocol->isObjC();
+bool irgen::requiresProtocolWitnessTable(IRGenModule &IGM,
+                                         ProtocolDecl *protocol) {
+  return IGM.SILMod->Types.protocolRequiresWitnessTable(protocol);
 }

@@ -238,7 +238,8 @@ namespace irgen {
                                                 CanType openedArchetype);
 
   /// True if the protocol requires a witness table for method dispatch.
-  bool requiresProtocolWitnessTable(ProtocolDecl *protocol);
+  bool requiresProtocolWitnessTable(IRGenModule &IGM,
+                                    ProtocolDecl *protocol);
 
   /// Allocate space for a value in a value buffer.
   Address emitAllocateBuffer(IRGenFunction &IGF, SILType valueType,

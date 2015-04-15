@@ -442,7 +442,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   bool requiresClassCheck = false;
   
   for (auto proto : allProtos) {
-    if (requiresProtocolWitnessTable(proto))
+    if (requiresProtocolWitnessTable(IGF.IGM, proto))
       requiresWitnessTableLookup = true;
     if (!proto->isObjC())
       continue;
@@ -601,7 +601,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // Look up witness tables for the protocols that need them.
   SmallVector<llvm::Value*, 4> witnessTableProtos;
   for (auto proto : allProtos) {
-    if (!requiresProtocolWitnessTable(proto))
+    if (!requiresProtocolWitnessTable(IGF.IGM, proto))
       continue;
     auto descriptor = emitProtocolDescriptorRef(IGF, proto);
     witnessTableProtos.push_back(descriptor);
