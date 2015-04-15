@@ -26,7 +26,7 @@ template class llvm::DomTreeNodeBase<SILBasicBlock>;
 DominanceInfo::DominanceInfo(SILFunction *F)
     : DominatorTreeBase(/*isPostDom*/ false) {
       assert(!F->isExternalDeclaration() &&
-             "Make sure the function is a definicion and not a declaration.");
+             "Make sure the function is a definition and not a declaration.");
   recalculate(*F);
 }
 
