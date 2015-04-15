@@ -4921,6 +4921,7 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     UNINTERESTING_ATTR(Accessibility)
+    UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(Asmname)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(IBAction)

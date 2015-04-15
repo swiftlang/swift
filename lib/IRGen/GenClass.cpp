@@ -398,7 +398,9 @@ void ClassTypeInfo::generateLayout(IRGenModule &IGM) const {
   builder.setAsBodyOfStruct(classTy);
   
   // Record the layout.
-  Layout = new StructLayout(builder, classTy, builder.getElements());
+  Layout = new StructLayout(builder,
+                            TheClass->getDeclaredTypeInContext()->getCanonicalType(),
+                            classTy, builder.getElements());
   AllStoredProperties
     = IGM.Context.AllocateCopy(builder.getAllStoredProperties());
   InheritedStoredProperties

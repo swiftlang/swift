@@ -498,7 +498,7 @@ namespace {
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      return StructLayout(IGM, LayoutKind::NonHeapObject,
+      return StructLayout(IGM, TheStruct, LayoutKind::NonHeapObject,
                           LayoutStrategy::Optimal, fieldTypes, StructTy);
     }
   };

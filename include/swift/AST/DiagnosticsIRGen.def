@@ -58,6 +58,12 @@ ERROR(too_few_output_filenames,irgen,none,
 ERROR(no_input_files_for_mt,irgen,none,
       "no swift input files for multi-threaded compilation", ())
 
+ERROR(alignment_dynamic_type_layout_unsupported,irgen,none,
+      "@_alignment is not supported on types with dynamic layout", ())
+ERROR(alignment_less_than_natural,irgen,none,
+      "@_alignment cannot decrease alignment below natural alignment of %0",
+      (unsigned))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

@@ -99,6 +99,8 @@ SIMPLE_DECL_ATTR(required, Required,
 SIMPLE_DECL_ATTR(optional, Optional,
                  OnConstructor|OnFunc|OnVar|OnSubscript|DeclModifier, 5)
 
+/// NOTE: 6 is unused.
+
 SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 
 SIMPLE_DECL_ATTR(exported, Exported, OnImport | UserInaccessible, 8)
@@ -132,9 +134,6 @@ SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
 
 SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
                  OnProtocol | UserInaccessible, 19)
-
-SIMPLE_DECL_ATTR(objc_non_lazy_realization, ObjCNonLazyRealization,
-                 OnClass, 53)
 
 DECL_ATTR(inline, Inline, OnFunc | OnConstructor, 20)
 
@@ -205,6 +204,9 @@ DECL_ATTR(__objc_bridged, ObjCBridged, OnClass | NotSerialized | RejectByParser,
 SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
                  OnClass, 52)
 
+SIMPLE_DECL_ATTR(objc_non_lazy_realization, ObjCNonLazyRealization,
+                 OnClass, 53)
+
 DECL_ATTR(__synthesized_protocol, SynthesizedProtocol,
           OnStruct | OnEnum | OnClass | NotSerialized | RejectByParser,
           /* Not serialized */54)
@@ -212,6 +214,8 @@ DECL_ATTR(__synthesized_protocol, SynthesizedProtocol,
 SIMPLE_DECL_ATTR(testable, Testable,
                  OnImport | NotSerialized | UserInaccessible,
                  /* Not serialized */ 55)
+
+DECL_ATTR(_alignment, Alignment, OnStruct | OnEnum | UserInaccessible, 56)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

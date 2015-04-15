@@ -47,6 +47,7 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "ScalarTypeInfo.h"
+#include "StructLayout.h"
 #include "UnimplementedTypeInfo.h"
 
 using namespace swift;
@@ -4045,9 +4046,9 @@ irgen::getEnumImplStrategy(IRGenModule &IGM, CanType ty) {
 
 TypeInfo *
 EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
-                                    SpareBitVector SB,
-                                    Alignment A, IsPOD_t isPOD,
-                                    IsBitwiseTakable_t isBT) {
+                                       SpareBitVector SB,
+                                       Alignment A, IsPOD_t isPOD,
+                                       IsBitwiseTakable_t isBT) {
   TypeInfo *mutableTI;
   switch (TIK) {
   case Opaque:
@@ -4072,10 +4073,13 @@ namespace {
                                                    llvm::StructType *enumTy) {
     if (ElementsWithPayload.empty()) {
       enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
+      Alignment alignment(1);
+      applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+                            alignment);
       return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
-                                                             Size(0), {},
-                                                             Alignment(1),
-                                                             IsPOD));
+                                                           Size(0), {},
+                                                           alignment,
+                                                           IsPOD));
     } else {
       const TypeInfo &eltTI = *getSingleton();
 
@@ -4088,16 +4092,22 @@ namespace {
       }
 
       if (TIK <= Opaque) {
+        auto alignment = eltTI.getBestKnownAlignment();
+        applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
+                              alignment);
         return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
-                               eltTI.getBestKnownAlignment(),
+                               alignment,
                                eltTI.isPOD(ResilienceScope::Local),
                                eltTI.isBitwiseTakable(ResilienceScope::Local)));
       } else {
         auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
+        auto alignment = fixedEltTI.getFixedAlignment();
+        applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+                              alignment);
         return getFixedEnumTypeInfo(enumTy,
                           fixedEltTI.getFixedSize(),
                           fixedEltTI.getSpareBits(),
-                          fixedEltTI.getFixedAlignment(),
+                          alignment,
                           fixedEltTI.isPOD(ResilienceScope::Local),
                           fixedEltTI.isBitwiseTakable(ResilienceScope::Local));
       }
@@ -4129,9 +4139,13 @@ namespace {
     spareBits.appendClearBits(tagBits);
     spareBits.extendWithSetBits(tagSize.getValueInBits());
 
+    Alignment alignment(tagBytes);
+    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+                          alignment);
+
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                                      enumTy, tagSize, std::move(spareBits),
-                                     Alignment(tagBytes), IsPOD));
+                                     alignment, IsPOD));
   }
 
   TypeInfo *
@@ -4139,7 +4153,8 @@ namespace {
                                                       SILType Type,
                                                       EnumDecl *theEnum,
                                                       llvm::StructType *enumTy){
-    // The type should have come from Clang and should have a raw type.
+    // The type should have come from Clang or be @objc,
+    // and should have a raw type.
     assert((theEnum->hasClangNode() || theEnum->isObjC())
            && "c-compatible enum didn't come from clang!");
     assert(theEnum->hasRawType()
@@ -4165,10 +4180,14 @@ namespace {
     llvm::Type *body[] = { tagTy };
     enumTy->setBody(body, /*isPacked*/ false);
 
+    auto alignment = rawFixedTI.getFixedAlignment();
+    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+                          alignment);
+
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
                                                  rawFixedTI.getFixedSize(),
                                                  rawFixedTI.getSpareBits(),
-                                                 rawFixedTI.getFixedAlignment(),
+                                                 alignment,
                                                  IsPOD));
   }
 
@@ -4228,8 +4247,13 @@ namespace {
       spareBits.appendClearBits(ExtraTagBitCount);
       spareBits.appendSetBits(extraTagByteCount * 8 - ExtraTagBitCount);
     }
+    
+    auto alignment = payloadTI.getFixedAlignment();
+    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+                          alignment);
+    
     return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
-                        payloadTI.getFixedAlignment(),
+                        alignment,
                         payloadTI.isPOD(ResilienceScope::Component),
                         payloadTI.isBitwiseTakable(ResilienceScope::Component));
   }
@@ -4245,10 +4269,16 @@ namespace {
 
     // Layout has to be done when the value witness table is instantiated,
     // during initializeMetadata.
+    auto &payloadTI = getPayloadTypeInfo();
+    auto alignment = payloadTI.getBestKnownAlignment();
+    
+    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
+                          alignment);
+    
     return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
-           getPayloadTypeInfo().getBestKnownAlignment(),
-           getPayloadTypeInfo().isPOD(ResilienceScope::Component),
-           getPayloadTypeInfo().isBitwiseTakable(ResilienceScope::Component)));
+           alignment,
+           payloadTI.isPOD(ResilienceScope::Component),
+           payloadTI.isBitwiseTakable(ResilienceScope::Component)));
   }
 
   TypeInfo *
@@ -4392,6 +4422,9 @@ namespace {
       }
       assert(PayloadTagBits.count() == numTagBits);
     }
+    
+    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/ true,
+                          worstAlignment);
 
     return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                                 worstAlignment, isPOD, isBT);

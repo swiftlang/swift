@@ -1178,6 +1178,12 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCBlob      // asmname
   >;
+  
+  using AlignmentDeclAttrLayout = BCRecordLayout<
+    Alignment_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCFixed<31> // alignment
+  >;
 
   using SemanticsDeclAttrLayout = BCRecordLayout<
     Semantics_DECL_ATTR,

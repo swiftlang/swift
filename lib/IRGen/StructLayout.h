@@ -285,6 +285,13 @@ private:
   void addNonFixedSizeElementAtOffsetZero(ElementLayout &elt);
 };
 
+/// Apply layout attributes such as @_alignment to the layout properties of a
+/// type, diagnosing any problems with them.
+void applyLayoutAttributes(IRGenModule &IGM,
+                           CanType ty,
+                           bool isFixedLayout,
+                           /*inout*/ Alignment &alignment);
+
 /// A struct layout is the result of laying out a complete structure.
 class StructLayout {
   /// The statically-known minimum bound on the alignment.
@@ -305,6 +312,7 @@ class StructLayout {
   /// Whether the elements in this layout are all bitwise-takable.
   IsBitwiseTakable_t IsKnownBitwiseTakable;
   
+  CanType ASTTy;
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
 
@@ -317,12 +325,14 @@ public:
   ///   layout must include the reference-counting header
   /// \param typeToFill - if present, must be an opaque type whose body
   ///   will be filled with this layout
-  StructLayout(IRGenModule &IGM, LayoutKind kind, LayoutStrategy strategy,
+  StructLayout(IRGenModule &IGM, CanType astTy,
+               LayoutKind kind, LayoutStrategy strategy,
                ArrayRef<const TypeInfo *> fields,
                llvm::StructType *typeToFill = 0);
 
   /// Create a structure layout from a builder.
   StructLayout(const StructLayoutBuilder &builder,
+               CanType astTy,
                llvm::Type *type,
                ArrayRef<ElementLayout> elements)
     : MinimumAlign(builder.getAlignment()),
@@ -331,6 +341,7 @@ public:
       IsFixedLayout(builder.isFixedLayout()),
       IsKnownPOD(builder.isKnownPOD()),
       IsKnownBitwiseTakable(builder.isKnownBitwiseTakable()),
+      ASTTy(astTy),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
 

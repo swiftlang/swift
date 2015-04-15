@@ -17,6 +17,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 
 #include "FixedTypeInfo.h"
 #include "IRGenFunction.h"
@@ -52,10 +54,12 @@ void irgen::addHeapHeaderToLayout(IRGenModule &IGM,
 }
 
 /// Perform structure layout on the given types.
-StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
+StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
+                           LayoutKind layoutKind,
                            LayoutStrategy strategy,
                            ArrayRef<const TypeInfo *> types,
                            llvm::StructType *typeToFill) {
+  ASTTy = astTy;
   Elements.reserve(types.size());
 
   // Fill in the Elements array.
@@ -100,6 +104,33 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
     }
   }
   assert(typeToFill == nullptr || Ty == typeToFill);
+  if (ASTTy)
+    applyLayoutAttributes(IGM, ASTTy, IsFixedLayout, MinimumAlign);
+}
+
+void irgen::applyLayoutAttributes(IRGenModule &IGM,
+                                  CanType ASTTy,
+                                  bool IsFixedLayout,
+                                  Alignment &MinimumAlign) {
+  assert(ASTTy && "shouldn't call applyLayoutAttributes without a type");
+  
+  auto &Diags = IGM.Context.Diags;
+  auto decl = ASTTy->getAnyNominal();
+  
+  if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
+    assert(alignment->Value != 0
+           && ((alignment->Value - 1) & alignment->Value) == 0
+           && "alignment not a power of two!");
+    
+    if (!IsFixedLayout)
+      Diags.diagnose(alignment->getLocation(),
+                     diag::alignment_dynamic_type_layout_unsupported);
+    else if (alignment->Value < MinimumAlign.getValue())
+      Diags.diagnose(alignment->getLocation(),
+                   diag::alignment_less_than_natural, MinimumAlign.getValue());
+    else
+      MinimumAlign = Alignment(alignment->Value);
+  }
 }
 
 llvm::Constant *StructLayout::emitSize(IRGenModule &IGM) const {

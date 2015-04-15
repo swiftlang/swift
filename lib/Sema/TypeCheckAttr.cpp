@@ -74,6 +74,13 @@ public:
   IGNORED_ATTR(Testable)
 #undef IGNORED_ATTR
 
+  void visitAlignmentAttr(AlignmentAttr *attr) {
+    // Alignment must be a power of two.
+    unsigned value = attr->Value;
+    if (value == 0 || (value & (value - 1)) != 0)
+      TC.diagnose(attr->getLocation(), diag::alignment_not_power_of_two);
+  }
+
   void visitAutoClosureAttr(AutoClosureAttr *attr) {
     TC.checkAutoClosureAttr(cast<ParamDecl>(D), attr);
   }
@@ -561,6 +568,7 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     IGNORED_ATTR(AutoClosure)
+    IGNORED_ATTR(Alignment)
     IGNORED_ATTR(Asmname)
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Exported)

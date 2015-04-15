@@ -995,6 +995,9 @@ ERROR(attr_expected_comma,attribute_parsing,none,
 ERROR(attr_expected_string_literal,attribute_parsing,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(alignment_must_be_positive_integer,attribute_parsing,none,
+      "alignment value must be a positive integer literal", ())
+
 ERROR(attr_interpolated_string,attribute_parsing,none,
 "%0 cannot be an interpolated string literal", (StringRef))
 

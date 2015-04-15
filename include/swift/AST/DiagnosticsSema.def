@@ -600,6 +600,9 @@ WARNING(unsupported_synthesize_init_variadic,sema_tcd,none,
 NOTE(variadic_superclass_init_here,sema_tcd,none,
      "variadic superclass initializer defined here", ())
 
+ERROR(alignment_not_power_of_two,sema_tcd,none,
+      "alignment value must be a power of two", ())
+
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,
       "%select{ERROR|static|class}1 stored properties not yet supported"

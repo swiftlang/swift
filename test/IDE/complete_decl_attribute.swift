@@ -59,9 +59,9 @@ class C {}
 // KEYWORD3-NEXT:             Keyword/None:                       objc[#Class Attribute#]; name=objc{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       IBDesignable[#Class Attribute#]; name=IBDesignable{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       UIApplicationMain[#Class Attribute#]; name=UIApplicationMain{{$}}
-// KEYWORD3-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Class Attribute#]; name=objc_non_lazy_realization{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       requires_stored_property_inits[#Class Attribute#]; name=requires_stored_property_inits{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       NSApplicationMain[#Class Attribute#]; name=NSApplicationMain{{$}}
+// KEYWORD3-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Class Attribute#]; name=objc_non_lazy_realization{{$}}
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD4^#
@@ -92,10 +92,10 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       IBOutlet[#Declaration Attribute#]; name=IBOutlet{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSManaged[#Declaration Attribute#]; name=NSManaged{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       UIApplicationMain[#Declaration Attribute#]; name=UIApplicationMain{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Declaration Attribute#]; name=objc_non_lazy_realization{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       inline[#Declaration Attribute#]; name=inline{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       requires_stored_property_inits[#Declaration Attribute#]; name=requires_stored_property_inits{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       autoclosure[#Declaration Attribute#]; name=autoclosure{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noescape[#Declaration Attribute#]; name=noescape{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Declaration Attribute#]; name=objc_non_lazy_realization{{$}}
 // KEYWORD_LAST-NEXT:             End completions

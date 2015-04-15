@@ -1526,6 +1526,16 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                       theAttr->Name);
     return;
   }
+  
+  case DAK_Alignment: {
+    auto *theAlignment = cast<AlignmentAttr>(DA);
+    auto abbrCode = DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];
+    AlignmentDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                        theAlignment->isImplicit(),
+                                        theAlignment->Value);
+    return;
+  }
+  
   case DAK_Semantics: {
     auto *theAttr = cast<SemanticsAttr>(DA);
     auto abbrCode = DeclTypeAbbrCodes[SemanticsDeclAttrLayout::Code];

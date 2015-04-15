@@ -628,6 +628,22 @@ public:
   }
 };
 
+/// Defines the @_alignment attribute.
+class AlignmentAttr : public DeclAttribute {
+public:
+  AlignmentAttr(unsigned Value, SourceLoc AtLoc, SourceRange Range,
+                bool Implicit)
+    : DeclAttribute(DAK_Alignment, AtLoc, Range, Implicit),
+      Value(Value) {}
+  
+  // The alignment value.
+  const unsigned Value;
+  
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Alignment;
+  }
+};
+
 /// Determine the result of comparing an availabilty attribute to a specific
 /// minimum platform version.
 enum class MinVersionComparison {

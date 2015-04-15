@@ -577,6 +577,40 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     break;
   }
+  
+  case DAK_Alignment: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+    
+    if (Tok.isNot(tok::integer_literal)) {
+      diagnose(Loc, diag::alignment_must_be_positive_integer);
+      return false;
+    }
+    
+    StringRef alignmentText = Tok.getText();
+    unsigned alignmentValue;
+    if (alignmentText.getAsInteger(0, alignmentValue))
+      llvm_unreachable("not valid integer literal token?!");
+    
+    consumeToken(tok::integer_literal);
+    
+    auto range = SourceRange(Loc, Tok.getRange().getStart());
+    
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    Attributes.add(new (Context) AlignmentAttr(alignmentValue, AtLoc, range,
+                                               /*implicit*/ false));
+    
+    break;
+  }
+  
   case DAK_Semantics: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
