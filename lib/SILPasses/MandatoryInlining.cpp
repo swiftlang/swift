@@ -318,7 +318,7 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
 ///
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
-runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
+runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
                          SILModule::LinkingMode Mode,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
@@ -331,7 +331,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   if (CurrentInliningSet.contains(F)) {
     // This cannot happen on a top-level call, so AI should be non-null.
     assert(AI && "Cannot have circular inline without apply");
-    SILLocation L = AI->getLoc();
+    SILLocation L = AI.getLoc();
     assert(L && "Must have location for transparent inline apply");
     diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
              diag::circular_transparent);
@@ -346,25 +346,28 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   SmallVector<SILValue, 32> FullArgs;
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     for (auto I = FI->begin(), E = FI->end(); I != E; ++I) {
-      ApplyInst *InnerAI = dyn_cast<ApplyInst>(I);
+      FullApplySite InnerAI = FullApplySite::isa(I);
+
 
       if (!InnerAI)
         continue;
 
-      auto *ApplyBlock = InnerAI->getParent();
+      auto *ApplyBlock = InnerAI.getParent();
 
-      if (auto *NewInst = tryDevirtualizeApply(InnerAI)) {
-        replaceDeadApply(InnerAI, NewInst);
-        I = SILBasicBlock::iterator(NewInst);
-        auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
-        if (!NewAI)
-          continue;
+      if (ApplyInst *App = dyn_cast<ApplyInst>(I)) {
+        if (auto *NewInst = tryDevirtualizeApply(App)) {
+          replaceDeadApply(InnerAI, NewInst);
+          I = SILBasicBlock::iterator(NewInst);
+          auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
+          if (!NewAI)
+            continue;
 
-        InnerAI = NewAI;
+          InnerAI = NewAI;
+        }
       }
 
-      SILLocation Loc = InnerAI->getLoc();
-      SILValue CalleeValue = InnerAI->getCallee();
+      SILLocation Loc = InnerAI.getLoc();
+      SILValue CalleeValue = InnerAI.getCallee();
       bool IsThick;
       PartialApplyInst *PAI;
       SILFunction *CalleeFunction = getCalleeFunction(InnerAI, IsThick,
@@ -385,7 +388,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         // inlines within this same recursive call rather than simply
         // propogating the failure.
         if (AI) {
-          SILLocation L = AI->getLoc();
+          SILLocation L = AI.getLoc();
           assert(L && "Must have location for transparent inline apply");
           diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
                    diag::note_while_inlining);
@@ -399,7 +402,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently.
       DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
-                         << " into @" << InnerAI->getFunction()->getName()
+                         << " into @" << InnerAI.getFunction()->getName()
                          << "\n");
 
       // Decrement our iterator (carefully, to avoid going off the front) so it
@@ -411,7 +414,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         I = ApplyBlock->end();
 
       TypeSubstitutionMap ContextSubs;
-      std::vector<Substitution> ApplySubs(InnerAI->getSubstitutions());
+      std::vector<Substitution> ApplySubs(InnerAI.getSubstitutions());
 
       if (PAI) {
         auto PAISubs = PAI->getSubstitutions();
@@ -425,12 +428,12 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
                          SILInliner::InlineKind::MandatoryInline,
                          ContextSubs, ApplySubs);
       if (!Inliner.inlineFunction(InnerAI, FullArgs)) {
-        I = InnerAI;
+        I = InnerAI.getInstruction();
         continue;
       }
 
       // Inlining was successful. Remove the apply.
-      InnerAI->eraseFromParent();
+      InnerAI.getInstruction()->eraseFromParent();
 
       // Reestablish our iterator if it wrapped.
       if (I == ApplyBlock->end())
@@ -481,8 +484,10 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.isThunk())
         continue;
 
-      runOnFunctionRecursively(&F, nullptr, Mode, FullyInlinedSet, SetFactory,
-                               SetFactory.getEmptySet());
+      runOnFunctionRecursively(&F,
+                               FullApplySite(static_cast<ApplyInst*>(nullptr)),
+                               Mode, FullyInlinedSet,
+                               SetFactory, SetFactory.getEmptySet());
     }
 
     if (!ShouldCleanup)
