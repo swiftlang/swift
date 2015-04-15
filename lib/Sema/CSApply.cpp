@@ -142,6 +142,7 @@ Type Solution::computeSubstitutions(
                                               getConstraintSystem().DC,
                                               /*expression=*/true,
                                               &conformance);
+        (void)isOpenedAnyObject;
         assert((conforms ||
                 firstArchetype->getIsRecursive() ||
                 isOpenedAnyObject(replacement) ||

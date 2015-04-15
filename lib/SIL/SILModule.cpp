@@ -372,6 +372,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   // it.
   CanSILFunctionType FTy = F->getLoweredFunctionType();
   if (FTy->hasSelfParam()) {
+    (void)verifySILSelfParameterType;
     assert(verifySILSelfParameterType(constant, F, FTy) &&
            "Invalid signature for SIL Self parameter type");
   }

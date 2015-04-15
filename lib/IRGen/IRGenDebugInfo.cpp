@@ -84,6 +84,7 @@ static void mangleIdent(llvm::raw_string_ostream &OS, StringRef Id) {
   // If the identifier contains non-ASCII character, we mangle with an initial
   // X and Punycode the identifier string.
   std::string PunycodeBuf;
+  (void) isNonAscii;
   if (isNonAscii(Id)) {
     OS << 'X';
     Punycode::encodePunycodeUTF8(Id, PunycodeBuf);
