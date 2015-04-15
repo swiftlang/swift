@@ -587,7 +587,7 @@ SILModule::lookUpFunctionInWitnessTable(const ProtocolConformance *C,
   // If no witness table was found, bail.
   if (!Ret.first) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
-          C->dump());
+          if (C) C->dump(); else Member.dump());
     return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
   }
 
