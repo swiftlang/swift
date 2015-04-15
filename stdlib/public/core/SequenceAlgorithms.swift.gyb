@@ -356,13 +356,11 @@ extension SequenceType {
   final public func _prext_filter(
     @noescape includeElement: (${GElement}) -> Bool
   ) -> [${GElement}] {
-    var result: [${GElement}] = []
-    for e in self {
-      if includeElement(e) {
-        result.append(e)
-      }
-    }
-    return result
+    // Cast away @noescape.
+    typealias IncludeElement = (${GElement}) -> Bool
+    let escapableIncludeElement =
+      unsafeBitCast(includeElement, IncludeElement.self)
+    return Array<${GElement}>(lazy(self).filter(escapableIncludeElement))
   }
 }
 
@@ -392,12 +390,10 @@ extension SequenceType {
   final public func _prext_map<T>(
     @noescape transform: (${GElement}) -> T
   ) -> [T] {
-    var result: [T] = []
-    result.reserveCapacity(underestimateCount(self))
-    for element in self {
-      result.append(transform(element))
-    }
-    return result
+    // Cast away @noescape.
+    typealias Transform = (${GElement}) -> T
+    let escapableTransform = unsafeBitCast(transform, Transform.self)
+    return Array<T>(lazy(self).map(escapableTransform))
   }
 }
 
