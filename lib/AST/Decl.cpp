@@ -1619,11 +1619,11 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   return false;
 }
 
-ArrayRef<ValueDecl *> ValueDecl::getConformances() const {
+ArrayRef<ValueDecl *> ValueDecl::getSatisfiedProtocolRequirements() const {
   if (!conformsToProtocolRequirement())
     return ArrayRef<ValueDecl *>();
 
-  return getASTContext().getConformances(this);
+  return getASTContext().getSatisfiedProtocolRequirements(this);
 }
 
 void ValueDecl::setType(Type T) {

@@ -204,7 +204,7 @@ ide::walkOverriddenDecls(const ValueDecl *VD,
       walkOverriddenClangDecls(ClangD, Fn);
       return;
     }
-    for (auto Conf: const_cast<ValueDecl*>(CurrOver)->getConformances())
+    for (auto Conf: CurrOver->getSatisfiedProtocolRequirements())
       Fn(Conf);
   }
 }

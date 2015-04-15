@@ -770,7 +770,7 @@ namespace {
         OS << "_for=" << ASD->getFullName();
       }
       
-      for (auto VD: FD->getConformances()) {
+      for (auto VD: FD->getSatisfiedProtocolRequirements()) {
         OS << '\n';
         OS.indent(Indent+2) << "(conformance ";
         VD->dumpRef(OS);

@@ -1158,7 +1158,8 @@ void ASTContext::recordConformingDecl(ValueDecl *ConformingD,
   }
 }
 
-ArrayRef<ValueDecl *> ASTContext::getConformances(const ValueDecl *D) const {
+ArrayRef<ValueDecl *>
+ASTContext::getSatisfiedProtocolRequirements(const ValueDecl *D) const {
   auto It = ConformingDeclMap.find(D);
   if (It != ConformingDeclMap.end())
     return It->second;

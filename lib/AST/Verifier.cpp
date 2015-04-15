@@ -656,7 +656,7 @@ struct ASTNodeBase {};
         }
       }
       if (D->conformsToProtocolRequirement()) {
-        if (D->getConformances().empty()) {
+        if (D->getSatisfiedProtocolRequirements().empty()) {
           PrettyStackTraceDecl debugStack("checking conformances", D);
           Out << "conforms bit set but no conformances found\n";
           D->dump(Out);
