@@ -985,11 +985,8 @@ public:
 
     // Inline functions bottom up from the leafs.
     for (auto *F : BottomUpFunctions) {
-      // If F is empty, attempt to link it. Skip it if we fail to do so.
-      if (F->isExternalDeclaration())
-        if (!getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll,
-                                       CallGraphLinkerEditor(CG).getCallback()))
-          continue;
+      assert(F->isDefinition() &&
+             "Expected only defined functions in the call graph!");
 
       bool Devirtualized;
       if (inliner.inlineCallsIntoFunction(F, DA, LA, CG, Devirtualized))
