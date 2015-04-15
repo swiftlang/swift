@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-guaranteed-self %s | FileCheck %s --check-prefix=GUARANTEED
 
 public protocol P1 {
   func reqP1a()
@@ -185,19 +184,13 @@ func testLogicalExistentialSetters(var hasAP1: HasAP1, b: Bool) {
 func plusOneP1() -> P1 {}
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions38test_open_existential_semantics_opaqueFTPS_2P1_PS0___T_
-// GUARANTEED-LABEL: sil hidden @_TF19protocol_extensions38test_open_existential_semantics_opaqueFTPS_2P1_PS0___T_
 func test_open_existential_semantics_opaque(guaranteed: P1,
                                             var immediate: P1) {
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $P1
-  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $P1
-
   // CHECK: [[VALUE:%.*]] = open_existential_addr %0
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
 
-  // GUARANTEED: [[VALUE:%.*]] = open_existential_addr %0
-  // GUARANTEED: [[METHOD:%.*]] = function_ref
-  // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
   guaranteed.f1()
   
   // -- Need a guaranteed copy because it's immutable
@@ -208,15 +201,6 @@ func test_open_existential_semantics_opaque(guaranteed: P1,
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK: deinit_existential_addr [[IMMEDIATE]]
   // CHECK: dealloc_stack [[IMMEDIATE]]
-
-  // GUARANTEED: copy_addr [[IMMEDIATE_BOX]]#1 to [initialization] [[IMMEDIATE:%.*]]#1
-  // GUARANTEED: [[VALUE:%.*]] = open_existential_addr [[IMMEDIATE]]#1
-  // GUARANTEED: [[METHOD:%.*]] = function_ref
-  // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // -- TODO: Avoid splitting the cleanup here.
-  // GUARANTEED: destroy_addr [[VALUE]]
-  // GUARANTEED: deinit_existential_addr [[IMMEDIATE]]
-  // GUARANTEED: dealloc_stack [[IMMEDIATE]]
   immediate.f1()
 
   // CHECK: [[PLUS_ONE:%.*]] = alloc_stack $P1
@@ -226,15 +210,6 @@ func test_open_existential_semantics_opaque(guaranteed: P1,
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK: deinit_existential_addr [[PLUS_ONE]]
   // CHECK: dealloc_stack [[PLUS_ONE]]
-
-  // GUARANTEED: [[PLUS_ONE:%.*]] = alloc_stack $P1
-  // GUARANTEED: [[VALUE:%.*]] = open_existential_addr [[PLUS_ONE]]#1
-  // GUARANTEED: [[METHOD:%.*]] = function_ref
-  // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // -- TODO: Avoid splitting the cleanup here.
-  // GUARANTEED: destroy_addr [[VALUE]]
-  // GUARANTEED: deinit_existential_addr [[PLUS_ONE]]
-  // GUARANTEED: dealloc_stack [[PLUS_ONE]]
   plusOneP1().f1()
 }
 
@@ -247,11 +222,9 @@ extension CP1 {
 func plusOneCP1() -> CP1 {}
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions37test_open_existential_semantics_classFTPS_3CP1_PS0___T_
-// GUARANTEED-LABEL: sil hidden @_TF19protocol_extensions37test_open_existential_semantics_classFTPS_3CP1_PS0___T_
 func test_open_existential_semantics_class(guaranteed: CP1,
                                            var immediate: CP1) {
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $CP1
-  // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $CP1
 
   // CHECK-NOT: strong_retain %0
   // CHECK: [[VALUE:%.*]] = open_existential_ref %0
@@ -259,13 +232,6 @@ func test_open_existential_semantics_class(guaranteed: CP1,
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK-NOT: strong_release [[VALUE]]
   // CHECK-NOT: strong_release %0
-
-  // GUARANTEED-NOT: strong_retain %0
-  // GUARANTEED: [[VALUE:%.*]] = open_existential_ref %0
-  // GUARANTEED: [[METHOD:%.*]] = function_ref
-  // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // GUARANTEED-NOT: strong_release [[VALUE]]
-  // GUARANTEED-NOT: strong_release %0
   guaranteed.f1()
 
   // CHECK: [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]
@@ -275,14 +241,6 @@ func test_open_existential_semantics_class(guaranteed: CP1,
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK: strong_release [[VALUE]]
   // CHECK-NOT: strong_release [[IMMEDIATE]]
-
-  // GUARANTEED: [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]
-  // GUARANTEED: strong_retain [[IMMEDIATE]]
-  // GUARANTEED: [[VALUE:%.*]] = open_existential_ref [[IMMEDIATE]]
-  // GUARANTEED: [[METHOD:%.*]] = function_ref
-  // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // GUARANTEED: strong_release [[VALUE]]
-  // GUARANTEED-NOT: strong_release [[IMMEDIATE]]
   immediate.f1()
 
   // CHECK: [[F:%.*]] = function_ref {{.*}}plusOneCP1
@@ -292,14 +250,6 @@ func test_open_existential_semantics_class(guaranteed: CP1,
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK: strong_release [[VALUE]]
   // CHECK-NOT: strong_release [[PLUS_ONE]]
-
-  // GUARANTEED: [[F:%.*]] = function_ref {{.*}}plusOneCP1
-  // GUARANTEED: [[PLUS_ONE:%.*]] = apply [[F]]()
-  // GUARANTEED: [[VALUE:%.*]] = open_existential_ref [[PLUS_ONE]]
-  // GUARANTEED: [[METHOD:%.*]] = function_ref
-  // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // GUARANTEED: strong_release [[VALUE]]
-  // GUARANTEED-NOT: strong_release [[PLUS_ONE]]
   plusOneCP1().f1()
 }
 
