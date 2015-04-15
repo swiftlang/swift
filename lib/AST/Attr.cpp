@@ -84,6 +84,10 @@ const AvailabilityAttr *DeclAttributes::getUnavailable(
       if (!AvAttr->isActivePlatform(ctx))
         continue;
 
+      // Unconditional unavailability.
+      if (AvAttr->isUnconditionallyUnavailable())
+        return AvAttr;
+
       auto MinVersion = ctx.LangOpts.getMinPlatformVersion();
       switch (AvAttr->getMinVersionAvailability(MinVersion)) {
       case MinVersionComparison::Available:
@@ -102,8 +106,15 @@ const AvailabilityAttr *
 DeclAttributes::getDeprecated(const ASTContext &ctx) const {
   for (auto Attr : *this) {
     if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
-      if (AvAttr->isInvalid() || !AvAttr->isActivePlatform(ctx))
+      if (AvAttr->isInvalid())
         continue;
+
+      if (!AvAttr->isActivePlatform(ctx))
+        continue;
+
+      // Unconditional deprecated.
+      if (AvAttr->isUnconditionallyDeprecated())
+        return AvAttr;
 
       Optional<clang::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.hasValue())
@@ -224,6 +235,8 @@ void DeclAttribute::print(ASTPrinter &Printer,
 
     if (Attr->isUnconditionallyUnavailable())
       Printer << ", unavailable";
+    else if (Attr->isUnconditionallyDeprecated())
+      Printer << ", deprecated";
 
     if (Attr->Introduced)
       Printer << ", introduced=" << Attr->Introduced.getValue().getAsString();
@@ -237,7 +250,8 @@ void DeclAttribute::print(ASTPrinter &Printer,
     // the generated interface.
     if (!Attr->Message.empty())
       Printer << ", message=\"" << Attr->Message << "\"";
-    else if (Attr->Unavailable == AvailabilityAttr::UnavailabilityKind::InSwift)
+    else if (Attr->getUnconditionalAvailability()
+               == UnconditionalAvailabilityKind::UnavailableInSwift)
       Printer << ", message=\"Not available in Swift\"";
 
     Printer << ")";
@@ -473,26 +487,48 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
 }
 
 AvailabilityAttr *
-AvailabilityAttr::createUnavailableAttr(ASTContext &C,
-                                        StringRef Message,
-                                        StringRef Rename,
-                                        UnavailabilityKind Reason) {
-  assert(Reason != UnavailabilityKind::None);
+AvailabilityAttr::createUnconditional(ASTContext &C,
+                                      StringRef Message,
+                                      StringRef Rename,
+                                      UnconditionalAvailabilityKind Reason) {
+  assert(Reason != UnconditionalAvailabilityKind::None);
   clang::VersionTuple NoVersion;
   return new (C) AvailabilityAttr(
     SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
-    NoVersion, NoVersion, NoVersion,
-    /* isUnavailable */ Reason,
-    /* isImplicit */ false);
+    NoVersion, NoVersion, NoVersion, Reason, /* isImplicit */ false);
 }
 
 bool AvailabilityAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
+bool AvailabilityAttr::isUnconditionallyUnavailable() const {
+  switch (Unconditional) {
+  case UnconditionalAvailabilityKind::None:
+  case UnconditionalAvailabilityKind::Deprecated:
+    return false;
+
+  case UnconditionalAvailabilityKind::Unavailable:
+  case UnconditionalAvailabilityKind::UnavailableInSwift:
+    return true;
+  }
+}
+
+bool AvailabilityAttr::isUnconditionallyDeprecated() const {
+  switch (Unconditional) {
+  case UnconditionalAvailabilityKind::None:
+  case UnconditionalAvailabilityKind::Unavailable:
+  case UnconditionalAvailabilityKind::UnavailableInSwift:
+    return false;
+
+  case UnconditionalAvailabilityKind::Deprecated:
+    return true;
+  }
+}
+
 MinVersionComparison AvailabilityAttr::getMinVersionAvailability(
                        clang::VersionTuple minVersion) const {
-  // Unconditionally unavailable.
+  // Unconditional unavailability.
   if (isUnconditionallyUnavailable())
     return MinVersionComparison::Unavailable;
 

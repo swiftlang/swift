@@ -661,15 +661,17 @@ enum class MinVersionComparison {
   Obsoleted,
 };
 
+/// Describes the unconditional availability of a declaration.
+enum class UnconditionalAvailabilityKind {
+  None,
+  Deprecated,
+  UnavailableInSwift,
+  Unavailable,
+};
+
 /// Defines the @availability attribute.
 class AvailabilityAttr : public DeclAttribute {
 public:
-  enum class UnavailabilityKind {
-    None,
-    Normal,
-    InSwift
-  };
-
 #define INIT_VER_TUPLE(X)\
   X(X.empty() ? Optional<clang::VersionTuple>() : X)
 
@@ -679,32 +681,18 @@ public:
                    const clang::VersionTuple &Introduced,
                    const clang::VersionTuple &Deprecated,
                    const clang::VersionTuple &Obsoleted,
-                   UnavailabilityKind Unavailable,
+                   UnconditionalAvailabilityKind Unconditional,
                    bool Implicit)
     : DeclAttribute(DAK_Availability, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename),
       INIT_VER_TUPLE(Introduced),
       INIT_VER_TUPLE(Deprecated),
       INIT_VER_TUPLE(Obsoleted),
-      Unavailable(Unavailable),
+      Unconditional(Unconditional),
       Platform(Platform)
   {}
 
 #undef INIT_VER_TUPLE
-
-  AvailabilityAttr(SourceLoc AtLoc, SourceRange Range,
-                   PlatformKind Platform,
-                   StringRef Message, StringRef Rename,
-                   const clang::VersionTuple &Introduced,
-                   const clang::VersionTuple &Deprecated,
-                   const clang::VersionTuple &Obsoleted,
-                   bool IsUnvailable,
-                   bool Implicit)
-    : AvailabilityAttr(AtLoc, Range, Platform, Message, Rename, Introduced,
-                       Deprecated, Obsoleted,
-                       IsUnvailable ? UnavailabilityKind::Normal
-                                    : UnavailabilityKind::None,
-                       Implicit) {}
 
   /// The optional message.
   const StringRef Message;
@@ -722,16 +710,21 @@ public:
   /// Indicates when the symbol was obsoleted.
   const Optional<clang::VersionTuple> Obsoleted;
 
-  /// Indicates if the declaration is unconditionally unavailable, and why.
-  const UnavailabilityKind Unavailable;
+  /// Indicates if the declaration has unconditional availability.
+  const UnconditionalAvailabilityKind Unconditional;
 
   /// The platform of the availability.
   const PlatformKind Platform;
 
-  /// Returns true if the declaration is unconditionally unavailable for any
-  /// reason.
-  bool isUnconditionallyUnavailable() const {
-    return Unavailable != UnavailabilityKind::None;
+  /// Whether this is an unconditionally unavailable entity.
+  bool isUnconditionallyUnavailable() const;
+
+  /// Whether this is an unconditionally deprecated entity.
+  bool isUnconditionallyDeprecated() const;
+
+  /// Returns the unconditional unavailability.
+  UnconditionalAvailabilityKind getUnconditionalAvailability() const {
+    return Unconditional;
   }
 
   /// Determine if a given declaration should be considered unavailable given
@@ -764,10 +757,12 @@ public:
   MinVersionComparison getMinVersionAvailability(
                          clang::VersionTuple minVersion) const;
 
-  /// Create an AvailabilityAttr that indicates 'unavailable' for all platforms.
+  /// Create an AvailabilityAttr that indicates specific availability
+  /// for all platforms.
   static AvailabilityAttr *
-  createUnavailableAttr(ASTContext &C, StringRef Message, StringRef Rename = "",
-                        UnavailabilityKind Reason = UnavailabilityKind::Normal);
+  createUnconditional(ASTContext &C, StringRef Message, StringRef Rename = "",
+                      UnconditionalAvailabilityKind Reason
+                        = UnconditionalAvailabilityKind::Unavailable);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Availability;

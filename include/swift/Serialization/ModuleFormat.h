@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 191; // Last change: consolidate function type representations
+const uint16_t VERSION_MINOR = 192; // Last change: deprecated attribute
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1263,6 +1263,7 @@ namespace decls_block {
     Availability_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCFixed<1>, // is unconditionally unavailable?
+    BCFixed<1>, // is unconditionally deprecated?
     BC_AVAIL_TUPLE, // Introduced
     BC_AVAIL_TUPLE, // Deprecated
     BC_AVAIL_TUPLE, // Obsoleted

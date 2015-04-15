@@ -2026,12 +2026,22 @@ NOTE(availability_obsoleted, sema_avail, none,
     (DeclName, StringRef, clang::VersionTuple))
 
 WARNING(availability_deprecated, sema_avail, none,
-        "%0 was deprecated in %1 %2",
-        (DeclName, StringRef, clang::VersionTuple))
+        "%0 %select{is|%select{is|was}3}1 deprecated"
+        "%select{| %select{on|in}3 %2%select{| %4}3}1",
+        (DeclName, bool, StringRef, bool, clang::VersionTuple))
 
 WARNING(availability_deprecated_msg, sema_avail, none,
-        "%0 was deprecated in %1 %2: %3",
-        (DeclName, StringRef, clang::VersionTuple, StringRef))
+        "%0 %select{is|%select{is|was}3}1 deprecated"
+        "%select{| %select{on|in}3 %2%select{| %4}3}1: %5",
+        (DeclName, bool, StringRef, bool, clang::VersionTuple, StringRef))
+
+WARNING(availability_deprecated_rename, sema_avail, none,
+        "%0 %select{is|%select{is|was}3}1 deprecated"
+        "%select{| %select{on|in}3 %2%select{| %4}3}1: renamed to '%5'",
+        (DeclName, bool, StringRef, bool, clang::VersionTuple, StringRef))
+
+NOTE(note_deprecated_rename, sema_avail, none,
+     "use '%0' instead", (StringRef))
 
 ERROR(availability_decl_more_than_enclosing, sema_avail, none,
       "declaration cannot be more available than enclosing scope", ())

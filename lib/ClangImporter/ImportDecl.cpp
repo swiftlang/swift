@@ -2677,7 +2677,7 @@ namespace {
         }
         os << ")'";
         member->getAttrs().add(
-          AvailabilityAttr::createUnavailableAttr(
+          AvailabilityAttr::createUnconditional(
             Impl.SwiftContext, 
             Impl.SwiftContext.AllocateCopy(os.str())));
       }
@@ -3239,7 +3239,7 @@ namespace {
           errorStr += ']';
 
           auto attr
-            = AvailabilityAttr::createUnavailableAttr(
+            = AvailabilityAttr::createUnconditional(
                 Impl.SwiftContext,
                 Impl.SwiftContext.AllocateCopy(errorStr.str()));
           ctor->getAttrs().add(attr);
@@ -4539,8 +4539,8 @@ namespace {
         message = "cannot find Swift declaration for this protocol";
       else
         llvm_unreachable("unknown bridged decl kind");
-      auto attr = AvailabilityAttr::createUnavailableAttr(Impl.SwiftContext,
-                                                          message);
+      auto attr = AvailabilityAttr::createUnconditional(Impl.SwiftContext,
+                                                        message);
       VD->getAttrs().add(attr);
     }
 
@@ -4742,7 +4742,7 @@ namespace {
           // Fake it by making an unavailable opaque @objc root class.
           auto result = createRootClass();
           result->setImplicit();
-          auto attr = AvailabilityAttr::createUnavailableAttr(Impl.SwiftContext,
+          auto attr = AvailabilityAttr::createUnconditional(Impl.SwiftContext,
               "This Objective-C class has only been forward-declared; "
               "import its owning module to use it");
           result->getAttrs().add(attr);
@@ -5152,7 +5152,7 @@ void ClangImporter::Implementation::importAttributes(
 
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
-  bool IsUnavailable = false;
+  auto Unconditional = UnconditionalAvailabilityKind::None;
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
     //
@@ -5162,9 +5162,9 @@ void ClangImporter::Implementation::importAttributes(
     //
     if (auto unavailable = dyn_cast<clang::UnavailableAttr>(*AI)) {
       auto Message = unavailable->getMessage();
-      auto attr = AvailabilityAttr::createUnavailableAttr(C, Message);
+      auto attr = AvailabilityAttr::createUnconditional(C, Message);
       MappedDecl->getAttrs().add(attr);
-      IsUnavailable = true;
+      Unconditional = UnconditionalAvailabilityKind::Unavailable;
       continue;
     }
 
@@ -5175,10 +5175,10 @@ void ClangImporter::Implementation::importAttributes(
     //
     if (auto unavailable_annot = dyn_cast<clang::AnnotateAttr>(*AI))
       if (unavailable_annot->getAnnotation() == "swift1_unavailable") {
-        auto attr = AvailabilityAttr::createUnavailableAttr(
-            C, "", "", AvailabilityAttr::UnavailabilityKind::InSwift);
+        auto attr = AvailabilityAttr::createUnconditional(
+            C, "", "", UnconditionalAvailabilityKind::UnavailableInSwift);
         MappedDecl->getAttrs().add(attr);
-        IsUnavailable = true;
+        Unconditional = UnconditionalAvailabilityKind::Unavailable;
         continue;
       }
 
@@ -5195,9 +5195,9 @@ void ClangImporter::Implementation::importAttributes(
     //
     if (auto deprecated = dyn_cast<clang::DeprecatedAttr>(*AI)) {
       auto Message = deprecated->getMessage();
-      auto attr = AvailabilityAttr::createUnavailableAttr(C, Message);
+      auto attr = AvailabilityAttr::createUnconditional(C, Message);
       MappedDecl->getAttrs().add(attr);
-      IsUnavailable = true;
+      Unconditional = UnconditionalAvailabilityKind::Unavailable;
       continue;
     }
 
@@ -5208,11 +5208,11 @@ void ClangImporter::Implementation::importAttributes(
 
       // Is this our special "availability(swift, unavailable)" attribute?
       if (Platform == "swift") {
-        auto attr = AvailabilityAttr::createUnavailableAttr(
+        auto attr = AvailabilityAttr::createUnconditional(
             C, avail->getMessage(), /*renamed*/"",
-            AvailabilityAttr::UnavailabilityKind::InSwift);
+            UnconditionalAvailabilityKind::UnavailableInSwift);
         MappedDecl->getAttrs().add(attr);
-        IsUnavailable = true;
+        Unconditional = UnconditionalAvailabilityKind::Unavailable;
         continue;
       }
 
@@ -5235,7 +5235,9 @@ void ClangImporter::Implementation::importAttributes(
         continue;
 
       // Is this declaration marked unconditionally unavailable?
-      IsUnavailable = avail->getUnavailable();
+      if (avail->getUnavailable())
+        Unconditional = UnconditionalAvailabilityKind::Unavailable;
+
       StringRef message = avail->getMessage();
 
       const auto &deprecated = avail->getDeprecated();
@@ -5243,7 +5245,7 @@ void ClangImporter::Implementation::importAttributes(
         if (DeprecatedAsUnavailableFilter &&
             DeprecatedAsUnavailableFilter(deprecated.getMajor(),
                                           deprecated.getMinor())) {
-          IsUnavailable = true;
+          Unconditional = UnconditionalAvailabilityKind::Unavailable;
           if (message.empty())
             message = DeprecatedAsUnavailableMessage;
         }
@@ -5256,14 +5258,14 @@ void ClangImporter::Implementation::importAttributes(
                                              platformK.getValue(),
                                              message, /*rename*/StringRef(),
                                              introduced, deprecated, obsoleted,
-                                             IsUnavailable, /*implicit=*/false);
+                                             Unconditional, /*implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
     }
   }
 
   // If the method is unavailable, we're done.
-  if (IsUnavailable)
+  if (Unconditional == UnconditionalAvailabilityKind::Unavailable)
     return;
 
   // Add implicit attributes.
@@ -5272,7 +5274,7 @@ void ClangImporter::Implementation::importAttributes(
     auto sel = MD->getSelector();
     if (sel.getNameForSlot(0).startswith("performSelector") ||
         sel.getNameForSlot(0).startswith("makeObjectsPerformSelector")) {
-      auto attr = AvailabilityAttr::createUnavailableAttr(C,
+      auto attr = AvailabilityAttr::createUnconditional(C,
                     "'performSelector' methods are unavailable");
       MappedDecl->getAttrs().add(attr);
       return;
@@ -5282,7 +5284,7 @@ void ClangImporter::Implementation::importAttributes(
     if (auto knownMethod = getKnownObjCMethod(MD)) {
       // Availability.
       if (knownMethod->Unavailable) {
-        auto attr = AvailabilityAttr::createUnavailableAttr(
+        auto attr = AvailabilityAttr::createUnconditional(
                       C,
                       SwiftContext.AllocateCopy(knownMethod->UnavailableMsg));
         MappedDecl->getAttrs().add(attr);
@@ -5298,7 +5300,7 @@ void ClangImporter::Implementation::importAttributes(
   } else if (auto PD = dyn_cast<clang::ObjCPropertyDecl>(ClangDecl)) {
     if (auto knownProperty = getKnownObjCProperty(PD)) {
       if (knownProperty->Unavailable) {
-        auto attr = AvailabilityAttr::createUnavailableAttr(
+        auto attr = AvailabilityAttr::createUnconditional(
                       C,
                       SwiftContext.AllocateCopy(knownProperty->UnavailableMsg));
         MappedDecl->getAttrs().add(attr);
@@ -5308,7 +5310,7 @@ void ClangImporter::Implementation::importAttributes(
     if (isa<clang::ObjCInterfaceDecl>(CD) || isa<clang::ObjCProtocolDecl>(CD)) {
       if (auto knownContext = getKnownObjCContext(CD)) {
         if (knownContext->Unavailable) {
-          auto attr = AvailabilityAttr::createUnavailableAttr(
+          auto attr = AvailabilityAttr::createUnconditional(
                         C,
                         SwiftContext.AllocateCopy(
                           knownContext->UnavailableMsg));
@@ -5321,7 +5323,7 @@ void ClangImporter::Implementation::importAttributes(
   // Ban NSInvocation.
   if (auto ID = dyn_cast<clang::ObjCInterfaceDecl>(ClangDecl)) {
     if (ID->getName() == "NSInvocation") {
-      auto attr = AvailabilityAttr::createUnavailableAttr(C, "");
+      auto attr = AvailabilityAttr::createUnconditional(C, "");
       MappedDecl->getAttrs().add(attr);
       return;
     }
@@ -5336,7 +5338,7 @@ void ClangImporter::Implementation::importAttributes(
           FD->getName().endswith("Autorelease")))
       if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>())
         if (isCFTypeDecl(t->getDecl())) {
-          auto attr = AvailabilityAttr::createUnavailableAttr(C,
+          auto attr = AvailabilityAttr::createUnconditional(C,
             "Core Foundation objects are automatically memory managed");
           MappedDecl->getAttrs().add(attr);
           return;
@@ -5786,8 +5788,8 @@ void ClangImporter::Implementation::
 markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
 
   unavailabilityMsgRef = SwiftContext.AllocateCopy(unavailabilityMsgRef);
-  auto ua = AvailabilityAttr::createUnavailableAttr(SwiftContext,
-                                                    unavailabilityMsgRef);
+  auto ua = AvailabilityAttr::createUnconditional(SwiftContext,
+                                                  unavailabilityMsgRef);
   decl->getAttrs().add(ua);
 }
 
