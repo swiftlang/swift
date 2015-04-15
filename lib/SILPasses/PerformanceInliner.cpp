@@ -225,11 +225,11 @@ namespace {
                               SILLoopAnalysis *LA,
                               ConstantTracker &constTracker);
     
-    void visitColdBlocks(SmallVectorImpl<ApplyInst *> &CallSitesToInline,
+    void visitColdBlocks(SmallVectorImpl<ApplyInst *> &AppliesToInline,
                                SILBasicBlock *root, DominanceInfo *DT);
 
-    void collectCallSitesToInline(SILFunction *Caller,
-                                SmallVectorImpl<ApplyInst *> &CallSitesToInline,
+    void collectAppliesToInline(SILFunction *Caller,
+                                SmallVectorImpl<ApplyInst *> &AppliesToInline,
                                   DominanceAnalysis *DA,
                                   SILLoopAnalysis *LA,
                                   CallGraph &CG,
@@ -787,8 +787,8 @@ static FullApplySite devirtualizeMaintainingCallGraph(FullApplySite Apply,
 }
 
 
-void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
-                                SmallVectorImpl<ApplyInst *> &CallSitesToInline,
+void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
+                                SmallVectorImpl<ApplyInst *> &AppliesToInline,
                                                      DominanceAnalysis *DA,
                                                      SILLoopAnalysis *LA,
                                                      CallGraph &CG,
@@ -857,7 +857,7 @@ void SILPerformanceInliner::collectCallSitesToInline(SILFunction *Caller,
     
     const unsigned CallsToCalleeThreshold = 1024;
     if (CalleeCount[Callee] <= CallsToCalleeThreshold)
-      CallSitesToInline.push_back(AI);
+      AppliesToInline.push_back(AI);
   }
 }
 
@@ -883,15 +883,15 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   // First step: collect all the functions we want to inline.  We
   // don't change anything yet so that the dominator information
   // remains valid.
-  SmallVector<ApplyInst *, 8> CallSitesToInline;
-  collectCallSitesToInline(Caller, CallSitesToInline, DA, LA, CG,
+  SmallVector<ApplyInst *, 8> AppliesToInline;
+  collectAppliesToInline(Caller, AppliesToInline, DA, LA, CG,
                            Devirtualized);
 
-  if (CallSitesToInline.empty())
+  if (AppliesToInline.empty())
     return false;
 
   // Second step: do the actual inlining.
-  for (auto AI : CallSitesToInline) {
+  for (auto AI : AppliesToInline) {
     SILFunction *Callee = getReferencedFunction(AI);
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
@@ -927,7 +927,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 // Find functions in cold blocks which are forced to be inlined.
 // All other functions are not inlined in cold blocks.
 void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<ApplyInst *> &
-                                               CallSitesToInline,
+                                               AppliesToInline,
                                             SILBasicBlock *Root,
                                             DominanceInfo *DT) {
   DominanceOrder domOrder(Root, DT);
@@ -940,7 +940,7 @@ void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<ApplyInst *> &
       auto *Callee = getEligibleFunction(AI);
       if (Callee && isProfitableInColdBlock(Callee)) {
         DEBUG(llvm::dbgs() << "    inline in cold block:" <<  *AI);
-        CallSitesToInline.push_back(AI);
+        AppliesToInline.push_back(AI);
       }
     }
     domOrder.pushChildren(block);
