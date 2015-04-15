@@ -105,19 +105,20 @@ private:
     return *ValueInfoMap.find(Value)->second;
   }
 
-  ValueBase *getArgForTerminator(TermInst *Term, SILBasicBlock *SuccBB,
-                                 int Index) {
+  void getArgsForTerminator(TermInst *Term, SILBasicBlock *SuccBB, int Index,
+                            llvm::SmallVectorImpl<ValueBase *> &Operands) {
     switch (Term->getKind()) {
     case ValueKind::BranchInst:
-      return cast<BranchInst>(Term)->getArg(Index).getDef();
+      return Operands.push_back(cast<BranchInst>(Term)->getArg(Index).getDef());
 
     case ValueKind::CondBranchInst: {
       auto *CBI = cast<CondBranchInst>(Term);
       if (SuccBB == CBI->getTrueBB())
-        return CBI->getTrueArgs()[Index].getDef();
+        return Operands.push_back(CBI->getTrueArgs()[Index].getDef());
       assert(SuccBB == CBI->getFalseBB() &&
              "Block is not a successor of terminator!");
-      return CBI->getFalseArgs()[Index].getDef();
+      Operands.push_back(CBI->getFalseArgs()[Index].getDef());
+      return;
     }
 
     case ValueKind::SwitchEnumInst:
@@ -126,13 +127,19 @@ private:
     case ValueKind::CheckedCastAddrBranchInst:
     case ValueKind::DynamicMethodBranchInst:
       assert(Index == 0 && "Expected argument index to always be zero!");
-      return Term->getOperand(0).getDef();
+      return Operands.push_back(Term->getOperand(0).getDef());
 
     case ValueKind::UnreachableInst:
     case ValueKind::ReturnInst:
     case ValueKind::AutoreleaseReturnInst:
     case ValueKind::SwitchValueInst:
+    case ValueKind::ThrowInst:
       llvm_unreachable("Did not expect terminator that does not have args!");
+
+    case ValueKind::TryApplyInst:
+      for (auto &O : cast<TryApplyInst>(Term)->getAllOperands())
+        Operands.push_back(O.get().getDef());
+      return;
 
     default:
       llvm_unreachable("Unhandled terminator kind!");
@@ -151,10 +158,8 @@ private:
       auto *BB = A->getParent();
       auto Index = A->getIndex();
 
-      for (auto *Pred : BB->getPreds()) {
-        auto *V = getArgForTerminator(Pred->getTerminator(), BB, Index);
-        Operands.push_back(V);
-      }
+      for (auto *Pred : BB->getPreds())
+        getArgsForTerminator(Pred->getTerminator(), BB, Index, Operands);
       return;
     }
   }
