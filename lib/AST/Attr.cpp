@@ -148,6 +148,9 @@ void DeclAttributes::print(ASTPrinter &Printer,
   for (auto DA : orderedAttributes) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
+    if (!Options.PrintUserInaccessibleAttrs &&
+        DeclAttribute::isUserInaccessible(DA->getKind()))
+      continue;
     if (std::find(Options.ExcludeAttrList.begin(),
                   Options.ExcludeAttrList.end(),
                   DA->getKind()) != Options.ExcludeAttrList.end())

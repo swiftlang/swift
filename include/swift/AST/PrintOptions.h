@@ -106,6 +106,10 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
+  /// Whether to print decl attributes that are only used internally,
+  /// such as asmname, transparent, etc.
+  bool PrintUserInaccessibleAttrs = true;
+
   /// List of attribute kinds that should not be printed.
   std::vector<DeclAttrKind> ExcludeAttrList = { DAK_Transparent, DAK_Effects };
 
@@ -179,6 +183,7 @@ struct PrintOptions {
     result.SkipImplicit = true;
     result.SkipPrivateStdlibDecls = true;
     result.SkipDeinit = true;
+    result.PrintUserInaccessibleAttrs = false;
     result.PrintImplicitAttrs = false;
     result.ExcludeAttrList.push_back(DAK_Exported);
     result.PrintFunctionRepresentationAttrs = false;
