@@ -631,7 +631,10 @@ namespace {
       }
 
       // Otherwise, we need to translate into a temporary.
-      assert(outputType.getConvention() == ParameterConvention::Indirect_In);
+      assert(outputType.getConvention() == ParameterConvention::Indirect_In ||
+             outputType.getConvention() ==
+                 ParameterConvention::Indirect_In_Guaranteed);
+
       auto &outputTL = SGF.getTypeLowering(outputType.getSILType());
       auto temp = SGF.emitTemporary(Loc, outputTL);
       translateSingleInto(origType, substType, input, *temp.get());

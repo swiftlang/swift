@@ -217,14 +217,14 @@ struct AO<T>: Fooable {
   mutating func bar() {
     self.bar()
   }
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3basU__fGS0_Q__FT_T_ : $@convention(method) <T> (@in_guaranteed AO<T>) -> () 
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3basU__fGS0_Q__FT_T_ : $@convention(method) <T> (@in_guaranteed AO<T>) -> ()
   // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
   func bas() {
     self.bas()
   }
 
-  
+
   var prop1: Int = 0
   var prop2: Int {
     // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AOg5prop2Si : $@convention(method) <T> (@in_guaranteed AO<T>) -> Int {
@@ -400,4 +400,59 @@ func S_curryThunk(s: S) -> (S -> Int -> ()/*, Int -> ()*/) {
 
 func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
   return (AO.foo /*, ao.foo*/)
+}
+
+// ----------------------------------------------------------------------------
+// Make sure that we properly translate in_guaranteed parameters
+// correctly if we are asked to.
+// ----------------------------------------------------------------------------
+
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_12SequenceTypeS_FS1_17_constrainElementUS1__U_S_17FakeGeneratorType___fQPS1_FQS3_7ElementT_ : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
+// CHECK: bb0([[ARG0_PTR:%.*]] : $*FakeElement, [[ARG1_PTR:%.*]] : $*FakeArray):
+// CHECK: [[GUARANTEED_COPY_STACK_SLOT:%.*]] = alloc_stack $FakeArray
+// CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]#1
+// CHECK: [[ARG0:%.*]] = load [[ARG0_PTR]]
+// CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]#1
+// CHECK: [[TRANSLATION_STACK_SLOT:%.*]] = alloc_stack $FakeArray
+// CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT:%.*]]#1
+// CHECK: function_ref guaranteed_self.SequenceDefaultsType._constrainElement <A : guaranteed_self.SequenceDefaultsType>(guaranteed_self.SequenceDefaultsType.Self)(guaranteed_self.FakeElement) -> ()
+// CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
+// CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[TRANSLATION_STACK_SLOT]]#1)
+// CHECK: destroy_addr [[TRANSLATION_STACK_SLOT]]#1
+
+class Z {}
+
+public struct FakeGenerator {}
+public struct FakeArray {
+  var z = Z()
+}
+public struct FakeElement {}
+
+public protocol FakeGeneratorType {
+  typealias Element
+}
+
+extension FakeGenerator : FakeGeneratorType {
+  public typealias Element = FakeElement
+}
+
+public protocol SequenceDefaultsType {
+  typealias Element
+  typealias Generator : FakeGeneratorType
+}
+
+extension SequenceDefaultsType {
+  public final func _constrainElement(FakeGenerator.Element) {}
+}
+
+public protocol SequenceType : SequenceDefaultsType {
+  func _constrainElement(Element)
+}
+
+
+extension FakeArray : SequenceType {
+  typealias Element = FakeElement
+  typealias Generator = FakeGenerator
+
+  func _containsElement(Element) {}
 }
