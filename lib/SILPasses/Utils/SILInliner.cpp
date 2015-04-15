@@ -100,8 +100,8 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   BBMap.clear();
   // Do not allow the entry block to be cloned again
   SILBasicBlock::iterator InsertPoint =
-    std::next(SILBasicBlock::iterator(AI.getInstruction()));
-  BBMap.insert(std::make_pair(CalleeEntryBB, InsertPoint->getParent()));
+    SILBasicBlock::iterator(AI.getInstruction());
+  BBMap.insert(std::make_pair(CalleeEntryBB, AI.getParent()));
   getBuilder().setInsertionPoint(InsertPoint);
   // Recursively visit callee's BB in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
@@ -151,8 +151,9 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // Modify return terminators to branch to the return-to BB, rather than
     // trying to clone the ReturnInst.
     if (ReturnInst *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
+      auto thrownValue = remapValue(RI->getOperand());
       getBuilder().createBranch(Loc.getValue(), ReturnToBB,
-                                remapValue(RI->getOperand()))
+                                thrownValue)
         ->setDebugScope(AIScope);
       continue;
     }
@@ -161,8 +162,9 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // trying to clone the ThrowInst.
     if (ThrowInst *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
       auto tryAI = cast<TryApplyInst>(AI);
+      auto returnedValue = remapValue(TI->getOperand());
       getBuilder().createBranch(Loc.getValue(), tryAI->getErrorBB(),
-                                remapValue(TI->getOperand()))
+                                returnedValue)
         ->setDebugScope(AIScope);
       continue;
     }
