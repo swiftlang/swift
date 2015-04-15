@@ -93,6 +93,12 @@ namespace swift {
     // FIXME: This should probably be limited to the particular SourceFile.
     bool Playground = false;
 
+    /// Whether to delay adding enum protocol conformances during code
+    /// completion. This isn't completely correct with multiple files but is
+    /// currently necessary to get reasonable performance.
+    // FIXME: remove this when rdar://20047340 is fixed.
+    bool EnableCodeCompletionDelayedEnumConformanceHack = false;
+
     /// \brief Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
 

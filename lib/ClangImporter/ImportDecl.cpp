@@ -1826,10 +1826,12 @@ namespace {
         enumDecl->setRawType(underlyingType);
         
         // Add protocol declarations to the enum declaration.
-        // FIXME: Delay the protocol conformances in playground mode
-        // only as a performance hack. This is not generally handled
+        // FIXME: Delay the protocol conformances in playground mode and code-
+        // completion only as a performance hack. This is not generally handled
         // correctly in multi-file builds. rdar://problem/20047340
-        if (Impl.SwiftContext.LangOpts.Playground) {
+        const auto &LangOpts = Impl.SwiftContext.LangOpts;
+        if (LangOpts.Playground ||
+            LangOpts.EnableCodeCompletionDelayedEnumConformanceHack) {
           DelayedProtocolDecl delayedProtocols[] = {
             [&]() {return cxt.getProtocol(
                 KnownProtocolKind::RawRepresentable);},
