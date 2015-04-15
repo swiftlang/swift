@@ -116,6 +116,8 @@ void irgen::applyLayoutAttributes(IRGenModule &IGM,
   
   auto &Diags = IGM.Context.Diags;
   auto decl = ASTTy->getAnyNominal();
+  if (!decl)
+    return;
   
   if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
     assert(alignment->Value != 0
