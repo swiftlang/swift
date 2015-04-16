@@ -806,9 +806,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // Parse and return this as an UnresolvedPatternExpr around a binding.  This
     // will be resolved (or rejected) by sema when the overall refutable pattern
     // it transformed from an expression into a pattern.
-    if (InVarOrLetPattern == IVOLP_ImplicitlyImmutable ||
-        InVarOrLetPattern == IVOLP_InVar ||
-        InVarOrLetPattern == IVOLP_InLet) {
+    if ((InVarOrLetPattern == IVOLP_ImplicitlyImmutable ||
+         InVarOrLetPattern == IVOLP_InVar ||
+         InVarOrLetPattern == IVOLP_InLet) &&
+        // If we have "case let x." or "case let x(", we parse x as a normal
+        // name, not a binding, because it is the start of an enum pattern or
+        // call pattern.
+        peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
       Identifier name;
       SourceLoc loc = consumeIdentifier(&name);
       auto pattern = createBindingFromPattern(loc, name,

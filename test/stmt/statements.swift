@@ -327,6 +327,7 @@ func test_let_else(x : Int, y : Int??, cond : Bool) {
   let a? = y else {}
   let b? = y where cond else {}
   let c = x where cond else {}
+  let Optional.Some(d) = y else {}
 
   let n1? where cond else {}    // expected-error {{refutable pattern requires an initializer value to match against}}
   let n2? : Int? where cond else {}    // expected-error {{refutable pattern requires an initializer value to match against}}
