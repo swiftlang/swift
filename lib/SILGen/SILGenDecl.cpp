@@ -227,7 +227,6 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
 };
 
 namespace {
-
 class ReleaseValueCleanup : public Cleanup {
   SILValue v;
 public:
@@ -240,7 +239,9 @@ public:
       gen.B.emitReleaseValueOperation(l, v);
   }
 };
+} // end anonymous namespace
 
+namespace {
 /// Cleanup to destroy an initialized variable.
 class DeallocStackCleanup : public Cleanup {
   SILValue Addr;
@@ -251,7 +252,9 @@ public:
     gen.B.createDeallocStack(l, Addr);
   }
 };
+} // end anonymous namespace
 
+namespace {
 /// Cleanup to destroy an initialized 'var' variable.
 class DestroyLocalVariable : public Cleanup {
   VarDecl *Var;
@@ -262,7 +265,9 @@ public:
     gen.destroyLocalVariable(l, Var);
   }
 };
+} // end anonymous namespace
 
+namespace {
 /// Cleanup to destroy an uninitialized local variable.
 class DeallocateUninitializedLocalVariable : public Cleanup {
   VarDecl *Var;
@@ -273,7 +278,9 @@ public:
     gen.deallocateUninitializedLocalVariable(l, Var);
   }
 };
+} // end anonymous namespace
 
+namespace {
 /// An initialization of a local 'var'.
 class LocalVariableInitialization : public SingleBufferInitialization {
   /// The local variable decl being initialized.
@@ -322,7 +329,9 @@ public:
     DidFinish = true;
   }
 };
+} // end anonymous namespace
 
+namespace {
 /// Initialize a writeback buffer that receives the value of a 'let'
 /// declaration.
 class LetValueInitialization : public Initialization {
@@ -448,7 +457,9 @@ public:
     DidFinish = true;
   }
 };
+} // end anonymous namespace
 
+namespace {
 /// An initialization for a global variable.
 class GlobalInitialization : public SingleBufferInitialization {
   /// The physical address of the global.
@@ -462,13 +473,18 @@ public:
     return address;
   }
 };
+} // end anonymous namespace
 
+namespace {
 class DebuggerInitialization : public GlobalInitialization {
 public:
   DebuggerInitialization(SILValue address) : GlobalInitialization(address) {
   }
 };
+} // end anonymous namespace
 
+
+namespace {
 /// Initialize a variable of reference-storage type.
 class ReferenceStorageInitialization : public Initialization {
   InitializationPtr VarInit;
@@ -494,7 +510,9 @@ public:
     VarInit->finishInitialization(gen);
   }
 };
+} // end anonymous namespace
 
+namespace {
 /// Abstract base class for refutable pattern initializations.
 class RefutablePatternInitialization : public Initialization {
   /// This is the label to jump to if the pattern fails to match.
@@ -522,7 +540,9 @@ public:
   }
 
 };
+} // end anonymous namespace
 
+namespace {
 class ExprPatternInitialization : public RefutablePatternInitialization {
   ExprPattern *P;
 public:
@@ -532,6 +552,7 @@ public:
   void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
                            SILLocation loc, SILGenFunction &SGF) override;
 };
+} // end anonymous namespace
 
 void ExprPatternInitialization::
 copyOrInitValueInto(ManagedValue value, bool isInit,
@@ -557,6 +578,7 @@ copyOrInitValueInto(ManagedValue value, bool isInit,
   SGF.B.setInsertionPoint(contBB);
 }
 
+namespace {
 class EnumElementPatternInitialization : public RefutablePatternInitialization {
   EnumElementDecl *ElementDecl;
   InitializationPtr subInitialization;
@@ -575,7 +597,8 @@ public:
       subInitialization.get()->finishInitialization(SGF);
   }
 };
-  
+} // end anonymous namespace
+
 void EnumElementPatternInitialization::
 copyOrInitValueInto(ManagedValue value, bool isInit,
                     SILLocation loc, SILGenFunction &SGF) {
@@ -634,6 +657,8 @@ copyOrInitValueInto(ManagedValue value, bool isInit,
   subInitialization->copyOrInitValueInto(eltMV, isInit, loc, SGF);
 }
 
+
+namespace {
 
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
