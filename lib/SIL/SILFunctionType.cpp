@@ -425,26 +425,23 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
                         const Optional<ForeignErrorConvention> &foreignError) {
   SmallVector<SILParameterInfo, 8> inputs;
 
-  // Per above, only honor the most general abstraction pattern for thick
-  // or polymorphic functions.
+  // Per above, only fully honor opaqueness in the abstraction pattern
+  // for thick or polymorphic functions.  We don't need to worry about
+  // non-opaque patterns because the type-checker forbids non-thick
+  // function types from having generic parameters or results.
   if (origType.isOpaque() &&
       substFnOldType->getExtInfo().getSILRepresentation()
         != SILFunctionType::Representation::Thick &&
       isa<FunctionType>(substFnOldType)) {
-    origType = AbstractionPattern(substFnOldType);
+    origType = AbstractionPattern(M.Types.getCurGenericContext(),
+                                  substFnOldType);
   }
 
   // Find the generic parameters.
-  GenericParamList *genericParams = nullptr;
-  if (auto polyFnType = dyn_cast<PolymorphicFunctionType>(substFnOldType)) {
-    genericParams = &polyFnType->getGenericParams();
-  }
-  GenericSignature *genericSig = nullptr;
+  CanGenericSignature genericSig = nullptr;
   if (auto genFnType = dyn_cast<GenericFunctionType>(substFnInterfaceType)) {
-    genericSig = GenericSignature::get(genFnType->getGenericParams(),
-                                       genFnType->getRequirements());
+    genericSig = genFnType.getGenericSignature();
   }
-  assert(bool(genericParams) == bool(genericSig));
 
   // Lower the interface type in a generic context.
   GenericContextScope scope(M.Types, genericSig);
@@ -1570,14 +1567,9 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
     return origFnType;
 
   // Use the generic parameters from the substituted type.
-  GenericParamList *genericParams = nullptr;
-  GenericSignature *genericSig = nullptr;
-  if (auto polySubstFn = dyn_cast<PolymorphicFunctionType>(substLoweredType))
-    genericParams = &polySubstFn->getGenericParams();
+  CanGenericSignature genericSig;
   if (auto genSubstFn = dyn_cast<GenericFunctionType>(substLoweredInterfaceType))
-    genericSig = GenericSignature::get(genSubstFn->getGenericParams(),
-                                       genSubstFn->getRequirements());
-  assert(bool(genericParams) == bool(genericSig));
+    genericSig = genSubstFn.getGenericSignature();
 
   GenericContextScope scope(*this, genericSig);
   SILFunctionTypeSubstituter substituter(*this, origFnType);
@@ -1625,8 +1617,28 @@ namespace {
     SILModule &TheSILModule;
     Module *TheASTModule;
     TypeSubstitutionMap &Subs;
+    CanGenericSignature Generics;
 
     ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
+
+    class GenericsRAII {
+      SILTypeSubstituter &Self;
+      GenericContextScope Scope;
+      CanGenericSignature OldGenerics;
+    public:
+      GenericsRAII(SILTypeSubstituter &self, CanGenericSignature generics)
+        : Self(self),
+          Scope(self.TheSILModule.Types, generics),
+          OldGenerics(self.Generics) {
+        if (generics) self.Generics = generics;
+      }
+
+      ~GenericsRAII() {
+        Self.Generics = OldGenerics;
+      }
+    };
+
+
   public:
     SILTypeSubstituter(SILModule &silModule, Module *astModule,
                        TypeSubstitutionMap &subs)
@@ -1639,8 +1651,7 @@ namespace {
     CanSILFunctionType visitSILFunctionType(CanSILFunctionType origType,
                                             bool dropGenerics = false)
     {
-      GenericContextScope scope(TheSILModule.Types,
-                                origType->getGenericSignature());
+      GenericsRAII scope(*this, origType->getGenericSignature());
 
       SILResultInfo substResult = subst(origType->getResult());
 
@@ -1706,8 +1717,10 @@ namespace {
       assert(!isa<AnyFunctionType>(origType));
       assert(!isa<LValueType>(origType) && !isa<InOutType>(origType));
 
-      assert(TheSILModule.Types.getLoweredType(origType).getSwiftRValueType()
-               == origType);
+      AbstractionPattern abstraction(Generics, origType);
+
+      assert(TheSILModule.Types.getLoweredType(abstraction, origType)
+               .getSwiftRValueType() == origType);
 
       CanType substType =
         origType.subst(TheASTModule, Subs, true, nullptr)->getCanonicalType();
@@ -1718,8 +1731,7 @@ namespace {
         return origType;
       }
 
-      return TheSILModule.Types.getLoweredType(AbstractionPattern(origType),
-                                               substType)
+      return TheSILModule.Types.getLoweredType(abstraction, substType)
                .getSwiftRValueType();
     }
   };

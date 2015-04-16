@@ -513,6 +513,9 @@ class TypeConverter {
   
   /// ArchetypeBuilder used for lowering types in generic function contexts.
   Optional<ArchetypeBuilder> GenericArchetypes;
+
+  /// The current generic context signature.
+  CanGenericSignature CurGenericContext;
   
   CanAnyFunctionType makeConstantType(SILDeclRef constant, bool addCaptures);
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant,
@@ -753,11 +756,17 @@ public:
   /// Types containing generic parameter references must be lowered in a generic
   /// context. There can be at most one level of generic context active at any
   /// point in time.
-  void pushGenericContext(GenericSignature *sig);
+  void pushGenericContext(CanGenericSignature sig);
+
+  /// Return the current generic context.  This should only be used in
+  /// the type-conversion routines.
+  CanGenericSignature getCurGenericContext() const {
+    return CurGenericContext;
+  }
   
   /// Pop a generic function context. See GenericContextScope for an RAII
   /// interface to this function. There must be an active generic context.
-  void popGenericContext(GenericSignature *sig);
+  void popGenericContext(CanGenericSignature sig);
   
   /// Return the archetype builder for the current generic context. Fails if no
   /// generic context has been pushed.
@@ -815,13 +824,12 @@ TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
 /// RAII interface to push a generic context.
 class GenericContextScope {
   TypeConverter &TC;
-  GenericSignature *Sig;
+  CanGenericSignature Sig;
 public:
-  GenericContextScope(TypeConverter &TC,
-                      GenericSignature *Sig)
-    : TC(TC), Sig(Sig)
+  GenericContextScope(TypeConverter &TC, CanGenericSignature sig)
+    : TC(TC), Sig(sig)
   {
-    TC.pushGenericContext(Sig);
+    TC.pushGenericContext(sig);
   }
   
   ~GenericContextScope() {

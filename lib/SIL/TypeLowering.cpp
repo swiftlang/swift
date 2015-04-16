@@ -2212,7 +2212,7 @@ SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
   return silSubstType;
 }
 
-void TypeConverter::pushGenericContext(GenericSignature *sig) {
+void TypeConverter::pushGenericContext(CanGenericSignature sig) {
   // If the generic signature is empty, this is a no-op.
   if (!sig)
     return;
@@ -2220,6 +2220,9 @@ void TypeConverter::pushGenericContext(GenericSignature *sig) {
   // GenericFunctionTypes shouldn't nest.
   assert(!GenericArchetypes.hasValue() && "already in generic context?!");
   assert(DependentTypes.empty() && "already in generic context?!");
+  assert(!CurGenericContext && "already in generic context!");
+
+  CurGenericContext = sig;
   
   // Prepare the ArchetypeBuilder with the generic signature.
   GenericArchetypes.emplace(*M.getSwiftModule(), M.getASTContext().Diags);
@@ -2227,12 +2230,13 @@ void TypeConverter::pushGenericContext(GenericSignature *sig) {
     llvm_unreachable("error adding generic signature to archetype builder?!");
 }
 
-void TypeConverter::popGenericContext(GenericSignature *sig) {
+void TypeConverter::popGenericContext(CanGenericSignature sig) {
   // If the generic signature is empty, this is a no-op.
   if (!sig)
     return;
 
   assert(GenericArchetypes.hasValue() && "not in generic context?!");
+  assert(CurGenericContext == sig && "unpaired push/pop");
   
   // Erase our cached TypeLowering objects and associated mappings for dependent
   // types.
@@ -2249,6 +2253,7 @@ void TypeConverter::popGenericContext(GenericSignature *sig) {
   DependentTypes.clear();
   DependentBPA.Reset();
   GenericArchetypes.reset();
+  CurGenericContext = nullptr;
 }
 
 ProtocolDispatchStrategy

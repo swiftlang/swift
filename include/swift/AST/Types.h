@@ -2886,7 +2886,7 @@ public:
   }
 
   bool isPolymorphic() const { return GenericSig != nullptr; }
-  GenericSignature *getGenericSignature() const { return GenericSig; }
+  CanGenericSignature getGenericSignature() const { return GenericSig; }
 
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
 

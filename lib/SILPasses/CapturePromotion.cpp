@@ -831,7 +831,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   TypeSubstitutionMap ContextSubs;
 
   ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
-  auto *genericSig = F->getLoweredFunctionType()->getGenericSignature();
+  auto genericSig = F->getLoweredFunctionType()->getGenericSignature();
   auto *genericParams = F->getContextGenericParams();
 
   if (ApplySubs.size()) {

@@ -815,7 +815,7 @@ TypeConverter::~TypeConverter() {
   }
 }
 
-void TypeConverter::pushGenericContext(GenericSignature *signature) {
+void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   if (!signature)
     return;
   
@@ -824,7 +824,7 @@ void TypeConverter::pushGenericContext(GenericSignature *signature) {
   IGM.SILMod->Types.pushGenericContext(signature);
 }
 
-void TypeConverter::popGenericContext(GenericSignature *signature) {
+void TypeConverter::popGenericContext(CanGenericSignature signature) {
   if (!signature)
     return;
 

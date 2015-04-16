@@ -94,7 +94,8 @@ AbstractionPattern::getOptional(AbstractionPattern object,
                                 ->getCanonicalType(),
                               object.getClangType());
   case Kind::Type:
-    return AbstractionPattern(OptionalType::get(optionalKind, object.getType())
+    return AbstractionPattern(object.getGenericSignature(),
+                              OptionalType::get(optionalKind, object.getType())
                                 ->getCanonicalType());
   }
   llvm_unreachable("bad kind");
@@ -164,7 +165,8 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
     return AbstractionPattern(cast<TupleType>(getType()).getElementType(index),
                               getClangArrayElementType(getClangType(), index));
   case Kind::Type:
-    return AbstractionPattern(cast<TupleType>(getType()).getElementType(index));
+    return AbstractionPattern(getGenericSignature(),
+                              cast<TupleType>(getType()).getElementType(index));
   case Kind::ClangFunctionParamTupleType:
     return AbstractionPattern(cast<TupleType>(getType()).getElementType(index),
                           getClangFunctionParameterType(getClangType(), index));
@@ -226,7 +228,7 @@ AbstractionPattern AbstractionPattern::transformType(
   case Kind::ClangType:
     return AbstractionPattern(transform(getType()), getClangType());
   case Kind::Type:
-    return AbstractionPattern(transform(getType()));
+    return AbstractionPattern(getGenericSignature(), transform(getType()));
   case Kind::ObjCMethodParamTupleType:
     return getObjCMethodParamTuple(transform(getType()), getObjCMethod());
 
@@ -279,7 +281,8 @@ AbstractionPattern AbstractionPattern::dropLastTupleElement() const {
   case Kind::ObjCMethodFormalParamTupleType:
     llvm_unreachable("operation is not needed on method abstraction patterns");
   case Kind::Type:
-    return AbstractionPattern(dropLastElement(getType()));
+    return AbstractionPattern(getGenericSignature(),
+                              dropLastElement(getType()));
 
   // In both of the following cases, if the transform makes it no
   // longer a tuple type, we need to change kinds.
@@ -310,7 +313,8 @@ AbstractionPattern AbstractionPattern::getLValueObjectType() const {
   case Kind::Opaque:
     return *this;
   case Kind::Type:
-    return AbstractionPattern(cast<InOutType>(getType()).getObjectType());
+    return AbstractionPattern(getGenericSignature(),
+                              cast<InOutType>(getType()).getObjectType());
   case Kind::ClangType:
     return AbstractionPattern(cast<InOutType>(getType()).getObjectType(),
                               getClangType());
@@ -333,8 +337,15 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     llvm_unreachable("abstraction pattern for tuple cannot be function");
   case Kind::Opaque:
     return *this;
-  case Kind::Type:
-    return AbstractionPattern(getResultType(getType()));
+  case Kind::Type: {
+    auto fnType = cast<AnyFunctionType>(getType());
+    if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
+      return AbstractionPattern(genericFn.getGenericSignature(),
+                                fnType.getResult());
+    } else {
+      return AbstractionPattern(getGenericSignature(), fnType.getResult());
+    }
+  }
   case Kind::ClangType: {
     auto clangFunctionType = getClangFunctionType(getClangType());
     return AbstractionPattern(getResultType(getType()),
@@ -360,7 +371,12 @@ AbstractionPattern AbstractionPattern::getFunctionInputType() const {
     return *this;
   case Kind::Type: {
     auto fnType = cast<AnyFunctionType>(getType());
-    return AbstractionPattern(fnType.getInput());
+    if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
+      return AbstractionPattern(genericFn.getGenericSignature(),
+                                fnType.getInput());
+    } else {
+      return AbstractionPattern(getGenericSignature(), fnType.getInput());
+    }
   }
   case Kind::ClangType: {
     // Preserve the Clang type in the resulting abstraction pattern.
@@ -394,7 +410,8 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::Tuple:
     return *this;
   case Kind::Type:
-    return AbstractionPattern(getType().getReferenceStorageReferent());
+    return AbstractionPattern(getGenericSignature(),
+                              getType().getReferenceStorageReferent());
   case Kind::ClangType:
     // This is not reflected in clang types.
     return AbstractionPattern(getType().getReferenceStorageReferent(),
@@ -416,9 +433,13 @@ void AbstractionPattern::print(raw_ostream &out) const {
     out << "AP::Opaque";
     return;
   case Kind::Type:
-    out << "AP::Type(";
+    out << "AP::Type";
+    if (auto sig = getGenericSignature()) {
+      sig->print(out);
+    }
+    out << '(';
     getType().dump(out);
-    out << ")";
+    out << ')';
     return;
   case Kind::Tuple:
     out << "AP::Tuple(";

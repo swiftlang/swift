@@ -77,9 +77,11 @@ class AbstractionPattern {
     const clang::Type *ClangType;
     const clang::ObjCMethodDecl *ObjCMethod;
     const AbstractionPattern *OrigTupleElements;
+    GenericSignature *GenericSig; // always canonical
   };
 
-  static bool isOpaqueType(CanType type) {
+  static bool isOpaqueType(CanGenericSignature signature, CanType type) {
+    assert(signature || !type->isDependentType());
     if (auto arch = dyn_cast<ArchetypeType>(type))
       return !arch->requiresClass();
     // FIXME: Check class constraint of dependent types in their originating
@@ -92,6 +94,11 @@ class AbstractionPattern {
   }
 
   Kind getKind() const { return Kind(TheKind); }
+
+  CanGenericSignature getGenericSignature() const {
+    assert(getKind() == Kind::Type);
+    return CanGenericSignature(GenericSig);
+  }
 
   unsigned getNumTupleElements_Stored() const {
     assert(getKind() == Kind::Tuple);
@@ -109,18 +116,20 @@ class AbstractionPattern {
             getKind() == Kind::ObjCMethodFormalParamTupleType);
   }
 
-  void initSwiftType(CanType origType) {
-    if (isOpaqueType(origType)) {
+  void initSwiftType(CanGenericSignature signature, CanType origType) {
+    assert(signature || !origType->isDependentType());
+    if (isOpaqueType(signature, origType)) {
       TheKind = unsigned(Kind::Opaque);
     } else {
       TheKind = unsigned(Kind::Type);
       OrigType = origType;
+      GenericSig = signature;
     }
   }
 
   void initClangType(CanType origType, const clang::Type *clangType,
                      Kind kind = Kind::ClangType) {
-    assert(!isOpaqueType(origType));
+    assert(!isOpaqueType(nullptr, origType));
     TheKind = unsigned(kind);
     OrigType = origType;
     ClangType = clangType;
@@ -128,7 +137,7 @@ class AbstractionPattern {
 
   void initObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
                       Kind kind) {
-    assert(!isOpaqueType(origType));
+    assert(!isOpaqueType(nullptr, origType));
     TheKind = unsigned(kind);
     OrigType = origType;
     ObjCMethod = method;
@@ -140,8 +149,10 @@ class AbstractionPattern {
 public:
   explicit AbstractionPattern(Type origType)
     : AbstractionPattern(origType->getCanonicalType()) {}
-  explicit AbstractionPattern(CanType origType) {
-    initSwiftType(origType);
+  explicit AbstractionPattern(CanType origType)
+    : AbstractionPattern(nullptr, origType) {}
+  explicit AbstractionPattern(CanGenericSignature signature, CanType origType) {
+    initSwiftType(signature, origType);
   }
   explicit AbstractionPattern(CanType origType, const clang::Type *clangType) {
     initClangType(origType, clangType);

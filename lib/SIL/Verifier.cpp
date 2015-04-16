@@ -220,7 +220,7 @@ public:
     auto signature1 = type1->getGenericSignature();
     auto signature2 = type2->getGenericSignature();
 
-    auto getAnyOptionalObjectTypeInContext = [&](GenericSignature *sig,
+    auto getAnyOptionalObjectTypeInContext = [&](CanGenericSignature sig,
                                                  SILType type) {
       Lowering::GenericContextScope context(F.getModule().Types, sig);
       OptionalTypeKind _;

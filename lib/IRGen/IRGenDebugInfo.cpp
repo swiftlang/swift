@@ -666,7 +666,7 @@ llvm::DITypeArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
                                                    DeclContext *DeclCtx) {
   SmallVector<llvm::Metadata *, 16> Parameters;
 
-  GenericContextScope Scope(IGM, FnTy->getGenericSignature());
+  GenericsRAII scope(*this, FnTy->getGenericSignature());
 
   // The function return type is the first element in the list.
   createParameterType(Parameters, FnTy->getSemanticResultSILType(),
@@ -1235,8 +1235,11 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(
   SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (auto ElemTy : TupleTy->getElementTypes()) {
-    DebugTypeInfo DbgTy(ElemTy, IGM.getTypeInfoForUnlowered(ElemTy),
-                        DeclContext);
+    auto &elemTI =
+      IGM.getTypeInfoForUnlowered(AbstractionPattern(CurGenerics,
+                                                  ElemTy->getCanonicalType()),
+                                  ElemTy);
+    DebugTypeInfo DbgTy(ElemTy, elemTI, DeclContext);
     Elements.push_back(
         createMemberType(DbgTy, StringRef(), OffsetInBits, Scope, File, Flags));
   }

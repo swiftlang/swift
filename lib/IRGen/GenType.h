@@ -152,10 +152,10 @@ public:
 
   /// Enter a generic context for lowering the parameters of a generic function
   /// type.
-  void pushGenericContext(GenericSignature *signature);
+  void pushGenericContext(CanGenericSignature signature);
   
   /// Exit a generic context.
-  void popGenericContext(GenericSignature *signature);
+  void popGenericContext(CanGenericSignature signature);
 
   /// Get the ArchetypeBuilder for the current generic context. Fails if there
   /// is no generic context.
@@ -187,7 +187,7 @@ private:
                                                            NominalTypeDecl *D);
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
     friend ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t);
-    friend void TypeConverter::popGenericContext(GenericSignature *signature);
+    friend void TypeConverter::popGenericContext(CanGenericSignature signature);
     
 #ifndef NDEBUG
     friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *) const;
@@ -201,17 +201,15 @@ private:
 /// a scope.
 class GenericContextScope {
   TypeConverter &TC;
-  GenericSignature *sig;
+  CanGenericSignature sig;
 public:
-  GenericContextScope(TypeConverter &TC,
-                      GenericSignature *sig)
+  GenericContextScope(TypeConverter &TC, CanGenericSignature sig)
     : TC(TC), sig(sig)
   {
     TC.pushGenericContext(sig);
   }
   
-  GenericContextScope(IRGenModule &IGM,
-                      GenericSignature *sig)
+  GenericContextScope(IRGenModule &IGM, CanGenericSignature sig)
     : GenericContextScope(IGM.Types, sig)
   {}
   
