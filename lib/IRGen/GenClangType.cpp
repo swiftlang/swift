@@ -600,10 +600,27 @@ void ClangTypeConverter::fillSpeciallyImportedTypeCache(IRGenModule &IGM) {
 
   // These types come from the ObjectiveC module.
   if (auto objcModule =
-        IGM.Context.getLoadedModule(IGM.Context.getIdentifier("ObjectiveC"))) {
+        IGM.Context.getLoadedModule(IGM.Context.Id_ObjectiveC)) {
     CACHE_TYPE(objcModule, "ObjCBool", ctx.ObjCBuiltinBoolTy);
     CACHE_TYPE(objcModule, "Selector", getClangSelectorType(ctx));
     CACHE_TYPE(objcModule, "NSZone", ctx.VoidPtrTy);
+  }
+  
+  // Handle SIMD types.
+  if (auto SIMDModule = IGM.Context.getLoadedModule(IGM.Context.Id_SIMD)) {
+#define MAP_SIMD_TYPE(_, CLANG_KIND, SWIFT_NAME)                               \
+    {                                                                          \
+      char name[] = #SWIFT_NAME "0";                                           \
+      for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) {       \
+        *(std::end(name) - 2) = '0' + i;                                       \
+        auto eltTy = getClangBuiltinTypeFromKind(ctx,                          \
+                                               clang::BuiltinType::CLANG_KIND);\
+        auto vecTy = ctx.getVectorType(eltTy,                                  \
+                                       i, clang::VectorType::GenericVector);   \
+        CACHE_TYPE(SIMDModule, name, ctx.getCanonicalType(vecTy));             \
+      }                                                                        \
+    }
+#include "swift/ClangImporter/SIMDMappedTypes.def"
   }
 
 #undef CACHE_STDLIB_TYPE
