@@ -1370,6 +1370,10 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   auto *SuccessBB = Inst->getSuccessBB();
   auto *FailureBB = Inst->getFailureBB();
 
+  // If there is an unbound generic type involved in the cast, bail.
+  if (Src.getType().hasArchetype() || Dest.getType().hasArchetype())
+    return nullptr;
+
   // %1 = metatype $A.Type
   // [%2 = init_existential_metatype %1 ...]
   // %3 = alloc_stack
