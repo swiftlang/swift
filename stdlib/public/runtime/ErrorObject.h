@@ -165,6 +165,10 @@ extern "C" id swift_bridgeErrorTypeToNSError(SwiftError *errorObject);
 /// ErrorType box.
 extern "C" SwiftError *swift_convertNSErrorToErrorType(id errorObject);
 
+/// Convert a (non-optional) ErrorType box to a (non-optional)
+/// NSError instance.
+extern "C" id swift_convertErrorTypeToNSError(SwiftError *errorObject);
+
 /// Attempt to dynamically cast an NSError instance to a Swift ErrorType
 /// implementation using the _ObjectiveCBridgeableErrorType protocol.
 ///

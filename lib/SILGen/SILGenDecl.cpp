@@ -20,6 +20,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -1027,35 +1028,28 @@ void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
 // ObjC method thunks
 //===----------------------------------------------------------------------===//
 
-static SILValue emitBridgeObjCReturnValue(SILGenFunction &gen,
-                                          SILLocation loc,
-                                          SILValue result,
-                                          AbstractionPattern origNativeTy,
-                                          CanType substNativeTy,
-                                          CanType bridgedTy) {
+static SILValue emitBridgeReturnValue(SILGenFunction &gen,
+                                      SILLocation loc,
+                                      SILValue result,
+                                      SILFunctionTypeRepresentation fnTypeRepr,
+                                      AbstractionPattern origNativeTy,
+                                      CanType substNativeTy,
+                                      CanType bridgedTy) {
   Scope scope(gen.Cleanups, CleanupLocation::get(loc));
 
   ManagedValue native = gen.emitManagedRValueWithCleanup(result);
-  ManagedValue bridged = gen.emitNativeToBridgedValue(loc, native,
-                                      SILFunctionTypeRepresentation::ObjCMethod,
-                                      origNativeTy,
-                                      substNativeTy,
-                                      bridgedTy);
+  ManagedValue bridged = gen.emitNativeToBridgedValue(loc, native, fnTypeRepr,
+                                      origNativeTy, substNativeTy, bridgedTy);
   return bridged.forward(gen);
 }
 
-/// Take a return value at +1 and adjust it to the retain count expected by
-/// the given ownership conventions.
+/// Take a return value at +1 and adjust it to the retain count
+/// expected by the given ownership conventions.
 static void emitObjCReturnValue(SILGenFunction &gen,
                                 SILLocation loc,
                                 SILValue result,
-                                CanType nativeTy,
                                 SILResultInfo resultInfo) {
-  // Bridge the result.
-  result = emitBridgeObjCReturnValue(gen, loc, result,
-                                     AbstractionPattern(nativeTy),
-                                     nativeTy,
-                                     resultInfo.getType());
+  assert(result.getType() == resultInfo.getSILType());
 
   // Autorelease the bridged result if necessary.
   switch (resultInfo.getConvention()) {
@@ -1093,7 +1087,9 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
 static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
                                                SILLocation loc,
                                                SILDeclRef thunk,
-                                               SmallVectorImpl<SILValue> &args){
+                                               SmallVectorImpl<SILValue> &args,
+                                               SILValue &foreignErrorSlot,
+                              Optional<ForeignErrorConvention> &foreignError) {
   SILDeclRef native = thunk.asForeign(false);
   auto objcInfo = gen.SGM.Types.getConstantFunctionType(thunk);
   auto swiftInfo = gen.SGM.Types.getConstantFunctionType(native);
@@ -1104,6 +1100,13 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
 
   SmallVector<ManagedValue, 8> bridgedArgs;
   bridgedArgs.reserve(objcInfo->getParameters().size());
+
+  // Find the foreign error convention if we have one.
+  if (orig->getLoweredFunctionType()->hasErrorResult()) {
+    auto func = cast<AbstractFunctionDecl>(thunk.getDecl());
+    foreignError = func->getForeignErrorConvention();
+    assert(foreignError && "couldn't find foreign error convention!");
+  }
 
   // Emit the indirect return argument, if any.
   if (objcInfo->hasIndirectResult()) {
@@ -1117,12 +1120,20 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   auto inputs = objcInfo->getParametersWithoutIndirectResult();
   auto nativeInputs = swiftInfo->getParametersWithoutIndirectResult();
   assert(!inputs.empty());
-  assert(inputs.size() == nativeInputs.size());
+  assert(inputs.size() ==
+           nativeInputs.size() + unsigned(foreignError.hasValue()));
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = gen.F.mapTypeIntoContext(inputs[i].getSILType());
     SILValue arg = new(gen.F.getModule()) SILArgument(gen.F.begin(), argTy);
 
-    // If this parameter is deallocating, emit an unmanged rvalue and
+    // If this parameter is the foreign error slot, pull it out.
+    // It does not correspond to a native argument.
+    if (foreignError && i == foreignError->getErrorParameterIndex()) {
+      foreignErrorSlot = arg;
+      continue;
+    }
+
+    // If this parameter is deallocating, emit an unmanaged rvalue and
     // continue. The object has the deallocating bit set so retain, release is
     // irrelevent.
     if (inputs[i].isDeallocating()) {
@@ -1149,10 +1160,13 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
     bridgedArgs.push_back(managedArg);
   }
 
-  assert(bridgedArgs.size() == objcInfo->getParameters().size() &&
+  assert(bridgedArgs.size() + unsigned(foreignError.hasValue())
+           == objcInfo->getParameters().size() &&
          "objc inputs don't match number of arguments?!");
   assert(bridgedArgs.size() == swiftInfo->getParameters().size() &&
          "swift inputs don't match number of arguments?!");
+  assert((foreignErrorSlot || !foreignError) &&
+         "didn't find foreign error slot");
 
   // Bridge the input types.
   Scope scope(gen.Cleanups, CleanupLocation::get(loc));
@@ -1188,7 +1202,10 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
 
   // Bridge the arguments.
   SmallVector<SILValue, 4> args;
-  auto objcFnTy = emitObjCThunkArguments(*this, loc, thunk, args);
+  Optional<ForeignErrorConvention> foreignError;
+  SILValue foreignErrorSlot;
+  auto objcFnTy = emitObjCThunkArguments(*this, loc, thunk, args,
+                                         foreignErrorSlot, foreignError);
   auto nativeInfo = getConstantInfo(native);
   auto swiftResultTy = nativeInfo.SILFnType->getResult()
     .map([&](CanType t) { return F.mapTypeIntoContext(t)->getCanonicalType(); });
@@ -1200,14 +1217,80 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   auto subs = F.getForwardingSubstitutions();
   auto substTy = nativeFn.getType().castTo<SILFunctionType>()
     ->substGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
-  SILValue result = B.createApply(loc, nativeFn,
-                                  SILType::getPrimitiveObjectType(substTy),
-                                  swiftResultTy.getSILType(), subs, args);
+  SILType substSILTy = SILType::getPrimitiveObjectType(substTy);
 
-  scope.pop();
-  
-  emitObjCReturnValue(*this, loc, result, nativeInfo.LoweredType.getResult(),
-                      objcResultTy);
+  CanType substNativeResultType = nativeInfo.LoweredType.getResult();
+  AbstractionPattern origNativeResultType =
+    AbstractionPattern(substNativeResultType);
+  CanType bridgedResultType = objcResultTy.getType();
+
+  SILValue result;
+  assert(foreignError.hasValue() == substTy->hasErrorResult());
+  if (!substTy->hasErrorResult()) {
+    // Create the apply.
+    result = B.createApply(loc, nativeFn, substSILTy,
+                           swiftResultTy.getSILType(), subs, args);
+
+    // Leave the scope immediately.  This isn't really necessary; it
+    // just limits lifetimes a little bit more.
+    scope.pop();
+
+    // Now bridge the return value.
+    result = emitBridgeReturnValue(*this, loc, result,
+                                   objcFnTy->getRepresentation(),
+                                   origNativeResultType,
+                                   substNativeResultType,
+                                   bridgedResultType);
+  } else {
+    SILBasicBlock *contBB = createBasicBlock();
+    SILBasicBlock *errorBB = createBasicBlock();
+    SILBasicBlock *normalBB = createBasicBlock();
+    B.createTryApply(loc, nativeFn, substSILTy, subs, args,
+                     normalBB, errorBB);
+
+    // Emit the non-error destination.
+    {
+      B.emitBlock(normalBB);
+      SILValue nativeResult =
+        normalBB->createBBArg(swiftResultTy.getSILType());
+
+      // In this branch, the eventual return value is mostly created
+      // by bridging the native return value, but we may need to
+      // adjust it slightly.
+      SILValue bridgedResult =
+        emitBridgeReturnValueForForeignError(loc, nativeResult, 
+                                             objcFnTy->getRepresentation(),
+                                             origNativeResultType,
+                                             substNativeResultType,
+                                             objcResultTy.getSILType(),
+                                             foreignErrorSlot, *foreignError);
+      B.createBranch(loc, contBB, bridgedResult);
+    }
+
+    // Emit the error destination.
+    {
+      B.emitBlock(errorBB);
+      SILValue nativeError =
+        errorBB->createBBArg(substTy->getErrorResult().getSILType());
+
+      // In this branch, the eventual return value is mostly invented.
+      // Store the native error in the appropriate location and return.
+      SILValue bridgedResult =
+        emitBridgeErrorForForeignError(loc, nativeError,
+                                       objcResultTy.getSILType(),
+                                       foreignErrorSlot, *foreignError);
+      B.createBranch(loc, contBB, bridgedResult);
+    }
+
+    // Emit the join block.
+    B.emitBlock(contBB);
+    result = contBB->createBBArg(objcResultTy.getSILType());
+
+    // Leave the scope now.
+    scope.pop();
+  }
+
+  emitObjCReturnValue(*this, loc, result, objcResultTy);
 }
 
 namespace {

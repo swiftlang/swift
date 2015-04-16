@@ -232,6 +232,12 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
   return false;
 }
 
+OptionalTypeKind SILType::getOptionalTypeKind() const {
+  OptionalTypeKind result;
+  getSwiftRValueType()->getAnyOptionalObjectType(result);
+  return result;
+}
+
 SILType SILType::getAnyOptionalObjectType(SILModule &M,
                                           OptionalTypeKind &OTK) const {
   if (auto objectTy = getSwiftRValueType()->getAnyOptionalObjectType(OTK)) {

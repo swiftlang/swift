@@ -14,6 +14,7 @@ add_swift_library(swiftSILGen
   SILGenDynamicCast.cpp
   SILGenEpilog.cpp
   SILGenExpr.cpp
+  SILGenForeignError.cpp
   SILGenFunction.cpp
   SILGenGlobalVariable.cpp
   SILGenLValue.cpp

@@ -400,6 +400,9 @@ public:
   /// Retrieve the declaration of Swift.CFunctionPointer<T>.
   NominalTypeDecl *getCFunctionPointerDecl() const;
 
+  /// Retrieve the declaration of the "memory" property of a pointer type.
+  VarDecl *getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const;
+
   /// Retrieve the declaration of Swift.Void.
   TypeAliasDecl *getVoidDecl() const;
 

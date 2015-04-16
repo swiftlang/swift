@@ -465,6 +465,9 @@ public:
   SILType getAnyOptionalObjectType(SILModule &SILMod,
                                    OptionalTypeKind &OTK) const;
 
+  /// Classify this type as an optional type.
+  OptionalTypeKind getOptionalTypeKind() const;
+
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }
 

@@ -310,6 +310,11 @@ swift::swift_convertNSErrorToErrorType(id errorObject) {
   return allocNilError();
 }
 
+id swift::swift_convertErrorTypeToNSError(SwiftError *errorObject) {
+  assert(errorObject && "bridging a nil error!");
+  return swift_bridgeErrorTypeToNSError(errorObject);
+}
+
 bool
 swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                     OpaqueValue *src,

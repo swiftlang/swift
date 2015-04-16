@@ -563,8 +563,20 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
   llvm_unreachable("bad CC");
 }
 
+/// Bridge an optional foreign error type to ErrorType.
 ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
                                                   ManagedValue bridgedError) {
+#ifndef NDEBUG
+  {
+    OptionalTypeKind optKind;
+    auto objType = bridgedError.getType().getSwiftRValueType()
+                                         .getAnyOptionalObjectType(optKind);
+    assert(optKind == OTK_Optional && "not Optional type");
+    assert(objType == SGM.Types.getNSErrorType() &&
+           "only handling NSError for now");
+  }
+#endif
+
   auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getNSErrorToErrorTypeFn());
   auto bridgeFnType = bridgeFn.getType().castTo<SILFunctionType>();
   auto nativeErrorType = bridgeFnType->getResult().getSILType();
@@ -576,4 +588,23 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
                                        nativeErrorType, {},
                                        bridgedError.forward(*this));
   return emitManagedRValueWithCleanup(nativeError);
+}
+
+/// Bridge ErrorType to a foreign error type.
+ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
+                                                  ManagedValue nativeError,
+                                                      CanType bridgedErrorType) {
+  assert(bridgedErrorType == SGM.Types.getNSErrorType() &&
+         "only handling NSError for now");
+
+  auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getErrorTypeToNSErrorFn());
+  auto bridgeFnType = bridgeFn.getType().castTo<SILFunctionType>();
+  assert(bridgeFnType->getResult().getConvention() == ResultConvention::Owned);
+  assert(bridgeFnType->getParameters()[0].getConvention()
+           == ParameterConvention::Direct_Owned);
+
+  SILValue bridgedError = B.createApply(loc, bridgeFn, bridgeFn.getType(),
+                                        bridgeFnType->getResult().getSILType(),
+                                        {}, nativeError.forward(*this));
+  return emitManagedRValueWithCleanup(bridgedError);
 }

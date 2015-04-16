@@ -1027,7 +1027,11 @@ public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 
 @asmname("swift_convertNSErrorToErrorType")
 public // COMPILER_INTRINSIC
-func _convertNSErrorToErrorType(string: NSError?) -> _ErrorType
+func _convertNSErrorToErrorType(error: NSError?) -> _ErrorType
+
+@asmname("swift_convertErrorTypeToNSError")
+public // COMPILER_INTRINSIC
+func _convertNSErrorToErrorType(error: _ErrorType) -> NSError
 
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods

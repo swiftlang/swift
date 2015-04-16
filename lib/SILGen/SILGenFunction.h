@@ -714,7 +714,7 @@ public:
 
   /// \brief Emits the standard rethrow epilog using a Swift error result.
   void emitRethrowEpilog(SILLocation topLevelLoc);
-  
+
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
   SILValue emitSelfDecl(VarDecl *selfDecl);
@@ -1032,6 +1032,11 @@ public:
   /// representation.  The value may be optional.
   ManagedValue emitBridgedToNativeError(SILLocation loc, ManagedValue v);
 
+  /// Convert a value in the native Swift ErrorType representation to
+  /// a bridged error type representation.
+  ManagedValue emitNativeToBridgedError(SILLocation loc, ManagedValue v,
+                                        CanType bridgedType);
+
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr
   /// is nil, and leaving the insertion point on the success branch.
@@ -1227,6 +1232,27 @@ public:
                                     CanSILFunctionType expectedType,
                                     CanSILFunctionType &substFnType,
                                     SmallVectorImpl<Substitution> &subs);
+
+  SILValue emitBridgeErrorForForeignError(SILLocation loc,
+                                          SILValue nativeError,
+                                          SILType bridgedResultType,
+                                          SILValue foreignErrorSlot,
+                                    const ForeignErrorConvention &foreignError);
+
+  SILValue
+  emitBridgeReturnValueForForeignError(SILLocation loc,
+                                       SILValue result,
+                                       SILFunctionTypeRepresentation repr,
+                                       AbstractionPattern origNativeType,
+                                       CanType substNativeType,
+                                       SILType bridgedResultType,
+                                       SILValue foreignErrorSlot,
+                                 const ForeignErrorConvention &foreignError);
+
+  ManagedValue emitForeignErrorCheck(SILLocation loc,
+                                     ManagedValue result,
+                                     ManagedValue errorSlot,
+                               const ForeignErrorConvention &foreignError);
   
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -1316,8 +1342,8 @@ public:
 
   /// Emit an lvalue that directly refers to the given instance variable
   /// (without going through getters or setters).
-  LValue emitDirectIVarLValue(SILLocation loc, ManagedValue base, VarDecl *var,
-                              AccessKind accessKind);
+  LValue emitPropertyLValue(SILLocation loc, ManagedValue base, VarDecl *var,
+                            AccessKind accessKind, AccessSemantics semantics);
 
   ManagedValue emitLValueToPointer(SILLocation loc, LValue &&lvalue,
                                    CanType pointerType, PointerTypeKind ptrKind,

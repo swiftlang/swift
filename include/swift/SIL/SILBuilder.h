@@ -569,10 +569,30 @@ public:
     return insert(new (F.getModule()) EnumInst(Loc, Operand, Element, Ty));
   }
 
-  /// Create an enum Optional<T>.Some.
-  EnumInst *createOptionalSome(SILLocation Loc, SILValue Operand, SILType Ty) {
-    auto *Decl = F.getModule().getASTContext().getOptionalSomeDecl();
-    return createEnum(Loc, Operand, Decl, Ty);
+  /// Inject a loadable value into the corresponding optional type.
+  EnumInst *createOptionalSome(SILLocation loc, SILValue operand, SILType ty) {
+    return createOptionalSome(loc, operand, ty.getOptionalTypeKind(), ty);
+  }
+
+  /// Inject a loadable value into the corresponding optional type.
+  EnumInst *createOptionalSome(SILLocation loc, SILValue operand,
+                               OptionalTypeKind optKind, SILType ty) {
+    assert(ty.getOptionalTypeKind() == optKind);
+    auto someDecl = F.getModule().getASTContext().getOptionalSomeDecl(optKind);
+    return createEnum(loc, operand, someDecl, ty);
+  }
+
+  /// Create the nil value of a loadable optional type.
+  EnumInst *createOptionalNone(SILLocation loc, SILType ty) {
+    return createOptionalNone(loc, ty.getOptionalTypeKind(), ty);
+  }
+
+  /// Create the nil value of a loadable optional type.
+  EnumInst *createOptionalNone(SILLocation loc, OptionalTypeKind optKind,
+                               SILType ty) {
+    assert(ty.getOptionalTypeKind() == optKind);
+    auto noneDecl = F.getModule().getASTContext().getOptionalNoneDecl(optKind);
+    return createEnum(loc, nullptr, noneDecl, ty);
   }
 
   InitEnumDataAddrInst *createInitEnumDataAddr(SILLocation Loc, SILValue Operand,

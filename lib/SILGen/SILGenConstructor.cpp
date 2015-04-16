@@ -783,7 +783,8 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
                                    AccessSemantics::DirectToStorage);
 
     LValue memberRef =
-      SGF.emitDirectIVarLValue(loc, self, named->getDecl(), AccessKind::Write);
+      SGF.emitPropertyLValue(loc, self, named->getDecl(), AccessKind::Write,
+                             AccessSemantics::DirectToStorage);
 
     // Assign to it.
     SGF.emitAssignToLValue(loc, std::move(src), std::move(memberRef));

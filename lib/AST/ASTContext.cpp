@@ -108,12 +108,15 @@ struct ASTContext::Implementation {
   
   /// The declaration of Swift.UnsafeMutablePointer<T>.
   NominalTypeDecl *UnsafeMutablePointerDecl = nullptr;
+  VarDecl *UnsafeMutablePointerMemoryDecl = nullptr;
   
   /// The declaration of Swift.UnsafePointer<T>.
   NominalTypeDecl *UnsafePointerDecl = nullptr;
+  VarDecl *UnsafePointerMemoryDecl = nullptr;
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
+  VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
 
   /// The declaration of Swift.CFunctionPointer<T -> U>.
   NominalTypeDecl *CFunctionPointerDecl = nullptr;
@@ -631,6 +634,52 @@ NominalTypeDecl *ASTContext::getAutoreleasingUnsafeMutablePointerDecl() const {
       = findStdlibType(*this, "AutoreleasingUnsafeMutablePointer");
   
   return Impl.AutoreleasingUnsafeMutablePointerDecl;
+}
+
+static VarDecl *getMemoryProperty(VarDecl *&cache,
+                           NominalTypeDecl *(ASTContext::*getNominal)() const,
+                                  const ASTContext &ctx) {
+  if (cache) return cache;
+
+  // There must be a generic type with one argument.
+  NominalTypeDecl *nominal = (ctx.*getNominal)();
+  if (!nominal) return nullptr;
+  auto generics = nominal->getGenericParams();
+  if (!generics) return nullptr;
+  if (generics->size() != 1) return nullptr;
+
+  // There must be a property named "memory".
+  auto identifier = ctx.getIdentifier("memory");
+  auto results = nominal->lookupDirect(identifier);
+  if (results.size() != 1) return nullptr;
+
+  // The property must have type T.
+  VarDecl *property = dyn_cast<VarDecl>(results[0]);
+  if (!property) return nullptr;
+  if (!property->getType()->isEqual(generics->getPrimaryArchetypes()[0]))
+    return nullptr;
+
+  cache = property;
+  return property;
+}
+
+VarDecl *
+ASTContext::getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const {
+  switch (ptrKind) {
+  case PTK_UnsafeMutablePointer:
+    return getMemoryProperty(Impl.UnsafeMutablePointerMemoryDecl,
+                             &ASTContext::getUnsafeMutablePointerDecl,
+                             *this);
+  case PTK_UnsafePointer:
+    return getMemoryProperty(Impl.UnsafePointerMemoryDecl,
+                             &ASTContext::getUnsafePointerDecl,
+                             *this);
+  case PTK_AutoreleasingUnsafeMutablePointer:
+    return getMemoryProperty(Impl.AutoreleasingUnsafeMutablePointerMemoryDecl,
+                         &ASTContext::getAutoreleasingUnsafeMutablePointerDecl,
+                             *this);
+  }
+  llvm_unreachable("bad pointer kind");
 }
 
 NominalTypeDecl *ASTContext::getCFunctionPointerDecl() const {

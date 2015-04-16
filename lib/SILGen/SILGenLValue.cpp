@@ -1839,14 +1839,18 @@ LValue SILGenLValue::visitInOutExpr(InOutExpr *e, AccessKind accessKind) {
   return visitRec(e->getSubExpr(), accessKind);
 }
 
-/// Emit an lvalue that directly refers to the given instance variable
-/// (without going through getters or setters).   This is designed to work with
-/// ManagedValue 'base's that are either +0 or +1.
-LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
-                                            VarDecl *ivar,
-                                            AccessKind accessKind) {
+/// Emit an lvalue that refers to the given property.  This is
+/// designed to work with ManagedValue 'base's that are either +0 or +1.
+LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
+                                          VarDecl *ivar, AccessKind accessKind,
+                                          AccessSemantics semantics) {
   SILGenLValue sgl(*this);
   LValue lv;
+
+  ArrayRef<Substitution> subs;
+  if (auto genericType = base.getType().getAs<BoundGenericType>()) {
+    subs = genericType->getSubstitutions(SGM.SwiftModule, nullptr);
+  }
 
   auto baseType = base.getType().getSwiftRValueType();
   LValueTypeData baseTypeData = getValueTypeData(base.getValue(), SGM.M);
@@ -1860,14 +1864,34 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
     ->getCanonicalType();
   LValueTypeData typeData = getStorageTypeData(*this, ivar, substFormalType);
 
+  AccessStrategy strategy =
+    ivar->getAccessStrategy(semantics, accessKind);
+
+  // Use the property accessors if the variable has accessors and this
+  // isn't a direct access to underlying storage.
+  if (strategy == AccessStrategy::DirectToAccessor ||
+      strategy == AccessStrategy::DispatchToAccessor) {
+    lv.add<GetterSetterComponent>(ivar, /*super*/ false,
+                                  strategy == AccessStrategy::DirectToAccessor,
+                                  subs, typeData);
+    return lv;
+  }
+
+  assert(strategy == AccessStrategy::Addressor ||
+         strategy == AccessStrategy::Storage);
+
   // Find the substituted storage type.
   SILType varStorageType =
     SGM.Types.getSubstitutedStorageType(ivar, substFormalType);
 
-  if (baseType->hasReferenceSemantics())
+  if (strategy == AccessStrategy::Addressor) {
+    lv.add<AddressorComponent>(ivar, /*super*/ false, /*direct*/ true,
+                               subs, typeData, varStorageType);
+  } else if (baseType->hasReferenceSemantics()) {
     lv.add<RefElementComponent>(ivar, varStorageType, typeData);
-  else
+  } else {
     lv.add<StructElementComponent>(ivar, varStorageType, typeData);
+  }
 
   if (varStorageType.is<ReferenceStorageType>()) {
     auto formalRValueType =

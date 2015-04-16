@@ -626,7 +626,8 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 
   // If the base is a reference type, just handle this as loading the lvalue.
   if (base.getType().getSwiftRValueType()->hasReferenceSemantics()) {
-    LValue LV = emitDirectIVarLValue(loc, base, field, AccessKind::Read);
+    LValue LV = emitPropertyLValue(loc, base, field, AccessKind::Read,
+                                   AccessSemantics::DirectToStorage);
     return emitLoadOfLValue(loc, std::move(LV), C);
   }
 

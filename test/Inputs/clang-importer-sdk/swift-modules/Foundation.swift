@@ -167,3 +167,6 @@ extension NSError: _ErrorType {}
 
 @asmname("swift_convertNSErrorToErrorType")
 func _convertNSErrorToErrorType(string: NSError?) -> _ErrorType
+
+@asmname("swift_convertErrorTypeToNSError")
+func _convertErrorTypeToNSError(string: _ErrorType) -> NSError
