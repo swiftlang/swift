@@ -1676,11 +1676,6 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       printFunctionParameters(decl);
     });
   
-  if (decl->getInitKind() == CtorInitializerKind::Factory) {
-    Printer << " -> ";
-    Printer.printName(decl->getExtensionType()->getAnyNominal()->getName());
-  }
-
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;
   }
