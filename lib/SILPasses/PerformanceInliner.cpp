@@ -1148,7 +1148,7 @@ public:
 
         if (inliner.inlineCallsIntoFunction(Top, DA, LA, CG)) {
           // Invalidate analyses, but lock the call graph since we
-          // maintain it
+          // maintain it.
           CGA->lockInvalidation();
           invalidateAnalysis(Top, SILAnalysis::PreserveKind::Nothing);
           CGA->unlockInvalidation();
