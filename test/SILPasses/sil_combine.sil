@@ -2367,3 +2367,45 @@ bb0(%0 : $*T):
   %16 = tuple ()                                  // user: %17
   return %16 : $()                                // id: %17
 }
+
+protocol P {
+}
+
+protocol Q : P {
+}
+
+struct T : Q {
+  init()
+}
+
+// CHECK-LABEL: sil @silcombine_checked_cast_addr_br_on_metatype_into_checked_cast_br_on_metatype
+// CHECK: bb0:
+// CHECK: metatype $@thick T.Type
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: checked_cast_br
+// CHECK: bb1(%[[ARG:[0-9]+]] : $@thick Q.Type)
+// CHECK: store %[[ARG]] to {{.*}} : $*@thick Q.Type
+// CHECK: }
+sil @silcombine_checked_cast_addr_br_on_metatype_into_checked_cast_br_on_metatype : $@convention(thin) () -> Bool {
+bb0:
+  %1 = metatype $@thick T.Type
+  %2 = init_existential_metatype %1 : $@thick T.Type, $@thick P.Type
+  %3 = alloc_stack $@thick P.Type
+  store %2 to %3#1 : $*@thick P.Type
+  %5 = alloc_stack $@thick Q.Type
+  checked_cast_addr_br take_always P.Type in %3#1 : $*@thick P.Type to Q.Type in %5#1 : $*@thick Q.Type, bb1, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Int1, -1
+  br bb2(%7 : $Builtin.Int1)
+
+bb2(%9 : $Builtin.Int1):
+  dealloc_stack %5#0 : $*@local_storage @thick Q.Type
+  dealloc_stack %3#0 : $*@local_storage @thick P.Type
+  %12 = struct $Bool (%9 : $Builtin.Int1)
+  return %12 : $Bool
+
+bb3:
+  %14 = integer_literal $Builtin.Int1, 0
+  br bb2(%14 : $Builtin.Int1)
+}

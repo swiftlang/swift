@@ -1366,7 +1366,6 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   auto Loc = Inst->getLoc();
   auto Src = Inst->getSrc();
   auto Dest = Inst->getDest();
-  auto TargetType = Inst->getTargetType();
   auto *SuccessBB = Inst->getSuccessBB();
   auto *FailureBB = Inst->getFailureBB();
 
@@ -1381,7 +1380,8 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   // checked_cast_addr_br %3 to ...
   // ->
   // %1 = metatype $A.Type
-  // checked_cast_addr_br %1 to ...
+  // %c = checked_cast_br %1 to ...
+  // store %c to %3 (if successful)
   if (auto *ASI = dyn_cast<AllocStackInst>(Src.getDef())) {
     // Check if the value of this alloc_stack is set only once by a store
     // instruction, used only by CCABI and then deallocated.
@@ -1413,21 +1413,23 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
         MI = dyn_cast<MetatypeInst>(Src);
 
       if (MI) {
+        if (SuccessBB->getSinglePredecessor()) {
         SILBuilderWithScope<1> B(Inst);
-        auto NewI = B.createCheckedCastAddrBranch(Loc,
-                                  Inst->getConsumptionKind(),
-                                  MI,
-                                  MI->getType().getSwiftRValueType(),
-                                  Dest,
-                                  TargetType,
+        auto NewI = B.createCheckedCastBranch(Loc,false /*isExact*/,
+                                  SILValue(MI, 0),
+                                  Dest.getType().getObjectType(),
                                   SuccessBB,
                                   FailureBB);
+        SuccessBB->createBBArg(Dest.getType().getObjectType(), nullptr);
+        B.setInsertionPoint(SuccessBB->begin());
+        // Store the result
+        B.createStore(Loc, SuccessBB->getBBArg(0), Dest);
         EraseInstAction(Inst);
         return NewI;
+        }
       }
     }
   }
-
   return nullptr;
 }
 
