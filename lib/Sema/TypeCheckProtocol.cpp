@@ -1555,10 +1555,6 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
                                         cast<AbstractStorageDecl>(requirement),
                                         storage);
 
-  // Note that the witness conforms to the requirement.
-  if (requirement != match.Witness)
-    TC.Context.recordConformingDecl(match.Witness, requirement);
-
   // If we didn't deduce any associated types, we're done.
   if (match.AssociatedTypeDeductions.empty())
     return;
@@ -1640,9 +1636,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   // Note whether this witness was deduced or defaulted.
   if (wasDeducedOrDefaulted)
     Conformance->addDefaultDefinition(assocType);
-
-  if (typeDecl)
-    TC.Context.recordConformingDecl(typeDecl, assocType);
 }
 
 namespace {

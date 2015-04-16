@@ -1196,25 +1196,6 @@ void ASTContext::recordKnownProtocols(Module *Stdlib) {
 #include "swift/AST/KnownProtocols.def"
 }
 
-void ASTContext::recordConformingDecl(ValueDecl *ConformingD,
-                                      ValueDecl *ConformanceD) {
-  assert(ConformingD && ConformanceD);
-  auto &Vec = ConformingDeclMap[ConformingD];
-  // The vector should commonly have few elements.
-  if (std::find(Vec.begin(), Vec.end(), ConformanceD) == Vec.end()) {
-    Vec.push_back(ConformanceD);
-    ConformingD->setConformsToProtocolRequirement();
-  }
-}
-
-ArrayRef<ValueDecl *>
-ASTContext::getSatisfiedProtocolRequirements(const ValueDecl *D) const {
-  auto It = ConformingDeclMap.find(D);
-  if (It != ConformingDeclMap.end())
-    return It->second;
-  return {};
-}
-
 Module *ASTContext::getLoadedModule(
     ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const {
   assert(!ModulePath.empty());
@@ -1438,7 +1419,6 @@ size_t ASTContext::getTotalMemory() const {
   size_t Size = sizeof(*this) +
     //LoadedModules ?
     // ExternalDefinitions ?
-    llvm::capacity_in_bytes(ConformingDeclMap) +
     llvm::capacity_in_bytes(CanonicalGenericTypeParamTypeNames) +
     // RemappedTypes ?
     sizeof(Impl) +

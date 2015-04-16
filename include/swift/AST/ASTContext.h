@@ -211,10 +211,6 @@ public:
   /// A consumer of type checker debug output.
   std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
 
-  /// Associates a conforming decl to its protocol conformance decls.
-  llvm::DenseMap<const ValueDecl *, llvm::TinyPtrVector<ValueDecl *>>
-     ConformingDeclMap;
-
   /// Cache for names of canonical GenericTypeParamTypes.
   mutable llvm::DenseMap<unsigned, Identifier>
     CanonicalGenericTypeParamTypeNames;
@@ -673,13 +669,6 @@ public:
 
   /// Record compiler-known protocol information in the AST.
   void recordKnownProtocols(Module *Stdlib);
-
-  /// Associates a conforming decl to its protocol requirement decl.
-  void recordConformingDecl(ValueDecl *ConformingD, ValueDecl *ConformanceD);
-
-  /// Returns the protocol requirement decls for a conforming decl.
-  ArrayRef<ValueDecl *>
-  getSatisfiedProtocolRequirements(const ValueDecl *D) const;
   
   /// \brief Retrieve the substitutions for a bound generic type, if known.
   Optional<ArrayRef<Substitution>>

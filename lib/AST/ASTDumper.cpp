@@ -507,8 +507,6 @@ namespace {
         }
       }
 
-      if (VD->conformsToProtocolRequirement())
-        OS << " conforms";
       if (auto Overridden = VD->getOverriddenDecl()) {
         OS << " override=";
         Overridden->dumpRef(OS);

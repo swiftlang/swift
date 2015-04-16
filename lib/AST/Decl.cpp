@@ -1619,11 +1619,15 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   return false;
 }
 
-ArrayRef<ValueDecl *> ValueDecl::getSatisfiedProtocolRequirements() const {
-  if (!conformsToProtocolRequirement())
-    return ArrayRef<ValueDecl *>();
+ArrayRef<ValueDecl *>
+ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
+  // Dig out the nominal type.
+  NominalTypeDecl *NTD =
+    getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+  if (!NTD || isa<ProtocolDecl>(NTD))
+    return {};
 
-  return getASTContext().getSatisfiedProtocolRequirements(this);
+  return NTD->getSatisfiedProtocolRequirementsForMember(this, Sorted);
 }
 
 void ValueDecl::setType(Type T) {

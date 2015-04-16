@@ -560,8 +560,6 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
       witness = ConcreteDeclRef(ctx, second, substitutions);
 
     witnesses.insert(std::make_pair(first, witness));
-    if (second && second != first)
-      ctx.recordConformingDecl(second, first);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

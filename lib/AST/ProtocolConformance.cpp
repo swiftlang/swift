@@ -722,6 +722,10 @@ class swift::ConformanceLookupTable {
   llvm::SmallDenseMap<DeclContext *, std::vector<ConformanceEntry *> >
     AllSupersededDiagnostics;
 
+  /// Associates a conforming decl to its protocol conformance decls.
+  llvm::DenseMap<const ValueDecl *, llvm::TinyPtrVector<ValueDecl *>>
+    ConformingDeclMap;
+
   /// Indicates whether we are visiting the superclass.
   bool VisitingSuperclass = false;
 
@@ -867,6 +871,7 @@ public:
   /// nominal type.
   void getAllConformances(NominalTypeDecl *nominal,
                           LazyResolver *resolver,
+                          bool sorted,
                           SmallVectorImpl<ProtocolConformance *> &scratch);
 
   /// Retrieve the protocols that would be implicitly synthesized.
@@ -875,6 +880,13 @@ public:
   /// somewhere.
   void getImplicitProtocols(NominalTypeDecl *nominal,
                             SmallVectorImpl<ProtocolDecl *> &protocols);
+
+  /// Returns the protocol requirements that \c Member conforms to.
+  ArrayRef<ValueDecl *>
+  getSatisfiedProtocolRequirementsForMember(const ValueDecl *member,
+                                            NominalTypeDecl *nominal,
+                                            LazyResolver *resolver,
+                                            bool sorted);
 
   // Only allow allocation of conformance lookup tables using the
   // allocator in ASTContext or by doing a placement new.
@@ -1843,6 +1855,7 @@ void ConformanceLookupTable::getAllProtocols(
 void ConformanceLookupTable::getAllConformances(
        NominalTypeDecl *nominal,
        LazyResolver *resolver,
+       bool sorted,
        SmallVectorImpl<ProtocolConformance *> &scratch) {
   // We need to expand and resolve all conformances to enumerate them.
   updateLookupTable(nominal, ConformanceStage::Resolved, resolver);
@@ -1855,7 +1868,40 @@ void ConformanceLookupTable::getAllConformances(
     }
   }
 
-  // FIXME: sort the conformances in some canonical order?
+  if (sorted) {
+    // If requested, sort the results.
+    ASTContext &ctx = nominal->getASTContext();
+    std::sort(scratch.begin(), scratch.end(), [&](ProtocolConformance *lhs,
+                                                  ProtocolConformance *rhs) {
+      // If the two conformances are normal conformances with locations,
+      // sort by location.
+      if (auto lhsNormal = dyn_cast<NormalProtocolConformance>(lhs)) {
+        if (auto rhsNormal = dyn_cast<NormalProtocolConformance>(rhs)) {
+          if (lhsNormal->getLoc().isValid() && rhsNormal->getLoc().isValid()) {
+            unsigned lhsBuffer
+              = ctx.SourceMgr.findBufferContainingLoc(lhsNormal->getLoc());
+            unsigned rhsBuffer
+              = ctx.SourceMgr.findBufferContainingLoc(rhsNormal->getLoc());
+
+            // If the buffers are the same, use source location ordering.
+            if (lhsBuffer == rhsBuffer) {
+              return ctx.SourceMgr.isBeforeInBuffer(lhsNormal->getLoc(),
+                                                    rhsNormal->getLoc());
+            }
+
+            // Otherwise, order by buffer identifier.
+            return StringRef(ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer))
+                   < StringRef(ctx.SourceMgr.getIdentifierForBuffer(rhsBuffer));
+          }
+        }
+      }
+
+      // Otherwise, sort by protocol.
+      ProtocolDecl *lhsProto = lhs->getProtocol();
+      ProtocolDecl *rhsProto = rhs->getProtocol();
+      return ProtocolType::compareProtocols(&lhsProto, &rhsProto) < 0;
+    });
+  }
 }
 
 void ConformanceLookupTable::getImplicitProtocols(
@@ -1866,6 +1912,43 @@ void ConformanceLookupTable::getImplicitProtocols(
       protocols.push_back(conformance->getProtocol());
     }
   }
+}
+
+ArrayRef<ValueDecl *>
+ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
+                                                const ValueDecl *member,
+                                                NominalTypeDecl *nominal,
+                                                LazyResolver *resolver,
+                                                bool sorted) {
+  auto It = ConformingDeclMap.find(member);
+  if (It != ConformingDeclMap.end())
+    return It->second;
+
+  SmallVector<ProtocolConformance *, 4> result;
+  getAllConformances(nominal, resolver, sorted, result);
+
+  auto &reqs = ConformingDeclMap[member];
+  if (isa<TypeDecl>(member)) {
+    for (auto *conf : result) {
+      conf->forEachTypeWitness(resolver, [&](const AssociatedTypeDecl *assoc,
+                                             const Substitution &subst,
+                                             TypeDecl *typeDecl) -> bool {
+        if (typeDecl == member)
+          reqs.push_back(const_cast<AssociatedTypeDecl*>(assoc));
+        return false;
+      });
+    }
+  } else {
+    for (auto *conf : result) {
+      conf->forEachValueWitness(resolver, [&](ValueDecl *req,
+                                              ConcreteDeclRef witness) {
+        if (witness.getDecl() == member)
+          reqs.push_back(req);
+      });
+    }
+  }
+
+  return reqs;
 }
 
 void ConformanceLookupTable::dump() const {
@@ -1969,42 +2052,8 @@ SmallVector<ProtocolConformance *, 2> NominalTypeDecl::getAllConformances(
   SmallVector<ProtocolConformance *, 2> result;
   ConformanceTable->getAllConformances(const_cast<NominalTypeDecl *>(this),
                                        getASTContext().getLazyResolver(),
+                                       sorted,
                                        result);
-
-  if (sorted) {
-    // If requested, sort the results.
-    ASTContext &ctx = getASTContext();
-    std::sort(result.begin(), result.end(), [&](ProtocolConformance *lhs,
-                                                ProtocolConformance *rhs) {
-      // If the two conformances are normal conformances with locations,
-      // sort by location.
-      if (auto lhsNormal = dyn_cast<NormalProtocolConformance>(lhs)) {
-        if (auto rhsNormal = dyn_cast<NormalProtocolConformance>(rhs)) {
-          if (lhsNormal->getLoc().isValid() && rhsNormal->getLoc().isValid()) {
-            unsigned lhsBuffer
-              = ctx.SourceMgr.findBufferContainingLoc(lhsNormal->getLoc());
-            unsigned rhsBuffer
-              = ctx.SourceMgr.findBufferContainingLoc(rhsNormal->getLoc());
-
-            // If the buffers are the same, use source location ordering.
-            if (lhsBuffer == rhsBuffer) {
-              return ctx.SourceMgr.isBeforeInBuffer(lhsNormal->getLoc(),
-                                                    rhsNormal->getLoc());
-            }
-
-            // Otherwise, order by buffer identifier.
-            return StringRef(ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer))
-                   < StringRef(ctx.SourceMgr.getIdentifierForBuffer(rhsBuffer));
-          }
-        }
-      }
-
-      // Otherwise, sort by protocol.
-      ProtocolDecl *lhsProto = lhs->getProtocol();
-      ProtocolDecl *rhsProto = rhs->getProtocol();
-      return ProtocolType::compareProtocols(&lhsProto, &rhsProto) < 0;
-    });
-  }
   return result;
 }
 
@@ -2018,6 +2067,20 @@ void NominalTypeDecl::registerProtocolConformance(
        ProtocolConformance *conformance) {
   prepareConformanceTable();
   ConformanceTable->registerProtocolConformance(conformance);
+}
+
+ArrayRef<ValueDecl *>
+NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
+                                             const ValueDecl *member,
+                                             bool sorted) const {
+  assert(member->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext()
+           == this);
+  assert(!isa<ProtocolDecl>(this));
+  prepareConformanceTable();
+  return ConformanceTable->getSatisfiedProtocolRequirementsForMember(member,
+                                           const_cast<NominalTypeDecl *>(this),
+                                           getASTContext().getLazyResolver(),
+                                           sorted);
 }
 
 SmallVector<ProtocolDecl *, 2>

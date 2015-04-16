@@ -309,14 +309,13 @@ class alignas(1 << DeclAlignInBits) Decl {
     friend class ValueDecl;
     friend class MemberLookupTable;
     unsigned : NumDeclBits;
-    unsigned ConformsToProtocolRequrement : 1;
     unsigned AlreadyInLookupTable : 1;
 
     /// Whether we have already checked whether this declaration is a 
     /// redeclaration.
     unsigned CheckedRedeclaration : 1;
   };
-  enum { NumValueDeclBits = NumDeclBits + 3 };
+  enum { NumValueDeclBits = NumDeclBits + 2 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
   class AbstractStorageDeclBitfields {
@@ -2165,7 +2164,6 @@ class ValueDecl : public Decl {
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, DeclName name, SourceLoc NameLoc)
     : Decl(K, DC), Name(name), NameLoc(NameLoc) {
-    ValueDeclBits.ConformsToProtocolRequrement = false;
     ValueDeclBits.AlreadyInLookupTable = false;
     ValueDeclBits.CheckedRedeclaration = false;
   }
@@ -2344,16 +2342,9 @@ public:
   /// Returns true if this decl can be found by id-style dynamic lookup.
   bool canBeAccessedByDynamicLookup() const;
 
-  /// Returns true if this decl conforms to a protocol requirement.
-  bool conformsToProtocolRequirement() const {
-    return ValueDeclBits.ConformsToProtocolRequrement;
-  }
-  void setConformsToProtocolRequirement(bool Value = true) {
-    ValueDeclBits.ConformsToProtocolRequrement = Value;
-  }
-
   /// Returns the protocol requirements that this decl conforms to.
-  ArrayRef<ValueDecl *> getSatisfiedProtocolRequirements() const;
+  ArrayRef<ValueDecl *>
+  getSatisfiedProtocolRequirements(bool Sorted = false) const;
 
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
@@ -2985,12 +2976,19 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   /// Prepare the conformance table.
   void prepareConformanceTable() const;
 
+  /// Returns the protocol requirements that \c Member conforms to.
+  ArrayRef<ValueDecl *>
+    getSatisfiedProtocolRequirementsForMember(const ValueDecl *Member,
+                                              bool Sorted) const;
+
   friend class ASTContext;
   friend class MemberLookupTable;
   friend class ConformanceLookupTable;
   friend class ExtensionDecl;
   friend class DeclContext;
   friend class IterableDeclContext;
+  friend ArrayRef<ValueDecl *>
+           ValueDecl::getSatisfiedProtocolRequirements(bool) const;
 
 protected:
   Type DeclaredTy;
