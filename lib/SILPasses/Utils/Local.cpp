@@ -1158,6 +1158,9 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   if (auto *I = optimizeCheckedCastAddrBranchInst(Inst))
     Inst = dyn_cast<CheckedCastAddrBranchInst>(I);
 
+  if (!Inst)
+    return nullptr;
+
   auto Loc = Inst->getLoc();
   auto Src = Inst->getSrc();
   auto Dest = Inst->getDest();
@@ -1279,6 +1282,9 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   if (auto *I = optimizeCheckedCastBranchInst(Inst))
     Inst = dyn_cast<CheckedCastBranchInst>(I);
+
+  if (!Inst)
+    return nullptr;
 
   auto LoweredSourceType = Inst->getOperand().getType();
   auto LoweredTargetType = Inst->getCastType();
