@@ -2168,7 +2168,8 @@ visitUnreachableInst(UnreachableInst *UI) {
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
-  return CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI);
+  CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI);
+  return nullptr;
 }
 
 SILInstruction *
@@ -2506,13 +2507,15 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
 
 SILInstruction *
 SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
-  return CastOpt.optimizeCheckedCastBranchInst(CBI);
+  CastOpt.optimizeCheckedCastBranchInst(CBI);
+  return nullptr;
 }
 
 SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
-  return CastOpt.optimizeCheckedCastAddrBranchInst(CCABI);
+  CastOpt.optimizeCheckedCastAddrBranchInst(CCABI);
+  return nullptr;
 }
 
 SILInstruction *
