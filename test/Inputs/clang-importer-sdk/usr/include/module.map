@@ -97,3 +97,8 @@ module exceptions {
   header "exceptions.h"
   export *
 }
+
+module c_simd {
+  header "simd.h"
+  export *
+}

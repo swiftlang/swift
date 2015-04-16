@@ -618,6 +618,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableCFunctionPointers |=
       Args.hasArg(OPT_enable_c_function_pointers);
   
+  Opts.EnableSIMDImport |=
+      Args.hasArg(OPT_enable_simd_import);
+
   Opts.EnableCharacterLiterals |= Args.hasArg(OPT_enable_character_literals);
 
   if (auto A = Args.getLastArg(OPT_enable_access_control,

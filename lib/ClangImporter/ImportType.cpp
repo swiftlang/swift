@@ -420,13 +420,45 @@ namespace {
     }
 
     ImportResult VisitVectorType(const clang::VectorType *type) {
-      // FIXME: We could map these.
-      return Type();
-    }
-
-    ImportResult VisitExtVectorType(const clang::ExtVectorType *type) {
-      // FIXME: We could map these.
-      return Type();
+      // We can map this into a type from the SIMD module, if it exists.
+      if (!Impl.SwiftContext.LangOpts.EnableSIMDImport)
+        return Type();
+      
+      auto *SIMD = Impl.tryLoadSIMDModule();
+      if (!SIMD)
+        return Type();
+      
+      // Map the element type and count to a Swift name, such as
+      // float x 3 => Float3.
+      SmallString<16> name;
+      {
+        llvm::raw_svector_ostream names(name);
+        
+        if (auto builtinTy
+              = dyn_cast<clang::BuiltinType>(type->getElementType())){
+          switch (builtinTy->getKind()) {
+          case clang::BuiltinType::Float:
+            names << "Float";
+            break;
+          case clang::BuiltinType::Double:
+            names << "Double";
+            break;
+          case clang::BuiltinType::Int:
+            names << "Int";
+            break;
+          default:
+            // TODO:
+            return Type();
+          }
+        } else {
+          return Type();
+        }
+        
+        names << type->getNumElements();
+        names.flush();
+      }
+      
+      return Impl.getNamedSwiftType(SIMD, name);
     }
 
     ImportResult VisitFunctionProtoType(const clang::FunctionProtoType *type) {
@@ -1651,19 +1683,30 @@ Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
   return SwiftContext.getLoadedModule(SwiftContext.getIdentifier(name));
 }
 
-Module *ClangImporter::Implementation::tryLoadFoundationModule() {
-  if (!checkedFoundationModule.hasValue()) {
-    Identifier name = SwiftContext.getIdentifier(FOUNDATION_MODULE_NAME);
-
+static Module *tryLoadModule(ASTContext &C,
+                             Identifier name,
+                             bool importForwardDeclarations,
+                             Optional<Module *> &cache) {
+  if (!cache.hasValue()) {
     // If we're synthesizing forward declarations, we don't want to pull in
-    // Foundation too eagerly.
-    if (ImportForwardDeclarations)
-      checkedFoundationModule = SwiftContext.getLoadedModule(name);
+    // the module too eagerly.
+    if (importForwardDeclarations)
+      cache = C.getLoadedModule(name);
     else
-      checkedFoundationModule = SwiftContext.getModule({ {name, SourceLoc()} });
+      cache = C.getModule({ {name, SourceLoc()} });
   }
 
-  return checkedFoundationModule.getValue();
+  return cache.getValue();
+}
+
+Module *ClangImporter::Implementation::tryLoadFoundationModule() {
+  return tryLoadModule(SwiftContext, SwiftContext.Id_Foundation,
+                       ImportForwardDeclarations, checkedFoundationModule);
+}
+
+Module *ClangImporter::Implementation::tryLoadSIMDModule() {
+  return tryLoadModule(SwiftContext, SwiftContext.Id_SIMD,
+                       ImportForwardDeclarations, checkedSIMDModule);
 }
 
 Type ClangImporter::Implementation::getNamedSwiftType(Module *module,

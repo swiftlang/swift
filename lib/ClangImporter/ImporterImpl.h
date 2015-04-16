@@ -531,7 +531,7 @@ public:
   clang::Selector setObjectForKeyedSubscript;
 
 private:
-  Optional<Module *> checkedFoundationModule;
+  Optional<Module *> checkedFoundationModule, checkedSIMDModule;
 
   /// External Decls that we have imported but not passed to the ASTContext yet.
   SmallVector<Decl *, 4> RegisteredExternalDecls;
@@ -839,6 +839,12 @@ public:
   /// After this has been called, the Foundation module will or won't be loaded
   /// into the ASTContext.
   Module *tryLoadFoundationModule();
+
+  /// \brief Returns the "SIMD" module, if it can be loaded.
+  ///
+  /// After this has been called, the SIMD module will or won't be loaded
+  /// into the ASTContext.
+  Module *tryLoadSIMDModule();
 
   /// \brief Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.

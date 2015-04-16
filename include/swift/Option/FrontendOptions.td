@@ -197,6 +197,10 @@ def enable_c_function_pointers : Flag<["-"],
   "enable-c-function-pointers">,
   HelpText<"Enable native C function pointer types">;
 
+def enable_simd_import : Flag<["-"],
+  "enable-simd-import">,
+  HelpText<"Enable importing C vector types as SIMD types">;
+
 def enable_character_literals : Flag<["-"], "enable-character-literals">,
   HelpText<"Enable legacy character literals">;
 
