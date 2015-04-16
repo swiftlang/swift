@@ -102,12 +102,6 @@ public protocol CollectionType
   /// `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get}
 
-  /// Return a value less than or equal to the number of elements in
-  /// `self`, **nondestructively**.
-  ///
-  /// Complexity: O(N)
-  func _prext_underestimateCount() -> Int
-
   // Do not use this operator directly; call `count(x)` instead
   func ~> (_:Self, _:(_Count, ())) -> Index.Distance
 }
