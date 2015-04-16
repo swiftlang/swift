@@ -816,9 +816,22 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     // Generate a load for the source argument.
     auto *Load = Builder.createLoad(Loc, Src);
     // Try to convert the source into the expected ObjC type first.
-    // TODO: If type of the source and the expected ObjC type are
-    // equal, there is no need to generate the conversion.
-    if (isConditional) {
+
+
+    if (Load->getType() == SILBridgedTy) {
+      // If type of the source and the expected ObjC type are
+      // equal, there is no need to generate the conversion
+      // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
+      if (isConditional) {
+        SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
+        CastSuccessBB->createBBArg(SILBridgedTy);
+        Builder.createBranch(Loc, CastSuccessBB, SILValue(Load,0));
+        Builder.setInsertionPoint(CastSuccessBB);
+        SrcOp = SILValue(CastSuccessBB->getBBArg(0), 0);
+      } else {
+        SrcOp = Load;
+      }
+    } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
       CastSuccessBB->createBBArg(SILBridgedTy);
       NewI = Builder.createCheckedCastBranch(Loc, false, SILValue(Load, 0),
