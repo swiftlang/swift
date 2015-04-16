@@ -881,6 +881,9 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   assert(BridgedFunc && "Bridging function was not found");
 
+  auto ParamTypes = BridgedFunc->getLoweredFunctionType()
+                               ->getParametersWithoutIndirectResult();
+
   auto *FuncRef = Builder.createFunctionRef(Loc, BridgedFunc);
 
   auto MetaTy = MetatypeType::get(Target, MetatypeRepresentation::Thick);
@@ -923,26 +926,60 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     InOutOptionalParam = Dest;
   }
 
+  assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
+         "Parameter should be @owned");
+
+  // Emit a retain.
+  Builder.createRetainValue(Loc, SrcOp);
+
   Args.push_back(InOutOptionalParam);
   Args.push_back(SrcOp);
   Args.push_back(SILValue(MetaTyVal, 0));
 
   auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args);
+
+  // If the source of a cast should be destroyed, emit a release.
+  if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(Inst)) {
+    assert(UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways);
+    if (UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
+      Builder.createReleaseValue(Loc, SrcOp);
+    }
+  }
+
+  if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(Inst)) {
+    if (CCABI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
+      Builder.createReleaseValue(Loc, SrcOp);
+    } else if (CCABI->getConsumptionKind() ==
+               CastConsumptionKind::TakeOnSuccess) {
+      // Insert a release in the success BB.
+      Builder.setInsertionPoint(SuccessBB->begin());
+      Builder.createReleaseValue(Loc, SrcOp);
+    }
+  }
+
+  // Results should be checked in case we process a conditional
+  // case. E.g. casts from NSArray into [SwiftType] may fail, i.e. return .None.
   if (isConditional) {
     // Copy the temporary into Dest.
-    // Load from the optional
+    // Load from the optional.
     auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl(OTK);
-    bool isNotAddressOnly = !InOutOptionalParam.getType().isTrivial(M) &&
-                            !InOutOptionalParam.getType().isAddressOnly(M);
+
+    SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock*>, 1> CaseBBs;
+    CaseBBs.push_back(std::make_pair(M.getASTContext().getOptionalNoneDecl(), FailureBB));
+    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, ConvSuccessBB, CaseBBs);
+
+    Builder.setInsertionPoint(FailureBB->begin());
+    Builder.createDeallocStack(Loc, SILValue(Tmp, 0));
+
+    Builder.setInsertionPoint(ConvSuccessBB);
     auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
                                                         SomeDecl);
     auto LoadFromOptional = Builder.createLoad(Loc, SILValue(Addr, 0));
-    if (isNotAddressOnly)
-      Builder.createRetainValue(Loc, LoadFromOptional);
+
     // Store into Dest
     Builder.createStore(Loc, LoadFromOptional, Dest);
-    if (isNotAddressOnly)
-      Builder.createReleaseValue(Loc, LoadFromOptional);
+
     Builder.createDeallocStack(Loc, SILValue(Tmp, 0));
     SmallVector<SILValue, 1> SuccessBBArgs;
     Builder.createBranch(Loc, SuccessBB, SuccessBBArgs);
@@ -999,8 +1036,13 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   assert(ResultsRef.size() == 1 && "There should be only one declaration of _bridgeToObjectiveC");
 
   auto MemberDeclRef = SILDeclRef(Results.front());
-  auto *BridgeFunc = M.getOrCreateFunction(Loc, MemberDeclRef, ForDefinition_t::NotForDefinition);
-  assert(BridgeFunc && "Implementation of _bridgeToObjectiveC could not be found");
+  auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef,
+                                            ForDefinition_t::NotForDefinition);
+  assert(BridgedFunc &&
+         "Implementation of _bridgeToObjectiveC could not be found");
+
+  auto ParamTypes = BridgedFunc->getLoweredFunctionType()
+                               ->getParametersWithoutIndirectResult();
 
   auto SILFnTy = SILType::getPrimitiveObjectType(
       M.Types.getConstantFunctionType(BridgeFuncDeclRef));
@@ -1014,24 +1056,29 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
 
-  auto FnRef = Builder.createFunctionRef(Loc, BridgeFunc);
+  auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
   if (Src.getType().isAddress()) {
     // Create load
     Src = SILValue(Builder.createLoad(Loc, Src), 0);
   }
 
-  // Generate a code to invoke the briding function.
+  if(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
+    Builder.createRetainValue(Loc, Src);
+
+  // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src);
+
+  if(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
+    Builder.createReleaseValue(Loc, Src);
 
   SILInstruction *NewI = NewAI;
 
   if (Dest) {
     // If it is addr cast then store the result.
     NewI = Builder.createStore(Loc, SILValue(NewAI, 0), Dest);
-    // Insert a retain if required
-    if (Dest.getType().isAddress()) {
-      NewI = Builder.createStrongRetain(Loc, NewAI);
-    }
+  }
+
+  if (Dest) {
     EraseInstAction(Inst);
   }
 
