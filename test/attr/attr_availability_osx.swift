@@ -48,3 +48,26 @@ class DeprecatedClassIn10_11 { }
 
 // Elements deprecated later than the minimum deployment target (which is 10.10, in this case) should not generate warnings
 func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn10_11) { }
+
+// Unconditional platform unavailability
+@availability(OSX, unavailable)
+func doSomethingNotOnOSX() { }
+// expected-note @-1{{'doSomethingNotOnOSX()' has been explicitly marked unavailable here}}
+
+doSomethingNotOnOSX() // expected-error{{'doSomethingNotOnOSX()' is unavailable}}
+
+@availability(iOS, unavailable)
+func doSomethingNotOniOS() { }
+
+doSomethingNotOniOS() // okay
+
+// Unconditional platform deprecation
+@availability(OSX, deprecated)
+func doSomethingDeprecatedOnOSX() { }
+
+doSomethingDeprecatedOnOSX() // expected-warning{{'doSomethingDeprecatedOnOSX()' is deprecated on OS X}}
+
+@availability(iOS, deprecated)
+func doSomethingDeprecatedOniOS() { }
+
+doSomethingDeprecatedOniOS() // okay

@@ -683,7 +683,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     StringRef Message, Renamed;
     clang::VersionTuple Introduced, Deprecated, Obsoleted;
-    bool Unavailable = false;
+    auto Unconditional = UnconditionalAvailabilityKind::None;
     bool AnyAnnotations = false;
     int ParamIndex = 0;
 
@@ -761,8 +761,19 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         break;
       }
 
-      case IsIntroduced:
       case IsDeprecated:
+        if (Tok.isNot(tok::equal)) {
+          if (Unconditional != UnconditionalAvailabilityKind::None) {
+            diagnose(Tok, diag::attr_availability_unavailable_deprecated,
+                     AttrName);
+          }
+
+          Unconditional = UnconditionalAvailabilityKind::Deprecated;
+          break;
+        }
+        SWIFT_FALLTHROUGH;
+
+      case IsIntroduced:
       case IsObsoleted: {
         // Items with version arguments.
         if (!consumeIf(tok::equal)) {
@@ -793,7 +804,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       }
 
       case IsUnavailable:
-        Unavailable = true;
+        if (Unconditional != UnconditionalAvailabilityKind::None) {
+          diagnose(Tok, diag::attr_availability_unavailable_deprecated,
+                   AttrName);
+        }
+
+        Unconditional = UnconditionalAvailabilityKind::Unavailable;
         break;
 
       case IsInvalid:
@@ -827,7 +843,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                         Introduced,
                                         Deprecated,
                                         Obsoleted,
-                                        Unavailable,
+                                        Unconditional,
                                         /*Implicit=*/false));
       }
       else {

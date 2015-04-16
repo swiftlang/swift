@@ -1010,7 +1010,10 @@ ERROR(attr_accessibility_expected_set,attribute_parsing,none,
 
 // availability
 ERROR(attr_availability_platform,attribute_parsing,none,
-"expected platform name or '*' for '%0' attribute", (StringRef))
+      "expected platform name or '*' for '%0' attribute", (StringRef))
+ERROR(attr_availability_unavailable_deprecated,attribute_parsing,none,
+      "%0 attribute cannot be both unconditionally 'unavailable' and "
+      "'deprecated'", (StringRef))
 
 ERROR(attr_availability_unknown_platform,attribute_parsing,none,
 "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))

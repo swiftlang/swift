@@ -928,9 +928,12 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
 
   if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
     if (auto Attr = AvailabilityAttr::isUnavailable(TypeDecl)) {
-      switch (Attr->Unavailable) {
-      case AvailabilityAttr::UnavailabilityKind::None:
-      case AvailabilityAttr::UnavailabilityKind::Normal:
+      switch (Attr->getUnconditionalAvailability()) {
+      case UnconditionalAvailabilityKind::None:
+      case UnconditionalAvailabilityKind::Deprecated:
+        break;
+
+      case UnconditionalAvailabilityKind::Unavailable:
         if (!Attr->Rename.empty()) {
           TC.diagnose(Loc, diag::availability_decl_unavailable_rename,
                       CI->getIdentifier(), Attr->Rename)
@@ -946,7 +949,7 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
         }
         break;
 
-      case AvailabilityAttr::UnavailabilityKind::InSwift:
+      case UnconditionalAvailabilityKind::UnavailableInSwift:
         if (Attr->Message.empty()) {
           TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift,
                       CI->getIdentifier())

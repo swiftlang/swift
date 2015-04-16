@@ -99,3 +99,42 @@ let _: Int
 
 @availability(OSX, introduced=1.0.0x4) // expected-error{{expected version number in 'availability' attribute}}
 let _: Int
+
+@availability(*, deprecated, unavailable, message="message") // expected-error{{availability attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
+struct BadUnconditionalAvailability { };
+
+@availability(*, deprecated, message="message")
+func deprecated_func_with_message() {}
+
+@availability(*, deprecated, message="message")
+struct DeprecatedTypeWithMessage { }
+
+func use_deprecated_with_message() {
+  deprecated_func_with_message() // expected-warning{{'deprecated_func_with_message()' is deprecated: message}}
+  var x : DeprecatedTypeWithMessage // expected-warning{{'DeprecatedTypeWithMessage' is deprecated: message}}
+}
+
+@availability(*, deprecated, message="message")
+func use_deprecated_func_with_message2() {
+ deprecated_func_with_message() // no diagnostic
+}
+
+@availability(*, deprecated, renamed="blarg")
+func deprecated_func_with_renamed() {}
+
+@availability(*, deprecated, message="blarg is your friend", renamed="blarg")
+func deprecated_func_with_message_renamed() {}
+
+@availability(*, deprecated, renamed="wobble")
+struct DeprecatedTypeWithRename { }
+
+func use_deprecated_with_renamed() {
+  deprecated_func_with_renamed() // expected-warning{{'deprecated_func_with_renamed()' is deprecated: renamed to 'blarg'}}
+  // expected-note@-1{{use 'blarg'}}{{3-31=blarg}}
+
+  deprecated_func_with_message_renamed() //expected-warning{{'deprecated_func_with_message_renamed()' is deprecated: blarg is your friend}}
+  // expected-note@-1{{use 'blarg'}}{{3-39=blarg}}
+
+  var x: DeprecatedTypeWithRename // expected-warning{{'DeprecatedTypeWithRename' is deprecated: renamed to 'wobble'}}
+  // expected-note@-1{{use 'wobble'}}{{10-34=wobble}}
+}

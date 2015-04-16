@@ -2057,17 +2057,34 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
   }
 
   StringRef Platform = Attr->prettyPlatformString();
-  clang::VersionTuple DeprecatedVersion = Attr->Deprecated.getValue();
+  clang::VersionTuple DeprecatedVersion;
+  if (Attr->Deprecated)
+    DeprecatedVersion = Attr->Deprecated.getValue();
 
-  if (Attr->Message.empty()) {
+  if (Attr->Message.empty() && Attr->Rename.empty()) {
     diagnose(ReferenceRange.Start, diag::availability_deprecated, Name,
-             Platform, DeprecatedVersion).highlight(Attr->getRange());
+             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+             DeprecatedVersion)
+      .highlight(Attr->getRange());
     return;
   }
 
-  diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
-           Platform, DeprecatedVersion,
-           Attr->Message).highlight(Attr->getRange());
+  if (Attr->Message.empty()) {
+    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename, Name,
+             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+             DeprecatedVersion, Attr->Rename)
+      .highlight(Attr->getRange());
+  } else {
+    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
+             Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
+             DeprecatedVersion, Attr->Message)
+      .highlight(Attr->getRange());
+  }
+
+  if (!Attr->Rename.empty()) {
+    diagnose(ReferenceRange.Start, diag::note_deprecated_rename, Attr->Rename)
+      .fixItReplace(ReferenceRange, Attr->Rename);
+  }
 }
 
 // checkForForbiddenPrefix is for testing purposes.

@@ -21,11 +21,14 @@
 
 using namespace swift;
 
+namespace {
+
 /// The inferred availability required to access a group of declarations
 /// on a single platform.
 struct InferredAvailability {
-  bool ExplicitlyUnavailable = false;
-
+  UnconditionalAvailabilityKind Unconditional
+    = UnconditionalAvailabilityKind::None;
+  
   Optional<clang::VersionTuple> Introduced;
   Optional<clang::VersionTuple> Deprecated;
   Optional<clang::VersionTuple> Obsoleted;
@@ -34,6 +37,8 @@ struct InferredAvailability {
 /// The type of a function that merges two version tuples.
 typedef const clang::VersionTuple &(*MergeFunction)(
     const clang::VersionTuple &, const clang::VersionTuple &);
+
+} // end anonymous namespace
 
 /// Apply a merge function to two optional versions, returning the result
 /// in Inferred.
@@ -55,7 +60,10 @@ mergeIntoInferredVersion(const Optional<clang::VersionTuple> &Version,
 /// the attribute requires.
 static void mergeWithInferredAvailability(const AvailabilityAttr *Attr,
                                           InferredAvailability &Inferred) {
-  Inferred.ExplicitlyUnavailable |= Attr->isUnconditionallyUnavailable();
+  Inferred.Unconditional
+    = static_cast<UnconditionalAvailabilityKind>(
+      std::max(static_cast<unsigned>(Inferred.Unconditional),
+               static_cast<unsigned>(Attr->getUnconditionalAvailability())));
 
   // The merge of two introduction versions is the maximum of the two versions.
   mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max);
@@ -83,7 +91,7 @@ createAvailabilityAttr(PlatformKind Platform,
       SourceLoc(), SourceRange(), Platform,
       /*Message=*/StringRef(),
       /*Rename=*/StringRef(), Introduced, Deprecated, Obsoleted,
-      Inferred.ExplicitlyUnavailable, /*Implicit=*/true);
+      Inferred.Unconditional, /*Implicit=*/true);
 }
 
 void AvailabilityInference::applyInferredAvailabilityAttrs(
