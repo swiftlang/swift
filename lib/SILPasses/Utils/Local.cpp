@@ -1221,15 +1221,19 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
     // ensure that types are not existential,
     // and that not both types are classes.
     BridgedI = optimizeBridgedCasts(Inst, true, Src, Dest, SourceType,
-                                       TargetType, SuccessBB, FailureBB);
-
+                                    TargetType, SuccessBB, FailureBB);
 
     if (!BridgedI) {
-      if (!emitSuccessfulIndirectUnconditionalCast(
-            Builder, Mod.getSwiftModule(), Loc, Inst->getConsumptionKind(), Src,
-            SourceType, Dest, TargetType, Inst))
+      // Since it is an addr cast, only address types are handled here.
+      if (!Src.getType().isAddress() || !Dest.getType().isAddress()) {
+        return nullptr;
+      } else if (!emitSuccessfulIndirectUnconditionalCast(
+                     Builder, Mod.getSwiftModule(), Loc,
+                     Inst->getConsumptionKind(), Src, SourceType, Dest,
+                     TargetType, Inst)) {
         // No optimization was possible.
         return nullptr;
+      }
       EraseInstAction(Inst);
     }
     SILInstruction *NewI = &BB->getInstList().back();
