@@ -494,12 +494,9 @@ static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
   SourceLoc Loc = R.Start;
   auto Name = D->getFullName();
 
-  switch (Attr->getUnconditionalAvailability()) {
-  case UnconditionalAvailabilityKind::Deprecated:
-    break;
-
-  case UnconditionalAvailabilityKind::None:
-  case UnconditionalAvailabilityKind::Unavailable:
+  switch (Attr->Unavailable) {
+  case AvailabilityAttr::UnavailabilityKind::None:
+  case AvailabilityAttr::UnavailabilityKind::Normal:
     if (!Attr->Rename.empty()) {
       TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
                   Attr->Rename).fixItReplace(R, Attr->Rename);
@@ -511,7 +508,7 @@ static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
     }
     break;
 
-  case UnconditionalAvailabilityKind::UnavailableInSwift:
+  case AvailabilityAttr::UnavailabilityKind::InSwift:
     if (Attr->Message.empty()) {
       TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift, Name)
           .highlight(R);

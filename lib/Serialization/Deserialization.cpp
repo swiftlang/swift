@@ -1795,14 +1795,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
         bool isImplicit;
         bool isUnavailable;
-        bool isDeprecated;
         DEF_VER_TUPLE_PIECES(Introduced);
         DEF_VER_TUPLE_PIECES(Deprecated);
         DEF_VER_TUPLE_PIECES(Obsoleted);
         unsigned platform, messageSize, renameSize;
         // Decode the record, pulling the version tuple information.
         serialization::decls_block::AvailabilityDeclAttrLayout::readRecord(
-            scratch, isImplicit, isUnavailable, isDeprecated,
+            scratch, isImplicit, isUnavailable,
             LIST_VER_TUPLE_PIECES(Introduced),
             LIST_VER_TUPLE_PIECES(Deprecated),
             LIST_VER_TUPLE_PIECES(Obsoleted),
@@ -1816,19 +1815,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         DECODE_VER_TUPLE(Deprecated)
         DECODE_VER_TUPLE(Obsoleted)
 
-        UnconditionalAvailabilityKind unconditional;
-        if (isUnavailable)
-          unconditional = UnconditionalAvailabilityKind::Unavailable;
-        else if (isDeprecated)
-          unconditional = UnconditionalAvailabilityKind::Deprecated;
-        else
-          unconditional = UnconditionalAvailabilityKind::None;
-
         Attr = new (ctx) AvailabilityAttr(
           SourceLoc(), SourceRange(),
           (PlatformKind)platform, message, rename,
           Introduced, Deprecated, Obsoleted,
-          unconditional, isImplicit);
+          isUnavailable, isImplicit);
         break;
 
 #undef DEF_VER_TUPLE_PIECES
