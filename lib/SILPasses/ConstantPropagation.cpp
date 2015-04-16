@@ -791,10 +791,20 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
         WorkList.insert(&I);
       else if (isApplyOfStringConcat(I))
         WorkList.insert(&I);
+      else if (isa<CheckedCastBranchInst>(&I) || isa<CheckedCastAddrBranchInst>(&I) ||
+               isa<UnconditionalCheckedCastInst>(&I) ||
+               isa<UnconditionalCheckedCastAddrInst>(&I))
+        WorkList.insert(&I);
     }
   }
 
   llvm::SetVector<SILInstruction *> FoldedUsers;
+  CastOptimizer CastOpt(/* ReplaceInstUsesAction */
+                  [&](SILInstruction *I, ValueBase * V) {
+                    SILValue(I).replaceAllUsesWith(V);
+                  },
+                  /* EraseAction */
+                  [&](SILInstruction *I) { WorkList.remove(I); I->eraseFromParent(); });
 
   while (!WorkList.empty()) {
     SILInstruction *I = WorkList.pop_back_val();
@@ -833,6 +843,38 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
       constantFoldStringConcatenation(AI, WorkList);
       continue;
     }
+
+    if (isa<CheckedCastBranchInst>(I) || isa<CheckedCastAddrBranchInst>(I) ||
+        isa<UnconditionalCheckedCastInst>(I) ||
+        isa<UnconditionalCheckedCastAddrInst>(I)) {
+      // Try to perform cast optimizations.
+      SILInstruction *Result = nullptr;
+      switch(I->getKind()) {
+      default:
+        llvm_unreachable("Unexpected instruction for cast optimizations");
+      case ValueKind::CheckedCastBranchInst:
+        Result = CastOpt.simplifyCheckedCastBranchInst(cast<CheckedCastBranchInst>(I));
+        break;
+      case ValueKind::CheckedCastAddrBranchInst:
+        Result = CastOpt.simplifyCheckedCastAddrBranchInst(cast<CheckedCastAddrBranchInst>(I));
+        break;
+      case ValueKind::UnconditionalCheckedCastInst:
+        Result = CastOpt.optimizeUnconditionalCheckedCastInst(cast<UnconditionalCheckedCastInst>(I));
+        break;
+      case ValueKind::UnconditionalCheckedCastAddrInst:
+        Result = CastOpt.optimizeUnconditionalCheckedCastAddrInst(cast<UnconditionalCheckedCastAddrInst>(I));
+        break;
+      }
+
+      if (Result) {
+        if (isa<CheckedCastBranchInst>(Result) || isa<CheckedCastAddrBranchInst>(Result) ||
+                isa<UnconditionalCheckedCastInst>(Result) ||
+                isa<UnconditionalCheckedCastAddrInst>(Result))
+          WorkList.insert(Result);
+      }
+      continue;
+    }
+
 
     // Go through all users of the constant and try to fold them.
     FoldedUsers.clear();

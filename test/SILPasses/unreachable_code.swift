@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
-
 func ifFalse() -> Int {
   if false { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
@@ -327,3 +326,8 @@ func testLetElseExprPattern(a : Int) {
 }
 
 
+public func testFailingCast(s:String) -> Int {
+   // There should be no notes or warnings about a call to a noreturn function, because we do not expose
+   // how casts are lowered.
+   return s as! Int // expected-warning {{cast from 'String' to unrelated type 'Int' always fails}}
+}
