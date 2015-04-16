@@ -481,7 +481,6 @@ static bool _conformsToProtocol(const OpaqueValue *value,
     case MetadataKind::Existential: {
       auto sourceExistential = cast<ExistentialTypeMetadata>(type);
       // The existential conforms to AnyObject if it's class-constrained.
-      // FIXME: It also must not carry witness tables.
       return sourceExistential->isClassBounded();
     }
       
@@ -973,29 +972,21 @@ _dynamicCastUnknownClassToExistential(const void *object,
                                     const ExistentialTypeMetadata *targetType) {
   for (unsigned i = 0, e = targetType->Protocols.NumProtocols; i < e; ++i) {
     const ProtocolDescriptor *protocol = targetType->Protocols[i];
-
-    switch (protocol->Flags.getDispatchStrategy()) {
-    case ProtocolDispatchStrategy::Swift:
-      // If the target existential requires witness tables, we can't do this cast.
-      // The result type would not have a single-refcounted-pointer rep.
+    // If the target existential requires witness tables, we can't do this cast.
+    // The result type would not have a single-refcounted-pointer rep.
+    if (protocol->Flags.needsWitnessTable())
       return nullptr;
-    case ProtocolDispatchStrategy::ObjC:
 #if SWIFT_OBJC_INTEROP
-      if (!_swift_objectConformsToObjCProtocol(object, protocol))
-        return nullptr;
-      break;
-#else
-      assert(false && "ObjC interop disabled?!");
+    if (!_swift_objectConformsToObjCProtocol(object, protocol))
       return nullptr;
+#else
+    // The only non-@objc, non-witness-table-requiring protocol should be
+    // AnyObject (in no-ObjC-interop mode).
+    assert(protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject
+           && "swift protocols besides AnyObject should always require a "
+              "witness table");
 #endif
-    case ProtocolDispatchStrategy::Empty:
-      // The only non-@objc, non-witness-table-requiring protocol should be
-      // AnyObject for now.
-      assert(protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject
-             && "swift protocols besides AnyObject should always require a "
-                "witness table");
-      break;
-    }
+
   }
   
   return object;

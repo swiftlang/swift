@@ -4451,8 +4451,7 @@ namespace {
         .withClassConstraint(Protocol->requiresClass()
                                ? ProtocolClassConstraint::Class
                                : ProtocolClassConstraint::Any)
-        .withDispatchStrategy(
-                Lowering::TypeConverter::getProtocolDispatchStrategy(Protocol))
+        .withNeedsWitnessTable(requiresProtocolWitnessTable(IGM, Protocol))
         .withSpecialProtocol(getSpecialProtocolID(Protocol));
       
       Fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,

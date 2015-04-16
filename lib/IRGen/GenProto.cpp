@@ -5468,6 +5468,5 @@ irgen::emitExistentialMetatypeProjection(IRGenFunction &IGF,
 
 bool irgen::requiresProtocolWitnessTable(IRGenModule &IGM,
                                          ProtocolDecl *protocol) {
-  return ProtocolDescriptorFlags::needsWitnessTable(
-     Lowering::TypeConverter::getProtocolDispatchStrategy(protocol));
+  return IGM.SILMod->Types.protocolRequiresWitnessTable(protocol);
 }

@@ -14,7 +14,6 @@
 #define SIL_TypeLowering_h
 
 #include "swift/AST/ArchetypeBuilder.h"
-#include "swift/ABI/MetadataValues.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
@@ -566,13 +565,9 @@ public:
   /// Get the calling convention used to call a declaration.
   SILFunctionTypeRepresentation getDeclRefRepresentation(SILDeclRef c);
   
-  /// Get the method dispatch strategy for a protocol.
-  static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
-  
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
-    return ProtocolDescriptorFlags::needsWitnessTable
-             (getProtocolDispatchStrategy(P));
+    return !P->isObjC();
   }
   
   /// True if a type is passed indirectly at +0 when used as the "self"
