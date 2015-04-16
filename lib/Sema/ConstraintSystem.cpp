@@ -1233,7 +1233,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                !baseObjTy->is<ArchetypeType>()) {
       ProtocolConformance *conformance = nullptr;
       if (TC.conformsToProtocol(baseObjTy, proto, DC, true, &conformance) &&
-          conformance->isComplete()) {
+          conformance->hasTypeWitness(assocType, nullptr)) {
         type = conformance->getTypeWitness(assocType, &TC).getReplacement();
       }
     }
