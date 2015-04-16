@@ -109,10 +109,6 @@ SILInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 bool tryCheckedCastBrJumpThreading(TermInst *Term, DominanceInfo *DT,
                                    SmallVectorImpl<SILBasicBlock *> &BBs);
 
-/// Returns true if C1, C2 represent equivalent conditions in the
-/// sense that each is eventually based on the same value.
-bool areEquivalentConditions(SILValue C1, SILValue C2);
-
 /// If Closure is a partial_apply or thin_to_thick_function with only local
 /// ref count users and a set of post-dominating releases:
 ///

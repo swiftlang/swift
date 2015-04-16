@@ -235,24 +235,6 @@ void swift::updateSSAAfterCloning(BaseThreadingCloner &Cloner,
   }
 }
 
-static SILValue getUnderlyingCondition(SILValue V) {
-  if (auto *SEI = dyn_cast<SelectEnumInst>(V))
-    V = SEI->getEnumOperand().stripCasts();
-
-  if (auto *BI = dyn_cast<BuiltinInst>(V)) {
-    // Expect-intrinsics have no effect, so we can see through them.
-    if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
-      return BI->getArguments()[0];
-  }
-  return V;
-}
-
-/// Returns true if C1, C2 represent equivalent conditions in the
-/// sense that each is eventually based on the same value.
-bool swift::areEquivalentConditions(SILValue C1, SILValue C2) {
-  return getUnderlyingCondition(C1) == getUnderlyingCondition(C2);
-}
-
 template <class SwitchEnumTy, class SwitchEnumCaseTy>
 static SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
                                      SmallVectorImpl<SwitchEnumCaseTy> &Cases,

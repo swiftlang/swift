@@ -541,7 +541,7 @@ bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongSomePaths() {
 /// all or at least  some paths.
 bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongPaths() {
   // Are conditions equivalent along all paths?
-  if (areEquivalentConditions(DomCondition, Condition)) {
+  if (DomCondition == Condition) {
     // Conditions are exactly the same, without any restrictions.
     // They are equivalent along all paths.
 
