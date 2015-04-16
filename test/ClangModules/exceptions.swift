@@ -99,4 +99,14 @@ extension NSObject {
 // CHECK:   br bb3([[T0]] : $Optional<NSString>)
 // CHECK: bb3([[T0:%.*]] : $Optional<NSString>):
 // CHECK:   autorelease_return [[T0]] : $Optional<NSString>
+
+// CHECK-LABEL: sil hidden @_TToFE10exceptionsCSo8NSObject7takeIntfS0_FzSiT_ : $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
+// CHECK: bb0([[I:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[SELF:%[0-9]+]] : $NSObject)
+  @objc func takeInt(i: Int) throws { }
+
+// CHECK-LABEL: sil hidden @_TToFE10exceptionsCSo8NSObject10takeDoublefS0_FzTSd3intSi7closureFSiSi_T_ : $@convention(objc_method) (Double, Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @convention(block) (Int) -> Int, NSObject) -> Bool
+// CHECK: bb0([[D:%[0-9]+]] : $Double, [[INT:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[CLOSURE:%[0-9]+]] : $@convention(block) (Int) -> Int, [[SELF:%[0-9]+]] : $NSObject):
+  @objc func takeDouble(d: Double, int: Int, closure: (Int) -> Int) throws {
+    throw NSError()
+  }
 }

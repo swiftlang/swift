@@ -295,8 +295,10 @@ enum class ConventionsKind : uint8_t {
         assert(!isIndirectParameter(convention));
       }
 
+      maybeAddForeignErrorParameter();
+
       auto loweredType = substTL.getLoweredType().getSwiftRValueType();
-      addParameter(SILParameterInfo(loweredType, convention));
+      Inputs.push_back(SILParameterInfo(loweredType, convention));
     }
 
     /// This is a special entry point that allows destructure inputs to handle
@@ -345,6 +347,8 @@ enum class ConventionsKind : uint8_t {
         return;
       }
 
+      maybeAddForeignErrorParameter();
+
       unsigned origParamIndex = NextOrigParamIndex++;
 
       auto &substTL = M.Types.getTypeLowering(origType, substType);
@@ -361,12 +365,7 @@ enum class ConventionsKind : uint8_t {
         assert(!isIndirectParameter(convention));
       }
       auto loweredType = substTL.getLoweredType().getSwiftRValueType();
-      addParameter(SILParameterInfo(loweredType, convention));
-    }
-
-    void addParameter(SILParameterInfo param) {
-      maybeAddForeignErrorParameter();
-      Inputs.push_back(param);
+      Inputs.push_back(SILParameterInfo(loweredType, convention));
     }
 
     void maybeAddForeignErrorParameter() {
