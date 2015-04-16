@@ -1656,7 +1656,7 @@ struct ${CollectionType} : RangeReplaceableCollectionType {
 
 %   if Implementation == 'Custom':
 
-  public func _prext_filter(
+  func _prext_filter(
     @noescape includeElement: (OpaqueValue<Int>) -> Bool
   ) -> ${CollectionType} {
     ++RangeReplaceableCollectionWithCustomFilterMethod.timesFilterWasCalled
