@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 191; // Last change: consolidate function type representations
+const uint16_t VERSION_MINOR = 192; // Last change: include the type decl for type witnesses
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;

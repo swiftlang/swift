@@ -74,10 +74,17 @@ ProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   CONFORMANCE_SUBCLASS_DISPATCH(hasTypeWitness, (assocType, resolver));
 }
 
+std::pair<const Substitution &, TypeDecl *>
+ProtocolConformance::getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
+                                                LazyResolver *resolver) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitnessSubstAndDecl,
+                                (assocType, resolver))
+}
+
 const Substitution &
 ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType, 
                                     LazyResolver *resolver) const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitness, (assocType, resolver))
+  return getTypeWitnessSubstAndDecl(assocType, resolver).first;
 }
 
 Type
@@ -185,7 +192,8 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   return false;
 }
 
-const Substitution &NormalProtocolConformance::getTypeWitness(
+std::pair<const Substitution &, TypeDecl *>
+NormalProtocolConformance::getTypeWitnessSubstAndDecl(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {
   auto known = TypeWitnesses.find(assocType);
@@ -201,12 +209,13 @@ const Substitution &NormalProtocolConformance::getTypeWitness(
 
 void NormalProtocolConformance::setTypeWitness(
        AssociatedTypeDecl *assocType,
-       const Substitution &substitution) const {
+       const Substitution &substitution,
+       TypeDecl *typeDecl) const {
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");
   assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
   assert(!isComplete() && "Conformance already complete?");
-  TypeWitnesses[assocType] = substitution;
+  TypeWitnesses[assocType] = std::make_pair(substitution, typeDecl);
 }
 
   /// Retrieve the value witness corresponding to the given requirement.
@@ -256,7 +265,8 @@ bool SpecializedProtocolConformance::hasTypeWitness(
          GenericConformance->hasTypeWitness(assocType, resolver);
 }
 
-const Substitution &SpecializedProtocolConformance::getTypeWitness(
+std::pair<const Substitution &, TypeDecl *>
+SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {
   // If we've already created this type witness, return it.
@@ -268,9 +278,12 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
   // Otherwise, perform substitutions to create this witness now.
   TypeSubstitutionMap substitutionMap = GenericConformance->getGenericParams()
     ->getSubstitutionMap(GenericSubstitutions);
-  
-  auto &genericWitness
-    = GenericConformance->getTypeWitness(assocType, resolver);
+
+  auto genericWitnessAndDecl
+    = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
+
+  auto &genericWitness = genericWitnessAndDecl.first;
+  auto *typeDecl = genericWitnessAndDecl.second;
   auto conformingDC = getDeclContext();
   auto conformingModule = conformingDC->getParentModule();
   auto specializedType
@@ -281,7 +294,7 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
 
   // If the type witness was unchanged, just copy it directly.
   if (specializedType.getPointer() == genericWitness.getReplacement().getPointer()) {
-    TypeWitnesses[assocType] = genericWitness;
+    TypeWitnesses[assocType] = genericWitnessAndDecl;
     return TypeWitnesses[assocType];
   }
 
@@ -301,8 +314,10 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
 
   // Form the substitution.
   auto &ctx = assocType->getASTContext();
-  TypeWitnesses[assocType] = Substitution{archetype, specializedType,
-                                          ctx.AllocateCopy(conformances)};
+  TypeWitnesses[assocType] = std::make_pair(
+                        Substitution{archetype, specializedType,
+                                     ctx.AllocateCopy(conformances)},
+                        typeDecl);
   return TypeWitnesses[assocType];
 }
 

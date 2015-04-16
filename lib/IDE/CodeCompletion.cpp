@@ -1244,7 +1244,8 @@ public:
         continue;
       Conformance->forEachTypeWitness(TypeResolver.get(),
                                       [&](const AssociatedTypeDecl *ATD,
-                                          const Substitution &Subst) -> bool {
+                                          const Substitution &Subst,
+                                          TypeDecl *TD) -> bool {
         Types[ATD] = Subst.getReplacement();
         return false;
       });

@@ -1634,7 +1634,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   // Record the type witness.
   Conformance->setTypeWitness(
     assocType,
-    getArchetypeSubstitution(TC, DC, assocType->getArchetype(), type));
+    getArchetypeSubstitution(TC, DC, assocType->getArchetype(), type),
+    typeDecl);
 
   // Note whether this witness was deduced or defaulted.
   if (wasDeducedOrDefaulted)

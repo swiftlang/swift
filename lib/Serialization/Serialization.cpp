@@ -1018,8 +1018,10 @@ void Serializer::writeNormalConformance(
 
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                   [&](AssociatedTypeDecl *assocType,
-                                      const Substitution &witness) {
+                                      const Substitution &witness,
+                                      TypeDecl *typeDecl) {
     data.push_back(addDeclRef(assocType));
+    data.push_back(addDeclRef(typeDecl));
     // The substitution record is serialized later.
     ++numTypeWitnesses;
     return false;
@@ -1055,7 +1057,8 @@ void Serializer::writeNormalConformance(
   });
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                   [&](AssociatedTypeDecl *assocType,
-                                      const Substitution &witness) {
+                                      const Substitution &witness,
+                                      TypeDecl *typeDecl) {
     writeSubstitutions(witness, DeclTypeAbbrCodes);
     return false;
   });

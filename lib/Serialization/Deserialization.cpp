@@ -570,9 +570,10 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
     auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
-    auto second = maybeReadSubstitution(DeclTypeCursor);
-    assert(second.hasValue());
-    typeWitnesses[first] = *second;
+    auto second = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
+    auto third = maybeReadSubstitution(DeclTypeCursor);
+    assert(third.hasValue());
+    typeWitnesses[first] = std::make_pair(*third, second);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
@@ -590,7 +591,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   // Set type witnesses.
   for (auto typeWitness : typeWitnesses) {
-    conformance->setTypeWitness(typeWitness.first, typeWitness.second);
+    conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
+                                typeWitness.second.second);
   }
 
   // Set witnesses.
