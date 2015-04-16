@@ -28,6 +28,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -3125,13 +3126,13 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   Identifier ID_SIMD = Context.Id_SIMD;
   if (auto SIMDModule = Context.getLoadedModule(ID_SIMD)) {
     StdlibTypeNames.clear();
-#define MAP_SIMD_TYPE(_, BASENAME)                              \
-    {                                                           \
-      char name[] = #BASENAME "0";                              \
-      for (unsigned i = 2; i <= 4; ++i) {                       \
-        *(std::end(name) - 2) = '0' + i;                        \
-        StdlibTypeNames.push_back(Context.getIdentifier(name)); \
-      }                                                         \
+#define MAP_SIMD_TYPE(_, __, BASENAME)                                   \
+    {                                                                    \
+      char name[] = #BASENAME "0";                                       \
+      for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) { \
+        *(std::end(name) - 2) = '0' + i;                                 \
+        StdlibTypeNames.push_back(Context.getIdentifier(name));          \
+      }                                                                  \
     }
 #include "swift/ClangImporter/SIMDMappedTypes.def"
     lookupLibraryTypes(*this, SIMDModule, StdlibTypeNames, ObjCMappedTypes);

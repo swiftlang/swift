@@ -18,6 +18,9 @@
 
 #include "swift/AST/ClangModuleLoader.h"
 
+/// The maximum number of SIMD vector elements we currently try to import.
+#define SWIFT_MAX_IMPORTED_SIMD_ELEMENTS 4
+
 namespace llvm {
   class Triple;
 }

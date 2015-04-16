@@ -437,13 +437,13 @@ namespace {
         if (auto builtinTy
               = dyn_cast<clang::BuiltinType>(type->getElementType())){
           switch (builtinTy->getKind()) {
-#define MAP_SIMD_TYPE(BUILTIN_KIND, SWIFT_BASENAME) \
+#define MAP_SIMD_TYPE(_, BUILTIN_KIND, SWIFT_BASENAME) \
           case clang::BuiltinType::BUILTIN_KIND:    \
             names << #SWIFT_BASENAME;               \
             break;
 #include "swift/ClangImporter/SIMDMappedTypes.def"
           default:
-            // TODO:
+            // A vector type we don't know how to map.
             return Type();
           }
         } else {

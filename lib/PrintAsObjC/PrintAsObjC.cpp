@@ -663,13 +663,26 @@ private:
       MAP(CMutableVoidPointer, "void *", true);
       MAP(CConstVoidPointer, "void const *", true);
 
-      Identifier ID_ObjectiveC = ctx.getIdentifier(OBJC_MODULE_NAME);
+      Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 
         = { "BOOL", false};
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] 
         = { "SEL", true };
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] 
         = { "NSZone *", true };
+      
+      // Use typedefs we set up for SIMD vector types.
+#define MAP_SIMD_TYPE(_, __, BASENAME) \
+      specialNames[{ctx.Id_SIMD, ctx.getIdentifier(#BASENAME "2")}] \
+        = { "swift_" #BASENAME "2", false };                        \
+      specialNames[{ctx.Id_SIMD, ctx.getIdentifier(#BASENAME "3")}] \
+        = { "swift_" #BASENAME "3", false };                        \
+      specialNames[{ctx.Id_SIMD, ctx.getIdentifier(#BASENAME "4")}] \
+        = { "swift_" #BASENAME "4", false };
+#include "swift/ClangImporter/SIMDMappedTypes.def"
+      static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
+                    "must add or remove special name mappings if max number of "
+                    "SIMD elements is changed");
     }
 
     auto iter = specialNames.find({moduleName, name});
@@ -1219,6 +1232,9 @@ public:
       return false;
     if (otherModule->isStdlibModule())
       return true;
+    // Don't need a module for SIMD types in C.
+    if (otherModule->getName() == M.Ctx.Id_SIMD)
+      return true;
 
     // If there's a Clang node, see if it comes from an explicit submodule.
     // Import that instead, looking through any implicit submodules.
@@ -1522,7 +1538,15 @@ public:
            "#  define __null_unspecified\n"
            "# endif\n"
            "#  define SWIFT_NULLABILITY(X)\n"
-           "#endif\n";
+           "#endif\n"
+#define MAP_SIMD_TYPE(C_TYPE, _, SWIFT_NAME) \
+           "typedef " #C_TYPE " swift_" #SWIFT_NAME "2 __attribute__((__ext_vector_type__(2)));\n" \
+           "typedef " #C_TYPE " swift_" #SWIFT_NAME "3 __attribute__((__ext_vector_type__(3)));\n" \
+           "typedef " #C_TYPE " swift_" #SWIFT_NAME "4 __attribute__((__ext_vector_type__(4)));\n"
+#include "swift/ClangImporter/SIMDMappedTypes.def"
+           ;
+    static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
+                "need to add SIMD typedefs here if max elements is increased");
   }
 
   bool isUnderlyingModule(Module *import) {
