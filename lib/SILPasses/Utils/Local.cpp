@@ -1688,7 +1688,10 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
                                          TargetType, isSourceTypeExact);
 
   if (Feasibility == DynamicCastFeasibility::MaySucceed) {
-    return nullptr;
+    // Forced bridged casts can be still simplified here.
+    // If they fail, they fail inside the conversion function.
+    if (!isBridgingCast(SourceType, TargetType))
+      return nullptr;
   }
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
@@ -1712,7 +1715,8 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     WillFailAction();
   }
 
-  if (Feasibility == DynamicCastFeasibility::WillSucceed) {
+  if (Feasibility == DynamicCastFeasibility::WillSucceed ||
+      Feasibility == DynamicCastFeasibility::MaySucceed) {
 
     bool ResultNotUsed = isa<AllocStackInst>(Dest.getDef());
     for (auto Use : Dest.getUses()) {
