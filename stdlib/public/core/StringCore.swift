@@ -598,7 +598,7 @@ extension _StringCore : ExtensibleCollectionType {
       }
     }
     
-    let growth = s~>_underestimateCount()
+    let growth = s._prext_underestimateCount()
     var g = s.generate()
 
     if _fastPath(growth > 0) {

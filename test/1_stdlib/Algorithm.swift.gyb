@@ -356,7 +356,7 @@ Algorithm.test("map/CollectionType") {
     expectType([Int16].self, &result)
     expectEqual([], result)
     expectLE(c.underestimatedCount, result.capacity)
-    expectGE(2 * result.count, result.capacity) {
+    expectGE(result.count + 3, result.capacity) {
       "map() should use the precise element count"
     }
   }
@@ -365,16 +365,7 @@ Algorithm.test("map/CollectionType") {
       [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
     let result = map(c) { $0 + 1 }
     expectEqual([ 1, 31, 11, 91 ], result)
-    expectGE(2 * result.count, result.capacity) {
-      "map() should use the precise element count"
-    }
-  }
-  if true {
-    let c = MinimalForwardCollection(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
-    let result = map(c) { $0 + 1 }
-    expectEqual([ 1, 31, 11, 91 ], result)
-    expectGE(2 * result.count, result.capacity) {
+    expectGE(result.count + 3, result.capacity) {
       "map() should use the precise element count"
     }
   }
@@ -1817,7 +1808,7 @@ SequenceTypeAlgorithms.test("map/CollectionType") {
   expectEqual(0, LifetimeTracked.instances)
   for test in mapTests {
     for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Overestimate,
+      UnderestimateCountBehavior.Precise,
       UnderestimateCountBehavior.Value(0)
     ] {
       let s = MinimalForwardCollection<OpaqueValue<Int>>(
@@ -1840,7 +1831,7 @@ SequenceTypeAlgorithms.test("map/CollectionType") {
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
-      expectGE(2 * result.count, result.capacity) {
+      expectGE(result.count + 3, result.capacity) {
         "map() should use the precise element count"
       }
     }
@@ -2118,6 +2109,143 @@ SequenceTypeAlgorithms.test("zip") {
       stackTrace: test.loc.withCurrentLoc())
   }
 }
+
+//===----------------------------------------------------------------------===//
+// underestimateCount()
+//===----------------------------------------------------------------------===//
+
+func callGenericUnderestimatedCount<S : SequenceType>(s: S) -> Int {
+  return s._prext_underestimateCount()
+}
+
+struct SequenceWithDefaultUnderestimateCount : SequenceType {
+  init() {}
+
+  func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
+    expectUnreachable()
+    return MinimalSequence(
+      [ 1, 2, 3 ]._prext_map { OpaqueValue($0) }
+    ).generate()
+  }
+}
+
+SequenceTypeAlgorithms.test("underestimateCount/SequenceType/DefaultImplementation") {
+  let s = SequenceWithDefaultUnderestimateCount()
+  expectEqual(0, callGenericUnderestimatedCount(s))
+}
+
+struct SequenceWithCustomUnderestimateCount : SequenceType {
+  init(underestimatedCount: Int) {
+    self._underestimatedCount = underestimatedCount
+  }
+
+  func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
+    expectUnreachable()
+    return MinimalSequence(
+      [ 0xffff, 0xffff, 0xffff ]._prext_map { OpaqueValue($0) }
+    ).generate()
+  }
+
+  func _prext_underestimateCount() -> Int {
+    return _underestimatedCount
+  }
+
+  let _underestimatedCount: Int
+}
+
+SequenceTypeAlgorithms.test("underestimateCount/SequenceType/CustomImplementation") {
+  if true {
+    let s = SequenceWithCustomUnderestimateCount(underestimatedCount: 5)
+    expectEqual(5, callGenericUnderestimatedCount(s))
+  }
+  if true {
+    let s = SequenceWithCustomUnderestimateCount(underestimatedCount: 42)
+    expectEqual(42, callGenericUnderestimatedCount(s))
+  }
+}
+
+struct CollectionWithDefaultUnderestimateCount : CollectionType {
+  init(count: Int) {
+    self._count = count
+  }
+
+  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+    expectUnreachable()
+    return MinimalGenerator([])
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    expectUnreachable()
+    return OpaqueValue(0xffff)
+  }
+
+  var _count: Int
+}
+
+SequenceTypeAlgorithms.test("underestimateCount/CollectionType/DefaultImplementation") {
+  if true {
+    let s = CollectionWithDefaultUnderestimateCount(count: 0)
+    expectEqual(0, callGenericUnderestimatedCount(s))
+  }
+  if true {
+    let s = CollectionWithDefaultUnderestimateCount(count: 5)
+    expectEqual(5, callGenericUnderestimatedCount(s))
+  }
+}
+
+struct CollectionWithCustomUnderestimateCount : CollectionType {
+  init(underestimatedCount: Int) {
+    self._underestimatedCount = underestimatedCount
+  }
+
+  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+    expectUnreachable()
+    return MinimalGenerator([])
+  }
+
+  var startIndex: MinimalForwardIndex {
+    expectUnreachable()
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: 0xffff)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    expectUnreachable()
+    return MinimalForwardIndex(
+      position: 0xffff, startIndex: 0, endIndex: 0xffff)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    expectUnreachable()
+    return OpaqueValue(0xffff)
+  }
+
+  func _prext_underestimateCount() -> Int {
+    return _underestimatedCount
+  }
+
+  let _underestimatedCount: Int
+}
+
+SequenceTypeAlgorithms.test("underestimateCount/CollectionType/CustomImplementation") {
+  if true {
+    let s = CollectionWithCustomUnderestimateCount(underestimatedCount: 0)
+    expectEqual(0, callGenericUnderestimatedCount(s))
+  }
+  if true {
+    let s = CollectionWithCustomUnderestimateCount(underestimatedCount: 5)
+    expectEqual(5, callGenericUnderestimatedCount(s))
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 // isEmpty

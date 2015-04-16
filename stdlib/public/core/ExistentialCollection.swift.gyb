@@ -214,10 +214,10 @@ public struct AnySequence<T> : SequenceType {
 }
 
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
-public func ~> <Element>(
-  source: Any${Kind}<Element>, _: (_UnderestimateCount, ())
-) -> Int {
-  return source._box._underestimateCount()
+extension Any${Kind} {
+  public func _prext_underestimateCount() -> Int {
+    return _box._underestimateCount()
+  }
 }
 
 public func ~> <Element>(

@@ -2187,15 +2187,13 @@ public struct MinimalSequence<T> : SequenceType {
     return MinimalGenerator(_sharedState)
   }
 
+  public func _prext_underestimateCount() -> Int {
+    return underestimatedCount
+  }
+
   public var underestimatedCount: Int
 
   internal let _sharedState: _MinimalGeneratorSharedState<T>
-}
-
-public func ~> <T> (
-  s: MinimalSequence<T>, _: (_UnderestimateCount, ())
-) -> Int {
-  return s.underestimatedCount
 }
 
 //===----------------------------------------------------------------------===//
@@ -2359,15 +2357,13 @@ public struct ${Self}<T> : CollectionType {
     return _elements[i.position]
   }
 
+  public func _prext_underestimateCount() -> Int {
+    return underestimatedCount
+  }
+
   public var underestimatedCount: Int
 
   internal let _elements: [T]
-}
-
-public func ~> <T> (
-  c: ${Self}<T>, _: (_UnderestimateCount, ())
-) -> Int {
-  return c.underestimatedCount
 }
 
 %end
@@ -2409,6 +2405,10 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
 
   public func generate() -> MinimalGenerator<T> {
     return MinimalGenerator(elements)
+  }
+
+  public func _prext_underestimateCount() -> Int {
+    return underestimatedCount
   }
 
   public var startIndex: ${Index} {
@@ -2483,12 +2483,6 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   public var reservedCapacity: Int = 0
 
   public var elements: [T]
-}
-
-public func ~> <T> (
-  c: ${Self}<T>, _: (_UnderestimateCount, ())
-) -> Int {
-  return c.underestimatedCount
 }
 
 %end

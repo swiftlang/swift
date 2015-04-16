@@ -61,24 +61,6 @@ public protocol GeneratorType {
 public protocol _SequenceType {
 }
 
-/// This protocol is an implementation detail of `SequenceType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `SequenceType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _Sequence_Type : _SequenceType, _SequenceDefaultsType {
-  /// A type whose instances can produce the elements of this
-  /// sequence, in order.
-  typealias Generator : GeneratorType
-
-  /// Return a *generator* over the elements of this *sequence*.  The
-  /// *generator*\ 's next element is the first element of the
-  /// sequence.
-  ///
-  /// Complexity: O(1)
-  func generate() -> Generator
-}
-
 public protocol _SequenceDefaultsType {
   /// A type that provides the *sequence*\ 's iteration interface and
   /// encapsulates its iteration state.
@@ -95,7 +77,45 @@ public protocol _SequenceDefaultsType {
 extension _SequenceDefaultsType {
 }
 
-extension _SequenceDefaultsType {
+public protocol _SequenceElementInvariantDefaultsType {
+  // This protocol is an anchor point for default implementations for
+  // SequenceType that don't depend on sequence contents.
+}
+
+extension _SequenceElementInvariantDefaultsType {
+  /// Return a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// Complexity: O(N)
+  final public func _prext_underestimateCount() -> Int {
+    return 0
+  }
+}
+
+/// This protocol is an implementation detail of `SequenceType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `SequenceType` and thus must
+/// be satisfied by types conforming to that protocol.
+public protocol _Sequence_Type
+  : _SequenceType, _SequenceDefaultsType, _SequenceElementInvariantDefaultsType {
+
+  /// A type whose instances can produce the elements of this
+  /// sequence, in order.
+  typealias Generator : GeneratorType
+
+  /// Return a *generator* over the elements of this *sequence*.  The
+  /// *generator*\ 's next element is the first element of the
+  /// sequence.
+  ///
+  /// Complexity: O(1)
+  func generate() -> Generator
+
+  /// Return a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// Complexity: O(N)
+  func _prext_underestimateCount() -> Int
 }
 
 /// A type that can be iterated with a `for`\ ...\ `in` loop.
@@ -113,12 +133,6 @@ public protocol SequenceType : _Sequence_Type {
   ///
   /// Complexity: O(1)
   func generate() -> Generator
-
-  /// Return a value less than or equal to the number of elements in
-  /// self, **nondestructively**.
-  ///
-  /// Complexity: O(N)
-  func ~> (_:Self,_:(_UnderestimateCount,())) -> Int
 
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke the function
   /// on `self` and return its result.  Otherwise, return `nil`.
@@ -141,26 +155,12 @@ public func _copyToNativeArrayBuffer<Args>(args: Args)
   return (_CopyToNativeArrayBuffer(), args)
 }
 
-// Operation tags for underestimateCount.  See Index.swift for an
-// explanation of operation tags.
-public struct _UnderestimateCount {}
-internal func _underestimateCount<Args>(args: Args)
-  -> (_UnderestimateCount, Args)
-{
-  return (_UnderestimateCount(), args)
-}
-
-// Default implementation of underestimateCount for Sequences.  Do not
-// use this operator directly; call underestimateCount(s) instead
-public func ~> <T : _SequenceType>(s: T,_:(_UnderestimateCount, ())) -> Int {
-  return 0
-}
-
 /// Return an underestimate of the number of elements in the given
 /// sequence, without consuming the sequence.  For Sequences that are
 /// actually Collections, this will return count(x)
 public func underestimateCount<T : SequenceType>(x: T) -> Int {
-  return x~>_underestimateCount()
+  // FIXME(prext): remove this function when protocol extensions land.
+  return x._prext_underestimateCount()
 }
 
 public struct _InitializeTo {}

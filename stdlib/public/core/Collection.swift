@@ -66,10 +66,17 @@ public protocol _CollectionType : _SequenceType {
   subscript(_i: Index) -> _Element {get}
 }
 
-public protocol _CollectionDefaultsType : _CollectionType {
-}
+public protocol _CollectionDefaultsType
+  : _CollectionType, _SequenceElementInvariantDefaultsType {}
 
 extension _CollectionDefaultsType {
+  /// Return a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// Complexity: O(N)
+  final public func _prext_underestimateCount() -> Int {
+    return numericCast(count(self))
+  }
 }
 
 /// A multi-pass *sequence* with addressable positions.
@@ -97,12 +104,6 @@ public protocol CollectionType
 
   // Do not use this operator directly; call `count(x)` instead
   func ~> (_:Self, _:(_Count, ())) -> Index.Distance
-}
-
-// Default implementation of underestimateCount for *collections*.  Do not
-// use this operator directly; call `underestimateCount(s)` instead
-public func ~> <T : _CollectionType>(x:T,_:(_UnderestimateCount,())) -> Int {
-  return numericCast(x~>_count())
 }
 
 // A fast implementation for when you are backed by a contiguous array.
