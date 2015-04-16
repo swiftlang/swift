@@ -535,13 +535,19 @@ public func ~> <
 {
   let initialCapacity = source._prext_underestimateCount()
   var result = _ContiguousArrayBuffer<S.Generator.Element>(
-    count: 0, minimumCapacity: initialCapacity)
+    count: initialCapacity, minimumCapacity: initialCapacity)
 
-  // Using GeneratorSequence here essentially promotes the sequence to
-  // a SequenceType from _Sequence_Type so we can iterate the elements
-  for x in GeneratorSequence(source.generate()) {
-    result += CollectionOfOne(x)
+  var generator = source.generate()
+
+  var p = result.baseAddress
+  for _ in 0..<initialCapacity {
+    (p++).initialize(generator.next()!)
   }
+
+  while let element? = generator.next() {
+    result += CollectionOfOne(element)
+  }
+
   return result
 }
 

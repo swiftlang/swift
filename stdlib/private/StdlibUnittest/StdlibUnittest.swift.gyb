@@ -2096,6 +2096,7 @@ internal class _MinimalGeneratorSharedState<T> {
 
   internal let data: [T]
   internal var i: Int = 0
+  internal var underestimatedCount: Int = 0
 }
 
 //===----------------------------------------------------------------------===//
@@ -2151,6 +2152,9 @@ public enum UnderestimateCountBehavior {
   /// Return the actual number of elements.
   case Precise
 
+  /// Return the actual number of elements divided by 2.
+  case Half
+
   /// Return an overestimated count.  Useful to test how algorithms reserve
   /// memory.
   case Overestimate
@@ -2173,13 +2177,16 @@ public struct MinimalSequence<T> : SequenceType {
 
     switch underestimatedCount {
     case .Precise:
-      self.underestimatedCount = data.count
+      self._sharedState.underestimatedCount = data.count
+
+    case .Half:
+      self._sharedState.underestimatedCount = data.count / 2
 
     case .Overestimate:
-      self.underestimatedCount = data.count * 3 + 5
+      self._sharedState.underestimatedCount = data.count * 3 + 5
 
     case .Value(let count):
-      self.underestimatedCount = count
+      self._sharedState.underestimatedCount = count
     }
   }
 
@@ -2188,10 +2195,8 @@ public struct MinimalSequence<T> : SequenceType {
   }
 
   public func _prext_underestimateCount() -> Int {
-    return underestimatedCount
+    return max(0, self._sharedState.underestimatedCount - self._sharedState.i)
   }
-
-  public var underestimatedCount: Int
 
   internal let _sharedState: _MinimalGeneratorSharedState<T>
 }
@@ -2327,6 +2332,9 @@ public struct ${Self}<T> : CollectionType {
     case .Precise:
       self.underestimatedCount = _elements.count
 
+    case .Half:
+      self.underestimatedCount = _elements.count / 2
+
     case .Overestimate:
       self.underestimatedCount = _elements.count * 3 + 5
 
@@ -2389,6 +2397,9 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
     switch underestimatedCount {
     case .Precise:
       self.underestimatedCount = elements.count
+
+    case .Half:
+      self.underestimatedCount = elements.count / 2
 
     case .Overestimate:
       self.underestimatedCount = elements.count * 3 + 5

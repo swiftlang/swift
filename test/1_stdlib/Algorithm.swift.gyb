@@ -211,7 +211,7 @@ Algorithm.test("filter/SequenceType") {
   // FIXME(prext): remove these tests together with the filter() function when
   // protocol extensions land.  These tests have been migrated to the new API.
   if true {
-    let s = MinimalSequence<Int>([], underestimatedCount: .Overestimate)
+    let s = MinimalSequence<Int>([], underestimatedCount: .Precise)
     var result = filter(s) {
       (x: Int) -> Bool in
       expectUnreachable()
@@ -224,7 +224,7 @@ Algorithm.test("filter/SequenceType") {
   }
   if true {
     let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
+      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
     let result = filter(s) { (x: Int) -> Bool in false }
     expectEqual([], result)
     expectEqual([], Array(s)) { "sequence should be consumed" }
@@ -232,7 +232,7 @@ Algorithm.test("filter/SequenceType") {
   }
   if true {
     let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
+      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
     let result = filter(s) { (x: Int) -> Bool in true }
     expectEqual([ 0, 30, 10, 90 ], result)
     expectEqual([], Array(s)) { "sequence should be consumed" }
@@ -248,7 +248,7 @@ Algorithm.test("filter/SequenceType") {
   }
   if true {
     let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
+      [ 0, 30, 10, 90 ], underestimatedCount: .Precise)
     let result = filter(s) { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
     expectEqual([], Array(s)) { "sequence should be consumed" }
@@ -310,7 +310,7 @@ Algorithm.test("map/SequenceType") {
   // protocol extensions land.  These tests have been migrated to the new API.
 
   if true {
-    let s = MinimalSequence<Int>([], underestimatedCount: .Overestimate)
+    let s = MinimalSequence<Int>([], underestimatedCount: .Precise)
     var result = map(s) {
       (x: Int) -> Int16 in
       expectUnreachable()
@@ -319,8 +319,6 @@ Algorithm.test("map/SequenceType") {
     expectType([Int16].self, &result)
     expectEqual([], result)
     expectEqual([], Array(s))
-    // FIXME: <rdar://problem/19810841> Reserve capacity when running map() over a SequenceType
-    // expectLE(s.underestimatedCount, result.capacity)
   }
   if true {
     let s = MinimalSequence(
@@ -328,17 +326,13 @@ Algorithm.test("map/SequenceType") {
     let result = map(s) { $0 + 1 }
     expectEqual([ 1, 31, 11, 91 ], result)
     expectEqual([], Array(s))
-    // FIXME: <rdar://problem/19810841> Reserve capacity when running map() over a SequenceType
-    // expectLE(s.underestimatedCount, result.capacity)
   }
   if true {
     let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Overestimate)
+      [ 0, 30, 10, 90 ], underestimatedCount: .Precise)
     let result = map(s) { $0 + 1 }
     expectEqual([ 1, 31, 11, 91 ], result)
     expectEqual([], Array(s))
-    // FIXME: <rdar://problem/19810841> Reserve capacity when running map() over a SequenceType
-    // expectLE(s.underestimatedCount, result.capacity)
   }
 }
 
@@ -356,18 +350,12 @@ Algorithm.test("map/CollectionType") {
     expectType([Int16].self, &result)
     expectEqual([], result)
     expectLE(c.underestimatedCount, result.capacity)
-    expectGE(result.count + 3, result.capacity) {
-      "map() should use the precise element count"
-    }
   }
   if true {
     let c = MinimalForwardCollection(
       [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
     let result = map(c) { $0 + 1 }
     expectEqual([ 1, 31, 11, 91 ], result)
-    expectGE(result.count + 3, result.capacity) {
-      "map() should use the precise element count"
-    }
   }
 }
 
@@ -1515,7 +1503,8 @@ SequenceTypeAlgorithms.test("filter/SequenceType/${dispatch}") {
   expectEqual(0, LifetimeTracked.instances)
   for test in filterTests {
     for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Overestimate,
+      UnderestimateCountBehavior.Precise,
+      UnderestimateCountBehavior.Half,
       UnderestimateCountBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
@@ -1687,7 +1676,8 @@ SequenceTypeAlgorithms.test("filter/RangeReplaceableCollectionType/${CollectionT
   expectEqual(0, LifetimeTracked.instances)
   for test in filterTests {
     for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Overestimate,
+      UnderestimateCountBehavior.Precise,
+      UnderestimateCountBehavior.Half,
       UnderestimateCountBehavior.Value(0)
     ] {
 %     if CollectionKind == 'Minimal':
@@ -1768,13 +1758,15 @@ let mapTests = [
   MapTest([ 101 ], [ 1 ], { (x: Int) -> Int32 in x + 100 }),
   MapTest([ 101, 102 ], [ 1, 2 ], { (x: Int) -> Int32 in x + 100 }),
   MapTest([ 101, 102, 103 ], [ 1, 2, 3 ], { (x: Int) -> Int32 in x + 100 }),
+  MapTest(Array(101..<200), Array(1..<100), { (x: Int) -> Int32 in x + 100 }),
 ]
 
 SequenceTypeAlgorithms.test("map/SequenceType") {
   expectEqual(0, LifetimeTracked.instances)
   for test in mapTests {
     for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Overestimate,
+      UnderestimateCountBehavior.Precise,
+      UnderestimateCountBehavior.Half,
       UnderestimateCountBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
@@ -1795,10 +1787,6 @@ SequenceTypeAlgorithms.test("map/SequenceType") {
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
-      // FIXME: <rdar://problem/19810841> Reserve capacity when running map() over a SequenceType
-      // expectLE(s.underestimatedCount, result.capacity) {
-      //   "map() should reserve capacity"
-      // }
     }
   }
   expectEqual(0, LifetimeTracked.instances)
@@ -1809,6 +1797,7 @@ SequenceTypeAlgorithms.test("map/CollectionType") {
   for test in mapTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
+      UnderestimateCountBehavior.Half,
       UnderestimateCountBehavior.Value(0)
     ] {
       let s = MinimalForwardCollection<OpaqueValue<Int>>(
@@ -1830,9 +1819,6 @@ SequenceTypeAlgorithms.test("map/CollectionType") {
       }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
-      }
-      expectGE(result.count + 3, result.capacity) {
-        "map() should use the precise element count"
       }
     }
   }
@@ -1901,7 +1887,7 @@ let flatMapTests = [
 SequenceTypeAlgorithms.test("flatMap/SequenceType") {
   for test in flatMapTests {
     for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Overestimate,
+      UnderestimateCountBehavior.Precise,
       UnderestimateCountBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
@@ -1974,7 +1960,7 @@ let flatMapToOptionalTests = [
 SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
   for test in flatMapToOptionalTests {
     for underestimateCountBehavior in [
-      UnderestimateCountBehavior.Overestimate,
+      UnderestimateCountBehavior.Precise,
       UnderestimateCountBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
@@ -2246,6 +2232,18 @@ SequenceTypeAlgorithms.test("underestimateCount/CollectionType/CustomImplementat
   }
 }
 
+//===----------------------------------------------------------------------===//
+// _copyToNativeArrayBuffer()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("_copyToNativeArrayBuffer/OverestimatedCount") {
+  let s = MinimalSequence<OpaqueValue<Int>>(
+    [ 1, 2, 3 ]._prext_map { OpaqueValue($0) },
+    underestimatedCount: .Value(4))
+  expectCrashLater()
+  let array = s~>_copyToNativeArrayBuffer()
+  _blackHole(array)
+}
 
 //===----------------------------------------------------------------------===//
 // isEmpty
