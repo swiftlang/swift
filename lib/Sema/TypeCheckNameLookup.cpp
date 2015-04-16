@@ -193,7 +193,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
       ProtocolConformance *conformance = nullptr;
       if (!conformsToProtocol(type, protocol, dc, isKnownPrivate,
                               &conformance) ||
-          !conformance || !conformance->isComplete()) {
+          !conformance || !conformance->hasTypeWitness(assocType, nullptr)) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
       }

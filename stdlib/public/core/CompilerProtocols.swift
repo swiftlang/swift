@@ -75,14 +75,6 @@ public protocol _SequenceDefaultsType {
 }
 
 extension _SequenceDefaultsType {
-}
-
-public protocol _SequenceElementInvariantDefaultsType {
-  // This protocol is an anchor point for default implementations for
-  // SequenceType that don't depend on sequence contents.
-}
-
-extension _SequenceElementInvariantDefaultsType {
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
@@ -98,7 +90,7 @@ extension _SequenceElementInvariantDefaultsType {
 /// Its requirements are inherited by `SequenceType` and thus must
 /// be satisfied by types conforming to that protocol.
 public protocol _Sequence_Type
-  : _SequenceType, _SequenceDefaultsType, _SequenceElementInvariantDefaultsType {
+  : _SequenceType, _SequenceDefaultsType {
 
   /// A type whose instances can produce the elements of this
   /// sequence, in order.

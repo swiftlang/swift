@@ -67,7 +67,7 @@ public protocol _CollectionType : _SequenceType {
 }
 
 public protocol _CollectionDefaultsType
-  : _CollectionType, _SequenceElementInvariantDefaultsType {}
+  : _CollectionType, _SequenceDefaultsType {}
 
 extension _CollectionDefaultsType {
   /// Return a value less than or equal to the number of elements in
@@ -101,6 +101,12 @@ public protocol CollectionType
   /// Requires: `position` indicates a valid position in `self` and
   /// `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get}
+
+  /// Return a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// Complexity: O(N)
+  func _prext_underestimateCount() -> Int
 
   // Do not use this operator directly; call `count(x)` instead
   func ~> (_:Self, _:(_Count, ())) -> Index.Distance

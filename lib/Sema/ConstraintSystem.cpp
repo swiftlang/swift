@@ -1080,7 +1080,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
       ProtocolConformance *conformance = nullptr;
       if (TC.conformsToProtocol(baseObjTy, proto, DC, true, &conformance) &&
-          conformance->isComplete()) {
+          conformance->hasTypeWitness(assocType, nullptr)) {
         auto memberTy = conformance->getTypeWitness(assocType, &TC)
           .getReplacement();
         if (!isTypeReference)
