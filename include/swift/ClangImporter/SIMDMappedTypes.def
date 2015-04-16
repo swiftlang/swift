@@ -1,0 +1,28 @@
+//===--- SIMDMappedTypes.def - Mapped Type Database -------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the database of builtin C types, vectors of which are
+// imported as swift SIMD types.
+//
+//
+// MAP_SIMD_TYPE(BUILTIN_KIND, SWIFT_BASENAME)
+//
+//   maps vectors of the Clang builtin type identified by BUILTIN_KIND to
+//   Swift types in the SIMD module beginning with SWIFT_BASENAME.
+//
+//===----------------------------------------------------------------------===//
+
+MAP_SIMD_TYPE(Float, Float)
+MAP_SIMD_TYPE(Double, Double)
+MAP_SIMD_TYPE(Int, Int)
+
+#undef MAP_SIMD_TYPE

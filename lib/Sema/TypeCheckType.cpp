@@ -3096,7 +3096,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   }
 #include "swift/SIL/BridgedTypes.def"
 
-  Identifier ID_ObjectiveC = Context.getIdentifier(OBJC_MODULE_NAME);
+  Identifier ID_ObjectiveC = Context.Id_ObjectiveC;
   if (auto ObjCModule = Context.getLoadedModule(ID_ObjectiveC)) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("Selector"));
@@ -3113,13 +3113,28 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
                        ObjCMappedTypes);
   }
 
-
-  Identifier ID_Foundation = Context.getIdentifier(FOUNDATION_MODULE_NAME);
+  Identifier ID_Foundation = Context.Id_Foundation;
   if (auto FoundationModule = Context.getLoadedModule(ID_Foundation)) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("NSErrorPointer"));
     lookupLibraryTypes(*this, FoundationModule, StdlibTypeNames,
                        ObjCMappedTypes);
+  }
+  
+  // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
+  Identifier ID_SIMD = Context.Id_SIMD;
+  if (auto SIMDModule = Context.getLoadedModule(ID_SIMD)) {
+    StdlibTypeNames.clear();
+#define MAP_SIMD_TYPE(_, BASENAME)                              \
+    {                                                           \
+      char name[] = #BASENAME "0";                              \
+      for (unsigned i = 2; i <= 4; ++i) {                       \
+        *(std::end(name) - 2) = '0' + i;                        \
+        StdlibTypeNames.push_back(Context.getIdentifier(name)); \
+      }                                                         \
+    }
+#include "swift/ClangImporter/SIMDMappedTypes.def"
+    lookupLibraryTypes(*this, SIMDModule, StdlibTypeNames, ObjCMappedTypes);
   }
 }
 

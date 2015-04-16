@@ -437,15 +437,11 @@ namespace {
         if (auto builtinTy
               = dyn_cast<clang::BuiltinType>(type->getElementType())){
           switch (builtinTy->getKind()) {
-          case clang::BuiltinType::Float:
-            names << "Float";
+#define MAP_SIMD_TYPE(BUILTIN_KIND, SWIFT_BASENAME) \
+          case clang::BuiltinType::BUILTIN_KIND:    \
+            names << #SWIFT_BASENAME;               \
             break;
-          case clang::BuiltinType::Double:
-            names << "Double";
-            break;
-          case clang::BuiltinType::Int:
-            names << "Int";
-            break;
+#include "swift/ClangImporter/SIMDMappedTypes.def"
           default:
             // TODO:
             return Type();
