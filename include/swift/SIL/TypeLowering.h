@@ -789,6 +789,18 @@ public:
 private:
   Type getLoweredCBridgedType(Type t, const clang::Type *clangTy,
                               bool bridgedCollectionsAreOptional);
+
+  CanType getBridgedInputType(SILFunctionTypeRepresentation rep,
+                              CanType input,
+                              const clang::Decl *clangDecl);
+
+  CanType getBridgedResultType(SILFunctionTypeRepresentation rep,
+                               CanType result,
+                               const clang::Decl *clangDecl);
+
+  CanAnyFunctionType getBridgedFunctionType(CanAnyFunctionType t,
+                                            AnyFunctionType::ExtInfo extInfo,
+                                            const clang::Decl *decl);
 };
 
 inline const TypeLowering &
