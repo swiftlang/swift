@@ -1005,7 +1005,7 @@ namespace {
       auto flags = ProtocolDescriptorFlags()
         .withSwift(!getProtocol()->hasClangNode())
         .withClassConstraint(ProtocolClassConstraint::Class)
-        .withNeedsWitnessTable(false)
+        .withDispatchStrategy(ProtocolDispatchStrategy::ObjC)
         .withSpecialProtocol(getSpecialProtocolID(getProtocol()));
       
       fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, flags.getIntValue()));

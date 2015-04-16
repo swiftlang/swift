@@ -305,7 +305,7 @@ ProtocolDescriptor ProtocolA{
   ProtocolDescriptorFlags()
     .withSwift(true)
     .withClassConstraint(ProtocolClassConstraint::Any)
-    .withNeedsWitnessTable(true)
+    .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
 };
 
 ProtocolDescriptor ProtocolB{
@@ -314,7 +314,7 @@ ProtocolDescriptor ProtocolB{
   ProtocolDescriptorFlags()
     .withSwift(true)
     .withClassConstraint(ProtocolClassConstraint::Any)
-    .withNeedsWitnessTable(true)
+    .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
 };
 
 ProtocolDescriptor ProtocolErrorType{
@@ -323,7 +323,7 @@ ProtocolDescriptor ProtocolErrorType{
   ProtocolDescriptorFlags()
     .withSwift(true)
     .withClassConstraint(ProtocolClassConstraint::Any)
-    .withNeedsWitnessTable(true)
+    .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
     .withSpecialProtocol(SpecialProtocol::ErrorType)
 };
 
@@ -333,7 +333,7 @@ ProtocolDescriptor ProtocolClassConstrained{
   ProtocolDescriptorFlags()
     .withSwift(true)
     .withClassConstraint(ProtocolClassConstraint::Class)
-    .withNeedsWitnessTable(true)
+    .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
 };
 
 ProtocolDescriptor ProtocolNoWitnessTable{
@@ -342,7 +342,7 @@ ProtocolDescriptor ProtocolNoWitnessTable{
   ProtocolDescriptorFlags()
     .withSwift(true)
     .withClassConstraint(ProtocolClassConstraint::Class)
-    .withNeedsWitnessTable(false)
+    .withDispatchStrategy(ProtocolDispatchStrategy::ObjC)
 };
 
 static const ExistentialTypeMetadata *test_getExistentialMetadata(
@@ -576,20 +576,24 @@ TEST(MetadataTest, getGenericMetadata_SuperclassWithUnexpectedPrefix) {
 }
 
 static ProtocolDescriptor OpaqueProto1 = { "OpaqueProto1", nullptr,
-  ProtocolDescriptorFlags().withSwift(true).withNeedsWitnessTable(true)
-                           .withClassConstraint(ProtocolClassConstraint::Any)
+  ProtocolDescriptorFlags().withSwift(true)
+                          .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
+                          .withClassConstraint(ProtocolClassConstraint::Any)
 };
 static ProtocolDescriptor OpaqueProto2 = { "OpaqueProto2", nullptr,
-  ProtocolDescriptorFlags().withSwift(true).withNeedsWitnessTable(true)
-                           .withClassConstraint(ProtocolClassConstraint::Any)
+  ProtocolDescriptorFlags().withSwift(true)
+                          .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
+                          .withClassConstraint(ProtocolClassConstraint::Any)
 };
 static ProtocolDescriptor OpaqueProto3 = { "OpaqueProto3", nullptr,
-  ProtocolDescriptorFlags().withSwift(true).withNeedsWitnessTable(true)
-                           .withClassConstraint(ProtocolClassConstraint::Any)
+  ProtocolDescriptorFlags().withSwift(true)
+                          .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
+                          .withClassConstraint(ProtocolClassConstraint::Any)
 };
 static ProtocolDescriptor ClassProto1 = { "ClassProto1", nullptr,
-  ProtocolDescriptorFlags().withSwift(true).withNeedsWitnessTable(true)
-                           .withClassConstraint(ProtocolClassConstraint::Class)
+  ProtocolDescriptorFlags().withSwift(true)
+                          .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
+                          .withClassConstraint(ProtocolClassConstraint::Class)
 };
 
 TEST(MetadataTest, getExistentialTypeMetadata_opaque) {

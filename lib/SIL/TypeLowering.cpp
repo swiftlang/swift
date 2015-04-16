@@ -2250,3 +2250,21 @@ void TypeConverter::popGenericContext(GenericSignature *sig) {
   DependentBPA.Reset();
   GenericArchetypes.reset();
 }
+
+ProtocolDispatchStrategy
+TypeConverter::getProtocolDispatchStrategy(ProtocolDecl *P) {
+  // AnyObject has no requirements (other than the object being a class), so
+  // needs no method dispatch.
+  if (auto known = P->getKnownProtocolKind()) {
+    if (*known == KnownProtocolKind::AnyObject)
+      return ProtocolDispatchStrategy::Empty;
+  }
+  
+  // Otherwise, ObjC protocols use ObjC method dispatch, and Swift protocols
+  // use witness tables.
+  
+  if (P->isObjC())
+    return ProtocolDispatchStrategy::ObjC;
+  
+  return ProtocolDispatchStrategy::Swift;
+}

@@ -236,6 +236,8 @@ public:
 /// Flag that indicates whether an existential type is class-constrained or not.
 enum class ProtocolClassConstraint : bool {
   /// The protocol is class-constrained, so only class types can conform to it.
+  ///
+  /// This must be 0 for ABI compatibility with Objective-C protocol_t records.
   Class = false,
   /// Any type can conform to the protocol.
   Any = true,
@@ -244,6 +246,8 @@ enum class ProtocolClassConstraint : bool {
 /// Identifiers for protocols with special meaning to the Swift runtime.
 enum class SpecialProtocol: uint8_t {
   /// Not a special protocol.
+  ///
+  /// This must be 0 for ABI compatibility with Objective-C protocol_t records.
   None = 0,
   /// The AnyObject protocol.
   AnyObject = 1,
@@ -251,15 +255,35 @@ enum class SpecialProtocol: uint8_t {
   ErrorType = 2,
 };
 
+/// Identifiers for protocol method dispatch strategies.
+enum class ProtocolDispatchStrategy: uint8_t {
+  /// Uses ObjC method dispatch.
+  ///
+  /// This must be 0 for ABI compatibility with Objective-C protocol_t records.
+  ObjC = 0,
+  
+  /// Uses Swift protocol witness table dispatch.
+  ///
+  /// To invoke methods of this protocol, a pointer to a protocol witness table
+  /// corresponding to the protocol conformance must be available.
+  Swift = 1,
+  
+  /// The protocol guarantees that it has no methods to dispatch. It requires
+  /// neither Objective-C metadata nor a witness table.
+  Empty = 2,
+};
+
 /// Flags for protocol descriptors.
 class ProtocolDescriptorFlags {
   typedef uint32_t int_type;
   enum : int_type {
-    IsSwift           = 1U <<  0U,
-    ClassConstraint   = 1U <<  1U,
-    NeedsWitnessTable = 1U <<  2U,
+    IsSwift           =   1U <<  0U,
+    ClassConstraint   =   1U <<  1U,
 
-    SpecialProtocolMask = 0x7F000000U,
+    DispatchStrategyMask  = 0xFU << 2U,
+    DispatchStrategyShift = 2,
+
+    SpecialProtocolMask  = 0x7F000000U,
     SpecialProtocolShift = 24,
     
     /// Reserved by the ObjC runtime.
@@ -279,9 +303,10 @@ public:
     return ProtocolDescriptorFlags((Data & ~ClassConstraint)
                                      | (bool(c) ? ClassConstraint : 0));
   }
-  constexpr ProtocolDescriptorFlags withNeedsWitnessTable(bool n) const {
-    return ProtocolDescriptorFlags((Data & ~NeedsWitnessTable)
-                                     | (n ? NeedsWitnessTable : 0));
+  constexpr ProtocolDescriptorFlags withDispatchStrategy(
+                                             ProtocolDispatchStrategy s) const {
+    return ProtocolDescriptorFlags((Data & ~DispatchStrategyMask)
+                                     | (int_type(s) << DispatchStrategyShift));
   }
   constexpr ProtocolDescriptorFlags
   withSpecialProtocol(SpecialProtocol sp) const {
@@ -291,12 +316,32 @@ public:
   
   /// Was the protocol defined in Swift?
   bool isSwift() const { return Data & IsSwift; }
+
   /// Is the protocol class-constrained?
   ProtocolClassConstraint getClassConstraint() const {
     return ProtocolClassConstraint(bool(Data & ClassConstraint));
   }
+  
+  /// What dispatch strategy does this protocol use?
+  ProtocolDispatchStrategy getDispatchStrategy() const {
+    return ProtocolDispatchStrategy((Data & DispatchStrategyMask)
+                                      >> DispatchStrategyShift);
+  }
+  
   /// Does the protocol require a witness table for method dispatch?
-  bool needsWitnessTable() const { return Data & NeedsWitnessTable; }
+  bool needsWitnessTable() const {
+    return needsWitnessTable(getDispatchStrategy());
+  }
+  
+  static bool needsWitnessTable(ProtocolDispatchStrategy strategy) {
+    switch (strategy) {
+    case ProtocolDispatchStrategy::ObjC:
+    case ProtocolDispatchStrategy::Empty:
+      return false;
+    case ProtocolDispatchStrategy::Swift:
+      return true;
+    }
+  }
   
   /// Return the identifier if this is a special runtime-known protocol.
   SpecialProtocol getSpecialProtocol() const {
