@@ -25,7 +25,7 @@ func test_unavailable_func(x : NSObject) {
 }
 
 func test_deprecated_imported_as_unavailable(s:UnsafeMutablePointer<CChar>) {
-  let x = tmpnam(s) // expected-error {{'tmpnam' is unavailable: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
+  let x = tmpnam(s) // expected-warning {{'tmpnam' is deprecated: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
 }
 
 func test_NSInvocation(x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}

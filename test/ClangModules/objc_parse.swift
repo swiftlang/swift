@@ -454,7 +454,7 @@ func testNullarySelectorPieces(obj: AnyObject) {
 }
 
 func testFactoryMethodAvailability() {
-  let _ = DeprecatedFactoryMethod() // expected-error{{'init()' is unavailable: use something newer}}
+  let _ = DeprecatedFactoryMethod() // expected-warning{{'init()' is deprecated: use something newer}}
 }
 
 func testRepeatedMembers(obj: RepeatedMembers) {

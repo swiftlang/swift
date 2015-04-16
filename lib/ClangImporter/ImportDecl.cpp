@@ -5185,19 +5185,13 @@ void ClangImporter::Implementation::importAttributes(
     //
     // __attribute__((deprecated))
     //
-    // Mapping: @availability(*,unavailable)
-    //
-    // APIs marked as 'deprecated' are implicitly mapped in as 'unavailable'
-    // for stricter API rules going forward.
-    //
-    // FIXME: This will possibly need to account for versioning and API
-    // evolution in the future if other APIs are marked deprecated.
+    // Mapping: @availability(*,deprecated)
     //
     if (auto deprecated = dyn_cast<clang::DeprecatedAttr>(*AI)) {
       auto Message = deprecated->getMessage();
-      auto attr = AvailabilityAttr::createUnconditional(C, Message);
+      auto attr = AvailabilityAttr::createUnconditional(C, Message, "",
+                    UnconditionalAvailabilityKind::Deprecated);
       MappedDecl->getAttrs().add(attr);
-      AnyUnavailable = true;
       continue;
     }
 

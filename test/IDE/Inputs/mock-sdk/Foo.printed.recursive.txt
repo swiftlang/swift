@@ -231,7 +231,7 @@ class FooUnavailableMembers : FooClassBase {
   func unavailable()
   @availability(*, unavailable, message="Not available in Swift")
   func swiftUnavailable()
-  @availability(*, unavailable, message="x")
+  @availability(*, deprecated, message="x")
   func deprecated()
   @availability(OSX, introduced=10.1)
   func availabilityIntroduced()

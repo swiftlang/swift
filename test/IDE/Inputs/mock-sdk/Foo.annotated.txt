@@ -231,7 +231,7 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
   func <loc>unavailable()</loc></decl>
   <decl:Func>@availability(*, unavailable, message="Not available in Swift")
   func <loc>swiftUnavailable()</loc></decl>
-  <decl:Func>@availability(*, unavailable, message="x")
+  <decl:Func>@availability(*, deprecated, message="x")
   func <loc>deprecated()</loc></decl>
   <decl:Func>@availability(OSX, introduced=10.1)
   func <loc>availabilityIntroduced()</loc></decl>
