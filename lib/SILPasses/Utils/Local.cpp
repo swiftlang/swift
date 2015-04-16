@@ -1624,6 +1624,13 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
+
+    if (Inst->use_empty()) {
+      EraseInstAction(Inst);
+      WillSucceedAction();
+      return nullptr;
+    }
+
     SILBuilderWithScope<1> Builder(Inst);
 
     // Try to apply the bridged casts optimizations
