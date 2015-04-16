@@ -372,3 +372,41 @@ func testLetElseOptional2(a : String?) -> String {
   return t
 }
 
+enum MyOpt<T> {
+  case None, Some(T)
+}
+
+// CHECK-LABEL: sil hidden @_TF16if_while_binding28testAddressOnlyEnumInLetElseU__FGOS_5MyOptQ__Q_ 
+// CHECK-NEXT: bb0(%0 : $*T, %1 : $*MyOpt<T>):
+// CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>  // let a
+// CHECK-NEXT: %3 = alloc_stack $T  // let t
+// CHECK-NEXT: %4 = alloc_stack $MyOpt<T>
+// CHECK-NEXT: copy_addr %1 to [initialization] %4#1 : $*MyOpt<T>
+// CHECK-NEXT: switch_enum_addr %4#1 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
+func testAddressOnlyEnumInLetElse<T>(a : MyOpt<T>) -> T {
+// CHECK:  bb1:
+// CHECK-NEXT:   destroy_addr %4#1 : $*MyOpt<T>
+// CHECK-NEXT:   dealloc_stack %4#0
+// CHECK-NEXT:   dealloc_stack %3#0
+// CHECK-NEXT:   br bb3
+  let t? = a else { abort() }
+
+// CHECK:    bb2:
+// CHECK-NEXT:     %11 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
+// CHECK-NEXT:     copy_addr [take] %11 to [initialization] %3#1 : $*T
+// CHECK-NEXT:     dealloc_stack %4#0
+// CHECK-NEXT:     copy_addr [take] %3#1 to [initialization] %0 : $*T
+// CHECK-NEXT:     dealloc_stack %3#0
+// CHECK-NEXT:     destroy_addr %1 : $*MyOpt<T>
+// CHECK-NEXT:     %17 = tuple ()
+// CHECK-NEXT:     return %17 : $()
+  
+// CHECK:    bb3:
+// CHECK-NEXT:     // function_ref if_while_binding.abort () -> ()
+// CHECK-NEXT:     %19 = function_ref @_TF16if_while_binding5abortFT_T_
+// CHECK-NEXT:     %20 = apply %19() : $@convention(thin) @noreturn () -> ()
+// CHECK-NEXT:     unreachable
+
+  return t
+}
+
