@@ -632,6 +632,14 @@ public struct Set<T : Hashable> :
     }
     return result
   }
+
+  //
+  // `SequenceType` conformance
+  //
+
+  public func _customContainsEquatableElement(member: T) -> Bool? {
+    return contains(member)
+  }
 }
 
 /// Check for both subset and equality relationship between

@@ -261,7 +261,10 @@ extension SequenceType ${"" if preds else "where Self.Generator.Element : Compar
 extension SequenceType where Self.Generator.Element : Equatable {
   /// Return `true` iff `x` is in `self`.
   final public func _prext_contains(element: ${GElement}) -> Bool {
-    // FIXME: dynamic dispatch for Set and Dictionary.
+    if let result? = _customContainsEquatableElement(element) {
+      return result
+    }
+
     for e in self {
       if e == element {
         return true

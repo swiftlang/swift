@@ -1179,6 +1179,93 @@ SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/${dispatch}") {
 
 % end
 
+struct SequenceWithCustomContainsMethod : SequenceType {
+  static var timesContainsWasCalled: Int = 0
+
+  internal let _elements: [Int]
+
+  init(_ elements: [Int]) {
+    self._elements = elements
+  }
+
+  func generate() -> MinimalGenerator<MinimalEquatableValue> {
+    // Lie from our generate() method about sequence contents.
+    // Tests using this type should not call generate() anyway.
+    expectUnreachable()
+    return MinimalSequence<MinimalEquatableValue>([]).generate()
+  }
+
+  func _customContainsEquatableElement(
+    element: MinimalEquatableValue
+  ) -> Bool? {
+    ++SequenceWithCustomContainsMethod.timesContainsWasCalled
+    for e in _elements {
+      if e == element.value {
+        return true
+      }
+    }
+    return false
+  }
+}
+
+func callStaticContains(
+  sequence: SequenceWithCustomContainsMethod,
+  element: MinimalEquatableValue) -> Bool {
+  return sequence._prext_contains(element)
+}
+
+% for dispatch in [ 'Static', 'Generic' ]:
+
+SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/CustomImplementation/${dispatch}") {
+  for test in findTests {
+    let s = SequenceWithCustomContainsMethod(test.sequence)
+    SequenceWithCustomContainsMethod.timesContainsWasCalled = 0
+    expectEqual(
+      test.expected != nil,
+      call${dispatch}Contains(s, MinimalEquatableValue(test.element)),
+      stackTrace: test.loc.withCurrentLoc())
+    expectEqual(1, SequenceWithCustomContainsMethod.timesContainsWasCalled)
+  }
+}
+
+% end
+
+% for dispatch in [ 'Static', 'Generic' ]:
+
+// FIXME: implement the same optimization for Dictionary.
+// FIXME: move to the file where other Set tests live.
+SequenceTypeAlgorithms.test("Set<T>.contains/WhereElementIsEquatable/CustomImplementation/${dispatch}") {
+  for test in findTests {
+    let s = Set<MinimalHashableValue>(
+      test.sequence.map { MinimalHashableValue($0) })
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    MinimalHashableValue.timesHashValueWasCalled = 0
+    expectEqual(
+      test.expected != nil,
+      s._prext_contains(MinimalHashableValue(test.element)),
+      stackTrace: test.loc.withCurrentLoc())
+    if test.sequence.isEmpty {
+      expectEqual(
+        0, MinimalHashableValue.timesEqualEqualWasCalled,
+        stackTrace: test.loc.withCurrentLoc())
+      expectEqual(
+        0, MinimalHashableValue.timesHashValueWasCalled,
+        stackTrace: test.loc.withCurrentLoc())
+    } else {
+      expectNotEqual(
+        0, MinimalHashableValue.timesHashValueWasCalled,
+        stackTrace: test.loc.withCurrentLoc())
+    }
+    if test.expected != nil {
+      expectNotEqual(
+        0, MinimalHashableValue.timesEqualEqualWasCalled,
+        stackTrace: test.loc.withCurrentLoc())
+    }
+  }
+}
+
+% end
+
 SequenceTypeAlgorithms.test("contains/Predicate") {
   for test in findTests {
     let s = MinimalSequence<OpaqueValue<Int>>(

@@ -82,6 +82,12 @@ extension _SequenceDefaultsType {
   final public func _prext_underestimateCount() -> Int {
     return 0
   }
+
+  final public func _customContainsEquatableElement(
+    element: Generator.Element
+  ) -> Bool? {
+    return nil
+  }
 }
 
 /// This protocol is an implementation detail of `SequenceType`; do
@@ -108,6 +114,10 @@ public protocol _Sequence_Type
   ///
   /// Complexity: O(N)
   func _prext_underestimateCount() -> Int
+
+  func _customContainsEquatableElement(
+    element: Generator.Element
+  ) -> Bool?
 }
 
 /// A type that can be iterated with a `for`\ ...\ `in` loop.
