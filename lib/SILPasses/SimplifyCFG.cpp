@@ -805,9 +805,17 @@ static SILBasicBlock *getTrampolineDest(SILBasicBlock *SBB) {
     return nullptr;
 
   // Check that the arguments are the same and in the right order.
-  for (int i = 0, e = SBB->getNumBBArg(); i < e; ++i)
-    if (BrArgs[i] != SBB->getBBArg(i))
+  for (int i = 0, e = SBB->getNumBBArg(); i < e; ++i) {
+    SILArgument *BBArg = SBB->getBBArg(i);
+    if (BrArgs[i] != BBArg)
       return nullptr;
+    
+    // The arguments may not be used in another block, because when the
+    // predecessor of SBB directly jumps to the successor, the SBB block does
+    // not dominate the other use anymore.
+    if (!BBArg->hasOneUse())
+      return nullptr;
+  }
 
   return BI->getDestBB();
 }
