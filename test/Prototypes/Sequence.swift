@@ -14,7 +14,7 @@
 import StdlibUnittest
 
 public protocol Q_SequenceDefaultsType {
-  typealias Element
+//  typealias Element
   typealias Generator : GeneratorType
   func generate() -> Generator
 }
@@ -53,7 +53,7 @@ extension Q_SequenceDefaultsType {
     }
   }
 
-  public final static func _constrainElement(Generator.Element) {}
+//  public final static func _constrainElement(Generator.Element) {}
 }
 
 /// A type that can be iterated with a `for`\ ...\ `in` loop.
@@ -84,15 +84,15 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
 
   /// Create a ContiguousArray containing the elements of `self`,
   /// in the same order.
-  func copyToContiguousArray() -> ContiguousArray<Element>
+  func copyToContiguousArray() -> ContiguousArray<Generator.Element>
 
   /// Initialize the storage at baseAddress with the contents of this
   /// sequence.
   func initializeRawMemory(
-    baseAddress: UnsafeMutablePointer<Element>
+    baseAddress: UnsafeMutablePointer<Generator.Element>
   )
   
-  static func _constrainElement(Element)
+//  static func _constrainElement(Element)
 }
 
 public extension GeneratorType {
@@ -109,6 +109,12 @@ public protocol Q_IndexableType {
   subscript(position: Index) -> Element {get}
   var startIndex: Index {get}
   var endIndex: Index {get}
+}
+
+extension Q_IndexableType {
+  public final func generate() -> Q_IndexingGenerator<Self> {
+    return Q_IndexingGenerator(pos: self.startIndex, elements: self)
+  }
 }
 
 public protocol Q_CollectionDefaultsType : Q_IndexableType, Q_SequenceType {}
@@ -154,16 +160,13 @@ extension Array : Q_CollectionType {
   }
 }
 
+
 struct Boo : Q_CollectionType {
   let startIndex: Int = 0
   let endIndex: Int = 10
   
   subscript(i: Int) -> String {
     return "Boo"
-  }
-
-  func generate() -> Q_IndexingGenerator<Boo> {
-    return Q_IndexingGenerator(pos: self.startIndex, elements: self)
   }
 }
 
