@@ -96,18 +96,20 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
 }
 
 public extension GeneratorType {
-  typealias Generator = Self
-  
-  public final func generate() -> Generator {
+  public final func generate() -> Self {
     return self
   }
 }
 
-public protocol Q_CollectionDefaultsType : Q_SequenceType {
+public protocol Q_IndexableType {
   typealias Index : ForwardIndexType
+  typealias Element
+  subscript(position: Index) -> Element {get}
   var startIndex: Index {get}
   var endIndex: Index {get}
 }
+
+public protocol Q_CollectionDefaultsType : Q_IndexableType, Q_SequenceType {}
 
 extension Q_CollectionDefaultsType {
   public final func count() -> Index.Distance {
@@ -124,6 +126,21 @@ extension Q_CollectionDefaultsType {
   }
 }
 
+public struct Q_IndexingGenerator<C: Q_IndexableType> : GeneratorType, Q_SequenceType {
+  public typealias Element = C.Element
+  var pos: C.Index
+  let elements: C
+  
+  public mutating func next() -> C.Element? {
+    if pos == elements.endIndex {
+      return nil
+    }
+    let ret = elements[pos]
+    ++pos
+    return ret
+  }
+}
+
 public protocol Q_CollectionType : Q_CollectionDefaultsType {
   func count() -> Index.Distance
   subscript(position: Index) -> Element {get}
@@ -132,6 +149,19 @@ public protocol Q_CollectionType : Q_CollectionDefaultsType {
 extension Array : Q_CollectionType {
   public func copyToContiguousArray() -> ContiguousArray<Element> {
     return ContiguousArray(self~>_copyToNativeArrayBuffer())
+  }
+}
+
+struct Boo : Q_CollectionType {
+  let startIndex: Int = 0
+  let endIndex: Int = 10
+  
+  subscript(i: Int) -> String {
+    return "Boo"
+  }
+
+  func generate() -> Q_IndexingGenerator<Boo> {
+    return Q_IndexingGenerator(pos: self.startIndex, elements: self)
   }
 }
 
