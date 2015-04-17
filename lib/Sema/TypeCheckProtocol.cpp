@@ -1477,11 +1477,13 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   assert(!resultReplacement->isDependentType() && "Can't be dependent");
   SmallVector<ProtocolConformance *, 4> conformances;
 
+  bool isError = replacement->is<ErrorType>();
   for (auto proto : archetype->getConformsTo()) {
     ProtocolConformance *conformance = nullptr;
     bool conforms = tc.conformsToProtocol(replacement, proto, dc, false,
                                           &conformance);
-    assert(conforms && "Conformance should already have been verified");
+    assert((conforms || isError) &&
+           "Conformance should already have been verified");
     (void)conforms;
     conformances.push_back(conformance);
   }
@@ -2438,7 +2440,16 @@ ConformanceChecker::resolveSingleTypeWitness(AssociatedTypeDecl *assocType) {
   // Note that we're resolving this witness.
   assert(ResolvingTypeWitnesses.count(assocType) == 0 && "Currently resolving");
   ResolvingTypeWitnesses.insert(assocType);
-  defer([&]{ ResolvingTypeWitnesses.erase(assocType); });
+  defer([&]{
+    ResolvingTypeWitnesses.erase(assocType);
+
+    // If we didn't compute a type witness, record an error.
+    if (!Conformance->hasTypeWitness(assocType, nullptr)) {
+      recordTypeWitness(assocType, ErrorType::get(TC.Context),
+                        assocType, DC, true);
+      Conformance->setState(ProtocolConformanceState::Invalid);
+    }
+  });
 
   // Try to resolve this type witness via name lookup, which is the
   // most direct mechanism.
@@ -2663,7 +2674,7 @@ void ConformanceChecker::checkConformance() {
   llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
   SuppressDiagnostics = false;
 
-  // FIXME: Caller checks that this the type conforms to all of the
+  // FIXME: Caller checks that this type conforms to all of the
   // inherited protocols.
   
   // Resolve any associated type members via lookup.
@@ -2672,7 +2683,7 @@ void ConformanceChecker::checkConformance() {
     if (!assocType)
       continue;
 
-    // If we've already determined this type witness, skip it.
+    // Check if we've already looked for a type witness.
     if (Conformance->hasTypeWitness(assocType))
       continue;
 
