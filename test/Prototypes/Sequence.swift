@@ -101,6 +101,8 @@ public extension GeneratorType {
   }
 }
 
+public typealias Q_ConcreteGeneratorType = protocol<GeneratorType, Q_SequenceType>
+
 public protocol Q_IndexableType {
   typealias Index : ForwardIndexType
   typealias Element
@@ -126,7 +128,7 @@ extension Q_CollectionDefaultsType {
   }
 }
 
-public struct Q_IndexingGenerator<C: Q_IndexableType> : GeneratorType, Q_SequenceType {
+public struct Q_IndexingGenerator<C: Q_IndexableType> : Q_ConcreteGeneratorType {
   public typealias Element = C.Element
   var pos: C.Index
   let elements: C
