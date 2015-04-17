@@ -1233,9 +1233,9 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *inst) {
   }
 
   doPostProcess(inst,
-    getBuilder().createOpenExistentialRef(getOpLocation(inst->getLoc()),
-                                          getOpValue(inst->getOperand()),
-                                          getOpType(inst->getType())));
+    getBuilder().createOpenExistentialMetatype(getOpLocation(inst->getLoc()),
+                                               getOpValue(inst->getOperand()),
+                                               getOpType(inst->getType())));
 }
 
 template<typename ImplClass>
