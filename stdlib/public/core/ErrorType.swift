@@ -17,6 +17,7 @@ public protocol _ErrorType {
   var code: Int { get }
 }
 
+#if _runtime(_ObjC)
 // Helper functions for the C++ runtime to have easy access to domain and
 // code as Objective-C values.
 @asmname("swift_stdlib_getErrorDomainNSString")
@@ -34,3 +35,4 @@ public func _stdlib_getErrorCode<T : _ErrorType>(x: UnsafePointer<T>) -> Int {
 // NSError.
 @asmname("swift_bridgeErrorTypeToNSError")
 public func _bridgeErrorTypeToNSError(e: _ErrorType) -> AnyObject
+#endif
