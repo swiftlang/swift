@@ -127,7 +127,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INSIDE_CONCRETE1_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE3 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE3_SUB | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME_SUB
-// FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE4 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE4 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONSTRAINED_GENERIC_3 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONSTRAINED_GENERIC_3_SUB | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME_SUB
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INSIDE_CONCRETE2_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME

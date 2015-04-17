@@ -465,7 +465,6 @@ static void lookupVisibleMemberDeclsImpl(
   // If the base is a protocol composition, enumerate members of the protocols.
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
     for (auto Proto : PC->getProtocols())
-      // FIXME:
       lookupVisibleMemberDeclsImpl(Proto, Consumer, CurrDC, LS, Reason,
                                    TypeResolver, Visited);
     return;
