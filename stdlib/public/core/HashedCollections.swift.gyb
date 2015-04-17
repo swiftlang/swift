@@ -1803,6 +1803,10 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   internal func indexForKey(key: Key) -> Index? {
+    if count == 0 {
+      // Fast path that avoids computing the hash of the key.
+      return .None
+    }
     let (i, found) = _find(key, _bucket(key))
     return found ? i : .None
   }
@@ -1831,6 +1835,11 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   internal func maybeGet(key: Key) -> Value? {
+    if count == 0 {
+      // Fast path that avoids computing the hash of the key.
+      return .None
+    }
+
     let (i, found) = _find(key, _bucket(key))
     if found {
       return self[i.offset]!.value

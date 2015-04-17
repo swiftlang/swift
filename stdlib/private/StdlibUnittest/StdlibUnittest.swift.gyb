@@ -2498,6 +2498,131 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
 
 %end
 
+/// A type that does not conform to any protocols.
+///
+/// This type can be used to check that generic functions don't rely on any
+/// conformances.
+public struct OpaqueValue<Underlying> {
+  public var value: Underlying
+  public var identity: Int
+
+  public init(_ value: Underlying) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Underlying, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+}
+
+/// A type that conforms only to `Equatable`.
+///
+/// This type can be used to check that generic functions don't rely on any
+/// other conformances.
+public struct MinimalEquatableValue : Equatable {
+  public static var timesEqualEqualWasCalled: Int = 0
+
+  public var value: Int
+  public var identity: Int
+
+  public init(_ value: Int) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Int, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+}
+public func == (
+  lhs: MinimalEquatableValue,
+  rhs: MinimalEquatableValue
+) -> Bool {
+  ++MinimalEquatableValue.timesEqualEqualWasCalled
+  return lhs.value == rhs.value
+}
+
+% for kind in [ 'Value', 'Class' ]:
+%   Self = 'MinimalHashable%s' % kind
+
+/// A type that conforms only to `Equatable` and `Hashable`.
+///
+/// This type can be used to check that generic functions don't rely on any
+/// other conformances.
+public struct ${Self} : Equatable, Hashable {
+  public static var timesEqualEqualWasCalled: Int = 0
+  public static var timesHashValueWasCalled: Int = 0
+
+  public var value: Int
+  public var identity: Int
+
+  public init(_ value: Int) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Int, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+
+  public var hashValue: Int {
+    ++${Self}.timesHashValueWasCalled
+    return value.hashValue
+  }
+}
+
+public func == (
+  lhs: ${Self},
+  rhs: ${Self}
+) -> Bool {
+  ++${Self}.timesEqualEqualWasCalled
+  return lhs.value == rhs.value
+}
+
+% end
+
+/// A type that conforms only to `Equatable` and `Comparable`.
+///
+/// This type can be used to check that generic functions don't rely on any
+/// other conformances.
+public struct MinimalComparableValue : Equatable, Comparable {
+  public static var timesEqualEqualWasCalled: Int = 0
+  public static var timesLessWasCalled: Int = 0
+
+  public var value: Int
+  public var identity: Int
+
+  public init(_ value: Int) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Int, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+}
+
+public func == (
+  lhs: MinimalComparableValue,
+  rhs: MinimalComparableValue
+) -> Bool {
+  ++MinimalComparableValue.timesEqualEqualWasCalled
+  return lhs.value == rhs.value
+}
+
+public func < (
+  lhs: MinimalComparableValue,
+  rhs: MinimalComparableValue
+) -> Bool {
+  ++MinimalComparableValue.timesLessWasCalled
+  return lhs.value < rhs.value
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

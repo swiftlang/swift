@@ -204,6 +204,18 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
   assert(d[20]! == 1020)
   assert(d[30]! == 1030)
   assert(d[40]! == 2040)
+
+  if true {
+    var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    MinimalHashableValue.timesHashValueWasCalled = 0
+    expectEmpty(d2[MinimalHashableValue(42)])
+
+    // If the dictionary is empty, we shouldn't be computing the hash value of
+    // the provided key.
+    expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+  }
 }
 
 DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
@@ -246,6 +258,19 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
   assert(d[TestKeyTy(20)]!.value == 1020)
   assert(d[TestKeyTy(30)]!.value == 1030)
   assert(d[TestKeyTy(40)]!.value == 2040)
+
+  if true {
+    var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
+    MinimalHashableClass.timesEqualEqualWasCalled = 0
+    MinimalHashableClass.timesHashValueWasCalled = 0
+
+    expectEmpty(d2[MinimalHashableClass(42)])
+
+    // If the dictionary is empty, we shouldn't be computing the hash value of
+    // the provided key.
+    expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+  }
 }
 
 
@@ -425,6 +450,18 @@ DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
     assert(foundIndex1 == nil)
     assert(identity1 == unsafeBitCast(d, Word.self))
   }
+
+  if true {
+    var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    MinimalHashableValue.timesHashValueWasCalled = 0
+    expectEmpty(d2.indexForKey(MinimalHashableValue(42)))
+
+    // If the dictionary is empty, we shouldn't be computing the hash value of
+    // the provided key.
+    expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+  }
 }
 
 DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
@@ -449,6 +486,18 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
     var foundIndex1 = d.indexForKey(TestKeyTy(1111))
     assert(foundIndex1 == nil)
     assert(identity1 == unsafeBitCast(d, Word.self))
+  }
+
+  if true {
+    var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
+    MinimalHashableClass.timesEqualEqualWasCalled = 0
+    MinimalHashableClass.timesHashValueWasCalled = 0
+    expectEmpty(d2.indexForKey(MinimalHashableClass(42)))
+
+    // If the dictionary is empty, we shouldn't be computing the hash value of
+    // the provided key.
+    expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
   }
 }
 

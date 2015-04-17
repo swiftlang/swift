@@ -369,6 +369,18 @@ SetTestSuite.test("COW.Fast.ContainsDoesNotReallocate") {
 
   expectTrue(s.contains(1010))
   expectEqual(identity1, unsafeBitCast(s, Word.self))
+
+  if true {
+    var s2: Set<MinimalHashableValue> = []
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    MinimalHashableValue.timesHashValueWasCalled = 0
+    expectFalse(s2.contains(MinimalHashableValue(42)))
+
+    // If the set is empty, we shouldn't be computing the hash value of the
+    // provided key.
+    expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+  }
 }
 
 SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate") {
@@ -402,6 +414,18 @@ SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate") {
   expectTrue(s.contains(TestKeyTy(2020)))
   expectTrue(s.contains(TestKeyTy(3030)))
   expectTrue(s.contains(TestKeyTy(4040)))
+
+  if true {
+    var s2: Set<MinimalHashableClass> = []
+    MinimalHashableClass.timesEqualEqualWasCalled = 0
+    MinimalHashableClass.timesHashValueWasCalled = 0
+    expectFalse(s2.contains(MinimalHashableClass(42)))
+
+    // If the set is empty, we shouldn't be computing the hash value of the
+    // provided key.
+    expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+  }
 }
 
 SetTestSuite.test("COW.Fast.InsertDoesNotReallocate") {
@@ -521,6 +545,18 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
     expectEmpty(foundIndex1)
     expectEqual(identity1, unsafeBitCast(s, Word.self))
   }
+
+  if true {
+    var s2: Set<MinimalHashableValue> = []
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    MinimalHashableValue.timesHashValueWasCalled = 0
+    expectEmpty(s2.indexOf(MinimalHashableValue(42)))
+
+    // If the set is empty, we shouldn't be computing the hash value of the
+    // provided key.
+    expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+  }
 }
 
 SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
@@ -544,6 +580,18 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
     var foundIndex1 = s.indexOf(TestKeyTy(1111))
     expectEmpty(foundIndex1)
     expectEqual(identity1, unsafeBitCast(s, Word.self))
+  }
+
+  if true {
+    var s2: Set<MinimalHashableClass> = []
+    MinimalHashableClass.timesEqualEqualWasCalled = 0
+    MinimalHashableClass.timesHashValueWasCalled = 0
+    expectEmpty(s2.indexOf(MinimalHashableClass(42)))
+
+    // If the set is empty, we shouldn't be computing the hash value of the
+    // provided key.
+    expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
   }
 }
 
