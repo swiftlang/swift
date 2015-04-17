@@ -1,7 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-// XFAIL: linux
-
 func curry<T, U, V>(f: (T, U) -> V)(_ x: T)(_ y: U) -> V {
   return f(x, y)
 }
