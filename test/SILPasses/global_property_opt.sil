@@ -142,40 +142,6 @@ bb3(%a1 : $Array<X>):
   return %10 : $Bool
 }
 
-// CHECK-LABEL: sil @test_unknown_init
-// CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
-// CHECK: [[R:%[0-9]+]] = apply [[F]]
-// CHECK: return [[R]]
-sil @test_unknown_init : $@convention(thin) (@owned _ArrayBuffer<X>) -> Bool {
-bb0(%0 : $_ArrayBuffer<X>):
-  %a1 = struct $Array<X> (%0 : $_ArrayBuffer<X>)
-
-  %f1 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
-  %10 = apply %f1(%a1) : $@convention(method) (@guaranteed Array<X>) -> Bool
-  return %10 : $Bool
-}
-
-// CHECK-LABEL: sil @test_buffer_overwritten
-// CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
-// CHECK: [[R:%[0-9]+]] = apply [[F]]
-// CHECK: return [[R]]
-sil @test_buffer_overwritten : $@convention(thin) (@owned _ArrayBuffer<X>) -> Bool {
-bb0(%0 : $_ArrayBuffer<X>):
-  %1 = alloc_stack $Array<X>
-  %3 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
-  %4 = apply %3() : $@convention(thin) () -> @owned Array<X>
-  store %4 to %1#1 : $*Array<X>
-
-  %b1 = struct_element_addr %1#1 : $*Array<X>, #Array._buffer
-  store %0 to %b1 : $*_ArrayBuffer<X>
-
-  %5 = load %1#1 : $*Array<X>
-  %6 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
-  %10 = apply %6(%5) : $@convention(method) (@guaranteed Array<X>) -> Bool
-  dealloc_stack %1#0 : $*@local_storage Array<X>
-  return %10 : $Bool
-}
-
 // CHECK-LABEL: sil @test_tuple
 // CHECK: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
 // CHECK: [[R:%[0-9]+]] = struct $Bool ([[I]] : $Builtin.Int1)
