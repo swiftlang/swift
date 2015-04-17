@@ -243,10 +243,6 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.setStageName("EarlyLoopOpt");
   AddHighLevelLoopOptPasses(PM);
-  
-  PM.addDeadFunctionElimination();
-  PM.addGlobalPropertyOpt();
-  
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 
