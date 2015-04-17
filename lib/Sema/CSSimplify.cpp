@@ -1706,6 +1706,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (auto meta1 = type1->getAs<MetatypeType>()) {
         if (meta1->getInstanceType()->mayHaveSuperclass()
             && type2->isAnyObject()) {
+          increaseScore(ScoreKind::SK_UserConversion);
           return addSolvedRestrictedConstraint(
                            ConversionRestrictionKind::ClassMetatypeToAnyObject);
         }
@@ -1723,6 +1724,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         if (auto protoTy = meta1->getInstanceType()->getAs<ProtocolType>()) {
           if (protoTy->getDecl()->isObjC()
               && isProtocolClassType(type2)) {
+            increaseScore(ScoreKind::SK_UserConversion);
             return addSolvedRestrictedConstraint(
                     ConversionRestrictionKind::ProtocolMetatypeToProtocolClass);
           }
@@ -1732,6 +1734,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // Class-constrained existential metatypes can be converted to AnyObject.
         if (meta1->getInstanceType()->isClassExistentialType()
             && type2->isAnyObject()) {
+          increaseScore(ScoreKind::SK_UserConversion);
           return addSolvedRestrictedConstraint(
                      ConversionRestrictionKind::ExistentialMetatypeToAnyObject);
         }
