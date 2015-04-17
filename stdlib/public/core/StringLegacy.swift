@@ -138,6 +138,7 @@ extension String {
   /// If the string represents an integer that fits into an Int, returns
   /// the corresponding integer.  This accepts strings that match the regular
   /// expression "[-+]?[0-9]+" only.
+  @availability(*, deprecated, message="Use Int() initializer")
   public func toInt() -> Int? {
     var scalars = self.unicodeScalars
 

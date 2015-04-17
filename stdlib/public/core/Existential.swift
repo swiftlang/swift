@@ -19,17 +19,17 @@
 // their respective protocols.
 
 /// Deprecated; use `AnyGenerator<T>` instead
-// @availability(*, unavailable, renamed="AnyGenerator")
+@availability(*, deprecated, renamed="AnyGenerator")
 public struct GeneratorOf<T> : GeneratorType, SequenceType {
 
   /// Deprecated; use `anyGenerator { ... }`` instead
-  // @availability(*, unavailable, renamed="anyGenerator")
+  @availability(*, deprecated, renamed="anyGenerator")
   public init(_ nextElement: ()->T?) {
     self._next = nextElement
   }
   
   /// Deprecated; use `anyGenerator(base)`` instead
-  // @availability(*, unavailable, renamed="anyGenerator")
+  @availability(*, deprecated, renamed="anyGenerator")
   public init<G: GeneratorType where G.Element == T>(var _ base: G) {
     self._next = { base.next() }
   }
@@ -53,7 +53,7 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
 }
 
 /// Deprecated; use `AnySequence<T>` instead
-// @availability(*, unavailable, renamed="AnySequence")
+@availability(*, deprecated, renamed="AnySequence")
 public struct SequenceOf<T> : SequenceType {
   /// Construct an instance whose `generate()` method forwards to
   /// `makeUnderlyingGenerator`
