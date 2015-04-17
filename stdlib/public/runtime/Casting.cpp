@@ -414,7 +414,22 @@ _setupClassMask() {
 size_t swift::swift_classMask = _setupClassMask();
 uint8_t swift::swift_classShift = 0;
 
-/// Dynamically cast a class object to a Swift class type.
+
+/// Dynamically cast a class metatype to a Swift class metatype.
+static const ClassMetadata *
+_dynamicCastClassMetatype(const ClassMetadata *sourceType,
+                          const ClassMetadata *targetType) {
+  do {
+    if (sourceType == targetType) {
+      return sourceType;
+    }
+    sourceType = _swift_getSuperclass(sourceType);
+  } while (sourceType);
+  
+  return nullptr;
+}
+
+/// Dynamically cast a class instance to a Swift class type.
 const void *
 swift::swift_dynamicCastClass(const void *object,
                               const ClassMetadata *targetType) {
@@ -429,13 +444,8 @@ swift::swift_dynamicCastClass(const void *object,
 
   auto isa = _swift_getClassOfAllocated(object);
 
-  do {
-    if (isa == targetType) {
-      return object;
-    }
-    isa = _swift_getSuperclass(isa);
-  } while (isa);
-
+  if (_dynamicCastClassMetatype(isa, targetType))
+    return object;
   return nullptr;
 }
 
@@ -1109,7 +1119,6 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
   _failCorruptType(targetType);
 }
 
-#if SWIFT_OBJC_INTEROP
 const Metadata *
 swift::swift_dynamicCastMetatype(const Metadata *sourceType,
                                  const Metadata *targetType) {
@@ -1131,11 +1140,17 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
       SWIFT_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
+#if SWIFT_OBJC_INTEROP
       // We go through ObjC lookup to deal with potential runtime magic in ObjC
       // land.
       if (swift_dynamicCastObjCClassMetatype((const ClassMetadata*)sourceType,
                                              (const ClassMetadata*)targetType))
         return origSourceType;
+#else
+      if (_dynamicCastClassMetatype((const ClassMetadata*)sourceType,
+                                    (const ClassMetadata*)targetType))
+        return origSourceType;
+#endif
       return nullptr;
     }
     case MetadataKind::ForeignClass: {
@@ -1238,11 +1253,17 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
       SWIFT_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
+#if SWIFT_OBJC_INTEROP
       // We go through ObjC lookup to deal with potential runtime magic in ObjC
       // land.
       swift_dynamicCastObjCClassMetatypeUnconditional(
                                             (const ClassMetadata*)sourceType,
                                             (const ClassMetadata*)targetType);
+#else
+      if (!_dynamicCastClassMetatype((const ClassMetadata*)sourceType,
+                                     (const ClassMetadata*)targetType))
+        swift_dynamicCastFailure(sourceType, targetType);
+#endif
       // If we returned, then the cast succeeded.
       return origSourceType;
     }
@@ -1323,7 +1344,6 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     return origSourceType;
   }
 }
-#endif
 
 /// Do a dynamic cast to the target class.
 static bool _dynamicCastUnknownClass(OpaqueValue *dest,

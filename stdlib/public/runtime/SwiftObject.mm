@@ -1006,6 +1006,21 @@ swift::swift_dynamicCastObjCClassMetatypeUnconditional(
   swift_dynamicCastFailure(source, dest);
 }
 
+extern "C" const char *swift_getGenericClassObjCName(const ClassMetadata *clas,
+                                                     const char *basename) {
+  // FIXME: We should use a runtime mangler to form the real mangled name of the
+  // generic instance. Since we don't have a runtime mangler yet, just tack the
+  // address of the class onto the basename, which is totally lame but at least
+  // gives a unique name to the ObjC runtime.
+  size_t baseLen = strlen(basename);
+  size_t alignMask = alignof(char) - 1;
+  auto fullName = (char*)swift_slowAlloc(baseLen + 17, alignMask);
+  snprintf(fullName, baseLen + 17, "%s%016llX", basename,
+           (unsigned long long)clas);
+  return fullName;
+}
+#endif
+
 const ClassMetadata *
 swift::swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
                                              const ClassMetadata *targetType) {
@@ -1023,21 +1038,6 @@ swift::swift_dynamicCastForeignClassMetatypeUnconditional(
   // the metadata.
   return sourceType;
 }
-
-extern "C" const char *swift_getGenericClassObjCName(const ClassMetadata *clas,
-                                                     const char *basename) {
-  // FIXME: We should use a runtime mangler to form the real mangled name of the
-  // generic instance. Since we don't have a runtime mangler yet, just tack the
-  // address of the class onto the basename, which is totally lame but at least
-  // gives a unique name to the ObjC runtime.
-  size_t baseLen = strlen(basename);
-  size_t alignMask = alignof(char) - 1;
-  auto fullName = (char*)swift_slowAlloc(baseLen + 17, alignMask);
-  snprintf(fullName, baseLen + 17, "%s%016llX", basename,
-           (unsigned long long)clas);
-  return fullName;
-}
-#endif
 
 // Given a non-nil object reference, return true iff the object uses
 // native swift reference counting.

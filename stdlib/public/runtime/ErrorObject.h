@@ -115,10 +115,17 @@ struct SwiftError : SwiftErrorHeader {
   bool isPureNSError() const { return false; }
 #endif
   
+#if SWIFT_OBJC_INTEROP
   /// Get the type of the contained value.
   const Metadata *getType() const;
   /// Get the ErrorType protocol witness table for the contained type.
   const WitnessTable *getErrorConformance() const;
+#else
+  /// Get the type of the contained value.
+  const Metadata *getType() const { return type; }
+  /// Get the ErrorType protocol witness table for the contained type.
+  const WitnessTable *getErrorConformance() const { return errorConformance; }
+#endif
   
   // Don't copy or move, please.
   SwiftError(const SwiftError &) = delete;

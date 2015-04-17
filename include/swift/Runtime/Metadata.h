@@ -2340,19 +2340,20 @@ extern "C" const void *
 swift_dynamicCastUnknownClassUnconditional(const void *object,
                                            const Metadata *targetType);
 
-#if SWIFT_OBJC_INTEROP
 extern "C" const Metadata *
 swift_dynamicCastMetatype(const Metadata *sourceType,
                           const Metadata *targetType);
 extern "C" const Metadata *
 swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
                                        const Metadata *targetType);
+#if SWIFT_OBJC_INTEROP
 extern "C" const ClassMetadata *
 swift_dynamicCastObjCClassMetatype(const ClassMetadata *sourceType,
                                    const ClassMetadata *targetType);
 extern "C" const ClassMetadata *
 swift_dynamicCastObjCClassMetatypeUnconditional(const ClassMetadata *sourceType,
                                                 const ClassMetadata *targetType);
+#endif
 
 extern "C" const ClassMetadata *
 swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
@@ -2361,7 +2362,6 @@ extern "C" const ClassMetadata *
 swift_dynamicCastForeignClassMetatypeUnconditional(
   const ClassMetadata *sourceType,
   const ClassMetadata *targetType);
-#endif
 
 /// \brief Return the dynamic type of an opaque value.
 ///
