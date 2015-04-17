@@ -5,6 +5,10 @@
 // FIXME: Should be a SIL test, but we can't parse same-type constraints
 // <rdar://problem/16238241>
 
+// REQUIRES: disabled
+// <rdar://problem/20592059> test/IRGen/generic_same_type.swift depends on
+// stdlib implementation details and was XFAIL'ed
+
 protocol Runcible {
   typealias Mince
   typealias Quince

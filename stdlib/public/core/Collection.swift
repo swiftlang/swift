@@ -95,6 +95,25 @@ extension _CollectionDefaultsType {
   }
 }
 
+/// This protocol is an implementation detail of `CollectionType`; do
+/// not use it directly.
+///
+/// Its requirements are inherited by `CollectionType` and thus must
+/// be satisfied by types conforming to that protocol.
+public protocol _CollectionGeneratorDefaultsType {
+  typealias Index : ForwardIndexType
+  typealias Element
+  subscript(position: Index) -> Element { get }
+  var startIndex: Index { get }
+  var endIndex: Index { get }
+}
+
+extension _CollectionGeneratorDefaultsType {
+  final public func generate() -> IndexingGenerator<Self> {
+    return IndexingGenerator(self)
+  }
+}
+
 /// A multi-pass *sequence* with addressable positions.
 ///
 /// Positions are represented by an associated `Index` type.  Whereas
@@ -110,7 +129,8 @@ extension _CollectionDefaultsType {
 ///     let x = self[i]
 ///   }
 public protocol CollectionType
-  : _CollectionType, _CollectionDefaultsType, SequenceType {
+  : _CollectionType, _CollectionDefaultsType,
+  _CollectionGeneratorDefaultsType, SequenceType {
 
   /// Access the element indicated by `position`.
   ///
@@ -214,7 +234,7 @@ public protocol MutableCollectionType : CollectionType {
 ///      }
 ///    }
 public struct IndexingGenerator<
-  C: _CollectionType
+  C: _CollectionGeneratorDefaultsType
 > : GeneratorType, SequenceType {
   // Because of <rdar://problem/14396120> we've had to factor
   // _CollectionType out of CollectionType to make it useful.
@@ -236,7 +256,7 @@ public struct IndexingGenerator<
   /// element exists.
   ///
   /// Requires: no preceding call to `self.next()` has returned `nil`.
-  public mutating func next() -> C._Element? {
+  public mutating func next() -> C.Element? {
     return _position == _elements.endIndex
     ? .None : .Some(_elements[_position++])
   }

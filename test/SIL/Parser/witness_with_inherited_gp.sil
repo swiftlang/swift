@@ -1,5 +1,10 @@
 // RUN: %target-sil-opt %s -verify -module-name WitnessTableWithGP | FileCheck %s
 
+// REQUIRES: disabled
+// FIXME: <rdar://problem/20592011>
+// test/SIL/Parser/witness_with_inherited_gp.sil depends on stdlib
+// implementation details and was XFAIL'ed
+
 import Swift
 
 public struct mmEnumerateGenerator<

@@ -146,7 +146,11 @@ internal class _${Kind}Box<S : ${Kind}Type>
   typealias Element = S.Generator.Element
   
   override func generate() -> _AnyGeneratorBase {
-    return _GeneratorBox(_base.generate())
+    // FIXME: an intermediate variable is a workaround for:
+    // <rdar://problem/20582672> _GeneratorBox(_base.generate()) does
+    // not compile when put into one expression
+    let x = _base.generate()
+    return _GeneratorBox(x)
   }
   override func _underestimateCount() -> Int {
     return Swift.underestimateCount(_base)

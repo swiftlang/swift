@@ -2221,6 +2221,111 @@ SequenceTypeAlgorithms.test("_copyToNativeArrayBuffer/OverestimatedCount") {
 }
 
 //===----------------------------------------------------------------------===//
+// CollectionType.generate(), CollectionType.Generator
+//===----------------------------------------------------------------------===//
+
+struct MinimalCollectionWithDefaultGenerator : CollectionType {
+  init(count: Int) {
+    self._count = count
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    return OpaqueValue(i.position + 1)
+  }
+
+  var _count: Int
+}
+
+func callGenericGenerate<S : SequenceType>(sequence: S) -> S.Generator {
+  return sequence.generate()
+}
+
+SequenceTypeAlgorithms.test("CollectionType.generate()/DefaultImplementation") {
+  for count in [ 0, 5 ] {
+    let collection = MinimalCollectionWithDefaultGenerator(count: count)
+
+    // Check the return type of the function when called statically.
+    var generator = collection.generate()
+    expectType(
+      IndexingGenerator<MinimalCollectionWithDefaultGenerator>.self,
+      &generator)
+
+    // Check the return type of the function when called generically.
+    var genericGenerator = callGenericGenerate(collection)
+    expectType(
+      IndexingGenerator<MinimalCollectionWithDefaultGenerator>.self,
+      &genericGenerator)
+
+    checkForwardCollection(
+      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      collection,
+      { $0.value == $1.value },
+      SourceLocStack().withCurrentLoc())
+  }
+}
+
+struct MinimalCollectionWithCustomGenerator : CollectionType {
+  init(count: Int) {
+    self._count = count
+  }
+
+  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+    return MinimalGenerator<OpaqueValue<Int>>(
+      Array(1..<_count+1)._prext_map { OpaqueValue($0) }
+    )
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    return OpaqueValue(i.position + 1)
+  }
+
+  var _count: Int
+}
+
+SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
+  for count in [ 0, 5 ] {
+    let collection = MinimalCollectionWithCustomGenerator(count: count)
+
+    // Check the return type of the function when called statically.
+    var generator = collection.generate()
+    expectType(
+      MinimalGenerator<OpaqueValue<Int>>.self,
+      &generator)
+
+    // Check the return type of the function when called generically.
+    var genericGenerator = callGenericGenerate(collection)
+    expectType(
+      MinimalGenerator<OpaqueValue<Int>>.self,
+      &genericGenerator)
+
+    checkForwardCollection(
+      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      collection,
+      { $0.value == $1.value },
+      resiliencyChecks: .none,
+      SourceLocStack().withCurrentLoc())
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // isEmpty
 //===----------------------------------------------------------------------===//
 
