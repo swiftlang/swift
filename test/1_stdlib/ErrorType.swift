@@ -1,7 +1,15 @@
 // RUN: %target-run-simple-swift
 
 import StdlibUnittest
+#if _runtime(_ObjC)
 import Foundation
+#else
+func autoreleasepool(@noescape code: () -> ()) {
+  // Native runtime does not have autorelease pools.  Execute the code
+  // directly.
+  code()
+}
+#endif
 
 var ErrorTypeTests = TestSuite("ErrorType")
 
@@ -77,6 +85,9 @@ ErrorTypeTests.test("dynamic casts") {
     // Do the same with rvalues, so we exercise the
     // take-on-success/destroy-on-failure paths.
 
+#if _runtime(_ObjC)
+    // FIXME: on native runtime, the compiler crashes on these statements.
+    // <rdar://problem/20585210> Type checker crashes on parts of test/1_stdlib/ErrorType.swift
     expectEqual(((NoisyError() as _ErrorType) as! NoisyError).domain, "NoisyError")
     expectEqual(((NoisyError() as _ErrorType) as! OtherClassProtocol).otherClassProperty, "otherClassProperty")
     expectEqual(((NoisyError() as _ErrorType) as! OtherProtocol).otherProperty, "otherProperty")
@@ -86,12 +97,14 @@ ErrorTypeTests.test("dynamic casts") {
 
     expectEqual(((NoisyError() as OtherClassProtocol) as! _ErrorType).domain, "NoisyError")
     expectEqual(((NoisyError() as OtherClassProtocol) as! _ErrorType).code, 123)
+#endif
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
 var CanaryHandle = 0
 
+#if _runtime(_ObjC)
 ErrorTypeTests.test("NSError") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
@@ -112,7 +125,9 @@ ErrorTypeTests.test("NSError") {
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
+#endif
 
+#if _runtime(_ObjC)
 ErrorTypeTests.test("NSError-to-enum bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
@@ -152,6 +167,7 @@ ErrorTypeTests.test("NSError-to-enum bridging") {
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
+#endif
 
 func opaqueUpcastToAny<T>(x: T) -> Any {
   return x
@@ -162,6 +178,7 @@ struct StructError: _ErrorType {
   var code: Int { return 4812 }
 }
 
+#if _runtime(_ObjC)
 ErrorTypeTests.test("ErrorType-to-NSError bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
@@ -212,6 +229,7 @@ ErrorTypeTests.test("ErrorType-to-NSError bridging") {
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
+#endif
 
 runAllTests()
 
