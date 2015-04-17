@@ -1151,7 +1151,8 @@ let findTests = [
 
 func callStaticContains(
   sequence: MinimalSequence<MinimalEquatableValue>,
-  element: MinimalEquatableValue) -> Bool {
+  element: MinimalEquatableValue
+) -> Bool {
   return sequence._prext_contains(element)
 }
 
@@ -1230,6 +1231,13 @@ SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/CustomImplementati
 
 % end
 
+func callStaticContains(
+  set: Set<MinimalHashableValue>,
+  element: MinimalHashableValue
+) -> Bool {
+  return set._prext_contains(element)
+}
+
 % for dispatch in [ 'Static', 'Generic' ]:
 
 // FIXME: implement the same optimization for Dictionary.
@@ -1242,7 +1250,7 @@ SequenceTypeAlgorithms.test("Set<T>.contains/WhereElementIsEquatable/CustomImple
     MinimalHashableValue.timesHashValueWasCalled = 0
     expectEqual(
       test.expected != nil,
-      s._prext_contains(MinimalHashableValue(test.element)),
+      call${dispatch}Contains(s, MinimalHashableValue(test.element)),
       stackTrace: test.loc.withCurrentLoc())
     if test.sequence.isEmpty {
       expectEqual(
