@@ -10,10 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
-// FIXME: Various casting issues will have to be fixed to support this
-// collection without the objc runtime.
-
 import SwiftShims
 
 % traversals = ['Forward', 'Bidirectional', 'RandomAccess']
@@ -616,5 +612,3 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   internal let _box: Box
 }
 % end
-
-#endif
