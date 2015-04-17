@@ -36,11 +36,18 @@ func existentialMetatype(x: P) {
 protocol PP: P {}
 protocol Q {}
 
-/* TODO: incorrectly rejected by Sema
+// CHECK-LABEL: sil hidden @_TF21existential_metatypes26existentialMetatypeUpcast1FPMPS_2PP_PMPS_1P_
+// CHECK:         [[OPENED:%.*]] = open_existential_metatype %0
+// CHECK:         [[NEW:%.*]] = init_existential_metatype [[OPENED]]
+// CHECK:         return [[NEW]]
 func existentialMetatypeUpcast1(x: PP.Type) -> P.Type {
   return x
 }
+
+// CHECK-LABEL: sil hidden @_TF21existential_metatypes26existentialMetatypeUpcast2FPMPS_1PS_1Q_PMPS0__
+// CHECK:         [[OPENED:%.*]] = open_existential_metatype %0
+// CHECK:         [[NEW:%.*]] = init_existential_metatype [[OPENED]]
+// CHECK:         return [[NEW]]
 func existentialMetatypeUpcast2(x: protocol<P,Q>.Type) -> P.Type {
   return x
 }
- */

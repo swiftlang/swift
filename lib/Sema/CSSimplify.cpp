@@ -1562,12 +1562,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto meta1 = cast<AnyMetatypeType>(desugar1);
       auto meta2 = cast<AnyMetatypeType>(desugar2);
 
-      // metatype<A> < metatype<B> if A < B and both A and B are classes.
       TypeMatchKind subKind = TypeMatchKind::SameType;
+      // A.Type < B.Type if A < B and both A and B are classes.
       if (isa<MetatypeType>(desugar1) &&
           kind != TypeMatchKind::SameType &&
           meta1->getInstanceType()->mayHaveSuperclass() &&
           meta2->getInstanceType()->getClassOrBoundGenericClass())
+        subKind = std::min(kind, TypeMatchKind::Subtype);
+      // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
+      // and Q.Type are both existential metatypes.
+      else if (isa<ExistentialMetatypeType>(meta1)
+          && isa<ExistentialMetatypeType>(meta2))
         subKind = std::min(kind, TypeMatchKind::Subtype);
       
       return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
