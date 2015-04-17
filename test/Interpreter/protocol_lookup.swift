@@ -29,7 +29,7 @@ extension Int: Fooable {
 }
 
 func fooify<T>(x: T) {
-  if let foo = x as? Fooable {
+  if let foo? = x as? Fooable {
     foo.foo()
   } else {
     println("not fooable")
@@ -92,14 +92,14 @@ extension Int: Barrable {
 }
 
 let foo: Fooable = 2
-if let bar = foo as? Barrable {
+if let bar? = foo as? Barrable {
   bar.bar() // CHECK-NEXT: Int.bar
 } else {
   println("not barrable")
 }
 
 let foo2: Fooable = S()
-if let bar2 = foo2 as? Barrable {
+if let bar2? = foo2 as? Barrable {
   bar2.bar()
 } else {
   println("not barrable") // CHECK-NEXT: not barrable
@@ -127,13 +127,13 @@ extension D: Fungible {
 
 let c1: AnyObject = C()
 let c2: Any = C()
-if let fruncible = c1 as? protocol<Fooable, Runcible> {
+if let fruncible? = c1 as? protocol<Fooable, Runcible> {
   fruncible.foo() // CHECK-NEXT: C
   fruncible.runce() // CHECK-NEXT: C
 } else {
   println("not fooable and runcible")
 }
-if let fruncible = c2 as? protocol<Fooable, Runcible> {
+if let fruncible? = c2 as? protocol<Fooable, Runcible> {
   fruncible.foo() // CHECK-NEXT: C
   fruncible.runce() // CHECK-NEXT: C
 } else {
