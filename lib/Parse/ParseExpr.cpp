@@ -1536,10 +1536,12 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
 
 bool Parser::
 parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
-                               Pattern *&params, SourceLoc &arrowLoc,
+                               Pattern *&params, SourceLoc &throwsLoc,
+                               SourceLoc &arrowLoc,
                                TypeRepr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
   params = nullptr;
+  throwsLoc = SourceLoc();
   arrowLoc = SourceLoc();
   explicitResultType = nullptr;
   inLoc = SourceLoc();
@@ -1565,6 +1567,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
       // Consume the ')', if it's there.
       if (consumeIf(tok::r_paren)) {
+        consumeIf(tok::kw_throws);
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
           if (!canParseType())
@@ -1584,6 +1587,8 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
         return false;
       }
+      
+      consumeIf(tok::kw_throws);
 
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
@@ -1746,6 +1751,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
       params = TuplePattern::create(Context, SourceLoc(), elements,SourceLoc());
     }
+    
+    if (Tok.is(tok::kw_throws))
+      throwsLoc = consumeToken();
 
     // Parse the optional explicit return type.
     if (Tok.is(tok::arrow)) {
@@ -1806,11 +1814,12 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Parse the closure-signature, if present.
   Pattern *params = nullptr;
+  SourceLoc throwsLoc;
   SourceLoc arrowLoc;
   TypeRepr *explicitResultType;
   SourceLoc inLoc;
   SmallVector<CaptureListEntry, 2> captureList;
-  parseClosureSignatureIfPresent(captureList, params, arrowLoc,
+  parseClosureSignatureIfPresent(captureList, params, throwsLoc, arrowLoc,
                                  explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
@@ -1826,7 +1835,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(params, arrowLoc, inLoc,
+  auto *closure = new (Context) ClosureExpr(params, throwsLoc, arrowLoc, inLoc,
                                             explicitResultType,
                                             discriminator, CurDeclContext);
   // The arguments to the func are defined in their own scope.

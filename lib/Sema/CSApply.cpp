@@ -4437,6 +4437,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
   auto newClosure = new (tc.Context)
                       ClosureExpr(closureExpr->getParams(),
                                   SourceLoc(),
+                                  SourceLoc(),
                                   closureExpr->getInLoc(),
                                   TypeLoc(),
                                   closureExpr->getDiscriminator(),

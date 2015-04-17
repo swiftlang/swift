@@ -1126,6 +1126,7 @@ public:
   bool parseClosureSignatureIfPresent(
                                 SmallVectorImpl<CaptureListEntry> &captureList,
                                       Pattern *&params,
+                                      SourceLoc &throwsLoc,
                                       SourceLoc &arrowLoc,
                                       TypeRepr *&explicitResultType,
                                       SourceLoc &inLoc);

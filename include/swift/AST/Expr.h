@@ -2785,6 +2785,9 @@ public:
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
 
+  /// The location of the "throws", if present.
+  SourceLoc ThrowsLoc;
+  
   /// \brief The location of the '->' denoting an explicit return type,
   /// if present.
   SourceLoc ArrowLoc;
@@ -2800,12 +2803,13 @@ class ClosureExpr : public AbstractClosureExpr {
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
 public:
-  ClosureExpr(Pattern *params, SourceLoc arrowLoc, SourceLoc inLoc,
-              TypeLoc explicitResultType, unsigned discriminator,
-              DeclContext *parent)
+  ClosureExpr(Pattern *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
+              SourceLoc inLoc, TypeLoc explicitResultType,
+              unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      ArrowLoc(arrowLoc), InLoc(inLoc), ExplicitResultType(explicitResultType),
+      ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
+      ExplicitResultType(explicitResultType),
       Body(nullptr) {
     setParams(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
@@ -2858,9 +2862,14 @@ public:
     return ArrowLoc;
   }
 
-  /// retrieve the location of the \c in for a closure that has it.
+  /// \brief Retrieve the location of the \c in for a closure that has it.
   SourceLoc getInLoc() const {
     return InLoc;
+  }
+  
+  /// \brief Retrieve the location of the 'throws' for a closure that has it.
+  SourceLoc getThrowsLoc() const {
+    return ThrowsLoc;
   }
 
   /// \brief Retrieve the explicit result type location information.

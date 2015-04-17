@@ -100,3 +100,11 @@ func testSubtypeArgument2(x1: (fn: (String -> Int)) -> Int,
   // expected-note@-1{{expected an argument list of type '((fn: (String throws -> Int)) -> Int)'}}
   subtypeArgument2(x2)
 }
+
+// Closures
+var c1 = {() throws -> Int in 0}
+
+var c2 : () throws -> Int = c1 // ok
+var c3 : () -> Int = c1 // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
+var c4 : () -> Int = {() throws -> Int in 0} // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
+var c5 : () -> Int = { try 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}

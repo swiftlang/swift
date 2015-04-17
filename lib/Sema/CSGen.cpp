@@ -1624,6 +1624,66 @@ namespace {
       expr->setType(expr->getClosureBody()->getType());
       return expr->getType();
     }
+    
+    /// \brief Walk a closure AST to determine if it can throw.
+    static bool closureCanThrow(ClosureExpr *expr) {
+      
+      class FindInnerTryExpressions : public ASTWalker {
+        bool FoundTry = false;
+        
+        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          
+          // If we've found a 'try', record it and terminate the traversal.
+          if (dyn_cast<TryExpr>(expr)) {
+            FoundTry = true;
+            return { false, nullptr };
+          }
+          
+          // Do not recurse into other closures.
+          if (dyn_cast<ClosureExpr>(expr))
+            return { false, expr };
+          
+          return { true, expr };
+        }
+        
+        bool walkToDeclPre(Decl *decl) override {
+          // Do not walk into function or type declarations.
+          if (dyn_cast<AbstractFunctionDecl>(decl) ||
+              dyn_cast<AbstractStorageDecl>(decl) ||
+              dyn_cast<OperatorDecl>(decl) ||
+              dyn_cast<TypeDecl>(decl))
+            return false;
+          
+          return true;
+        }
+        
+        std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+          
+          // Do not walk into 'do' clauses.
+          if (dyn_cast<DoStmt>(stmt)) {
+            return { false, stmt };
+          }
+          
+          return { true, stmt };
+        }
+        
+      public:
+        bool foundTry() { return FoundTry; }
+      };
+      
+      if (expr->getThrowsLoc().isValid())
+        return true;
+      
+      auto body = expr->getBody();
+      
+      if (!body)
+        return false;
+      
+      auto tryFinder = FindInnerTryExpressions();
+      body->walk(tryFinder);
+      return tryFinder.foundTry();
+    }
+    
 
     Type visitClosureExpr(ClosureExpr *expr) {
       
@@ -1666,8 +1726,13 @@ namespace {
                          expr,
                          LocatorPathElt::getTupleElement(0)));
 
+      auto extInfo = FunctionType::ExtInfo();
+      
+      if (closureCanThrow(expr))
+        extInfo = extInfo.withThrows();
+      
       // FIXME: If we want keyword arguments for closures, add them here.
-      funcTy = FunctionType::get(paramTy, funcTy);
+      funcTy = FunctionType::get(paramTy, funcTy, extInfo);
 
       return funcTy;
     }
