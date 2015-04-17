@@ -49,11 +49,9 @@ extension CollectionType where Self.${GElement} : Equatable {
   ///
   /// Complexity: O(\ `self.count()`\ )
   final public func _prext_find(element: ${GElement}) -> Index? {
-    if let result? = _customFindEquatableElement(element) {
-      return result
-    }
-
-    for i in self._prext_indices {
+    // FIXME: dynamic dispatch for Set and Dictionary.
+    // FIXME: _prext_indices
+    for i in indices(self) {
       if self[i] == element {
         return i
       }
