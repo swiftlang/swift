@@ -362,6 +362,19 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return (index >= 0) && (index < __bufferPointer.value.count)
   }
 
+  /// Return whether the given `index` is valid for subscripting, i.e. `0
+  /// ≤ index < count`
+  ///
+  /// For ContiguousArrayBuffer, this is equivalent to the
+  /// `_isValidSubscript(_:hoistedIsNativeBuffer:)` form, but is necessary
+  /// for interface parity with `ArrayBuffer`.
+  @inline(__always)
+  func _isValidSubscript(index : Int, hoistedIsNativeNoTypeCheckBuffer : Bool)
+      -> Bool {
+    return _isValidSubscript(index,
+      hoistedIsNativeNoTypeCheckBuffer : hoistedIsNativeNoTypeCheckBuffer)
+  }
+
   /// How many elements the buffer can store without reallocation
   public var capacity: Int {
     return __bufferPointer.value.capacity
