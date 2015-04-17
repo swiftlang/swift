@@ -1236,8 +1236,19 @@ static Type representsNonTrivialGenericParameter(TypeVariableType *typeVar) {
 
   auto archetype = locator->getPath().back().getArchetype();
   for (auto proto : archetype->getConformsTo()) {
-    if (!proto->isObjC())
-      return archetype;
+    // AnyObject is always trivially representable as a generic parameter;
+    // there is no runtime witness.
+    auto known = proto->getKnownProtocolKind();
+    if (known && *known == KnownProtocolKind::AnyObject)
+      continue;
+    
+    // ObjC protocols are trivially representable as a generic parameter;
+    // they are witnessed by the ObjC runtime.
+    if (proto->isObjC())
+      continue;
+    
+    // Other protocols would need Swift runtime support to self-conform.
+    return archetype;
   }
 
   return nullptr;
