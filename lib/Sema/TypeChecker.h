@@ -666,6 +666,11 @@ public:
     handleExternalDecl(nominal);
   }
 
+  /// Determine whether the given (potentially constrained) protocol extension
+  /// is usable for the given type.
+  bool isProtocolExtensionUsable(DeclContext *dc, Type type,
+                                 ExtensionDecl *protocolExtension) override;
+
   /// Validate the signature of a generic function.
   ///
   /// \param func The generic function.

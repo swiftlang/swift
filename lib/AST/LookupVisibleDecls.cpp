@@ -160,17 +160,28 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   return true;
 }
 
+/// Lookup members in extensions of \p LookupType, using \p BaseType as the
+/// underlying type when checking any constraints on the extensions.
 static void doGlobalExtensionLookup(Type BaseType,
+                                    Type LookupType,
                                     SmallVectorImpl<ValueDecl *> &FoundDecls,
                                     const DeclContext *CurrDC,
                                     LookupState LS,
                                     DeclVisibilityKind Reason,
                                     LazyResolver *TypeResolver) {
-  auto nominal = BaseType->getAnyNominal();
+  auto nominal = LookupType->getAnyNominal();
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
     bool validatedExtension = false;
+    if (TypeResolver && extension->isProtocolExtensionContext()) {
+      if (!TypeResolver->isProtocolExtensionUsable(
+              const_cast<DeclContext *>(CurrDC), BaseType, extension)) {
+        continue;
+      }
+      validatedExtension = true;
+    }
+
     for (auto Member : extension->getMembers()) {
       if (auto VD = dyn_cast<ValueDecl>(Member))
         if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver)) {
@@ -189,15 +200,18 @@ static void doGlobalExtensionLookup(Type BaseType,
   removeShadowedDecls(FoundDecls, CurrDC->getParentModule(), TypeResolver);
 }
 
-/// \brief Enumerate immediate members of the type \c BaseType and its
+/// \brief Enumerate immediate members of the type \c LookupType and its
 /// extensions, as seen from the context \c CurrDC.
 ///
-/// Don't do lookup into superclasses or implemented protocols.
-static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
-                              const DeclContext *CurrDC,
-                              LookupState LS, DeclVisibilityKind Reason,
+/// Don't do lookup into superclasses or implemented protocols.  Uses
+/// \p BaseType as the underlying type when checking any constraints on the
+/// extensions.
+static void lookupTypeMembers(Type BaseType, Type LookupType,
+                              VisibleDeclConsumer &Consumer,
+                              const DeclContext *CurrDC, LookupState LS,
+                              DeclVisibilityKind Reason,
                               LazyResolver *TypeResolver) {
-  NominalTypeDecl *D = BaseType->getAnyNominal();
+  NominalTypeDecl *D = LookupType->getAnyNominal();
   assert(D && "should have a nominal type");
 
   bool LookupFromChildDeclContext = false;
@@ -226,7 +240,7 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
       if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
         FoundDecls.push_back(VD);
   }
-  doGlobalExtensionLookup(BaseType, FoundDecls, CurrDC, LS, Reason,
+  doGlobalExtensionLookup(BaseType, LookupType, FoundDecls, CurrDC, LS, Reason,
                           TypeResolver);
 
   // Report the declarations we found to the consumer.
@@ -372,11 +386,38 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
 
     // Add members from any extensions.
     SmallVector<ValueDecl *, 2> FoundDecls;
-    doGlobalExtensionLookup(Proto->getDeclaredType(), FoundDecls, FromContext,
-                            LS, ReasonForThisProtocol, TypeResolver);
+    doGlobalExtensionLookup(BaseTy, Proto->getDeclaredType(), FoundDecls,
+                            FromContext, LS, ReasonForThisProtocol,
+                            TypeResolver);
     for (auto *VD : FoundDecls)
       Consumer.foundDecl(VD, ReasonForThisProtocol);
   }
+}
+
+static void
+lookupVisibleMemberDeclsImpl(Type BaseTy, VisibleDeclConsumer &Consumer,
+                             const DeclContext *CurrDC, LookupState LS,
+                             DeclVisibilityKind Reason,
+                             LazyResolver *TypeResolver, VisitedSet &Visited);
+
+static void lookupVisibleProtocolMemberDecls(
+    Type BaseTy, ProtocolType *PT, VisibleDeclConsumer &Consumer,
+    const DeclContext *CurrDC, LookupState LS, DeclVisibilityKind Reason,
+    LazyResolver *TypeResolver, VisitedSet &Visited) {
+  if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+    // Handle AnyObject in a special way.
+    doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
+    return;
+  }
+  if (!Visited.insert(PT->getDecl()).second)
+    return;
+
+  for (auto Proto : PT->getDecl()->getProtocols())
+    lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(), Consumer, CurrDC,
+                                 LS, getReasonForSuper(Reason), TypeResolver,
+                                 Visited);
+
+  lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason, TypeResolver);
 }
 
 static void lookupVisibleMemberDeclsImpl(
@@ -416,26 +457,15 @@ static void lookupVisibleMemberDeclsImpl(
 
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
-    if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      // Handle AnyObject in a special way.
-      doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
-      return;
-    }
-    if (!Visited.insert(PT->getDecl()).second)
-      return;
-
-    for (auto Proto : PT->getDecl()->getProtocols())
-      lookupVisibleMemberDeclsImpl(Proto->getDeclaredType(), Consumer, CurrDC,
-                                   LS, getReasonForSuper(Reason), TypeResolver,
-                                   Visited);
-
-    lookupTypeMembers(PT, Consumer, CurrDC, LS, Reason, TypeResolver);
+    lookupVisibleProtocolMemberDecls(BaseTy, PT, Consumer, CurrDC, LS, Reason,
+                                     TypeResolver, Visited);
     return;
   }
 
   // If the base is a protocol composition, enumerate members of the protocols.
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
     for (auto Proto : PC->getProtocols())
+      // FIXME:
       lookupVisibleMemberDeclsImpl(Proto, Consumer, CurrDC, LS, Reason,
                                    TypeResolver, Visited);
     return;
@@ -444,9 +474,9 @@ static void lookupVisibleMemberDeclsImpl(
   // Enumerate members of archetype's requirements.
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
-      lookupVisibleMemberDeclsImpl(Proto->getDeclaredType(), Consumer, CurrDC,
-                                   LS, getReasonForSuper(Reason),
-                                   TypeResolver, Visited);
+      lookupVisibleProtocolMemberDecls(
+          BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
+          getReasonForSuper(Reason), TypeResolver, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
       lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LS,
@@ -461,7 +491,8 @@ static void lookupVisibleMemberDeclsImpl(
       break;
 
     // Look in for members of a nominal type.
-    lookupTypeMembers(BaseTy, Consumer, CurrDC, LS, Reason, TypeResolver);
+    lookupTypeMembers(BaseTy, BaseTy, Consumer, CurrDC, LS, Reason,
+                      TypeResolver);
     lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
                                              Reason, TypeResolver, Visited);
     // If we have a class type, look into its superclass.

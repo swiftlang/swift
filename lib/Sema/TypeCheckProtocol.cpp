@@ -3021,3 +3021,46 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
     return nullptr;
   }
 }
+
+bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
+                                            ExtensionDecl *protocolExtension) {
+  using namespace constraints;
+
+  assert(protocolExtension->isProtocolExtensionContext() &&
+         "Only intended for protocol extensions");
+
+  resolveExtension(protocolExtension);
+
+  // Dig down to the type we care about.
+  type = type->getInOutObjectType()->getRValueType();
+  if (auto metaTy = type->getAs<AnyMetatypeType>())
+    type = metaTy->getInstanceType();
+
+  auto genericSig = protocolExtension->getGenericSignature();
+  auto protCanonSig = protocolExtension->getExtendedType()
+                        ->getAs<ProtocolType>()
+                        ->getDecl()
+                        ->getGenericSignature()
+                        ->getCanonicalSignature();
+  // Unconstrained protocol extensions are usable.
+  if (protCanonSig == genericSig->getCanonicalSignature())
+    return true;
+
+  // Set up a constraint system where we open the generic parameters of the
+  // protocol extension.
+  ConstraintSystem cs(*this, dc, None);
+  llvm::DenseMap<CanType, TypeVariableType *> replacements;
+
+  cs.openGeneric(protocolExtension, genericSig->getGenericParams(),
+                 genericSig->getRequirements(), false, nullptr,
+                 ConstraintLocatorBuilder(nullptr), replacements);
+
+  // Bind the 'Self' type variable to the provided type.
+  CanType selfType = genericSig->getGenericParams()[0]->getCanonicalType();
+  auto selfTypeVar = replacements[selfType];
+  cs.addConstraint(ConstraintKind::Bind, selfTypeVar, type, nullptr);
+
+  // If we can solve the solution, the protocol extension is usable.
+  SmallVector<Solution, 1> solutions;
+  return !cs.solve(solutions);
+}

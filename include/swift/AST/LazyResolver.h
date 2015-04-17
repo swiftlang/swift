@@ -107,6 +107,11 @@ public:
   /// Resolve any implicitly-generated members and conformances for generated
   /// external decls.
   virtual void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) = 0;
+
+  /// Determine whether the given (potentially constrained) protocol extension
+  /// is usable for the given type.
+  virtual bool isProtocolExtensionUsable(DeclContext *dc, Type type,
+                                         ExtensionDecl *protocolExtension) = 0;
 };
 
 

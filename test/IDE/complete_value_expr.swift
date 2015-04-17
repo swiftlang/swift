@@ -118,6 +118,24 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP1 | FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP2 | FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP3 | FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONSTRAINED_GENERIC_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONSTRAINED_GENERIC_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INSIDE_CONCRETE1_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INSIDE_CONCRETE1_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE3 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE3_SUB | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME_SUB
+// FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE4 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONSTRAINED_GENERIC_3 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONSTRAINED_GENERIC_3_SUB | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME_SUB
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INSIDE_CONCRETE2_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INSIDE_CONCRETE2_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_ONLYME
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_TA_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_TA
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_TA_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_TA
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_INIT
 
 // Test code completion of expressions that produce a value.
 
@@ -1472,3 +1490,121 @@ func testGenericConforming3<T: P3>(x: T) {
 // PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP2()[#Void#]{{; name=.+$}}
 // PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP3()[#Void#]{{; name=.+$}}
 // PROTOCOL_EXT_GENERICP3: End completions
+
+struct OnlyMe {}
+protocol P4 {
+  typealias T
+}
+extension P4 where Self.T : P1 {
+  final func extP4WhenP1() {}
+  final var x: Int { return 1 }
+  init() {}
+}
+extension P4 where Self.T : P1 {
+  init(x: Int) {}
+}
+extension P4 where Self.T == OnlyMe {
+  final func extP4OnlyMe() {}
+  final subscript(x: Int) -> Int { return 2 }
+}
+struct Concrete1 : P4 {
+  typealias T = WillConformP1
+}
+struct Generic1<S: P1> : P4 {
+  typealias T = S
+}
+struct Concrete2 : P4 {
+  typealias T = OnlyMe
+}
+struct Generic2<S> : P4 {
+  typealias T = S
+}
+
+func testConstrainedP4(x: P4) {
+  x.#^PROTOCOL_EXT_P4^#
+}
+// PROTOCOL_EXT_P4-NOT: extP4
+
+func testConstrainedConcrete1(x: Concrete1) {
+  x.#^PROTOCOL_EXT_CONCRETE1^#
+}
+func testConstrainedConcrete2(x: Generic1<WillConformP1>) {
+  x.#^PROTOCOL_EXT_CONCRETE2^#
+}
+func testConstrainedGeneric1<S: P1>(x: Generic1<S>) {
+  x.#^PROTOCOL_EXT_CONSTRAINED_GENERIC_1^#
+}
+func testConstrainedGeneric2<S: P4 where S.T : P1>(x: S) {
+  x.#^PROTOCOL_EXT_CONSTRAINED_GENERIC_2^#
+}
+extension Concrete1 {
+  func testInsideConstrainedConcrete1_1() {
+    #^PROTOCOL_EXT_INSIDE_CONCRETE1_1^#
+  }
+  func testInsideConstrainedConcrete1_2() {
+    self.#^PROTOCOL_EXT_INSIDE_CONCRETE1_2^#
+  }
+}
+// PROTOCOL_EXT_P4_P1: Begin completions
+// PROTOCOL_EXT_P4_P1-NOT: extP4OnlyMe()
+// PROTOCOL_EXT_P4_P1-DAG: Decl[InstanceMethod]/Super:         extP4WhenP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_P1-DAG: Decl[InstanceVar]/Super:         x[#Int#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_P1-NOT: extP4OnlyMe()
+// PROTOCOL_EXT_P4_P1: End completions
+
+func testConstrainedConcrete3(x: Concrete2) {
+  x.#^PROTOCOL_EXT_CONCRETE3^#
+}
+func testConstrainedConcrete3_sub(x: Concrete2) {
+  x#^PROTOCOL_EXT_CONCRETE3_SUB^#
+}
+func testConstrainedConcrete4(x: Generic2<OnlyMe>) {
+  x.#^PROTOCOL_EXT_CONCRETE4^#
+}
+func testConstrainedGeneric1<S: P4 where S.T == OnlyMe>(x: S) {
+  x.#^PROTOCOL_EXT_CONSTRAINED_GENERIC_3^#
+}
+func testConstrainedGeneric1_sub<S: P4 where S.T == OnlyMe>(x: S) {
+  x#^PROTOCOL_EXT_CONSTRAINED_GENERIC_3_SUB^#
+}
+extension Concrete2 {
+  func testInsideConstrainedConcrete2_1() {
+    #^PROTOCOL_EXT_INSIDE_CONCRETE2_1^#
+  }
+  func testInsideConstrainedConcrete2_2() {
+    self.#^PROTOCOL_EXT_INSIDE_CONCRETE2_2^#
+  }
+}
+// PROTOCOL_EXT_P4_ONLYME: Begin completions
+// PROTOCOL_EXT_P4_ONLYME-NOT: extP4WhenP1()
+// PROTOCOL_EXT_P4_ONLYME-NOT: x[#Int#]
+// PROTOCOL_EXT_P4_ONLYME-DAG: Decl[InstanceMethod]/Super:    extP4OnlyMe()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_ONLYME-NOT: extP4WhenP1()
+// PROTOCOL_EXT_P4_ONLYME-NOT: x[#Int#]
+// PROTOCOL_EXT_P4_ONLYME: End completions
+
+// PROTOCOL_EXT_P4_ONLYME_SUB: Begin completions
+// PROTOCOL_EXT_P4_ONLYME_SUB: Decl[Subscript]/Super:              [{#Int#}][#Int#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_ONLYME_SUB: End completions
+
+func testTypealias1() {
+  Concrete1.#^PROTOCOL_EXT_TA_1^#
+}
+func testTypealias1<S: P4 where S.T == WillConformP1>() {
+  S.#^PROTOCOL_EXT_TA_2^#
+}
+// PROTOCOL_EXT_TA: Begin completions
+// PROTOCOL_EXT_TA-DAG: Decl[TypeAlias]/{{Super|CurrNominal}}: T
+// PROTOCOL_EXT_TA: End completions
+
+func testProtExtInit1() {
+  Concrete1(#^PROTOCOL_EXT_INIT_1^#
+}
+func testProtExtInit2<S: P4 where S.T : P1>() {
+  S(#^PROTOCOL_EXT_INIT_2^#
+}
+
+// PROTOCOL_EXT_INIT: Begin completions
+// PROTOCOL_EXT_INIT: Decl[Constructor]/Super:            ['('])[#Self#]{{; name=.+$}}
+// PROTOCOL_EXT_INIT: Decl[Constructor]/Super:            ['(']{#x: Int#})[#Self#]{{; name=.+$}}
+// PROTOCOL_EXT_INIT: End completions
