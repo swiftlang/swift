@@ -2070,6 +2070,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     case TypeKind::ExistentialMetatype:
       return !cast<AnyMetatypeType>(type.getPointer())->hasRepresentation();
 
+    case TypeKind::Archetype: {
+      auto arch = type->getAs<ArchetypeType>();
+      return !arch->isOpenedExistential();
+    }
+
     default:
       return true;
     }
