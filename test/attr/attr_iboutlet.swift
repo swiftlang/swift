@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+
 @IBOutlet // expected-error {{only instance properties can be declared @IBOutlet}}
 var iboutlet_global: Int
 

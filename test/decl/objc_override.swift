@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+
 class A {
   @objc func a() { } // expected-note{{method 'a()' declared here}}
 

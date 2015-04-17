@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
 
+// REQUIRES: objc_interop
+
 // Check that casts between bridged types are replaced by more 
 // efficient code sequences.
 // 

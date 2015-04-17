@@ -16,6 +16,8 @@
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) %s -parse -emit-objc-header-path %t/error_handling.h -import-objc-header %S/../Inputs/empty.h
 // RUN: FileCheck %s < %t/error_handling.h
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // CHECK-LABEL: @interface Throwing1

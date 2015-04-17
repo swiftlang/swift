@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+
 @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}}
 var iboutlet_global: Int
 
