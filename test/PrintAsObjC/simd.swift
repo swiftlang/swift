@@ -6,6 +6,8 @@
 // RUN: %check-in-clang %t/simd.h
 // RUN: %check-in-clang -fno-modules %t/simd.h -include Foundation.h
 
+// REQUIRES: objc_interop
+
 import Foundation
 import SIMD
 

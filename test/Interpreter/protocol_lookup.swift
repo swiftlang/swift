@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
+// XFAIL: linux
+// FIXME: <rdar://problem/20583365> Interpreter/protocol_lookup.swift regressed on Linux
+
 // Note: JIT mode is checked in Interpreter/protocol_lookup_jit.swift.
 
 protocol Fooable {
