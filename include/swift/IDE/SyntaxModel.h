@@ -48,7 +48,9 @@ enum class SyntaxNodeKind : uint8_t {
   /// Any occurence of '@<attribute-name>' anywhere.
   AttributeId,
   /// A "resolved/active" attribute. Mis-applied attributes will be AttributeId.
-  AttributeBuiltin
+  AttributeBuiltin,
+  /// An editor placeholder string <#like this#>.
+  EditorPlaceholder,
 };
 
 struct SyntaxNode {

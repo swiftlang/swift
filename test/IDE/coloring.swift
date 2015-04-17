@@ -313,3 +313,6 @@ func test5() -> Int {
 
 // CHECK: <comment-line>// <comment-url>http://whatever.com/what-ever</comment-url></comment-line>
 // http://whatever.com/what-ever
+
+// CHECK: <kw>func</kw> <placeholder><#test1#></placeholder> () {}
+func <#test1#> () {}

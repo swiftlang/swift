@@ -645,6 +645,7 @@ public:
     case SyntaxNodeKind::BuildConfigId: Id = "#id"; break;
     case SyntaxNodeKind::AttributeId: Id = "attr-id"; break;
     case SyntaxNodeKind::AttributeBuiltin: Id = "attr-builtin"; break;
+    case SyntaxNodeKind::EditorPlaceholder: Id = "placeholder"; break;
     }
 
     OS << (Begin ? "<" : "</") << Id << '>';
@@ -671,6 +672,7 @@ public:
     case SyntaxNodeKind::BuildConfigId: Col = llvm::raw_ostream::YELLOW; break;
     case SyntaxNodeKind::AttributeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::AttributeBuiltin: Col = llvm::raw_ostream::MAGENTA; break;
+    case SyntaxNodeKind::EditorPlaceholder: Col = llvm::raw_ostream::YELLOW; break;
     }
 
     if (Begin) {

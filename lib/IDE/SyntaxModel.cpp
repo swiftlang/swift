@@ -85,7 +85,12 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #undef KEYWORD
       case tok::pound_available: Kind =
           SyntaxNodeKind::BuildConfigKeyword; break;
-      case tok::identifier: Kind = SyntaxNodeKind::Identifier; break;
+      case tok::identifier:
+        if (Tok.getText().startswith("<#"))
+          Kind = SyntaxNodeKind::EditorPlaceholder;
+        else
+          Kind = SyntaxNodeKind::Identifier;
+        break;
       case tok::dollarident: Kind = SyntaxNodeKind::DollarIdent; break;
       case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;
       case tok::floating_literal: Kind = SyntaxNodeKind::Floating; break;
