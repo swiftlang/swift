@@ -536,8 +536,26 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
   SILType resultTy = getLoweredLoadableType(ctor->getResultType());
 
-  SILValue initedSelfValue
-    = B.createApply(Loc, initVal.forward(*this), initTy, resultTy, subs, args);
+  auto initFnType = initTy.castTo<SILFunctionType>();
+
+  SILValue initedSelfValue;
+  if (!initFnType->hasErrorResult()) {
+    initedSelfValue =
+      B.createApply(Loc, initVal.forward(*this), initTy, resultTy, subs, args);
+  } else {
+    SILBasicBlock *errorBB = createBasicBlock();
+    SILBasicBlock *normalBB = createBasicBlock();
+    B.createTryApply(Loc, initVal.forward(*this), initTy, subs, args,
+                     normalBB, errorBB);
+
+    B.emitBlock(errorBB);
+    SILValue error =
+      errorBB->createBBArg(initFnType->getErrorResult().getSILType());
+    B.createThrow(Loc, error);
+
+    B.emitBlock(normalBB);
+    initedSelfValue = normalBB->createBBArg(resultTy);
+  }
 
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),

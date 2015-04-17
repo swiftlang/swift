@@ -137,3 +137,24 @@ func all_together_now(flag: Bool) -> Cat {
   }
 }
 
+// Initializers.
+class HasThrowingInit {
+  var field: Int
+  init(value: Int) throws {
+    field = value
+  }
+}
+// CHECK-LABEL: sil hidden @_TFC10exceptions15HasThrowingInitcfMS0_FzT5valueSi_S0_ : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error _ErrorType) {
+// CHECK:      [[T0:%.*]] = mark_uninitialized [rootself] %1 : $HasThrowingInit
+// CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $HasThrowingInit
+// CHECK-NEXT: assign %0 to [[T1]] : $*Int
+// CHECK-NEXT: return [[T0]] : $HasThrowingInit
+
+// CHECK-LABEL: sil hidden @_TFC10exceptions15HasThrowingInitCfMS0_FzT5valueSi_S0_ : $@convention(thin) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error _ErrorType)
+// CHECK:      [[SELF:%.*]] = alloc_ref $HasThrowingInit
+// CHECK:      [[T0:%.*]] = function_ref @_TFC10exceptions15HasThrowingInitcfMS0_FzT5valueSi_S0_ : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error _ErrorType)
+// CHECK-NEXT: try_apply [[T0]](%0, [[SELF]]) : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error _ErrorType), normal bb1, error bb2
+// CHECK:    bb1([[SELF:%.*]] : $HasThrowingInit):
+// CHECK-NEXT: return [[SELF]]
+// CHECK:    bb2([[ERROR:%.*]] : $_ErrorType):
+// CHECK-NEXT: throw [[ERROR]]

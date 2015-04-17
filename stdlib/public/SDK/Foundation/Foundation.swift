@@ -1031,7 +1031,7 @@ func _convertNSErrorToErrorType(error: NSError?) -> _ErrorType
 
 @asmname("swift_convertErrorTypeToNSError")
 public // COMPILER_INTRINSIC
-func _convertNSErrorToErrorType(error: _ErrorType) -> NSError
+func _convertErrorTypeToNSError(error: _ErrorType) -> NSError
 
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods
