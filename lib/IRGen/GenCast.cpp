@@ -215,7 +215,6 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
 
   switch (toMetatype->getRepresentation()) {
   case MetatypeRepresentation::Thick: {
-    assert(IGF.IGM.ObjCInterop && "should have objc runtime");
     // Get the Swift metadata for the type we're checking.
     toMetadata = IGF.emitTypeMetadataRef(toMetatype.getInstanceType());
     switch (mode) {
