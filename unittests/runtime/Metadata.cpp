@@ -458,6 +458,13 @@ TEST(MetadataTest, getExistentialMetadata) {
                 mixedWitnessTable->Flags.getSpecialProtocol());
       return mixedWitnessTable;
     });
+  
+  const ValueWitnessTable *ExpectedErrorTypeValueWitnesses;
+#if SWIFT_OBJC_INTEROP
+  ExpectedErrorTypeValueWitnesses = &_TWVBO;
+#else
+  ExpectedErrorTypeValueWitnesses = &_TWVBo;
+#endif
 
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
@@ -467,7 +474,7 @@ TEST(MetadataTest, getExistentialMetadata) {
       EXPECT_EQ(1U, special->Flags.getNumWitnessTables());
       EXPECT_EQ(SpecialProtocol::ErrorType,
                 special->Flags.getSpecialProtocol());
-      EXPECT_EQ(&_TWVBO,
+      EXPECT_EQ(ExpectedErrorTypeValueWitnesses,
                 special->getValueWitnesses());
       return special;
     });
@@ -481,7 +488,7 @@ TEST(MetadataTest, getExistentialMetadata) {
       // Compositions of special protocols aren't special.
       EXPECT_EQ(SpecialProtocol::None,
                 special->Flags.getSpecialProtocol());
-      EXPECT_NE(&_TWVBO,
+      EXPECT_NE(ExpectedErrorTypeValueWitnesses,
                 special->getValueWitnesses());
       return special;
     });
