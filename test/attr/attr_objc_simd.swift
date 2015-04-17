@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 import SIMD
 
