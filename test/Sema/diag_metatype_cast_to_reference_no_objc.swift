@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -disable-objc-interop -parse %s -verify
 
+class C {}
+
 func test(c: AnyClass) {
-  var obj: AnyObject = c // expected-error {{converting a metatype to a reference is only supported with an Objective-C runtime}}
+  let obj: AnyObject = c // expected-error {{type 'AnyClass' does not conform to protocol 'AnyObject'}}
+  let obj2: AnyObject = C.self // expected-error {{type 'C.Type' does not conform to protocol 'AnyObject'}}
 }

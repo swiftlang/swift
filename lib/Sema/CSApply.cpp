@@ -4744,16 +4744,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return coerceExistential(expr, toType, locator);
 
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
+      assert(tc.getLangOpts().EnableObjCInterop
+             && "metatypes can only be cast to objects w/ objc runtime!");
       return new (tc.Context) ClassMetatypeToObjectExpr(expr, toType);
     }
     case ConversionRestrictionKind::ExistentialMetatypeToAnyObject: {
-      // The SIL generation for this operation winds up going through
-      // an Objective-C object conversion, which doesn't work without the
-      // Objective-C runtime. So only allow it if we're using Objective-C
-      // interop.
-      if (!tc.getLangOpts().EnableObjCInterop) {
-        tc.diagnose(expr->getLoc(), diag::unsupported_objc_metatype_conversion);
-      }
+      assert(tc.getLangOpts().EnableObjCInterop
+             && "metatypes can only be cast to objects w/ objc runtime!");
       return new (tc.Context) ExistentialMetatypeToObjectExpr(expr, toType);
     }
     case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass: {
