@@ -366,8 +366,6 @@ extension String {
       return Int(_swift_stdlib_unicode_compare_utf8_utf8(
         lhsPtr, Int32(_core.count),
         rhsPtr, Int32(rhs._core.count)))
-    default:
-      _preconditionFailure("Unreachable but necessary case for exhaustive switch")
     }
 #endif
   }
