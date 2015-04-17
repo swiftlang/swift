@@ -1238,8 +1238,7 @@ static Type representsNonTrivialGenericParameter(TypeVariableType *typeVar) {
   for (auto proto : archetype->getConformsTo()) {
     // AnyObject is always trivially representable as a generic parameter;
     // there is no runtime witness.
-    auto known = proto->getKnownProtocolKind();
-    if (known && *known == KnownProtocolKind::AnyObject)
+    if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
       continue;
     
     // ObjC protocols are trivially representable as a generic parameter;

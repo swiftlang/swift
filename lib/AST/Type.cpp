@@ -223,10 +223,14 @@ bool CanType::isObjCExistentialTypeImpl(CanType type) {
   if (protocols.empty())
     return false;
 
-  // Any non-@objc protocol makes this no longer ObjC-compatible.
+  // Any non-AnyObject, non-@objc protocol makes this no longer ObjC-compatible.
   for (auto proto : protocols) {
-    if (!proto->isObjC())
-      return false;
+    if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
+      continue;
+    if (proto->isObjC())
+      continue;
+    
+    return false;
   }
   return true;
 }
