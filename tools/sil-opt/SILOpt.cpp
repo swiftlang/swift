@@ -250,6 +250,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::SwiftArrayOpts,
                                    "array-specialize",
                                    "Specialize arrays"),
+                        clEnumValN(PassKind::GlobalPropertyOpt,
+                                   "global-property-opt",
+                                   "Optimize properties"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>

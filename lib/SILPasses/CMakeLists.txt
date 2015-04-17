@@ -34,6 +34,7 @@ add_swift_library(swiftSILPasses
   DeadFunctionElimination.cpp
   GlobalOpt.cpp
   GlobalARCOpts.cpp
+  GlobalPropertyOpt.cpp
   DeadCodeElimination.cpp
   LoopInfoPrinter.cpp
   FunctionSignatureOpts.cpp
