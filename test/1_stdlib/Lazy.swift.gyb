@@ -40,9 +40,10 @@ LazyTestSuite.test("firstLast") {
 
 LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
   let s = MinimalSequence(
-    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
+    [ 0, 30, 10, 90 ]._prext_map { OpaqueValue($0) },
+    underestimatedCount: .Value(42))
   var lazySeq = lazy(s)
-  expectType(LazySequence<MinimalSequence<Int>>.self, &lazySeq)
+  expectType(LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &lazySeq)
   expectEqual(42, underestimateCount(lazySeq))
 }
 
@@ -50,10 +51,14 @@ LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
 
 LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
   let s = Minimal${traversal}Collection(
-    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
+    [ 0, 30, 10, 90 ]._prext_map { OpaqueValue($0) },
+    underestimatedCount: .Value(42))
   var lazySeq = lazy(s)
   expectType(
-    Lazy${traversal}Collection<Minimal${traversal}Collection<Int>>.self, &lazySeq)
+    Lazy${traversal}Collection<
+      Minimal${traversal}Collection<OpaqueValue<Int>>
+    >.self,
+    &lazySeq)
   expectEqual(42, underestimateCount(lazySeq))
 }
 
@@ -65,10 +70,17 @@ LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
 
 LazyTestSuite.test("MapSequenceView<Sequence>/underestimateCount") {
   let s = MinimalSequence(
-    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
-  var lazyMap = lazy(s).map({ $0 })
+    [ 0, 30, 10, 90 ]._prext_map { OpaqueValue($0) },
+    underestimatedCount: .Value(42))
+  var lazyMap = lazy(s).map { OpaqueValue(Int32($0.value)) }
   expectType(
-    LazySequence<MapSequenceView<MinimalSequence<Int>, Int>>.self, &lazyMap)
+    LazySequence<
+      MapSequenceView<
+        MinimalSequence<OpaqueValue<Int>>,
+        OpaqueValue<Int32>
+      >
+    >.self,
+    &lazyMap)
   expectEqual(42, underestimateCount(lazyMap))
 }
 
@@ -76,10 +88,16 @@ LazyTestSuite.test("MapSequenceView<Sequence>/underestimateCount") {
 
 LazyTestSuite.test("MapCollectionView<${traversal}Collection>/underestimateCount") {
   let s = Minimal${traversal}Collection(
-    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
-  var lazyMap = lazy(s).map({ $0 })
+    [ 0, 30, 10, 90 ]._prext_map { OpaqueValue($0) },
+    underestimatedCount: .Value(42))
+  var lazyMap = lazy(s).map { OpaqueValue(Int32($0.value)) }
   expectType(
-    Lazy${traversal}Collection<MapCollectionView<Minimal${traversal}Collection<Int>, Int>>.self,
+    Lazy${traversal}Collection<
+      MapCollectionView<
+        Minimal${traversal}Collection<OpaqueValue<Int>>,
+        OpaqueValue<Int32>
+      >
+    >.self,
     &lazyMap)
   expectEqual(42, underestimateCount(lazyMap))
 }
