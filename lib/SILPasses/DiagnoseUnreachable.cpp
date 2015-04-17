@@ -451,15 +451,13 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
       // noreturn.
       if (isUserCode(CurrentInst) && !DiagnosedUnreachableCode) {
         if (NoReturnCall->getLoc().is<RegularLocation>()) {
-          if (!NoReturnCall->getLoc().isASTNode<ExplicitCastExpr>()) {
-            diagnose(BB.getModule().getASTContext(),
-                     CurrentInst->getLoc().getSourceLoc(),
-                     diag::unreachable_code);
-            diagnose(BB.getModule().getASTContext(),
-                     NoReturnCall->getLoc().getSourceLoc(),
-                     diag::call_to_noreturn_note);
-            DiagnosedUnreachableCode = true;
-          }
+          diagnose(BB.getModule().getASTContext(),
+                   CurrentInst->getLoc().getSourceLoc(),
+                   diag::unreachable_code);
+          diagnose(BB.getModule().getASTContext(),
+                   NoReturnCall->getLoc().getSourceLoc(),
+                   diag::call_to_noreturn_note);
+          DiagnosedUnreachableCode = true;
         }
       }
 
@@ -569,8 +567,6 @@ static bool diagnoseUnreachableBlock(const SILBasicBlock &B,
         // emphasis should be on the condition (to ensure we have a single
         // message per switch).
         const SwitchStmt *SS = BrInfo.Loc.getAsASTNode<SwitchStmt>();
-        if (!SS)
-          break;
         assert(SS);
         const Expr *SE = SS->getSubjectExpr();
         diagnose(M.getASTContext(), SE->getLoc(), diag::switch_on_a_constant);
