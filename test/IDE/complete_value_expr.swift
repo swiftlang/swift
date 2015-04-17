@@ -109,6 +109,16 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INTERPOLATED_STRING_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P3 | FileCheck %s -check-prefix=PROTOCOL_EXT_P3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_WILLCONFORMP1 | FileCheck %s -check-prefix=PROTOCOL_EXT_WILLCONFORMP1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_DIDCONFORMP2 | FileCheck %s -check-prefix=PROTOCOL_EXT_DIDCONFORMP2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_DIDCONFORMP3 | FileCheck %s -check-prefix=PROTOCOL_EXT_DIDCONFORMP3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP1 | FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP2 | FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP3 | FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP3
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -1328,3 +1338,137 @@ func testResolveModules1() {
 func testInterpolatedString1() {
   "\(fooObject.#^INTERPOLATED_STRING_1^#)"
 }
+
+//===--- Check protocol extensions
+
+struct WillConformP1 {
+}
+
+protocol P1 {
+  func reqP1()
+}
+
+protocol P2 : P1 {
+  func reqP2()
+}
+
+protocol P3 : P1, P2 {
+}
+
+extension P1 {
+  final func extP1() {}
+}
+
+extension P2 {
+  final func extP2() {}
+}
+
+extension P3 {
+  final func reqP1() {}
+  final func reqP2() {}
+  final func extP3() {}
+}
+
+extension WillConformP1 : P1 {
+  func reqP1() {}
+}
+
+struct DidConformP2 : P2 {
+  func reqP1() {}
+  func reqP2() {}
+}
+
+struct DidConformP3 : P3 {
+}
+
+func testProtocol1(x: P1) {
+  x.#^PROTOCOL_EXT_P1^#
+}
+// PROTOCOL_EXT_P1: Begin completions
+// PROTOCOL_EXT_P1-DAG: Decl[InstanceMethod]/CurrNominal:   reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P1-DAG: Decl[InstanceMethod]/CurrNominal:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P1: End completions
+
+
+func testProtocol2(x: P2) {
+  x.#^PROTOCOL_EXT_P2^#
+}
+// PROTOCOL_EXT_P2: Begin completions
+// PROTOCOL_EXT_P2-DAG: Decl[InstanceMethod]/Super:   reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P2-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P2-DAG: Decl[InstanceMethod]/CurrNominal:   reqP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P2-DAG: Decl[InstanceMethod]/CurrNominal:   extP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P2: End completions
+
+func testProtocol3(x: P3) {
+  x.#^PROTOCOL_EXT_P3^#
+}
+// PROTOCOL_EXT_P3: Begin completions
+
+// FIXME: the next two should both be "CurrentNominal"
+// PROTOCOL_EXT_P3-DAG: Decl[InstanceMethod]/Super:   reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P3-DAG: Decl[InstanceMethod]/Super:   reqP2()[#Void#]{{; name=.+$}}
+
+// PROTOCOL_EXT_P3-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P3-DAG: Decl[InstanceMethod]/Super:   extP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P3-DAG: Decl[InstanceMethod]/CurrNominal:   extP3()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P3: End completions
+
+func testConformingConcrete1(x: WillConformP1) {
+  x.#^PROTOCOL_EXT_WILLCONFORMP1^#
+}
+// PROTOCOL_EXT_WILLCONFORMP1: Begin completions
+// PROTOCOL_EXT_WILLCONFORMP1-DAG: Decl[InstanceMethod]/CurrNominal:   reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_WILLCONFORMP1-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_WILLCONFORMP1: End completions
+
+func testConformingConcrete2(x: DidConformP2) {
+  x.#^PROTOCOL_EXT_DIDCONFORMP2^#
+}
+// PROTOCOL_EXT_DIDCONFORMP2: Begin completions
+// PROTOCOL_EXT_DIDCONFORMP2-DAG: Decl[InstanceMethod]/CurrNominal:   reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_DIDCONFORMP2-DAG: Decl[InstanceMethod]/CurrNominal:   reqP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_DIDCONFORMP2-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_DIDCONFORMP2-DAG: Decl[InstanceMethod]/Super:   extP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_DIDCONFORMP2: End completions
+
+func testConformingConcrete3(x: DidConformP3) {
+  x.#^PROTOCOL_EXT_DIDCONFORMP3^#
+}
+// PROTOCOL_EXT_DIDCONFORMP3: Begin completions
+// FIXME: the next two should both be "CurrentNominal"
+// PROTOCOL_EXT_DIDCONFORMP3-DAG: Decl[InstanceMethod]/Super:   reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_DIDCONFORMP3-DAG: Decl[InstanceMethod]/Super:   reqP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_DIDCONFORMP3-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_DIDCONFORMP3-DAG: Decl[InstanceMethod]/Super:   extP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_DIDCONFORMP3-DAG: Decl[InstanceMethod]/Super:   extP3()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_DIDCONFORMP3: End completions
+
+func testGenericConforming1<T: P1>(x: T) {
+  x.#^PROTOCOL_EXT_GENERICP1^#
+}
+// PROTOCOL_EXT_GENERICP1: Begin completions
+// PROTOCOL_EXT_GENERICP1-DAG: Decl[InstanceMethod]/Super:   reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP1-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP1: End completions
+
+func testGenericConforming2<T: P2>(x: T) {
+  x.#^PROTOCOL_EXT_GENERICP2^#
+}
+// PROTOCOL_EXT_GENERICP2: Begin completions
+// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super:   reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super:   reqP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP2-DAG: Decl[InstanceMethod]/Super:   extP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP2: End completions
+
+func testGenericConforming3<T: P3>(x: T) {
+  x.#^PROTOCOL_EXT_GENERICP3^#
+}
+// PROTOCOL_EXT_GENERICP3: Begin completions
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   reqP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   reqP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP1()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP2()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP3()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_GENERICP3: End completions

@@ -369,6 +369,13 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         }
       }
     }
+
+    // Add members from any extensions.
+    SmallVector<ValueDecl *, 2> FoundDecls;
+    doGlobalExtensionLookup(Proto->getDeclaredType(), FoundDecls, FromContext,
+                            LS, ReasonForThisProtocol, TypeResolver);
+    for (auto *VD : FoundDecls)
+      Consumer.foundDecl(VD, ReasonForThisProtocol);
   }
 }
 

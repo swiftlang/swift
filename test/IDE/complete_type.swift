@@ -658,7 +658,6 @@ protocol AssocType1 {
 //===--- Test that we can complete types in extension declarations.
 //===---
 
-// FIXME: Filter out protocols.
 extension #^TYPE_IN_EXTENSION_1^#
 
 //===---
