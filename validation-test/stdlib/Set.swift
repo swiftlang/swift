@@ -3226,6 +3226,14 @@ SetTestSuite.test("first") {
   expectEmpty(emptySet.first)
 }
 
+SetTestSuite.test("isEmpty") {
+  let s1 = Set([1010, 2020, 3030])
+  expectFalse(s1.isEmpty)
+
+  let emptySet = Set<Int>()
+  expectTrue(emptySet.isEmpty)
+}
+
 SetTestSuite.test("count") {
   let s1 = Set([1010, 2020, 3030])
   var s2 = Set([4040, 5050, 6060])
@@ -3238,6 +3246,29 @@ SetTestSuite.test("contains") {
   expectTrue(s1.contains(1010))
   expectFalse(s1.contains(999))
   expectFalse(Set<Int>().contains(1010))
+}
+
+SetTestSuite.test("_customContainsEquatableElement") {
+  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
+  expectTrue(s1._customContainsEquatableElement(1010))
+  expectFalse(s1._customContainsEquatableElement(999))
+  expectFalse(Set<Int>()._customContainsEquatableElement(1010))
+}
+
+SetTestSuite.test("indexOf") {
+  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
+  let foundIndex1 = s.indexOf(1010)!
+  expectEqual(1010, s1[foundIndex1])
+
+  expectEmpty(s.indexOf(999))
+}
+
+SetTestSuite.test("_customFindEquatableElement") {
+  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
+  let foundIndex1 = s._customFindEquatableElement(1010)!!
+  expectEqual(1010, s1[foundIndex1])
+
+  expectEmpty(s._customFindEquatableElement(999)!)
 }
 
 SetTestSuite.test("commutative") {
