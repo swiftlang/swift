@@ -1,6 +1,9 @@
 // RUN: %target-parse-verify-swift
 // RUN: not %target-swift-frontend -parse %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
+// Make sure we do not emit availability errors or warnings when -disable-availability-checking is passed
+// RUN: not %target-swift-frontend -parse -disable-availability-checking %s 2>&1 | FileCheck %s '--implicit-check-not=error:' '--implicit-check-not=warning:'
+
 // REQUIRES: OS=macosx
 
 @availability(OSX, introduced=10.9)
@@ -923,6 +926,7 @@ extension ClassToExtend {
 
   // We rely on not allowing nesting of extensions, so test to make sure
   // this emits an error.
+  // CHECK:error: declaration is only valid at file scope
   extension ClassToExtend { } // expected-error {{declaration is only valid at file scope}}
 }
 
