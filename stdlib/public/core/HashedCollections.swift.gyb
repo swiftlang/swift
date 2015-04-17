@@ -640,6 +640,10 @@ public struct Set<T : Hashable> :
   public func _customContainsEquatableElement(member: T) -> Bool? {
     return contains(member)
   }
+
+  public func _customFindEquatableElement(member: T) -> Index?? {
+    return Optional(indexOf(member))
+  }
 }
 
 /// Check for both subset and equality relationship between

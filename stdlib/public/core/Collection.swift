@@ -77,6 +77,22 @@ extension _CollectionDefaultsType {
   final public func _prext_underestimateCount() -> Int {
     return numericCast(count(self))
   }
+
+  /// Customization point for `SequenceType._prext_find()`.
+  ///
+  /// Define this method if the collection can find an element in less than
+  /// O(N) by exploiting collection-specific knowledge.
+  ///
+  /// Returns: `nil` if a linear search should be attempted instead,
+  /// `Optional(nil)` if the element was not found, or
+  /// `Optional(Optional(index))` if an element was found.
+  ///
+  /// Complexity: O(N)
+  final public func _customFindEquatableElement(
+    element: Generator.Element
+  ) -> Index?? {
+    return nil
+  }
 }
 
 /// A multi-pass *sequence* with addressable positions.
@@ -101,6 +117,18 @@ public protocol CollectionType
   /// Requires: `position` indicates a valid position in `self` and
   /// `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get}
+
+  /// Customization point for `SequenceType._prext_find()`.
+  ///
+  /// Define this method if the collection can find an element in less than
+  /// O(N) by exploiting collection-specific knowledge.
+  ///
+  /// Returns: `nil` if a linear search should be attempted instead,
+  /// `Optional(nil)` if the element was not found, or
+  /// `Optional(Optional(index))` if an element was found.
+  ///
+  /// Complexity: O(N)
+  func _customFindEquatableElement(element: Generator.Element) -> Index??
 
   // Do not use this operator directly; call `count(x)` instead
   func ~> (_:Self, _:(_Count, ())) -> Index.Distance
