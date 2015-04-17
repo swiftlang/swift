@@ -175,7 +175,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
 //                             Use Graph Analysis
 //===----------------------------------------------------------------------===//
 
-/// Returns true if Inst is an instruction that would require us to keep the
+/// Returns false if Inst is an instruction that would require us to keep the
 /// alloc_ref alive.
 static bool canZapInstruction(SILInstruction *Inst) {
   // It is ok to eliminate various retains/releases. We are either removing
