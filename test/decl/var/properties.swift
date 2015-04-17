@@ -972,7 +972,7 @@ class rdar16941124Derived : rdar16941124Base {
 
 // Overrides of properties with custom ownership.
 class OwnershipBase {
-  class var defaultObject: AnyObject { return self }
+  class var defaultObject: AnyObject { fatalError("") }
 
   var strongVar: AnyObject? // expected-note{{overridden declaration is here}}
   weak var weakVar: AnyObject?
