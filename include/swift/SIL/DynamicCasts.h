@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SUBTYPING_H
-#define SWIFT_SIL_SUBTYPING_H
+#ifndef SWIFT_SIL_DYNAMICCASTS_H
+#define SWIFT_SIL_DYNAMICCASTS_H
 
 namespace swift {
 
