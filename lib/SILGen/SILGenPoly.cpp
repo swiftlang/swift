@@ -1459,11 +1459,12 @@ SILGenFunction::emitRValueAsOrig(Expr *expr, AbstractionPattern origFormalType,
                               substFormalType, ctxt);
 }
 
+
 //===----------------------------------------------------------------------===//
 // Protocol witnesses
 //===----------------------------------------------------------------------===//
 
-// FIxME: Witnesses are label-invariant to their requirement, so you end up with
+// FIXME: Witnesses are label-invariant to their requirement, so you end up with
 // the obnoxious corner case:
 //
 // protocol LabeledSelfRequirement {
