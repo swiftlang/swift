@@ -15,7 +15,6 @@
 //===--- Definitions needed only while experimental -----------------------===//
 extension _InitializeTo {  }
 extension _CopyToNativeArrayBuffer {  }
-extension _Count {  }
 extension _ContiguousArrayBuffer {
 }
 
@@ -117,10 +116,6 @@ public struct AnySequence<T> : SequenceType {
 }
 
 public func ~> <Element>(
-  source: AnySequence<Element>, _: (_UnderestimateCount, ())
-) -> Int 
-
-public func ~> <Element>(
   source: AnySequence<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) 
@@ -128,10 +123,6 @@ public func ~> <Element>(
 public func ~> <Element>(
   source: AnySequence<Element>, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<Element> 
-
-public func ~> <Element>(
-  source: AnyForwardCollection<Element>, _: (_UnderestimateCount, ())
-) -> Int 
 
 public func ~> <Element>(
   source: AnyForwardCollection<Element>,
@@ -143,13 +134,6 @@ public func ~> <Element>(
 ) -> _ContiguousArrayBuffer<Element> 
 
 public func ~> <Element>(
-  source: AnyForwardCollection<Element>, _: (_Count,())
-) -> IntMax 
-public func ~> <Element>(
-  source: AnyBidirectionalCollection<Element>, _: (_UnderestimateCount, ())
-) -> Int 
-
-public func ~> <Element>(
   source: AnyBidirectionalCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) 
@@ -159,13 +143,6 @@ public func ~> <Element>(
 ) -> _ContiguousArrayBuffer<Element> 
 
 public func ~> <Element>(
-  source: AnyBidirectionalCollection<Element>, _: (_Count,())
-) -> IntMax 
-public func ~> <Element>(
-  source: AnyRandomAccessCollection<Element>, _: (_UnderestimateCount, ())
-) -> Int 
-
-public func ~> <Element>(
   source: AnyRandomAccessCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) 
@@ -173,10 +150,6 @@ public func ~> <Element>(
 public func ~> <Element>(
   source: AnyRandomAccessCollection<Element>, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<Element> 
-
-public func ~> <Element>(
-  source: AnyRandomAccessCollection<Element>, _: (_Count,())
-) -> IntMax 
 
 //===--- ForwardIndex -----------------------------------------------------===//
 //===----------------------------------------------------------------------===//

@@ -16,7 +16,6 @@
 internal typealias _ContiguousArrayStorageBase = AnyObject
 extension _InitializeTo { init() {} }
 extension _CopyToNativeArrayBuffer { init() {} }
-extension _Count { init() {} }
 extension _ContiguousArrayBuffer {
   var _storage: _ContiguousArrayStorageBase { return owner }
   init(_ owner: _ContiguousArrayStorageBase) {
@@ -177,7 +176,7 @@ internal class _CollectionBox<S: CollectionType>
   typealias Element = S.Generator.Element
   
   override func generate() -> _AnyGeneratorBase {
-    return _GeneratorBox(_base.generate())
+    fatalError("")
   }
   override func _underestimateCount() -> Int {
     return Swift.underestimateCount(_base)
@@ -189,7 +188,7 @@ internal class _CollectionBox<S: CollectionType>
     return (_base~>(_CopyToNativeArrayBuffer(), ()))._storage
   }
   override func _count() -> IntMax {
-    return numericCast(_base~>(_Count(), ()))
+    return 0
   }
   override subscript(position: _ForwardIndexBoxType) -> Element {
     if let i? = position._unbox() as S.Index? {
@@ -234,12 +233,6 @@ public struct AnySequence<T> : SequenceType {
 }
 
 public func ~> <Element>(
-  source: AnySequence<Element>, _: (_UnderestimateCount, ())
-) -> Int {
-  return source._box._underestimateCount()
-}
-
-public func ~> <Element>(
   source: AnySequence<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) {
@@ -250,12 +243,6 @@ public func ~> <Element>(
   source: AnySequence<Element>, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<Element> {
   return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
-}
-
-public func ~> <Element>(
-  source: AnyForwardCollection<Element>, _: (_UnderestimateCount, ())
-) -> Int {
-  return source._box._underestimateCount()
 }
 
 public func ~> <Element>(
@@ -272,17 +259,6 @@ public func ~> <Element>(
 }
 
 public func ~> <Element>(
-  source: AnyForwardCollection<Element>, _: (_Count,())
-) -> IntMax {
-  return source._box._count()
-}
-public func ~> <Element>(
-  source: AnyBidirectionalCollection<Element>, _: (_UnderestimateCount, ())
-) -> Int {
-  return source._box._underestimateCount()
-}
-
-public func ~> <Element>(
   source: AnyBidirectionalCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) {
@@ -296,17 +272,6 @@ public func ~> <Element>(
 }
 
 public func ~> <Element>(
-  source: AnyBidirectionalCollection<Element>, _: (_Count,())
-) -> IntMax {
-  return source._box._count()
-}
-public func ~> <Element>(
-  source: AnyRandomAccessCollection<Element>, _: (_UnderestimateCount, ())
-) -> Int {
-  return source._box._underestimateCount()
-}
-
-public func ~> <Element>(
   source: AnyRandomAccessCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) {
@@ -317,12 +282,6 @@ public func ~> <Element>(
   source: AnyRandomAccessCollection<Element>, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<Element> {
   return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
-}
-
-public func ~> <Element>(
-  source: AnyRandomAccessCollection<Element>, _: (_Count,())
-) -> IntMax {
-  return source._box._count()
 }
 
 //===--- ForwardIndex -----------------------------------------------------===//
