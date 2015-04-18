@@ -639,6 +639,26 @@ public:
                  DeclContext *dc,
                  ProtocolConformanceState state);
 
+  /// A callback used to produce a diagnostic for an ill-formed protocol
+  /// conformance that was type-checked before we're actually walking the
+  /// conformance itself, along with a bit indicating whether this diagnostic
+  /// produces an error.
+  struct DelayedConformanceDiag {
+    ValueDecl *Requirement;
+    std::function<void()> Callback;
+    bool IsError;
+  };
+
+  /// Add a delayed diagnostic produced while type-checking a
+  /// particular protocol conformance.
+  void addDelayedConformanceDiag(NormalProtocolConformance *conformance,
+                                 DelayedConformanceDiag fn);
+
+  /// Retrieve the delayed-conformance diagnostic callbacks for the
+  /// given normal protocol conformance.
+  std::vector<DelayedConformanceDiag>
+  takeDelayedConformanceDiags(NormalProtocolConformance *conformance);
+
   /// \brief Produce a specialized conformance, which takes a generic
   /// conformance and substitutes
   ///

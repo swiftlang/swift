@@ -181,6 +181,12 @@ struct ASTContext::Implementation {
   llvm::DenseMap<const AbstractFunctionDecl *,
                  ForeignErrorConvention> ForeignErrorConventions;
 
+  /// Map from normal protocol conformances to diagnostics that have
+  /// been delayed until the conformance is fully checked.
+  llvm::DenseMap<NormalProtocolConformance *,
+                 std::vector<ASTContext::DelayedConformanceDiag>>
+    DelayedConformanceDiags;
+
   /// Conformance loaders for declarations that have them.
   llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
     ConformanceLoaders;
@@ -1412,6 +1418,23 @@ std::pair<LazyMemberLoader *, uint64_t> ASTContext::takeConformanceLoader(
   auto known = Impl.ConformanceLoaders.find(decl);
   auto result = known->second;
   Impl.ConformanceLoaders.erase(known);
+  return result;
+}
+
+void ASTContext::addDelayedConformanceDiag(
+       NormalProtocolConformance *conformance,
+       DelayedConformanceDiag fn) {
+  Impl.DelayedConformanceDiags[conformance].push_back(std::move(fn));
+}
+
+std::vector<ASTContext::DelayedConformanceDiag>
+ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance *conformance){
+  std::vector<ASTContext::DelayedConformanceDiag> result;
+  auto known = Impl.DelayedConformanceDiags.find(conformance);
+  if (known != Impl.DelayedConformanceDiags.end()) {
+    result = std::move(known->second);
+    Impl.DelayedConformanceDiags.erase(known);
+  }
   return result;
 }
 

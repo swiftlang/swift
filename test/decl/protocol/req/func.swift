@@ -231,9 +231,6 @@ struct X10 : P10 {
   func bar<T>(x: T) { }
 }
 
-// <rdar://problem/15715996>
-// FIXME: This should type-check; for now, we're testing that it does
-// not crash.
 protocol P11 {
   func ==(x: Self, y: Self) -> Bool
 }
@@ -243,7 +240,7 @@ protocol P12 {
   func getIndex() -> Index // expected-note{{protocol requires function 'getIndex()' with type '() -> X12.Index'}}
 }
 
-struct XIndexType : P11 { } // expected-error{{type 'XIndexType' does not conform to protocol 'P11'}}
+struct XIndexType : P11 { }
 
 struct X12 : P12 { // expected-error{{type 'X12' does not conform to protocol 'P12'}}
   func getIndex() -> XIndexType { return XIndexType() } // expected-note{{candidate has non-matching type '() -> XIndexType'}}
