@@ -170,7 +170,10 @@ if True:
 }%
 
 ${SelfDocComment}
-public struct ${Self}<T> : _CollectionType, MutableCollectionType, Sliceable, _DestructorSafeContainer {
+public struct ${Self}<T>
+  : CollectionType, MutableCollectionType, Sliceable,
+  _DestructorSafeContainer {
+
   /// The type of element stored by this `${Self}`
   public typealias Element = T
 
@@ -874,7 +877,7 @@ func _arrayOutOfPlaceReplace<
 /// A _debugPrecondition check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
-internal func _expectEnd<C: _CollectionType>(
+internal func _expectEnd<C : CollectionType>(
   i: C.Index, s: C
 ) {
   _debugPrecondition(
@@ -1177,11 +1180,11 @@ func _arrayReserve<_Buffer: _ArrayBufferType>(
 }
 
 public func _extractOrCopyToNativeArrayBuffer<
-  _Buffer: _ArrayBufferType
-where _Buffer.Generator.Element == _Buffer.Element,
-      _Buffer.Element == _Buffer._Element
->(source: _Buffer) 
-  -> _ContiguousArrayBuffer<_Buffer.Element> 
+  Buffer : _ArrayBufferType
+  where
+  Buffer.Generator.Element == Buffer.Element
+>(source: Buffer) 
+  -> _ContiguousArrayBuffer<Buffer.Generator.Element> 
 {
   if let n? = source.requestNativeBuffer() {
     return n
@@ -1191,10 +1194,10 @@ where _Buffer.Generator.Element == _Buffer.Element,
 
 /// Append items from newItems to buffer
 func _arrayAppendSequence<
-  _Buffer: _ArrayBufferType,
-  S: SequenceType where S.Generator.Element == _Buffer.Element
+  Buffer : _ArrayBufferType,
+  S : SequenceType where S.Generator.Element == Buffer.Element
 >(
-  inout buffer: _Buffer, newItems: S
+  inout buffer: Buffer, newItems: S
 ) {
   var stream = newItems.generate()
   var nextItem = stream.next()

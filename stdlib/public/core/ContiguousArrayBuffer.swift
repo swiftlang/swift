@@ -541,7 +541,7 @@ extension _ContiguousArrayBuffer : CollectionType {
 }
 
 public func ~> <
-  S: _Sequence_Type
+  S : _Sequence_Type
 >(
   source: S, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<S.Generator.Element>
@@ -565,8 +565,7 @@ public func ~> <
 }
 
 public func ~> <
-  C: protocol<_CollectionType, _Sequence_Type>
-  where C._Element == C.Generator.Element
+  C : CollectionType
 >(
   source: C, _:(_CopyToNativeArrayBuffer, ())
 ) -> _ContiguousArrayBuffer<C.Generator.Element>
@@ -575,8 +574,7 @@ public func ~> <
 }
 
 func _copyCollectionToNativeArrayBuffer<
-  C: protocol<_CollectionType, _Sequence_Type>
-  where C._Element == C.Generator.Element
+  C : CollectionType
 >(source: C) -> _ContiguousArrayBuffer<C.Generator.Element>
 {
   let count: Int = numericCast(Swift.count(source))

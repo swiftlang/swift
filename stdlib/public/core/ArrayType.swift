@@ -10,18 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol __ArrayType : _CollectionType {
+public protocol __ArrayType : CollectionType {
   var count: Int {get}
 
   typealias _Buffer : _ArrayBufferType
   var _buffer: _Buffer {get}
   
-  func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<_Element>
+  func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Generator.Element>
 }
 
 public func ~> <
-  A: protocol<__ArrayType, _Sequence_Type>
-  where A._Element == A.Generator.Element
+  A : __ArrayType
 >(
   source: A, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<A.Generator.Element> {

@@ -172,7 +172,7 @@ public func ~> <T : protocol<_Sequence_Type, _ArrayType>>(
 
 // Default implementation of `preprocessingPass` for *collections*.  Do not
 // use this operator directly; call `_preprocessingPass(s)` instead
-public func ~> <T : _CollectionType, R>(
+public func ~> <T : CollectionType, R>(
   s: T, args: (_PreprocessingPass, ( (T)->R ))
 ) -> R? {
   return args.1(s)
