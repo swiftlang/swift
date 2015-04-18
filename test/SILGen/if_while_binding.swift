@@ -410,3 +410,13 @@ func testAddressOnlyEnumInLetElse<T>(a : MyOpt<T>) -> T {
   return t
 }
 
+
+
+// CHECK-LABEL: sil hidden @_TF16if_while_binding19testCleanupEmissionU__FQ_T_
+// <rdar://problem/20563234> let-else problem: cleanups for bound patterns shouldn't be run in the else block
+protocol MyProtocol {}
+func testCleanupEmission<T>(x: T) {
+  // SILGen shouldn't crash/verify abort on this example.
+  let x2? = x as? MyProtocol else { return }
+}
+

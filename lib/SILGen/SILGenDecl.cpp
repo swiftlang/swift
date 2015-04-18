@@ -804,16 +804,28 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, Type patternType) {
 }
 
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
-  // If this is a conditional PBD, it will have an 'else' block.  Prepare for
-  // its emission.
+  // If this is a conditional PBD, it will have an 'else' block.  Create a block
+  // and emit code into it before processing any of the patterns, because none
+  // of the bound variables will be in scope in the 'else' context.
   JumpDest elseBB = JumpDest::invalid();
   if (PBD->isRefutable()) {
     assert(PBD->getElse().isExplicit() &&
            "Refutable PatternBinding must have an else block");
 
     // Create a basic block for the else block we'll jump to.
-    elseBB = JumpDest(createBasicBlock(),
-                      getCleanupsDepth(), CleanupLocation(PBD));
+    elseBB = JumpDest(createBasicBlock(), getCleanupsDepth(),
+                      CleanupLocation(PBD));
+    
+    // Move the insertion point to the 'else' block temporarily and emit the
+    // body of the 'else'.
+    SavedInsertionPoint savedIP(*this, elseBB.getBlock());
+    emitStmt(PBD->getElse().getExplicitBody());
+
+    // The else block must end in a noreturn call, return, break etc.  It
+    // isn't valid to fall off into the normal flow.  To model this, we emit
+    // an unreachable instruction and then have SIL diagnostic check this.
+    if (B.hasValidInsertionPoint())
+      B.createUnreachable(PBD);
   }
 
   // Allocate the variables and build up an Initialization over their
@@ -829,21 +841,6 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
       emitExprInto(Init, initialization.get());
     } else {
       initialization->finishInitialization(*this);
-    }
-  }
-
-
-  // For our conditional PBD, emit the else block logic.
-  if (elseBB.getBlock()) {  // Emit the else block logic.
-    // Move the insertion point to the throw destination.
-    SavedInsertionPoint savedIP(*this, elseBB.getBlock());
-
-    emitStmt(PBD->getElse().getExplicitBody());
-    if (B.hasValidInsertionPoint()) {
-      // The else block must end in a noreturn call, return, break etc.  It
-      // isn't valid to fall off into the normal flow.  To model this, we emit
-      // an unreachable instruction and then have SIL diagnostic check this.
-      B.createUnreachable(PBD);
     }
   }
 }
