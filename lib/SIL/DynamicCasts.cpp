@@ -811,8 +811,7 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
 /// things handleable by the scalar checked casts --- and that's not
 /// totally unreasonable --- you will need to make the scalar checked
 /// casts take a cast consumption kind.
-bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
-                                                CanType sourceType,
+bool swift::canUseScalarCheckedCastInstructions(CanType sourceType,
                                                 CanType targetType) {
   // Look through one level of optionality on the source.
   auto sourceObjectType = sourceType;
@@ -848,8 +847,7 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
                                       SILValue dest, CanType targetType,
                                       SILBasicBlock *indirectSuccBB,
                                       SILBasicBlock *indirectFailBB) {
-  assert(canUseScalarCheckedCastInstructions(B.getModule(),
-                                             sourceType, targetType));
+  assert(canUseScalarCheckedCastInstructions(sourceType, targetType));
 
   // We only need a different failure block if the cast consumption
   // requires us to destroy the source value.

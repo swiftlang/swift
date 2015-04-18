@@ -250,7 +250,7 @@ namespace {
 
   private:
     CastStrategy getStrategy() const {
-      if (canUseScalarCheckedCastInstructions(SGF.SGM.M, SourceType, TargetType))
+      if (canUseScalarCheckedCastInstructions(SourceType, TargetType))
         return CastStrategy::Scalar;
       return CastStrategy::Address;
     }

@@ -63,8 +63,7 @@ bool emitSuccessfulIndirectUnconditionalCast(
 
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions, or does we need to use the indirect instructions?
-bool canUseScalarCheckedCastInstructions(
-    SILModule &M, CanType sourceType, CanType targetType);
+bool canUseScalarCheckedCastInstructions(CanType sourceType,CanType targetType);
 
 /// Carry out the operations required for an indirect conditional cast
 /// using a scalar cast operation.
