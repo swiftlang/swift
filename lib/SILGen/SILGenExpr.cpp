@@ -27,6 +27,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "ExitableFullExpr.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -1591,11 +1592,13 @@ RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
                                       E->getCastKind(), C);
 }
 
+
 RValue RValueEmitter::
 visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                 SGFContext C) {
-  return emitConditionalCheckedCast(SGF, E, E->getSubExpr(), E->getType(),
-                                    E->getCastKind(), C);
+  ManagedValue operand = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  return emitConditionalCheckedCast(SGF, E, operand, E->getSubExpr()->getType(),
+                                    E->getType(), E->getCastKind(), C);
 }
 
 RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {

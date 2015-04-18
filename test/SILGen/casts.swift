@@ -73,16 +73,15 @@ struct S : P {}
 // CHECK:   [[T0:%.*]] = load [[TMP]]#1 : $*S
 // CHECK:   [[T1:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, [[T0]] : $S
 // CHECK:   dealloc_stack [[TMP]]#0
-// CHECK:   dealloc_stack [[COPY]]#0
 // CHECK:   br bb3([[T1]] : $Optional<S>)
 //   Failure block.
 // CHECK: bb2:
 // CHECK:   [[T0:%.*]] = enum $Optional<S>, #Optional.None!enumelt
 // CHECK:   dealloc_stack [[TMP]]#0
-// CHECK:   dealloc_stack [[COPY]]#0
 // CHECK:   br bb3([[T0]] : $Optional<S>)
 //   Continuation block.
 // CHECK: bb3([[RESULT:%.*]] : $Optional<S>):
+// CHECK:   dealloc_stack [[COPY]]#0
 // CHECK:   destroy_addr [[IN]] : $*P
 // CHECK:   return [[RESULT]]
 func downcast_existential_conditional(p: P) -> S? {

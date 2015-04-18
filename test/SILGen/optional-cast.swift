@@ -8,7 +8,6 @@ func foo(y : A?) {
 }
 // CHECK-DAG: sil hidden @_TF4main3foo
 // CHECK:      [[X:%.*]] = alloc_box $Optional<B>
-// CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[X]]#1 : $*Optional<B>, #Optional.Some
 //   Materialize the parameter.
 // CHECK-NEXT: [[TMP_OPTA:%.*]] = alloc_stack $Optional<A>
 // CHECK-NEXT: retain_value %0
@@ -25,21 +24,21 @@ func foo(y : A?) {
 // CHECK:    [[IS_PRESENT]]:
 // CHECK-NEXT: [[TMP_A:%.*]] = unchecked_take_enum_data_addr [[TMP_OPTA]]#1
 // CHECK-NEXT: [[VAL:%.*]] = load [[TMP_A]]
+// CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[X]]#1 : $*Optional<B>, #Optional.Some
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //   If so, materialize that and inject it into x.
 // CHECK:    [[IS_B]]([[T0:%.*]] : $B):
 // CHECK-NEXT: store [[T0]] to [[X_VALUE]] : $*B
 // CHECK-NEXT: inject_enum_addr [[X]]#1 : $*Optional<B>, #Optional.Some
-// CHECK-NEXT: dealloc_stack [[TMP_OPTA]]#0
 // CHECK-NEXT: br [[CONT:bb[0-9]+]]
 //   If not, release the A and inject nothing into x.
 // CHECK:    [[NOT_B]]:
 // CHECK-NEXT: strong_release [[VAL]]
 // CHECK-NEXT: inject_enum_addr [[X]]#1 : $*Optional<B>, #Optional.None
-// CHECK-NEXT: dealloc_stack [[TMP_OPTA]]#0
 // CHECK-NEXT: br [[CONT]]
 //   Finish the prsent path.
 // CHECK:    [[CONT]]:
+// CHECK-NEXT: dealloc_stack [[TMP_OPTA]]#0
 // CHECK-NEXT: br [[CONT2:bb[0-9]+]]
 //   Finish the not-present path.
 // CHECK:    [[NOT_PRESENT]]:
@@ -59,7 +58,6 @@ func bar(y : A????) {
 // CHECK-NEXT: [[TMP_OB:%.*]] = init_enum_data_addr [[TMP_OOB]]
 // CHECK-NEXT: [[TMP_B:%.*]] = init_enum_data_addr [[TMP_OB]]
 // CHECK-NEXT: [[TMP_OB2:%.*]] = alloc_stack $Optional<B>
-// CHECK-NEXT: [[TMP_OB2_VALUE:%.*]] = init_enum_data_addr [[TMP_OB2]]#1 : $*Optional<B>, #Optional.Some
 // CHECK-NEXT: [[TMP_OA:%.*]] = alloc_stack $Optional<A>
 // CHECK-NEXT: [[TMP_OOA:%.*]] = alloc_stack $Optional<Optional<A>>
 // CHECK-NEXT: [[TMP_OOOA:%.*]] = alloc_stack $Optional<Optional<Optional<A>>>
@@ -130,25 +128,18 @@ func bar(y : A????) {
 // CHECK:    [[PPPP]]:
 // CHECK-NEXT: [[TMP_A:%.*]] = unchecked_take_enum_data_addr [[TMP_OA]]
 // CHECK-NEXT: [[VAL:%.*]] = load [[TMP_A]]
+// CHECK-NEXT: [[TMP_OB2_VALUE:%.*]] = init_enum_data_addr [[TMP_OB2]]#1 : $*Optional<B>, #Optional.Some
 // CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //   If so, inject it back into an optional.
 //   TODO: We're going to switch back out of this; we really should peephole it.
 // CHECK:    [[IS_B]]([[T0:%.*]] : $B):
 // CHECK-NEXT: store [[T0]] to [[TMP_OB2_VALUE]]
 // CHECK-NEXT: inject_enum_addr [[TMP_OB2]]#1 : $*Optional<B>, #Optional.Some
-// CHECK-NEXT: dealloc_stack [[TMP_OOOOA]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OOOA]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
 // CHECK-NEXT: br [[SWITCH_OB2:bb[0-9]+]]
 //   If not, inject nothing into an optional.
 // CHECK:    [[NOT_B]]:
 // CHECK-NEXT: strong_release [[VAL]]
 // CHECK-NEXT: inject_enum_addr [[TMP_OB2]]#1 : $*Optional<B>, #Optional.None
-// CHECK-NEXT: dealloc_stack [[TMP_OOOOA]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OOOA]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
-// CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
 // CHECK-NEXT: br [[SWITCH_OB2]]
 //   Switch out on the value in [[OB2]].
 // CHECK:    [[SWITCH_OB2]]:
@@ -156,6 +147,10 @@ func bar(y : A????) {
 // CHECK-NEXT: cond_br [[T1]], [[IS_B2:bb.*]], [[NOT_B2:bb[0-9]+]]
 //   If it's not present, finish the evaluation.
 // CHECK:    [[NOT_B2]]:
+// CHECK-NEXT: dealloc_stack [[TMP_OOOOA]]#0
+// CHECK-NEXT: dealloc_stack [[TMP_OOOA]]#0
+// CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
+// CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
 // CHECK-NEXT: destroy_addr [[TMP_OB2]]#1
 // CHECK-NEXT: dealloc_stack [[TMP_OB2]]#0
 // CHECK-NEXT: br [[NIL_DEPTH2]]
@@ -165,6 +160,10 @@ func bar(y : A????) {
 // CHECK-NEXT: [[VALUE_B:%.*]] = load [[PAYLOAD_B]]
 // CHECK-NEXT: store [[VALUE_B]] to [[TMP_B]]
 // CHECK-NEXT: inject_enum_addr [[TMP_OB]]{{.*}}Some
+// CHECK-NEXT: dealloc_stack [[TMP_OOOOA]]#0
+// CHECK-NEXT: dealloc_stack [[TMP_OOOA]]#0
+// CHECK-NEXT: dealloc_stack [[TMP_OOA]]#0
+// CHECK-NEXT: dealloc_stack [[TMP_OA]]#0
 // CHECK-NEXT: dealloc_stack [[TMP_OB2]]#0
 // CHECK-NEXT: br [[DONE_DEPTH0:bb[0-9]+]]
 //   On various failure paths, set OB := nil.
@@ -197,11 +196,11 @@ func baz(y : AnyObject?) {
 }
 // CHECK-DAG: sil hidden @_TF4main3baz
 // CHECK:      [[X:%.*]] = alloc_box $Optional<B>
-// CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[X]]#1 : $*Optional<B>, #Optional.Some
 // CHECK-NEXT: [[TMP_OPTANY:%.*]] = alloc_stack $Optional<AnyObject>
 // CHECK-NEXT: retain_value %0
 // CHECK-NEXT: store %0 to [[TMP_OPTANY]]#1
 // CHECK:      [[T1:%.*]] = select_enum_addr [[TMP_OPTANY]]#1
 // CHECK:      [[TMP_ANY:%.*]] = unchecked_take_enum_data_addr [[TMP_OPTANY]]
 // CHECK-NEXT: [[VAL:%.*]] = load [[TMP_ANY]]
+// CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[X]]#1 : $*Optional<B>, #Optional.Some
 // CHECK-NEXT: checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]

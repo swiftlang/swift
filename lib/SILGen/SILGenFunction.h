@@ -1150,7 +1150,7 @@ public:
   /// \param handleFalse  A callback to invoke in the failure path.  The
   ///                     current BB should be terminated.
   void emitCheckedCastBranch(SILLocation loc, ConsumableManagedValue src,
-                             CanType sourceType, CanType targetType,
+                             Type sourceType, CanType targetType,
                              SGFContext C,
                              std::function<void(ManagedValue)> handleTrue,
                              std::function<void()> handleFalse);
