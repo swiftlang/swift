@@ -10,24 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct _Count {}
-internal func _count<Args>(a: Args) -> (_Count, Args) {
-  return (_Count(), a)
-}
-
-// Default implementation of count for Collections
-// Do not use this operator directly; call count(x) instead
-public func ~> <T : _CollectionType>(x:T, _:(_Count,()))
-  -> T.Index.Distance
-{
-  return distance(x.startIndex, x.endIndex)
-}
-
 /// Return the number of elements in x.
 ///
 /// O(1) if T.Index is RandomAccessIndexType; O(N) otherwise.
-public func count <T : _CollectionType>(x: T) -> T.Index.Distance {
-  return x~>_count()
+public func count <T : CollectionType>(x: T) -> T.Index.Distance {
+  // FIXME(prext): remove this function when protocol extensions land.
+  return x._prext_count()
 }
 
 /// This protocol is an implementation detail of `CollectionType`; do
@@ -75,7 +63,15 @@ extension _CollectionDefaultsType {
   ///
   /// Complexity: O(N)
   final public func _prext_underestimateCount() -> Int {
-    return numericCast(count(self))
+    return numericCast(_prext_count())
+  }
+
+  /// Return the number of elements.
+  ///
+  /// Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// O(N) otherwise.
+  final public func _prext_count() -> Index.Distance {
+    return distance(startIndex, endIndex)
   }
 
   /// Customization point for `SequenceType._prext_find()`.
@@ -138,6 +134,12 @@ public protocol CollectionType
   /// `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get}
 
+  /// Return the number of elements.
+  ///
+  /// Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// O(N) otherwise.
+  func _prext_count() -> Index.Distance
+
   /// Customization point for `SequenceType._prext_find()`.
   ///
   /// Define this method if the collection can find an element in less than
@@ -149,9 +151,6 @@ public protocol CollectionType
   ///
   /// Complexity: O(N)
   func _customFindEquatableElement(element: Generator.Element) -> Index??
-
-  // Do not use this operator directly; call `count(x)` instead
-  func ~> (_:Self, _:(_Count, ())) -> Index.Distance
 }
 
 // A fast implementation for when you are backed by a contiguous array.

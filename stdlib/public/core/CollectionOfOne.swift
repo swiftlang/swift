@@ -78,11 +78,12 @@ public struct CollectionOfOne<T> : CollectionType {
     _precondition(position == .Zero, "Index out of range")
     return element
   }
-  
+
+  /// Return the number of elements (always one).
+  public func _prext_count() -> Int {
+    return 1
+  }
+
   let element: T
 }
 
-// Specialization of count for CollectionOfOne<T>
-public func ~> <T>(x:CollectionOfOne<T>, _:(_Count, ())) -> Int {
-  return 1
-}

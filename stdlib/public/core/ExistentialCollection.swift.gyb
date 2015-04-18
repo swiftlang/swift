@@ -163,7 +163,7 @@ internal class _${Kind}Box<S : ${Kind}Type>
   }
 %   if Kind == 'Collection':
   override func _count() -> IntMax {
-    return numericCast(_base~>(_Count(), ()))
+    return numericCast(_base._prext_count())
   }
   override subscript(position: _ForwardIndexBoxType) -> Element {
     if let i? = position._unbox() as S.Index? {
@@ -233,13 +233,6 @@ public func ~> <Element>(
   return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
 }
 
-%  if Kind != 'Sequence':
-public func ~> <Element>(
-  source: Any${Kind}<Element>, _: (_Count,())
-) -> IntMax {
-  return source._box._count()
-}
-%  end
 % end
 
 //===--- ForwardIndex -----------------------------------------------------===//
@@ -605,6 +598,13 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   /// `position != endIndex`.
   public subscript(position: Any${Traversal}Index) -> Element {
     return _box[position._box]
+  }
+
+  /// Return the number of elements.
+  ///
+  /// Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}
+  public func _prext_count() -> IntMax {
+    return _box._count()
   }
 
   /// Uniquely identifies the stored underlying collection.

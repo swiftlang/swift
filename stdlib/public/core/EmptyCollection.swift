@@ -70,9 +70,10 @@ public struct EmptyCollection<T> : CollectionType {
   public subscript(position: Index) -> T {
     _preconditionFailure("Index out of range")
   }
+
+  /// Return the number of elements (always zero).
+  public func _prext_count() -> Int {
+    return 0
+  }
 }
 
-// Specialization of count for EmptyCollection<T>
-public func ~> <T>(x:EmptyCollection<T>, _:(_Count, ())) -> Int {
-  return 0
-}

@@ -2205,7 +2205,13 @@ public struct MinimalSequence<T> : SequenceType {
 // MinimalForwardIndex
 //===----------------------------------------------------------------------===//
 
-public struct MinimalForwardIndex : ForwardIndexType {
+% for Distance in [ '', 'Int32' ]:
+
+public struct MinimalForward${Distance}Index : ForwardIndexType {
+% if Distance != '':
+  typealias Distance = ${Distance}
+% end
+
   public init(position: Int, endIndex: Int) {
     self.position = position
     self.endIndex = endIndex
@@ -2216,18 +2222,25 @@ public struct MinimalForwardIndex : ForwardIndexType {
     self.endIndex = endIndex
   }
 
-  public func successor() -> MinimalForwardIndex {
+  public func successor() -> MinimalForward${Distance}Index {
     expectNotEqual(endIndex, position)
-    return MinimalForwardIndex(position: position + 1, endIndex: endIndex)
+    return MinimalForward${Distance}Index(
+      position: position + 1,
+      endIndex: endIndex)
   }
 
   public let position: Int
   public let endIndex: Int
 }
 
-public func == (lhs: MinimalForwardIndex, rhs: MinimalForwardIndex) -> Bool {
+public func == (
+  lhs: MinimalForward${Distance}Index,
+  rhs: MinimalForward${Distance}Index
+) -> Bool {
   return lhs.position == rhs.position
 }
+
+% end
 
 //===----------------------------------------------------------------------===//
 // MinimalBidirectionalIndex

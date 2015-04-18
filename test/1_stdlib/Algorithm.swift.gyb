@@ -2253,17 +2253,21 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/DefaultImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalCollectionWithDefaultGenerator(count: count)
 
-    // Check the return type of the function when called statically.
-    var generator = collection.generate()
-    expectType(
-      IndexingGenerator<MinimalCollectionWithDefaultGenerator>.self,
-      &generator)
+    if true {
+      // Check the return type of the function when called statically.
+      var generator = collection.generate()
+      expectType(
+        IndexingGenerator<MinimalCollectionWithDefaultGenerator>.self,
+        &generator)
+    }
 
-    // Check the return type of the function when called generically.
-    var genericGenerator = callGenericGenerate(collection)
-    expectType(
-      IndexingGenerator<MinimalCollectionWithDefaultGenerator>.self,
-      &genericGenerator)
+    if true {
+      // Check the return type of the function when called generically.
+      var generator = callGenericGenerate(collection)
+      expectType(
+        IndexingGenerator<MinimalCollectionWithDefaultGenerator>.self,
+        &generator)
+    }
 
     checkForwardCollection(
       Array(1..<count+1)._prext_map { OpaqueValue($0) },
@@ -2278,7 +2282,10 @@ struct MinimalCollectionWithCustomGenerator : CollectionType {
     self._count = count
   }
 
+  static var timesGenerateWasCalled: Int = 0
+
   func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+    ++MinimalCollectionWithCustomGenerator.timesGenerateWasCalled
     return MinimalGenerator<OpaqueValue<Int>>(
       Array(1..<_count+1)._prext_map { OpaqueValue($0) }
     )
@@ -2304,17 +2311,25 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalCollectionWithCustomGenerator(count: count)
 
-    // Check the return type of the function when called statically.
-    var generator = collection.generate()
-    expectType(
-      MinimalGenerator<OpaqueValue<Int>>.self,
-      &generator)
+    if true {
+      // Check the return type of the function when called statically.
+      MinimalCollectionWithCustomGenerator.timesGenerateWasCalled = 0
+      var generator = collection.generate()
+      expectType(
+        MinimalGenerator<OpaqueValue<Int>>.self,
+        &generator)
+      expectEqual(1, MinimalCollectionWithCustomGenerator.timesGenerateWasCalled)
+    }
 
-    // Check the return type of the function when called generically.
-    var genericGenerator = callGenericGenerate(collection)
-    expectType(
-      MinimalGenerator<OpaqueValue<Int>>.self,
-      &genericGenerator)
+    if true {
+      MinimalCollectionWithCustomGenerator.timesGenerateWasCalled = 0
+      // Check the return type of the function when called generically.
+      var generator = callGenericGenerate(collection)
+      expectType(
+        MinimalGenerator<OpaqueValue<Int>>.self,
+        &generator)
+      expectEqual(1, MinimalCollectionWithCustomGenerator.timesGenerateWasCalled)
+    }
 
     checkForwardCollection(
       Array(1..<count+1)._prext_map { OpaqueValue($0) },
@@ -2363,6 +2378,97 @@ SequenceTypeAlgorithms.test("first") {
     }
   }
 }
+
+//===----------------------------------------------------------------------===//
+// count()
+//===----------------------------------------------------------------------===//
+
+% for Implementation in [ 'Default', 'Custom' ]:
+
+struct MinimalCollectionWith${Implementation}Count : CollectionType {
+  init(count: Int) {
+    self._count = count
+  }
+
+  var startIndex: MinimalForwardInt32Index {
+    return MinimalForwardInt32Index(
+      position: 0,
+      startIndex: 0,
+      endIndex: _count)
+  }
+
+  var endIndex: MinimalForwardInt32Index {
+    return MinimalForwardInt32Index(
+      position: _count,
+      startIndex: 0,
+      endIndex: _count)
+  }
+
+  subscript(i: MinimalForwardInt32Index) -> OpaqueValue<Int> {
+    return OpaqueValue(i.position + 1)
+  }
+
+  var _count: Int
+
+%   if Implementation == 'Custom':
+
+  static var timesCountWasCalled: Int = 0
+
+  func _prext_count() -> Int32 {
+    ++MinimalCollectionWithCustomCount.timesCountWasCalled
+    return Int32(_count)
+  }
+
+%   end
+}
+
+% end
+
+func callGenericCount<C : CollectionType>(collection: C) -> C.Index.Distance {
+  return collection._prext_count()
+}
+
+% for Implementation in [ 'Default', 'Custom' ]:
+
+SequenceTypeAlgorithms.test("CollectionType.count()/${Implementation}Implementation") {
+  for count in [ 0, 5 ] {
+    let collection = MinimalCollectionWith${Implementation}Count(count: count)
+
+    if true {
+      // Check the return type of the function when called statically.
+%   if Implementation == 'Custom':
+      MinimalCollectionWithCustomCount.timesCountWasCalled = 0
+%   end
+      var result = collection._prext_count()
+      expectType(Int32.self, &result)
+      expectEqual(Int32(count), result)
+%   if Implementation == 'Custom':
+      expectEqual(1, MinimalCollectionWithCustomCount.timesCountWasCalled)
+%   end
+    }
+
+    if true {
+      // Check the return type of the function when called generically.
+%   if Implementation == 'Custom':
+      MinimalCollectionWithCustomCount.timesCountWasCalled = 0
+%   end
+      var result = callGenericCount(collection)
+      expectType(Int32.self, &result)
+      expectEqual(Int32(count), result)
+%   if Implementation == 'Custom':
+      expectEqual(1, MinimalCollectionWithCustomCount.timesCountWasCalled)
+%   end
+    }
+
+    checkForwardCollection(
+      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      collection,
+      { $0.value == $1.value },
+      SourceLocStack().withCurrentLoc())
+  }
+}
+
+% end
 
 //===----------------------------------------------------------------------===//
 // find()
