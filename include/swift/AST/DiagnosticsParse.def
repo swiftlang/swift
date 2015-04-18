@@ -739,6 +739,9 @@ ERROR(expected_expr_conditional_where,stmt_parsing,PointsToFirstBadToken,
       "expected expression in conditional binding 'where' clause", ())
 ERROR(conditional_var_initializer_required,stmt_parsing,none,
       "variable binding in a condition requires an initializer", ())
+ERROR(where_end_of_binding_use_letvar,stmt_parsing,none,
+      "binding ended by previous 'where' clause; "
+      "use '%0' to introduce a new one", (StringRef))
 
 ERROR(no_type_annotation_in_condition,stmt_parsing,none,
       "type annotation is not permitted in condition; did you mean to match"

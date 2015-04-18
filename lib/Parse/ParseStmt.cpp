@@ -829,11 +829,30 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   assert(CurDeclContext->isLocalContext() &&
          "conditional binding in non-local context?!");
 
+  // For error recovery purposes, keep track of the disposition of the last
+  // pattern binding we saw ('let' vs 'var') in multiple PBD cases.
+  bool IsLet = true;
+ 
   // Parse the list of condition-bindings, each of which can have a 'where'.
   do {
-    bool IsLet = Tok.is(tok::kw_let);
-    SourceLoc VarLoc = consumeToken();
-
+    SourceLoc VarLoc;
+    
+    if (Tok.isAny(tok::kw_let, tok::kw_var)) {
+      IsLet = Tok.is(tok::kw_let);
+      VarLoc = consumeToken();
+    } else {
+      // We get here with erroneous code like:
+      //    if let x? = foo() where cond(), y? = bar()
+      // which is a common typo for:
+      //    if let x? = foo() where cond(),
+      //       LET y? = bar()
+      // diagnose this specifically and produce a nice fixit.
+      diagnose(Tok, diag::where_end_of_binding_use_letvar,
+               IsLet ? "let" : "var")
+        .fixItInsert(Tok.getLoc(), IsLet ? "let " : "var ");
+      VarLoc = Tok.getLoc();
+    }
+    
     SmallVector<PatternBindingEntry, 4> entries;
     
     // Parse the list of name binding's within a let/var clauses.
@@ -906,8 +925,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                           /*parent*/CurDeclContext);
     result.push_back(PBD);
     
-  } while (Tok.is(tok::comma) && peekToken().isAny(tok::kw_let, tok::kw_var) &&
-           consumeIf(tok::comma));
+  } while (consumeIf(tok::comma));
 
   Condition = Context.AllocateCopy(result);
   return Status;
