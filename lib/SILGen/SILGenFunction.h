@@ -704,13 +704,7 @@ public:
   /// \param TopLevelLoc The location of the top-level expression during whose
   ///        evaluation the epilog is being produced, for example, the
   ///        AbstractClosureExpr.
-  /// \param IsAutoGen Flags if the prolog is auto-generated.
-  void emitEpilog(SILLocation TopLevelLoc, bool IsAutoGen = false);
-
-  /// \brief Emit the rethrow basic block, leaving the insertion point there.
-  /// \returns None if there is no rethrow block or it is unreachable
-  Optional<std::pair<SILValue, SILLocation>>
-    emitRethrowBB(SILLocation topLevelLoc);
+  void emitEpilog(SILLocation TopLevelLoc);
 
   /// \brief Emits the standard rethrow epilog using a Swift error result.
   void emitRethrowEpilog(SILLocation topLevelLoc);

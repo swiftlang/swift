@@ -410,7 +410,6 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   emitStmt(fd->getBody());
 
   emitEpilog(fd);
-  emitRethrowEpilog(fd);
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
@@ -431,7 +430,6 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
                    autoclosure->getSingleExpressionBody());
   }
   emitEpilog(ace);
-  emitRethrowEpilog(ace);
 }
 
 void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
