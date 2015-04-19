@@ -52,19 +52,6 @@ namespace {
     }
 
   };
-
-
-  /// An Initialization subclass used to destructure tuple initializations.
-  class TupleElementInitialization : public SingleBufferInitialization {
-  public:
-    SILValue ElementAddr;
-
-    TupleElementInitialization(SILValue addr)
-      : ElementAddr(addr)
-    {}
-
-    SILValue getAddressOrNull() const override { return ElementAddr; }
-  };
   
   /// An Initialization of a tuple pattern, such as "var (a,b)".
   class TupleInitialization : public Initialization {
@@ -151,7 +138,7 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                                         fieldTy);
 
       buf.push_back(InitializationPtr(new
-                                        TupleElementInitialization(fieldAddr)));
+                                        KnownAddressInitialization(fieldAddr)));
     }
     finishInitialization(gen);
     return buf;
@@ -221,6 +208,8 @@ copyOrInitValueIntoSingleBuffer(ManagedValue explodedElement, bool isInit,
   }
 }
 
+void KnownAddressInitialization::anchor() const {
+}
 
 void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
   if (Cleanup.isValid())
@@ -399,6 +388,26 @@ public:
     assert(DidFinish && "did not call LetValueInit::finishInitialization!");
   }
 
+  bool hasAddress() const { return address.isValid(); }
+  
+  // SingleBufferInitializations always have an address.
+  SILValue getAddressForInPlaceInitialization() const override {
+    // Emit into the buffer that 'let's produce for address-only values if
+    // we have it.
+    if (hasAddress()) return address;
+    return SILValue();
+  }
+
+  /// Return true if we can get the addresses of elements with the
+  /// 'getSubInitializationsForTuple' method.
+  ///
+  /// Let-value initializations cannot be broken into constituent pieces if a
+  /// scalar value needs to be bound.  If there is an address in play, then we
+  /// can initialize the address elements of the tuple though.
+  bool canSplitIntoSubelementAddresses() const override {
+    return hasAddress();
+  }
+  
   void emitDebugValue(SILValue v, SILGenFunction &gen) {
     // Emit a debug_value[_addr] instruction to record the start of this value's
     // lifetime.
@@ -456,30 +465,6 @@ public:
     if (DestroyCleanup != CleanupHandle::invalid())
       gen.Cleanups.setCleanupState(DestroyCleanup, CleanupState::Active);
     DidFinish = true;
-  }
-};
-} // end anonymous namespace
-
-namespace {
-/// An initialization for a global variable.
-class GlobalInitialization : public SingleBufferInitialization {
-  /// The physical address of the global.
-  SILValue address;
-
-public:
-  GlobalInitialization(SILValue address) : address(address)
-  {}
-
-  SILValue getAddressOrNull() const override {
-    return address;
-  }
-};
-} // end anonymous namespace
-
-namespace {
-class DebuggerInitialization : public GlobalInitialization {
-public:
-  DebuggerInitialization(SILValue address) : GlobalInitialization(address) {
   }
 };
 } // end anonymous namespace
@@ -869,7 +854,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, Type patternType) {
     SILValue SV = SILDebugClient->emitLValueForVariable(vd, B);
 
     VarLocs[vd] = SILGenFunction::VarLoc::get(SV);
-    return InitializationPtr(new DebuggerInitialization(SV));
+    return InitializationPtr(new KnownAddressInitialization(SV));
   }
 
   CanType varType = vd->getType()->getCanonicalType();
@@ -897,7 +882,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, Type patternType) {
       addr = B.createMarkUninitializedVar(vd, addr);
 
     VarLocs[vd] = SILGenFunction::VarLoc::get(addr);
-    Result = InitializationPtr(new GlobalInitialization(addr));
+    Result = InitializationPtr(new KnownAddressInitialization(addr));
   } else {
     Result = emitLocalVariableWithCleanup(vd, isUninitialized);
   }

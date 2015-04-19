@@ -223,21 +223,6 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   }
 }
 
-namespace {
-
-/// IndirectReturnInitialization - represents initializing an indirect return
-/// value.
-class IndirectReturnInitialization : public SingleBufferInitialization {
-  SILValue address;
-public:
-  IndirectReturnInitialization(SILValue address)
-    : address(address) {}
-  
-  SILValue getAddressOrNull() const override { return address; }
-};
-
-} // end anonymous namespace
-
 void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
   SILValue result;
@@ -245,7 +230,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     // Indirect return of an address-only value.
     FullExpr scope(Cleanups, CleanupLocation(ret));
     InitializationPtr returnInit(
-                       new IndirectReturnInitialization(IndirectReturnAddress));
+                       new KnownAddressInitialization(IndirectReturnAddress));
     emitExprInto(ret, returnInit.get());
   } else {
     // SILValue return.
@@ -558,23 +543,6 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
   emitOrDeleteBlock(SGF, endDest.getBlock(), S);
 }
 
-namespace {
-  
-/// NextForEachValueInitialization - initialization for the 'next' value buffer
-/// used during for each loop codegen.
-
-class NextForEachValueInitialization : public SingleBufferInitialization {
-  SILValue address;
-public:
-  NextForEachValueInitialization(SILValue address)
-    : address(address) {}
-  
-  SILValue getAddressOrNull() const override { return address; }
-};
-
-} // end anonymous namespace
-
-
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'generator' variable that we'll be using for iteration.
   Scope OuterForScope(SGF.Cleanups, CleanupLocation(S));
@@ -605,7 +573,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // allocations in the subexpression are immediately released.
   {
     Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getGeneratorNext()));
-    InitializationPtr nextInit(new NextForEachValueInitialization(nextBuf));
+    InitializationPtr nextInit(new KnownAddressInitialization(nextBuf));
     SGF.emitExprInto(S->getGeneratorNext(), nextInit.get());
     nextInit->finishInitialization(SGF);
   }

@@ -62,19 +62,6 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
   }
 }
 
-namespace {
-  class ImplicitValueInitialization : public SingleBufferInitialization {
-    SILValue slot;
-  public:
-    ImplicitValueInitialization(SILValue slot) : slot(slot) {}
-
-    SILValue getAddressOrNull() const override {
-      return slot;
-    }
-  };
-}
-
-
 static void emitImplicitValueConstructor(SILGenFunction &gen,
                                          ConstructorDecl *ctor) {
   RegularLocation Loc(ctor);
@@ -120,7 +107,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
       auto &fieldTL = gen.getTypeLowering(fieldTy);
       SILValue slot = gen.B.createStructElementAddr(Loc, resultSlot, field,
                                                     fieldTL.getLoweredType().getAddressType());
-      InitializationPtr init(new ImplicitValueInitialization(slot));
+      InitializationPtr init(new KnownAddressInitialization(slot));
 
       // An initialized 'let' property has a single value specified by the
       // initializer - it doesn't come from an argument.

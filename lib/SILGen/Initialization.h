@@ -75,26 +75,32 @@ public:
   bool canForwardInBranch() const;
 
   /// Return true if we can get the addresses of elements with the
-  /// 'getSubInitializationsForTuple' method.
-  bool canSplitIntoSubelementAddresses() const {
-    return kind != Kind::LetValue || hasAddress();
+  /// 'getSubInitializationsForTuple' method.  Subclasses can override this to
+  /// disable this behavior.
+  virtual bool canSplitIntoSubelementAddresses() const {
+    return true;
   }
   
   /// If this initialization represents a single contiguous buffer, return the
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() const = 0;
   
-  /// Returns true if this initialization represents a single contiguous buffer.
-  bool hasAddress() const { return getAddressOrNull().isValid(); }
-
   /// Returns the address of the single contiguous buffer represented by this
   /// initialization. Once the address has been stored to,
   /// finishInitialization must be called.
-  SILValue getAddress() {
+  SILValue getAddress() const {
     SILValue address = getAddressOrNull();
     assert(address && "initialization does not represent a single buffer");
     return address;
   }
+  
+  
+  /// If this initialization has an address we can directly emit into, return
+  /// it.  Otherwise, return a null SILValue.
+  virtual SILValue getAddressForInPlaceInitialization() const {
+    return SILValue();
+  }
+  
 
   /// If this initialization represents an aggregation of sub-initializations,
   /// return the sub-initializations. If it represents a single
@@ -141,7 +147,12 @@ public:
   {}
   
   virtual ~SingleBufferInitialization();
-  
+
+  // SingleBufferInitializations always have an address.
+  SILValue getAddressForInPlaceInitialization() const override {
+    return getAddress();
+  }
+
   void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
                            SILLocation loc, SILGenFunction &gen) override {
     copyOrInitValueIntoSingleBuffer(explodedElement, isInit, getAddress(),
@@ -154,6 +165,20 @@ public:
                                               SILValue BufferAddress,
                                               SILLocation loc,
                                               SILGenFunction &gen);
+};
+  
+/// This is an initialization for a specific address in memory.
+class KnownAddressInitialization : public SingleBufferInitialization {
+  /// The physical address of the global.
+  SILValue address;
+  
+  virtual void anchor() const;
+public:
+  KnownAddressInitialization(SILValue address) : address(address) {}
+  
+  SILValue getAddressOrNull() const override {
+    return address;
+  }
 };
 
 /// Abstract base class for single-buffer initializations.

@@ -840,35 +840,8 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
 }
 
 // Return an initialization address we can emit directly into.
-static SILValue getAddressForInPlaceInitialization(Initialization *I) {
-  if (!I) return SILValue();
-  
-  SILValue address;
-  switch (I->kind) {
-  case Initialization::Kind::LetValue:
-    // Emit into the buffer that 'let's produce for address-only values if
-    // we have it.
-    if (I->hasAddress())
-      address = I->getAddress();
-    break;
-  case Initialization::Kind::Translating:
-  case Initialization::Kind::Ignored:
-  case Initialization::Kind::Refutable:
-    break;
-    
-  case Initialization::Kind::Tuple:
-    // FIXME: For a single-element tuple, we could emit into the single field.
-    
-    // The tuple initialization isn't contiguous, so we can't emit directly
-    // into it.
-    break;
-    
-  case Initialization::Kind::SingleBuffer:
-    // Emit into the buffer.
-    address = I->getAddress();
-    break;
-  }
-  return address;
+static SILValue getAddressForInPlaceInitialization(const Initialization *I) {
+  return I ? I->getAddressForInPlaceInitialization() : SILValue();
 }
 
 SILValue SILGenFunction::
@@ -1218,48 +1191,6 @@ RValue RValueEmitter::visitCovariantReturnConversionExpr(
   return RValue(SGF, e, result);
 }
 
-namespace {
-  /// An Initialization representing the concrete value buffer inside an
-  /// opaque existential container.
-  class OpaqueExistentialValueInitialization
-    : public SingleBufferInitialization {
-    SILValue valueAddr;
-  public:
-    OpaqueExistentialValueInitialization(SILValue valueAddr)
-      : valueAddr(valueAddr)
-    {}
-    
-    SILValue getAddressOrNull() const override {
-      return valueAddr;
-    }
-
-    void finishInitialization(SILGenFunction &gen) override {
-      // FIXME: Disable the DeinitExistential cleanup and enable the
-      // DestroyAddr cleanup for the existential container.
-    }
-  };
-
-  /// An Initialization representing the concrete value buffer inside a
-  /// boxed existential container.
-  class BoxedExistentialValueInitialization
-    : public SingleBufferInitialization {
-    SILValue valueAddr;
-  public:
-    BoxedExistentialValueInitialization(SILValue valueAddr)
-      : valueAddr(valueAddr)
-    {}
-    
-    SILValue getAddressOrNull() const override {
-      return valueAddr;
-    }
-    
-    void finishInitialization(SILGenFunction &gen) override {
-      // FIXME: Disable the DeallocExistentialBox cleanup and enable the
-      // Release cleanup for the existential container.
-    }
-  };
-}
-
 static RValue emitClassBoundedErasure(SILGenFunction &gen, ErasureExpr *E) {
   ManagedValue sub = gen.emitRValueAsSingleValue(E->getSubExpr());
   SILType resultTy = gen.getLoweredLoadableType(E->getType());
@@ -1403,8 +1334,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
                                 concreteTL.getLoweredType(),
                                 E->getConformances());
     // Initialize the concrete value in-place.
-    InitializationPtr init(
-                           new OpaqueExistentialValueInitialization(valueAddr));
+    InitializationPtr init(new KnownAddressInitialization(valueAddr));
     ManagedValue mv = gen.emitRValueAsOrig(E->getSubExpr(), abstractionPattern,
                                            concreteTL, SGFContext(init.get()));
     if (!mv.isInContext()) {
@@ -1458,7 +1388,7 @@ static RValue emitBoxedErasure(SILGenFunction &gen, ErasureExpr *E) {
     auto valueAddr = box->getValueAddressResult();
     
     // Initialize the concrete value in-place.
-    InitializationPtr init(new BoxedExistentialValueInitialization(valueAddr));
+    InitializationPtr init(new KnownAddressInitialization(valueAddr));
     ManagedValue mv = gen.emitRValueAsOrig(E->getSubExpr(), abstractionPattern,
                                            concreteTL, SGFContext(init.get()));
     if (!mv.isInContext()) {
@@ -1696,9 +1626,8 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
                                          RegularLocation(E));
       assert(subInitializations.size() == E->getElements().size() &&
              "initialization for tuple has wrong number of elements");
-      for (unsigned i = 0, size = subInitializations.size(); i < size; ++i) {
+      for (unsigned i = 0, size = subInitializations.size(); i < size; ++i)
         SGF.emitExprInto(E->getElement(i), subInitializations[i].get());
-      }
       return RValue();
     }
   }
@@ -2557,21 +2486,6 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
   return RValue(SGF, E, ManagedValue::forUnmanaged(value));
 }
 
-namespace {
-  /// An Initialization representing the result of an address-only ternary.
-  class TernaryInitialization : public SingleBufferInitialization {
-    SILValue valueAddr;
-  public:
-    TernaryInitialization(SILValue valueAddr)
-      : valueAddr(valueAddr)
-    {}
-    
-    SILValue getAddressOrNull() const override {
-      return valueAddr;
-    }
-  };
-}
-
 RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
   auto &lowering = SGF.getTypeLowering(E->getType());
   
@@ -2624,7 +2538,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     {
       auto TE = E->getThenExpr();
       FullExpr trueScope(SGF.Cleanups, CleanupLocation(TE));
-      TernaryInitialization init(resultAddr);
+      KnownAddressInitialization init(resultAddr);
       SGF.emitExprInto(TE, &init);
     }
     cond.exitTrue(SGF);
@@ -2633,7 +2547,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     {
       auto EE = E->getElseExpr();
       FullExpr trueScope(SGF.Cleanups, CleanupLocation(EE));
-      TernaryInitialization init(resultAddr);
+      KnownAddressInitialization init(resultAddr);
       SGF.emitExprInto(EE, &init);
     }
     cond.exitFalse(SGF);
