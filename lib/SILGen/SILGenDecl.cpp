@@ -608,6 +608,27 @@ public:
 };
 } // end anonymous namespace
 
+static bool shouldDisableCleanupOnFailurePath(ManagedValue value,
+                                              EnumElementDecl *elementDecl,
+                                              SILGenFunction &SGF) {
+  // If the enum is trivial, then there is no cleanup to disabled.
+  if (value.isPlusZeroRValueOrTrivial()) return false;
+  
+  // Check all of the members of the enum.  If any have a non-trivial payload,
+  // then we can't disable the cleanup.
+  for (auto elt : elementDecl->getParentEnum()->getAllElements()) {
+    // Ignore the element that will be handled.
+    if (elt == elementDecl) continue;
+    
+    // Elements without payloads are trivial.
+    if (!elt->hasArgumentType()) continue;
+    
+    if (!SGF.getTypeLowering(elt->getArgumentType()).isTrivial())
+      return false;
+  }
+  return true;
+}
+
 void EnumElementPatternInitialization::
 emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
               Initialization *subInit, JumpDest failureDest,
@@ -616,7 +637,27 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
   auto destination = std::make_pair(ElementDecl, contBB);
   
+  
+  // Get a destination that runs all of the cleanups needed when existing on the
+  // failure path.  If the enum we're testing is non-trivial, there will be a
+  // cleanup in this stack that will release its value.
+  //
+  // However, if the tested case is the only non-trivial case in the enum, then
+  // the destruction on the failure path will be a no-op, so we can disable the
+  // cleanup on that path.  This is an important micro-optimization for
+  // Optional, since the .None case doesn't need to be cleaned up.
+  bool ShouldDisableCleanupOnFailure =
+    shouldDisableCleanupOnFailurePath(value, ElementDecl, SGF);
+  
+  if (ShouldDisableCleanupOnFailure)
+    SGF.Cleanups.setCleanupState(value.getCleanup(), CleanupState::Dormant);
+  
   auto defaultBB = SGF.Cleanups.emitBlockForCleanups(failureDest, loc);
+
+  // Restore it if we disabled it.
+  if (ShouldDisableCleanupOnFailure)
+    SGF.Cleanups.setCleanupState(value.getCleanup(), CleanupState::Active);
+  
   if (value.getType().isAddress())
     SGF.B.createSwitchEnumAddr(loc, value.getValue(), defaultBB, destination);
   else

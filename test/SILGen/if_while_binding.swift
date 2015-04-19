@@ -352,22 +352,19 @@ return t
 // CHECK-NEXT: bb0(%0 : $Optional<String>):
 // CHECK-NEXT:   debug_value %0 : $Optional<String>  // let a
 // CHECK-NEXT:   retain_value %0 : $Optional<String>
-// CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb2, default bb1
+// CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb1, default bb2
 func testLetElseOptional2(a : String?) -> String {
-// CHECK:      bb1:
-// CHECK-NEXT:   release_value %0 : $Optional<String>
-// CHECK-NEXT:   br bb3
   let t? = a else { abort() }
 
-// CHECK:  bb2(%6 : $String):
-// CHECK-NEXT:   debug_value %6 : $String  // let t
+// CHECK:  bb1(%4 : $String):
+// CHECK-NEXT:   debug_value %4 : $String  // let t
 // CHECK-NEXT:   release_value %0 : $Optional<String>
-// CHECK-NEXT:   return %6 : $String
+// CHECK-NEXT:   return %4 : $String
 
-// CHECK:        bb3:
+// CHECK:        bb2:
 // CHECK-NEXT:   // function_ref if_while_binding.abort () -> ()
-// CHECK-NEXT:   %10 = function_ref @_TF16if_while_binding5abortFT_T_
-// CHECK-NEXT:   %11 = apply %10()
+// CHECK-NEXT:   %8 = function_ref @_TF16if_while_binding5abortFT_T_
+// CHECK-NEXT:   %9 = apply %8()
 // CHECK-NEXT:   unreachable
   return t
 }
@@ -385,26 +382,25 @@ enum MyOpt<T> {
 // CHECK-NEXT: switch_enum_addr %4#1 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
 func testAddressOnlyEnumInLetElse<T>(a : MyOpt<T>) -> T {
 // CHECK:  bb1:
-// CHECK-NEXT:   destroy_addr %4#1 : $*MyOpt<T>
 // CHECK-NEXT:   dealloc_stack %4#0
 // CHECK-NEXT:   dealloc_stack %3#0
 // CHECK-NEXT:   br bb3
   let t? = a else { abort() }
 
 // CHECK:    bb2:
-// CHECK-NEXT:     %11 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
-// CHECK-NEXT:     copy_addr [take] %11 to [initialization] %3#1 : $*T
+// CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
+// CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3#1 : $*T
 // CHECK-NEXT:     dealloc_stack %4#0
 // CHECK-NEXT:     copy_addr [take] %3#1 to [initialization] %0 : $*T
 // CHECK-NEXT:     dealloc_stack %3#0
 // CHECK-NEXT:     destroy_addr %1 : $*MyOpt<T>
-// CHECK-NEXT:     %17 = tuple ()
-// CHECK-NEXT:     return %17 : $()
+// CHECK-NEXT:     tuple ()
+// CHECK-NEXT:     return 
   
 // CHECK:    bb3:
 // CHECK-NEXT:     // function_ref if_while_binding.abort () -> ()
-// CHECK-NEXT:     %19 = function_ref @_TF16if_while_binding5abortFT_T_
-// CHECK-NEXT:     %20 = apply %19() : $@convention(thin) @noreturn () -> ()
+// CHECK-NEXT:     %18 = function_ref @_TF16if_while_binding5abortFT_T_
+// CHECK-NEXT:     %19 = apply %18() : $@convention(thin) @noreturn () -> ()
 // CHECK-NEXT:     unreachable
 
   return t
