@@ -1154,7 +1154,7 @@ void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
                                         CanType formalValueType,
                                         bool isIrrefutable) {
   // Initialize the variable value.
-  InitializationPtr init = SGF.emitInitializationForVarDecl(var, Type());
+  InitializationPtr init = SGF.emitInitializationForVarDecl(var);
 
   RValue rv(SGF, loc, formalValueType, value.getFinalManagedValue());
   if (shouldTake(value, isIrrefutable)) {

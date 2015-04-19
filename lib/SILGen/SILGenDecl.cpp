@@ -514,7 +514,7 @@ public:
   void bindVariable(SILLocation loc, VarDecl *var, ManagedValue value,
                     CanType formalValueType, SILGenFunction &SGF) {
     // Initialize the variable value.
-    InitializationPtr init = SGF.emitInitializationForVarDecl(var, Type());
+    InitializationPtr init = SGF.emitInitializationForVarDecl(var);
     RValue(SGF, loc, formalValueType, value).forwardInto(SGF, init.get(), loc);
   }
 
@@ -782,8 +782,7 @@ struct InitializationForPattern
       return InitializationPtr(new BlackHoleInitialization());
     }
 
-    auto Ty = P->hasType() ? P->getType() : Type();
-    return SGF.emitInitializationForVarDecl(P->getDecl(), Ty);
+    return SGF.emitInitializationForVarDecl(P->getDecl());
   }
 
   // Bind a tuple pattern by aggregating the component variables into a
@@ -832,8 +831,7 @@ struct InitializationForPattern
 
 } // end anonymous namespace
 
-InitializationPtr
-SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, Type patternType) {
+InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
   // If this is a computed variable, we don't need to do anything here.
   // We'll generate the getter and setter when we see their FuncDecls.
   if (!vd->hasStorage())
