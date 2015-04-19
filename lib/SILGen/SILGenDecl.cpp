@@ -40,9 +40,7 @@ namespace {
   /// (that is, 'var (_)') that bind to values without storing them.
   class BlackHoleInitialization : public Initialization {
   public:
-    BlackHoleInitialization()
-      : Initialization(Initialization::Kind::Ignored)
-    {}
+    BlackHoleInitialization() {}
 
     SILValue getAddressOrNull() const override { return SILValue(); }
 
@@ -78,7 +76,7 @@ namespace {
     /// here.
     SmallVector<InitializationPtr, 4> subInitializations;
     
-    TupleInitialization() : Initialization(Initialization::Kind::Tuple) {}
+    TupleInitialization() {}
     
     SILValue getAddressOrNull() const override {
       if (subInitializations.size() == 1)
@@ -313,8 +311,7 @@ class LetValueInitialization : public Initialization {
   bool DidFinish = false;
 
 public:
-  LetValueInitialization(VarDecl *vd, SILGenFunction &gen)
-    : Initialization(Initialization::Kind::LetValue), vd(vd)
+  LetValueInitialization(VarDecl *vd, SILGenFunction &gen) : vd(vd)
   {
     auto &lowering = gen.getTypeLowering(vd->getType());
     
@@ -473,8 +470,7 @@ class ReferenceStorageInitialization : public Initialization {
   InitializationPtr VarInit;
 public:
   ReferenceStorageInitialization(InitializationPtr &&subInit)
-    : Initialization(Initialization::Kind::Translating),
-      VarInit(std::move(subInit)) {}
+    : VarInit(std::move(subInit)) {}
 
   SILValue getAddressOrNull() const override { return SILValue(); }
 
@@ -502,7 +498,7 @@ class RefutablePatternInitialization : public Initialization {
   JumpDest failureDest;
 public:
   RefutablePatternInitialization(JumpDest failureDest)
-  : Initialization(Initialization::Kind::Refutable), failureDest(failureDest) {
+    : failureDest(failureDest) {
     assert(failureDest.isValid() &&
            "Refutable patterns can only exist in failable conditions");
   }

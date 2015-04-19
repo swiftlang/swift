@@ -43,36 +43,12 @@ using InitializationPtr = std::unique_ptr<Initialization>;
 /// initialization paths.
 class Initialization {
 public:
-  enum class Kind {
-    /// This Initialization is for a _ binding or other ignored value; the
-    /// corresponding result can be discarded.
-    Ignored,
-    /// This Initialization is to bind a 'let' declaration into VarLocs
-    /// directly.
-    LetValue,
-    /// This Initialization is for a single buffer with a physical address,
-    /// which can be accessed with getAddress() and stored to.
-    SingleBuffer,
-    /// This Initialization performs a semantic translation on its
-    /// operand and cannot be directly stored to.
-    Translating,
-    /// This Initialization is for a tuple of sub-initializations.
-    Tuple,
-    /// This Initialization is for a refutable match, which occurs in refutable
-    /// pattern contexts.
-    Refutable
-  };
-private:
-  /// The Kind of initialization.
-  const Kind kind;
-public:
-  
-  Initialization(Kind kind) : kind(kind) {}
+  Initialization() {}
   virtual ~Initialization() {}
 
   /// Return true if this initialization is a simple address in memory.
-  bool isSingleBuffer() const {
-    return kind == Kind::SingleBuffer;
+  virtual bool isSingleBuffer() const {
+    return false;
   }
 
    /// If this initialization represents a single contiguous buffer, return the
@@ -145,9 +121,11 @@ private:
 /// initializations that have an addressable memory object to be stored into.
 class SingleBufferInitialization : public Initialization {
 public:
-  SingleBufferInitialization()
-    : Initialization(Initialization::Kind::SingleBuffer)
-  {}
+  SingleBufferInitialization() {}
+  
+  bool isSingleBuffer() const override {
+    return true;
+  }
 
   // SingleBufferInitializations always have an address.
   SILValue getAddressForInPlaceInitialization() const override {
