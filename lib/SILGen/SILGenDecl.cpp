@@ -14,6 +14,7 @@
 #include "Initialization.h"
 #include "RValue.h"
 #include "Scope.h"
+#include "SILGenDynamicCast.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebuggerClient.h"
@@ -583,15 +584,23 @@ class EnumElementPatternInitialization : public RefutablePatternInitialization {
   EnumElementDecl *ElementDecl;
   InitializationPtr subInitialization;
 public:
-    EnumElementPatternInitialization(EnumElementDecl *ElementDecl,
-                                     InitializationPtr &&subInitialization,
-                                     JumpDest patternFailDest)
+  EnumElementPatternInitialization(EnumElementDecl *ElementDecl,
+                                   InitializationPtr &&subInitialization,
+                                   JumpDest patternFailDest)
     : RefutablePatternInitialization(patternFailDest), ElementDecl(ElementDecl),
       subInitialization(std::move(subInitialization)) {}
     
-  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                           SILLocation loc, SILGenFunction &SGF) override;
+  void copyOrInitValueInto(ManagedValue value, bool isInit,
+                           SILLocation loc, SILGenFunction &SGF) override {
+    assert(isInit && "Only initialization is supported for refutable patterns");
+    emitEnumMatch(value, ElementDecl, subInitialization.get(), getFailureDest(),
+                  loc, SGF);
+  }
 
+  static void emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
+                            Initialization *subInit, JumpDest FailureDest,
+                            SILLocation loc, SILGenFunction &SGF);
+  
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization.get()->finishInitialization(SGF);
@@ -600,14 +609,14 @@ public:
 } // end anonymous namespace
 
 void EnumElementPatternInitialization::
-copyOrInitValueInto(ManagedValue value, bool isInit,
-                    SILLocation loc, SILGenFunction &SGF) {
-  assert(isInit && "Only initialization is supported for refutable patterns");
+emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
+              Initialization *subInit, JumpDest failureDest,
+              SILLocation loc, SILGenFunction &SGF) {
   
   SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
   auto destination = std::make_pair(ElementDecl, contBB);
   
-  auto defaultBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
+  auto defaultBB = SGF.Cleanups.emitBlockForCleanups(failureDest, loc);
   if (value.getType().isAddress())
     SGF.B.createSwitchEnumAddr(loc, value.getValue(), defaultBB, destination);
   else
@@ -617,7 +626,7 @@ copyOrInitValueInto(ManagedValue value, bool isInit,
   
   // If the enum case has no bound value, we're done.
   if (!ElementDecl->hasArgumentType()) {
-    assert(!subInitialization.get() &&
+    assert(subInit == nullptr &&
            "Cannot have a subinit when there is no value to match against");
     return;
   }
@@ -632,7 +641,7 @@ copyOrInitValueInto(ManagedValue value, bool isInit,
   if (!value.getType().isAddress())
     eltValue = new (SGF.F.getModule()) SILArgument(contBB, eltTy);
 
-  if (!subInitialization.get()) {
+  if (subInit == nullptr) {
     // If there is no subinitialization, then we are done matching.  Don't
     // bother projecting out the address-only element value only to ignore it.
     return;
@@ -654,9 +663,50 @@ copyOrInitValueInto(ManagedValue value, bool isInit,
   // Now that we have a +1 value, pass it down to the sub-initialization to chew
   // on.
   auto eltMV = SGF.emitManagedRValueWithCleanup(eltValue, eltTL);
-  subInitialization->copyOrInitValueInto(eltMV, isInit, loc, SGF);
+  subInit->copyOrInitValueInto(eltMV, /*is an init*/true, loc, SGF);
 }
 
+namespace {
+class IsPatternInitialization : public RefutablePatternInitialization {
+  IsPattern *pattern;
+  InitializationPtr subInitialization;
+public:
+  IsPatternInitialization(IsPattern *pattern,
+                          InitializationPtr &&subInitialization,
+                          JumpDest patternFailDest)
+  : RefutablePatternInitialization(patternFailDest), pattern(pattern),
+    subInitialization(std::move(subInitialization)) {}
+    
+  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                           SILLocation loc, SILGenFunction &SGF) override;
+  
+  void finishInitialization(SILGenFunction &SGF) override {
+    if (subInitialization.get())
+      subInitialization.get()->finishInitialization(SGF);
+  }
+};
+} // end anonymous namespace
+
+void IsPatternInitialization::
+copyOrInitValueInto(ManagedValue value, bool isInit,
+                    SILLocation loc, SILGenFunction &SGF) {
+  assert(isInit && "Only initialization is supported for refutable patterns");
+  
+  // Try to perform the cast to the destination type, producing an optional that
+  // indicates whether we succeeded.
+  auto destType = OptionalType::get(pattern->getCastTypeLoc().getType());
+  
+  value = emitConditionalCheckedCast(SGF, loc, value, pattern->getType(),
+                                     destType, pattern->getCastKind(),
+                                     SGFContext())
+            .getAsSingleValue(SGF, loc);
+  
+  // Now that we have our result as an optional, we can use an enum projection
+  // to do all the work.
+  EnumElementPatternInitialization::
+  emitEnumMatch(value, SGF.getASTContext().getOptionalSomeDecl(),
+                subInitialization.get(), getFailureDest(), loc, SGF);
+}
 
 namespace {
 
@@ -731,7 +781,11 @@ struct InitializationForPattern
     return InitializationPtr(res);
   }
   InitializationPtr visitIsPattern(IsPattern *P) {
-    llvm_unreachable("'as' and 'is' pattern not supported in let/else yet");
+    InitializationPtr subInit;
+    if (auto *subP = P->getSubPattern())
+      subInit = visit(subP);
+    return InitializationPtr(new IsPatternInitialization(P, std::move(subInit),
+                                                         patternFailDest));
   }
   InitializationPtr visitBoolPattern(BoolPattern *P) {
     llvm_unreachable("bools not supported in let/else yet");

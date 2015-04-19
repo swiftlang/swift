@@ -420,3 +420,25 @@ func testCleanupEmission<T>(x: T) {
   let x2? = x as? MyProtocol else { return }
 }
 
+
+// CHECK-LABEL: sil hidden @_TF16if_while_binding15test_is_patternFCS_9BaseClassT_
+func test_is_pattern(y : BaseClass) {
+  // checked_cast_br %0 : $BaseClass to $DerivedClass
+  let is DerivedClass = y else { marker_1(); return }
+  
+  marker_2()
+}
+
+// CHECK-LABEL: sil hidden @_TF16if_while_binding15test_as_patternFCS_9BaseClassCS_12DerivedClass
+func test_as_pattern(y : BaseClass) -> DerivedClass {
+  // checked_cast_br %0 : $BaseClass to $DerivedClass
+  let result as DerivedClass = y else {  }
+  // CHECK: bb{{.*}}({{.*}} : $DerivedClass):
+
+  
+  // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : $DerivedClass):
+  // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass  // let result
+  // CHECK-NEXT: strong_release %0 : $BaseClass
+  // CHECK-NEXT: return [[PTR]] : $DerivedClass
+  return result
+}
