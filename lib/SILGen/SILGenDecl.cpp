@@ -46,13 +46,30 @@ namespace {
 
     SILValue getAddressOrNull() const override { return SILValue(); }
 
+    bool canSplitIntoSubelementAddresses() const override {
+      return true;
+    }
+    
+    ArrayRef<InitializationPtr>
+    getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
+                                  SmallVectorImpl<InitializationPtr> &buf,
+                                  SILLocation Loc) override {
+      // "Destructure" an ignored binding into multiple ignored bindings.
+      for (auto fieldType : cast<TupleType>(type)->getElementTypes()) {
+        (void) fieldType;
+        buf.push_back(InitializationPtr(new BlackHoleInitialization()));
+      }
+      return buf;
+    }
+
     void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
                              SILLocation loc, SILGenFunction &gen) override {
       /// This just ignores the provided value.
     }
-
   };
-  
+} // end anonymous namespace
+
+namespace {
   /// An Initialization of a tuple pattern, such as "var (a,b)".
   class TupleInitialization : public Initialization {
   public:
@@ -69,8 +86,15 @@ namespace {
       else
         return SILValue();
     }
-
-    ArrayRef<InitializationPtr> getSubInitializations() const {
+    
+    bool canSplitIntoSubelementAddresses() const override {
+      return true;
+    }
+    
+    ArrayRef<InitializationPtr>
+    getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
+                                  SmallVectorImpl<InitializationPtr> &buf,
+                                  SILLocation Loc) override {
       return subInitializations;
     }
     
@@ -83,75 +107,9 @@ namespace {
                              SILLocation loc, SILGenFunction &gen) override {
       llvm_unreachable("tuple initialization not destructured?!");
     }
-    
   };
-}
+} // end anonymous namespace
 
-bool Initialization::canForwardInBranch() const {
-  switch (kind) {
-  case Kind::Ignored:
-  case Kind::SingleBuffer:
-    return true;
-
-  // These initializations expect to be activated exactly once.
-  case Kind::LetValue:
-  case Kind::Translating:
-  case Kind::Refutable:
-    return false;
-
-  case Kind::Tuple:
-    for (auto &subinit : ((TupleInitialization*)this)->getSubInitializations()){
-      if (!subinit->canForwardInBranch())
-        return false;
-    }
-    return true;
-  }
-  llvm_unreachable("bad initialization kind!");
-}
-
-ArrayRef<InitializationPtr>
-Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                                      SmallVectorImpl<InitializationPtr> &buf,
-                                      SILLocation Loc) {
-  assert(canSplitIntoSubelementAddresses() && "Client shouldn't call this");
-  switch (kind) {
-  case Kind::Tuple:
-    return ((TupleInitialization*)this)->getSubInitializations();
-      
-  case Kind::Ignored:
-    // "Destructure" an ignored binding into multiple ignored bindings.
-    for (auto fieldType : cast<TupleType>(type)->getElementTypes()) {
-      (void) fieldType;
-      buf.push_back(InitializationPtr(new BlackHoleInitialization()));
-    }
-    return buf;
-  case Kind::LetValue:
-  case Kind::SingleBuffer: {
-    // Destructure the buffer into per-element buffers.
-    auto tupleTy = cast<TupleType>(type);
-    SILValue baseAddr = getAddress();
-    for (unsigned i = 0, size = tupleTy->getNumElements(); i < size; ++i) {
-      auto fieldType = tupleTy.getElementType(i);
-      SILType fieldTy = gen.getLoweredType(fieldType).getAddressType();
-      SILValue fieldAddr = gen.B.createTupleElementAddr(Loc,
-                                                        baseAddr, i,
-                                                        fieldTy);
-
-      buf.push_back(InitializationPtr(new
-                                        KnownAddressInitialization(fieldAddr)));
-    }
-    finishInitialization(gen);
-    return buf;
-  }
-  case Kind::Translating:
-    // This could actually be done by collecting translated values, if
-    // we introduce new needs for translating initializations.
-    llvm_unreachable("cannot destructure a translating initialization");
-  case Kind::Refutable:
-    llvm_unreachable("cannot destructure a refutable initialization");
-  }
-  llvm_unreachable("bad initialization kind");
-}
 
 namespace {
   class CleanupClosureConstant : public Cleanup {
@@ -184,8 +142,25 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   }
 }
 
-SingleBufferInitialization::~SingleBufferInitialization() {
-  // vtable anchor.
+ArrayRef<InitializationPtr> SingleBufferInitialization::
+getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
+                              SmallVectorImpl<InitializationPtr> &buf,
+                              SILLocation Loc) {
+  // Destructure the buffer into per-element buffers.
+  auto tupleTy = cast<TupleType>(type);
+  SILValue baseAddr = getAddress();
+  for (unsigned i = 0, size = tupleTy->getNumElements(); i < size; ++i) {
+    auto fieldType = tupleTy.getElementType(i);
+    SILType fieldTy = gen.getLoweredType(fieldType).getAddressType();
+    SILValue fieldAddr = gen.B.createTupleElementAddr(Loc,
+                                                      baseAddr, i,
+                                                      fieldTy);
+    
+    buf.push_back(InitializationPtr(new
+                                    KnownAddressInitialization(fieldAddr)));
+  }
+  finishInitialization(gen);
+  return buf;
 }
 
 void SingleBufferInitialization::
@@ -407,6 +382,28 @@ public:
   bool canSplitIntoSubelementAddresses() const override {
     return hasAddress();
   }
+  
+  ArrayRef<InitializationPtr>
+  getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
+                                SmallVectorImpl<InitializationPtr> &buf,
+                                SILLocation Loc) override {
+    // Destructure the buffer into per-element buffers.
+    auto tupleTy = cast<TupleType>(type);
+    SILValue baseAddr = getAddress();
+    for (unsigned i = 0, size = tupleTy->getNumElements(); i < size; ++i) {
+      auto fieldType = tupleTy.getElementType(i);
+      SILType fieldTy = gen.getLoweredType(fieldType).getAddressType();
+      SILValue fieldAddr = gen.B.createTupleElementAddr(Loc,
+                                                        baseAddr, i,
+                                                        fieldTy);
+      
+      buf.push_back(InitializationPtr(new
+                                      KnownAddressInitialization(fieldAddr)));
+    }
+    finishInitialization(gen);
+    return buf;
+  }
+
   
   void emitDebugValue(SILValue v, SILGenFunction &gen) {
     // Emit a debug_value[_addr] instruction to record the start of this value's

@@ -2869,7 +2869,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
 
   std::unique_ptr<TemporaryInitialization> optTemp;
   Initialization *optInit = C.getEmitInto();
-  bool usingProvidedContext = optInit && optInit->canForwardInBranch();
+  bool usingProvidedContext = optInit && optInit->isSingleBuffer();
   if (!usingProvidedContext) {
     optTemp = SGF.emitTemporary(E, optTL);
     optInit = optTemp.get();
@@ -2903,12 +2903,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   SGF.B.emitBlock(failureBB);
 
   // FIXME: reset optInit here?
-
-  SILValue resultAddr = optInit->getAddressOrNull();
-  assert(resultAddr || optInit->kind == Initialization::Kind::Ignored);
-  if (resultAddr) {
-    SGF.emitInjectOptionalNothingInto(E, resultAddr, optTL);
-  }
+  SGF.emitInjectOptionalNothingInto(E, optInit->getAddress(), optTL);
 
   // FIXME: finish optInit within a conditional scope.
 

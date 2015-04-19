@@ -56,32 +56,26 @@ public:
     /// This Initialization performs a semantic translation on its
     /// operand and cannot be directly stored to.
     Translating,
-    /// This Initialization is for a tuple of sub-initializations, which can
-    /// be accessed with getSubInitializations().
+    /// This Initialization is for a tuple of sub-initializations.
     Tuple,
     /// This Initialization is for a refutable match, which occurs in refutable
     /// pattern contexts.
     Refutable
   };
-  
+private:
   /// The Kind of initialization.
   const Kind kind;
+public:
   
   Initialization(Kind kind) : kind(kind) {}
   virtual ~Initialization() {}
 
-  /// Return true if this initialization can be forwarded down along
-  /// multiple branches of a conditional branch.
-  bool canForwardInBranch() const;
-
-  /// Return true if we can get the addresses of elements with the
-  /// 'getSubInitializationsForTuple' method.  Subclasses can override this to
-  /// disable this behavior.
-  virtual bool canSplitIntoSubelementAddresses() const {
-    return true;
+  /// Return true if this initialization is a simple address in memory.
+  bool isSingleBuffer() const {
+    return kind == Kind::SingleBuffer;
   }
-  
-  /// If this initialization represents a single contiguous buffer, return the
+
+   /// If this initialization represents a single contiguous buffer, return the
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() const = 0;
   
@@ -101,6 +95,12 @@ public:
     return SILValue();
   }
   
+  /// Return true if we can get the addresses of elements with the
+  /// 'getSubInitializationsForTuple' method.  Subclasses can override this to
+  /// enable this behavior.
+  virtual bool canSplitIntoSubelementAddresses() const {
+    return false;
+  }
 
   /// If this initialization represents an aggregation of sub-initializations,
   /// return the sub-initializations. If it represents a single
@@ -113,10 +113,13 @@ public:
   /// is given to this vector.
   /// \param Loc The location with which the single initialization should be
   ///        associated.
-  ArrayRef<InitializationPtr>
+  virtual ArrayRef<InitializationPtr>
   getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                 SmallVectorImpl<InitializationPtr> &buf,
-                                SILLocation Loc);
+                                SILLocation Loc) {
+    assert(0&&"Must implement if canSplitIntoSubelementAddresses returns true");
+    abort();
+  }
   
   /// Perform post-initialization bookkeeping for this initialization.
   virtual void finishInitialization(SILGenFunction &gen) {}
@@ -145,13 +148,21 @@ public:
   SingleBufferInitialization()
     : Initialization(Initialization::Kind::SingleBuffer)
   {}
-  
-  virtual ~SingleBufferInitialization();
 
   // SingleBufferInitializations always have an address.
   SILValue getAddressForInPlaceInitialization() const override {
     return getAddress();
   }
+  
+  bool canSplitIntoSubelementAddresses() const override {
+    return true;
+  }
+  
+  ArrayRef<InitializationPtr>
+  getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
+                                SmallVectorImpl<InitializationPtr> &buf,
+                                SILLocation Loc) override;
+
 
   void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
                            SILLocation loc, SILGenFunction &gen) override {
