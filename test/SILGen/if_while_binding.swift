@@ -438,3 +438,11 @@ func test_as_pattern(y : BaseClass) -> DerivedClass {
   // CHECK-NEXT: return [[PTR]] : $DerivedClass
   return result
 }
+
+// CHECK-LABEL: sil hidden @_TF16if_while_binding21testEnumReabstractionFP_T_
+func testEnumReabstraction(x: Any) {
+  let f? = x as? () -> () else {}
+  // CHECK: function_ref reabstraction thunk helper from @callee_owned (@in ()) -> (@out ()) to @callee_owned () -> (@unowned ())
+  f()
+}
+

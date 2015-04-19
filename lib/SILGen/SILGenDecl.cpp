@@ -701,9 +701,21 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
     value.forward(SGF);
   }
   
-  // Now that we have a +1 value, pass it down to the sub-initialization to chew
-  // on.
+  // Now we have a +1 value.
   auto eltMV = SGF.emitManagedRValueWithCleanup(eltValue, eltTL);
+  
+  // Reabstract to the substituted type, if needed.
+  CanType substEltTy =
+    value.getSwiftType()->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
+                                          ElementDecl, nullptr,
+                                      ElementDecl->getArgumentInterfaceType())
+      ->getCanonicalType();
+  
+  eltMV = SGF.emitOrigToSubstValue(loc, eltMV,
+                             AbstractionPattern(ElementDecl->getArgumentType()),
+                                   substEltTy);
+  
+  // Pass the +1 value down into the sub initialization.
   subInit->copyOrInitValueInto(eltMV, /*is an init*/true, loc, SGF);
 }
 
