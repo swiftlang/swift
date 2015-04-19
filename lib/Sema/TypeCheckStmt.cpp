@@ -1093,6 +1093,13 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   return false;
 }
 
+static bool isKnownEndOfConstructor(ASTNode N) {
+  auto *S = N.dyn_cast<Stmt*>();
+  if (!S) return false;
+
+  return isa<ReturnStmt>(S) || isa<FailStmt>(S);
+}
+
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
@@ -1104,6 +1111,20 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   if (!body)
     return true;
 
+  // For constructors, we make sure that the body ends with a "return" stmt,
+  // which we either implicitly synthesize, or the user can write.  This
+  // simplifies SILGen.
+  if (body->getNumElements() == 0 ||
+      !isKnownEndOfConstructor(body->getElements().back())) {
+    SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
+                                 body->getElements().end());
+    Elts.push_back(new (Context) ReturnStmt(SourceLoc(), /*value*/nullptr,
+                                            /*implicit*/true));
+    body = BraceStmt::create(Context, body->getLBraceLoc(), Elts,
+                             body->getRBraceLoc(), body->isImplicit());
+    ctor->setBody(body);
+  }
+  
   // Type-check the body.
   StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(ctor));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
