@@ -17,13 +17,11 @@ struct Y<T> : Fooable {
 struct Z : Fooable {
   func foo(x: Float) {}
 
-  // FIXME: Feels inconsistent that we can't refer to AssocType
-  // unqualified, but qualified is okay.
-
   func blah() {
-    var at : AssocType // expected-error{{use of undeclared type 'AssocType'}}
+    var at : AssocType
   }
 
+  // FIXME: We should be able to find this.
   func blarg() -> AssocType {} // expected-error{{use of undeclared type 'AssocType'}}
 
   func wonka() -> Z.AssocType {}
@@ -150,5 +148,5 @@ struct V<T> : Fooable {
 }
 
 // FIXME: <rdar://problem/16123805> Inferred associated types can't be used in expression contexts
-var w = W.AssocType() // expected-error{{'W.Type' does not have a member named 'AssocType'}}
-var v = V<String>.AssocType() // expected-error{{'V<String>.Type' does not have a member named 'AssocType'}}
+var w = W.AssocType()
+var v = V<String>.AssocType()

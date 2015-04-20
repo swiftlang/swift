@@ -1651,6 +1651,33 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     return;
   }
 
+  // If there was no type declaration, synthesize one.
+  if (!typeDecl) {
+    auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
+                                                    assocType->getName(),
+                                                    SourceLoc(),
+                                                    TypeLoc::withoutLoc(type),
+                                                    DC);
+    Type metaType = MetatypeType::get(type);
+    aliasDecl->setImplicit();
+    if (metaType->hasArchetype()) {
+      aliasDecl->setInterfaceType(
+        TC.getInterfaceTypeFromInternalType(DC, metaType));
+    }
+    if (auto nominal = dyn_cast<NominalTypeDecl>(DC)) {
+      TC.computeAccessibility(nominal);
+      aliasDecl->setAccessibility(nominal->getFormalAccess());
+      nominal->addMember(aliasDecl);
+    } else {
+      auto ext = cast<ExtensionDecl>(DC);
+      TC.computeDefaultAccessibility(ext);
+      aliasDecl->setAccessibility(ext->getDefaultAccessibility());
+      ext->addMember(aliasDecl);
+    }
+
+    typeDecl = aliasDecl;
+  }
+
   // Record the type witness.
   Conformance->setTypeWitness(
     assocType,
