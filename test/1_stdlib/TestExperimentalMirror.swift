@@ -161,7 +161,7 @@ mirrors.test("Legacy") {
     file: String = __FILE__, line: UWord = __LINE__
   ) {
     expectEmpty(
-      mb.baseClassMirror,
+      mb.superclassMirror,
       stackTrace: stackTrace, file: file, line: line)
     
     expectEqual(
@@ -186,8 +186,8 @@ mirrors.test("Legacy") {
   expectEqual("dx", first(md.children)?.label)
   expectEqual(1, first(md.children)?.value as? Int)
   
-  expectNotEmpty(md.baseClassMirror)
-  if let mb2? = md.baseClassMirror { expectBMirror(mb2) }
+  expectNotEmpty(md.superclassMirror)
+  if let mb2? = md.superclassMirror { expectBMirror(mb2) }
 }
 
 mirrors.test("Addressing") {

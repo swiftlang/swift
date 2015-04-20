@@ -92,10 +92,10 @@ public struct Mirror {
     _ subject: T,
     children: C,
     displayStyle: DisplayStyle? = nil,
-    exposeBaseClass: Bool = true
+    exposeSuperclass: Bool = true
   ) {
     self._baseLegacyMirror = Mirror.getBaseLegacyMirror(
-      subject, exposeBaseClass)
+      subject, exposeSuperclass)
       
     self.children = Children(children)
     self.displayStyle = displayStyle
@@ -124,10 +124,10 @@ public struct Mirror {
   >(
     _ subject: T,
     unlabeledChildren: C, displayStyle: DisplayStyle? = nil,
-    exposeBaseClass: Bool = true
+    exposeSuperclass: Bool = true
   ) {
     self._baseLegacyMirror = Mirror.getBaseLegacyMirror(
-      subject, exposeBaseClass)
+      subject, exposeSuperclass)
       
     self.children = Children(
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
@@ -145,10 +145,10 @@ public struct Mirror {
     _ subject: T,
     children: DictionaryLiteral<String, Any>,
     displayStyle: DisplayStyle? = nil,
-    exposeBaseClass: Bool = true
+    exposeSuperclass: Bool = true
   ) {
     self._baseLegacyMirror = Mirror.getBaseLegacyMirror(
-      subject, exposeBaseClass)
+      subject, exposeSuperclass)
       
     self.children = Children(
       lazy(children).map { Child(label: $0.0, value: $0.1) }
@@ -163,16 +163,16 @@ public struct Mirror {
   /// Suggests a display style for the reflected subject.
   public let displayStyle: DisplayStyle?
 
-  public var baseClassMirror: Mirror? {
+  public var superclassMirror: Mirror? {
     return _baseLegacyMirror.map { Mirror($0) }
   }
 
   internal let _baseLegacyMirror: MirrorType?
 
   internal static func getBaseLegacyMirror<T>(
-    subject: T, _ exposeBaseClass: Bool
+    subject: T, _ exposeSuperclass: Bool
   ) -> MirrorType? {
-    if !(exposeBaseClass && subject is AnyObject) { return nil }
+    if !(exposeSuperclass && subject is AnyObject) { return nil }
     return reflect(subject)._baseMirror()
   }
 }
