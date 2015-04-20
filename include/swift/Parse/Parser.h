@@ -998,6 +998,7 @@ public:
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &throws,
+                                      bool &rethrows,
                                       TypeRepr *&retType);
   ParserStatus parseConstructorArguments(DeclName &FullName,
                                          Pattern *&BodyPattern,

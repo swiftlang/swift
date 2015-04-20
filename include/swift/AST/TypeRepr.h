@@ -341,19 +341,24 @@ class FunctionTypeRepr : public TypeRepr {
   GenericParamList *Generics;
   TypeRepr *ArgsTy;
   TypeRepr *RetTy;
-  bool Throws;
+  SourceLoc ArrowLoc;
+  SourceLoc ThrowsLoc;
 
 public:
-  FunctionTypeRepr(GenericParamList *Generics, TypeRepr *ArgsTy,
-                   TypeRepr *RetTy, bool throws)
+  FunctionTypeRepr(GenericParamList *generics, TypeRepr *argsTy,
+                   SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
     : TypeRepr(TypeReprKind::Function),
-      Generics(Generics), ArgsTy(ArgsTy), RetTy(RetTy), Throws(throws) {
+      Generics(generics), ArgsTy(argsTy), RetTy(retTy),
+      ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
   }
 
   GenericParamList *getGenericParams() const { return Generics; }
   TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
-  bool throws() const { return Throws; }
+  bool throws() const { return ThrowsLoc.isValid(); }
+
+  SourceLoc getArrowLoc() const { return ArrowLoc; }
+  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Function;

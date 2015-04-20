@@ -655,6 +655,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                SmallVectorImpl<Pattern *> &bodyPatterns,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &throwsLoc,
+                               bool &rethrows,
                                TypeRepr *&retType) {
   SmallVector<Identifier, 4> NamePieces;
   NamePieces.push_back(SimpleName);
@@ -696,8 +697,12 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   }
   
   // Check for the 'throws' keyword.
+  rethrows = false;
   if (Tok.is(tok::kw_throws)) {
     throwsLoc = consumeToken();
+  } else if (Tok.is(tok::kw_rethrows)) {
+    throwsLoc = consumeToken();
+    rethrows = true;
   }
 
   // If there's a trailing arrow, parse the rest as the result type.

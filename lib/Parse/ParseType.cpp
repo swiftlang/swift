@@ -163,13 +163,17 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   if (ty.isNull())
     return nullptr;
   
-  bool throws = false;
-  
-  if (consumeIf(tok::kw_throws))
-    throws = true;
+  SourceLoc throwsLoc;
+  if (consumeIf(tok::kw_throws, throwsLoc)) {
+    assert(throwsLoc.isValid());
+  } else if (consumeIf(tok::kw_rethrows, throwsLoc)) {
+    // 'rethrows' is only allowed on function declarations for now.
+    diagnose(throwsLoc, diag::rethrowing_function_type);
+  }
 
   // Handle type-function if we have an arrow.
-  if (consumeIf(tok::arrow)) {
+  SourceLoc arrowLoc;
+  if (consumeIf(tok::arrow, arrowLoc)) {
     ParserResult<TypeRepr> SecondHalf =
       parseType(diag::expected_type_function_result);
     if (SecondHalf.hasCodeCompletion())
@@ -177,17 +181,20 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     if (SecondHalf.isNull())
       return nullptr;
     auto fnTy = new (Context) FunctionTypeRepr(generics, ty.get(),
-                                               SecondHalf.get(),
-                                               throws);
+                                               throwsLoc,
+                                               arrowLoc,
+                                               SecondHalf.get());
     return makeParserResult(applyAttributeToType(fnTy, attrs));
   }
   
   // Only function types may throw.
-  if (throws) {
-    diagnose(ty.get()->getStartLoc(), diag::throwing_non_function);
+  if (throwsLoc.isValid()) {
+    diagnose(throwsLoc, diag::throwing_non_function)
+      .highlight(ty.get()->getSourceRange());
     return nullptr;
   }
 
+  // Only function types may be generic.
   if (generics) {
     auto brackets = generics->getSourceRange();
     diagnose(brackets.Start, diag::generic_non_function);

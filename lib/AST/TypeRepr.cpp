@@ -134,8 +134,9 @@ TypeRepr *CloneVisitor::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
 TypeRepr *CloneVisitor::visitFunctionTypeRepr(FunctionTypeRepr *T) {
   return new (Ctx) FunctionTypeRepr(/*FIXME: Clone?*/T->getGenericParams(),
                                     visit(T->getArgsTypeRepr()),
-                                    visit(T->getResultTypeRepr()),
-                                    T->throws());
+                                    T->getThrowsLoc(),
+                                    T->getArrowLoc(),
+                                    visit(T->getResultTypeRepr()));
 }
 
 TypeRepr *CloneVisitor::visitArrayTypeRepr(ArrayTypeRepr *T) {

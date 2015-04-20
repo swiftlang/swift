@@ -1467,8 +1467,12 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
     Printer << ")";
   }
 
-  if (AFD->isBodyThrowing())
-    Printer << " throws";
+  if (AFD->isBodyThrowing()) {
+    if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
+      Printer << " rethrows";
+    else
+      Printer << " throws";
+  }
 }
 
 bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,

@@ -837,6 +837,10 @@ NOTE(protocol_witness_settable_conflict,sema_tcd,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_noreturn_conflict,sema_tcd,none,
      "candidate is not @noreturn, but protocol requires it", ())
+NOTE(protocol_witness_rethrows_conflict,sema_tcd,none,
+     "candidate is not 'rethrows', but protocol requires it", ())
+NOTE(protocol_witness_throws_conflict,sema_tcd,none,
+     "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,sema_tcd,none,
      "candidate is not '@objc', but protocol requires it", ())
 
@@ -999,6 +1003,9 @@ ERROR(override_ownership_mismatch,sema_tcd,none,
       "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
       "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
       (/*Ownership*/unsigned, /*Ownership*/unsigned))
+ERROR(override_throws,sema_tcd,none,
+      "cannot override non-throwing %select{method|initializer}0 with "
+      "throwing %select{method|initializer}0", (bool))
 
 WARNING(override_unnecessary_IUO,sema_tcd,none,
       "overriding %0 parameter of type %1 with implicitly unwrapped optional "
@@ -1161,6 +1168,12 @@ ERROR(final_not_on_accessors,sema_tcd,none,
 
 ERROR(override_noreturn_with_return,sema_tcd,none,
       "an override of a @noreturn method should also be @noreturn", ())
+
+ERROR(override_rethrows_with_non_rethrows,sema_tcd,none,
+      "override of 'rethrows' %select{method|initializer}0 should also "
+      "be 'rethrows'", (bool))
+ERROR(rethrows_without_throwing_parameter,sema_tcd,none,
+      "'rethrows' function must take a throwing function argument", ())
 
 ERROR(inconsistent_attribute_override,sema_tcd,none,
       "@%0 must be consistent between a method and its override", (StringRef))

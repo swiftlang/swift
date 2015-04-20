@@ -469,6 +469,7 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
   switch (Tok.getKind()) {
+  case tok::kw_rethrows:
   case tok::kw_self:
   case tok::kw_Self:
   case tok::kw_throws:

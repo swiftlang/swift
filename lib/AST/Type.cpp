@@ -1605,8 +1605,19 @@ static bool canOverride(CanType t1, CanType t2,
   // Function-to-function.  (Polymorphic functions?)
   if (auto fn2 = dyn_cast<FunctionType>(t2)) {
     auto fn1 = dyn_cast<FunctionType>(t1);
-    if (!fn1 || fn1->getExtInfo() != fn2->getExtInfo())
+    if (!fn1)
       return false;
+
+    // Allow ExtInfos to differ in these ways:
+    //   - the overriding type may be noreturn even if the base type isn't
+    //   - the base type may be throwing even if the overriding type isn't
+    auto ext1 = fn1->getExtInfo();
+    auto ext2 = fn2->getExtInfo();
+    if (ext2.throws()) ext1 = ext1.withThrows(true);
+    if (ext1.isNoReturn()) ext2 = ext2.withIsNoReturn(true);
+    if (ext1 != ext2)
+      return false;
+
     // Inputs are contravariant, results are covariant.
     return (canOverride(fn2.getInput(), fn1.getInput(),
                         allowUnsafeParameterOverride, true, resolver) &&

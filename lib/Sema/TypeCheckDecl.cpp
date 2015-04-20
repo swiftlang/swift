@@ -4559,6 +4559,15 @@ public:
     }
   }
 
+  static void adjustFunctionTypeForOverride(Type &type) {
+    // Drop 'noreturn' and 'throws'.
+    auto fnType = type->castTo<AnyFunctionType>();
+    auto extInfo = fnType->getExtInfo();
+    extInfo = extInfo.withThrows(false).withIsNoReturn(false);
+    if (fnType->getExtInfo() != extInfo)
+      type = fnType->withExtInfo(extInfo);
+  }
+
   /// Determine which method or subscript this method or subscript overrides
   /// (if any).
   ///
@@ -4599,8 +4608,8 @@ public:
     // Figure out the type of the declaration that we're using for comparisons.
     auto declTy = decl->getInterfaceType()->getUnlabeledType(TC.Context);
     if (method) {
-      declTy = declTy->getWithoutNoReturn(2);
       declTy = declTy->castTo<AnyFunctionType>()->getResult();
+      adjustFunctionTypeForOverride(declTy);
     } else {
       declTy = declTy->getReferenceStorageReferent();
     }
@@ -4671,8 +4680,8 @@ public:
                                                          owningTy);
       parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
       if (method) {
-        parentDeclTy = parentDeclTy->getWithoutNoReturn(2);
         parentDeclTy = parentDeclTy->castTo<AnyFunctionType>()->getResult();
+        adjustFunctionTypeForOverride(parentDeclTy);
       } else {
         parentDeclTy = parentDeclTy->getReferenceStorageReferent();
       }
@@ -4902,6 +4911,11 @@ public:
 
   /// Attribute visitor that checks how the given attribute should be
   /// considered when overriding a declaration.
+  ///
+  /// Note that the attributes visited are those of the base
+  /// declaration, so if you need to check that the overriding
+  /// declaration doesn't have an attribute if the base doesn't have
+  /// it, this isn't sufficient.
   class AttributeOverrideChecker
           : public AttributeVisitor<AttributeOverrideChecker> {
     TypeChecker &TC;
@@ -4950,6 +4964,10 @@ public:
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
 
+    // These can't appear on overridable declarations.
+    UNINTERESTING_ATTR(AutoClosure)
+    UNINTERESTING_ATTR(NoEscape)
+
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
     UNINTERESTING_ATTR(Infix)
@@ -4968,6 +4986,18 @@ public:
       // one it overrides.
     }
 
+    void visitRethrowsAttr(RethrowsAttr *attr) {
+      // 'rethrows' functions are a subtype of ordinary 'throws' functions.
+      // Require 'rethrows' on the override if it was there on the base,
+      // unless the override is completely non-throwing.
+      if (!Override->getAttrs().hasAttribute<RethrowsAttr>() &&
+          cast<AbstractFunctionDecl>(Override)->isBodyThrowing()) {
+        TC.diagnose(Override, diag::override_rethrows_with_non_rethrows,
+                    isa<ConstructorDecl>(Override));
+        TC.diagnose(Base, diag::overridden_here);
+      }
+    }
+
     void visitFinalAttr(FinalAttr *attr) {
       // If this is an accessor, don't complain if we would have
       // complained about the storage declaration.
@@ -4983,23 +5013,6 @@ public:
       TC.diagnose(Override, diag::override_final, 
                   Override->getDescriptiveKind());
       TC.diagnose(Base, diag::overridden_here);
-    }
-
-    void visitAutoClosureAttr(AutoClosureAttr *attr) {
-      if (Base->getAttrs().hasAttribute<AutoClosureAttr>() !=
-          Override->getAttrs().hasAttribute<AutoClosureAttr>()) {
-        TC.diagnose(Override, diag::inconsistent_attribute_override,
-                    attr->getAttrName());
-        TC.diagnose(Base, diag::overridden_here);
-      }
-    }
-    void visitNoEscapeAttr(NoEscapeAttr *attr) {
-      if (Base->getAttrs().hasAttribute<NoEscapeAttr>() !=
-          Override->getAttrs().hasAttribute<NoEscapeAttr>()) {
-        TC.diagnose(Override, diag::inconsistent_attribute_override,
-                    attr->getAttrName());
-        TC.diagnose(Base, diag::overridden_here);
-      }
     }
 
     void visitNoReturnAttr(NoReturnAttr *attr) {
@@ -5181,6 +5194,17 @@ public:
       TC.diagnose(base, diag::overridden_here);
       override->getAttrs().add(
           new (TC.Context) OverrideAttr(SourceLoc()));
+    }
+
+    // If the overriding declaration is 'throws' but the base is not,
+    // complain.
+    if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
+      if (overrideFn->isBodyThrowing() &&
+          !cast<AbstractFunctionDecl>(base)->isBodyThrowing()) {
+        TC.diagnose(override, diag::override_throws,
+                    isa<ConstructorDecl>(override));
+        TC.diagnose(base, diag::overridden_here);
+      }
     }
 
     // FIXME: Possibly should extend to more availability checking.

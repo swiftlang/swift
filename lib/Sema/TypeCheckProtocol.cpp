@@ -216,6 +216,9 @@ namespace {
     /// \brief The types conflict.
     TypeConflict,
 
+    /// The witness throws, but the requirement does not.
+    ThrowsConflict,
+
     /// \brief The witness did not match due to static/non-static differences.
     StaticNonStaticConflict,
     
@@ -233,6 +236,9 @@ namespace {
 
     /// The witness is not @noreturn, but the requirement is.
     NoReturnConflict,
+
+    /// The witness is not rethrows, but the requirement is.
+    RethrowsConflict,
 
     /// The witness has a different Objective-C selector than the
     /// requirement.
@@ -399,6 +405,8 @@ namespace {
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
       case MatchKind::NoReturnConflict:
+      case MatchKind::RethrowsConflict:
+      case MatchKind::ThrowsConflict:
       case MatchKind::ObjCSelectorConflict:
       case MatchKind::NotObjC:
         return false;
@@ -422,6 +430,8 @@ namespace {
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
       case MatchKind::NoReturnConflict:
+      case MatchKind::RethrowsConflict:
+      case MatchKind::ThrowsConflict:
       case MatchKind::ObjCSelectorConflict:
       case MatchKind::NotObjC:
         return false;
@@ -974,6 +984,13 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
         !witnessAttrs.hasAttribute<NoReturnAttr>())
       return RequirementMatch(witness, MatchKind::NoReturnConflict);
 
+    // If the requirement is rethrows, the witness must either be
+    // rethrows or be non-throwing.
+    if (reqAttrs.hasAttribute<RethrowsAttr>() &&
+        !witnessAttrs.hasAttribute<RethrowsAttr>() &&
+        cast<AbstractFunctionDecl>(witness)->isBodyThrowing())
+      return RequirementMatch(witness, MatchKind::RethrowsConflict);
+
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
@@ -1054,13 +1071,12 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
   bool anyRenaming = false;
   if (decomposeFunctionType) {
     // Decompose function types into parameters and result type.
-    auto reqInputType = reqType->castTo<AnyFunctionType>()->getInput();
-    auto reqResultType = reqType->castTo<AnyFunctionType>()->getResult()
-                           ->getRValueType();
-    auto witnessInputType = witnessType->castTo<AnyFunctionType>()
-                              ->getInput();
-    auto witnessResultType = witnessType->castTo<AnyFunctionType>()
-                               ->getResult()->getRValueType();
+    auto reqFnType = reqType->castTo<AnyFunctionType>();
+    auto reqInputType = reqFnType->getInput();
+    auto reqResultType = reqFnType->getResult()->getRValueType();
+    auto witnessFnType = witnessType->castTo<AnyFunctionType>();
+    auto witnessInputType = witnessFnType->getInput();
+    auto witnessResultType = witnessFnType->getResult()->getRValueType();
 
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
@@ -1125,6 +1141,13 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
       // FIXME: Consider default arguments here?
     }
+
+    // If the witness is 'throws', the requirement must be.
+    if (witnessFnType->getExtInfo().throws() &&
+        !reqFnType->getExtInfo().throws()) {
+      return RequirementMatch(witness, MatchKind::ThrowsConflict);
+    }
+
   } else {
     // Simple case: add the constraint.
     auto types = getTypesToCompare(req, reqType, witnessType,
@@ -1422,6 +1445,10 @@ diagnoseMatch(TypeChecker &tc, Module *module,
                 withAssocTypes);
     break;
 
+  case MatchKind::ThrowsConflict:
+    tc.diagnose(match.Witness, diag::protocol_witness_throws_conflict);
+    break;
+
   case MatchKind::OptionalityConflict: {
     auto diag = tc.diagnose(match.Witness, 
                             diag::protocol_witness_optionality_conflict,
@@ -1461,6 +1488,10 @@ diagnoseMatch(TypeChecker &tc, Module *module,
   case MatchKind::NoReturnConflict:
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_noreturn_conflict);
+    break;
+  case MatchKind::RethrowsConflict:
+    // FIXME: Could emit a Fix-It here.
+    tc.diagnose(match.Witness, diag::protocol_witness_rethrows_conflict);
     break;
   case MatchKind::ObjCSelectorConflict:
     (void)checkObjCWitnessSelector(tc, req, match.Witness, /*complain=*/true);

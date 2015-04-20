@@ -3883,9 +3883,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   SourceLoc throwsLoc;
+  bool rethrows;
   ParserStatus SignatureStatus =
       parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
-                             throwsLoc, FuncRetTy);
+                             throwsLoc, rethrows, FuncRetTy);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -3896,6 +3897,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
     diagnose(FuncLoc, diag::protocol_method_argument_init);
     return nullptr;
+  }
+
+  // Add the 'rethrows' attribute.
+  if (rethrows) {
+    Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
   
   // Enter the arguments for the function into a new function-body scope.  We
@@ -4648,10 +4654,13 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return nullptr;
   }
 
-  // Parse 'throws'.
+  // Parse 'throws' or 'rethrows'.
   SourceLoc throwsLoc;
-  if (Tok.is(tok::kw_throws))
-    throwsLoc = consumeToken();
+  if (consumeIf(tok::kw_throws, throwsLoc)) {
+    // okay
+  } else if (consumeIf(tok::kw_rethrows, throwsLoc)) {
+    Attributes.add(new (Context) RethrowsAttr(throwsLoc));
+  }
 
   auto *SelfPattern = buildImplicitSelfParameter(ConstructorLoc,CurDeclContext);
 

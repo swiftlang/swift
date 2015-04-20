@@ -1571,7 +1571,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
       // Consume the ')', if it's there.
       if (consumeIf(tok::r_paren)) {
-        consumeIf(tok::kw_throws);
+        consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
           if (!canParseType())
@@ -1592,7 +1592,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         return false;
       }
       
-      consumeIf(tok::kw_throws);
+      consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
 
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
@@ -1756,8 +1756,12 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       params = TuplePattern::create(Context, SourceLoc(), elements,SourceLoc());
     }
     
-    if (Tok.is(tok::kw_throws))
+    if (Tok.is(tok::kw_throws)) {
       throwsLoc = consumeToken();
+    } else if (Tok.is(tok::kw_rethrows)) {
+      throwsLoc = consumeToken();
+      diagnose(throwsLoc, diag::rethrowing_function_type);
+    }
 
     // Parse the optional explicit return type.
     if (Tok.is(tok::arrow)) {

@@ -217,6 +217,9 @@ SIMPLE_DECL_ATTR(testable, Testable,
 
 DECL_ATTR(_alignment, Alignment, OnStruct | OnEnum | UserInaccessible, 56)
 
+SIMPLE_DECL_ATTR(rethrows, Rethrows,
+                 OnFunc | OnConstructor | RejectByParser, 57)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

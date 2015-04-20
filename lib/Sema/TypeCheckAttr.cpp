@@ -69,6 +69,7 @@ public:
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Postfix)
   IGNORED_ATTR(Prefix)
+  IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(Testable)
@@ -606,6 +607,7 @@ public:
   void visitIBActionAttr(IBActionAttr *attr);
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
+  void visitRethrowsAttr(RethrowsAttr *attr);
 
   bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
   void visitAccessibilityAttr(AccessibilityAttr *attr);
@@ -1132,6 +1134,42 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
     attr->setInvalid();
     return;
   }
+}
+
+static bool hasThrowingFunctionParameter(CanType type) {
+  // Only consider throwing function types.
+  if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
+    return fnType->getExtInfo().throws();
+  }
+
+  // Look through tuples.
+  if (auto tuple = dyn_cast<TupleType>(type)) {
+    for (auto eltType : tuple.getElementTypes()) {
+      if (hasThrowingFunctionParameter(eltType))
+        return true;
+    }
+    return false;
+  }
+
+  // Suppress diagnostics in the presence of errors.
+  if (isa<ErrorType>(type)) {
+    return true;
+  }
+
+  return false;
+}
+
+void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
+  // 'rethrows' only applies to functions that take throwing functions
+  // as parameters.
+  auto fn = cast<AbstractFunctionDecl>(D);
+  for (auto param : fn->getBodyParamPatterns()) {
+    if (hasThrowingFunctionParameter(param->getType()->getCanonicalType()))
+      return;
+  }
+
+  TC.diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
+  attr->setInvalid();
 }
 
 bool AttributeChecker::visitAbstractAccessibilityAttr(
