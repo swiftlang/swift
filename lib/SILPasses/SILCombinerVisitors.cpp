@@ -1274,6 +1274,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
       auto NewAI = Builder->createApply(
           AI->getLoc(), AI->getCallee(), NewSubstCalleeType,
           AI->getType(), Substitutions, Args);
+      NewAI->setDebugScope(AI->getDebugScope());
 
       replaceInstUsesWith(*AI, NewAI, 0);
       eraseInstFromFunction(*AI);
@@ -1608,10 +1609,12 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     // The type of the substition is the source type of the thin to thick
     // instruction.
     SILType substTy = TTTFI->getOperand().getType();
-    return ApplyInst::create(AI->getLoc(), TTTFI->getOperand(),
+    auto *NewAI = ApplyInst::create(AI->getLoc(), TTTFI->getOperand(),
                              substTy, AI->getType(),
                              AI->getSubstitutions(), Arguments,
                              *AI->getFunction());
+    NewAI->setDebugScope(AI->getDebugScope());
+    return NewAI;
   }
 
   // (apply (witness_method)) -> propagate information about
