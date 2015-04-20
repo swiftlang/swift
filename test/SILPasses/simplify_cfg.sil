@@ -669,6 +669,32 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @fold_switch_value : $@convention(thin) () -> Int32 {
+// CHECK: bb0:
+// CHECK-NOT: bb1
+// CHECK: integer_literal $Builtin.Int32, 100
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+sil @fold_switch_value : $@convention(thin) () -> Int32 {
+bb0:
+  %1 = integer_literal $Builtin.Int32, 24
+  %2 = integer_literal $Builtin.Int32, 25
+  switch_value %1 : $Builtin.Int32, case %1: bb1, case %2: bb2
+
+bb1:
+  %3 = integer_literal $Builtin.Int32, 100
+  br bb3(%3 : $Builtin.Int32)
+
+bb2:
+  %4 = integer_literal $Builtin.Int32, 200
+  br bb3(%4 : $Builtin.Int32)
+
+bb3(%5 : $Builtin.Int32):
+  %r = struct $Int32 (%5 : $Builtin.Int32)
+  return %r : $Int32
+}
+
+
 // CHECK-LABEL: @dominator_based_simplify_condbr
 // CHECK:  integer_literal $Builtin.Int64, 1
 // CHECK-NOT:  integer_literal $Builtin.Int64, 2

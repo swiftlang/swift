@@ -152,6 +152,7 @@ namespace {
     bool simplifyCondBrBlock(CondBranchInst *BI);
     bool simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI);
     bool simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI);
+    bool simplifySwitchValueBlock(SwitchValueInst *SVI);
     bool simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB);
     bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
@@ -1271,6 +1272,66 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   return true;
 }
 
+/// simplifySwitchValueBlock - Simplify a basic block that ends with a
+/// switch_value instruction that gets its operand from a an integer
+/// literal instruction.
+bool SimplifyCFG::simplifySwitchValueBlock(SwitchValueInst *SVI) {
+  auto *ThisBB = SVI->getParent();
+  if (auto *ILI = dyn_cast<IntegerLiteralInst>(SVI->getOperand())) {
+    SILBasicBlock *LiveBlock = nullptr;
+
+    auto Value = ILI->getValue();
+    // Find a case corresponding to this value
+    int i, e;
+    for (i = 0, e = SVI->getNumCases(); i < e; ++i) {
+      auto Pair = SVI->getCase(i);
+      auto *CaseIL = dyn_cast<IntegerLiteralInst>(Pair.first);
+      if (!CaseIL)
+        break;
+      auto CaseValue = CaseIL->getValue();
+      if (Value == CaseValue) {
+        LiveBlock = Pair.second;
+        break;
+      }
+    }
+
+    if (i == e && !LiveBlock) {
+      if (SVI->hasDefault()) {
+        LiveBlock = SVI->getDefaultBB();
+      }
+    }
+
+    if (LiveBlock) {
+      bool DroppedLiveBlock = false;
+      // Copy the successors into a vector, dropping one entry for the
+      // liveblock.
+      SmallVector<SILBasicBlock *, 4> Dests;
+      for (auto &S : SVI->getSuccessors()) {
+        if (S == LiveBlock && !DroppedLiveBlock) {
+          DroppedLiveBlock = true;
+          continue;
+        }
+        Dests.push_back(S);
+      }
+
+      SILBuilderWithScope<1>(SVI).createBranch(SVI->getLoc(), LiveBlock);
+      SVI->eraseFromParent();
+      if (ILI->use_empty())
+        ILI->eraseFromParent();
+
+      addToWorklist(ThisBB);
+
+      for (auto B : Dests)
+        simplifyAfterDroppingPredecessor(B);
+      addToWorklist(LiveBlock);
+      ++NumConstantFolded;
+      return true;
+    }
+  }
+
+  return simplifyTermWithIdenticalDestBlocks(ThisBB);
+}
+
 /// simplifyUnreachableBlock - Simplify blocks ending with unreachable by
 /// removing instructions that are safe to delete backwards until we
 /// hit an instruction we cannot delete.
@@ -1560,7 +1621,7 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case ValueKind::SwitchValueInst:
       // FIXME: Optimize for known switch values.
-      Changed |= simplifyTermWithIdenticalDestBlocks(BB);
+      Changed |= simplifySwitchValueBlock(cast<SwitchValueInst>(TI));
       break;
     case ValueKind::SwitchEnumInst:
       Changed |= simplifySwitchEnumBlock(cast<SwitchEnumInst>(TI));
