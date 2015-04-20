@@ -2284,9 +2284,10 @@ Type TypeBase::getTypeOfMember(Module *module, Type memberType,
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
   if (memberDC->isProtocolOrProtocolExtensionContext()) {
-    // We only substitute into archetypes for now.
-    // FIXME: This seems like an odd restriction.
-    if (!baseTy->is<ArchetypeType>())
+    // We only substitute into archetypes for now for protocols.
+    // FIXME: This seems like an odd restriction. Whatever is depending on
+    // this, shouldn't.
+    if (!baseTy->is<ArchetypeType>() && isa<ProtocolDecl>(memberDC))
       return memberType;
 
     // FIXME: This feels painfully inefficient. We're creating a dense map

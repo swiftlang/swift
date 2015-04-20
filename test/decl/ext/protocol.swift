@@ -398,6 +398,73 @@ func testSomeCollections(sc1: SomeCollection1, sc2: SomeCollection2) {
 }
 
 // ----------------------------------------------------------------------------
+// Typealiases in protocol extensions.
+// ----------------------------------------------------------------------------
+
+// Basic support
+protocol PTypeAlias1 {
+  typealias AssocType1
+}
+
+extension PTypeAlias1 {
+  typealias ArrayOfAssocType1 = [AssocType1]
+}
+
+struct STypeAlias1a: PTypeAlias1 {
+  typealias AssocType1 = Int
+}
+
+struct STypeAlias1b<T>: PTypeAlias1 {
+  typealias AssocType1 = T
+}
+
+func testPTypeAlias1() {
+  var a: STypeAlias1a.ArrayOfAssocType1 = []
+  a.append(1)
+
+  var b: STypeAlias1b<String>.ArrayOfAssocType1 = []
+  b.append("hello")
+}
+
+// Defaulted implementations to satisfy a requirement.
+protocol PTypeAliasSuper1 {
+}
+
+struct TypeAliasHelper<T> { }
+
+extension PTypeAliasSuper1 {
+  typealias Helper = TypeAliasHelper<Self>
+}
+
+protocol PTypeAliasSub1 : PTypeAliasSuper1 {
+  typealias Helper
+}
+
+struct STypeAliasSub1a : PTypeAliasSub1 { }
+
+struct STypeAliasSub1b<T, U> : PTypeAliasSub1 { }
+
+protocol PTypeAliasSuper2 {
+}
+
+extension PTypeAliasSuper2 {
+  final func foo() -> TypeAliasHelper<Self> { return TypeAliasHelper() }
+}
+
+protocol PTypeAliasSub2 : PTypeAliasSuper2 {
+  typealias Helper
+  func foo() -> Helper
+}
+
+struct STypeAliasSub2a : PTypeAliasSub2 { }
+
+struct STypeAliasSub2b<T, U> : PTypeAliasSub2 { }
+
+
+
+
+
+// ----------------------------------------------------------------------------
 // Partial ordering of protocol extension members
 // ----------------------------------------------------------------------------
 

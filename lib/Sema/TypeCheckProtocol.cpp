@@ -1626,22 +1626,11 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   // based on the declaration context of the conformance.
   if (fromDC != DC && DC->getGenericSignatureOfContext() &&
       fromDC->getGenericSignatureOfContext() && !isa<ProtocolDecl>(fromDC)) {
-    TypeSubstitutionMap substitutions;
-    auto fromGenericParams = fromDC->getGenericParamsOfContext();
-    auto toGenericParams = DC->getGenericParamsOfContext();
-    while (fromGenericParams) {
-      auto fromArchetypes = fromGenericParams->getAllArchetypes();
-      auto toArchetypes = toGenericParams->getAllArchetypes();
-      for (unsigned i = 0, n = fromArchetypes.size(); i != n; ++i) {
-        substitutions[fromArchetypes[i]] = toArchetypes[i];
-      }
+    // Map the type to an interface type.
+    type = TC.getInterfaceTypeFromInternalType(fromDC, type);
 
-      fromGenericParams = fromGenericParams->getOuterParameters();
-      toGenericParams = toGenericParams->getOuterParameters();
-    }
-
-    type = type.subst(fromDC->getParentModule(), substitutions,
-                      /*ignoreMissing=*/false, &TC);
+    // Map the type into the conformance's context.
+    type = Adoptee->getTypeOfMember(DC->getParentModule(), type, fromDC);
   }
 
   // If we already recoded this type witness, there's nothing to do.
