@@ -184,14 +184,15 @@ private:
     } method;
   };
   ArrayRef<Substitution> substitutions;
-  CanType OrigFormalOldType, OrigFormalInterfaceType;
-  CanAnyFunctionType SubstFormalType;
+  CanType origFormalOldType;
+  CanType origFormalInterfaceType;
+  CanAnyFunctionType substFormalType;
   Optional<SILLocation> specializeLoc;
   bool isTransparent;
-  bool HasSubstitutions = false;
+  bool hasSubstitutions = false;
 
   // The pointer back to the AST node that produced the callee.
-  SILLocation Loc;
+  SILLocation loc;
 
 
 public:
@@ -204,11 +205,11 @@ private:
          bool isTransparent, SILLocation L)
     : kind(Kind::IndirectValue),
       indirectValue(indirectValue),
-      OrigFormalOldType(origFormalType),
-      OrigFormalInterfaceType(origFormalType),
-      SubstFormalType(substFormalType),
+      origFormalOldType(origFormalType),
+      origFormalInterfaceType(origFormalType),
+      substFormalType(substFormalType),
       isTransparent(isTransparent),
-      Loc(L)
+      loc(L)
   {}
 
   static CanAnyFunctionType getConstantFormalType(SILGenFunction &gen,
@@ -229,13 +230,13 @@ private:
          CanAnyFunctionType substFormalType,
          SILLocation l)
     : kind(Kind::StandaloneFunction), standaloneFunction(standaloneFunction),
-      OrigFormalOldType(getConstantFormalType(gen, SILValue(),
+      origFormalOldType(getConstantFormalType(gen, SILValue(),
                                               standaloneFunction)),
-      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, SILValue(),
+      origFormalInterfaceType(getConstantFormalInterfaceType(gen, SILValue(),
                                                            standaloneFunction)),
-      SubstFormalType(substFormalType),
+      substFormalType(substFormalType),
       isTransparent(standaloneFunction.isTransparent()),
-      Loc(l)
+      loc(l)
   {
   }
 
@@ -246,12 +247,12 @@ private:
          CanAnyFunctionType substFormalType,
          SILLocation l)
     : kind(methodKind), method{selfValue, methodName},
-      OrigFormalOldType(getConstantFormalType(gen, selfValue, methodName)),
-      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, selfValue,
+      origFormalOldType(getConstantFormalType(gen, selfValue, methodName)),
+      origFormalInterfaceType(getConstantFormalInterfaceType(gen, selfValue,
                                                              methodName)),
-      SubstFormalType(substFormalType),
+      substFormalType(substFormalType),
       isTransparent(false),
-      Loc(l)
+      loc(l)
   {
   }
 
@@ -290,7 +291,7 @@ private:
   }
 
   CanType getWitnessMethodSelfType() const {
-    CanType type = SubstFormalType.getInput();
+    CanType type = substFormalType.getInput();
     if (auto tuple = dyn_cast<TupleType>(type)) {
       assert(tuple->getNumElements() == 1);
       type = tuple.getElementType(0);
@@ -307,15 +308,15 @@ private:
                                           CanAnyFunctionType origLoweredType,
                                           unsigned uncurryLevel,
                                           Optional<SILDeclRef> constant) const {
-    if (!HasSubstitutions) return origFnType;
+    if (!hasSubstitutions) return origFnType;
 
     assert(origLoweredType);
     auto substLoweredType =
-      SGM.Types.getLoweredASTFunctionType(SubstFormalType, uncurryLevel,
+      SGM.Types.getLoweredASTFunctionType(substFormalType, uncurryLevel,
                                           origLoweredType->getExtInfo(),
                                           constant);
     auto substLoweredInterfaceType =
-      SGM.Types.getLoweredASTFunctionType(SubstFormalType, uncurryLevel,
+      SGM.Types.getLoweredASTFunctionType(substFormalType, uncurryLevel,
                                           origLoweredType->getExtInfo(),
                                           constant);
     return SGM.Types.substFunctionType(origFnType, origLoweredType,
@@ -331,13 +332,13 @@ private:
     // (reflected in SubstFormalType) reflect an implicit level of
     // function application, including some extra polymorphic
     // substitution.
-    HasSubstitutions = true;
+    hasSubstitutions = true;
 
     auto &ctx = SGM.getASTContext();
 
     // Add the 'self' parameter back.  We want it to look like a
     // substitution of the appropriate clause from the original type.
-    auto polyFormalType = cast<PolymorphicFunctionType>(OrigFormalOldType);
+    auto polyFormalType = cast<PolymorphicFunctionType>(origFormalOldType);
     auto substSelfType =
       buildSubstSelfType(polyFormalType.getInput(), protocolSelfType, ctx);
 
@@ -345,7 +346,7 @@ private:
                                          /*noreturn*/ false,
                                          /*throws*/ polyFormalType->throws());
 
-    SubstFormalType = CanFunctionType::get(substSelfType, SubstFormalType,
+    substFormalType = CanFunctionType::get(substSelfType, substFormalType,
                                            extInfo);
   }
 
@@ -355,20 +356,20 @@ private:
     assert(kind == Kind::DynamicMethod);
 
     // Drop the original self clause.
-    CanType methodType = OrigFormalOldType;
+    CanType methodType = origFormalOldType;
     methodType = cast<AnyFunctionType>(methodType).getResult();
 
     // Replace it with the dynamic self type.
-    OrigFormalOldType = OrigFormalInterfaceType
+    origFormalOldType = origFormalInterfaceType
       = getDynamicMethodFormalType(SGM, method.selfValue,
                                    method.methodName.getDecl(),
                                    method.methodName, methodType);
 
     // Add a self clause to the substituted type.
-    auto origFormalType = cast<AnyFunctionType>(OrigFormalOldType);
+    auto origFormalType = cast<AnyFunctionType>(origFormalOldType);
     auto selfType = origFormalType.getInput();
-    SubstFormalType
-      = CanFunctionType::get(selfType, SubstFormalType,
+    substFormalType
+      = CanFunctionType::get(selfType, substFormalType,
                              origFormalType->getExtInfo());
   }
 
@@ -440,15 +441,15 @@ public:
     assert(getNaturalUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
     specializeLoc = loc;
-    HasSubstitutions = true;
+    hasSubstitutions = true;
   }
 
   CanType getOrigFormalType() const {
-    return OrigFormalOldType;
+    return origFormalOldType;
   }
 
   CanAnyFunctionType getSubstFormalType() const {
-    return SubstFormalType;
+    return substFormalType;
   }
 
   unsigned getNaturalUncurryLevel() const {
@@ -479,7 +480,7 @@ public:
     case Kind::IndirectValue:
       assert(level == 0 && "can't curry indirect function");
       mv = indirectValue;
-      assert(!HasSubstitutions);
+      assert(!hasSubstitutions);
       break;
 
     case Kind::StandaloneFunction: {
@@ -489,7 +490,7 @@ public:
         transparent = false;
       constant = standaloneFunction.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(*constant);
-      SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
+      SILValue ref = gen.emitGlobalFunctionRef(loc, *constant, constantInfo);
       mv = ManagedValue::forUnmanaged(ref);
       break;
     }
@@ -501,14 +502,14 @@ public:
 
       // If the call is curried, emit a direct call to the curry thunk.
       if (level < method.methodName.uncurryLevel) {
-        SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
+        SILValue ref = gen.emitGlobalFunctionRef(loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         transparent = false;
         break;
       }
 
       // Otherwise, do the dynamic dispatch inline.
-      SILValue methodVal = gen.B.createClassMethod(Loc,
+      SILValue methodVal = gen.B.createClassMethod(loc,
                                                    method.selfValue,
                                                    *constant,
                                                    constantInfo.getSILType(),
@@ -526,7 +527,7 @@ public:
 
       constant = method.methodName.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(*constant);
-      SILValue methodVal = gen.B.createSuperMethod(Loc,
+      SILValue methodVal = gen.B.createSuperMethod(loc,
                                                    method.selfValue,
                                                    *constant,
                                                    constantInfo.getSILType(),
@@ -544,7 +545,7 @@ public:
 
       // If the call is curried, emit a direct call to the curry thunk.
       if (level < method.methodName.uncurryLevel) {
-        SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
+        SILValue ref = gen.emitGlobalFunctionRef(loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         transparent = false;
         break;
@@ -559,7 +560,7 @@ public:
       if (!archetype->getOpenedExistentialType().isNull())
         OpenedExistential = method.selfValue;
 
-      SILValue fn = gen.B.createWitnessMethod(Loc,
+      SILValue fn = gen.B.createWitnessMethod(loc,
                                   archetype,
                                   /*conformance*/ nullptr,
                                   *constant,
@@ -584,7 +585,7 @@ public:
                                 method.selfValue.getType().getSwiftRValueType(),
                                 method.methodName);
 
-      SILValue fn = gen.B.createDynamicMethod(Loc,
+      SILValue fn = gen.B.createDynamicMethod(loc,
                           method.selfValue,
                           constant,
                           SILType::getPrimitiveObjectType(closureType),
