@@ -26,23 +26,23 @@ import Swift
 /// Mirrors are used by playgrounds and the debugger.
 public struct Mirror {
 
-  /// Initialize a mirror that reflects upon the given `instance`.
+  /// Initialize a mirror that reflects upon the given `subject`.
   ///
-  /// If the dynamic type of `instance` conforms to
+  /// If the dynamic type of `subject` conforms to
   /// `CustomReflectable`, returns the result of calling its
   /// `customMirror` method.  Otherwise, returns a mirror synthesized
-  /// for `instance` by the language.
+  /// for `subject` by the language.
   ///
-  /// Note: If the dynamic type of `instance` has value semantics,
-  /// subsequent mutations of `instance` will not observable in
+  /// Note: If the dynamic type of `subject` has value semantics,
+  /// subsequent mutations of `subject` will not observable in
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
-  public init(reflecting instance: Any) {
-    if let customized? = instance as? CustomReflectable {
+  public init(reflecting subject: Any) {
+    if let customized? = subject as? CustomReflectable {
       self = customized.customMirror()
     }
     else {
-      self = Mirror(Swift.reflect(instance))
+      self = Mirror(Swift.reflect(subject))
     }
   }
   
@@ -137,10 +137,10 @@ public struct Mirror {
   }
   
   /// A collection of `Child` elements describing the structure of the
-  /// reflected instance.
+  /// reflected subject.
   public let children: Children
 
-  /// Suggests a display style for the reflected instance.
+  /// Suggests a display style for the reflected subject.
   public let displayStyle: DisplayStyle?
 }
 
@@ -176,7 +176,7 @@ extension Mirror {
     func customMirror() -> Mirror { return mirror }
   }
   
-  /// Return a specific descendant of the reflected instance, or `nil`
+  /// Return a specific descendant of the reflected subject, or `nil`
   /// if no such descendant exists.
   ///
   /// A `String` argument selects the first `Child` with a matching label.
@@ -207,7 +207,7 @@ extension Mirror {
   ///
   /// As you can see, complexity for each element of the argument list
   /// depends on the argument type and capabilities of the collection
-  /// used to initialize the corresponding instance's parent's mirror.
+  /// used to initialize the corresponding subject's parent's mirror.
   /// Each `String` argument results in a linear search.  In short,
   /// this function is suitable for exploring the structure of a
   /// `Mirror` in a REPL or playground, but don't expect it to be
@@ -317,29 +317,29 @@ internal func _find<
 public typealias PlaygroundQuickLook = QuickLookObject
 
 extension PlaygroundQuickLook {
-  /// Initialize for the given `instance`.
+  /// Initialize for the given `subject`.
   ///
-  /// If the dynamic type of `instance` conforms to
+  /// If the dynamic type of `subject` conforms to
   /// `CustomPlaygroundQuickLookable`, returns the result of calling
   /// its `customPlaygroundQuickLook` method.  Otherwise, returns
-  /// a `PlaygroundQuickLook` synthesized for `instance` by the
+  /// a `PlaygroundQuickLook` synthesized for `subject` by the
   /// language.  Note: in some cases the result may be
-  /// `.Text(String(reflecting: instance))`.
+  /// `.Text(String(reflecting: subject))`.
   ///
-  /// Note: If the dynamic type of `instance` has value semantics,
-  /// subsequent mutations of `instance` will not observable in
+  /// Note: If the dynamic type of `subject` has value semantics,
+  /// subsequent mutations of `subject` will not observable in
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
-  public init(reflecting instance: Any) {
-    if let customized? = instance as? CustomPlaygroundQuickLookable {
+  public init(reflecting subject: Any) {
+    if let customized? = subject as? CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook()
     }
     else {
-      if let q? = Swift.reflect(instance).quickLookObject {
+      if let q? = Swift.reflect(subject).quickLookObject {
         self = q
       }
       else {
-        self = .Text(String(reflecting: instance))
+        self = .Text(String(reflecting: subject))
       }
     }
   }
