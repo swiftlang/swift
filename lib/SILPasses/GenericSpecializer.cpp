@@ -146,7 +146,7 @@ bool GenericSpecializer::specialize(const llvm::SmallVectorImpl<SILFunction *>
     Worklist.pop_back();
 
     // Don't optimize functions that are marked with the opt.never attribute.
-    if (F->hasSemanticsString("optimize.never"))
+    if (!F->shouldOptimize())
       continue;
 
     collectApplyInst(*F, CG, NewApplies);

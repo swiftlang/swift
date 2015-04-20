@@ -462,7 +462,7 @@ bool GlobalPropertyOpt::replacePropertyCalls() {
   bool Changed = false;
   for (ApplyInst *AI : propertyCalls) {
     // Don't optimize functions that are marked with the opt.never attribute.
-    if (AI->getFunction()->hasSemanticsString("optimize.never"))
+    if (!AI->getFunction()->shouldOptimize())
       continue;
 
     SILValue array = AI->getArgument(0);

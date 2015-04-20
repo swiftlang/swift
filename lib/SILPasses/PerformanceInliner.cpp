@@ -998,7 +998,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
                                                     SILLoopAnalysis *LA,
                                                     CallGraph &CG) {
   // Don't optimize functions that are marked with the opt.never attribute.
-  if (Caller->hasSemanticsString("optimize.never"))
+  if (!Caller->shouldOptimize())
     return false;
 
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");

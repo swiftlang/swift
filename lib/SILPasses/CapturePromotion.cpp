@@ -958,7 +958,7 @@ constructMapFromPartialApplyToPromoteableIndices(SILFunction *F,
 static void
 processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
   // Don't optimize functions that are marked with the opt.never attribute.
-  if (F->hasSemanticsString("optimize.never"))
+  if (!F->shouldOptimize())
     return;
 
   // This is a map from each partial apply to a set of indices of promotable

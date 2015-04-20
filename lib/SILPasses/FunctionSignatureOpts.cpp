@@ -816,7 +816,7 @@ public:
     for (auto &F : *M) {
 
       // Don't optimize functions that are marked with the opt.never attribute.
-      if (F.hasSemanticsString("optimize.never"))
+      if (!F.shouldOptimize())
         continue;
 
       // Check the signature of F to make sure that it is a function that we can

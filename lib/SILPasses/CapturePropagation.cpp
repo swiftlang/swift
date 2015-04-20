@@ -312,7 +312,7 @@ void CapturePropagation::run() {
   for (auto &F : *getModule()) {
 
     // Don't optimize functions that are marked with the opt.never attribute.
-    if (F.hasSemanticsString("optimize.never"))
+    if (!F.shouldOptimize())
       continue;
 
     // Cache cold blocks per function.

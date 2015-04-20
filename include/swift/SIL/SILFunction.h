@@ -330,6 +330,11 @@ public:
     return SemanticsAttr == Value;
   }
 
+  /// \returns True if the function is optimizable (i.e. not marked as no-opt).
+  bool shouldOptimize() const {
+    return !hasSemanticsString("optimize.never");
+  }
+
   /// Initialize the source location of the function.
   void setLocation(SILLocation L) { Location = L; }
 

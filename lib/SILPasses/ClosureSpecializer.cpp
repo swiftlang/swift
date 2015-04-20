@@ -745,7 +745,7 @@ public:
     for (auto *F : CG.getBottomUpFunctionOrder()) {
 
       // Don't optimize functions that are marked with the opt.never attribute.
-      if (F->hasSemanticsString("optimize.never"))
+      if (!F->shouldOptimize())
         return;
 
       // If F is an external declaration, attempt to link in its definition. If

@@ -62,7 +62,7 @@ public:
     for (auto &F : *getModule()) {
 
       // Don't optimize functions that are marked with the opt.never attribute.
-      if (F.hasSemanticsString("optimize.never"))
+      if (!F.shouldOptimize())
         return;
 
       DEBUG(llvm::dbgs() << "*** Devirtualizing Function: "
