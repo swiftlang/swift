@@ -2872,3 +2872,14 @@ extern "C" bool _swift_isClass(OpaqueExistentialContainer *value) {
 
   return Result;
 }
+
+// func _swift_getSuperclass_nonNull(_: AnyClass) -> AnyClass?
+extern "C" const ClassMetadata *_swift_getSuperclass_nonNull(
+  const ClassMetadata *theClass
+) {
+  if (theClass->isAnyExistentialType())
+    return nil;
+  const auto super = theClass->SuperClass;
+  return super != getRootSuperclass() ? super : nullptr ;
+}
+

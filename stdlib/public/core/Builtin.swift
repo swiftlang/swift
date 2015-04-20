@@ -407,3 +407,13 @@ internal func _makeBridgeObject(
     object, bits._builtinWordValue
   )
 }
+
+/// Return the superclass of `t`, if any.  The result is nil if `t` is
+/// a root class or class protocol.
+@inline(__always)
+public // @testable
+func _getSuperclass(t: AnyClass) -> AnyClass? {
+  return unsafeBitCast(
+    _swift_getSuperclass_nonNull(unsafeBitCast(t, COpaquePointer.self)),
+    AnyClass.self)
+}
