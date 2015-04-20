@@ -9,10 +9,10 @@ struct LoadableStruct {
   // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT10alwaysFailCS_1C_GSqS0__
   // CHECK:       bb0([[C:%.*]] : $C
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $LoadableStruct
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[FAIL:bb[0-9]+]]
   // CHECK:       [[FAIL]]:
   // CHECK:         strong_release [[C]]
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[NIL:%.*]] = enum $Optional<LoadableStruct>, #Optional.None!enumelt
   // CHECK:         br [[EXIT:bb[0-9]+]]([[NIL]] : $Optional<LoadableStruct>)
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<LoadableStruct>):
@@ -28,7 +28,6 @@ struct LoadableStruct {
     x = C()
 
   // CHECK:       bb{{.*}}:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[FAILURE:bb[0-9]+]]
     if opt {
       return nil
@@ -37,6 +36,7 @@ struct LoadableStruct {
   // CHECK:       bb{{.*}}:
   // CHECK:         [[SELF:%.*]] = load [[SELF_MARKED]]
   // CHECK:         [[SELF_OPT:%.*]] = enum $Optional<LoadableStruct>, #Optional.Some!enumelt.1, [[SELF]]
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[EXIT:bb.*]]([[SELF_OPT]] : $Optional<LoadableStruct>)
 
   // CHECK:       [[FAILURE]]:
@@ -54,7 +54,6 @@ struct LoadableStruct {
     x = C()
 
   // CHECK:       bb{{.*}}:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[FAILURE:bb[0-9]+]]
     if iuo {
       return nil
@@ -63,9 +62,11 @@ struct LoadableStruct {
   // CHECK:       bb{{.*}}:
   // CHECK:         [[SELF:%.*]] = load [[SELF_MARKED]]
   // CHECK:         [[SELF_OPT:%.*]] = enum $ImplicitlyUnwrappedOptional<LoadableStruct>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[SELF]]
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[EXIT:bb.*]]([[SELF_OPT]] : $ImplicitlyUnwrappedOptional<LoadableStruct>)
 
   // CHECK:       [[FAILURE]]:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[NIL:%.*]] = enum $ImplicitlyUnwrappedOptional<LoadableStruct>, #ImplicitlyUnwrappedOptional.None
   // CHECK:         br [[EXIT]]([[NIL]] : $ImplicitlyUnwrappedOptional<LoadableStruct>)
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $ImplicitlyUnwrappedOptional<LoadableStruct>):
@@ -84,7 +85,6 @@ struct LoadableStruct {
   // CHECK:         cond_br [[HAS_VALUE]], [[DOES_HAVE_VALUE:bb[0-9]+]], [[DOESNT_HAVE_VALUE:bb[0-9]+]]
   // -- TODO: failure
   // CHECK:       [[DOESNT_HAVE_VALUE]]:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         destroy_addr [[DELEGATEE_SELF_MAT]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF_MAT]]
   // CHECK:         br [[FAILURE:bb[0-9]+]]
@@ -96,7 +96,9 @@ struct LoadableStruct {
   // CHECK:         assign [[DELEGATEE_SELF_VAL]] to [[SELF_MARKED]]
   // CHECK:         dealloc_stack [[TMP]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF_MAT]]
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:       [[FAILURE]]:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[NIL:%.*]] = enum $Optional<LoadableStruct>, #Optional.None
   // CHECK:         br [[EXIT:bb.*]]([[NIL]] : $Optional<LoadableStruct>)
     self.init(opt: true)
@@ -130,7 +132,6 @@ struct AddressOnlyStruct {
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
     x = C()
   // CHECK:       bb{{.*}}:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[FAILURE:bb[0-9]+]]
     if opt {
       return nil
@@ -140,9 +141,11 @@ struct AddressOnlyStruct {
   // CHECK:         [[DEST_PAYLOAD:%.*]] = init_enum_data_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.Some
   // CHECK:         copy_addr [[SELF_MARKED]] to [initialization] [[DEST_PAYLOAD]]
   // CHECK:         inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.Some
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[EXIT:bb[0-9]+]]
 
   // CHECK:       [[FAILURE]]:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.None!enumelt
   // CHECK:         br [[EXIT]]
   // CHECK:       [[EXIT]]:
@@ -155,7 +158,6 @@ struct AddressOnlyStruct {
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]#1
     x = C()
   // CHECK:       bb{{.*}}:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[FAILURE:bb[0-9]+]]
     if iuo {
       return nil
@@ -165,8 +167,10 @@ struct AddressOnlyStruct {
   // CHECK:         [[DEST_PAYLOAD:%.*]] = init_enum_data_addr %0 : $*ImplicitlyUnwrappedOptional<AddressOnlyStruct>, #ImplicitlyUnwrappedOptional.Some
   // CHECK:         copy_addr [[SELF_MARKED]] to [initialization] [[DEST_PAYLOAD]]
   // CHECK:         inject_enum_addr %0 : $*ImplicitlyUnwrappedOptional<AddressOnlyStruct>, #ImplicitlyUnwrappedOptional.Some
+  // CHECK:         strong_release [[SELF_BOX]]
 
   // CHECK:       [[FAILURE]]:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         inject_enum_addr %0 : $*ImplicitlyUnwrappedOptional<AddressOnlyStruct>, #ImplicitlyUnwrappedOptional.None!enumelt
   // CHECK:         br [[EXIT:bb[0-9]+]]
   }
@@ -182,7 +186,6 @@ struct AddressOnlyStruct {
   // CHECK:         cond_br [[HAS_VALUE]], [[DOES_HAVE_VALUE:bb[0-9]+]], [[DOESNT_HAVE_VALUE:bb[0-9]+]]
   // -- TODO: failure
   // CHECK:       [[DOESNT_HAVE_VALUE]]:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         destroy_addr [[DELEGATEE_SELF]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF]]
   // CHECK:         br [[FAILURE:bb[0-9]+]]
@@ -193,8 +196,10 @@ struct AddressOnlyStruct {
   // CHECK:         copy_addr [take] [[TMP]]#1 to [[SELF_MARKED]]
   // CHECK:         dealloc_stack [[TMP]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF]]
+  // CHECK:         strong_release [[SELF_BOX]]
     self.init(opt: true)
   // CHECK:       [[FAILURE]]:
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.None!enumelt
   // CHECK:         br [[EXIT:bb[0-9]+]]
   }
