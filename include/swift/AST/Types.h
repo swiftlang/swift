@@ -680,6 +680,10 @@ public:
   Type getTypeOfMember(Module *module, const ValueDecl *member,
                        LazyResolver *resolver, Type memberType = Type());
 
+  /// Given the type of a member from a particular declaration context,
+  /// substitute in the types from the given base type (this) to produce
+  /// the resulting member type.
+  Type getTypeOfMember(Module *module, Type memberType, DeclContext *memberDC);
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();

@@ -2262,10 +2262,16 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
   if (!memberType)
     memberType = member->getInterfaceType();
 
+  return getTypeOfMember(module, memberType, member->getDeclContext());
+}
+
+Type TypeBase::getTypeOfMember(Module *module, Type memberType,
+                               DeclContext *memberDC) {
   // If the member is not part of a type, there's nothing to substitute.
-  auto memberDC = member->getDeclContext();
   if (!memberDC->isTypeContext())
     return memberType;
+
+  LazyResolver *resolver = memberDC->getASTContext().getLazyResolver();
 
   // Ignore lvalues in the base type.
   Type baseTy(getRValueType());
