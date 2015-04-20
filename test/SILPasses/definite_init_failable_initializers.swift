@@ -47,8 +47,8 @@ class RootClass {
 
   init() { x = 0; y = 0 }
 
-  convenience init?(failBeforeDelegation: Bool) {  // expected-error{{failable convenience initializer must delegate to self.init() before returning nil}}
-    if failBeforeDelegation { return nil }
+  convenience init?(failBeforeDelegation: Bool) {
+    if failBeforeDelegation { return nil }  // expected-error{{failable convenience initializer must delegate to self.init() before returning nil}}
     self.init()
   }
 
@@ -73,8 +73,8 @@ class RootClass {
   }
 
   convenience init?(failBeforeFailableDelegation: Bool) {
-    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
-    if failBeforeFailableDelegation { return nil }
+    if failBeforeFailableDelegation { return nil }     // expected-error {{failable convenience initializer must delegate to self.init() before returning nil}}
+
     self.init(failBeforeInitialization: ())
   }
 
@@ -112,10 +112,10 @@ class SubClass: RootClass {
   }
 
   init?(failBeforeFailableSuperInit: Bool) {
-    // expected-error@-1{{properties of a class instance must be initialized before returning nil}}
-    // expected-note@-2{{super.init must be called before returning nil}}
     z = 0
-    if failBeforeFailableSuperInit { return nil }
+    if failBeforeFailableSuperInit { return nil }      // expected-error{{properties of a class instance must be initialized before returning nil}}
+    // expected-note@-1{{super.init must be called before returning nil}}
+
     super.init(failBeforeInitialization: ())
   }
 
@@ -126,8 +126,8 @@ class SubClass: RootClass {
   }
 
   convenience init?(failBeforeDelegation: Bool) {
-    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
     if failBeforeDelegation { return nil }
+    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
     self.init()
   }
 
@@ -137,8 +137,8 @@ class SubClass: RootClass {
   }
 
   convenience init?(failBeforeFailableDelegation: Bool) {
-    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
     if failBeforeFailableDelegation { return nil }
+    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
     self.init(failBeforeInitialization: ())
   }
 

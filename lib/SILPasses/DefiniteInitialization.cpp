@@ -1343,16 +1343,30 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   // after a failure.  Handle this by only allowing an early 'return nil' in an
   // initializer after all properties are initialized.
   if (TheMemory.isClassInitSelf()) {
+    SILLocation loc = Release->getLoc();
+    
+    // The release is generally a cleanup in a failure block, and is usually the
+    // first instruction in the block.  For better QoI, try to rewind back up
+    // the CFG a bit to find a source location that is better.
+    if (loc.getKind() == SILLocation::CleanupKind) {
+      SILBasicBlock *SILBB = Release->getParent();
+      for (auto pred : SILBB->getPreds()) {
+        // Pick the terminator of any predecessor who doesn't have all members
+        // initialized.
+        if (!getLivenessAtInst(pred->getTerminator(), 0, TheMemory.NumElements)
+            .isAllYes())
+          loc = pred->getTerminator()->getLoc();
+      }
+    }
+    
     // If this is a convenience initializer, report that self.init() must be
     // called.
     if (TheMemory.isDelegatingInit()) {
-      diagnose(Module, Release->getLoc(),
-               diag::self_init_must_be_called_before_failure);
+      diagnose(Module, loc, diag::self_init_must_be_called_before_failure);
     } else {
       // Otherwise all members must be initialized (including the base class, if
       // present).
-      diagnose(Module, Release->getLoc(),
-               diag::object_not_fully_initialized_before_failure);
+      diagnose(Module, loc, diag::object_not_fully_initialized_before_failure);
       
       // Note each of the members that isn't initialized.
       DIMemoryUse Use(Release, DIUseKind::Load, 0, TheMemory.NumElements);
@@ -1362,8 +1376,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
       // then report on failure to call super.init as well.
       if (TheMemory.isAnyDerivedClassSelf() &&
           Availability.get(Availability.size()-1) != DIKind::Yes)
-        diagnose(Module, Release->getLoc(),
-                 diag::must_call_super_init_failable_init);
+        diagnose(Module, loc, diag::must_call_super_init_failable_init);
     }
   }
 
