@@ -11,6 +11,17 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
+// These are just here pending review.
+/// Return `true` iff `t0` is identical to `t1`
+func == (t0: Any.Type, t1: Any.Type) -> Bool {
+  return unsafeBitCast(t0, Int.self) == unsafeBitCast(t1, Int.self)
+}
+
+/// Return `false` iff `t0` is identical to `t1`
+func != (t0: Any.Type, t1: Any.Type) -> Bool {
+  return !(t0 == t1)
+}
+
 #if _runtime(_ObjC)
 // FIXME: ExistentialCollection needs to be supported before this will work
 // without the ObjC Runtime.
@@ -88,15 +99,32 @@ public struct Mirror {
 
   static func _noSuperclassMirror() -> Mirror? { return nil }
   
-  internal static func _superclassGenerator(
-    subject: Any, _ superclassMirror: SuperclassMirror
+  internal static func _superclassGenerator<T: Any>(
+    subject: T, _ superclassMirror: SuperclassMirror
   ) -> ()->Mirror? {
     switch superclassMirror {
     case .None: return Mirror._noSuperclassMirror
     case .Synthesized: return {
-        reflect(subject)._legacySuperMirror().map { Mirror($0) }
+        // Find the right legacy superclass mirror (inefficient, but works)
+        
+        // get a mirror for the most-derived type
+        var legacyMirror = reflect(subject)
+        // get the most-derived type
+        var derivedType: AnyClass? = subject.dynamicType as? AnyClass
+
+        // Walk up the chain of mirrors/classes until we find T.self
+        while let (m?, t?) = (legacyMirror._legacySuperMirror(), derivedType) {
+            if t == T.self {
+              return Mirror(m)
+            }
+            legacyMirror = m
+            derivedType = _getSuperclass(t)
+          }
+        return nil
       }
-    case .Customized(let superduperclassMirror): return { nil }
+    case .Customized(let overridden): return {
+        overridden()
+      }
     }
   }
   

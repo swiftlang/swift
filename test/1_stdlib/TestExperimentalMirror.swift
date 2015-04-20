@@ -339,6 +339,66 @@ mirrors.test("class/CustomizedSuper/NoSuperclassMirror") {
   let b = Mirror(reflecting: B())
   expectEmpty(b.superclassMirror)
 }
+
+//===--- Override Superclass Mirrors --------------------------------------===//
+mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Direct") {
+  class A : CustomReflectable {
+    var a: Int = 1
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "aye": a ])
+    }
+  }
+
+  // B inherits A directly
+  class B : A {
+    var b: UInt = 42
+    override func customMirror() -> Mirror {
+      return Mirror(
+        self, children: [ "bee": b ],
+        superclassMirror: .Customized(
+          // FIXME: should be "super.customMirror", but for <rdar://20598526>.
+          {super.customMirror()} 
+        ))
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectNotEmpty(b.superclassMirror)
+  expectEqual("aye", first(b.superclassMirror!.children)!.label)
+  expectEmpty(b.superclassMirror!.superclassMirror)
+}
+
+mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
+  class A : CustomReflectable {
+    var a: Int = 1
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "aye": a ])
+    }
+  }
+
+  class X : A {}
+
+  // B inherits A indirectly through X
+  class B : X {
+    var b: UInt = 42
+    override func customMirror() -> Mirror {
+      return Mirror(
+        self, children: [ "bee": b ],
+        superclassMirror: .Customized(
+          // FIXME: should be "super.customMirror", but for <rdar://20598526>.
+          {super.customMirror()} 
+        ))
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectNotEmpty(b.superclassMirror)
+  // Not the behavior we eventually want, but expected until the other
+  // behavior is implemented.
+  expectEqual("aye", first(b.superclassMirror!.children)!.label)
+  expectEmpty(b.superclassMirror!.superclassMirror)
+}
+
 //===--- End Class Support ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
