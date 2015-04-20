@@ -136,6 +136,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_TA_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_TA
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_INIT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_T_DOT_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_T_DOT_1
 
 // Test code completion of expressions that produce a value.
 
@@ -1608,3 +1611,27 @@ func testProtExtInit2<S: P4 where S.T : P1>() {
 // PROTOCOL_EXT_INIT: Decl[Constructor]/Super:            ['('])[#Self#]{{; name=.+$}}
 // PROTOCOL_EXT_INIT: Decl[Constructor]/Super:            ['(']{#x: Int#})[#Self#]{{; name=.+$}}
 // PROTOCOL_EXT_INIT: End completions
+
+extension P4 where Self.T == OnlyMe {
+  final func test1() {
+    self.#^PROTOCOL_EXT_P4_DOT_1^#
+  }
+  final func test2() {
+    #^PROTOCOL_EXT_P4_DOT_2^#
+  }
+}
+// PROTOCOL_EXT_P4_DOT: Begin completions
+// PROTOCOL_EXT_P4_DOT-NOT: extP4WhenP1()
+// PROTOCOL_EXT_P4_DOT-DAG: Decl[InstanceMethod]/Super:         extP4OnlyMe()[#Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_DOT-NOT: extP4WhenP1()
+// PROTOCOL_EXT_P4_DOT: End completions
+
+extension P4 where Self.T == WillConformP1 {
+  final func test() {
+    T.#^PROTOCOL_EXT_P4_T_DOT_1^#
+  }
+}
+// PROTOCOL_EXT_P4_T_DOT_1: Begin completions
+// PROTOCOL_EXT_P4_T_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   reqP1({#self: WillConformP1#})[#() -> Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_T_DOT_1-DAG: Decl[InstanceMethod]/Super:   extP1({#self: Self#})[#() -> Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_T_DOT_1: End completions

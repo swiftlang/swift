@@ -14,6 +14,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_6 | FileCheck %s -check-prefix=KW_DECL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_7 | FileCheck %s -check-prefix=KW_DECL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_8 | FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_9 | FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_10 | FileCheck %s -check-prefix=KW_DECL
 
 // KW_DECL: Begin completions
 // KW_DECL-DAG: Keyword/None: class{{; name=.+$}}
@@ -178,4 +180,12 @@ class AfterOtherKeywords3 {
 
 class AfterOtherKeywords4 {
   public override #^IN_NOMINAL_DECL_8^#
+}
+
+extension InStruct {
+  #^IN_NOMINAL_DECL_9^#
+}
+
+extension InProtocol {
+  #^IN_NOMINAL_DECL_10^#
 }
