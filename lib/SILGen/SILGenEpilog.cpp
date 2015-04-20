@@ -51,15 +51,16 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
 
   // If the current BB isn't terminated, and we require a return, then we
   // are not allowed to fall off the end of the function and can't reach here.
-  if (NeedsReturn && B.hasValidInsertionPoint()) {
+  if (NeedsReturn && B.hasValidInsertionPoint())
     B.createUnreachable(ImplicitReturnFromTopLevel);
-  }
 
   if (epilogBB->pred_empty()) {
     bool hadArg = !epilogBB->bbarg_empty();
 
     // If the epilog was not branched to at all, kill the BB and
     // just emit the epilog into the current BB.
+    while (!epilogBB->empty())
+      epilogBB->getInstList().back().eraseFromParent();
     eraseBasicBlock(epilogBB);
 
     // If the current bb is terminated then the epilog is just unreachable.
@@ -75,7 +76,6 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // If the epilog has a single predecessor and there's no current insertion
     // point to fall through from, then we can weld the epilog to that
     // predecessor BB.
-
     bool needsArg = false;
     if (!epilogBB->bbarg_empty()) {
       assert(epilogBB->bbarg_size() == 1 && "epilog should take 0 or 1 args");
@@ -85,10 +85,14 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // Steal the branch argument as the return value if present.
     SILBasicBlock *pred = *epilogBB->pred_begin();
     BranchInst *predBranch = cast<BranchInst>(pred->getTerminator());
-    assert(predBranch->getArgs().size() == (needsArg ? 1 : 0)
-           && "epilog predecessor arguments does not match block params");
-    if (needsArg)
+    assert(predBranch->getArgs().size() == (needsArg ? 1 : 0) &&
+           "epilog predecessor arguments does not match block params");
+
+    if (needsArg) {
       returnValue = predBranch->getArgs()[0];
+      // RAUW the old BB argument (if any) with the new value.
+      SILValue(*epilogBB->bbarg_begin(),0).replaceAllUsesWith(returnValue);
+    }
 
     // If we are optimizing, we should use the return location from the single,
     // previously processed, return statement if any.
@@ -97,9 +101,12 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     } else {
       returnLoc = ImplicitReturnFromTopLevel;
     }
-
+    
     // Kill the branch to the now-dead epilog BB.
     pred->getInstList().erase(predBranch);
+
+    // Move any instructions from the EpilogBB to the end of the 'pred' block.
+    pred->getInstList().splice(pred->end(), epilogBB->getInstList());
 
     // Finally we can erase the epilog BB.
     eraseBasicBlock(epilogBB);
@@ -121,11 +128,11 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // If we are falling through from the current block, the return is implicit.
     B.emitBlock(epilogBB, ImplicitReturnFromTopLevel);
   }
-
+  
   // Emit top-level cleanups into the epilog block.
   assert(!Cleanups.hasAnyActiveCleanups(getCleanupsDepth(),
-                                        ReturnDest.getDepth())
-         && "emitting epilog in wrong scope");
+                                        ReturnDest.getDepth()) &&
+         "emitting epilog in wrong scope");
 
   auto cleanupLoc = CleanupLocation::get(TopLevel);
   Cleanups.emitCleanupsForReturn(cleanupLoc);
@@ -141,30 +148,43 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
 }
 
 void SILGenFunction::emitEpilog(SILLocation TopLevel) {
+  // Some callers will want to provide a custom epilog.  They do this by filling
+  // it into the EpilogBB.  When they do that, just disable the default one.
+  bool callerProvidedEpilog = !ReturnDest.getBlock()->empty();
+
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(TopLevel);
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(TopLevel);
 
-  // If the epilog is unreachable, we're done.
+  SILBasicBlock *ResultBB = nullptr;
+  
   if (!maybeReturnValue) {
-    emitRethrowEpilog(TopLevel);
-    return;
+    // Nothing to do.
+  } else if (callerProvidedEpilog) {
+    // If the epilog is reachable, and the caller provided an epilog, just
+    // remember the block so the caller can continue it.
+    ResultBB = B.getInsertionBB();
+    assert(ResultBB && "Didn't have an epilog block?");
+    B.clearInsertionPoint();
+  } else {
+    // Otherwise, if the epilog block is reachable, return the return value.
+    SILValue returnValue = *maybeReturnValue;
+
+    // Return () if no return value was given.
+    if (!returnValue)
+      returnValue = emitEmptyTuple(CleanupLocation::get(TopLevel));
+
+    B.createReturn(returnLoc, returnValue);
+
+    if (!MainScope)
+      MainScope = F.getDebugScope();
+    setDebugScopeForInsertedInstrs(MainScope);
   }
-
-  // Otherwise, return the return value, if any.
-  SILValue returnValue = *maybeReturnValue;
-
-  // Return () if no return value was given.
-  if (!returnValue)
-    returnValue = emitEmptyTuple(CleanupLocation::get(TopLevel));
-
-  B.createReturn(returnLoc, returnValue);
-
-  if (!MainScope)
-    MainScope = F.getDebugScope();
-  setDebugScopeForInsertedInstrs(MainScope);
   
   emitRethrowEpilog(TopLevel);
+  
+  if (ResultBB)
+    B.setInsertionPoint(ResultBB);
 }
 
 void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {

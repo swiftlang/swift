@@ -2162,7 +2162,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
       // If the delegate result is nil, clean up and propagate 'nil' from our
       // constructor.
       SGF.B.emitBlock(noneBB);
-      assert(SGF.FailDest.isValid() && SGF.FailSelfDecl && "too big to fail");
+      assert(SGF.FailDest.isValid() && "too big to fail");
+      if (SGF.FailSelfDecl) {
       // If the delegation consumed self, then our box for 'self' is
       // uninitialized, so we have to deallocate it without triggering a
       // destructor using dealloc_box.
@@ -2183,6 +2184,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
         // we can count on the box having a retain count of exactly 1 here.
         SGF.B.createDeallocBox(E, SGF.getLoweredType(SGF.FailSelfDecl->getType()),
                                selfBox);
+      }
       }
       SGF.Cleanups.emitBranchAndCleanups(SGF.FailDest, E);
       

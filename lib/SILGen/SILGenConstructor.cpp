@@ -181,28 +181,24 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   (void)selfTy;
   assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
 
-  // Emit a local variable for 'self'.
-  // FIXME: The (potentially partially initialized) variable would need to be
-  // cleaned up on an error unwind.
-  emitLocalVariable(selfDecl,
-                    isDelegating ? MarkUninitializedInst::DelegatingSelf
-                                 : MarkUninitializedInst::RootSelf);
-
+  
+  // Allocate the local variable for 'self'.
+  emitLocalVariableWithCleanup(selfDecl, false)->finishInitialization(*this);
+  
   // Mark self as being uninitialized so that DI knows where it is and how to
   // check for it.
-  SILValue selfLV, selfBox;
+  SILValue selfLV;
   {
     auto &SelfVarLoc = VarLocs[selfDecl];
-    selfBox = SelfVarLoc.box;
     selfLV = SelfVarLoc.value;
+    auto MUIKind =  isDelegating ? MarkUninitializedInst::DelegatingSelf
+                                 : MarkUninitializedInst::RootSelf;
+    selfLV = B.createMarkUninitialized(selfDecl, SelfVarLoc.value, MUIKind);
+    SelfVarLoc.value = selfLV;
   }
-
-  // FIXME: Handle 'self' along with the other body patterns.
-
+  
   // Emit the prolog.
-  emitProlog(ctor->getBodyParamPatterns()[1],
-             ctor->getResultType(),
-             ctor);
+  emitProlog(ctor->getBodyParamPatterns()[1], ctor->getResultType(), ctor);
   emitConstructorMetatypeArg(*this, ctor);
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -247,7 +243,6 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     }
 
     FailDest = JumpDest(failureBB, Cleanups.getCleanupsDepth(), ctor);
-    FailSelfDecl = selfDecl;
   }
 
   // If this is not a delegating constructor, emit member initializers.
@@ -261,96 +256,86 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Emit the constructor body.
   emitStmt(ctor->getBody());
 
-  Optional<SILValue> maybeReturnValue;
-  SILLocation returnLoc(ctor);
-  std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(ctor);
-
-  // Don't finish without emitting the rethrow epilog.
-  defer([&]{ emitRethrowEpilog(ctor); });
-
-  // Return 'self' in the epilog.
-  if (!maybeReturnValue)
-    return;
-
-  auto cleanupLoc = CleanupLocation::get(ctor);
-
-  assert(selfBox && "self should be a mutable box");
-
-  // If 'self' is address-only, copy 'self' into the indirect return slot.
-  if (lowering.isAddressOnly()) {
-    assert(IndirectReturnAddress &&
-           "no indirect return for address-only ctor?!");
-
-    // Get the address to which to store the result.
-    SILValue returnAddress;
-    switch (ctor->getFailability()) {
-    // For non-failable initializers, store to the return address directly.
-    case OTK_None:
-      returnAddress = IndirectReturnAddress;
-      break;
-    // If this is a failable initializer, project out the payload.
-    case OTK_Optional:
-    case OTK_ImplicitlyUnwrappedOptional:
-      returnAddress = B.createInitEnumDataAddr(ctor, IndirectReturnAddress,
-          getASTContext().getOptionalSomeDecl(ctor->getFailability()),
-          selfLV.getType());
-      break;
-    }
-
-    // We have to do a non-take copy because someone else may be using the box.
-    B.createCopyAddr(cleanupLoc, selfLV, returnAddress,
-                     IsNotTake, IsInitialization);
-    B.emitStrongRelease(cleanupLoc, selfBox);
-
-    // Inject the enum tag if the result is optional because of failability.
-    switch (ctor->getFailability()) {
-    case OTK_None:
-      // Not optional.
-      break;
-
-    case OTK_Optional:
-    case OTK_ImplicitlyUnwrappedOptional:
-      // Inject the 'Some' tag.
-      B.createInjectEnumAddr(ctor, IndirectReturnAddress,
-                   getASTContext().getOptionalSomeDecl(ctor->getFailability()));
-      break;
-    }
-
-    if (failureExitBB) {
-      B.createBranch(returnLoc, failureExitBB);
+  
+  // Build a custom epilog block, since the AST representation of the
+  // constructor decl (which has no self in the return type) doesn't match the
+  // SIL representation.
+  SILValue selfValue;
+  {
+    // On failure, we'll clean up everything (except self, which should already
+    // have been released) and return nil instead.
+    SavedInsertionPoint savedIP(*this, ReturnDest.getBlock());
+    assert(B.getInsertionBB()->empty() && "Epilog already set up?");
+    
+    auto cleanupLoc = CleanupLocation::get(ctor);
+    
+    if (!lowering.isAddressOnly()) {
+      // Otherwise, load and return the final 'self' value.
+      selfValue = B.createLoad(cleanupLoc, selfLV);
+      
+      // Emit a retain of the loaded value, since we return it +1.
+      lowering.emitRetainValue(B, cleanupLoc, selfValue);
+      
+      // Inject the self value into an optional if the constructor is failable.
+      if (ctor->getFailability() != OTK_None) {
+        selfValue = B.createEnum(ctor, selfValue,
+                                 getASTContext().getOptionalSomeDecl(ctor->getFailability()),
+                                 getLoweredLoadableType(ctor->getResultType()));
+      }
     } else {
-      B.createReturn(returnLoc, emitEmptyTuple(ctor));
+      // If 'self' is address-only, copy 'self' into the indirect return slot.
+      assert(IndirectReturnAddress &&
+             "no indirect return for address-only ctor?!");
+      
+      // Get the address to which to store the result.
+      SILValue returnAddress;
+      switch (ctor->getFailability()) {
+      // For non-failable initializers, store to the return address directly.
+      case OTK_None:
+        returnAddress = IndirectReturnAddress;
+        break;
+      // If this is a failable initializer, project out the payload.
+      case OTK_Optional:
+      case OTK_ImplicitlyUnwrappedOptional:
+        returnAddress = B.createInitEnumDataAddr(ctor, IndirectReturnAddress,
+                 getASTContext().getOptionalSomeDecl(ctor->getFailability()),
+                                                 selfLV.getType());
+        break;
+      }
+      
+      // We have to do a non-take copy because someone else may be using the
+      // box (e.g. someone could have closed over it).
+      B.createCopyAddr(cleanupLoc, selfLV, returnAddress,
+                       IsNotTake, IsInitialization);
+      
+      // Inject the enum tag if the result is optional because of failability.
+      if (ctor->getFailability() != OTK_None) {
+        // Inject the 'Some' tag.
+        B.createInjectEnumAddr(ctor, IndirectReturnAddress,
+                               getASTContext().getOptionalSomeDecl(ctor->getFailability()));
+      }
     }
-    return;
   }
+  
+  // Finally, emit the epilog and post-matter.
+  emitEpilog(ctor);
 
-  // Otherwise, load and return the final 'self' value.
-  SILValue selfValue = B.createLoad(cleanupLoc, selfLV);
-
-  // We have to do a retain because someone else may be using the box.
-  lowering.emitRetainValue(B, cleanupLoc, selfValue);
-
-  // Release the box.
-  B.emitStrongRelease(cleanupLoc, selfBox);
-
-  // Inject the self value into an optional if the constructor is failable.
-  switch (ctor->getFailability()) {
-  case OTK_None:
-    // Not optional.
-    break;
-
-  case OTK_Optional:
-  case OTK_ImplicitlyUnwrappedOptional:
-    selfValue = B.createEnum(ctor, selfValue,
-                   getASTContext().getOptionalSomeDecl(ctor->getFailability()),
-                   getLoweredLoadableType(ctor->getResultType()));
-    break;
-  }
-
-  if (failureExitBB) {
-    B.createBranch(returnLoc, failureExitBB, selfValue);
-  } else {
-    B.createReturn(returnLoc, selfValue);
+  // Finish off the epilog by returning.  If this is a failable ctor, then we
+  // actually jump to the failure epilog to keep the invariant that there is
+  // only one SIL return instruction per SIL function.
+  if (B.hasValidInsertionPoint()) {
+    SILLocation returnLoc = B.getInsertionBB()->getInstList().back().getLoc();
+    if (!failureExitBB) {
+      if (!selfValue)
+        selfValue = emitEmptyTuple(ctor);
+      
+      B.createReturn(returnLoc, selfValue);
+    } else {
+      if (selfValue)
+        B.createBranch(returnLoc, failureExitBB, selfValue);
+      else
+        B.createBranch(returnLoc, failureExitBB);
+    }
   }
 }
 

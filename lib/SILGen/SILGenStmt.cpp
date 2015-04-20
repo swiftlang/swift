@@ -675,20 +675,21 @@ void StmtEmitter::visitFallthroughStmt(FallthroughStmt *S) {
 }
 
 void StmtEmitter::visitFailStmt(FailStmt *S) {
-  assert(SGF.FailDest.isValid() && SGF.FailSelfDecl && "too big to fail");
-  // Clean up 'self', which may be constant or variable depending on whether
-  // the initializer delegates.
-  auto &selfLoc = SGF.VarLocs[SGF.FailSelfDecl];
-  if (selfLoc.box.isValid()) {
-    // Release the box containing 'self'.
-    SGF.B.createStrongRelease(S, selfLoc.box);
-  } else {
-    assert(!selfLoc.value.getType().isAddress() &&
-           "Pointer shouldn't be an address");
-    // Release the 'self' value.
-    SGF.B.createStrongRelease(S, selfLoc.value);
+  if (SGF.FailSelfDecl) {
+    assert(SGF.FailDest.isValid() && "too big to fail");
+    // Clean up 'self', which may be constant or variable depending on whether
+    // the initializer delegates.
+    auto &selfLoc = SGF.VarLocs[SGF.FailSelfDecl];
+    if (selfLoc.box.isValid()) {
+      // Release the box containing 'self'.
+      SGF.B.createStrongRelease(S, selfLoc.box);
+    } else {
+      assert(!selfLoc.value.getType().isAddress() &&
+             "Pointer shouldn't be an address");
+      // Release the 'self' value.
+      SGF.B.createStrongRelease(S, selfLoc.value);
+    }
   }
-  
   // Jump to the failure block.
   SGF.Cleanups.emitBranchAndCleanups(SGF.FailDest, S);
 }
