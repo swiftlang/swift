@@ -9,10 +9,6 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// 
-//
-//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "globalpropertyopt"
 #include "swift/SILPasses/Passes.h"
