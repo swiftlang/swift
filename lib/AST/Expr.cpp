@@ -255,6 +255,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::StringLiteral:
   case ExprKind::InterpolatedStringLiteral:
   case ExprKind::MagicIdentifierLiteral:
+  case ExprKind::ObjectLiteral:
     return true;
 
   case ExprKind::DiscardAssignment:

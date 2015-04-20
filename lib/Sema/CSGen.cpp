@@ -1010,6 +1010,46 @@ namespace {
       }
       }
     }
+
+    Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+      auto protocol = tc.getLiteralProtocol(expr);
+      if (!protocol) {
+        tc.diagnose(expr->getLoc(), diag::use_unknown_object_literal,
+                    expr->getName());
+        return nullptr;
+      }
+
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                      TVO_PrefersSubtypeBinding);
+      
+      tv->getImpl().literalConformanceProto = protocol;
+      
+      CS.addConstraint(ConstraintKind::ConformsTo, tv,
+                       protocol->getDeclaredType(),
+                       CS.getConstraintLocator(expr));
+
+      // Add constraint on args.
+      DeclName constrName = tc.getObjectLiteralConstructorName(expr);
+      assert(constrName);
+      ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
+      if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front())) {
+        tc.diagnose(protocol, diag::object_literal_broken_proto);
+        return nullptr;
+      }
+      auto *constr = cast<ConstructorDecl>(constrs.front());
+      CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
+        expr->getArg()->getType(), constr->getArgumentType(),
+        CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+
+      Type result = tv;
+      if (constr->getFailability() != OTK_None) {
+        result = OptionalType::get(constr->getFailability(), result);
+      }
+
+      return result;
+    }
+
     Type visitDeclRefExpr(DeclRefExpr *E) {
       // If we're referring to an invalid declaration, don't type-check.
       //

@@ -1375,6 +1375,13 @@ public:
     OS << ')';
   }
 
+  void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
+    printCommon(E, "object_literal")
+      << " name=" << E->getName().str();
+    OS << '\n';
+    printRec(E->getArg());
+  }
+
   void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
     printCommon(E, "discard_assignment_expr") << ')';
   }

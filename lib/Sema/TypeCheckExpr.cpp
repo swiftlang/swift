@@ -607,6 +607,20 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &DictionaryLiteralType;
     name = "Dictionary";
   }
+  // _ColorLiteralConvertible -> _ColorLiteralType
+  else if (protocol == getProtocol(
+                         SourceLoc(),
+                         KnownProtocolKind::_ColorLiteralConvertible)) {
+    type = &ColorLiteralType;
+    name = "_ColorLiteralType";
+  }
+  // _ImageLiteralConvertible -> _ImageLiteralType
+  else if (protocol == getProtocol(
+                         SourceLoc(),
+                         KnownProtocolKind::_ImageLiteralConvertible)) {
+    type = &ImageLiteralType;
+    name = "_ImageLiteralType";
+  }
 
   if (!type)
     return nullptr;

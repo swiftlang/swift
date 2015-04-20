@@ -61,6 +61,8 @@ LITERAL_CONVERTIBLE_PROTOCOL(StringInterpolationConvertible, string)
 LITERAL_CONVERTIBLE_PROTOCOL(StringLiteralConvertible, string)
 LITERAL_CONVERTIBLE_PROTOCOL(NilLiteralConvertible, nil)
 LITERAL_CONVERTIBLE_PROTOCOL(UnicodeScalarLiteralConvertible, character)
+LITERAL_CONVERTIBLE_PROTOCOL(_ColorLiteralConvertible, color)
+LITERAL_CONVERTIBLE_PROTOCOL(_ImageLiteralConvertible, image)
 
 BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinBooleanLiteralConvertible)
 BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinCharacterLiteralConvertible)

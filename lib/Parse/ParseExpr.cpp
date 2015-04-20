@@ -909,6 +909,10 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = parseExprCollection();
     break;
 
+  case tok::l_square_lit: // [#Color(...)#], [#Image(...)#]
+    Result = parseExprObjectLiteral();
+    break;
+
   case tok::pound_available: {     // #available(...)
     SourceLoc PoundLoc = consumeToken(tok::pound_available);
     
@@ -2087,6 +2091,42 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
       TupleExpr::create(Context, LLoc, SubExprs, SubExprNames, SubExprNameLocs,
                         RLoc, /*hasTrailingClosure=*/false,
                         /*Implicit=*/false));
+}
+
+/// \brief Parse an object literal expression.
+///
+/// expr-literal:
+///   '[#' identifier expr-paren '#]'
+ParserResult<Expr>
+Parser::parseExprObjectLiteral() {
+  SourceLoc LLitLoc = consumeToken(tok::l_square_lit);
+  Identifier Name;
+  SourceLoc NameLoc;
+  if (parseIdentifier(Name, NameLoc,
+                      diag::expected_identifier_after_l_square_lit)) {
+    return makeParserError();
+  }
+  // Parse a tuple of args
+  if (!Tok.is(tok::l_paren)) {
+    diagnose(Tok, diag::expected_arg_list_in_object_literal);
+    return makeParserError();
+  }
+  ParserResult<Expr> Arg;
+  Arg = parseExprList(tok::l_paren, tok::r_paren);
+  if (Arg.hasCodeCompletion()) {
+    return Arg;
+  }
+  if (Arg.isParseError()) {
+    return makeParserError();
+  }
+  if (!Tok.is(tok::r_square_lit)) {
+    diagnose(Tok, diag::expected_r_square_lit_after_object_literal);
+    return makeParserError();
+  }
+  SourceLoc RLitLoc = consumeToken(tok::r_square_lit);
+  return makeParserResult(
+    new (Context) ObjectLiteralExpr(LLitLoc, Name, NameLoc, Arg.get(), RLitLoc,
+                                    /*implicit=*/false));
 }
 
 /// \brief Parse an expression call suffix.

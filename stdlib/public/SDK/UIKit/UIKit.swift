@@ -192,3 +192,21 @@ extension UIView : Reflectable {
     return _UIViewMirror(self)
   }
 }
+
+extension UIColor : _ColorLiteralConvertible {
+  public required convenience init(colorLiteralRed red: Float, green: Float,
+                                   blue: Float, alpha: Float) {
+    self.init(red: CGFloat(red), green: CGFloat(green),
+              blue: CGFloat(blue), alpha: CGFloat(alpha))
+  }
+}
+
+public typealias _ColorLiteralType = UIColor
+
+extension UIImage : _ImageLiteralConvertible {
+  public required convenience init?(imageLiteral name: String) {
+    self.init(named: name)
+  }
+}
+
+public typealias _ImageLiteralType = UIImage

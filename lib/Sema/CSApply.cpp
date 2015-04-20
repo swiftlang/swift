@@ -2141,6 +2141,41 @@ namespace {
       }
     }
 
+    Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
+      auto &ctx = cs.getASTContext();
+      auto &tc = cs.getTypeChecker();
+
+      // Figure out the type we're converting to.
+      auto openedType = expr->getType();
+      auto type = simplifyType(openedType);
+      expr->setType(type);
+
+      Type conformingType = type;
+      if (auto baseType = conformingType->getAnyOptionalObjectType()) {
+        // The type may be optional due to a failable initializer in the
+        // protocol.
+        conformingType = baseType;
+      }
+
+      // Find the appropriate object literal protocol.
+      auto proto = tc.getLiteralProtocol(expr);
+      assert(proto && "Missing object literal protocol?");
+      ProtocolConformance *conformance = nullptr;
+      bool conforms = tc.conformsToProtocol(conformingType, proto, cs.DC, true,
+                                            &conformance);
+      (void)conforms;
+      assert(conforms && "object literal type conforms to protocol");
+        
+      DeclName constrName(tc.getObjectLiteralConstructorName(expr));
+      Expr *arg = expr->getArg();
+      Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
+                                                ctx);
+      Expr *result = tc.callWitness(base, dc, proto, conformance,
+                                    constrName, arg,
+                                    diag::object_literal_broken_proto);
+      return result;
+    }
+
     /// \brief Retrieve the type of a reference to the given declaration.
     Type getTypeOfDeclReference(ValueDecl *decl, bool isSpecialized) {
       if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {

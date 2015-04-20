@@ -1271,7 +1271,7 @@ private:
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
-  Optional<ArrayRef<Type>> AlternativeLiteralTypes[11];
+  Optional<ArrayRef<Type>> AlternativeLiteralTypes[13];
 
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.

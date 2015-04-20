@@ -761,6 +761,37 @@ public:
   }
 };
 
+// ObjectLiteralExpr - An expression of the form
+// '[#Color(red: 1, blue: 0, green: 0, alpha: 1)#]' with a name and a list
+// argument. The components of the list argument are meant to be themselves
+// constant.
+class ObjectLiteralExpr : public LiteralExpr {
+  Identifier Name;
+  Expr *Arg;
+
+  SourceLoc LLitLoc;
+  SourceLoc NameLoc;
+  SourceLoc RLitLoc;
+
+public:
+  ObjectLiteralExpr(SourceLoc LLitLoc, Identifier Name, SourceLoc NameLoc,
+                    Expr *Arg, SourceLoc RLitLoc, bool implicit = false)
+    : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
+      Name(Name), Arg(Arg),
+      LLitLoc(LLitLoc), NameLoc(NameLoc), RLitLoc(RLitLoc) {}
+
+  Identifier getName() const { return Name; }
+  Expr *getArg() const { return Arg; }
+  void setArg(Expr *arg) { Arg = arg; }
+
+  SourceLoc getSourceLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const { return SourceRange(LLitLoc, RLitLoc); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ObjectLiteral;
+  }
+};
+
 /// DiscardAssignmentExpr - A '_' in the left-hand side of an assignment, which
 /// discards the corresponding tuple element on the right-hand side.
 class DiscardAssignmentExpr : public Expr {

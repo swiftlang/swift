@@ -483,7 +483,7 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
     /// value, plus one. Otherwise, it will be 0.
-    unsigned KnownProtocol : 5;
+    unsigned KnownProtocol : 6;
 
     /// The stage of the circularity check for this protocol.
     unsigned Circularity : 2;

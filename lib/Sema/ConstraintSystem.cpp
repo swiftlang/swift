@@ -250,6 +250,8 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::NilLiteralConvertible: index = 8; break;
   case KnownProtocolKind::BooleanLiteralConvertible: index = 9; break;
   case KnownProtocolKind::UnicodeScalarLiteralConvertible: index = 10; break;
+  case KnownProtocolKind::_ColorLiteralConvertible: index = 11; break;
+  case KnownProtocolKind::_ImageLiteralConvertible: index = 12; break;
   }
 
   // If we already looked for alternative literal types, return those results.
@@ -302,6 +304,8 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 
   case KnownProtocolKind::NilLiteralConvertible:
   case KnownProtocolKind::BooleanLiteralConvertible:
+  case KnownProtocolKind::_ColorLiteralConvertible:
+  case KnownProtocolKind::_ImageLiteralConvertible:
     break;
   }
 

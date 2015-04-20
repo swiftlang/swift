@@ -946,6 +946,14 @@ ERROR(expected_rsquare_expr_list,expr_parsing,none,
 ERROR(expected_rsquare_array_expr,expr_parsing,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
 
+// Object literal expressions
+ERROR(expected_identifier_after_l_square_lit,expr_parsing,none,
+      "expected identifier after '[#' in object literal expression", ())
+ERROR(expected_arg_list_in_object_literal,expr_parsing,none,
+      "expected argument list in object literal", ())
+ERROR(expected_r_square_lit_after_object_literal,expr_parsing,none,
+      "expected '#]' at end of object literal expression", ())
+
 // If expressions
 ERROR(expected_expr_after_if_question,expr_parsing,none,
       "expected expression after '?' in ternary expression", ())

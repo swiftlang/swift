@@ -119,6 +119,9 @@ PUNCTUATOR(r_brace,       "}")
 PUNCTUATOR(l_square,      "[")
 PUNCTUATOR(r_square,      "]")
 
+PUNCTUATOR(l_square_lit,  "[#")
+PUNCTUATOR(r_square_lit,  "#]")
+
 PUNCTUATOR(period,        ".")
 PUNCTUATOR(period_prefix, ".")
 PUNCTUATOR(comma,         ",")

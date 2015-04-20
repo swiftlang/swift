@@ -328,6 +328,8 @@ private:
   Type StringLiteralType;
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
+  Type ColorLiteralType;
+  Type ImageLiteralType;
   Type StringType;
   Type Int8Type;
   Type UInt8Type;
@@ -1226,6 +1228,8 @@ public:
   /// \returns the literal protocol, if known and available, or null if the
   /// expression does not have an associated literal protocol.
   ProtocolDecl *getLiteralProtocol(Expr *expr);
+
+  DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
 
   /// Get the module appropriate for looking up standard library types.
   ///

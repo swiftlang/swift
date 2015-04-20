@@ -430,6 +430,18 @@ public protocol StringInterpolationConvertible {
   init<T>(stringInterpolationSegment expr: T)
 }
 
+/// Conforming types can be initialized with color literals (e.g.
+/// [#Color(colorLiteralRed: 1, blue: 0, green: 0, alpha: 1)#]).
+public protocol _ColorLiteralConvertible {
+  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)
+}
+
+/// Optionals of conforming types can be initialized with image literals (e.g.
+/// [#Image(imageLiteral: "hi.png")#]).
+public protocol _ImageLiteralConvertible {
+  init?(imageLiteral: String)
+}
+
 /// A container is destructor safe if whether it may store to memory on
 /// destruction only depends on its type parameters.
 /// For example, whether Array<T> may store to memory on destruction depends

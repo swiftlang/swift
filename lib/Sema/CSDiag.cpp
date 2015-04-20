@@ -235,6 +235,15 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
+
+      if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
+        targetAnchor = nullptr;
+        targetPath.clear();
+
+        anchor = objectLiteralExpr->getArg();
+        path = path.slice(1);
+        continue;
+      }
       break;
 
     case ConstraintLocator::ApplyFunction:

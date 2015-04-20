@@ -4339,6 +4339,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::StringLiteralConvertible:
   case KnownProtocolKind::NilLiteralConvertible:
   case KnownProtocolKind::UnicodeScalarLiteralConvertible:
+  case KnownProtocolKind::_ColorLiteralConvertible:
+  case KnownProtocolKind::_ImageLiteralConvertible:
   case KnownProtocolKind::_BuiltinBooleanLiteralConvertible:
   case KnownProtocolKind::_BuiltinCharacterLiteralConvertible:
   case KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible:

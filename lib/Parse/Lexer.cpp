@@ -1368,12 +1368,12 @@ Restart:
   const char *TokStart = CurPtr;
   
   switch (*CurPtr++) {
-    case '\'':
-      if (LangOpts.EnableCharacterLiterals)
-        return lexCharacterLiteral();
-    SWIFT_FALLTHROUGH;
+  case '\'':
+    if (LangOpts.EnableCharacterLiterals)
+      return lexCharacterLiteral();
+  SWIFT_FALLTHROUGH;
 
-    default: {
+  default: {
     char const *tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
       return lexIdentifier();
@@ -1434,7 +1434,13 @@ Restart:
 
   case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
-  case '[': return formToken(tok::l_square, TokStart);
+  case '[': {
+    if (*CurPtr == '#') { // [#
+      CurPtr++;
+      return formToken(tok::l_square_lit, TokStart);
+    }
+    return formToken(tok::l_square, TokStart);
+  }
   case '(': return formToken(tok::l_paren, TokStart);
   case '}': return formToken(tok::r_brace,  TokStart);
   case ']': return formToken(tok::r_square, TokStart);
@@ -1446,6 +1452,11 @@ Restart:
   case ':': return formToken(tok::colon,    TokStart);
 
   case '#': {
+    if (*CurPtr == ']') { // #]
+      CurPtr++;
+      return formToken(tok::r_square_lit, TokStart);
+    }
+
     if (getSubstring(TokStart + 1, 2).equals("if") &&
         isWhitespace(CurPtr[2])) {
       CurPtr += 2;

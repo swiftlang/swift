@@ -155,8 +155,37 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
       return nullptr;
     }
   }
+
+  if (auto E = dyn_cast<ObjectLiteralExpr>(expr)) {
+    Identifier name = E->getName();
+    if (name.str().equals("Color")) {
+      return getProtocol(expr->getLoc(),
+                         KnownProtocolKind::_ColorLiteralConvertible);
+    } else if (name.str().equals("Image")) {
+      return getProtocol(expr->getLoc(),
+                         KnownProtocolKind::_ImageLiteralConvertible);
+    } else {
+      return nullptr;
+    }
+  }
   
   return nullptr;
+}
+
+DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
+  Identifier name = expr->getName();
+  if (name.str().equals("Color")) {
+    return DeclName(Context, Context.Id_init,
+                    { Context.getIdentifier("colorLiteralRed"),
+                      Context.getIdentifier("green"),
+                      Context.getIdentifier("blue"),
+                      Context.getIdentifier("alpha") });
+  } else if (name.str().equals("Image")) {
+    return DeclName(Context, Context.Id_init,
+                    { Context.getIdentifier("imageLiteral") });
+  } else {
+    return DeclName();
+  }
 }
 
 Module *TypeChecker::getStdlibModule(const DeclContext *dc) {

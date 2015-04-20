@@ -143,3 +143,21 @@ public extension NSGradient {
 public func NSApplicationMain(
   argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>>
 ) -> Int32
+
+extension NSColor : _ColorLiteralConvertible {
+  public required convenience init(colorLiteralRed red: Float, green: Float,
+                                   blue: Float, alpha: Float) {
+    self.init(SRGBRed: CGFloat(red), green: CGFloat(green),
+              blue: CGFloat(blue), alpha: CGFloat(alpha))
+  }
+}
+
+public typealias _ColorLiteralType = NSColor
+
+extension NSImage : _ImageLiteralConvertible {
+  public required convenience init?(imageLiteral name: String) {
+    self.init(named: name)
+  }
+}
+
+public typealias _ImageLiteralType = NSImage

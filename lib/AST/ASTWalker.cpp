@@ -133,6 +133,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return E;
   }
+
+  Expr *visitObjectLiteralExpr(ObjectLiteralExpr *E) {
+    if (Expr *arg = E->getArg()) {
+      if (Expr *arg2 = doIt(arg)) {
+        E->setArg(arg2);
+      } else {
+        return nullptr;
+      }
+    }
+    return E;
+  }
   
   Expr *visitCollectionExpr(CollectionExpr *E) {
     if (Expr *Sub = doIt(E->getSubExpr())) {
