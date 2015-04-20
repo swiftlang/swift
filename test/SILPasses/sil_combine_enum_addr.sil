@@ -40,6 +40,43 @@ bb2:
   br bb1
 }
 
+
+// CHECK-LABEL: sil  @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
+// CHECK: unconditional_checked_cast_addr
+// CHECK: inject_enum_addr
+// CHECK-NOT: switch_enum_addr
+// CHECK-NOT: bb1
+// CHECK: unchecked_take_enum_data_addr
+// CHECK: return
+sil  @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> () {
+bb0(%0 : $*Int, %1 : $*_Stdout):
+  %2 = alloc_stack $CustomStringConvertible
+  %3 = alloc_stack $Optional<CustomStringConvertible>
+  %4 = init_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  %5 = alloc_stack $Int
+  %6 = load %0 : $*Int
+  store %6 to %5#1 : $*Int
+  unconditional_checked_cast_addr take_always Int in %5#1 : $*Int to CustomStringConvertible in %4 : $*CustomStringConvertible
+  inject_enum_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  dealloc_stack %5#0 : $*@local_storage Int
+  %13 = switch_enum_addr %3#1 : $*Optional<CustomStringConvertible>, case #Optional.Some!enumelt.1: bb3, case #Optional.None!enumelt: bb2
+
+bb1:
+  %15 = tuple ()
+  dealloc_stack %3#0 : $*@local_storage Optional<CustomStringConvertible>
+  dealloc_stack %2#0 : $*@local_storage CustomStringConvertible
+  return %15 : $()
+
+bb2:
+  br bb1
+
+bb3:
+  %19 = unchecked_take_enum_data_addr %3#1 : $*Optional<CustomStringConvertible>, #Optional.Some!enumelt.1
+  copy_addr [take] %19 to [initialization] %2#1 : $*CustomStringConvertible
+  br bb1
+}
+
+
 // Check that a checked_cast_addr_br converting a known type into a protocol type
 // is performed at the compile-time if protocol conformances are statically known.
 //

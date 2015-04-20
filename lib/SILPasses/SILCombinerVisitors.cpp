@@ -1809,37 +1809,101 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     // Replace the select_enum_addr by %Result1
 
     auto *Term = IEAI->getParent()->getTerminator();
-    auto *CBI = dyn_cast<CondBranchInst>(Term);
-    if (!CBI)
-      return nullptr;
-    auto BeforeTerm = prev(prev(IEAI->getParent()->end()));
-    auto *SEAI = dyn_cast<SelectEnumAddrInst>(BeforeTerm);
-    if (!SEAI)
-      return nullptr;
+    if (isa<CondBranchInst>(Term) || isa<SwitchValueInst>(Term)) {
+      auto BeforeTerm = prev(prev(IEAI->getParent()->end()));
+      auto *SEAI = dyn_cast<SelectEnumAddrInst>(BeforeTerm);
+      if (!SEAI)
+        return nullptr;
 
-    SILBasicBlock::iterator II = IEAI;
-    StoreInst *SI = nullptr;
-    for (;;) {
-      SILInstruction *CI = II;
-      if (CI == SEAI)
-        break;
-      ++II;
-      SI = dyn_cast<StoreInst>(CI);
-      if (SI) {
-        if (SI->getDest() == IEAI->getOperand())
+      SILBasicBlock::iterator II = IEAI;
+      StoreInst *SI = nullptr;
+      for (;;) {
+        SILInstruction *CI = II;
+        if (CI == SEAI)
+          break;
+        ++II;
+        SI = dyn_cast<StoreInst>(CI);
+        if (SI) {
+          if (SI->getDest() == IEAI->getOperand())
+            return nullptr;
+        }
+        // Allow all instructions inbetween, which don't have any dependency to
+        // the store.
+        if (AA->mayWriteToMemory(II, IEAI->getOperand()))
           return nullptr;
       }
-      // Allow all instructions inbetween, which don't have any dependency to
-      // the store.
-      if (AA->mayWriteToMemory(II, IEAI->getOperand()))
-        return nullptr;
+
+      auto *InjectedEnumElement = IEAI->getElement();
+      auto Result = SEAI->getCaseResult(InjectedEnumElement);
+
+      // Replace select_enum_addr by the result
+      replaceInstUsesWith(*SEAI, Result.getDef());
+      return nullptr;
     }
 
-    auto *InjectedEnumElement = IEAI->getElement();
-    auto Result = SEAI->getCaseResult(InjectedEnumElement);
+    // Check for the following pattern inside the current basic block:
+    // inject_enum_addr %payload_allocation, $EnumType.case1
+    // ... no insns storing anything into %payload_allocation
+    // switch_enum_addr  %payload_allocation,
+    //                   case $EnumType.case1: %bbX,
+    //                   case case $EnumType.case2: %bbY
+    //                   ...
+    //
+    // Replace the switch_enum_addr by select_enum_addr, switch_value.
+    if (auto *SEI = dyn_cast<SwitchEnumAddrInst>(Term)) {
+      SILBasicBlock::iterator II = IEAI;
+      StoreInst *SI = nullptr;
+      for (;;) {
+        SILInstruction *CI = II;
+        if (CI == SEI)
+          break;
+        ++II;
+        SI = dyn_cast<StoreInst>(CI);
+        if (SI) {
+          if (SI->getDest() == IEAI->getOperand())
+            return nullptr;
+        }
+        // Allow all instructions inbetween, which don't have any dependency to
+        // the store.
+        if (AA->mayWriteToMemory(II, IEAI->getOperand()))
+          return nullptr;
+      }
 
-    // Replace select_enum_addr by the result
-    replaceInstUsesWith(*SEAI, Result.getDef());
+      auto *InjectedEnumElement = IEAI->getElement();
+
+      auto *Dest = SEI->getCaseDestination(InjectedEnumElement);
+
+
+      // Replace switch_enum_addr by a branch instruction.
+      SILBuilderWithScope<1> B(SEI);
+      SmallVector<std::pair<EnumElementDecl *, SILValue>, 8> CaseValues;
+      SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> CaseBBs;
+
+      auto IntTy = SILType::getBuiltinIntegerType(32, B.getASTContext());
+
+      for (int i = 0, e = SEI->getNumCases(); i < e; ++i) {
+        auto Pair = SEI->getCase(i);
+        auto *IL = B.createIntegerLiteral(SEI->getLoc(), IntTy, APInt(32, i, false));
+        SILValue ILValue = SILValue(IL);
+        CaseValues.push_back(std::make_pair(Pair.first, ILValue));
+        CaseBBs.push_back(std::make_pair(ILValue, Pair.second));
+      }
+
+      SILValue DefaultValue;
+      SILBasicBlock *DefaultBB = nullptr;
+
+      if (SEI->hasDefault()) {
+        auto *IL = B.createIntegerLiteral(SEI->getLoc(), IntTy, APInt(32, SEI->getNumCases(), false));
+        DefaultValue = SILValue(IL);
+        DefaultBB = SEI->getDefaultBB();
+      }
+
+      auto *SEAI = B.createSelectEnumAddr(SEI->getLoc(), SEI->getOperand(), IntTy, DefaultValue, CaseValues);
+
+      B.createSwitchValue(SEI->getLoc(), SILValue(SEAI), DefaultBB, CaseBBs);
+
+      return eraseInstFromFunction(*SEI);
+    }
 
     return nullptr;
   }
