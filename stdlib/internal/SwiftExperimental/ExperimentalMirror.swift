@@ -86,12 +86,16 @@ public struct Mirror {
   case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set
   }
 
+  static func _noSuperclassMirror() -> Mirror? { return nil }
+  
   internal static func _superclassGenerator(
     subject: Any, _ superclassMirror: SuperclassMirror
   ) -> ()->Mirror? {
     switch superclassMirror {
-    case .None: return { nil }
-    case .Synthesized: return  { nil }
+    case .None: return Mirror._noSuperclassMirror
+    case .Synthesized: return {
+        reflect(subject)._legacySuperMirror().map { Mirror($0) }
+      }
     case .Customized(let superduperclassMirror): return { nil }
     }
   }

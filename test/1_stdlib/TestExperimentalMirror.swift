@@ -190,6 +190,158 @@ mirrors.test("Legacy") {
   if let mb2? = md.superclassMirror { expectBMirror(mb2) }
 }
 
+//===----------------------------------------------------------------------===//
+//===--- Class Support ----------------------------------------------------===//
+
+mirrors.test("Class/Root/Uncustomized") {
+  class A { var a: Int = 1 }
+
+  let a = Mirror(reflecting: A())
+  expectEmpty(a.superclassMirror)
+  expectEqual(1, count(a.children))
+  expectEqual("a", first(a.children)!.label)
+}
+
+//===--- Synthesized Superclass Mirrors -----------------------------------===//
+mirrors.test("Class/Root/SynthesizedSuper/Explicit") {
+  class B : CustomReflectable {
+    var b: String = "two"
+    func customMirror() -> Mirror {
+      return Mirror(
+        self, children: [ "bee": b ], superclassMirror: .Synthesized)
+    }
+  }
+  
+  let b = Mirror(reflecting: B())
+  expectEmpty(b.superclassMirror)
+  expectEqual(1, count(b.children))
+  expectEqual("bee", first(b.children)!.label)
+}
+
+
+mirrors.test("class/Root/SynthesizedSuper/Implicit") {
+  class C : CustomReflectable {
+    var c: UInt = 3
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "sea": c ])
+    }
+  }
+  
+  let c = Mirror(reflecting: C())
+  expectEmpty(c.superclassMirror)
+  expectEqual(1, count(c.children))
+  expectEqual("sea", first(c.children)!.label)
+}
+
+mirrors.test("class/UncustomizedSuper/Synthesized/Implicit") {
+  class A { var a: Int = 1 }
+
+  class B : A, CustomReflectable {
+    var b: UInt = 42
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "bee": b ])
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectNotEmpty(b.superclassMirror)
+  expectEqual("a", first(b.superclassMirror!.children)!.label)
+  expectEmpty(b.superclassMirror!.superclassMirror)
+}
+
+mirrors.test("class/UncustomizedSuper/Synthesized/Explicit") {
+  class A { var a: Int = 1 }
+
+  class B : A, CustomReflectable {
+    var b: UInt = 42
+    func customMirror() -> Mirror {
+      return Mirror(
+        self, children: [ "bee": b ], superclassMirror: .Synthesized)
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectNotEmpty(b.superclassMirror)
+  expectEqual("a", first(b.superclassMirror!.children)!.label)
+  expectEmpty(b.superclassMirror!.superclassMirror)
+}
+
+mirrors.test("class/CustomizedSuper/Synthesized") {
+  class A : CustomReflectable {
+    var a: Int = 1
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "aye": a ])
+    }
+  }
+
+  class B : A {
+    var b: UInt = 42
+    // This is an unusual case: when writing override on a
+    // customMirror implementation you would typically want to pass
+    // .CustomSuperclassMirror(super.customMirror) or, in rare cases,
+    // .NoSuperclassMirror.  However, it has an expected behavior,
+    // which we test here.
+    override func customMirror() -> Mirror {
+      return Mirror(self, children: [ "bee": b ])
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectNotEmpty(b.superclassMirror)
+  expectEqual("a", first(b.superclassMirror!.children)!.label)
+  expectEmpty(b.superclassMirror!.superclassMirror)
+}
+
+//===--- Suppressed Superclass Mirrors ------------------------------------===//
+mirrors.test("Class/Root/NoSuperclassMirror") {
+  class B : CustomReflectable {
+    var b: String = "two"
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "bee": b ], superclassMirror: .None)
+    }
+  }
+  
+  let b = Mirror(reflecting: B())
+  expectEmpty(b.superclassMirror)
+  expectEqual(1, count(b.children))
+  expectEqual("bee", first(b.children)!.label)
+}
+
+mirrors.test("class/UncustomizedSuper/NoSuperclassMirror") {
+  class A { var a: Int = 1 }
+
+  class B : A, CustomReflectable {
+    var b: UInt = 42
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "bee": b ], superclassMirror: nil)
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectEmpty(b.superclassMirror)
+}
+
+mirrors.test("class/CustomizedSuper/NoSuperclassMirror") {
+  class A : CustomReflectable {
+    var a: Int = 1
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "aye": a ])
+    }
+  }
+
+  class B : A {
+    var b: UInt = 42
+    override func customMirror() -> Mirror {
+      return Mirror(self, children: [ "bee": b ], superclassMirror: nil)
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectEmpty(b.superclassMirror)
+}
+//===--- End Class Support ------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
 mirrors.test("Addressing") {
   let m0 = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m0.descendant(0) as? Int)
