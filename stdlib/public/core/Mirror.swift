@@ -255,6 +255,18 @@ extension Mirror.DisplayStyle {
   }
 }
 
+internal func _hasType(instance: Any, type: Any.Type) -> Bool {
+  return unsafeBitCast(instance.dynamicType, Int.self)
+    == unsafeBitCast(type, Int.self) 
+}
+
+extension MirrorType {
+  public // Temporary, for work in SwiftExperimental
+  final var _firstChildIsBase: Bool {
+    return self.count != 0 && _hasType(self[0].1, _ClassSuperMirror.self)
+  }
+}
+
 extension Mirror {
   /// An adapter that represents a legacy `MirrorType`\ 's children as
   /// a `Collection` with integer `Index`.  Note that the performance

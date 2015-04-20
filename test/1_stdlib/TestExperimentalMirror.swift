@@ -150,6 +150,16 @@ mirrors.test("Legacy") {
     contains(zip(x0, m.children)) {
       $0.0.label != $0.1.label || $0.0.value as! Int != $0.1.value as! Int
     })
+
+  class B { let bx: Int = 0 }
+  class D:B { let dx: Int = 1 }
+  
+  // Ensure that the base class instance is properly filtered out of
+  // the child list
+  let md = Mirror(reflecting: D())
+  expectEqual(1, count(md.children))
+  expectEqual("dx", first(md.children)?.label)
+  expectEqual(1, first(md.children)?.value as? Int)
 }
 
 mirrors.test("Addressing") {
