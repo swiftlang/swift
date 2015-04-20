@@ -673,17 +673,16 @@ bb0(%0 : $Int, %1 : $@thin MyStruct.Type):
   %2 = alloc_stack $MyStruct  // var self         // users: %3, %10
   %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct // users: %8, %9
   debug_value %0 : $Int  // let i                 // id: %4
-  %5 = metatype $@thin MyStruct.Type              // user: %7
-  // function_ref main.MyStruct.init (main.MyStruct.Type)() -> main.MyStruct
-  %6 = function_ref @selfinit : $@convention(thin) (@thin MyStruct.Type) -> MyStruct // user: %7
-  %7 = apply %6(%5) : $@convention(thin) (@thin MyStruct.Type) -> MyStruct // user: %8
-  assign %7 to %3 : $*MyStruct                    // id: %8
-  %9 = load %3 : $*MyStruct                       // user: %11
-  dealloc_stack %2#0 : $*@local_storage MyStruct  // id: %10
-  return %9 : $MyStruct                           // id: %11
+
+  %6 = function_ref @selfinit : $@convention(thin) () -> MyStruct
+  %7 = apply %6() : $@convention(thin) () -> MyStruct
+  assign %7 to %3 : $*MyStruct
+  %9 = load %3 : $*MyStruct
+  dealloc_stack %2#0 : $*@local_storage MyStruct
+  return %9 : $MyStruct
 }
 
-sil @selfinit : $@convention(thin) (@thin MyStruct.Type) -> MyStruct // user: %7
+sil @selfinit : $@convention(thin) () -> MyStruct // user: %7
 
 struct MyStruct2 {
   var x: P
@@ -893,4 +892,38 @@ bb0(%0 : $DerivedClassWithIVars, %i : $Int):
   strong_retain %18 : $DerivedClassWithIVars
   strong_release %1#0 : $Builtin.NativeObject
   return %18 : $DerivedClassWithIVars
+}
+
+
+// <rdar://problem/20608881> DI miscompiles this testcase into a memory leak
+struct MyStruct3 {
+  @sil_stored var c: C
+}
+sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
+
+// CHECK-LABEL: sil hidden @test_conditional_destroy_delegating_init
+sil hidden @test_conditional_destroy_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+// CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
+
+  %2 = alloc_stack $MyStruct3
+  %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct3
+  cond_br %0, bb1, bb2
+
+bb1:
+  %9 = function_ref @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
+  %10 = apply %9() : $@convention(thin) () -> @owned MyStruct3
+  assign %10 to %3 : $*MyStruct3
+
+// CHECK: apply {{.*}}()  : $@convention(thin) () -> @owned MyStruct3
+// CHECK-NEXT:  [[SET:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:  store [[SET]] to [[CONTROL]]#1 : $*Builtin.Int1
+
+  br bb2
+
+bb2:
+  destroy_addr %3 : $*MyStruct3
+  dealloc_stack %2#0 : $*@local_storage MyStruct3
+  %15 = tuple ()
+  return %15 : $()
 }

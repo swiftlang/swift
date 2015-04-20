@@ -1493,6 +1493,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       // The dynamically unknown case is the interesting one, handle it below.
       break;
 
+    case DIUseKind::SelfInit:
     case DIUseKind::Initialization:
       // If this is an initialization of only trivial elements, then we don't
       // need to update the bitvector.
