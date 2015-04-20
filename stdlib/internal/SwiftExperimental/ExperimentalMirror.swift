@@ -36,13 +36,10 @@ func != (t0: Any.Type, t1: Any.Type) -> Bool {
 ///
 /// Mirrors are used by playgrounds and the debugger.
 public struct Mirror {
-  public enum SuperclassMirror : NilLiteralConvertible {
-    public init(nilLiteral: ()) {
-      self = .None
-    }
-  case Synthesized
+  public enum SuperclassRepresentation {
+  case Generated
   case Customized(()->Mirror)
-  case None
+  case Suppressed
   }
 
 
@@ -50,7 +47,7 @@ public struct Mirror {
   ///
   /// If the dynamic type of `subject` conforms to
   /// `CustomReflectable`, returns the result of calling its
-  /// `customMirror` method.  Otherwise, returns a mirror synthesized
+  /// `customMirror` method.  Otherwise, returns a mirror generated
   /// for `subject` by the language.
   ///
   /// Note: If the dynamic type of `subject` has value semantics,
@@ -100,11 +97,11 @@ public struct Mirror {
   static func _noSuperclassMirror() -> Mirror? { return nil }
   
   internal static func _superclassGenerator<T: Any>(
-    subject: T, _ superclassMirror: SuperclassMirror
+    subject: T, _ superclassRepresentation: SuperclassRepresentation
   ) -> ()->Mirror? {
-    switch superclassMirror {
-    case .None: return Mirror._noSuperclassMirror
-    case .Synthesized: return {
+    switch superclassRepresentation {
+    case .Suppressed: return Mirror._noSuperclassMirror
+    case .Generated: return {
         // Find the right legacy superclass mirror (inefficient, but works)
         
         // get a mirror for the most-derived type
@@ -142,11 +139,11 @@ public struct Mirror {
   >(
     _ subject: T,
     children: C,
-    superclassMirror: SuperclassMirror = .Synthesized,
+    superclassRepresentation: SuperclassRepresentation = .Generated,
     displayStyle: DisplayStyle? = nil
   ) {
     self._createSuperclassMirror = Mirror._superclassGenerator(
-      subject, superclassMirror)
+      subject, superclassRepresentation)
       
     self.children = Children(children)
     self.displayStyle = displayStyle
@@ -175,11 +172,11 @@ public struct Mirror {
   >(
     _ subject: T,
     unlabeledChildren: C,
-    superclassMirror: SuperclassMirror = .Synthesized,
+    superclassRepresentation: SuperclassRepresentation = .Generated,
     displayStyle: DisplayStyle? = nil
   ) {
     self._createSuperclassMirror = Mirror._superclassGenerator(
-      subject, superclassMirror)
+      subject, superclassRepresentation)
       
     self.children = Children(
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
@@ -196,11 +193,11 @@ public struct Mirror {
   public init<T>(
     _ subject: T,
     children: DictionaryLiteral<String, Any>,
-    superclassMirror: SuperclassMirror = .Synthesized,
+    superclassRepresentation: SuperclassRepresentation = .Generated,
     displayStyle: DisplayStyle? = nil
   ) {
     self._createSuperclassMirror = Mirror._superclassGenerator(
-      subject, superclassMirror)
+      subject, superclassRepresentation)
       
     self.children = Children(
       lazy(children).map { Child(label: $0.0, value: $0.1) }
@@ -215,7 +212,7 @@ public struct Mirror {
   /// Suggests a display style for the reflected subject.
   public let displayStyle: DisplayStyle?
 
-  public var superclassMirror: Mirror? {
+  public func superclassMirror() -> Mirror? {
     return _createSuperclassMirror()
   }
 
@@ -428,7 +425,7 @@ extension PlaygroundQuickLook {
   /// If the dynamic type of `subject` conforms to
   /// `CustomPlaygroundQuickLookable`, returns the result of calling
   /// its `customPlaygroundQuickLook` method.  Otherwise, returns
-  /// a `PlaygroundQuickLook` synthesized for `subject` by the
+  /// a `PlaygroundQuickLook` generated for `subject` by the
   /// language.  Note: in some cases the result may be
   /// `.Text(String(reflecting: subject))`.
   ///
