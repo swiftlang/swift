@@ -2056,8 +2056,8 @@ void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
 }
 
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
-                                                   SILValue addr) {
-  SILType optType = addr.getType().getObjectType();
+                                                   SILValue addrOrValue) {
+  SILType optType = addrOrValue.getType().getObjectType();
   OptionalTypeKind optionalKind;
   getOptionalValueType(optType, optionalKind);
 
@@ -2065,8 +2065,12 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
   SILValue yes = B.createIntegerLiteral(loc, boolTy, 1);
   SILValue no = B.createIntegerLiteral(loc, boolTy, 0);
   auto someDecl = getASTContext().getOptionalSomeDecl(optionalKind);
-  return B.createSelectEnumAddr(loc, addr, boolTy, no,
-                                std::make_pair(someDecl, yes));
+  
+  if (addrOrValue.getType().isAddress())
+    return B.createSelectEnumAddr(loc, addrOrValue, boolTy, no,
+                                  std::make_pair(someDecl, yes));
+  return B.createSelectEnum(loc, addrOrValue, boolTy, no,
+                            std::make_pair(someDecl, yes));
 }
 
 ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
@@ -2091,36 +2095,46 @@ ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
-                                                    ManagedValue addr,
+                                                    ManagedValue addrOrValue,
                                                     const TypeLowering &optTL,
                                                     SGFContext C) {
   OptionalTypeKind OTK;
-  SILType origPayloadTy = addr.getType().getAnyOptionalObjectType(SGM.M, OTK);
+  SILType origPayloadTy =
+    addrOrValue.getType().getAnyOptionalObjectType(SGM.M, OTK);
 
-  auto formalOptionalTy = addr.getType().getSwiftRValueType();
+  auto formalOptionalTy = addrOrValue.getType().getSwiftRValueType();
   auto formalPayloadTy = formalOptionalTy
     ->getAnyOptionalObjectType()
     ->getCanonicalType();
   
-  // Take the payload from the optional.
-  // Cheat a bit in the +0 case—UncheckedTakeEnumData will never actually
-  // invalidate an Optional enum value.
-  SILValue payloadVal = B.createUncheckedTakeEnumDataAddr(loc,
-                                       addr.forward(*this),
-                                       getASTContext().getOptionalSomeDecl(OTK),
-                                       origPayloadTy);
+  auto someDecl = getASTContext().getOptionalSomeDecl(OTK);
+ 
+  ManagedValue payload;
+
+  // Take the payload from the optional.  Cheat a bit in the +0
+  // case—UncheckedTakeEnumData will never actually invalidate an Optional enum
+  // value.
+  SILValue payloadVal;
+  if (!addrOrValue.getType().isAddress()) {
+    payloadVal = B.createUncheckedEnumData(loc, addrOrValue.forward(*this),
+                                           someDecl);
+  } else {
+    payloadVal =
+      B.createUncheckedTakeEnumDataAddr(loc, addrOrValue.forward(*this),
+                                        someDecl, origPayloadTy);
   
-  if (optTL.isLoadable())
-    payloadVal = B.createLoad(loc, payloadVal);
-  ManagedValue origPayload;
-  if (addr.hasCleanup())
-    origPayload = emitManagedRValueWithCleanup(payloadVal);
+    if (optTL.isLoadable())
+      payloadVal = B.createLoad(loc, payloadVal);
+  }
+
+  // Produce a correctly managed value.
+  if (addrOrValue.hasCleanup())
+    payload = emitManagedRValueWithCleanup(payloadVal);
   else
-    origPayload = ManagedValue::forUnmanaged(payloadVal);
+    payload = ManagedValue::forUnmanaged(payloadVal);
   
   // Reabstract it to the substituted form, if necessary.
-  return emitOrigToSubstValue(loc, origPayload,
-                              AbstractionPattern::getOpaque(),
+  return emitOrigToSubstValue(loc, payload, AbstractionPattern::getOpaque(),
                               formalPayloadTy, C);
 }
 

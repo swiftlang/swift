@@ -79,23 +79,15 @@ struct LoadableStruct {
   // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1
   // CHECK:         [[DELEGATEE_INIT:%.*]] = function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FT3optSb_GSqS0__
   // CHECK:         [[DELEGATEE_SELF:%.*]] = apply [[DELEGATEE_INIT]]
-  // CHECK:         [[DELEGATEE_SELF_MAT:%.*]] = alloc_stack $Optional<LoadableStruct>
-  // CHECK:         store [[DELEGATEE_SELF]] to [[DELEGATEE_SELF_MAT]]
-  // CHECK:         [[HAS_VALUE:%.*]] = select_enum_addr [[DELEGATEE_SELF_MAT]]#1
-  // CHECK:         cond_br [[HAS_VALUE]], [[DOES_HAVE_VALUE:bb[0-9]+]], [[DOESNT_HAVE_VALUE:bb[0-9]+]]
+    
+  // CHECK: = integer_literal $Builtin.Int1, -1
+  // CHECK: = integer_literal $Builtin.Int1, 0
+  // CHECK: = select_enum %11 : $Optional<LoadableStruct>, case #Optional.Some!enumelt.1:
+  // CHECK: cond_br {{.*}}, [[DOES_HAVE_VALUE:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
   // -- TODO: failure
-  // CHECK:       [[DOESNT_HAVE_VALUE]]:
-  // CHECK:         destroy_addr [[DELEGATEE_SELF_MAT]]
-  // CHECK:         dealloc_stack [[DELEGATEE_SELF_MAT]]
-  // CHECK:         br [[FAILURE:bb[0-9]+]]
   // CHECK:       [[DOES_HAVE_VALUE]]:
-  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
-  // CHECK:         [[TMP:%.*]] = alloc_stack $LoadableStruct
-  // CHECK:         apply [[GET_VALUE_FN]]<LoadableStruct>([[TMP]]#1, [[DELEGATEE_SELF_MAT]]#1)
-  // CHECK:         [[DELEGATEE_SELF_VAL:%.*]] = load [[TMP]]
+  // CHECK:         [[DELEGATEE_SELF_VAL:%.*]] = unchecked_enum_data [[DELEGATEE_SELF]] : $Optional<LoadableStruct>, #Optional.Some!enumelt.1
   // CHECK:         assign [[DELEGATEE_SELF_VAL]] to [[SELF_MARKED]]
-  // CHECK:         dealloc_stack [[TMP]]
-  // CHECK:         dealloc_stack [[DELEGATEE_SELF_MAT]]
   // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:       [[FAILURE]]:
   // CHECK:         strong_release [[SELF_BOX]]
@@ -186,15 +178,11 @@ struct AddressOnlyStruct {
   // CHECK:         cond_br [[HAS_VALUE]], [[DOES_HAVE_VALUE:bb[0-9]+]], [[DOESNT_HAVE_VALUE:bb[0-9]+]]
   // -- TODO: failure
   // CHECK:       [[DOESNT_HAVE_VALUE]]:
-  // CHECK:         destroy_addr [[DELEGATEE_SELF]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF]]
   // CHECK:         br [[FAILURE:bb[0-9]+]]
   // CHECK:       [[DOES_HAVE_VALUE]]:
-  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
-  // CHECK:         [[TMP:%.*]] = alloc_stack $AddressOnlyStruct
-  // CHECK:         apply [[GET_VALUE_FN]]<AddressOnlyStruct>([[TMP]]#1, [[DELEGATEE_SELF]]#1)
-  // CHECK:         copy_addr [take] [[TMP]]#1 to [[SELF_MARKED]]
-  // CHECK:         dealloc_stack [[TMP]]
+  // CHECK:         [[TMP:%.*]] = unchecked_take_enum_data_addr [[DELEGATEE_SELF]]#1 : $*Optional<AddressOnlyStruct>, #Optional.Some!enumelt.1
+  // CHECK:         copy_addr [take] [[TMP]] to [[SELF_MARKED]]
   // CHECK:         dealloc_stack [[DELEGATEE_SELF]]
   // CHECK:         strong_release [[SELF_BOX]]
     self.init(opt: true)
@@ -291,25 +279,13 @@ class RootClass {
   // CHECK:         [[SELF_TAKEN:%.*]] = load [[SELF_MARKED]]
   // CHECK:         [[INIT:%.*]] = class_method [[SELF_TAKEN]] : $RootClass, #RootClass.init
   // CHECK:         [[NEW_SELF_OPT:%.*]] = apply [[INIT]]({{.*}}, [[SELF_TAKEN]])
-  // CHECK:         [[NEW_SELF_OPT_MAT:%.*]] = alloc_stack $Optional<RootClass>
-  // CHECK:         store [[NEW_SELF_OPT]] to [[NEW_SELF_OPT_MAT]]
-  // CHECK:         [[HAS_VALUE:%.*]] = select_enum_addr [[NEW_SELF_OPT_MAT]]#1
-  // CHECK:         cond_br [[HAS_VALUE]], [[HAS_VALUE:bb[0-9]+]], [[NO_VALUE:bb[0-9]+]]
-
-  // CHECK:       [[NO_VALUE]]:
-  // CHECK:          dealloc_box $RootClass, [[SELF_BOX]]
-  // CHECK:          destroy_addr [[NEW_SELF_OPT_MAT]]
-  // CHECK:          dealloc_stack [[NEW_SELF_OPT_MAT]]
-  // CHECK:          br [[FAILURE:bb[0-9]+]]
+  // CHECK:         [[HAS_VALUE1:%.*]] = select_enum [[NEW_SELF_OPT]]
+  // CHECK:         dealloc_box $RootClass, [[SELF_BOX]]#0
+  // CHECK:         cond_br [[HAS_VALUE1]], [[HAS_VALUE:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
 
   // CHECK:       [[HAS_VALUE]]:
-  // CHECK:         [[GET_OPTIONAL_VALUE:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
-  // CHECK:         [[TMP:%.*]] = alloc_stack $RootClass
-  // CHECK:         apply [[GET_OPTIONAL_VALUE]]<RootClass>([[TMP]]#1, [[NEW_SELF_OPT_MAT]]#1)
-  // CHECK:         [[NEW_SELF:%.*]] = load [[TMP]]
+  // CHECK:         [[NEW_SELF:%.*]] = unchecked_enum_data [[NEW_SELF_OPT]]
   // CHECK:         store [[NEW_SELF]] to [[SELF_MARKED]]
-  // CHECK:         dealloc_stack [[TMP]]
-  // CHECK:         dealloc_stack [[NEW_SELF_OPT_MAT]]
 
   // CHECK:         [[SELF_RESULT:%.*]] = load [[SELF_MARKED]]
   // CHECK:         strong_retain [[SELF_RESULT]]

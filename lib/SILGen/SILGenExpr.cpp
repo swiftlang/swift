@@ -2144,25 +2144,16 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
 
   case OTK_Optional:
   case OTK_ImplicitlyUnwrappedOptional: {
-    // Materialize the value so we can pass it indirectly to optional
-    // intrinsics.
-    auto mat = SGF.emitMaterialize(E, newSelf);
-    
     // If the current constructor is not failable, abort.
     switch (ctorDecl->getFailability()) {
-
     case OTK_Optional:
     case OTK_ImplicitlyUnwrappedOptional: {
       SILBasicBlock *someBB = SGF.createBasicBlock();
-      SILBasicBlock *noneBB = SGF.createBasicBlock();
 
-      auto hasValue = SGF.emitDoesOptionalHaveValue(E, mat.address);
-      SGF.B.createCondBranch(E, hasValue, someBB, noneBB);
+      auto hasValue = SGF.emitDoesOptionalHaveValue(E, newSelf.getValue());
       
-      // If the delegate result is nil, clean up and propagate 'nil' from our
-      // constructor.
-      SGF.B.emitBlock(noneBB);
       assert(SGF.FailDest.isValid() && "too big to fail");
+      
       if (SGF.FailSelfDecl) {
       // If the delegation consumed self, then our box for 'self' is
       // uninitialized, so we have to deallocate it without triggering a
@@ -2177,7 +2168,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
         // We didn't consume, so release the box normally.
         SGF.B.createStrongRelease(E, selfBox);
         break;
-      
+        
       case SILGenFunction::DidConsumeSelf:
         // We did consume. Deallocate the box. This is safe because any capture
         // of 'self' prior to full initialization would be a DI violation, so
@@ -2186,14 +2177,30 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                selfBox);
       }
       }
-      SGF.Cleanups.emitBranchAndCleanups(SGF.FailDest, E);
+      
+      // On the failure case, we don't need to clean up the 'self' returned
+      // by the call to the other constructor, since we know it is nil and
+      // therefore dynamically trivial.
+      SGF.Cleanups.setCleanupState(newSelf.getCleanup(), CleanupState::Dormant);
+      auto noneBB = SGF.Cleanups.emitBlockForCleanups(SGF.FailDest, E);
+      SGF.Cleanups.setCleanupState(newSelf.getCleanup(), CleanupState::Active);
+      
+      SGF.B.createCondBranch(E, hasValue, someBB, noneBB);
       
       // Otherwise, project out the value and carry on.
       SGF.B.emitBlock(someBB);
       
-      SWIFT_FALLTHROUGH;
+      // If the current constructor is not failable, force out the value.
+      newSelf = SGF.emitUncheckedGetOptionalValueFrom(E, newSelf,
+                                      SGF.getTypeLowering(newSelf.getType()),
+                                                      SGFContext());
+      break;
     }
     case OTK_None: {
+      // Materialize the value so we can pass it to
+      // emitCheckedGetOptionalValueFrom, which requires it to be indirect.
+      auto mat = SGF.emitMaterialize(E, newSelf);
+
       auto matMV = ManagedValue(mat.address, mat.valueCleanup);
       // If the current constructor is not failable, force out the value.
       newSelf = SGF.emitCheckedGetOptionalValueFrom(E, matMV,
