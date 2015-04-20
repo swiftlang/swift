@@ -584,16 +584,23 @@ static SILBasicBlock *splitEdge(TermInst *T, unsigned EdgeIdx,
 
   // Update the dominator tree.
   if (DT) {
-    auto *DestBBNode = DT->getNode(DestBB);
+    auto *SrcBBNode = DT->getNode(SrcBB);
+
     // Unreachable code could result in a null return here.
-    if (DestBBNode) {
+    if (SrcBBNode) {
       // The new block is dominated by the SrcBB.
       auto *EdgeBBNode = DT->addNewBlock(EdgeBB, SrcBB);
 
-      // Are all predecessors of DestBB dominated by SrcBB?
+      // Are all predecessors of DestBB dominated by DestBB?
+      auto *DestBBNode = DT->getNode(DestBB);
       bool OldSrcBBDominatesAllPreds = std::all_of(
           DestBB->pred_begin(), DestBB->pred_end(), [=](SILBasicBlock *B) {
-            if (DT->dominates(SrcBB, B))
+            if (B == EdgeBB)
+              return true;
+            auto *PredNode = DT->getNode(B);
+            if (!PredNode)
+              return true;
+            if (DT->dominates(DestBBNode, PredNode))
               return true;
             return false;
           });
