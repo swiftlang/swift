@@ -1449,6 +1449,9 @@ public:
 
     // Add dominator tree nodes for the new basic blocks.
     fixDomTreeNodes(DomTree.getNode(StartBB));
+
+    // Update SSA form for values used outside of the copied region.
+    updateSSAForm();
     return ClonedStartBB;
   }
 
@@ -1459,9 +1462,11 @@ protected:
   void fixDomTreeNodes(DominanceInfoNode *OrigNode) {
     auto *BB = OrigNode->getBlock();
     auto MapIt = BBMap.find(BB);
-    assert(MapIt != BBMap.end() && "Must have an entry in the map");
-    auto *ClonedBB = MapIt->second;
+    // Outside the cloned region.
+    if (MapIt == BBMap.end())
+      return;
 
+    auto *ClonedBB = MapIt->second;
     // Exit blocks (BBMap[BB] == BB) end the recursion.
     if (ClonedBB == BB)
       return;
@@ -1485,9 +1490,6 @@ protected:
 
     for (auto *Child : *OrigNode)
       fixDomTreeNodes(Child);
-
-    // Update SSA form for values used outside of the copied region.
-    updateSSAForm();
   }
 
   SILValue remapValue(SILValue V) {
@@ -1703,6 +1705,13 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Lp->getExitBlocks(ExitBlocks);
 
+  // Collect the exit blocks dominated by the loop - they will be dominated by
+  // the check block.
+  SmallVector<SILBasicBlock *, 16> ExitBlocksDominatedByPreheader;
+  for (auto *ExitBlock: ExitBlocks)
+    if (DomTree->dominates(CheckBlock, ExitBlock))
+      ExitBlocksDominatedByPreheader.push_back(ExitBlock);
+
   // Split the preheader before the first instruction.
   SILBasicBlock *NewPreheader =
       splitBasicBlockAndBranch(&*CheckBlock->begin(), DomTree, nullptr);
@@ -1732,7 +1741,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   CheckBlock->getTerminator()->eraseFromParent();
 
   // Fixup the exit blocks. They are now dominated by the check block.
-  for (auto *BB : ExitBlocks)
+  for (auto *BB : ExitBlocksDominatedByPreheader)
     DomTree->changeImmediateDominator(DomTree->getNode(BB),
                                       DomTree->getNode(CheckBlock));
 
