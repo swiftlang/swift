@@ -262,8 +262,14 @@ internal func _hasType(instance: Any, type: Any.Type) -> Bool {
 
 extension MirrorType {
   public // Temporary, for work in SwiftExperimental
-  final var _firstChildIsBase: Bool {
-    return self.count != 0 && _hasType(self[0].1, _ClassSuperMirror.self)
+  final func _baseMirror() -> MirrorType? {
+    if self.count > 0 {
+      let childMirror = self[0].1
+      if _hasType(childMirror, _ClassSuperMirror.self) {
+        return childMirror
+      }
+    }
+    return nil
   }
 }
 

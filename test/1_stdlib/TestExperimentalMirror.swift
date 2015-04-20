@@ -41,7 +41,7 @@ extension Mirror: CustomStringConvertible {
 mirrors.test("RandomAccessStructure") {
   struct Eggs : CustomReflectable {
     func customMirror() -> Mirror {
-      return Mirror(unlabeledChildren: ["aay", "bee", "cee"])
+      return Mirror(self, unlabeledChildren: ["aay", "bee", "cee"])
     }
   }
 
@@ -73,7 +73,7 @@ func find(substring: String, within domain: String) -> String.Index? {
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
     func customMirror() -> Mirror {
-      return Mirror(unlabeledChildren: Set(letters), displayStyle: .Set)
+      return Mirror(self, unlabeledChildren: Set(letters), displayStyle: .Set)
     }
   }
 
@@ -93,7 +93,7 @@ mirrors.test("ForwardStructure") {
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
     func customMirror() -> Mirror {
-      return Mirror(unlabeledChildren: letters, displayStyle: .Collection)
+      return Mirror(self, unlabeledChildren: letters, displayStyle: .Collection)
     }
   }
 
@@ -110,7 +110,7 @@ mirrors.test("BidirectionalStructure") {
 mirrors.test("LabeledStructure") {
   struct Zee : CustomReflectable, CustomStringConvertible {
     func customMirror() -> Mirror {
-      return Mirror(children: ["bark": 1, "bite": 0])
+      return Mirror(self, children: ["bark": 1, "bite": 0])
     }
     var description: String { return "Zee" }
   }
@@ -122,7 +122,7 @@ mirrors.test("LabeledStructure") {
   struct Zee2 : CustomReflectable {
     func customMirror() -> Mirror {
       return Mirror(
-        children: ["bark": 1, "bite": 0], displayStyle: .Dictionary)
+        self, children: ["bark": 1, "bite": 0], displayStyle: .Dictionary)
     }
   }
   let z2 = Zee2().customMirror()
@@ -132,7 +132,7 @@ mirrors.test("LabeledStructure") {
   struct Heterogeny : CustomReflectable {
     func customMirror() -> Mirror {
       return Mirror(
-        children: ["bark": 1, "bite": Zee()])
+        self, children: ["bark": 1, "bite": Zee()])
     }
   }
   let h = Heterogeny().customMirror()
@@ -152,7 +152,32 @@ mirrors.test("Legacy") {
     })
 
   class B { let bx: Int = 0 }
-  class D:B { let dx: Int = 1 }
+  class D : B { let dx: Int = 1 }
+
+  let mb = Mirror(reflecting: B())
+  
+  func expectBMirror(
+    mb: Mirror,   stackTrace: SourceLocStack? = nil,
+    file: String = __FILE__, line: UWord = __LINE__
+  ) {
+    expectEmpty(
+      mb.baseClassMirror,
+      stackTrace: stackTrace, file: file, line: line)
+    
+    expectEqual(
+      1, count(mb.children),
+      stackTrace: stackTrace, file: file, line: line)
+    
+    expectEqual(
+      "bx", first(mb.children)?.label,
+      stackTrace: stackTrace, file: file, line: line)
+    
+    expectEqual(
+      0, first(mb.children)?.value as? Int,
+      stackTrace: stackTrace, file: file, line: line)
+  }
+  
+  expectBMirror(mb)
   
   // Ensure that the base class instance is properly filtered out of
   // the child list
@@ -160,6 +185,9 @@ mirrors.test("Legacy") {
   expectEqual(1, count(md.children))
   expectEqual("dx", first(md.children)?.label)
   expectEqual(1, first(md.children)?.value as? Int)
+  
+  expectNotEmpty(md.baseClassMirror)
+  if let mb2? = md.baseClassMirror { expectBMirror(mb2) }
 }
 
 mirrors.test("Addressing") {
@@ -190,7 +218,7 @@ mirrors.test("Addressing") {
 
   struct Zee : CustomReflectable {
     func customMirror() -> Mirror {
-      return Mirror(children: ["bark": 1, "bite": 0])
+      return Mirror(self, children: ["bark": 1, "bite": 0])
     }
   }
   

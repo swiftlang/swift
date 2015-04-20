@@ -87,8 +87,16 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    C: CollectionType where C.Generator.Element == Child
-  >(children: C, displayStyle: DisplayStyle? = nil) {
+    T, C: CollectionType where C.Generator.Element == Child
+  >(
+    _ subject: T,
+    children: C,
+    displayStyle: DisplayStyle? = nil,
+    exposeBaseClass: Bool = true
+  ) {
+    self._baseLegacyMirror = Mirror.getBaseLegacyMirror(
+      subject, exposeBaseClass)
+      
     self.children = Children(children)
     self.displayStyle = displayStyle
   }
@@ -112,8 +120,15 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    C: CollectionType
-  >(unlabeledChildren: C, displayStyle: DisplayStyle? = nil) {
+    T, C: CollectionType
+  >(
+    _ subject: T,
+    unlabeledChildren: C, displayStyle: DisplayStyle? = nil,
+    exposeBaseClass: Bool = true
+  ) {
+    self._baseLegacyMirror = Mirror.getBaseLegacyMirror(
+      subject, exposeBaseClass)
+      
     self.children = Children(
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
     )
@@ -126,10 +141,15 @@ public struct Mirror {
   /// argument.  Be aware that although an *actual* `Dictionary` is
   /// arbitrarily-ordered, the ordering of the `Mirror`\ 's `children`
   /// will exactly match that of the literal you pass.
-  public init(
+  public init<T>(
+    _ subject: T,
     children: DictionaryLiteral<String, Any>,
-    displayStyle: DisplayStyle? = nil
+    displayStyle: DisplayStyle? = nil,
+    exposeBaseClass: Bool = true
   ) {
+    self._baseLegacyMirror = Mirror.getBaseLegacyMirror(
+      subject, exposeBaseClass)
+      
     self.children = Children(
       lazy(children).map { Child(label: $0.0, value: $0.1) }
     )
@@ -142,6 +162,19 @@ public struct Mirror {
 
   /// Suggests a display style for the reflected subject.
   public let displayStyle: DisplayStyle?
+
+  public var baseClassMirror: Mirror? {
+    return _baseLegacyMirror.map { Mirror($0) }
+  }
+
+  internal let _baseLegacyMirror: MirrorType?
+
+  internal static func getBaseLegacyMirror<T>(
+    subject: T, _ exposeBaseClass: Bool
+  ) -> MirrorType? {
+    if !(exposeBaseClass && subject is AnyObject) { return nil }
+    return reflect(subject)._baseMirror()
+  }
 }
 
 /// A type that explicitly supplies its own Mirror.
@@ -263,8 +296,14 @@ internal func _hasType(instance: Any, type: Any.Type) -> Bool {
 }
 
 extension MirrorType {
-  final internal var _firstChildIsBase: Bool {
-    return self.count != 0 && _hasType(self[0].1, _ClassSuperMirror.self)
+  final internal func _baseMirror() -> MirrorType? {
+    if self.count > 0 {
+      let childMirror = self[0].1
+      if _hasType(childMirror, _ClassSuperMirror.self) {
+        return childMirror
+      }
+    }
+    return nil
   }
 }
 */
@@ -282,7 +321,7 @@ extension Mirror {
     }
 
     var startIndex: Int {
-      return _oldMirror._firstChildIsBase ? 1 : 0
+      return _oldMirror._baseMirror() == nil ? 0 : 1
     }
 
     var endIndex: Int { return _oldMirror.count }
@@ -306,9 +345,9 @@ extension Mirror {
   /// to use the new style, which only present forward traversal in
   /// general.
   internal init(_ oldMirror: MirrorType) {
-    self.init(
-      children: LegacyChildren(oldMirror),
-      displayStyle: DisplayStyle(legacy: oldMirror.disposition))
+    self._baseLegacyMirror = oldMirror._baseMirror()
+    self.children = Children(LegacyChildren(oldMirror))
+    self.displayStyle = DisplayStyle(legacy: oldMirror.disposition)
   }
 }
 
