@@ -25,6 +25,15 @@ import Swift
 ///
 /// Mirrors are used by playgrounds and the debugger.
 public struct Mirror {
+  public enum SuperclassMirror : NilLiteralConvertible {
+    public init(nilLiteral: ()) {
+      self = .None
+    }
+  case Synthesized
+  case Customized(()->Mirror)
+  case None
+  }
+
 
   /// Initialize a mirror that reflects upon the given `subject`.
   ///
@@ -77,6 +86,16 @@ public struct Mirror {
   case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set
   }
 
+  internal static func _superclassGenerator(
+    subject: Any, _ superclassMirror: SuperclassMirror
+  ) -> ()->Mirror? {
+    switch superclassMirror {
+    case .None: return { nil }
+    case .Synthesized: return  { nil }
+    case .Customized(let superduperclassMirror): return { nil }
+    }
+  }
+  
   /// Initialize with the given collection of `children` and optional
   /// `displayStyle`.
   ///
@@ -91,11 +110,11 @@ public struct Mirror {
   >(
     _ subject: T,
     children: C,
-    displayStyle: DisplayStyle? = nil,
-    exposeSuperclass: Bool = true
+    superclassMirror: SuperclassMirror = .Synthesized,
+    displayStyle: DisplayStyle? = nil
   ) {
-    self._baseLegacyMirror = Mirror.getBaseLegacyMirror(
-      subject, exposeSuperclass)
+    self._createSuperclassMirror = Mirror._superclassGenerator(
+      subject, superclassMirror)
       
     self.children = Children(children)
     self.displayStyle = displayStyle
@@ -123,11 +142,12 @@ public struct Mirror {
     T, C: CollectionType
   >(
     _ subject: T,
-    unlabeledChildren: C, displayStyle: DisplayStyle? = nil,
-    exposeSuperclass: Bool = true
+    unlabeledChildren: C,
+    superclassMirror: SuperclassMirror = .Synthesized,
+    displayStyle: DisplayStyle? = nil
   ) {
-    self._baseLegacyMirror = Mirror.getBaseLegacyMirror(
-      subject, exposeSuperclass)
+    self._createSuperclassMirror = Mirror._superclassGenerator(
+      subject, superclassMirror)
       
     self.children = Children(
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
@@ -144,11 +164,11 @@ public struct Mirror {
   public init<T>(
     _ subject: T,
     children: DictionaryLiteral<String, Any>,
-    displayStyle: DisplayStyle? = nil,
-    exposeSuperclass: Bool = true
+    superclassMirror: SuperclassMirror = .Synthesized,
+    displayStyle: DisplayStyle? = nil
   ) {
-    self._baseLegacyMirror = Mirror.getBaseLegacyMirror(
-      subject, exposeSuperclass)
+    self._createSuperclassMirror = Mirror._superclassGenerator(
+      subject, superclassMirror)
       
     self.children = Children(
       lazy(children).map { Child(label: $0.0, value: $0.1) }
@@ -164,17 +184,10 @@ public struct Mirror {
   public let displayStyle: DisplayStyle?
 
   public var superclassMirror: Mirror? {
-    return _baseLegacyMirror.map { Mirror($0) }
+    return _createSuperclassMirror()
   }
 
-  internal let _baseLegacyMirror: MirrorType?
-
-  internal static func getBaseLegacyMirror<T>(
-    subject: T, _ exposeSuperclass: Bool
-  ) -> MirrorType? {
-    if !(exposeSuperclass && subject is AnyObject) { return nil }
-    return reflect(subject)._baseMirror()
-  }
+  internal let _createSuperclassMirror: ()->Mirror?
 }
 
 /// A type that explicitly supplies its own Mirror.
@@ -296,7 +309,7 @@ internal func _hasType(instance: Any, type: Any.Type) -> Bool {
 }
 
 extension MirrorType {
-  final internal func _baseMirror() -> MirrorType? {
+  final internal func _legacySuperMirror() -> MirrorType? {
     if self.count > 0 {
       let childMirror = self[0].1
       if _hasType(childMirror, _ClassSuperMirror.self) {
@@ -321,7 +334,7 @@ extension Mirror {
     }
 
     var startIndex: Int {
-      return _oldMirror._baseMirror() == nil ? 0 : 1
+      return _oldMirror._legacySuperMirror() == nil ? 0 : 1
     }
 
     var endIndex: Int { return _oldMirror.count }
@@ -345,7 +358,9 @@ extension Mirror {
   /// to use the new style, which only present forward traversal in
   /// general.
   internal init(_ oldMirror: MirrorType) {
-    self._baseLegacyMirror = oldMirror._baseMirror()
+    self._createSuperclassMirror = {
+      oldMirror._legacySuperMirror().map { Mirror($0) }
+    }
     self.children = Children(LegacyChildren(oldMirror))
     self.displayStyle = DisplayStyle(legacy: oldMirror.disposition)
   }
