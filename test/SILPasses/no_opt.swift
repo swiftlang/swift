@@ -17,9 +17,8 @@ public func foo1() {
 // CHECK: integer_literal
 // CHECK: integer_literal
 // CHECK: integer_literal
-// CHECK: integer_literal
 // CHECK: return
-@semantics("optimize.never")
+@semantics("optimize.sil.never")
 public func foo2() {
   bar(1)
   bar(2)

@@ -526,7 +526,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     if (!Edge->hasSingleCallee()) continue;
 
     // Don't optimize functions that are marked with the opt.never attribute.
-    if (Edge->getApply().getFunction()->hasSemanticsString("optimize.never"))
+    if (!Edge->getApply().getFunction()->shouldOptimize())
       continue;
 
     auto *AI = dyn_cast<ApplyInst>(Edge->getApply().getInstruction());

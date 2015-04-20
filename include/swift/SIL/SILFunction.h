@@ -332,7 +332,7 @@ public:
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt).
   bool shouldOptimize() const {
-    return !hasSemanticsString("optimize.never");
+    return !hasSemanticsString("optimize.sil.never");
   }
 
   /// Initialize the source location of the function.

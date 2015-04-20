@@ -330,14 +330,21 @@ readwrite
 
   function has side effects and the optimizer can't assume anything.
 
-@optimize attribute
-~~~~~~~~~~~~~~~~~~~~
+Optimize semantics attribute
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The @optimize attribute adds function-sepcific directives to the optimizer.
+The optimize attribute adds function-sepcific directives to the optimizer.
 
-The @optimize attribute supports the following tags:
+The optimize attribute supports the following tags:
 
-none
+sil.never
 
-   The optimizer should not optimize this funciton. 
+   The sil optimizer should not optimize this funciton.
+
+  Example:
+  @semantics("optimize.sil.never")
+  func miscompile() { ... }
+
+
+
 
