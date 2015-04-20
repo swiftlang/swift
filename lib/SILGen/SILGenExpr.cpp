@@ -208,6 +208,7 @@ namespace {
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
+    RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
     RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
@@ -2041,6 +2042,11 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
 RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {
+  return visit(E->getSemanticExpr(), C);
+}
+
+RValue RValueEmitter::
+visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
 }
 

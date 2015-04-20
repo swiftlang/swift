@@ -2170,10 +2170,11 @@ namespace {
       Expr *arg = expr->getArg();
       Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
                                                 ctx);
-      Expr *result = tc.callWitness(base, dc, proto, conformance,
-                                    constrName, arg,
-                                    diag::object_literal_broken_proto);
-      return result;
+      Expr *semanticExpr = tc.callWitness(base, dc, proto, conformance,
+                                          constrName, arg,
+                                          diag::object_literal_broken_proto);
+      expr->setSemanticExpr(semanticExpr);
+      return expr;
     }
 
     /// \brief Retrieve the type of a reference to the given declaration.

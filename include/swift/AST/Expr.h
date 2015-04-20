@@ -768,6 +768,7 @@ public:
 class ObjectLiteralExpr : public LiteralExpr {
   Identifier Name;
   Expr *Arg;
+  Expr *SemanticExpr;
 
   SourceLoc LLitLoc;
   SourceLoc NameLoc;
@@ -777,12 +778,15 @@ public:
   ObjectLiteralExpr(SourceLoc LLitLoc, Identifier Name, SourceLoc NameLoc,
                     Expr *Arg, SourceLoc RLitLoc, bool implicit = false)
     : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
-      Name(Name), Arg(Arg),
+      Name(Name), Arg(Arg), SemanticExpr(nullptr),
       LLitLoc(LLitLoc), NameLoc(NameLoc), RLitLoc(RLitLoc) {}
 
   Identifier getName() const { return Name; }
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
+
+  Expr *getSemanticExpr() const { return SemanticExpr; }
+  void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
 
   SourceLoc getSourceLoc() const { return NameLoc; }
   SourceRange getSourceRange() const { return SourceRange(LLitLoc, RLitLoc); }
