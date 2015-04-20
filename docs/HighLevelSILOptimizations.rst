@@ -330,3 +330,14 @@ readwrite
 
   function has side effects and the optimizer can't assume anything.
 
+@optimize attribute
+~~~~~~~~~~~~~~~~~~~~
+
+The @optimize attribute adds function-sepcific directives to the optimizer.
+
+The @optimize attribute supports the following tags:
+
+none
+
+   The optimizer should not optimize this funciton. 
+

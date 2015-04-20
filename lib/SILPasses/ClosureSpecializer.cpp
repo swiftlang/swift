@@ -743,6 +743,11 @@ public:
     // Specialize going bottom-up in the call graph.
     auto &CG = CGA->getOrBuildCallGraph();
     for (auto *F : CG.getBottomUpFunctionOrder()) {
+
+      // Don't optimize functions that are marked with the opt.never attribute.
+      if (F->hasSemanticsString("optimize.never"))
+        return;
+
       // If F is an external declaration, attempt to link in its definition. If
       // we fail to do so, there is nothing further that we can do.
       if (F->isExternalDeclaration())

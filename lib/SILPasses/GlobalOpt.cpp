@@ -284,6 +284,11 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF) {
 
 bool SILGlobalOpt::run() {
   for (auto &F : *Module) {
+
+    // Don't optimize functions that are marked with the opt.never attribute.
+    if (F.hasSemanticsString("optimize.never"))
+      continue;
+
     // Cache cold blocks per function.
     ColdBlockInfo ColdBlocks(DA);
     for (auto &BB : F) {

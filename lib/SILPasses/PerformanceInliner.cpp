@@ -997,6 +997,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
                                                     DominanceAnalysis *DA,
                                                     SILLoopAnalysis *LA,
                                                     CallGraph &CG) {
+  // Don't optimize functions that are marked with the opt.never attribute.
+  if (Caller->hasSemanticsString("optimize.never"))
+    return false;
+
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
 
   // First step: collect all the functions we want to inline.  We

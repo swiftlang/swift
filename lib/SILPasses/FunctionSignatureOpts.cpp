@@ -525,6 +525,10 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
   for (const CallGraphEdge *Edge : CallSites) {
     if (!Edge->hasSingleCallee()) continue;
 
+    // Don't optimize functions that are marked with the opt.never attribute.
+    if (Edge->getApply().getFunction()->hasSemanticsString("optimize.never"))
+      continue;
+
     auto *AI = dyn_cast<ApplyInst>(Edge->getApply().getInstruction());
     // TODO: Update for TryApply
     if (!AI)
@@ -810,6 +814,11 @@ public:
     DeadFunctions.reserve(128);
 
     for (auto &F : *M) {
+
+      // Don't optimize functions that are marked with the opt.never attribute.
+      if (F.hasSemanticsString("optimize.never"))
+        continue;
+
       // Check the signature of F to make sure that it is a function that we can
       // specialize. These are conditions independent of the call graph.
       if (!canSpecializeFunction(F))

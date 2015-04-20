@@ -135,7 +135,11 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
   for (auto &F : *Mod) {
     if (F.empty())
       continue;
-      
+
+    // Don't optimize functions that are marked with the opt.never attribute.
+    if (F.hasSemanticsString("optimize.never"))
+      continue;
+
     CompletedPasses &completedPasses = CompletedPassesMap[&F];
 
     for (auto SFT : FuncTransforms) {

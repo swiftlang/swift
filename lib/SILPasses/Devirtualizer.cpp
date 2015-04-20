@@ -60,6 +60,11 @@ public:
     // Perform devirtualization locally and compute potential polymorphic
     // arguments for all existing functions.
     for (auto &F : *getModule()) {
+
+      // Don't optimize functions that are marked with the opt.never attribute.
+      if (F.hasSemanticsString("optimize.never"))
+        return;
+
       DEBUG(llvm::dbgs() << "*** Devirtualizing Function: "
               << demangle_wrappers::demangleSymbolAsString(F.getName())
               << "\n");

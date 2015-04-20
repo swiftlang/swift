@@ -310,6 +310,11 @@ void CapturePropagation::run() {
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
   bool HasChanged = false;
   for (auto &F : *getModule()) {
+
+    // Don't optimize functions that are marked with the opt.never attribute.
+    if (F.hasSemanticsString("optimize.never"))
+      continue;
+
     // Cache cold blocks per function.
     ColdBlockInfo ColdBlocks(DA);
     for (auto &BB : F) {

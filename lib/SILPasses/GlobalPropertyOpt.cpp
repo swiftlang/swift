@@ -465,6 +465,10 @@ void GlobalPropertyOpt::propagatePropertiesInGraph() {
 bool GlobalPropertyOpt::replacePropertyCalls() {
   bool Changed = false;
   for (ApplyInst *AI : propertyCalls) {
+    // Don't optimize functions that are marked with the opt.never attribute.
+    if (AI->getFunction()->hasSemanticsString("optimize.never"))
+      continue;
+
     SILValue array = AI->getArgument(0);
     
     // Is the argument a native swift array?
