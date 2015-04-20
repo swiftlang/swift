@@ -734,6 +734,21 @@ bb1:
   return %5 : $()
 }
 
+sil @unbalanced_closure : $@convention(thin) (Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil @partial_apply_unbalanced_retain_release
+sil @partial_apply_unbalanced_retain_release : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: bb0
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @unbalanced_closure : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK: partial_apply
+  %2 = partial_apply %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  strong_retain %2 : $@callee_owned () -> ()
+  %4 = builtin "int_trap"() : $()
+// CHECK: unreachable
+  unreachable
+}
+
 class C1 {}
 class C2 : C1 {}
 class C3 : C2 {}

@@ -490,7 +490,6 @@ hasOnlyRetainReleaseUsers(PartialApplyInst *PAI,
   }
 
   // The retain release count better match up.
-  assert(RetainCount == (ReleaseCount - 1) && "Retain release mismatch!?");
   if (RetainCount != (ReleaseCount - 1))
     return nullptr;
 
