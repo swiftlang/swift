@@ -1029,7 +1029,6 @@ enum d2300_EnumDeclWithValues1 : Int {
 // PASS_COMMON-NEXT: {{^}}  case EDV2_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}  init?(rawValue: Int){{$}}
-// PASS_COMMON-NEXT: {{^}}  typealias RawValue = Int
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
@@ -1042,7 +1041,6 @@ enum d2400_EnumDeclWithValues2 : Double {
 // PASS_COMMON-NEXT: {{^}}  case EDV3_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}  init?(rawValue: Double){{$}}
-// PASS_COMMON-NEXT: {{^}}  typealias RawValue = Double
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Double { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
@@ -1120,10 +1118,11 @@ struct d2800_ProtocolWithAssociatedType1Impl : d2700_ProtocolWithAssociatedType1
   }
 }
 
+// FIXME: Should we print the deduced associated type TA1?
+// FIXME: rdar://15168378
 // PASS_COMMON: {{^}}struct d2800_ProtocolWithAssociatedType1Impl : d2700_ProtocolWithAssociatedType1 {{{$}}
 // PASS_COMMON-NEXT: {{^}}  func returnsTA1() -> Int{{$}}
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
-// PASS_COMMON-NEXT: {{^}}  typealias TA1 = Int
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
 //===---

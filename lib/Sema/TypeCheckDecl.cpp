@@ -1635,7 +1635,7 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
   ctor->setInitializerType(initFnType);
 }
 
-void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
+static void computeDefaultAccessibility(TypeChecker &TC, ExtensionDecl *ED) {
   if (ED->hasDefaultAccessibility())
     return;
 
@@ -1644,9 +1644,9 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
     return;
   }
 
-  checkInheritanceClause(ED);
+  TC.checkInheritanceClause(ED);
   if (auto nominal = ED->getExtendedType()->getAnyNominal()) {
-    validateDecl(nominal);
+    TC.validateDecl(nominal);
     ED->setDefaultAccessibility(std::min(nominal->getFormalAccess(),
                                          Accessibility::Internal));
   } else {
@@ -1704,7 +1704,7 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     }
     case DeclContextKind::ExtensionDecl: {
       auto extension = cast<ExtensionDecl>(DC);
-      computeDefaultAccessibility(extension);
+      computeDefaultAccessibility(*this, extension);
       D->setAccessibility(extension->getDefaultAccessibility());
     }
     }
@@ -5412,7 +5412,7 @@ public:
     }
     
     if (!IsFirstPass) {
-      TC.computeDefaultAccessibility(ED);
+      computeDefaultAccessibility(TC, ED);
       checkExplicitConformance(ED, ED->getExtendedType());
     }
     TC.checkDeclAttributes(ED);

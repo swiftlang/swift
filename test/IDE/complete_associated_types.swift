@@ -197,29 +197,29 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_INSTANCE: End completions
 
 // STRUCT_TYPES: Begin completions
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DefaultedTypeCommonA[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DefaultedTypeCommonD[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DeducedTypeCommonA[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DeducedTypeCommonD[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarDefaultedTypeA[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarDeducedTypeD[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DefaultedTypeCommonC[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DeducedTypeCommonC[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarBaseDefaultedType[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarBaseDeducedTypeC[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarBaseDeducedTypeD[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DefaultedTypeCommonB[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeB[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DeducedTypeCommonB[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDefaultedType[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDeducedTypeB[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDeducedTypeC[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDeducedTypeD[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeA[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeA[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeD[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .DefaultedTypeCommonA[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .DefaultedTypeCommonD[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .DeducedTypeCommonA[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .DeducedTypeCommonD[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .BarDefaultedTypeA[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .BarDeducedTypeD[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .DefaultedTypeCommonC[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .DeducedTypeCommonC[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .BarBaseDefaultedType[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .BarBaseDeducedTypeC[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .BarBaseDeducedTypeD[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .DefaultedTypeCommonB[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDefaultedTypeB[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .DeducedTypeCommonB[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooDefaultedType[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooDeducedTypeB[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooDeducedTypeC[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooDeducedTypeD[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDefaultedTypeA[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDeducedTypeA[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/Super:       .FooBaseDeducedTypeD[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal: .FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
 // STRUCT_TYPES: End completions
 
