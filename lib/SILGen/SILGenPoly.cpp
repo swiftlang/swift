@@ -1464,36 +1464,6 @@ SILGenFunction::emitRValueAsOrig(Expr *expr, AbstractionPattern origFormalType,
 // Protocol witnesses
 //===----------------------------------------------------------------------===//
 
-// FIXME: Witnesses are label-invariant to their requirement, so you end up with
-// the obnoxious corner case:
-//
-// protocol LabeledSelfRequirement {
-//   func method(x: Self)
-// }
-//
-// struct UnlabeledSelfWitness : LabeledSelfRequirement {
-//   func method(_: UnlabeledSelfWitness) {}
-// }
-//
-// (or vice versa). Deal with this by stripping the labels off of tuple types
-// before using them to reabstract arguments. The keyword arguments overhaul
-// should obviate the need for this hack.
-static CanType stripInputTupleLabels(CanType inputTy) {
-  auto tupleTy = dyn_cast<TupleType>(inputTy);
-  if (!tupleTy)
-    return inputTy;
-  auto unlabeled = map<SmallVector<TupleTypeElt, 4>>(tupleTy->getElements(),
-    [&](const TupleTypeElt &orig) {
-      return TupleTypeElt(stripInputTupleLabels(CanType(orig.getType())));
-    });
-  return TupleType::get(unlabeled, inputTy->getASTContext())
-    ->getCanonicalType();
-}
-
-static AbstractionPattern stripInputTupleLabels(AbstractionPattern p) {
-  return p.transformType(static_cast<CanType(*)(CanType)>(stripInputTupleLabels));
-}
-
 static SILValue getWitnessFunctionRef(SILGenFunction &gen,
                                       ProtocolConformance *conformance,
                                       SILDeclRef witness,
@@ -1607,7 +1577,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   auto witnessSubstSILTy
     = SGM.Types.getLoweredType(witnessSubstTy);
   auto witnessSubstFTy = witnessSubstSILTy.castTo<SILFunctionType>();
-  auto witnessSubstInputTys = stripInputTupleLabels(witnessSubstTy.getInput());
+  auto witnessSubstInputTys = witnessSubstTy.getInput();
   
   if (!isFree) {
     // If the requirement has a self parameter passed as an indirect +0 value,
@@ -1674,7 +1644,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   TranslateArguments(*this, loc, TranslationKind::OrigToSubst,
                  origParams, witnessParams,
                  witnessSubstFTy->getParametersWithoutIndirectResult())
-    .translate(stripInputTupleLabels(reqtOrigInputTy),
+    .translate(reqtOrigInputTy,
                witnessSubstInputTys);
 
   // Create an indirect result buffer if needed.
@@ -1698,7 +1668,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     TranslateArguments(*this, loc, TranslationKind::SubstToOrig,
                        witnessParams, genParams,
                        witnessFTy->getParametersWithoutIndirectResult())
-      .translate(stripInputTupleLabels(witnessOrigTy.getFunctionInputType()),
+      .translate(witnessOrigTy.getFunctionInputType(),
                  witnessSubstInputTys);
     witnessParams = std::move(genParams);
     
