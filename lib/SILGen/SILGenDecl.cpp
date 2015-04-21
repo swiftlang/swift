@@ -1025,8 +1025,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   }
 }
 
-void SILGenFunction::emitLocalVariable(VarDecl *vd,
-                               Optional<MarkUninitializedInst::Kind> MUIKind) {
+/// Create a LocalVariableInitialization for the uninitialized var.
+InitializationPtr SILGenFunction::
+emitLocalVariableWithCleanup(VarDecl *vd, bool NeedsMarkUninit) {
   assert(vd->getDeclContext()->isLocalContext() &&
          "can't emit a local var for a non-local var decl");
   assert(vd->hasStorage() && "can't emit storage for a computed variable");
@@ -1041,20 +1042,13 @@ void SILGenFunction::emitLocalVariable(VarDecl *vd,
   auto addr = SILValue(allocBox, 1);
 
   // Mark the memory as uninitialized, so DI will track it for us.
-  if (MUIKind.hasValue())
-    addr = B.createMarkUninitialized(vd, addr, MUIKind.getValue());
+  if (NeedsMarkUninit)
+    addr = B.createMarkUninitializedVar(vd, addr);
 
   /// Remember that this is the memory location that we're emitting the
   /// decl to.
   VarLocs[vd] = SILGenFunction::VarLoc::get(addr, box);
-}
 
-/// Create a LocalVariableInitialization for the uninitialized var.
-InitializationPtr SILGenFunction::
-emitLocalVariableWithCleanup(VarDecl *vd, bool NeedsMarkUninit) {
-  Optional<MarkUninitializedInst::Kind> MUIKind;
-  if (NeedsMarkUninit) MUIKind = MarkUninitializedInst::Var;
-  emitLocalVariable(vd, MUIKind);
   return InitializationPtr(new LocalVariableInitialization(vd, *this));
 }
 

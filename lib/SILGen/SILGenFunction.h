@@ -1285,11 +1285,6 @@ public:
   /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
   std::unique_ptr<Initialization> emitInitializationForVarDecl(VarDecl *vd);
   
-  /// Emit the allocation for a local variable. Returns the address of the
-  /// value. Does not register a cleanup.
-  void emitLocalVariable(VarDecl *D,
-                         Optional<MarkUninitializedInst::Kind> MUIKind);
-  
   /// Emit the allocation for a local variable, provides an Initialization
   /// that can be used to initialize it, and registers cleanups in the active
   /// scope.
