@@ -23,8 +23,9 @@ GElement = "Generator.Element"
 //===----------------------------------------------------------------------===//
 
 extension CollectionType {
-  // FIXME: dynamic dispatch for Set and Dictionary.
+  /// Returns `true` iff `self` is empty.
   final public var _prext_isEmpty: Bool {
+    // FIXME: dynamic dispatch for Set and Dictionary.
     return startIndex == endIndex
   }
 }
@@ -34,6 +35,7 @@ extension CollectionType {
 //===----------------------------------------------------------------------===//
 
 extension CollectionType {
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
   final public var _prext_first: Generator.Element? {
     return _prext_isEmpty ? nil : self[startIndex]
   }
