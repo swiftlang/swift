@@ -1862,7 +1862,8 @@ static void fixAvailabilityByAddingVersionCheck(
     PlatformKind Target = targetPlatform(TC.getLangOpts());
 
     Out << "if #available(" << platformString(Target)
-        << " >= " << RequiredRange.getLowerEndpoint().getAsString() << ") {\n";
+        << " >= " << RequiredRange.getLowerEndpoint().getAsString()
+        << ", *) {\n";
 
     Out << OriginalIndent << ExtraIndent << GuardedText << "\n";
 
