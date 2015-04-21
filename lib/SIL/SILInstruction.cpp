@@ -564,6 +564,14 @@ namespace {
     bool visitPointerToThinFunctionInst(PointerToThinFunctionInst *X) {
       return true;
     }
+
+    bool visitClassMethodInst(ClassMethodInst *RHS) {
+      auto *X = cast<ClassMethodInst>(LHS);
+      return X->getMember()  == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType()    == RHS->getType();
+    }
+
   private:
     const SILInstruction *LHS;
   };

@@ -64,12 +64,6 @@ bb0(%0 : $Int32, %1 : $FooClass):
 // CHECK-NOT: function_ref
 // CHECK: class_method
 // CHECK-NOT: function_ref
-// CHECK: class_method
-// CHECK-NOT: function_ref
-// CHECK: class_method
-// CHECK-NOT: function_ref
-// CHECK: class_method
-// CHECK-NOT: function_ref
 // CHECK: br bb1
 // CHECK: }
 // devirt_jump_thread.jumpthread_checked_cast_br (devirt_jump_thread.FooClass) -> Swift.Int32
@@ -180,7 +174,6 @@ bb12:                                             // Preds: bb3
 // CHECK: br bb1
 // CHECK-NOT: checked_cast_br
 // CHECK: bb3
-// CHECK: class_method
 // CHECK: class_method
 // CHECK: br bb1
 // CHECK }

@@ -37,9 +37,7 @@ func callfoo(f: Foo)->Int {
 // CHECK: br bb1(
 // CHECK: bb3
 // CHECK-NOT: checked_cast
-// CHECK: class_method
 // CHECK: apply
-// CHECK: class_method
 // CHECK: apply
 // CHECK: br bb1(
 @inline(never)

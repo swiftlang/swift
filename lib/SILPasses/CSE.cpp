@@ -64,6 +64,9 @@ struct SimpleValue {
     if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
       return !BI->mayReadOrWriteMemory();
     }
+    if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
+      return !CMI->isVolatile();
+    }
     switch (Inst->getKind()) {
     case ValueKind::FunctionRefInst:
     case ValueKind::GlobalAddrInst:
@@ -241,6 +244,12 @@ public:
 
   hash_code visitCondFailInst(CondFailInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
+  hash_code visitClassMethodInst(ClassMethodInst *X) {
+    return llvm::hash_combine(X->getKind(),
+                              X->getType(),
+                              X->getOperand());
   }
 
   hash_code visitTupleInst(TupleInst *X) {
