@@ -66,7 +66,6 @@ struct LoadableStruct {
   // CHECK:         br [[EXIT:bb.*]]([[SELF_OPT]] : $ImplicitlyUnwrappedOptional<LoadableStruct>)
 
   // CHECK:       [[FAILURE]]:
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[NIL:%.*]] = enum $ImplicitlyUnwrappedOptional<LoadableStruct>, #ImplicitlyUnwrappedOptional.None
   // CHECK:         br [[EXIT]]([[NIL]] : $ImplicitlyUnwrappedOptional<LoadableStruct>)
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $ImplicitlyUnwrappedOptional<LoadableStruct>):
@@ -228,7 +227,6 @@ class RootClass {
 
     if opt {
   // CHECK:       [[YES]]:
-  // CHECK:         strong_release [[SELF_MARKED]]
   // CHECK:         br [[FAILURE:bb[0-9]+]]
       return nil
     }
@@ -238,6 +236,7 @@ class RootClass {
   // CHECK:         br [[EXIT:bb[0-9]+]]([[SOME]] : $Optional<RootClass>)
 
   // CHECK:       [[FAILURE]]:
+  // CHECK:         strong_release [[SELF_MARKED]]
   // CHECK:         [[NIL:%.*]] = enum $Optional<RootClass>, #Optional.None!enumelt
   // CHECK:         br [[EXIT]]([[NIL]] : $Optional<RootClass>)
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<RootClass>):
@@ -262,8 +261,8 @@ class RootClass {
 
   // CHECK:         [[RESULT_SELF:%.*]] = load [[SELF_MARKED]]
   // CHECK:         strong_retain [[RESULT_SELF]]
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[SOME:%.*]] = enum $Optional<RootClass>, #Optional.Some!enumelt.1, [[RESULT_SELF]]
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[EXIT:bb[0-9]+]]([[SOME]] : $Optional<RootClass>)
   
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<RootClass>):
@@ -288,11 +287,12 @@ class RootClass {
 
   // CHECK:         [[SELF_RESULT:%.*]] = load [[SELF_MARKED]]
   // CHECK:         strong_retain [[SELF_RESULT]]
-  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         [[SOME:%.*]] = enum $Optional<RootClass>, #Optional.Some!enumelt.1, [[SELF_RESULT]]
+  // CHECK:         strong_release [[SELF_BOX]]
   // CHECK:         br [[EXIT:bb[0-9]+]]([[SOME]] : $Optional<RootClass>)
 
   // CHECK:       [[FAILURE]]:
+  // CHECK:          strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
   // CHECK:         [[NIL:%.*]] = enum $Optional<RootClass>, #Optional.None!enumelt
   // CHECK:         br [[EXIT]]([[NIL]] : $Optional<RootClass>)
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<RootClass>):

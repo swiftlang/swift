@@ -269,8 +269,6 @@ public:
   JumpDest ReturnDest = JumpDest::invalid();
   /// The cleanup depth and epilog BB for "fail" statements.
   JumpDest FailDest = JumpDest::invalid();
-  /// The 'self' variable that needs to be cleaned up on failure.
-  VarDecl *FailSelfDecl = nullptr;
 
   /// The destination for throws.  The block will always be in the
   /// postmatter and takes a BB argument of the exception type.

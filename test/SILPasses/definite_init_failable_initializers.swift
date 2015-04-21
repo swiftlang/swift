@@ -93,15 +93,15 @@ class SubClass: RootClass {
   }
 
   override init?(failBeforeInitialization: ()) {
-    // expected-error@-1{{properties of a class instance must be initialized before returning nil}}
-    // expected-note@-2{{super.init must be called before returning nil}}
+    // expected-error@+2{{properties of a class instance must be initialized before returning nil}}
+    // expected-note@+1{{super.init must be called before returning nil}}
     return nil
   }
 
   init?(failBeforeSuperInitialization: ()) {
-    // expected-error@-1{{properties of a class instance must be initialized before returning nil}}
-    // expected-note@-2{{super.init must be called before returning nil}}
     z = 0
+    // expected-error@+2{{properties of a class instance must be initialized before returning nil}}
+    // expected-note@+1{{super.init must be called before returning nil}}
     return nil
   }
 

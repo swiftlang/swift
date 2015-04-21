@@ -19,6 +19,8 @@ class SomeDerivedClass : Parent {
 // CHECK-NEXT: function_ref auto_generated_super_init_call.Parent.init
 // CHECK-NEXT: [[INITCALL1:%[0-9]+]] = function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
+// CHECK-NEXT:   = null_class $SomeDerivedClass
+// CHECK-NEXT:  store {{.*}} to [[SELF]] : $*SomeDerivedClass
 // CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
 // CHECK-NEXT: store [[DOWNCAST]] to [[SELF]] : $*SomeDerivedClass 
   }
@@ -42,6 +44,8 @@ class SomeDerivedClass : Parent {
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb_S0_ : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NEXT: apply
+// CHECK-NEXT:   = null_class $SomeDerivedClass
+// CHECK-NEXT:  store {{.*}} to {{.*}} : $*SomeDerivedClass
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: store
 // CHECK-NEXT: load

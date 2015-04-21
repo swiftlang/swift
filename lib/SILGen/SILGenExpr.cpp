@@ -2142,6 +2142,21 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   // Emit the subexpression.
   ManagedValue newSelf = SGF.emitRValueAsSingleValue(E->getSubExpr());
 
+  // We know that self is a box, so get its address.
+  SILValue selfAddr =
+    SGF.emitLValueForDecl(E, selfDecl, selfTy->getCanonicalType(),
+                          AccessKind::Write).getLValueAddress();
+
+  // In a class self.init or super.init situation, the self value will 'take'
+  // the value out of the box, leaving it as an unowned reference in an
+  // otherwise valid box.  We need to null it out so that a release of the box
+  // (e.g. on an error path of a failable init) will not do an extra release of
+  // the bit pattern in the box.
+  if (SGF.SelfInitDelegationState == SILGenFunction::DidConsumeSelf) {
+    auto Zero = SGF.B.createNullClass(E, selfAddr.getType().getObjectType());
+    SGF.B.createStore(E, Zero, selfAddr);
+  }
+  
   // If the delegated-to initializer can fail, check for the potential failure.
   switch (failability) {
   case OTK_None:
@@ -2213,10 +2228,6 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
 
-  // We know that self is a box, so get its address.
-  SILValue selfAddr =
-    SGF.emitLValueForDecl(E, selfDecl, selfTy->getCanonicalType(),
-                          AccessKind::Write).getLValueAddress();
   // Forward or assign into the box depending on whether we actually consumed
   // 'self'.
   switch (SGF.SelfInitDelegationState) {

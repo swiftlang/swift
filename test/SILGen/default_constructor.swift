@@ -54,6 +54,9 @@ class F : E { }
 // CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELFP]] : $F to $E
 // CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_TFC19default_constructor1EcfMS0_FT_S0_ : $@convention(method) (@owned E) -> @owned E
 // CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@convention(method) (@owned E) -> @owned E
+// CHECK-NEXT:   = null_class $F
+// CHECK-NEXT:  store {{.*}} to [[SELF]] : $*F
+
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
 // CHECK-NEXT: store [[ESELFW]] to [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
