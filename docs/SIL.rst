@@ -3611,7 +3611,7 @@ null_class
 ``````````
 ::
 
-sil-instruction ::= 'null_class' sil-type
+  sil-instruction ::= 'null_class' sil-type
 
 %1 = null_class $T
 // %1 has type $T
