@@ -24,11 +24,13 @@ class ValueObserver: NSObject {
 		observedValue.removeObserver(self, forKeyPath: "amount")
 	}
 	
-	override func observeValueForKeyPath(keyPath: String, ofObject object: AnyObject, change: [NSObject : AnyObject], context: UnsafeMutablePointer<Void>) {
+	override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [NSObject : AnyObject]?, context: UnsafeMutablePointer<Void>) {
 		if context == &observeContext {
-			if let amount = change[NSKeyValueChangeNewKey as NSString] as? Int {
-				println("Observed value updated to \(amount)")
-			}
+      if let change_? = change {
+        if let amount? = change_[NSKeyValueChangeNewKey as NSString] as? Int {
+          println("Observed value updated to \(amount)")
+        }
+      }
 		}
 	}
 }

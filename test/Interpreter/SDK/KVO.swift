@@ -30,12 +30,12 @@ class Observer : NSObject {
     model.number = 42
   }
 
-  override func observeValueForKeyPath(keyPath: String, ofObject object: AnyObject, change: [NSObject : AnyObject], context: UnsafeMutablePointer<Void>) {
+  override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [NSObject : AnyObject]?, context: UnsafeMutablePointer<Void>) {
     if context != &kvoContext {
       return super.observeValueForKeyPath(keyPath, ofObject: object, change: change, context: context)
     }
 
-    println(object.valueForKeyPath(keyPath))
+    println(object!.valueForKeyPath(keyPath!))
   }
 }
 
