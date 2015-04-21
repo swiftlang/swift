@@ -280,7 +280,6 @@ class RootClass {
   // CHECK:         [[INIT:%.*]] = class_method [[SELF_TAKEN]] : $RootClass, #RootClass.init
   // CHECK:         [[NEW_SELF_OPT:%.*]] = apply [[INIT]]({{.*}}, [[SELF_TAKEN]])
   // CHECK:         [[HAS_VALUE1:%.*]] = select_enum [[NEW_SELF_OPT]]
-  // CHECK:         dealloc_box $RootClass, [[SELF_BOX]]#0
   // CHECK:         cond_br [[HAS_VALUE1]], [[HAS_VALUE:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
 
   // CHECK:       [[HAS_VALUE]]:

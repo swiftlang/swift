@@ -2161,29 +2161,6 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
       assert(SGF.FailDest.isValid() && "too big to fail");
       
       if (SGF.FailSelfDecl) {
-      // If the delegation consumed self, then our box for 'self' is
-      // uninitialized, so we have to deallocate it without triggering a
-      // destructor using dealloc_box.
-      auto selfBox = SGF.VarLocs[SGF.FailSelfDecl].box;
-      assert(selfBox.isValid() && "self not boxed in constructor delegation?!");
-      switch (SGF.SelfInitDelegationState) {
-      case SILGenFunction::NormalSelf:
-        llvm_unreachable("self isn't normal in a constructor delegation");
-        
-      case SILGenFunction::WillConsumeSelf:
-        // We didn't consume, so release the box normally.
-        SGF.B.createStrongRelease(E, selfBox);
-        break;
-        
-      case SILGenFunction::DidConsumeSelf:
-        // We did consume. Deallocate the box. This is safe because any capture
-        // of 'self' prior to full initialization would be a DI violation, so
-        // we can count on the box having a retain count of exactly 1 here.
-        SGF.B.createDeallocBox(E, SGF.getLoweredType(SGF.FailSelfDecl->getType()),
-                               selfBox);
-      }
-      }
-      
       // On the failure case, we don't need to clean up the 'self' returned
       // by the call to the other constructor, since we know it is nil and
       // therefore dynamically trivial.
