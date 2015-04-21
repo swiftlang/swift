@@ -944,6 +944,10 @@ public:
     OS << "is_nonnull " << getIDAndType(I->getOperand());
   }
   
+  void visitNullClassInst(NullClassInst *I) {
+    OS << "null_class " << I->getType();
+  }
+
   void visitRetainValueInst(RetainValueInst *I) {
     OS << "retain_value " << getIDAndType(I->getOperand());
   }

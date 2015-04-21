@@ -3607,6 +3607,20 @@ Checks whether a reference type value is null, returning 1 if
 the value is not null, or 0 if it is null.  If the value is a function
 type, it checks the function pointer (not the data pointer) for null.
 
+null_class
+``````````
+::
+
+sil-instruction ::= 'null_class' sil-type
+
+%1 = null_class $T
+// %1 has type $T
+
+Creates a reference type value of null.  This is not a sensical thing for SIL
+to represent given that reference types are non-nullable, but makes sense at
+the machine level.  This is a horrible hack that should go away someday.
+
+
 ref_to_bridge_object
 ````````````````````
 ::

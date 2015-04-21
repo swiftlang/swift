@@ -524,6 +524,10 @@ public:
                       SILType::getBuiltinIntegerType(1, getASTContext())));
   }
 
+  NullClassInst *createNullClass(SILLocation loc, SILType resultType) {
+    return insert(new (F.getModule()) NullClassInst(loc, resultType));
+  }
+
   UnconditionalCheckedCastInst *createUnconditionalCheckedCast(SILLocation loc,
                                                                SILValue op,
                                                                SILType destTy) {

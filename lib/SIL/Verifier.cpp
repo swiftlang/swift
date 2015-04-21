@@ -2002,6 +2002,13 @@ public:
             "is_nonnull operand must be a class or function type");
   }
 
+  void checkNullClassInst(NullClassInst *I) {
+    // The result must be a class type.
+    auto Ty = I->getType().getSwiftType();
+    require(Ty->getClassOrBoundGenericClass(),
+            "nullclass result must be a class type");
+  }
+
   void checkAddressToPointerInst(AddressToPointerInst *AI) {
     require(AI->getOperand().getType().isAddress(),
             "address-to-pointer operand must be an address");

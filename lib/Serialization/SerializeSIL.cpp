@@ -995,11 +995,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), 0, 0, ListOfValues);
     break;
   }
-  case ValueKind::MetatypeInst: {
-    const MetatypeInst *MI = cast<MetatypeInst>(&SI);
-    writeOneTypeLayout(MI->getKind(), MI->getType());
+  case ValueKind::MetatypeInst:
+  case ValueKind::NullClassInst:
+    writeOneTypeLayout(SI.getKind(), SI.getType(0));
     break;
-  }
   case ValueKind::ObjCProtocolInst: {
     const ObjCProtocolInst *PI = cast<ObjCProtocolInst>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];

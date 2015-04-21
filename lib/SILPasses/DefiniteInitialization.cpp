@@ -44,7 +44,6 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 
   ++NumAssignRewritten;
 
-  auto &M = Inst->getModule();
   SILValue Src = Inst->getSrc();
 
   // If this is an initialization, or the storage type is trivial, we
@@ -54,7 +53,7 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
   // assignment with a store.  If it has non-trivial type and is an
   // initialization, we can also replace it with a store.
   if (isInitialization == IsInitialization ||
-      Inst->getDest().getType().isTrivial(M)) {
+      Inst->getDest().getType().isTrivial(Inst->getModule())) {
     B.createStore(Inst->getLoc(), Src, Inst->getDest());
   } else {
     // Otherwise, we need to replace the assignment with the full

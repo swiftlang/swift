@@ -1221,6 +1221,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
     .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
+    .Case("null_class", ValueKind::NullClassInst)
     .Case("objc_existential_metatype_to_object",
           ValueKind::ObjCExistentialMetatypeToObjectInst)
     .Case("objc_metatype_to_object", ValueKind::ObjCMetatypeToObjectInst)
@@ -2258,7 +2259,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   case ValueKind::AllocStackInst:
   case ValueKind::AllocRefInst:
-  case ValueKind::MetatypeInst: {
+  case ValueKind::MetatypeInst:
+  case ValueKind::NullClassInst: {
     bool IsObjC = false;
     if (Opcode == ValueKind::AllocRefInst &&
         parseSILOptional(IsObjC, *this, "objc"))
@@ -2270,11 +2272,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     
     if (Opcode == ValueKind::AllocStackInst)
       ResultVal = B.createAllocStack(InstLoc, Ty);
-    else if (Opcode == ValueKind::AllocRefInst) {
+    else if (Opcode == ValueKind::AllocRefInst)
       ResultVal = B.createAllocRef(InstLoc, Ty, IsObjC);
-    } else {
-      assert(Opcode == ValueKind::MetatypeInst);
+    else if (Opcode == ValueKind::MetatypeInst)
       ResultVal = B.createMetatype(InstLoc, Ty);
+    else {
+      assert(Opcode == ValueKind::NullClassInst);
+      ResultVal = B.createNullClass(InstLoc, Ty);
     }
     break;
   }

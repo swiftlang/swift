@@ -629,7 +629,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     }
     
     // The apply instruction does not capture the pointer when it is passed
-    // through [inout] arguments or for indirect returns.  InOut arguments are
+    // through 'inout' arguments or for indirect returns.  InOut arguments are
     // treated as uses and may-store's, but an indirect return is treated as a
     // full store.
     //

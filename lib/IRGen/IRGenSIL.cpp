@@ -686,6 +686,7 @@ public:
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *i);
 
   void visitIsNonnullInst(IsNonnullInst *i);
+  void visitNullClassInst(NullClassInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitIndexRawPointerInst(IndexRawPointerInst *i);
@@ -3732,6 +3733,17 @@ void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
   out.add(result);
   setLoweredExplosion(SILValue(i, 0), out);
 }
+
+void IRGenSILFunction::visitNullClassInst(swift::NullClassInst *i) {
+  auto resultTy = getTypeInfo(i->getType()).getStorageType();
+  auto *result =
+    llvm::ConstantPointerNull::get(cast<llvm::PointerType>(resultTy));
+  
+  Explosion out;
+  out.add(result);
+  setLoweredExplosion(SILValue(i, 0), out);
+}
+
 
 void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {
   auto toTy = getTypeInfo(i->getType()).getStorageType();
