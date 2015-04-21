@@ -72,20 +72,17 @@ NSOperatingSystemVersion operatingSystemVersionFromPlist() {
 /// Return the version of the operating system currently running for use in
 /// API availability queries.
 extern "C" NSOperatingSystemVersion _swift_stdlib_operatingSystemVersion() {
-  static NSOperatingSystemVersion version;
-  static dispatch_once_t onceToken;
-
-  dispatch_once(&onceToken, ^{
+  static NSOperatingSystemVersion version = ([]{
     // Use -[NSProcessInfo.operatingSystemVersion] when present
     // (on iOS 8 and OS X 10.10 and above).
     if ([NSProcessInfo
          instancesRespondToSelector:@selector(operatingSystemVersion)]) {
-      version = [[NSProcessInfo processInfo] operatingSystemVersion];
+      return [[NSProcessInfo processInfo] operatingSystemVersion];
     } else {
       // Otherwise load and parse from SystemVersion dictionary.
-      version = operatingSystemVersionFromPlist();
+      return operatingSystemVersionFromPlist();
     }
-  });
+  })();
 
   return version;
 }
