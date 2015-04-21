@@ -2490,13 +2490,31 @@ _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
 
 static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
   auto kind = T->getKind();
+  // Classes.
+  if (Metadata::isAnyKindOfClass(kind))
+    return true;
 #if SWIFT_OBJC_INTEROP
-  return Metadata::isAnyKindOfClass(kind) ||
-         (kind == MetadataKind::Existential &&
-          static_cast<const ExistentialTypeMetadata *>(T)->isObjC());
-#else
-  return Metadata::isAnyKindOfClass(kind);
+  // ObjC existentials.
+  if (kind == MetadataKind::Existential &&
+      static_cast<const ExistentialTypeMetadata *>(T)->isObjC())
+    return true;
+  
+  // Class metadata records are also objects with ObjC interop.
+  if (kind == MetadataKind::Metatype) {
+    auto metaT = static_cast<const MetatypeMetadata *>(T);
+    return metaT->InstanceType->isAnyClass();
+  }
+  
+  if (kind == MetadataKind::ExistentialMetatype) {
+    auto xmT = static_cast<const ExistentialMetatypeMetadata *>(T);
+    if (xmT->InstanceType->getKind() == MetadataKind::Existential)
+      return static_cast<const ExistentialTypeMetadata *>(xmT->InstanceType)
+        ->isObjC();
+    return false;
+  }
 #endif
+
+  return false;
 }
 
 #if SWIFT_OBJC_INTEROP
