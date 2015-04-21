@@ -147,11 +147,8 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   return { returnValue, *returnLoc };
 }
 
-void SILGenFunction::emitEpilog(SILLocation TopLevel) {
-  // Some callers will want to provide a custom epilog.  They do this by filling
-  // it into the EpilogBB.  When they do that, just disable the default one.
-  bool callerProvidedEpilog = !ReturnDest.getBlock()->empty();
-
+SILLocation SILGenFunction::
+emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(TopLevel);
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(TopLevel);
@@ -160,7 +157,7 @@ void SILGenFunction::emitEpilog(SILLocation TopLevel) {
   
   if (!maybeReturnValue) {
     // Nothing to do.
-  } else if (callerProvidedEpilog) {
+  } else if (UsesCustomEpilog) {
     // If the epilog is reachable, and the caller provided an epilog, just
     // remember the block so the caller can continue it.
     ResultBB = B.getInsertionBB();
@@ -185,6 +182,8 @@ void SILGenFunction::emitEpilog(SILLocation TopLevel) {
   
   if (ResultBB)
     B.setInsertionPoint(ResultBB);
+  
+  return returnLoc;
 }
 
 void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {

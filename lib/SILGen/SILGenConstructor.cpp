@@ -318,13 +318,12 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   }
   
   // Finally, emit the epilog and post-matter.
-  emitEpilog(ctor);
+  auto returnLoc = emitEpilog(ctor, /*UsesCustomEpilog*/true);
 
   // Finish off the epilog by returning.  If this is a failable ctor, then we
   // actually jump to the failure epilog to keep the invariant that there is
   // only one SIL return instruction per SIL function.
   if (B.hasValidInsertionPoint()) {
-    SILLocation returnLoc = B.getInsertionBB()->getInstList().back().getLoc();
     if (!failureExitBB) {
       if (!selfValue)
         selfValue = emitEmptyTuple(ctor);

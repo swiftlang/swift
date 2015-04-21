@@ -700,15 +700,18 @@ public:
   
   /// \brief Emits a standard epilog which runs top-level cleanups then returns
   /// the function return value, if any.  This can be customized by clients, who
-  /// inject their own code into the epilog block before calling this.  If they
-  /// do this, their code is run before the top-level cleanups, and the epilog
-  /// block to continue is returned as the insertion point of this function.
-  /// They must provide the final exit sequence for the block as well.
+  /// set UsesCustomEpilog to true, and optionally inject their own code into
+  /// the epilog block before calling this.  If they do this, their code is run
+  /// before the top-level cleanups, and the epilog block to continue is
+  /// returned as the insertion point of this function.  They must provide the
+  /// final exit sequence for the block as well.
   ///
   /// \param TopLevelLoc The location of the top-level expression during whose
   ///        evaluation the epilog is being produced, for example, the
   ///        AbstractClosureExpr.
-  void emitEpilog(SILLocation TopLevelLoc);
+  /// \param UsesCustomEpilog True if the client wants to manage its own epilog
+  ///        logic.
+  SILLocation emitEpilog(SILLocation TopLevelLoc,bool UsesCustomEpilog = false);
 
   /// \brief Emits the standard rethrow epilog using a Swift error result.
   void emitRethrowEpilog(SILLocation topLevelLoc);
