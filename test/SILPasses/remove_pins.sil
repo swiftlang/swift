@@ -18,9 +18,9 @@ struct ArrayInt{
   var buffer : ArrayIntBuffer
 }
 
-sil [semantics "array.make_mutable"] @make_mutable : $@convention(method) (@inout ArrayInt) -> Bool
+sil [_semantics "array.make_mutable"] @make_mutable : $@convention(method) (@inout ArrayInt) -> Bool
 
-sil [semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed ArrayInt) -> ()
+sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed ArrayInt) -> ()
 
 sil @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@convention(c) (UnsafePointer<HeapObject>) -> Bool
 

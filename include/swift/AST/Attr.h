@@ -609,7 +609,7 @@ public:
   }
 };
 
-/// Defines the @semantics attribute.
+/// Defines the @_semantics attribute.
 class SemanticsAttr : public DeclAttribute {
 public:
   SemanticsAttr(StringRef Value, SourceLoc AtLoc, SourceRange Range,

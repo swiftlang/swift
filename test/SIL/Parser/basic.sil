@@ -1181,8 +1181,8 @@ entry(%x : $Class1, %w : $Builtin.Word):
   return undef : $()
 }
 
-// CHECK-LABEL: sil [semantics "foo"] @test_semantics : $@convention(thin) () -> () {
-sil [semantics "foo"] @test_semantics : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
+sil [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $() 

@@ -206,7 +206,7 @@ namespace {
     IntConst getIntConst(SILValue val, int depth = 0);
   };
 
-  // Controls the decision to inline functions with @semantics, @effect and
+  // Controls the decision to inline functions with @_semantics, @effect and
   // global_init attributes.
   enum class InlineSelection {
     Everything,
@@ -217,7 +217,7 @@ namespace {
   class SILPerformanceInliner {
     /// The inline threashold.
     const int InlineCostThreshold;
-    /// Specifies which functions not to inline, based on @semantics and
+    /// Specifies which functions not to inline, based on @_semantics and
     /// global_init attributes.
     InlineSelection WhatToInline;
 
@@ -512,7 +512,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(ApplyInst *AI) {
     return nullptr;
   }
 
-  // Don't inline functions that are marked with the @semantics or @effects
+  // Don't inline functions that are marked with the @_semantics or @effects
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasDefinedSemantics() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
@@ -1076,7 +1076,7 @@ void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<ApplyInst *> &
 
 namespace {
 class SILPerformanceInlinerPass : public SILModuleTransform {
-  /// Specifies which functions not to inline, based on @semantics and
+  /// Specifies which functions not to inline, based on @_semantics and
   /// global_init attributes.
   InlineSelection WhatToInline;
   std::string PassName;
@@ -1167,7 +1167,7 @@ public:
 } // end anonymous namespace
 
 /// Create an inliner pass that does not inline functions that are marked with
-/// the @semantics, @effects or global_init attributes.
+/// the @_semantics, @effects or global_init attributes.
 SILTransform *swift::createEarlyInliner() {
   return new SILPerformanceInlinerPass(
     InlineSelection::NoSemanticsAndGlobalInit, "Early");
@@ -1180,7 +1180,7 @@ SILTransform *swift::createPerfInliner() {
 }
 
 /// Create an inliner pass that inlines all functions that are marked with
-/// the @semantics, @effects or global_init attributes.
+/// the @_semantics, @effects or global_init attributes.
 SILTransform *swift::createLateInliner() {
   return new SILPerformanceInlinerPass(InlineSelection::Everything, "Late");
 }

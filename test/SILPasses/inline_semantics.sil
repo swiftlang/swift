@@ -5,7 +5,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil [semantics "no_inline_plz"] @callee_func : $@convention(thin) () -> Int32 {
+sil [_semantics "no_inline_plz"] @callee_func : $@convention(thin) () -> Int32 {
 bb0:
   %0 = integer_literal $Builtin.Int32, 3           // user: %1
   %1 = struct $Int32 (%0 : $Builtin.Int32)         // user: %2

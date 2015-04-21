@@ -1503,7 +1503,7 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
     OS << "[readwrite] ";
 
   if (!getSemanticsAttr().empty())
-    OS << "[semantics \"" << getSemanticsAttr() << "\"] ";
+    OS << "[_semantics \"" << getSemanticsAttr() << "\"] ";
 
   printName(OS);
   OS << " : $";

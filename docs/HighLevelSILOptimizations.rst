@@ -53,13 +53,13 @@ operations on data types in the Swift standard library.
 Annotation of code in the standard library
 ------------------------------------------
 
-We use the ``@semantics`` attribute to annotate code in the standard library.
+We use the ``@_semantics`` attribute to annotate code in the standard library.
 These annotations can be used by the high-level SIL optimizer to perform
 domain-specific optimizations.
 
-This is an example of the ``@semantics`` attribute::
+This is an example of the ``@_semantics`` attribute::
 
-  @public @semantics("array.count")
+  @public @_semantics("array.count")
   func getCount() -> Int {
     return _buffer.count
    }
@@ -69,7 +69,7 @@ In this example we annotate a member of the Swift array struct with the tag
 size of the array.
 
 
-The ``@semantics`` attribute allows us to define "builtin" SIL-level
+The ``@_semantics`` attribute allows us to define "builtin" SIL-level
 operations implemented in Swift code. In SIL code they are encoded as
 apply instructions, but the optimizer can operate on them as atomic
 instructions. The semantic annotations don't necessarily need to be on
@@ -85,11 +85,11 @@ getElement instruction::
       return getElement(index)
      }
 
-  @semantics("array.check_subscript") func checkSubscript(index: Int) {
+  @_semantics("array.check_subscript") func checkSubscript(index: Int) {
     ...
   }
 	
-  @semantics("array.get_element") func getElement(index: Int) -> Element {
+  @_semantics("array.get_element") func getElement(index: Int) -> Element {
     return _buffer[index]
   }
 
@@ -97,7 +97,7 @@ getElement instruction::
 Swift optimizations
 -------------------
 The swift optimizer can access the information that is provided by the
-``@semantics`` attribute to perform high-level optimizations. In the early
+``@_semantics`` attribute to perform high-level optimizations. In the early
 stages of the optimization pipeline the optimizer does not inline functions
 with special semantics in order to allow the early high-level optimization
 passes to operate on them. In the later stages of the optimization pipeline
@@ -119,7 +119,7 @@ The Swift compiler can copy code from the standard library into the
 application. This allows the optimizer to inline calls from stdlib and improve
 the performance of code that uses common operators such as '++' or basic
 containers such as Array. However, importing code from the standard library can
-increase the binary size. Marking functions with @semantics("stdlib_binary_only")
+increase the binary size. Marking functions with @_semantics("stdlib_binary_only")
 will prevent the copying of the marked function from the standard library into the
 user program.
 
@@ -342,7 +342,7 @@ sil.never
    The sil optimizer should not optimize this funciton.
 
   Example:
-  @semantics("optimize.sil.never")
+  @_semantics("optimize.sil.never")
   func miscompile() { ... }
 
 

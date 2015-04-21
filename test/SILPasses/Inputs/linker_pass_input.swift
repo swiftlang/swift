@@ -6,7 +6,7 @@ public func doSomething() {
   unknown()
 }
 
-@semantics("stdlib_binary_only")
+@_semantics("stdlib_binary_only")
 public func doSomething2() {
   unknown()
 }

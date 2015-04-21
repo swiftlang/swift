@@ -45,7 +45,7 @@ bb0(%0 : $_ArrayBuffer<X>):
   return %10 : $Bool
 }
 
-sil [semantics "array.init"] @_array_X_init : $@convention(thin) () -> @owned Array<X>
+sil [_semantics "array.init"] @_array_X_init : $@convention(thin) () -> @owned Array<X>
 
-sil [semantics "array.props.isNativeNoTypeCheck"] @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
+sil [_semantics "array.props.isNativeNoTypeCheck"] @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
 

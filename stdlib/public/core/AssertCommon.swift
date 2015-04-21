@@ -141,7 +141,7 @@ func _assertionFailed(
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
 @noreturn @inline(never)
-@semantics("stdlib_binary_only")
+@_semantics("stdlib_binary_only")
 func _fatalErrorMessage(prefix: StaticString, message: StaticString,
                         file: StaticString, line: UWord) {
 #if INTERNAL_CHECKS_ENABLED

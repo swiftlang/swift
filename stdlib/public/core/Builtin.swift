@@ -236,23 +236,23 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
 // Branch hints
 //===----------------------------------------------------------------------===//
 
-// Use @semantics to indicate that the optimizer recognizes the
+// Use @_semantics to indicate that the optimizer recognizes the
 // semantics of these function calls. This won't be necessary with
 // mandatory generic inlining.
 
-@transparent @semantics("branchhint") internal
+@transparent @_semantics("branchhint") internal
 func _branchHint<C: BooleanType>(actual: C, expected: Bool) -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.boolValue.value, expected.value))
 }
 
 /// Optimizer hint that `x` is expected to be `true`
-@transparent @semantics("fastpath") public
+@transparent @_semantics("fastpath") public
 func _fastPath<C: BooleanType>(x: C) -> Bool {
   return _branchHint(x.boolValue, true)
 }
 
 /// Optimizer hint that `x` is expected to be `false`
-@transparent @semantics("slowpath") public
+@transparent @_semantics("slowpath") public
 func _slowPath<C: BooleanType>(x: C) -> Bool {
   return _branchHint(x.boolValue, false)
 }

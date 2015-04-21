@@ -3,6 +3,6 @@
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: %target-sil-opt %t/semantics.swiftmodule -o - | FileCheck %s
 
-//CHECK: @semantics("crazy") func foo()
-@semantics("crazy") func foo() -> Int  { return 5}
+//CHECK: @_semantics("crazy") func foo()
+@_semantics("crazy") func foo() -> Int  { return 5}
 

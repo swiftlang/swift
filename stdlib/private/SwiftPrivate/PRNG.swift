@@ -12,17 +12,17 @@
 
 import SwiftShims
 
-@inline(never) @semantics("stdlib_binary_only") // Hide the libbsd dependency
+@inline(never) @_semantics("stdlib_binary_only") // Hide the libbsd dependency
 public func rand32() -> UInt32 {
   return arc4random()
 }
 
-@inline(never) @semantics("stdlib_binary_only") // Hide the libbsd dependency
+@inline(never) @_semantics("stdlib_binary_only") // Hide the libbsd dependency
 public func rand32(#exclusiveUpperBound: UInt32) -> UInt32 {
   return arc4random_uniform(exclusiveUpperBound)
 }
 
-@inline(never) @semantics("stdlib_binary_only") // Hide the libbsd dependency
+@inline(never) @_semantics("stdlib_binary_only") // Hide the libbsd dependency
 public func rand64() -> UInt64 {
   return (UInt64(arc4random()) << 32) | UInt64(arc4random())
 }

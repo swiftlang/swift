@@ -844,7 +844,7 @@ bb0:
 }
 
 // Generic call to "branchHint" for use in specialized @slowPath
-sil public_external [transparent] [semantics "branchhint"] @_TFSs11_branchHintUSs11BooleanType__FTQ_Sb_Sb : $@convention(thin) <C where C : BooleanType> (@in C, Bool) -> Bool {
+sil public_external [transparent] [_semantics "branchhint"] @_TFSs11_branchHintUSs11BooleanType__FTQ_Sb_Sb : $@convention(thin) <C where C : BooleanType> (@in C, Bool) -> Bool {
 bb0(%0 : $*C, %1 : $Bool):
   %2 = witness_method $C, #BooleanType.boolValue!getter.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : BooleanType> (@inout τ_0_0) -> Bool // user: %4
   %3 = apply %2<C>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : BooleanType> (@inout τ_0_0) -> Bool
@@ -852,7 +852,7 @@ bb0(%0 : $*C, %1 : $Bool):
 }
 
 // Specialized call to "slowPath" for use in @coldcall_caller
-sil shared [noinline] [transparent] [semantics "slowpath"] @_TTSgSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@convention(thin) (@in Bool) -> Bool {
+sil shared [noinline] [transparent] [_semantics "slowpath"] @_TTSgSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@convention(thin) (@in Bool) -> Bool {
 bb0(%0 : $*Bool):
   %3 = integer_literal $Builtin.Int1, 0
   %4 = struct $Bool (%3 : $Builtin.Int1)
@@ -897,7 +897,7 @@ bb0:
   return %t : $()
 }
 
-sil [transparent] [semantics "fastpath"] @fastPathHelper : $@convention(thin) <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0) -> Bool
+sil [transparent] [_semantics "fastpath"] @fastPathHelper : $@convention(thin) <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0) -> Bool
 
 // fastpath.closedTest0 () -> ()
 // From <rdar://problem/17611447> _fastPath kills optimizer

@@ -36,10 +36,10 @@ struct AnArray<T> : _ObjectiveCBridgeable {
   }
 }
 
-sil [semantics "convertFromObjectiveC"] @bridgeFromObjectiveC :
+sil [_semantics "convertFromObjectiveC"] @bridgeFromObjectiveC :
   $@convention(thin) <τ_0_0> (@owned AnNSArray) -> @owned AnArray<τ_0_0>
 
-sil [semantics "convertToObjectiveC"] @bridgeToObjectiveC:
+sil [_semantics "convertToObjectiveC"] @bridgeToObjectiveC:
   $@convention(method) <τ_0_0> (@owned AnArray<τ_0_0>) -> @owned AnNSArray
 
 // CHECK-LABEL: sil @bridge_from_to_owned
@@ -80,10 +80,10 @@ bb0(%0 : $AnArray<AnyObject>):
   return %4 : $AnArray<AnyObject>
 }
 
-sil [semantics "convertFromObjectiveC"] @bridgeFromObjectiveCGuaranteed :
+sil [_semantics "convertFromObjectiveC"] @bridgeFromObjectiveCGuaranteed :
   $@convention(thin) <τ_0_0> (@guaranteed AnNSArray) -> @owned AnArray<τ_0_0>
 
-sil [semantics "convertToObjectiveC"] @bridgeToObjectiveCGuaranteed:
+sil [_semantics "convertToObjectiveC"] @bridgeToObjectiveCGuaranteed:
   $@convention(method) <τ_0_0> (@guaranteed AnArray<τ_0_0>) -> @owned AnNSArray
 
 // CHECK-LABEL: sil @bridge_from_to_guaranteed

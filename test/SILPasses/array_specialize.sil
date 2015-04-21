@@ -46,7 +46,7 @@ bb4:
   return %4 : $MyBool
 }
 
-sil public_external [semantics "array.props.isNative"] @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool {
+sil public_external [_semantics "array.props.isNative"] @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool {
 bb0(%0: $MyArray<MyClass>):
   unreachable
 }

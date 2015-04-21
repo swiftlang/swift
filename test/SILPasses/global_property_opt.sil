@@ -495,13 +495,13 @@ bb0(%0 : $Holder, %1 : $*StructHolder, %2 : $Array<X>):
   return %t1 : $()
 }
 
-sil [semantics "array.init"] @_array_X_init : $@convention(thin) () -> @owned Array<X>
+sil [_semantics "array.init"] @_array_X_init : $@convention(thin) () -> @owned Array<X>
 
-sil [semantics "array.mutate_unknown"] @_array_X_mutate : $@convention(method) (@inout Array<X>) -> ()
+sil [_semantics "array.mutate_unknown"] @_array_X_mutate : $@convention(method) (@inout Array<X>) -> ()
 
-sil [semantics "array.props.isNativeNoTypeCheck"] @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
+sil [_semantics "array.props.isNativeNoTypeCheck"] @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
 
-sil [semantics "array.uninitialized"] @_allocate_uninitialized_X : $@convention(thin) (Builtin.Word) -> @owned (Array<X>, Builtin.RawPointer)
+sil [_semantics "array.uninitialized"] @_allocate_uninitialized_X : $@convention(thin) (Builtin.Word) -> @owned (Array<X>, Builtin.RawPointer)
 
 sil @_take_array_addr : $@convention(method) (@inout Array<X>) -> ()
 

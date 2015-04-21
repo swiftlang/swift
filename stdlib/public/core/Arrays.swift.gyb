@@ -287,7 +287,7 @@ public struct ${Self}<T>
 
   //===--- private --------------------------------------------------------===//
 
-  @semantics("array.props.isNative")
+  @_semantics("array.props.isNative")
   public // @testable
   func _getArrayPropertyIsNative() -> Bool {
    return _buffer.arrayPropertyIsNative
@@ -295,23 +295,23 @@ public struct ${Self}<T>
 
   /// Returns true if the array is native and does not need a deferred type
   /// check.
-  @semantics("array.props.isNativeNoTypeCheck")
+  @_semantics("array.props.isNativeNoTypeCheck")
   public // @testable
   func _getArrayPropertyIsNativeNoTypeCheck() -> Bool {
    return _buffer.arrayPropertyIsNativeNoTypeCheck
   }
 
-  @semantics("array.get_count")
+  @_semantics("array.get_count")
   func _getCount() -> Int {
     return _buffer.count
   }
-  @semantics("array.get_capacity")
+  @_semantics("array.get_capacity")
   func _getCapacity() -> Int {
     return _buffer.capacity
   }
 
   // Requires: the array has a native buffer
-  @semantics("array.owner")
+  @_semantics("array.owner")
   func _getOwner() -> Builtin.NativeObject {
     return Builtin.castToNativeObject(_buffer.nativeOwner)
   }
@@ -327,14 +327,14 @@ public struct ${Self}<T>
     buffer = _Buffer(newBuffer)
   }
 
-  @semantics("array.make_mutable")
+  @_semantics("array.make_mutable")
   mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
       _copyBuffer(&_buffer)
     }
   }
 
-  @semantics("array.make_mutable")
+  @_semantics("array.make_mutable")
   mutating func _makeMutableAndUniqueOrPinned() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
       _copyBuffer(&_buffer)
@@ -343,7 +343,7 @@ public struct ${Self}<T>
 
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
-  @semantics("array.check_subscript")
+  @_semantics("array.check_subscript")
   public // @testable
   func _checkSubscript(index: Int, hoistedIsNativeBuffer: Bool) {
     _precondition(_buffer._isValidSubscript(index,
@@ -354,7 +354,7 @@ public struct ${Self}<T>
 %if Self == 'Array':
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`
-  @semantics("array.check_subscript")
+  @_semantics("array.check_subscript")
   public // @testable
   func _checkSubscript(index: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) {
     // Using this specialized version of ArrayBuffer._isValidSubscript (for
@@ -367,13 +367,13 @@ public struct ${Self}<T>
 %end
 
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`
-  @semantics("array.check_index")
+  @_semantics("array.check_index")
   func _checkIndex(index: Int) {
     _precondition(index <= count, "${Self} index out of range")
     _precondition(index >= 0, "Negative ${Self} index is out of range")
   }
 
-  @semantics("array.get_element")
+  @_semantics("array.get_element")
   @inline(__always)
   public // @testable
   func _getElement(index: Int, hoistedIsNativeNoTypeCheckBuffer : Bool)
@@ -382,7 +382,7 @@ public struct ${Self}<T>
       hoistedIsNativeNoTypeCheckBuffer : hoistedIsNativeNoTypeCheckBuffer)
   }
 
-  @semantics("array.get_element_address")
+  @_semantics("array.get_element_address")
   func _getElementAddress(index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer._getBaseAddress() + index
   }
@@ -432,7 +432,7 @@ extension ${Self} : ArrayLiteralConvertible {
 }
 
 // Referenced by the compiler to allocate array literals.
-@semantics("array.uninitialized")
+@_semantics("array.uninitialized")
 public func _allocateUninitialized${Self}<T>(count: Builtin.Word)
     -> (${Self}<T>, Builtin.RawPointer) {
   let (array, ptr) = ${Self}<T>._allocateUninitialized(Int(count))
@@ -441,7 +441,7 @@ public func _allocateUninitialized${Self}<T>(count: Builtin.Word)
 
 extension ${Self} : _ArrayType {
   /// Construct an empty ${Self}
-  @semantics("array.init")
+  @_semantics("array.init")
   public init() {
     _buffer = _Buffer()
   }
@@ -455,7 +455,7 @@ extension ${Self} : _ArrayType {
 
   /// Construct a ${Self} of `count` elements, each initialized to
   /// `repeatedValue`.
-  @semantics("array.init")
+  @_semantics("array.init")
   public init(count: Int, repeatedValue: T) {
     var p: UnsafeMutablePointer<T>
     (self, p) = ${Self}._allocateUninitialized(count)
@@ -543,7 +543,7 @@ extension ${Self} : _ArrayType {
   /// mutable contiguous storage.
   ///
   /// Complexity: O(`count`)
-  @semantics("array.mutate_unknown")
+  @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
 
@@ -559,7 +559,7 @@ extension ${Self} : _ArrayType {
   /// Append newElement to the ${Self}
   ///
   /// Complexity: amortized ${O1}
-  @semantics("array.mutate_unknown")
+  @_semantics("array.mutate_unknown")
   public mutating func append(newElement: T) {
     // Checking for the isNative fast-path in the outermost if-statement helps
     // the optimizer to eliminate subsequent isNative checks, e.g. when
@@ -967,7 +967,7 @@ extension ${Self} {
   ///
   /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
   /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
-  @semantics("array.mutate_unknown")
+  @_semantics("array.mutate_unknown")
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == _Buffer.Element
   >(

@@ -68,13 +68,13 @@ bb0:
 }
 
 // Swift.+ infix (Swift.String, Swift.String) -> Swift.String
-sil [readonly] [semantics "string.concat"] @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String
+sil [readonly] [_semantics "string.concat"] @_TFSsoi1pFTSSSS_SS : $@convention(thin) (@owned String, @owned String) -> @owned String
 
 // Swift.String._convertFromBuiltinStringLiteral (Swift.String.Type)(Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
-sil [readonly] [semantics "string.makeUTF8"] @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [readonly] [_semantics "string.makeUTF8"] @_TFSS32_convertFromBuiltinStringLiteralfMSSFTBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 // Swift.String._convertFromBuiltinUTF16StringLiteral (Swift.String.Type)(Builtin.RawPointer, numberOfCodeUnits : Builtin.Word) -> Swift.String
-sil [readonly] [semantics "string.makeUTF16"] @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+sil [readonly] [_semantics "string.makeUTF16"] @_TFSS37_convertFromBuiltinUTF16StringLiteralfMSSFTBp17numberOfCodeUnitsBw_SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
 
 //CHECK-LABEL: sil @_TF12StringConcat51testStringConcat_UnicodeScalarLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "1"

@@ -550,8 +550,8 @@ struct AlwaysInlinedMember : AlwaysInline {
   func alwaysInlined() {}
 }
 
-// CHECK-LABEL: sil hidden [semantics "foo"] @_TF9functions9semanticsFT_T_ : $@convention(thin) () -> ()
-@semantics("foo")
+// CHECK-LABEL: sil hidden [_semantics "foo"] @_TF9functions9semanticsFT_T_ : $@convention(thin) () -> ()
+@_semantics("foo")
 func semantics() {}
 
 

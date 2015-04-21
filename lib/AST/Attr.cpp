@@ -221,7 +221,7 @@ void DeclAttribute::print(ASTPrinter &Printer,
     break;
 
   case DAK_Semantics:
-    Printer << "@semantics(\"" << cast<SemanticsAttr>(this)->Value << "\")";
+    Printer << "@_semantics(\"" << cast<SemanticsAttr>(this)->Value << "\")";
     break;
 
   case DAK_Alignment:
@@ -333,7 +333,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_Alignment:
     return "_alignment";
   case DAK_Semantics:
-    return "semantics";
+    return "_semantics";
   case DAK_Availability:
     return "availability";
   case DAK_AutoClosure:

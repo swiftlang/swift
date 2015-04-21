@@ -720,7 +720,7 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       *MRK = EffectsKind::ReadOnly;
     else if (MRK && P.Tok.getText() == "readwrite")
       *MRK = EffectsKind::ReadWrite;
-    else if (Semantics && P.Tok.getText() == "semantics") {
+    else if (Semantics && P.Tok.getText() == "_semantics") {
       P.consumeToken(tok::identifier);
       if (P.Tok.getKind() != tok::string_literal) {
         P.diagnose(P.Tok, diag::expected_in_attribute_list);

@@ -836,8 +836,8 @@ bb0:
 }
 sil [fragile] [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
 
-// CHECK-LABEL: [semantics "foo"] @test_semantics : $@convention(thin) () -> ()
-sil [fragile] [semantics "foo"] @test_semantics : $@convention(thin) () -> () {
+// CHECK-LABEL: [_semantics "foo"] @test_semantics : $@convention(thin) () -> ()
+sil [fragile] [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
 bb0:
   %2 = tuple ()
   %3 = return %2 : $()

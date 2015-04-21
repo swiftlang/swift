@@ -154,7 +154,7 @@ extension String : UnicodeScalarLiteralConvertible {
 
 extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   @effects(readonly)
-  @semantics("string.makeUTF8")
+  @_semantics("string.makeUTF8")
   public
   init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
@@ -177,7 +177,7 @@ extension String : ExtendedGraphemeClusterLiteralConvertible {
 
 extension String : _BuiltinUTF16StringLiteralConvertible {
   @effects(readonly)
-  @semantics("string.makeUTF16")
+  @_semantics("string.makeUTF16")
   public
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer, 
@@ -195,7 +195,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
 
 extension String : _BuiltinStringLiteralConvertible {
   @effects(readonly)
-  @semantics("string.makeUTF8")
+  @_semantics("string.makeUTF8")
   public
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
@@ -333,7 +333,7 @@ extension String {
 #endif
 
   /// Compares two strings with the Unicode Collation Algorithm
-  @inline(never) @semantics("stdlib_binary_only") // Hide the CF/ICU dependency
+  @inline(never) @_semantics("stdlib_binary_only") // Hide the CF/ICU dependency
   public  // @testable
   func _compareDeterministicUnicodeCollation(rhs: String) -> Int {
     // Note: this operation should be consistent with equality comparison of
@@ -463,7 +463,7 @@ extension String : Hashable {
 }
 
 @effects(readonly)
-@semantics("string.concat")
+@_semantics("string.concat")
 public func +(var lhs: String, rhs: String) -> String {
   if (lhs.isEmpty) {
     return rhs

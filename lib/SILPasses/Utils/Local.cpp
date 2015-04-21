@@ -498,10 +498,10 @@ APInt StringConcatenationOptimizer::getConcatenatedLength() {
 
   // Real and reported length should be the same.
   assert(SLILenLeft == LenLeft->getValue() &&
-         "Size of string literal in @semantics(string.make) is wrong");
+         "Size of string literal in @_semantics(string.make) is wrong");
 
   assert(SLILenRight == LenRight->getValue() &&
-         "Size of string literal in @semantics(string.make) is wrong");
+         "Size of string literal in @_semantics(string.make) is wrong");
 
 
   // Compute length of the concatenated literal.

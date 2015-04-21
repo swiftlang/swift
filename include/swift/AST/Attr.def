@@ -137,7 +137,7 @@ SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
 
 DECL_ATTR(inline, Inline, OnFunc | OnConstructor, 20)
 
-DECL_ATTR(semantics, Semantics,
+DECL_ATTR(_semantics, Semantics,
           OnFunc | OnConstructor | OnDestructor | OnSubscript |
           UserInaccessible, 21)
 

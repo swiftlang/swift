@@ -201,7 +201,7 @@ public func println<T, TargetStream : OutputStreamType>(
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 @inline(never)
-@semantics("stdlib_binary_only")
+@_semantics("stdlib_binary_only")
 public func print<T>(value: T) {
   var target = _Stdout()
   target._lock()
@@ -219,7 +219,7 @@ public func print<T>(value: T) {
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 @inline(never)
-@semantics("stdlib_binary_only")
+@_semantics("stdlib_binary_only")
 public func println<T>(value: T) {
   var target = _Stdout()
   target._lock()
@@ -230,7 +230,7 @@ public func println<T>(value: T) {
 
 /// Writes a single newline character into the standard output.
 @inline(never)
-@semantics("stdlib_binary_only")
+@_semantics("stdlib_binary_only")
 public func println() {
   var target = _Stdout()
   target._lock()

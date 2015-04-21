@@ -8,7 +8,7 @@ doSomething()
 
 // Make sure we are not linking doSomethign2 because it is marked with 'noimport'
 
-// CHECK: sil [semantics "stdlib_binary_only"] @_TFSs12doSomething2FT_T_ : $@convention(thin) () -> ()
+// CHECK: sil [_semantics "stdlib_binary_only"] @_TFSs12doSomething2FT_T_ : $@convention(thin) () -> ()
 // CHECK-NOT: return
 doSomething2()
 

@@ -27,9 +27,9 @@ class MyArrayContainer<T> {
   deinit
 }
 
-sil [semantics "array.make_mutable"] @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
-sil [semantics "array.get_count"] @guaranteed_array_get_count : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
-sil [semantics "array.get_capacity"] @guaranteed_array_get_capacity : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+sil [_semantics "array.make_mutable"] @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+sil [_semantics "array.get_count"] @guaranteed_array_get_count : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
+sil [_semantics "array.get_capacity"] @guaranteed_array_get_capacity : $@convention(method) (@guaranteed MyArray<MyStruct>) -> Int
 
 // An unknown user
 sil @unknown : $@convention(thin) () -> ()
