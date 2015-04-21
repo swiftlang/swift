@@ -32,7 +32,9 @@ class Observer : NSObject {
 
   override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [NSObject : AnyObject]?, context: UnsafeMutablePointer<Void>) {
     if context != &kvoContext {
-      return super.observeValueForKeyPath(keyPath, ofObject: object, change: change, context: context)
+      // FIXME: we shouldn't need to unwrap these here, but it doesn't work on
+      // older SDKs where these are non-optional types.
+      return super.observeValueForKeyPath(keyPath!, ofObject: object!, change: change!, context: context)
     }
 
     println(object!.valueForKeyPath(keyPath!))
