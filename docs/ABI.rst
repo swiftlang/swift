@@ -737,6 +737,7 @@ Globals
   global ::= 'TO' global                 // ObjC-as-swift thunk
   global ::= 'To' global                 // swift-as-ObjC thunk
   global ::= 'TD' global                 // dynamic dispatch thunk
+  global ::= 'Td' global                 // direct method reference thunk
   global ::= 'TR' reabstract-signature   // reabstraction thunk helper function
   global ::= 'Tr' reabstract-signature   // reabstraction thunk
 

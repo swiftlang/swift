@@ -489,6 +489,14 @@ public:
       if (level < StandaloneFunction.uncurryLevel)
         transparent = false;
       constant = StandaloneFunction.atUncurryLevel(level);
+
+      // If we're currying a direct reference to a class-dispatched method,
+      // make sure we emit the right set of thunks.
+      if (constant->isCurried && StandaloneFunction.hasDecl())
+        if (auto func = StandaloneFunction.getAbstractFunctionDecl())
+          if (gen.getMethodDispatch(func) == MethodDispatch::Class)
+            constant = constant->asDirectReference(true);
+      
       constantInfo = gen.getConstantInfo(*constant);
       SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
       mv = ManagedValue::forUnmanaged(ref);
@@ -1233,7 +1241,8 @@ public:
                                        getSubstFnType(), fn));
     } else {
       // Native Swift super calls are direct.
-      setCallee(Callee::forDirect(gen, constant, getSubstFnType(), fn));
+      setCallee(Callee::forDirect(gen, constant,
+                                  getSubstFnType(), fn));
     }
 
     // If there are any substitutions for the callee, apply them now.

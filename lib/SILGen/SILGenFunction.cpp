@@ -136,8 +136,8 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
                  "delayed application of builtin");
     return SILUndef::get(constantInfo.getSILType(), SGM.M);
   }
-
-  // If the constant is a curry thunk we haven't emitted yet, emit it.
+  
+  // If the constant is a thunk we haven't emitted yet, emit it.
   if (!SGM.hasFunction(constant)) {
     if (constant.isCurried) {
       // Non-functions can't be referenced uncurried.
@@ -160,11 +160,15 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       // Reference the next uncurrying level of the function.
       SILDeclRef next = SILDeclRef(fd, SILDeclRef::Kind::Func,
                                  SILDeclRef::ConstructAtBestResilienceExpansion,
-                                   constant.uncurryLevel + 1);
+                                 constant.uncurryLevel + 1);
       // If the function is fully uncurried and natively foreign, reference its
       // foreign entry point.
       if (!next.isCurried && fd->hasClangNode())
         next = next.asForeign();
+      
+      // Preserve whether the curry thunks lead to a direct reference to the
+      // method implementation.
+      next = next.asDirectReference(constant.isDirectReference);
 
       SGM.emitCurryThunk(constant, next, fd);
     }
@@ -644,6 +648,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
 static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        SILLocation loc,
                                        SILDeclRef next,
+                                       bool direct,
                                        ArrayRef<SILValue> curriedArgs,
                                        ArrayRef<Substitution> curriedSubs) {
   // For a foreign function, reference the native thunk.
@@ -652,7 +657,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
 
   // If the fully-uncurried reference is to a native dynamic class method, emit
   // the dynamic dispatch.
-  auto fullyAppliedMethod = !next.isCurried && !next.isForeign &&
+  auto fullyAppliedMethod = !next.isCurried && !next.isForeign && !direct &&
     next.kind == SILDeclRef::Kind::Func &&
     next.hasDecl();
 
@@ -725,7 +730,8 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
     subs = gp->getForwardingSubstitutions(getASTContext());
   }
 
-  SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs, subs);
+  SILValue toFn = getNextUncurryLevelRef(*this, fd, to, from.isDirectReference,
+                                         curriedArgs, subs);
   SILType resultTy
     = SGM.getConstantType(from).castTo<SILFunctionType>()
          ->getResult().getSILType();

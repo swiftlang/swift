@@ -382,6 +382,9 @@ public:
       topLevel->addChild(NodeFactory::create(Node::Kind::NonObjCAttribute));
     } else if (Mangled.nextIf("TD")) {
       topLevel->addChild(NodeFactory::create(Node::Kind::DynamicAttribute));
+    } else if (Mangled.nextIf("Td")) {
+      topLevel->addChild(NodeFactory::create(
+                                   Node::Kind::DirectMethodReferenceAttribute));
     } else if (Mangled.nextIf("TV")) {
       topLevel->addChild(NodeFactory::create(Node::Kind::VTableAttribute));
     }
@@ -2241,6 +2244,7 @@ private:
     case Node::Kind::DependentProtocolWitnessTableTemplate:
     case Node::Kind::Destructor:
     case Node::Kind::DidSet:
+    case Node::Kind::DirectMethodReferenceAttribute:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
     case Node::Kind::ExplicitClosure:
@@ -2766,6 +2770,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::ObjCAttribute:
     Printer << "@objc ";
+    return;
+  case Node::Kind::DirectMethodReferenceAttribute:
+    Printer << "super ";
     return;
   case Node::Kind::DynamicAttribute:
     Printer << "dynamic ";

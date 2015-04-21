@@ -37,7 +37,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
                        ResilienceExpansion expansion,
                        unsigned atUncurryLevel, bool isForeign)
   : loc(vd), kind(kind), Expansion(unsigned(expansion)),
-    isForeign(isForeign), defaultArgIndex(0)
+    isForeign(isForeign), isDirectReference(0), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
 
@@ -87,7 +87,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
                        ResilienceExpansion expansion,
                        unsigned atUncurryLevel, bool asForeign) 
- : defaultArgIndex(0)
+ : isDirectReference(0), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
   if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
@@ -312,12 +312,15 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
   //   mangled-name ::= '_T' global     // Native symbol
   //   mangled-name ::= '_TTo' global   // ObjC interop thunk
   //   mangled-name ::= '_TTO' global   // Foreign function thunk
+  //   mangled-name ::= '_TTd' global   // Direct
   StringRef introducer = "_T";
   if (!prefix.empty()) {
     introducer = prefix;
   } else if (c.isForeign) {
     assert(prefix.empty() && "can't have custom prefix on thunk");
     introducer = "_TTo";
+  } else if (c.isDirectReference) {
+    introducer = "_TTd";
   } else if (c.isForeignToNativeThunk()) {
     assert(prefix.empty() && "can't have custom prefix on thunk");
     introducer = "_TTO";

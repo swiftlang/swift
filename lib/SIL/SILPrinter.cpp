@@ -317,6 +317,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
 
   if (isForeign)
     OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "foreign";
+
+  if (isDirectReference)
+    OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "direct";
 }
 
 void SILDeclRef::dump() const {

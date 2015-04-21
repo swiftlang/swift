@@ -124,6 +124,9 @@ struct SILDeclRef {
   unsigned isCurried : 1;
   /// True if this references a foreign entry point for the referenced decl.
   unsigned isForeign : 1;
+  /// True if this is a direct reference to a class's method implementation
+  /// that isn't dynamically dispatched.
+  unsigned isDirectReference : 1;
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
   
@@ -138,7 +141,7 @@ struct SILDeclRef {
   
   /// Produces a null SILDeclRef.
   SILDeclRef() : loc(), kind(Kind::Func), uncurryLevel(0), Expansion(0),
-                 isCurried(0), isForeign(0),
+                 isCurried(0), isForeign(0), isDirectReference(0),
                  defaultArgIndex(0) {}
   
   /// Produces a SILDeclRef of the given kind for the given decl.
@@ -199,6 +202,10 @@ struct SILDeclRef {
   }
   FuncDecl *getFuncDecl() const { return dyn_cast<FuncDecl>(getDecl()); }
   
+  AbstractFunctionDecl *getAbstractFunctionDecl() const {
+    return dyn_cast<AbstractFunctionDecl>(getDecl());
+  }
+  
   SILLocation getAsRegularLocation() const;
 
   /// Produce a mangled form of this constant.
@@ -240,7 +247,7 @@ struct SILDeclRef {
   bool isNoinline() const;
   /// \brief True if the function has __always inline attribute.
   bool isAlwaysInline() const;
-
+  
   /// \return True if the function has a effects attribute.
   bool hasEffectsAttribute() const;
 
@@ -255,6 +262,7 @@ struct SILDeclRef {
       && kind == rhs.kind
       && uncurryLevel == rhs.uncurryLevel
       && isForeign == rhs.isForeign
+      && isDirectReference == rhs.isDirectReference
       && defaultArgIndex == rhs.defaultArgIndex;
   }
   bool operator!=(SILDeclRef rhs) const {
@@ -262,6 +270,7 @@ struct SILDeclRef {
       || kind != rhs.kind
       || uncurryLevel != rhs.uncurryLevel
       || isForeign != rhs.isForeign
+      || isDirectReference != rhs.isDirectReference
       || defaultArgIndex != rhs.defaultArgIndex;
   }
   
@@ -278,8 +287,9 @@ struct SILDeclRef {
     bool willBeCurried = isCurried || level < uncurryLevel;
     // Curry thunks are never foreign.
     bool willBeForeign = isForeign && !willBeCurried;
+    bool willBeDirect = isDirectReference;
     return SILDeclRef(loc.getOpaqueValue(), kind, level,
-                      willBeCurried, willBeForeign,
+                      willBeCurried, willBeDirect, willBeForeign,
                       defaultArgIndex);
   }
   
@@ -287,7 +297,15 @@ struct SILDeclRef {
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
     return SILDeclRef(loc.getOpaqueValue(), kind, uncurryLevel, isCurried,
-                      foreign, defaultArgIndex);
+                      isDirectReference, foreign, defaultArgIndex);
+  }
+  
+  SILDeclRef asDirectReference(bool direct = true) const {
+    SILDeclRef r = *this;
+    // The 'direct' distinction only makes sense for curry thunks.
+    if (r.isCurried)
+      r.isDirectReference = direct;
+    return r;
   }
 
   /// True if the decl ref references a thunk from a natively foreign
@@ -303,11 +321,13 @@ struct SILDeclRef {
                        Kind kind,
                        unsigned uncurryLevel,
                        bool isCurried,
+                       bool isDirectReference,
                        bool isForeign,
                        unsigned defaultArgIndex)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
       kind(kind), uncurryLevel(uncurryLevel),
-      isCurried(isCurried), isForeign(isForeign),
+      isCurried(isCurried),
+      isForeign(isForeign), isDirectReference(isDirectReference),
       defaultArgIndex(defaultArgIndex)
   {}
   
@@ -349,11 +369,11 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
 
   static SILDeclRef getEmptyKey() {
     return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, 0,
-                      false, false, 0);
+                      false, false, false, 0);
   }
   static SILDeclRef getTombstoneKey() {
     return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func, 0,
-                      false, false, 0);
+                      false, false, false, 0);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
@@ -362,7 +382,8 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
                     ? UnsignedInfo::getHashValue(Val.defaultArgIndex)
                     : UnsignedInfo::getHashValue(Val.uncurryLevel);
     unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
-    return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7);
+    unsigned h5 = UnsignedInfo::getHashValue(Val.isDirectReference);
+    return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11);
   }
   static bool isEqual(swift::SILDeclRef const &LHS,
                       swift::SILDeclRef const &RHS) {
