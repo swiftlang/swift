@@ -1869,11 +1869,6 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
           return nullptr;
       }
 
-      auto *InjectedEnumElement = IEAI->getElement();
-
-      auto *Dest = SEI->getCaseDestination(InjectedEnumElement);
-
-
       // Replace switch_enum_addr by a branch instruction.
       SILBuilderWithScope<1> B(SEI);
       SmallVector<std::pair<EnumElementDecl *, SILValue>, 8> CaseValues;
