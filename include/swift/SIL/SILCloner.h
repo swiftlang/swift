@@ -947,7 +947,7 @@ void
 SILCloner<ImplClass>::visitNullClassInst(NullClassInst *Inst) {
   doPostProcess(Inst,
                 getBuilder().createNullClass(getOpLocation(Inst->getLoc()),
-                                             Inst->getType()));
+                                             getOpType(Inst->getType())));
 }
 
 
