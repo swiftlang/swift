@@ -2160,7 +2160,6 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
       
       assert(SGF.FailDest.isValid() && "too big to fail");
       
-      if (SGF.FailSelfDecl) {
       // On the failure case, we don't need to clean up the 'self' returned
       // by the call to the other constructor, since we know it is nil and
       // therefore dynamically trivial.
