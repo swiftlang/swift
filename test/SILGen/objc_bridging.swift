@@ -11,18 +11,13 @@ func getDescription(o: NSObject) -> String {
 // CHECK: bb0({{%.*}} : $NSObject):
 // CHECK:  [[DESCRIPTION:%.*]] = class_method [volatile] {{%.*}} : {{.*}}, #NSObject.description!getter.1.foreign
 // CHECK:  [[OPT_BRIDGED:%.*]] = apply [[DESCRIPTION]]({{%.*}})
-// CHECK:  retain_autoreleased [[OPT_BRIDGED]]
-// CHECK:  store [[OPT_BRIDGED]] to [[OPT_BRIDGED_BUF:%.*]]#1
-// CHECK:  select_enum_addr [[OPT_BRIDGED_BUF]]#1
-// CHECK:  [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
-// CHECK:  [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
+// CHECK:  strong_retain_autoreleased [[OPT_BRIDGED]]
+// CHECK:  select_enum [[OPT_BRIDGED]]
+// CHECK:  [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
 // CHECK:  [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:  [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
 // CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
-// CHECK:  [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
-// CHECK:  store [[NATIVE]] to [[NATIVE_BUF]]
-// CHECK:  inject_enum_addr [[OPT_NATIVE_BUF]]{{.*}}Some
-// CHECK:  [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]#1
+// CHECK:  [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
 // CHECK:  [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
 // CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:  [[NATIVE:%.*]] = load [[NATIVE_BUF]]
@@ -40,17 +35,12 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   [[UPPERCASE_STRING:%.*]] = class_method [volatile] {{%.*}} : {{.*}}, #NSString.uppercaseString!1.foreign
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[UPPERCASE_STRING]]({{%.*}})
 // CHECK:   retain_autoreleased [[OPT_BRIDGED]]
-// CHECK:   store [[OPT_BRIDGED]] to [[OPT_BRIDGED_BUF:%.*]]#1
-// CHECK:   select_enum_addr [[OPT_BRIDGED_BUF]]#1
-// CHECK:   [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
-// CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
+// CHECK:   select_enum [[OPT_BRIDGED]]
+// CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
-// CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
-// CHECK:   store [[NATIVE]] to [[NATIVE_BUF]]
-// CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
-// CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]#1
+// CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
@@ -58,7 +48,7 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK: }
 
 // @interface Foo -(void) setFoo: (NSString*)s; @end
-func setFoo(var f: Foo, var s: String) {
+func setFoo(f: Foo, var s: String) {
   f.setFoo(s)
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging6setFoo
@@ -68,17 +58,13 @@ func setFoo(var f: Foo, var s: String) {
 // CHECK:   copy_addr {{%.*}} to [initialization] [[NATIVE_BUF]] : $*String
 // CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]
-// CHECK:   store [[OPT_NATIVE]] to [[OPT_NATIVE_BUF:%.*]]#1
-// CHECK:   select_enum_addr
-// CHECK:   [[NATIVE_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_NATIVE_BUF]]
-// CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
+// CHECK:   select_enum [[OPT_NATIVE]]
+// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
-// CHECK:   [[BRIDGED_BUF:%.*]] = init_enum_data_addr [[OPT_BRIDGED_BUF:%[0-9]+]]
-// CHECK:   store [[BRIDGED]] to [[BRIDGED_BUF]]
-// CHECK:   inject_enum_addr [[OPT_BRIDGED_BUF]]
-// CHECK:   [[OPT_BRIDGED:%.*]] = load [[OPT_BRIDGED_BUF]]#1
-// CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], [[F]])
+// CHECK:    = enum $ImplicitlyUnwrappedOptional<NSString>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[BRIDGED]]
+// CHECK:   bb3([[OPT_BRIDGED:%.*]] : $ImplicitlyUnwrappedOptional<NSString>):
+// CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], %0)
 // CHECK:   release_value [[OPT_BRIDGED]]
 // CHECK: }
 
@@ -160,17 +146,12 @@ func callBar() -> String {
 // CHECK:   [[BAR:%.*]] = function_ref @bar
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[BAR]]()
 // CHECK:   retain_autoreleased [[OPT_BRIDGED]]
-// CHECK:   store [[OPT_BRIDGED]] to [[OPT_BRIDGED_BUF:%.*]]#1
-// CHECK:   select_enum_addr [[OPT_BRIDGED_BUF]]#1
-// CHECK:   [[BRIDGED_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BRIDGED_BUF]]
-// CHECK:   [[BRIDGED:%.*]] = load [[BRIDGED_BUF]]
+// CHECK:   select_enum [[OPT_BRIDGED]]
+// CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
-// CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
-// CHECK:   store [[NATIVE]] to [[NATIVE_BUF]]
-// CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
-// CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]#1
+// CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
 // CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
@@ -188,16 +169,12 @@ func callSetBar(var s: String) {
 // CHECK:   copy_addr {{%.*}} to [initialization] [[NATIVE_BUF]] : $*String
 // CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
 // CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]
-// CHECK:   store [[OPT_NATIVE]] to [[OPT_NATIVE_BUF:%.*]]#1
-// CHECK:   select_enum_addr [[OPT_NATIVE_BUF]]#1
-// CHECK:   [[NATIVE_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_NATIVE_BUF]]
-// CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
+// CHECK:   select_enum [[OPT_NATIVE]]
+// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
-// CHECK:   [[BRIDGED_BUF:%.*]] = init_enum_data_addr [[OPT_BRIDGED_BUF:%[0-9]+]]
-// CHECK:   store [[BRIDGED]] to [[BRIDGED_BUF]]
-// CHECK:   inject_enum_addr [[OPT_BRIDGED_BUF]]
-// CHECK:   [[OPT_BRIDGED:%.*]] = load [[OPT_BRIDGED_BUF]]#1
+// CHECK:    = enum $ImplicitlyUnwrappedOptional<NSString>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[BRIDGED]]
+// CHECK: bb3([[OPT_BRIDGED:%.*]] : $ImplicitlyUnwrappedOptional<NSString>):
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   release_value [[OPT_BRIDGED]]
 // CHECK: }

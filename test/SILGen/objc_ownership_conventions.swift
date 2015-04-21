@@ -112,18 +112,12 @@ func test10(let g: Gizmo) -> AnyClass {
   // CHECK-NEXT: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.classProp!getter.1.foreign : NSObject -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
-  // CHECK:      store [[OPT_OBJC]] to [[OPT_OBJC_BUF:%.*]]#1
-  // CHECK:      select_enum_addr [[OPT_OBJC_BUF]]#1
-  // CHECK:      [[OBJC_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_OBJC_BUF]]
-  // CHECK-NEXT: [[OBJC:%.*]] = load [[OBJC_BUF]]
+  // CHECK:      select_enum [[OPT_OBJC]]
+  // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK-NEXT: [[THICK_BUF:%.*]] = init_enum_data_addr [[OPT_THICK_BUF:%[0-9]+]]
-  // CHECK-NEXT: store [[THICK]] to [[THICK_BUF:%.*]]
-  // CHECK-NEXT: inject_enum_addr [[OPT_THICK_BUF]]
-  // CHECK:      [[T0:%.*]] = load [[OPT_THICK_BUF]]#1
-  // CHECK-NEXT: store [[T0]] to [[OPT_THICK_BUF:%.*]]#1
+  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[THICK]]
   // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-  // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, [[OPT_THICK_BUF]]#1)
+  // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, {{.*}})
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]#1
   // CHECK:      strong_release [[G]] : $Gizmo
   // CHECK:      strong_release [[G]] : $Gizmo
@@ -138,18 +132,12 @@ func test11(let g: Gizmo) -> AnyClass {
   // CHECK: [[NS_G:%[0-9]+]] = upcast [[G:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : NSObject -> () -> AnyObject.Type! , $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G]]) : $@convention(objc_method) (NSObject) -> ImplicitlyUnwrappedOptional<@objc_metatype AnyObject.Type>
-  // CHECK:      store [[OPT_OBJC]] to [[OPT_OBJC_BUF:%.*]]#1
-  // CHECK:      select_enum_addr [[OPT_OBJC_BUF]]#1
-  // CHECK:      [[OBJC_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_OBJC_BUF]]
-  // CHECK-NEXT: [[OBJC:%.*]] = load [[OBJC_BUF]]
+  // CHECK:      select_enum [[OPT_OBJC]]
+  // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK-NEXT: [[THICK_BUF:%.*]] = init_enum_data_addr [[OPT_THICK_BUF:%[0-9]+]]
-  // CHECK-NEXT: store [[THICK]] to [[THICK_BUF]]
-  // CHECK-NEXT: inject_enum_addr [[OPT_THICK_BUF]]
-  // CHECK:      [[T0:%.*]] = load [[OPT_THICK_BUF]]#1
-  // CHECK-NEXT: store [[T0]] to [[OPT_THICK_BUF:%.*]]#1
+  // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[THICK]]
   // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
-  // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, [[OPT_THICK_BUF]]#1)
+  // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, {{.*}})
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]#1
   // CHECK:      strong_release [[G]] : $Gizmo
   // CHECK:      strong_release [[G]] : $Gizmo

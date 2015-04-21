@@ -1192,13 +1192,23 @@ public:
                                      SILValue dest,
                                      const TypeLowering &optTL);
 
+  /// Return a value for an optional ".None" of the specified type. This only
+  /// works for loadable enum types.
+  SILValue getOptionalNoneValue(SILLocation loc, const TypeLowering &optTL);
+
+  /// Return a value for an optional ".Some(x)" of the specified type. This only
+  /// works for loadable enum types.
+  ManagedValue getOptionalSomeValue(SILLocation loc, ManagedValue value,
+                                    const TypeLowering &optTL);
+
+  
   /// \brief Emit a call to the library intrinsic _preconditionOptionalHasValue.
   void emitPreconditionOptionalHasValue(SILLocation loc, SILValue addr);
   
   /// \brief Emit a call to the library intrinsic _doesOptionalHaveValue.
   ///
   /// The result is a Builtin.Int1.
-  SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addr);
+  SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addrOrValue);
   
   /// \brief Emit a call to the library intrinsic _getOptionalValue
   /// given the address of the optional, which checks that an optional contains
@@ -1211,7 +1221,7 @@ public:
   /// \brief Extract the value from an optional, which must be known to contain
   /// a value.
   ManagedValue emitUncheckedGetOptionalValueFrom(SILLocation loc,
-                                                 ManagedValue addr,
+                                                 ManagedValue addrOrValue,
                                                  const TypeLowering &optTL,
                                                  SGFContext C);
 

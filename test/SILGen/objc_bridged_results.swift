@@ -21,31 +21,23 @@ func testNullable(obj: Test) -> [AnyObject]? {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullableArray!getter.1.foreign : Test -> () -> [AnyObject]? , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
-  // CHECK: [[RESULT_BOX:%[0-9]+]] = alloc_stack $Optional<Array<AnyObject>>
-  // CHECK: [[COCOA_BOX:%[0-9]+]] = alloc_stack $Optional<NSArray>
-  // CHECK: store [[COCOA_VAL]] to [[COCOA_BOX]]#1 : $*Optional<NSArray>
-  // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum_addr [[COCOA_BOX]]#1 : $*Optional<NSArray>
+  
+  // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $Optional<NSArray>
   // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
 
   // CHECK: [[CASE_NON_NIL]]:
-  // CHECK: [[COCOA_BOX_NON_NIL:%[0-9]+]] = unchecked_take_enum_data_addr [[COCOA_BOX]]#1 : $*Optional<NSArray>, #Optional.Some!enumelt.1
-  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = load [[COCOA_BOX_NON_NIL]] : $*NSArray
+  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $Optional<NSArray>, #Optional.Some!enumelt.1
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArrayU__FGSqCSo7NSArray_GSaQ__ : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
   // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[COCOA_VAL_NON_NIL]]
   // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_SOME_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK: [[RESULT_SOME_BOX:%[0-9]+]] = init_enum_data_addr [[RESULT_BOX]]#1 : $*Optional<Array<AnyObject>>, #Optional.Some!enumelt.1
-  // CHECK: store [[RESULT_VAL]] to [[RESULT_SOME_BOX]] : $*Array<AnyObject>
-  // CHECK: inject_enum_addr [[RESULT_BOX]]#1 : $*Optional<Array<AnyObject>>, #Optional.Some!enumelt.1
-  // CHECK: br [[FINISH:[^, ]+]]
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.Some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
+  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<AnyObject>>)
   
   // CHECK: [[CASE_NIL]]:
-  // CHECK: inject_enum_addr [[RESULT_BOX]]#1 : $*Optional<Array<AnyObject>>, #Optional.None!enumelt
-  // CHECK: br [[FINISH]]
+  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.None!enumelt
+  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<AnyObject>>)
   
-  // CHECK: [[FINISH]]:
-  // CHECK: [[RESULT:%[0-9]+]] = load [[RESULT_BOX]]#1 : $*Optional<Array<AnyObject>>
-  // CHECK: dealloc_stack [[COCOA_BOX]]#0 : $*@local_storage Optional<NSArray>
-  // CHECK: dealloc_stack [[RESULT_BOX]]#0 : $*@local_storage Optional<Array<AnyObject>>
+  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $Optional<Array<AnyObject>>):
   // CHECK: strong_release %0 : $Test
   // CHECK: return [[RESULT]] : $Optional<Array<AnyObject>>
   return obj.nullableArray
@@ -56,31 +48,22 @@ func testNullUnspecified(obj: Test) -> [AnyObject]! {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : Test -> () -> [AnyObject]! , $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
-  // CHECK: [[RESULT_BOX:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<Array<AnyObject>>
-  // CHECK: [[COCOA_BOX:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<NSArray>
-  // CHECK: store [[COCOA_VAL]] to [[COCOA_BOX]]#1 : $*ImplicitlyUnwrappedOptional<NSArray>
-  // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum_addr [[COCOA_BOX]]#1 : $*ImplicitlyUnwrappedOptional<NSArray>
+  // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>
   // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
 
   // CHECK: [[CASE_NON_NIL]]:
-  // CHECK: [[COCOA_BOX_NON_NIL:%[0-9]+]] = unchecked_take_enum_data_addr [[COCOA_BOX]]#1 : $*ImplicitlyUnwrappedOptional<NSArray>, #ImplicitlyUnwrappedOptional.Some!enumelt.1
-  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = load [[COCOA_BOX_NON_NIL]] : $*NSArray
+  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>, #ImplicitlyUnwrappedOptional.Some!enumelt.1
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArrayU__FGSqCSo7NSArray_GSaQ__ : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
   // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[COCOA_VAL_NON_NIL]]
   // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_SOME_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK: [[RESULT_SOME_BOX:%[0-9]+]] = init_enum_data_addr [[RESULT_BOX]]#1 : $*ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.Some!enumelt.1
-  // CHECK: store [[RESULT_VAL]] to [[RESULT_SOME_BOX]] : $*Array<AnyObject>
-  // CHECK: inject_enum_addr [[RESULT_BOX]]#1 : $*ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.Some!enumelt.1
-  // CHECK: br [[FINISH:[^, ]+]]
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
+  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>)
   
   // CHECK: [[CASE_NIL]]:
-  // CHECK: inject_enum_addr [[RESULT_BOX]]#1 : $*ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.None!enumelt
-  // CHECK: br [[FINISH]]
-  
-  // CHECK: [[FINISH]]:
-  // CHECK: [[RESULT:%[0-9]+]] = load [[RESULT_BOX]]#1 : $*ImplicitlyUnwrappedOptional<Array<AnyObject>>
-  // CHECK: dealloc_stack [[COCOA_BOX]]#0 : $*@local_storage ImplicitlyUnwrappedOptional<NSArray>
-  // CHECK: dealloc_stack [[RESULT_BOX]]#0 : $*@local_storage ImplicitlyUnwrappedOptional<Array<AnyObject>>
+  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.None!enumelt
+  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>)
+
+  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>):
   // CHECK: strong_release %0 : $Test
   // CHECK: return [[RESULT]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>
   return obj.nullUnspecifiedArray

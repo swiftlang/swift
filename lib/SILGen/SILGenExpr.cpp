@@ -2577,23 +2577,23 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
   // Create a temporary for the output optional.
   auto &resultTL = getTypeLowering(resultTy);
-  auto resultTemp = emitTemporaryAllocation(loc, resultTy);
 
-  // Materialize the input.
-  SILValue inputTemp;
-  if (input.getType().isAddress()) {
-    inputTemp = input.forward(*this);
-  } else {
-    inputTemp = emitTemporaryAllocation(loc, input.getType());
-    input.forwardInto(*this, loc, inputTemp);
-  }
+  // If the result is address-only, we need to return something in memory,
+  // otherwise the result is the BBArgument in the merge point.
+  SILValue result;
+  if (resultTL.isAddressOnly())
+    result = emitTemporaryAllocation(loc, resultTy);
+  else
+    result = new (F.getModule()) SILArgument(contBB, resultTL.getLoweredType());
 
-  // Branch on whether the input is optional.
-  auto isPresent = emitDoesOptionalHaveValue(loc, inputTemp);
+  
+  // Branch on whether the input is optional, this doesn't consume the value.
+  auto isPresent = emitDoesOptionalHaveValue(loc, input.getValue());
   B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
 
   // If it's present, apply the recursive transformation to the value.
   B.emitBlock(isPresentBB);
+  SILValue branchArg;
   {
     // Don't allow cleanups to escape the conditional block.
     FullExpr presentScope(Cleanups, CleanupLocation::get(loc));
@@ -2605,35 +2605,44 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
     // Pull the value out.  This will load if the value is not address-only.
     auto &inputTL = getTypeLowering(input.getType());
-    auto inputValue = emitUncheckedGetOptionalValueFrom(loc,
-                                          ManagedValue::forUnmanaged(inputTemp),
-                                          inputTL, SGFContext());
+    auto inputValue = emitUncheckedGetOptionalValueFrom(loc, input,
+                                                        inputTL, SGFContext());
 
     // Transform it.
     auto resultValue = transformValue(*this, loc, inputValue,
                                       loweredResultValueTy);
 
-    // Inject that into the result type.
-    ArgumentSource resultValueRV(loc, RValue(resultValue, resultValueTy));
-    emitInjectOptionalValueInto(loc, std::move(resultValueRV),
-                                resultTemp, resultTL);
+    // Inject that into the result type if the result is address-only.
+    if (resultTL.isAddressOnly()) {
+      ArgumentSource resultValueRV(loc, RValue(resultValue, resultValueTy));
+      emitInjectOptionalValueInto(loc, std::move(resultValueRV),
+                                  result, resultTL);
+    } else {
+      resultValue = getOptionalSomeValue(loc, resultValue, resultTL);
+      branchArg = resultValue.forward(*this);
+    }
   }
-  B.createBranch(loc, contBB);
+  if (branchArg)
+    B.createBranch(loc, contBB, branchArg);
+  else
+    B.createBranch(loc, contBB);
 
   // If it's not present, inject 'nothing' into the result.
   B.emitBlock(isNotPresentBB);
-  {
-    emitInjectOptionalNothingInto(loc, resultTemp, resultTL);
+  if (resultTL.isAddressOnly()) {
+    emitInjectOptionalNothingInto(loc, result, resultTL);
+    B.createBranch(loc, contBB);
+  } else {
+    branchArg = getOptionalNoneValue(loc, resultTL);
+    B.createBranch(loc, contBB, branchArg);
   }
-  B.createBranch(loc, contBB);
 
   // Continue.
   B.emitBlock(contBB);
-  if (resultTL.isAddressOnly()) {
-    return emitManagedBufferWithCleanup(resultTemp, resultTL);
-  } else {
-    return emitLoad(loc, resultTemp, resultTL, SGFContext(), IsTake);
-  }
+  if (resultTL.isAddressOnly())
+    return emitManagedBufferWithCleanup(result, resultTL);
+
+  return emitManagedRValueWithCleanup(result, resultTL);
 }
 
 RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc,

@@ -2026,6 +2026,49 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
   
   B.createInjectEnumAddr(loc, dest, getASTContext().getOptionalNoneDecl(OTK));
 }
+      
+/// Return a value for an optional ".None" of the specified type. This only
+/// works for loadable enum types.
+SILValue SILGenFunction::getOptionalNoneValue(SILLocation loc,
+                                              const TypeLowering &optTL) {
+  assert(optTL.isLoadable() && "Address-only optionals cannot use this");
+  OptionalTypeKind OTK;
+  optTL.getLoweredType().getSwiftRValueType()->getAnyOptionalObjectType(OTK);
+  assert(OTK != OTK_None);
+
+  return B.createEnum(loc, SILValue(), getASTContext().getOptionalNoneDecl(OTK),
+                      optTL.getLoweredType());
+}
+
+/// Return a value for an optional ".Some(x)" of the specified type. This only
+/// works for loadable enum types.
+ManagedValue SILGenFunction::
+getOptionalSomeValue(SILLocation loc, ManagedValue value,
+                     const TypeLowering &optTL) {
+  assert(optTL.isLoadable() && "Address-only optionals cannot use this");
+  SILType optType = optTL.getLoweredType();
+  CanType formalOptType = optType.getSwiftRValueType();
+
+  OptionalTypeKind OTK;
+  auto formalObjectType = formalOptType->getAnyOptionalObjectType(OTK)
+    ->getCanonicalType();
+  assert(OTK != OTK_None);
+  auto someDecl = getASTContext().getOptionalSomeDecl(OTK);
+  
+  auto archetype = formalOptType->getNominalOrBoundGenericNominal()
+                        ->getGenericParams()->getPrimaryArchetypes()[0];
+  AbstractionPattern origType(archetype);
+
+  
+  // Reabstract input value to the type expected by the enum.
+  value = emitSubstToOrigValue(loc, value, origType, formalObjectType);
+
+  SILValue result =
+    B.createEnum(loc, value.forward(*this), someDecl,
+                 optTL.getLoweredType());
+  return emitManagedRValueWithCleanup(result, optTL);
+}
+     
 
 void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                                       SILValue addr) {

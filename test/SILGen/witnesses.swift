@@ -362,9 +362,8 @@ struct FailableModel: FailableRequirement, IUOFailableRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses13FailableModelS_22IUOFailableRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   // CHECK: bb0([[SELF:%[0-9]+]] : $*ImplicitlyUnwrappedOptional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
   // CHECK: select_enum_addr [[RESULT_ADDR:%[0-9]+]]#1
-  // CHECK: [[RESULT:%[0-9]+]] = init_enum_data_addr [[IUO_TEMP:%[0-9]+]]#1
   // CHECK: cond_br
-  // CHECK: inject_enum_addr [[IUO_TEMP]]
+  // CHECK: enum $ImplicitlyUnwrappedOptional<FailableModel>, #ImplicitlyUnwrappedOptional.None!enumelt
   init?(foo: Int) {}
 }
 
@@ -413,8 +412,8 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSQS2__
   // CHECK: select_enum_addr
   // CHECK: unchecked_take_enum_data_addr
-  // CHECK: inject_enum_addr {{.*}}Some
-  // CHECK: inject_enum_addr {{.*}}None
+  // CHECK: enum $ImplicitlyUnwrappedOptional{{.*}}Some
+  // CHECK: enum $ImplicitlyUnwrappedOptional{{.*}}None
   // CHECK: return [[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<FailableClassModel>
   init?(foo: Int) {}
 }
@@ -423,9 +422,9 @@ final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassR
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementS_FS1_CUS1___fMQPS1_FT3fooSi_GSqS2__
   // CHECK: select_enum_addr
   // CHECK: unchecked_take_enum_data_addr
-  // CHECK: inject_enum_addr {{.*}}Some
-  // CHECK: inject_enum_addr {{.*}}None
-  // CHECK: return [[RESULT:%[0-9]+]] : $Optional<IUOFailableClassModel>
+  // CHECK: enum $Optional{{.*}}Some
+  // CHECK: enum $Optional{{.*}}None
+  // CHECK: return {{.*}} : $Optional<IUOFailableClassModel>
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_26NonFailableClassRefinementS_FS1_CUS1___fMQPS1_FT3fooSi_S2_
   // CHECK: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_

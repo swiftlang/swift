@@ -46,10 +46,7 @@ import Foundation
   // Blocks and C function pointers must not be reabstracted when placed in optionals.
   // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo7optFunc
   // CHECK:         [[COPY:%.*]] = copy_block %0
-  // CHECK:         store [[COPY]]
-  // CHECK-NOT:     store %0
-  // CHECK:         [[BLOCK_ADDR:%.*]] = unchecked_take_enum_data_addr
-  // CHECK:         [[BLOCK:%.*]] = load [[BLOCK_ADDR]]
+  // CHECK:         [[BLOCK:%.*]] = unchecked_enum_data [[COPY]]
   // TODO: redundant reabstractions here
   // CHECK:         [[BLOCK_THUNK:%.*]] = function_ref @_TTRXFdCb_dCSo8NSString_aS__XFo_oSS_oSS_
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[BLOCK_THUNK]]([[BLOCK]])
@@ -98,9 +95,7 @@ func callBlocks(x: Foo,
   // CHECK: apply [[BAS]]([[H_BLOCK]]
 
   // CHECK: [[G_BLOCK:%.*]] = copy_block {{%.*}} : $@convention(block) (NSString) -> @autoreleased NSString
-  // CHECK: [[SLOT:%.*]] = init_enum_data_addr [[OPTIONAL:%[0-9]+]]
-  // CHECK: store [[G_BLOCK]] to [[SLOT]]
-  // CHECK: inject_enum_addr [[OPTIONAL]]
+  // CHECK: enum $Optional<@convention(block) String -> String>, #Optional.Some!enumelt.1, [[G_BLOCK]]
 
   return (x.foo(f, x: 0), x.bar(g, x: "one"), x.bas(h, x: "two"), x.optFunc(g, x: "three"))
 }

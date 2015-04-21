@@ -147,12 +147,11 @@ func testOptionalResult(v : OptionalResultInheritor) {
 }
 // CHECK-LABEL: sil hidden @_TF12dynamic_self18testOptionalResult{{.*}} : $@convention(thin) (@owned OptionalResultInheritor) -> ()
 // CHECK:      [[T0:%.*]] = class_method [[V:%.*]] : $OptionalResult, #OptionalResult.foo!1 : Self -> () -> Self? , $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
-// CHECK-NEXT: apply [[T0]]([[V]])
-// CHECK:      select_enum_addr
-// CHECK:      [[T1:%.*]] = unchecked_take_enum_data_addr 
-// CHECK:      [[T2:%.*]] = load [[T1]]
-// CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T2]] : $OptionalResult to $OptionalResultInheritor
-// CHECK-NEXT: init_enum_data_addr
+// CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[V]])
+// CHECK:      select_enum [[RES]]
+// CHECK:      [[T1:%.*]] = unchecked_enum_data [[RES]]
+// CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T1]] : $OptionalResult to $OptionalResultInheritor
+// CHECK-NEXT: enum $Optional<OptionalResultInheritor>, #Optional.Some!enumelt.1, [[T4]]
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
 // CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1fUS1___fQPS1_FT_S2_
