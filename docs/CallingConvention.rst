@@ -308,7 +308,7 @@ considering here:
 
 * The caller may assert responsibility for the value.  In SIL, we call
   this a **guaranteed** parameter.  The callee can rely on the value
-  sytaying valid for the duration of the call.
+  staying valid for the duration of the call.
 
   This is optimal if the caller needs to use the value after the call
   and either has responsibility for it or has a guarantee like this
