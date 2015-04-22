@@ -233,6 +233,7 @@ public struct Mirror {
       
     self.children = Children(children)
     self.displayStyle = displayStyle
+    self._defaultDescendantRepresentation = defaultDescendantRepresentation
   }
 
   /// Represent `subject` with child values given by
@@ -287,6 +288,7 @@ public struct Mirror {
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
     )
     self.displayStyle = displayStyle
+    self._defaultDescendantRepresentation = defaultDescendantRepresentation
   }
 
   /// Represent `subject` with labeled structure described by
@@ -332,6 +334,7 @@ public struct Mirror {
       lazy(children).map { Child(label: $0.0, value: $0.1) }
     )
     self.displayStyle = displayStyle
+    self._defaultDescendantRepresentation = defaultDescendantRepresentation
   }
   
   /// A collection of `Child` elements describing the structure of the
@@ -347,6 +350,7 @@ public struct Mirror {
 
   internal let _makeSuperclassMirror: ()->Mirror?
   internal let _subjectType: Any.Type
+  internal let _defaultDescendantRepresentation: DefaultDescendantRepresentation
 }
 
 /// A type that explicitly supplies its own Mirror.
@@ -531,6 +535,7 @@ extension Mirror {
     }
     self.children = Children(LegacyChildren(oldMirror))
     self.displayStyle = DisplayStyle(legacy: oldMirror.disposition)
+    self._defaultDescendantRepresentation = .Generated
   }
 }
 
