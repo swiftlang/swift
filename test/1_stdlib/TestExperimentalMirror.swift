@@ -428,6 +428,61 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
   }
 }
 
+mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
+  class A : CustomReflectable {
+    var a: Int = 1
+    func customMirror() -> Mirror {
+      return Mirror(
+        self, children: [ "aye": a ],
+        defaultDescendantRepresentation: .Suppressed)
+    }
+  }
+
+  class X : A {}
+
+  class Y : X {}
+
+  // B inherits A indirectly through X and Y
+  class B : Y {
+    var b: UInt = 42
+    override func customMirror() -> Mirror {
+      return Mirror(
+        self, children: [ "bee": b ],
+        ancestorRepresentation: .Customized(
+          // FIXME: should be "super.customMirror", but for <rdar://20598526>.
+          {super.customMirror()} 
+        ))
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  if let a? = expectNotEmpty(b.superclassMirror()) {
+    if let aye? = expectNotEmpty(first(a.children)) {
+      expectEqual("aye", aye.label)
+    }
+  }
+}
+
+mirrors.test("class/Cluster") {
+  class A : CustomReflectable {
+    var a: Int = 1
+    func customMirror() -> Mirror {
+      return Mirror(
+        self, children: [ "aye": a ],
+        defaultDescendantRepresentation: .Suppressed)
+    }
+  }
+
+  class X : A {}
+
+  class Y : X {}
+
+  let a = Mirror(reflecting: Y())
+  if let aye? = expectNotEmpty(first(a.children)) {
+    expectEqual("aye", aye.label)
+  }
+}
+
 //===--- End Class Support ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 

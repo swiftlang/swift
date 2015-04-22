@@ -125,7 +125,9 @@ public struct Mirror {
       self = customized.customMirror()
     }
     else {
-      self = Mirror(Swift.reflect(subject), subjectType: subject.dynamicType)
+      self = Mirror(
+        legacy: Swift.reflect(subject),
+        subjectType: subject.dynamicType)
     }
   }
   
@@ -173,7 +175,7 @@ public struct Mirror {
 
     // Walk up the chain of mirrors/classes until we find staticSubclass
     while let superclass?: AnyClass? = _getSuperclass(cls) {
-      let superclassMirror? = clsMirror._legacySuperMirror()
+      let superclassMirror? = clsMirror._superMirror()
         else { break }
       
       if superclass == targetSuperclass { return superclassMirror }
@@ -195,20 +197,12 @@ public struct Mirror {
       switch ancestorRepresentation {
       case .Generated: return {
           self._legacyMirror(subject, asClass: superclass).map {
-            Mirror($0, subjectType: superclass)
+            Mirror(legacy: $0, subjectType: superclass)
           }
         }
       case .Customized(let makeAncestor):
         return {
-          let ancestor = makeAncestor()
-          if ancestor._subjectType == superclass {
-            return ancestor
-          }
-          else {
-            return self._legacyMirror(subject, asClass: superclass).map {
-              Mirror($0, subjectType: superclass, customAncestor: ancestor)
-            }
-          }
+          Mirror(subject, subjectClass: superclass, ancestor: makeAncestor())
         }
       case .Suppressed: break
       }
@@ -488,26 +482,24 @@ extension Mirror.DisplayStyle {
   }
 }
 
-/*
 internal func _hasType(instance: Any, type: Any.Type) -> Bool {
   return unsafeBitCast(instance.dynamicType, Int.self)
     == unsafeBitCast(type, Int.self) 
 }
 
 extension MirrorType {
-  final internal func _legacySuperMirror() -> MirrorType? {
-    if self.count > 0 {
-      let childMirror = self[0].1
-      if _hasType(childMirror, _ClassSuperMirror.self) {
-        return childMirror
-      }
-    }
-    return nil
+  final internal func _superMirror() -> MirrorType? {
+    return self._legacySuperMirror()
   }
 }
-*/
 
-extension Mirror {
+/// When constructed using the legacy reflection infrastructure, the
+/// resulting `Mirror`\ 's `children` collection will always be
+/// upgradable to `AnyRandomAccessCollection` even if it doesn't
+/// exhibit appropriate performance. To avoid this pitfall, convert
+/// mirrors to use the new style, which only present forward
+/// traversal in general.
+internal extension Mirror {
   /// An adapter that represents a legacy `MirrorType`\ 's children as
   /// a `Collection` with integer `Index`.  Note that the performance
   /// characterstics of the underlying `MirrorType` may not be
@@ -520,7 +512,7 @@ extension Mirror {
     }
 
     var startIndex: Int {
-      return _oldMirror._legacySuperMirror() == nil ? 0 : 1
+      return _oldMirror._superMirror() == nil ? 0 : 1
     }
 
     var endIndex: Int { return _oldMirror.count }
@@ -537,43 +529,62 @@ extension Mirror {
     internal let _oldMirror: MirrorType
   }
 
-  /// Construct from a legacy `MirrorType`.  Note that the resulting
-  /// `Mirror`\ 's `children` collection will always be upgradable to
-  /// `AnyRandomAccessCollection` even if it doesn't exhibit
-  /// appropriate performance. To avoid this pitfall, convert mirrors
-  /// to use the new style, which only present forward traversal in
-  /// general.
+  /// Initialize for a view of `subject` as `subjectClass`.
+  ///
+  /// :param: ancestor - a Mirror for a (non-strict) ancestor of
+  ///   `subjectClass`, to be injected into the resulting hierarchy.
+  ///
+  /// :param: legacy - either `nil`, or a legacy mirror for `subject`
+  ///    as `subjectClass`.
   internal init(
-    _ oldMirror: MirrorType,
-    subjectType: Any.Type,
-    customAncestor: Mirror? = nil
+    _ subject: AnyObject,
+    subjectClass: AnyClass,
+    ancestor: Mirror,
+    legacy legacyMirror: MirrorType? = nil
   ) {
-    if let subjectSuperclass? = _getSuperclass(subjectType) {
-      _sanityCheck(
-        customAncestor == nil
-        || customAncestor!._subjectType != subjectType,
-        "customAncestor should represent a strict ancestor of subjectType"
-      )
+    if ancestor._subjectType == subjectClass
+      || ancestor._defaultDescendantRepresentation == .Suppressed {
+      self = ancestor
+    }
+    else {
+      let legacyMirror = legacyMirror ?? Mirror._legacyMirror(
+        subject, asClass: subjectClass)!
+      
+      self = Mirror(
+        legacy: legacyMirror,
+        subjectType: subjectClass,
+        makeSuperclassMirror: {
+          _getSuperclass(subjectClass).map {
+            Mirror(
+              subject,
+              subjectClass: $0,
+              ancestor: ancestor,
+              legacy: legacyMirror._legacySuperMirror())
+          }
+        })
+    }
+  }
 
+  internal init(
+    legacy legacyMirror: MirrorType,
+    subjectType: Any.Type,
+    makeSuperclassMirror: (()->Mirror?)? = nil
+  ) {
+    if let makeSuperclassMirror? = makeSuperclassMirror {
+      self._makeSuperclassMirror = makeSuperclassMirror
+    }
+    else if let subjectSuperclass? = _getSuperclass(subjectType) {
       self._makeSuperclassMirror = {
-        customAncestor != nil
-        && customAncestor!._subjectType == subjectSuperclass
-        ? customAncestor!
-        : oldMirror._legacySuperMirror().map {
-          Mirror(
-            $0,
-            subjectType: subjectSuperclass,
-            customAncestor: customAncestor
-          )
-        }
+        legacyMirror._superMirror().map {
+          Mirror(legacy: $0, subjectType: subjectSuperclass) }
       }
     }
     else {
       self._makeSuperclassMirror = Mirror._noSuperclassMirror
     }
     self._subjectType = subjectType
-    self.children = Children(LegacyChildren(oldMirror))
-    self.displayStyle = DisplayStyle(legacy: oldMirror.disposition)
+    self.children = Children(LegacyChildren(legacyMirror))
+    self.displayStyle = DisplayStyle(legacy: legacyMirror.disposition)
     self._defaultDescendantRepresentation = .Generated
   }
 }
