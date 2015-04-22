@@ -251,6 +251,15 @@ protected:
 static bool isRelease(SILInstruction *Inst, SILValue Value,
                       RCIdentityFunctionInfo *RCIA,
                       SmallPtrSetImpl<Operand *> &MatchedReleases) {
+
+  // Before we can match a release with a retain we need to check that we have
+  // not already matched the release with a retain we processed earlier.
+  // We don't want to match the release with both retains in the example below.
+  //
+  //   retain %a  <--|
+  //   retain %a     | Match.   <-| Dont't match.
+  //   release %a <--|          <-|
+  //
   if (auto *R = dyn_cast<ReleaseValueInst>(Inst))
     if (!MatchedReleases.count(&R->getOperandRef()))
       if (RCIA->getRCIdentityRoot(Inst->getOperand(0)) ==
@@ -359,7 +368,16 @@ class COWArrayOpt {
   // abort earlier.
   SmallPtrSet<SILInstruction*, 8> ArrayUserSet;
 
-  // When matching retains to releases we must not count the same release twice.
+  // When matching retains to releases we must not match the same release twice.
+  //
+  // For example we could have:
+  //   retain %a // id %1
+  //   retain %a // id %2
+  //   release %a // id %3
+  // When we match %1 with %3, we can't match %3 again when we look for a
+  // matching release for %2.
+  // The set refers to operands instead of instructions because an apply could
+  // have several operands with release semantics.
   SmallPtrSet<Operand*, 8> MatchedReleases;
 public:
   COWArrayOpt(AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA, SILLoop *L,
