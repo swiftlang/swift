@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/enum-new.h -verify
+// REQUIRES: OS=macosx
 
 let _: Color = .Red
 let _: MoreColor = .Cyan
