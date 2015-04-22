@@ -22,13 +22,19 @@ using namespace Lowering;
 
 RValue &ArgumentSource::forceAndPeekRValue(SILGenFunction &gen) & {
   if (isRValue()) {
-    return Storage.TheRV.Value;
+    return peekRValue();
   }
 
   auto expr = asKnownExpr();
   StoredKind = Kind::RValue;
   new (&Storage.TheRV.Value) RValue(gen.emitRValue(expr));
   Storage.TheRV.Loc = expr;
+  return Storage.TheRV.Value;
+}
+
+RValue &ArgumentSource::peekRValue() & {
+  assert(isRValue() && "Undefined behavior to call this method without the "
+         "ArgumentSource actually being an RValue");
   return Storage.TheRV.Value;
 }
 

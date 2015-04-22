@@ -69,7 +69,9 @@ func test7(var g: Gizmo) {
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test8
 func test8(g: Gizmo) -> Gizmo {
   return g.clone()
-  // CHECK:      retain [[G:%0]]
+  // CHECK: bb0([[G:%.*]] : $Gizmo):
+  // CHECK-NOT:  retain
+  // CHECK: alloc_stack $ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.clone!1.foreign
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[G]])
   // CHECK-NEXT: store
@@ -79,7 +81,7 @@ func test8(g: Gizmo) -> Gizmo {
   // CHECK-NEXT: apply
   // CHECK-NEXT: [[RESULT:%.*]] = load
   // CHECK-NEXT: dealloc_stack
-  // CHECK-NEXT: release [[G]]
+  // CHECK-NOT: release [[G]]
   // CHECK-NEXT: dealloc_stack
   // CHECK-NEXT: release [[G]]
   // CHECK-NEXT: return [[RESULT]]
@@ -88,7 +90,9 @@ func test8(g: Gizmo) -> Gizmo {
 // CHECK-LABEL: sil hidden  @_TF26objc_ownership_conventions5test9
 func test9(g: Gizmo) -> Gizmo {
   return g.duplicate()
-  // CHECK:      retain [[G:%0]]
+  // CHECK: bb0([[G:%.*]] : $Gizmo):
+  // CHECK-NOT:      retain [[G:%0]]
+  // CHECK: alloc_stack
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.duplicate!1.foreign
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[G]])
   // CHECK-NEXT: retain_autoreleased [[RESULT]]
@@ -99,7 +103,7 @@ func test9(g: Gizmo) -> Gizmo {
   // CHECK-NEXT: apply
   // CHECK-NEXT: [[RESULT:%.*]] = load
   // CHECK-NEXT: dealloc_stack
-  // CHECK-NEXT: release [[G]]
+  // CHECK-NOT: release [[G]]
   // CHECK-NEXT: dealloc_stack
   // CHECK-NEXT: release [[G]]
   // CHECK-NEXT: return [[RESULT]]
@@ -174,8 +178,8 @@ func useInnerPointer(p: UnsafeMutablePointer<Void>) {}
 // Handle inner-pointer methods by autoreleasing self after the call.
 // CHECK-LABEL: sil hidden @_TF26objc_ownership_conventions18innerPointerMethod
 // CHECK:         [[USE:%.*]] = function_ref @_TF26objc_ownership_conventions15useInnerPointer
-// CHECK:         strong_retain %0
 // CHECK:         [[METHOD:%.*]] = class_method [volatile] %0 : $Gizmo, #Gizmo.getBytes!1.foreign : Gizmo -> () -> UnsafeMutablePointer<()> , $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutablePointer<()>
+// CHECK:         strong_retain %0
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]](%0)
 // CHECK:         autorelease_value %0
 // CHECK:         apply [[USE]]([[PTR]])

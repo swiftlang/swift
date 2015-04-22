@@ -299,9 +299,8 @@ class C: Fooable, Barrable {
 
   // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1C3foofS0_FSiT_ : $@convention(method) (Int, @guaranteed C) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
-  // CHECK:         retain{{.*}} [[SELF]]
-  // CHECK:         release{{.*}} [[SELF]]
-  // CHECK-NOT:     release{{.*}} [[SELF]]
+  // CHECK-NOT:     retain
+  // CHECK-NOT:     release
 
   // CHECK-LABEL: sil hidden @_TToFC15guaranteed_self1C3foofS0_FSiT_ : $@convention(objc_method) (Int, C) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
@@ -457,4 +456,101 @@ extension FakeArray : SequenceType {
   typealias Generator = FakeGenerator
 
   func _containsElement(Element) {}
+}
+
+// -----------------------------------------------------------------------------
+// Make sure that we properly add retains when emitting code for curried
+// functions.
+// -----------------------------------------------------------------------------
+
+class Kraken {}
+
+class CurriedTestBar {
+  func bar(x: Kraken)(_ y: Kraken)(_ z: Kraken) -> Kraken {
+    return z
+  }
+}
+
+// Make sure we create a closure and pass it in @owned with a retain before it.
+//
+// CHECK-LABEL: sil hidden @_TF15guaranteed_self13curried_test0FT_T_ : $@convention(thin) () -> () {
+// CHECK: [[FUNC:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarCfMS0_FT_S0_
+// CHECK: [[CTB:%.*]] = apply [[FUNC]](
+// CHECK: [[THUNK_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBar3barFS0_FCS_6KrakenFS1_FS1_S1_ : $@convention(thin) (@owned CurriedTestBar) -> @owned @callee_owned (@owned Kraken) -> @owned @callee_owned (@owned Kraken) -> @owned @callee_owned (@owned Kraken) -> @owned Kraken
+// CHECK: strong_retain [[CTB]]
+// CHECK: [[CLOSURE:%.*]] = apply [[THUNK_CONSTRUCTOR]]([[CTB]]
+// CHECK-NOT: strong_release [[CTB]]
+// CHECK: strong_release [[CLOSURE]]
+// CHECK-NEXT: strong_release [[CTB]]
+// CHECK-NOT: strong_release
+// CHECK: return
+func curried_test0() {
+  let b = CurriedTestBar()
+  let bar1 = b.bar
+}
+
+// CHECK-LABEL: sil hidden @_TF15guaranteed_self13curried_test1FT_T_ : $@convention(thin) () -> () {
+// CHECK: [[KRAKEN_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self6KrakenCfMS0_FT_S0_ : $@convention(thin) (@thick Kraken.Type) -> @owned Kraken
+// CHECK: [[KRAKEN:%.*]] = apply [[KRAKEN_CONSTRUCTOR]](
+// CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarCfMS0_FT_S0_
+// CHECK: [[CTB:%.*]] = apply [[CTB_CONSTRUCTOR]](
+// CHECK: [[THUNK_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBar3barfS0_FCS_6KrakenFS1_FS1_S1_ : $@convention(thin) (@owned Kraken, @owned CurriedTestBar) -> @owned @callee_owned (@owned Kraken) -> @owned @callee_owned (@owned Kraken) -> @owned Kraken
+// CHECK: strong_retain [[CTB]]
+// CHECK-NEXT: strong_retain [[KRAKEN]]
+// CHECK-NEXT: [[CLOSURE:%.*]] = apply [[THUNK_CONSTRUCTOR]]([[KRAKEN]], [[CTB]])
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: strong_release [[CLOSURE]]
+// CHECK-NEXT: strong_release [[CTB]]
+// CHECK-NEXT: strong_release [[KRAKEN]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+func curried_test1() {
+  let k = Kraken()
+  let b = CurriedTestBar()
+  let bar2 = b.bar(k)
+}
+
+// CHECK-LABEL: sil hidden @_TF15guaranteed_self13curried_test2FT_T_ : $@convention(thin) () -> () {
+// CHECK: [[KRAKEN_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self6KrakenCfMS0_FT_S0_ : $@convention(thin) (@thick Kraken.Type) -> @owned Kraken
+// CHECK: [[KRAKEN:%.*]] = apply [[KRAKEN_CONSTRUCTOR]](
+// CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarCfMS0_FT_S0_
+// CHECK: [[CTB:%.*]] = apply [[CTB_CONSTRUCTOR]](
+// CHECK: [[THUNK_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBar3barfS0_fCS_6KrakenFS1_FS1_S1_ : $@convention(thin) (@owned Kraken, @owned Kraken, @owned CurriedTestBar) -> @owned @callee_owned (@owned Kraken) -> @owned Kraken
+// CHECK: strong_retain [[CTB]]
+// CHECK-NEXT: strong_retain [[KRAKEN]]
+// CHECK-NEXT: strong_retain [[KRAKEN]]
+// CHECK-NEXT: [[CLOSURE:%.*]] = apply [[THUNK_CONSTRUCTOR]]([[KRAKEN]], [[KRAKEN]], [[CTB]])
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: strong_release [[CLOSURE]]
+// CHECK-NEXT: strong_release [[CTB]]
+// CHECK-NEXT: strong_release [[KRAKEN]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+func curried_test2() {
+  let k = Kraken()
+  let b = CurriedTestBar()
+  let bar3 = b.bar(k)(k)
+}
+
+// CHECK-LABEL: sil hidden @_TF15guaranteed_self13curried_test3FT_T_ : $@convention(thin) () -> () {
+// CHECK: [[KRAKEN_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self6KrakenCfMS0_FT_S0_ : $@convention(thin) (@thick Kraken.Type) -> @owned Kraken
+// CHECK: [[KRAKEN:%.*]] = apply [[KRAKEN_CONSTRUCTOR]](
+// CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarCfMS0_FT_S0_
+// CHECK: [[CTB:%.*]] = apply [[CTB_CONSTRUCTOR]](
+// CHECK: [[CLASS_METHOD:%.*]] = class_method [[CTB]] : $CurriedTestBar, #CurriedTestBar.bar!3 : CurriedTestBar -> (Kraken) -> (Kraken) -> (Kraken) -> Kraken , $@convention(method) (@owned Kraken, @owned Kraken, @owned Kraken, @guaranteed CurriedTestBar) -> @owned Kraken
+// CHECK-NOT: strong_retain [[CTB]]
+// CHECK: strong_retain [[KRAKEN]]
+// CHECK-NEXT: strong_retain [[KRAKEN]]
+// CHECK-NEXT: strong_retain [[KRAKEN]]
+// CHECK-NEXT: [[NEW_KRAKEN:%.*]] = apply [[CLASS_METHOD]]([[KRAKEN]], [[KRAKEN]], [[KRAKEN]], [[CTB]])
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: strong_release [[NEW_KRAKEN]]
+// CHECK-NEXT: strong_release [[CTB]]
+// CHECK-NEXT: strong_release [[KRAKEN]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+func curried_test3() {
+  let k = Kraken()
+  let b = CurriedTestBar()
+  let bar4 = b.bar(k)(k)(k)
 }

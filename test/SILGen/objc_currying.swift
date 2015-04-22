@@ -10,8 +10,8 @@ func curry_pod(x: CurryTest) -> Int -> Int {
 }
 // CHECK-LABEL: sil hidden @_TF13objc_currying9curry_podFCSo9CurryTestFSiSi : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:      bb0([[ARG1:%.*]] : $CurryTest):
-// CHECK:         strong_retain [[ARG1]]
 // CHECK:         [[THUNK:%.*]] = function_ref [[THUNK_FOO_1:@_TTOFCSo9CurryTest3podFS_FSiSi]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
+// CHECK:         strong_retain [[ARG1]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]](%0)
 // CHECK:         strong_release [[ARG1]]
 // CHECK:         return [[FN]]

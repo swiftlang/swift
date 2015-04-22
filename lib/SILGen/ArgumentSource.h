@@ -249,6 +249,10 @@ public:
   /// handle to that r-value.
   RValue &forceAndPeekRValue(SILGenFunction &gen) &;
 
+  /// Return an unowned handle to the r-value stored in this source. Undefined
+  /// if this ArgumentSource is not an rvalue.
+  RValue &peekRValue() &;
+
   RValue getAsRValue(SILGenFunction &gen, SGFContext C = SGFContext()) &&;
   ManagedValue getAsSingleValue(SILGenFunction &gen,
                                 SGFContext C = SGFContext()) &&;
