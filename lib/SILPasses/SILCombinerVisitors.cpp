@@ -1815,6 +1815,9 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       if (!SEAI)
         return nullptr;
 
+      if (SEAI->getOperand() != IEAI->getOperand())
+        return nullptr;
+
       SILBasicBlock::iterator II = IEAI;
       StoreInst *SI = nullptr;
       for (;;) {
@@ -1851,6 +1854,9 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     //
     // Replace the switch_enum_addr by select_enum_addr, switch_value.
     if (auto *SEI = dyn_cast<SwitchEnumAddrInst>(Term)) {
+      if (SEI->getOperand() != IEAI->getOperand())
+        return nullptr;
+
       SILBasicBlock::iterator II = IEAI;
       StoreInst *SI = nullptr;
       for (;;) {
