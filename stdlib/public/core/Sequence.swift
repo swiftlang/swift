@@ -99,9 +99,32 @@ public protocol _Sequence_Type
   /// Complexity: O(N)
   func _prext_underestimateCount() -> Int
 
+  /// Return an `Array` containing the results of mapping `transform`
+  /// over `self`.
+  ///
+  /// Complexity: O(N)
+  func _prext_map<T>(
+    @noescape transform: (Generator.Element) -> T
+  ) -> [T]
+
   func _customContainsEquatableElement(
     element: Generator.Element
   ) -> Bool?
+}
+
+extension SequenceType {
+  /// Return an `Array` containing the results of mapping `transform`
+  /// over `self`.
+  ///
+  /// Complexity: O(N)
+  final public func _prext_map<T>(
+    @noescape transform: (Generator.Element) -> T
+  ) -> [T] {
+    // Cast away @noescape.
+    typealias Transform = (Generator.Element) -> T
+    let escapableTransform = unsafeBitCast(transform, Transform.self)
+    return Array<T>(lazy(self).map(escapableTransform))
+  }
 }
 
 /// A type that can be iterated with a `for`\ ...\ `in` loop.
