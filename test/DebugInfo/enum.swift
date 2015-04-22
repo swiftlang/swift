@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
+// CHECK: ![[EMPTY:.*]] = !{}
 // CHECK: !MDCompositeType(tag: DW_TAG_union_type, name: "Color",
 // CHECK-SAME:             line: [[@LINE+3]]
 // CHECK-SAME:             size: 8, align: 8,
@@ -38,3 +39,7 @@ let c = MaybeIntPair.Just(74, 75)
 // CHECK-SAME:             size: 8, align: 8{{[,)]}}
 // CHECK-SAME:             identifier: "_TtGO4enum5MaybeOS_5Color_"
 let movie : Maybe<Color> = .None
+
+public enum Nothing { }
+public func foo(empty : Nothing) { }
+// CHECK: !MDCompositeType({{.*}}name: "Nothing", {{.*}}elements: ![[EMPTY]]
