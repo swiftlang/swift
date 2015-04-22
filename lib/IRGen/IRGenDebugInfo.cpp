@@ -1004,8 +1004,8 @@ public:
       llvm::DICompositeType CTy(Cur);
       llvm::DIArray Elts = CTy.getElements();
       unsigned N = Cur.getTag() == llvm::dwarf::DW_TAG_union_type
-                       ? 1 // For unions, pick any one.
-                       : Elts.getNumElements();
+        ? std::min(1U, Elts.getNumElements()) // For unions, pick any one.
+        : Elts.getNumElements();
 
       if (N) {
         // Push all elements in reverse order.
