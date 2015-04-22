@@ -736,7 +736,12 @@ namespace {
           default: return IGF.IGM.getGetBlockMetadataFn();
           }
         case AnyFunctionType::Representation::CFunctionPointer:
-          llvm_unreachable("todo: metadata for C function pointers");
+          switch (numArguments) {
+          case 1: return IGF.IGM.getGetCFunctionMetadata1Fn();
+          case 2: return IGF.IGM.getGetCFunctionMetadata2Fn();
+          case 3: return IGF.IGM.getGetCFunctionMetadata3Fn();
+          default: return IGF.IGM.getGetCFunctionMetadataFn();
+          }
         }
         llvm_unreachable("bad function representation");
       }();

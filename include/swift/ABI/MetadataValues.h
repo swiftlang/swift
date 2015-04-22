@@ -69,6 +69,9 @@ enum class MetadataKind : uintptr_t {
 
   /// A thin function type.
   ThinFunction = 18,
+  
+  /// A C function type.
+  CFunction = 19,
 
   // Array types?
   // L-value types?

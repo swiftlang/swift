@@ -843,6 +843,7 @@ public:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
     case MetadataKind::ThinFunction:
+    case MetadataKind::CFunction:
     case MetadataKind::PolyFunction:
     case MetadataKind::Existential:
     case MetadataKind::Metatype:
@@ -872,6 +873,7 @@ public:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
     case MetadataKind::ThinFunction:
+    case MetadataKind::CFunction:
     case MetadataKind::PolyFunction:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
@@ -1523,6 +1525,7 @@ struct FunctionTypeMetadata : public Metadata {
   static bool classof(const Metadata *metadata) {
     return metadata->getKind() == MetadataKind::Function ||
            metadata->getKind() == MetadataKind::ThinFunction ||
+           metadata->getKind() == MetadataKind::CFunction ||
            metadata->getKind() == MetadataKind::Block;
   }
 };
@@ -2104,6 +2107,28 @@ swift_getThinFunctionTypeMetadata3(const void *arg0,
                                    const void *arg2,
                                    const Metadata *resultMetadata);
 
+/// \brief Fetch a uniqued metadata for a C function type.
+extern "C" const FunctionTypeMetadata *
+swift_getCFunctionTypeMetadata(size_t numArguments,
+                               const void * argsAndResult []);
+
+extern "C" const FunctionTypeMetadata *
+swift_getCFunctionTypeMetadata0(const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getCFunctionTypeMetadata1(const void *arg0,
+                                const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getCFunctionTypeMetadata2(const void *arg0,
+                                const void *arg1,
+                                const Metadata *resultMetadata);
+
+extern "C" const FunctionTypeMetadata *
+swift_getCFunctionTypeMetadata3(const void *arg0,
+                                const void *arg1,
+                                const void *arg2,
+                                const Metadata *resultMetadata);
 
 #if SWIFT_OBJC_INTEROP
 /// \brief Fetch a uniqued metadata for a block type.

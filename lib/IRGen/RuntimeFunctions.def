@@ -344,6 +344,30 @@ FUNCTION(GetThinFunctionMetadata3, swift_getThinFunctionTypeMetadata3, RuntimeCC
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// Metadata *swift_getCFunctionTypeMetadata(size_t numArguments, const void **args, const Metadata *resultMetadata);
+FUNCTION(GetCFunctionMetadata, swift_getCFunctionTypeMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, Int8PtrTy->getPointerTo(0), TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getCFunctionTypeMetadata1(const void *arg0, const Metadata *resultMetadata);
+FUNCTION(GetCFunctionMetadata1, swift_getCFunctionTypeMetadata1, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getCFunctionTypeMetadata2(const void *arg0, const void *arg1, const Metadata *resultMetadata);
+FUNCTION(GetCFunctionMetadata2, swift_getCFunctionTypeMetadata2, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getCFunctionTypeMetadata3(const void *arg0, const void *arg1, const void *arg2, const Metadata *resultMetadata);
+FUNCTION(GetCFunctionMetadata3, swift_getCFunctionTypeMetadata3, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // Metadata *swift_getBlockTypeMetadata(size_t numArguments, const void **args, const Metadata *resultMetadata);
 FUNCTION(GetBlockMetadata, swift_getBlockTypeMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),

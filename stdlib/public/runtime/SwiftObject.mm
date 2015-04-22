@@ -869,6 +869,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
   case MetadataKind::Tuple:
   case MetadataKind::Function:
   case MetadataKind::ThinFunction:
+  case MetadataKind::CFunction:
   case MetadataKind::Existential:
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype:
@@ -918,6 +919,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
   case MetadataKind::Tuple:
   case MetadataKind::Function:
   case MetadataKind::ThinFunction:
+  case MetadataKind::CFunction:
   case MetadataKind::Existential:
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype:

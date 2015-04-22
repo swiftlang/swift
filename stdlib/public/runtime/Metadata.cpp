@@ -298,6 +298,7 @@ namespace {
 namespace {
   MetadataCache<FunctionCacheEntry> FunctionTypes;
   MetadataCache<FunctionCacheEntry> ThinFunctionTypes;
+  MetadataCache<FunctionCacheEntry> CFunctionTypes;
 #if SWIFT_OBJC_INTEROP
   MetadataCache<FunctionCacheEntry> BlockTypes;
 #endif
@@ -410,6 +411,19 @@ swift::swift_getThinFunctionTypeMetadata(size_t numArguments,
 }
 
 DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(ThinFunctionType)
+
+const FunctionTypeMetadata *
+swift::swift_getCFunctionTypeMetadata(size_t numArguments,
+                                         const void *argsAndResult[]) {
+
+  return _getFunctionTypeMetadata(numArguments,
+                                  argsAndResult,
+                                  MetadataKind::CFunction,
+                                  CFunctionTypes,
+                                  _TWVXfT_T_);
+}
+
+DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(CFunctionType)
 
 // Only define the block-type accessors if we need ObjC interop.
 #if SWIFT_OBJC_INTEROP
@@ -2211,6 +2225,7 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::Tuple:
   case MetadataKind::Function:
   case MetadataKind::ThinFunction:
+  case MetadataKind::CFunction:
   case MetadataKind::Block:
   case MetadataKind::PolyFunction:
   case MetadataKind::Existential:
@@ -2251,6 +2266,7 @@ Metadata::getClassObject() const {
   case MetadataKind::Tuple:
   case MetadataKind::Function:
   case MetadataKind::ThinFunction:
+  case MetadataKind::CFunction:
   case MetadataKind::Block:
   case MetadataKind::PolyFunction:
   case MetadataKind::Existential:

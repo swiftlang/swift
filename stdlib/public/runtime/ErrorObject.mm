@@ -368,6 +368,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::ThinFunction:
+  case MetadataKind::CFunction:
   case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:

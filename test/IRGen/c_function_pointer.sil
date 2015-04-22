@@ -31,3 +31,16 @@ entry(%f : $@convention(c) () -> ()):
   %z = apply %c(%f) : $@convention(c) (@convention(c) () -> ()) -> ()
   return %z : $()
 }
+
+// CHECK-LABEL: define %swift.type* @c_function_pointer_metadata()
+sil @c_function_pointer_metadata : $@convention(thin) () -> @thick Any.Type {
+entry:
+  // CHECK: call %swift.type* @_TMacT_T_()
+  %m = metatype $@thick (@convention(c) () -> ()).Type
+  %a = init_existential_metatype %m : $@thick (@convention(c) () -> ()).Type, $@thick Any.Type
+  return %a : $@thick Any.Type
+}
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMacT_T_()
+// CHECK:         call %swift.type* @swift_getCFunctionTypeMetadata1
+
