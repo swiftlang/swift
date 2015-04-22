@@ -53,10 +53,10 @@ static ApplySite replaceWithSpecializedFunction(ApplySite AI,
 
 ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
                                              SILFunction *&NewFunction,
-                             llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
+         llvm::SmallVectorImpl<FullApplyCollector::value_type> &NewApplyPairs) {
   NewFunction = nullptr;
 
-  assert(NewApplies.empty() && "Expected no new applies in vector yet!");
+  assert(NewApplyPairs.empty() && "Expected no new applies in vector yet!");
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
 
   auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
@@ -111,7 +111,9 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     NewF = GenericCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
                                         ClonedName, Apply,
                                         Collector.getCallback());
-    NewApplies = Collector.getFullApplies();
+    for (auto &P : Collector.getApplyPairs())
+      NewApplyPairs.push_back(P);
+
     NewFunction = NewF;
   }
 

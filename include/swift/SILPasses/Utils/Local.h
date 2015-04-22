@@ -18,6 +18,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include <functional>
+#include <utility>
 
 namespace swift {
 class DominanceInfo;
@@ -346,20 +347,28 @@ public:
 // Helper class that provides a callback that can be used in
 // inliners/cloners for collecting FullApplySites.
 class FullApplyCollector {
-  llvm::SmallVector<FullApplySite, 4> Applies;
+public:
+  typedef std::pair<FullApplySite, FullApplySite> value_type;
+  typedef std::function<void(SILInstruction *, SILInstruction *)> CallbackType;
 
-  void collect(SILInstruction *I) {
-    if (FullApplySite::isa(I))
-      Applies.push_back(FullApplySite(I));
+
+private:
+  llvm::SmallVector<value_type, 4> ApplyPairs;
+
+  void collect(SILInstruction *OldApply, SILInstruction *NewApply) {
+    if (FullApplySite::isa(NewApply))
+      ApplyPairs.push_back(std::make_pair(FullApplySite(NewApply),
+                                          FullApplySite(OldApply)));
   }
 
 public:
-  std::function<void(SILInstruction *)> getCallback() {
-    return std::bind(&FullApplyCollector::collect, this, std::placeholders::_1);
+  CallbackType getCallback() {
+    return std::bind(&FullApplyCollector::collect, this, std::placeholders::_1,
+                     std::placeholders::_2);
   }
 
-  llvm::SmallVectorImpl<FullApplySite> &getFullApplies() {
-    return Applies;
+  llvm::SmallVectorImpl<value_type> &getApplyPairs() {
+    return ApplyPairs;
   }
 };
 

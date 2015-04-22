@@ -191,12 +191,7 @@ ApplyInst *swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
 void swift::replaceDeadApply(FullApplySite Old, SILInstruction *New) {
   auto *OldApply = Old.getInstruction();
   OldApply->replaceAllUsesWith(New);
-
-  auto *CalleeInst = dyn_cast<SILInstruction>(Old.getCallee());
-
-  OldApply->eraseFromParent();
-  if (CalleeInst)
-    recursivelyDeleteTriviallyDeadInstructions(CalleeInst);
+  recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 
 bool swift::hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap) {

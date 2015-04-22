@@ -21,6 +21,7 @@
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -29,7 +30,7 @@ namespace swift {
 
 ApplySite trySpecializeApplyOfGeneric(ApplySite Apply,
                                       SILFunction *&NewFunction,
-                              llvm::SmallVectorImpl<FullApplySite> &NewApplies);
+          llvm::SmallVectorImpl<FullApplyCollector::value_type> &NewApplyPairs);
 
 } // end namespace swift
 

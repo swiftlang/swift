@@ -47,7 +47,7 @@ public:
 
   SILInliner(SILFunction &To, SILFunction &From, InlineKind IKind,
              TypeSubstitutionMap &ContextSubs, ArrayRef<Substitution> ApplySubs,
-             std::function<void(SILInstruction *)> Callback =nullptr)
+             FullApplyCollector::CallbackType Callback =nullptr)
     : TypeSubstCloner<SILInliner>(To, From, ContextSubs, ApplySubs, true),
     IKind(IKind), CalleeEntryBB(nullptr), CallSiteScope(nullptr),
     Callback(Callback) {
@@ -83,7 +83,7 @@ private:
 
     // Call client-supplied callback function.
     if (Callback)
-      Callback(Cloned);
+      Callback(Orig, Cloned);
 
     // We intentionally do not call
     // SILClonerWithScopes<SILInliner>::postProcess() here as it does
@@ -114,7 +114,7 @@ private:
   SILDebugScope *CallSiteScope;
   SILFunction *CalleeFunction;
   llvm::SmallDenseMap<SILDebugScope *, SILDebugScope *> InlinedScopeCache;
-  std::function<void(SILInstruction *)> Callback;
+  FullApplyCollector::CallbackType Callback;
 };
 
 } // end namespace swift

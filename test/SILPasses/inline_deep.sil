@@ -1,0 +1,249 @@
+// RUN: %target-sil-opt %s -inline -dce -mem2reg -copy-forwarding -global-arc-opts -mem2reg -verify | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class S<T> {
+  @inline(__always) func l0(x: T) -> T
+  @inline(__always) func l1(x: T) -> T
+  @inline(__always) func l2(x: T) -> T
+  @inline(__always) func l3(x: T) -> T
+  @inline(__always) func l4(x: T) -> T
+  @inline(__always) func l5(x: T) -> T
+  @inline(__always) func l6(x: T) -> T
+  @inline(__always) func l7(x: T) -> T
+  @inline(__always) func l8(x: T) -> T
+  @inline(__always) func l9(x: T) -> T
+  init()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l0U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l0U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %6 = tuple ()
+// CHECK: return
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l1U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l1U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  strong_retain %2 : $S<T>
+  %6 = class_method %2 : $S<T>, #S.l0!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %7 = alloc_stack $T
+  copy_addr %1 to [initialization] %7#1 : $*T
+  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<T>
+  dealloc_stack %7#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+// CHECK: return
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l2U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l2U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  strong_retain %2 : $S<T>
+  %6 = class_method %2 : $S<T>, #S.l1!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %7 = alloc_stack $T
+  copy_addr %1 to [initialization] %7#1 : $*T
+  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<T>
+  dealloc_stack %7#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+// CHECK: return
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l3U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l3U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  strong_retain %2 : $S<T>
+  %6 = class_method %2 : $S<T>, #S.l2!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %7 = alloc_stack $T
+  copy_addr %1 to [initialization] %7#1 : $*T
+  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<T>
+  dealloc_stack %7#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+// CHECK: return
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l4U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l4U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  strong_retain %2 : $S<T>
+  %6 = class_method %2 : $S<T>, #S.l3!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %7 = alloc_stack $T
+  copy_addr %1 to [initialization] %7#1 : $*T
+  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<T>
+  dealloc_stack %7#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+// CHECK: return
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l5U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l5U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  strong_retain %2 : $S<T>
+  %6 = class_method %2 : $S<T>, #S.l4!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %7 = alloc_stack $T
+  copy_addr %1 to [initialization] %7#1 : $*T
+  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<T>
+  dealloc_stack %7#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+// CHECK: return
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l6U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l6U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  strong_retain %2 : $S<T>
+  %6 = class_method %2 : $S<T>, #S.l5!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %7 = alloc_stack $T
+  copy_addr %1 to [initialization] %7#1 : $*T
+  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<T>
+  dealloc_stack %7#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+// CHECK: return
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l7U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l7U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  strong_retain %2 : $S<T>
+  %6 = class_method %2 : $S<T>, #S.l6!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %7 = alloc_stack $T
+  copy_addr %1 to [initialization] %7#1 : $*T
+  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<T>
+  dealloc_stack %7#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+// CHECK: return
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l8U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l8U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  strong_retain %2 : $S<T>
+  %6 = class_method %2 : $S<T>, #S.l7!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %7 = alloc_stack $T
+  copy_addr %1 to [initialization] %7#1 : $*T
+  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<T>
+  dealloc_stack %7#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+// CHECK: return
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil hidden [always_inline] @_TFC5depth1S2l9U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> ()
+sil hidden [always_inline] @_TFC5depth1S2l9U__fGS0_Q__FQ_Q_ : $@convention(method) <T> (@out T, @in T, @guaranteed S<T>) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $S<T>):
+  debug_value_addr %1 : $*T
+  debug_value %2 : $S<T>
+  strong_retain %2 : $S<T>
+  %6 = class_method %2 : $S<T>, #S.l8!1 : <T> S<T> -> (T) -> T , $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %7 = alloc_stack $T
+  copy_addr %1 to [initialization] %7#1 : $*T
+  %9 = apply %6<T>(%0, %7#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<T>
+  dealloc_stack %7#0 : $*@local_storage T
+  destroy_addr %1 : $*T
+  %13 = tuple ()
+// CHECK: return
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil hidden @_TFC5depth1ScU__fMGS0_Q__FT_GS0_Q__ : $@convention(method) <T> (@owned S<T>) -> @owned S<T>
+sil hidden @_TFC5depth1ScU__fMGS0_Q__FT_GS0_Q__ : $@convention(method) <T> (@owned S<T>) -> @owned S<T> {
+bb0(%0 : $S<T>):
+  debug_value %0 : $S<T>
+// CHECK: return
+  return %0 : $S<T>
+}
+
+// CHECK-LABEL: sil hidden @_TFC5depth1SCU__fMGS0_Q__FT_GS0_Q__ : $@convention(thin) <T> (@thick S<T>.Type) -> @owned S<T>
+sil hidden @_TFC5depth1SCU__fMGS0_Q__FT_GS0_Q__ : $@convention(thin) <T> (@thick S<T>.Type) -> @owned S<T> {
+bb0(%0 : $@thick S<T>.Type):
+  %1 = alloc_ref $S<T>
+  %2 = function_ref @_TFC5depth1ScU__fMGS0_Q__FT_GS0_Q__ : $@convention(method) <τ_0_0> (@owned S<τ_0_0>) -> @owned S<τ_0_0>
+  %3 = apply %2<T>(%1) : $@convention(method) <τ_0_0> (@owned S<τ_0_0>) -> @owned S<τ_0_0>
+// CHECK: return
+  return %3 : $S<T>
+}
+
+// CHECK-LABEL: sil @_TF5depth3topFT_VSs5Int32 : $@convention(thin) () -> Int32
+sil @_TF5depth3topFT_VSs5Int32 : $@convention(thin) () -> Int32 {
+// CHECK: bb0
+bb0:
+// CHECK-NOT: apply
+  %0 = function_ref @_TFC5depth1SCU__fMGS0_Q__FT_GS0_Q__ : $@convention(thin) <τ_0_0> (@thick S<τ_0_0>.Type) -> @owned S<τ_0_0>
+  %1 = metatype $@thick S<Int32>.Type
+  %2 = apply %0<Int32>(%1) : $@convention(thin) <τ_0_0> (@thick S<τ_0_0>.Type) -> @owned S<τ_0_0>
+  %3 = integer_literal $Builtin.Int32, 709
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = alloc_stack $Int32
+  store %4 to %5#1 : $*Int32
+  %7 = alloc_stack $Int32
+  %8 = function_ref @_TFC5depth1S2l9U__fGS0_Q__FQ_Q_ : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  %9 = apply %8<Int32>(%7#1, %5#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @guaranteed S<τ_0_0>) -> ()
+  strong_release %2 : $S<Int32>
+  %11 = load %7#1 : $*Int32
+  dealloc_stack %7#0 : $*@local_storage Int32
+  dealloc_stack %5#0 : $*@local_storage Int32
+// CHECK: return
+  return %11 : $Int32
+}
+
+sil_vtable S {
+  #S.l0!1: _TFC5depth1S2l0U__fGS0_Q__FQ_Q_
+  #S.l1!1: _TFC5depth1S2l1U__fGS0_Q__FQ_Q_
+  #S.l2!1: _TFC5depth1S2l2U__fGS0_Q__FQ_Q_
+  #S.l3!1: _TFC5depth1S2l3U__fGS0_Q__FQ_Q_
+  #S.l4!1: _TFC5depth1S2l4U__fGS0_Q__FQ_Q_
+  #S.l5!1: _TFC5depth1S2l5U__fGS0_Q__FQ_Q_
+  #S.l6!1: _TFC5depth1S2l6U__fGS0_Q__FQ_Q_
+  #S.l7!1: _TFC5depth1S2l7U__fGS0_Q__FQ_Q_
+  #S.l8!1: _TFC5depth1S2l8U__fGS0_Q__FQ_Q_
+  #S.l9!1: _TFC5depth1S2l9U__fGS0_Q__FQ_Q_
+  #S.init!initializer.1: _TFC5depth1ScU__fMGS0_Q__FT_GS0_Q__
+}

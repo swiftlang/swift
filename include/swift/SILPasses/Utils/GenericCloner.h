@@ -22,6 +22,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include <functional>
@@ -29,7 +30,7 @@
 namespace swift {
 
 class GenericCloner : public TypeSubstCloner<GenericCloner> {
-  std::function<void(SILInstruction *)> Callback;
+  FullApplyCollector::CallbackType Callback;
 
 public:
   friend class SILCloner<GenericCloner>;
@@ -39,7 +40,7 @@ public:
                 TypeSubstitutionMap &ContextSubs,
                 StringRef NewName,
                 ArrayRef<Substitution> ApplySubs,
-                std::function<void(SILInstruction *)> Callback)
+                FullApplyCollector::CallbackType Callback)
   : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
                     ApplySubs), Callback(Callback) {}
   /// Clone and remap the types in \p F according to the substitution
@@ -48,7 +49,7 @@ public:
                                     TypeSubstitutionMap &InterfaceSubs,
                                     TypeSubstitutionMap &ContextSubs,
                                     StringRef NewName, ApplySite Caller,
-                      std::function<void(SILInstruction *)> Callback =nullptr) {
+                           FullApplyCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.
     GenericCloner SC(F, InterfaceSubs, ContextSubs, NewName,
                      Caller.getSubstitutions(), Callback);
@@ -67,7 +68,7 @@ protected:
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     // Call client-supplied callback function.
     if (Callback)
-      Callback(Cloned);
+      Callback(Orig, Cloned);
 
     SILClonerWithScopes<GenericCloner>::postProcess(Orig, Cloned);
   }
