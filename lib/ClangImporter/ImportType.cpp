@@ -1475,18 +1475,18 @@ Type ClangImporter::Implementation::importMethodType(
                             knownMethod->getReturnTypeInfo());
   } else {
     OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
+  }
 
-    // If we have the getter for a property that itself has
-    // nullability, strip the outer nullability off the result type:
-    // we want the property's nullability here.
-    if (clangDecl->isPropertyAccessor()) {
-      if (auto property = clangDecl->findPropertyDecl()) {
-        if (property->getGetterMethodDecl() == clangDecl) {
-          if (auto propertyNullability
-                = property->getType()->getNullability(getClangASTContext())) {
-            (void)clang::AttributedType::stripOuterNullability(resultType);
-            OptionalityOfReturn = translateNullability(*propertyNullability);
-          }
+  // If we have the getter for a property that itself has
+  // nullability, strip the outer nullability off the result type:
+  // we want the property's nullability here.
+  if (clangDecl->isPropertyAccessor()) {
+    if (auto property = clangDecl->findPropertyDecl()) {
+      if (property->getGetterMethodDecl() == clangDecl) {
+        if (auto propertyNullability
+              = property->getType()->getNullability(getClangASTContext())) {
+          (void)clang::AttributedType::stripOuterNullability(resultType);
+          OptionalityOfReturn = translateNullability(*propertyNullability);
         }
       }
     }
