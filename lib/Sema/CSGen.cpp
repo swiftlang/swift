@@ -1700,9 +1700,9 @@ namespace {
         std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
           
           // Do not walk into the 'do' clause of a do/catch statement.
-          if (dyn_cast<BraceStmt>(stmt) &&
+          if (isa<BraceStmt>(stmt) &&
               Parent.getAsStmt() &&
-              dyn_cast<DoCatchStmt>(Parent.getAsStmt())) {
+              isa<DoCatchStmt>(Parent.getAsStmt())) {
             return { false, stmt };
           }
           
