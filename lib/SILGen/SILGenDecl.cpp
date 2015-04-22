@@ -966,6 +966,80 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
   }
 }
 
+
+/// Emit the boolean test and/or pattern bindings indicated by the specified
+/// stmt condition.  If the condition fails, control flow is transfered to the
+/// specified JumpDest.  The insertion point is left in the block where the
+/// condition has matched and any bound variables are in scope.
+///
+void SILGenFunction::emitStmtCondition(StmtCondition Cond,
+                                       JumpDest FailDest, SILLocation loc) {
+
+  assert(B.hasValidInsertionPoint() &&
+         "emitting condition at unreachable point");
+  
+  for (const auto &elt : Cond) {
+    // Handle boolean conditions.
+    if (auto *expr = elt.getCondition()) {
+      // Evaluate the condition as an i1 value (guaranteed by Sema).
+      SILValue V;
+      {
+        FullExpr Scope(Cleanups, CleanupLocation(expr));
+        V = emitRValue(expr).forwardAsSingleValue(*this, expr);
+      }
+      assert(V.getType().castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
+             "Sema forces conditions to have Builtin.i1 type");
+      
+      // Just branch on the condition.  On failure, we unwind any active cleanups,
+      // on success we fall through to a new block.
+      SILBasicBlock *ContBB = createBasicBlock();
+      auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
+      B.createCondBranch(expr, V, ContBB, FailBB);
+      
+      // Finally, emit the continue block and keep emitting the rest of the
+      // condition.
+      B.emitBlock(ContBB);
+      continue;
+    }
+    
+    auto *PBD = elt.getBinding();
+    for (auto entry : PBD->getPatternList()) {
+      InitializationPtr initialization =
+        InitializationForPattern(*this, FailDest).visit(entry.ThePattern);
+      
+      // If an initial value expression was specified by the decl, emit it into
+      // the initialization. Otherwise, mark it uninitialized for DI to resolve.
+      if (auto *Init = entry.Init) {
+        FullExpr Scope(Cleanups, CleanupLocation(Init));
+        emitExprInto(Init, initialization.get());
+      } else {
+        initialization->finishInitialization(*this);
+      }
+    }
+    
+    if (auto where = PBD->getWhereExpr()) {
+      // Evaluate the condition as an i1 value (guaranteed by Sema).
+      SILValue V;
+      {
+        FullExpr Scope(Cleanups, CleanupLocation(where));
+        V = emitRValue(where).forwardAsSingleValue(*this, where);
+      }
+      assert(V.getType().castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
+             "Sema forces conditions to have Builtin.i1 type");
+      
+      // Just branch on the condition.  On failure, we unwind any active cleanups,
+      // on success we fall through to a new block.
+      SILBasicBlock *ContBB = createBasicBlock();
+      auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
+      B.createCondBranch(where, V, ContBB, FailBB);
+      
+      // Finally, emit the continue block and keep emitting the rest of the
+      // condition.
+      B.emitBlock(ContBB);
+    }
+  }
+}
+
 InitializationPtr
 SILGenFunction::emitPatternBindingInitialization(Pattern *P) {
   return InitializationForPattern(*this, JumpDest::invalid()).visit(P);

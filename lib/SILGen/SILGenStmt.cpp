@@ -273,20 +273,35 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
 
   // Set up the block for the false case.  If there is an 'else' block, we make
   // a new one, otherwise it is our continue block.
-  SILBasicBlock *condFalseBB;
-  if (!S->getElseStmt())
-    condFalseBB = contBB;
-  else
-    condFalseBB = createBasicBlock();
-
+  JumpDest falseDest = contDest;
+  if (S->getElseStmt())
+    falseDest = createJumpDest(S);
+  
   // Emit the condition, along with the "then" part of the if properly guarded
   // by the condition and a jump to ContBB.  If the condition fails, jump to
   // the CondFalseBB.
-  SGF.emitStmtConditionWithBody(S, contBB, condFalseBB);
+  {
+    // Enter a scope for any bound pattern variables.
+    Scope trueScope(SGF.Cleanups, S);
 
+    SGF.emitStmtCondition(S->getCond(), falseDest, S);
+    
+    // In the success path, emit the 'then' part if the if.
+    SGF.emitProfilerIncrement(S->getThenStmt());
+    SGF.emitStmt(S->getThenStmt());
+  
+    // Finish the "true part" by cleaning up any temporaries and jumping to the
+    // continuation block.
+    if (SGF.B.hasValidInsertionPoint()) {
+      RegularLocation L(S->getThenStmt());
+      L.pointToEnd();
+      SGF.Cleanups.emitBranchAndCleanups(contDest, L);
+    }
+  }
+  
   // If there is 'else' logic, then emit it.
   if (S->getElseStmt()) {
-    SGF.B.emitBlock(condFalseBB);
+    SGF.B.emitBlock(falseDest.getBlock());
     visit(S->getElseStmt());
     if (SGF.B.hasValidInsertionPoint()) {
       RegularLocation L(S->getElseStmt());
@@ -316,13 +331,11 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
   
   // Create a new basic block and jump into it.
   JumpDest loopDest = createJumpDest(S->getBody());
-  SILBasicBlock *loopBB = loopDest.getBlock();
-  SGF.B.emitBlock(loopBB, S);
+  SGF.B.emitBlock(loopDest.getBlock(), S);
   
   // Create a break target (at this level in the cleanup stack) in case it is
   // needed.
   JumpDest breakDest = createJumpDest(S->getBody());
-  SILBasicBlock *breakBB = breakDest.getBlock();
 
   // Set the destinations for any 'break' and 'continue' statements inside the
   // body.
@@ -330,12 +343,30 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
   
   // Evaluate the condition, the body, and a branch back to LoopBB when the
   // condition is true.  On failure, jump to BreakBB.
-  SGF.emitStmtConditionWithBody(S, loopBB, breakBB);
+  {
+    // Enter a scope for any bound pattern variables.
+    Scope conditionScope(SGF.Cleanups, S);
+    
+    SGF.emitStmtCondition(S->getCond(), breakDest, S);
+    
+    // In the success path, emit the body of the while.
+    SGF.emitProfilerIncrement(S->getBody());
+    SGF.emitStmt(S->getBody());
+    
+    // Finish the "true part" by cleaning up any temporaries and jumping to the
+    // continuation block.
+    if (SGF.B.hasValidInsertionPoint()) {
+      RegularLocation L(S->getBody());
+      L.pointToEnd();
+      SGF.Cleanups.emitBranchAndCleanups(loopDest, L);
+    }
+  }
 
   SGF.BreakContinueDestStack.pop_back();
 
   // Handle break block.  If it was used, we link it up with the cleanup chain,
   // otherwise we just remove it.
+  SILBasicBlock *breakBB = breakDest.getBlock();
   if (breakBB->pred_empty()) {
     SGF.eraseBasicBlock(breakBB);
   } else {

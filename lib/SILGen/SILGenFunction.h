@@ -764,9 +764,8 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  void emitStmtConditionWithBody(LabeledConditionalStmt *S,
-                                 SILBasicBlock *SuccessBB,
-                                 SILBasicBlock *FailBB);
+  void emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
+                         SILLocation loc);
 
   void emitConditionalPBD(PatternBindingDecl *PBD, SILBasicBlock *FailBB);
 
