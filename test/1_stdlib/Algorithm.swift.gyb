@@ -1558,7 +1558,7 @@ struct ${CollectionType} : RangeReplaceableCollectionType {
   }
 
   subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
-    return elements[i.position]
+    return OpaqueValue(i.position + 1)
   }
 
   mutating func reserveCapacity(n: Int) {
