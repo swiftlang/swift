@@ -993,9 +993,9 @@ class Ping {
   func ping() -> Ping
 }
 
-sil hidden @_TFC4main4Ping4pingfS0_FT_S0_ : $@convention(method) (@guaranteed Ping) -> @owned Ping
-sil hidden @_TFC4main4PingD : $@convention(method) (@owned Ping) -> ()
-sil hidden @_TFC4main4PingcfMS0_FT_S0_ : $@convention(method) (@owned Ping) -> @owned Ping
+sil  @_TFC4main4Ping4pingfS0_FT_S0_ : $@convention(method) (@guaranteed Ping) -> @owned Ping
+sil  @_TFC4main4PingD : $@convention(method) (@owned Ping) -> ()
+sil  @_TFC4main4PingcfMS0_FT_S0_ : $@convention(method) (@owned Ping) -> @owned Ping
 
 // CHECK-LABEL: _TF4main4ringFCS_4PingT_
 // CHECK-NEXT:      bb0(%0 : $Ping):
@@ -1006,7 +1006,7 @@ sil hidden @_TFC4main4PingcfMS0_FT_S0_ : $@convention(method) (@owned Ping) -> @
 // CHECK-NEXT:      apply
 // CHECK-NEXT:      tuple
 // CHECK-NEXT:      return
-sil hidden @_TF4main4ringFCS_4PingT_ : $@convention(thin) (@owned Ping) -> () {
+sil @_TF4main4ringFCS_4PingT_ : $@convention(thin) (@owned Ping) -> () {
 bb0(%0 : $Ping):
   %1 = class_method %0 : $Ping, #Ping.ping!1 : Ping -> () -> Ping , $@convention(method) (@guaranteed Ping) -> @owned Ping
   %2 = class_method %0 : $Ping, #Ping.ping!1 : Ping -> () -> Ping , $@convention(method) (@guaranteed Ping) -> @owned Ping
