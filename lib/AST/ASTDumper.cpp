@@ -2127,17 +2127,16 @@ void TypeRepr::dump() const {
   llvm::errs() << '\n';
 }
 
+void Substitution::print(llvm::raw_ostream &os,
+                         const PrintOptions &PO) const {
+  Archetype->print(os, PO);
+  os << " = ";
+  Replacement->print(os, PO);
+}
+
 void Substitution::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
-}
-
-void swift::dump(const ArrayRef<Substitution> &subs) {
-  unsigned i = 0;
-  for (const auto &s : subs) {
-    llvm::errs() << i++ << ": ";
-    s.dump();
-  }
 }
 
 void ProtocolConformance::dump() const {

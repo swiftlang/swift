@@ -3000,23 +3000,3 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   }
   }
 }
-
-void Substitution::print(llvm::raw_ostream &os,
-                         const PrintOptions &PO) const {
-  Archetype->print(os, PO);
-  os << " = ";
-  Replacement->print(os, PO);
-
-  if (!Conformance.size()) return;
-
-  os << '[';
-  for (const auto *c : Conformance) {
-    os << ' ';
-    if (c) {
-      c->printName(os, PO);
-    } else {
-      os << "nullptr";
-    }
-  }
-  os << " ]";
-}

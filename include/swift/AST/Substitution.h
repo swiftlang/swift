@@ -96,8 +96,6 @@ private:
                      ArchetypeConformanceMap &conformanceMap) const;
 };
 
-void dump(const ArrayRef<Substitution> &subs);
-
 } // end namespace swift
 
 #endif
