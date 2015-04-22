@@ -75,13 +75,12 @@ public struct SourceLocStack {
 }
 
 func _printStackTrace(stackTrace: SourceLocStack?) {
-  if let s? = stackTrace {
-    println("stacktrace:")
-    for i in 0..<s.locs.count {
-      let loc = s.locs[s.locs.count - i - 1]
-      let comment = (loc.comment != nil) ? " ; \(loc.comment!)" : ""
-      println("  #\(i): \(loc.file):\(loc.line)\(comment)")
-    }
+  let s? = stackTrace else { return }
+  println("stacktrace:")
+  for i in 0..<s.locs.count {
+    let loc = s.locs[s.locs.count - i - 1]
+    let comment = (loc.comment != nil) ? " ; \(loc.comment!)" : ""
+    println("  #\(i): \(loc.file):\(loc.line)\(comment)")
   }
 }
 
@@ -663,10 +662,8 @@ struct _ParentProcess {
       var skippedTests = _UnitTestArray<String>()
       for t in testSuite._tests {
         let fullTestName = "\(testSuite.name).\(t.name)"
-        if let filter? = _filter {
-          if findSubstring(fullTestName, filter) == nil {
-            continue
-          }
+        if let filter? = _filter where findSubstring(fullTestName, filter) == nil {
+          continue
         }
 
         let activeSkips = t.getActiveSkipPredicates()

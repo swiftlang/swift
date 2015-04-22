@@ -34,19 +34,16 @@ ${MirrorDecl} {
   var quickLookObject: QuickLookObject? {
       // this code comes straight from the quicklooks
       
-      if let data? = (_value as AnyObject)._copyImageData?() {
-        // we could send a Raw, but I don't want to make a copy of the
-        // bytes for no good reason make an NSImage out of them and
-        // send that
+      let data? = (_value as AnyObject)._copyImageData?() else { return nil }
+      // we could send a Raw, but I don't want to make a copy of the
+      // bytes for no good reason make an NSImage out of them and
+      // send that
 #if os(OSX)
-        let img = NSImage(data: data)
+      let img = NSImage(data: data)
 #elseif os(iOS) || os(watchOS) || os(tvOS)
-        let img = UIImage(data: data)
+      let img = UIImage(data: data)
 #endif
-        return .Some(.Sprite(img))
-      }
-      
-      return nil
+      return .Some(.Sprite(img))
   }
   
 }

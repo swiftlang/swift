@@ -282,10 +282,8 @@ extension String {
   /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
   /// library.
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let ns? = _core.cocoaBuffer {
-      if CFStringGetLength(ns) == _core.count {
-        return ns
-      }
+    if let ns? = _core.cocoaBuffer where CFStringGetLength(ns) == _core.count {
+      return ns
     }
     _sanityCheck(_core.hasContiguousStorage)
     return _NSContiguousString(_core)

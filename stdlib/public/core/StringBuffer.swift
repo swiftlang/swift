@@ -91,38 +91,37 @@ public struct _StringBuffer {
   ) -> (_StringBuffer?, hadError: Bool) {
     // Determine how many UTF-16 code units we'll need
     var inputStream = input.generate()
-    if let (utf16Count, isAscii)? = UTF16.measure(encoding, input: inputStream,
-        repairIllFormedSequences: repairIllFormedSequences) {
-
-      // Allocate storage
-      var result = _StringBuffer(
-          capacity: max(utf16Count, minimumCapacity),
-          initialSize: utf16Count,
-          elementWidth: isAscii ? 1 : 2)
-
-      if isAscii {
-        var p = UnsafeMutablePointer<UTF8.CodeUnit>(result.start)
-        var sink = SinkOf<UTF32.CodeUnit> {
-            (p++).memory = UTF8.CodeUnit($0)
-          }
-        let hadError = transcode(
-          encoding, UTF32.self, input.generate(), &sink,
-          stopOnError: true)
-        _sanityCheck(!hadError, "string can not be ASCII if there were decoding errors")
-        return (result, hadError)
-      }
-      else {
-        var p = result._storage.baseAddress
-        var sink = SinkOf<UTF16.CodeUnit> {
-            (p++).memory = $0
-          }
-        let hadError = transcode(
-          encoding, UTF16.self, input.generate(), &sink,
-          stopOnError: !repairIllFormedSequences)
-        return (result, hadError)
-      }
-    } else {
+    let (utf16Count, isAscii)? = UTF16.measure(encoding, input: inputStream,
+        repairIllFormedSequences: repairIllFormedSequences) else {
       return (.None, true)
+    }
+
+    // Allocate storage
+    var result = _StringBuffer(
+        capacity: max(utf16Count, minimumCapacity),
+        initialSize: utf16Count,
+        elementWidth: isAscii ? 1 : 2)
+
+    if isAscii {
+      var p = UnsafeMutablePointer<UTF8.CodeUnit>(result.start)
+      var sink = SinkOf<UTF32.CodeUnit> {
+          (p++).memory = UTF8.CodeUnit($0)
+        }
+      let hadError = transcode(
+        encoding, UTF32.self, input.generate(), &sink,
+        stopOnError: true)
+      _sanityCheck(!hadError, "string can not be ASCII if there were decoding errors")
+      return (result, hadError)
+    }
+    else {
+      var p = result._storage.baseAddress
+      var sink = SinkOf<UTF16.CodeUnit> {
+          (p++).memory = $0
+        }
+      let hadError = transcode(
+        encoding, UTF16.self, input.generate(), &sink,
+        stopOnError: !repairIllFormedSequences)
+      return (result, hadError)
     }
   }
 

@@ -106,11 +106,10 @@ public struct Character :
       _representation = .Small(Builtin.trunc_Int64_Int63(initialUTF8.value))
     }
     else {
-      if let native? = s._core.nativeBuffer {
-        if native.start == UnsafeMutablePointer(s._core._baseAddress) {
-          _representation = .Large(native._storage)
-          return
-        }
+      if let native? = s._core.nativeBuffer
+              where native.start == UnsafeMutablePointer(s._core._baseAddress) {
+        _representation = .Large(native._storage)
+        return
       }
       var nativeString = ""
       nativeString.extend(s)

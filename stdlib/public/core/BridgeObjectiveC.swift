@@ -110,13 +110,13 @@ func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, AnyObject.self)
   }
-  if let bridged? = _bridgeNonVerbatimToObjectiveC(x) {
-    _autorelease(bridged)
-    return bridged
-  } else {
+  let bridged? = _bridgeNonVerbatimToObjectiveC(x) else {
     _preconditionFailure(
       "Dictionary key failed to bridge from Swift type to a Objective-C type")
   }
+  
+  _autorelease(bridged)
+  return bridged
 }
 
 @asmname("swift_bridgeNonVerbatimToObjectiveC")

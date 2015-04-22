@@ -349,14 +349,13 @@ extension PlaygroundQuickLook {
   public init(reflecting instance: Any) {
     if let customized? = instance as? CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook()
+      return
     }
-    else {
-      if let q? = Swift.reflect(instance).quickLookObject {
-        self = q
-      }
-      else {
-        self = .Text(String(reflecting: instance))
-      }
+
+    if let q? = Swift.reflect(instance).quickLookObject {
+      self = q
+    } else {
+      self = .Text(String(reflecting: instance))
     }
   }
 }

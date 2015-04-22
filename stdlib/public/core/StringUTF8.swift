@@ -276,11 +276,10 @@ extension String {
   public init?(_ utf8: UTF8View) {
     let wholeString = String(utf8._core)
     
-    if let start? = utf8.startIndex.samePositionIn(wholeString) {
-      if let end? = utf8.endIndex.samePositionIn(wholeString) {
-        self = wholeString[start..<end]
-        return
-      }
+    if let start? = utf8.startIndex.samePositionIn(wholeString),
+       let end? = utf8.endIndex.samePositionIn(wholeString) {
+      self = wholeString[start..<end]
+      return
     }
     return nil
   }

@@ -68,17 +68,15 @@ extension SequenceType ${"" if preds else "where Self.Generator.Element : Compar
 %   end
   ) -> ${GElement}? {
     var g = generate()
-    if var result? = g.next() {
-      for e in GeneratorSequence(g) {
+    var result? = g.next() else { return nil }
+    for e in GeneratorSequence(g) {
 %   if preds:
-        if isOrderedBefore(e, result) { result = e }
+      if isOrderedBefore(e, result) { result = e }
 %   else:
-        if e < result { result = e }
+      if e < result { result = e }
 %   end
-      }
-      return result
     }
-    return nil
+    return result
   }
 
   /// Returns the maximum element in `self`.
@@ -144,9 +142,6 @@ else:
         if ${"!isEquivalent(e0, e1)" if preds else "e0 != e1"} {
           return false
         }
-      }
-      else {
-        return true
       }
     }
     return otherGenerator.next() != nil ? false : true

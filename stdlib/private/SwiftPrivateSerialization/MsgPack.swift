@@ -300,11 +300,9 @@ public struct MsgPackDecoder {
   }
 
   internal mutating func _consumeByte() -> UInt8? {
-    if let result? = _lookByte() {
-      _consumedCount++
-      return result
-    }
-    return nil
+    let result? = _lookByte() else { return nil }
+    _consumedCount++
+    return result
   }
 
   internal mutating func _consumeByteIf(byte: UInt8) -> Bool {
@@ -403,10 +401,8 @@ public struct MsgPackDecoder {
 
   public mutating func readFloat32() -> Float32? {
     return _rewindIfReturnsNil {
-      if _consumeByteIf(0xca) {
-        if let bitPattern? = _readBigEndianUInt32() {
-          return Float32._fromBitPattern(bitPattern)
-        }
+      if _consumeByteIf(0xca), let bitPattern? = _readBigEndianUInt32() {
+        return Float32._fromBitPattern(bitPattern)
       }
       return nil
     }
@@ -414,10 +410,8 @@ public struct MsgPackDecoder {
 
   public mutating func readFloat64() -> Float64? {
     return _rewindIfReturnsNil {
-      if _consumeByteIf(0xcb) {
-        if let bitPattern? = _readBigEndianUInt64() {
-          return Float64._fromBitPattern(bitPattern)
-        }
+      if _consumeByteIf(0xcb), let bitPattern? = _readBigEndianUInt64() {
+        return Float64._fromBitPattern(bitPattern)
       }
       return nil
     }
