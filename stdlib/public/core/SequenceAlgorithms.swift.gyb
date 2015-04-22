@@ -404,8 +404,8 @@ extension SequenceType {
 //===----------------------------------------------------------------------===//
 
 extension SequenceType {
-  /// Return an `Array` containing the results of mapping `transform`
-  /// over `self` and flattening the result.
+  /// Return an `Array` containing concatenated results of mapping `transform`
+  /// over `self`.
   final public func _prext_flatMap<S : SequenceType>(
     @noescape transform: (${GElement}) -> S
   ) -> [S.${GElement}] {
