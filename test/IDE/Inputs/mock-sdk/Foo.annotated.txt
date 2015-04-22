@@ -77,7 +77,7 @@ func <loc>fooFunc1(a: <ref:Struct>Int32</ref>)</loc> -> <ref:Struct>Int32</ref><
 <decl:Func>func <loc>fooFunc1AnonymousParam(_: <ref:Struct>Int32</ref>)</loc> -> <ref:Struct>Int32</ref></decl>
 <decl:Func>func <loc>fooFunc3(a: <ref:Struct>Int32</ref>, b: <ref:Struct>Float</ref>, c: <ref:Struct>Double</ref>, d: <ref:Struct>UnsafeMutablePointer</ref><<ref:Struct>Int32</ref>>)</loc> -> <ref:Struct>Int32</ref></decl>
 <decl:Func>func <loc>fooFuncWithBlock(blk: ((<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!)</loc></decl>
-<decl:Func>func <loc>fooFuncWithFunctionPointer(fptr: (@convention(c) (<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!)</loc></decl>
+<decl:Func>func <loc>fooFuncWithFunctionPointer(fptr: <ref:Struct>CFunctionPointer</ref><((<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)>)</loc></decl>
 <decl:Func>@noreturn func <loc>fooFuncNoreturn1()</loc></decl>
 <decl:Func>@noreturn func <loc>fooFuncNoreturn2()</loc></decl>
 
