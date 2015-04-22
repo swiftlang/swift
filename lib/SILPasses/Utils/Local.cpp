@@ -1252,31 +1252,31 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
 SILInstruction *
 CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (Inst->isExact()) {
-    // Check if the exact dynamic type of the operand can be determined.
-    if (auto *ARI = dyn_cast<AllocRefInst>(Inst->getOperand().stripUpCasts())) {
-      SILBuilderWithScope<1> Builder(Inst);
-      auto Loc = Inst->getLoc();
-      auto *SuccessBB = Inst->getSuccessBB();
-      auto *FailureBB = Inst->getFailureBB();
+    auto *ARI = dyn_cast<AllocRefInst>(Inst->getOperand().stripUpCasts());
+    if (!ARI)
+      return nullptr;
 
-      if (ARI->getType() == Inst->getCastType()) {
-        // This exact cast will succeed.
-        SmallVector<SILValue, 1> Args;
-        Args.push_back(ARI);
-        auto *NewI = Builder.createBranch(Loc, SuccessBB, Args);
-        EraseInstAction(Inst);
-        WillSucceedAction();
-        return NewI;
-      } else {
-        // This exact cast will fail.
-        auto *NewI = Builder.createBranch(Loc, FailureBB);
-        EraseInstAction(Inst);
-        WillFailAction();
-        return NewI;
-      }
+    // We know the dynamic type of the operand.
+    SILBuilderWithScope<1> Builder(Inst);
+    auto Loc = Inst->getLoc();
+    auto *SuccessBB = Inst->getSuccessBB();
+    auto *FailureBB = Inst->getFailureBB();
+
+    if (ARI->getType() == Inst->getCastType()) {
+      // This exact cast will succeed.
+      SmallVector<SILValue, 1> Args;
+      Args.push_back(ARI);
+      auto *NewI = Builder.createBranch(Loc, SuccessBB, Args);
+      EraseInstAction(Inst);
+      WillSucceedAction();
+      return NewI;
     }
 
-    return nullptr;
+    // This exact cast will fail.
+    auto *NewI = Builder.createBranch(Loc, FailureBB);
+    EraseInstAction(Inst);
+    WillFailAction();
+    return NewI;
   }
 
   if (auto *I = optimizeCheckedCastBranchInst(Inst))
@@ -1333,11 +1333,12 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
       if (BridgedI) {
         CastedValue = SILValue(BridgedI, 0);
-      }
-      else
+      } else {
         CastedValue = emitSuccessfulScalarUnconditionalCast(
           Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
           SourceType, TargetType, Inst);
+      }
+
       if (!CastedValue)
         CastedValue =
             Builder.createUnconditionalCheckedCast(Loc, Op, LoweredTargetType);
