@@ -1797,11 +1797,11 @@ class ClassThrows1 {
 // CHECK-DUMP-LABEL: class_decl "ImplicitClassThrows1"
 @objc class ImplicitClassThrows1 {
   // CHECK: @objc func methodReturnsVoid() throws
-  // CHECK-DUMP: func_decl "methodReturnsVoid()"{{.*}}foreign_error=zero,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "methodReturnsVoid()"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   func methodReturnsVoid() throws { }
 
   // CHECK: @objc func methodReturnsObjCClass() throws -> Class_ObjC1
-  // CHECK-DUMP: func_decl "methodReturnsObjCClass()" {{.*}}foreign_error=nil,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>
+  // CHECK-DUMP: func_decl "methodReturnsObjCClass()" {{.*}}foreign_error=NilResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>
   func methodReturnsObjCClass() throws -> Class_ObjC1 {
     return Class_ObjC1()
   }
@@ -1816,18 +1816,18 @@ class ClassThrows1 {
   func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil }
 
   // CHECK: @objc func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int)
-  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=zero,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int, fn3: (Int) -> Int) throws { }
 
   // CHECK: @objc init(degrees: Double) throws
-  // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=nil,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>
+  // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>
   init(degrees: Double) throws { }
 }
 
 // CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"
 @objc class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
   // CHECK: @objc override func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: ((Int) -> Int), fn3: ((Int) -> Int))
-  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=zero,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   override func methodWithTrailingClosures(s: String, fn1: ((Int) -> Int), fn2: ((Int) -> Int), fn3: ((Int) -> Int)) throws { }
 }
 
@@ -1860,19 +1860,19 @@ class ThrowsObjCName {
 
   @objc(method7) func method7(x: Int) throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
 
-  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=zero,unowned,param=2,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   @objc(method8:fn1:error:fn2:)
   func method8(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 
-  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=zero,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   @objc(method9WithError:s:fn1:fn2:)
   func method9(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 }
 
 class SubclassThrowsObjCName : ThrowsObjCName {
-  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=zero,unowned,param=2,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   override func method8(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 
-  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=zero,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   override func method9(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 }

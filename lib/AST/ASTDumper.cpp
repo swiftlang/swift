@@ -684,21 +684,21 @@ namespace {
         bool wantResultType = false;
         switch (fec->getKind()) {
         case ForeignErrorConvention::ZeroResult:
-          OS << "zero";
+          OS << "ZeroResult";
           wantResultType = true;
           break;
 
         case ForeignErrorConvention::NonZeroResult:
-          OS << "nonzero";
+          OS << "NonZeroResult";
           wantResultType = true;
           break;
 
         case ForeignErrorConvention::NilResult:
-          OS << "nil";
+          OS << "NilResult";
           break;
 
         case ForeignErrorConvention::NonNilError:
-          OS << "nonnil";
+          OS << "NonNilError";
           break;
         }
 
@@ -807,11 +807,11 @@ namespace {
         break;
 
       case OTK_Optional:
-        OS << " failable?";
+        OS << " failable=Optional";
         break;
 
       case OTK_ImplicitlyUnwrappedOptional:
-        OS << " failable!";
+        OS << " failable=ImplicitlyUnwrappedOptional";
         break;
       }
 
