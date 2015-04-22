@@ -120,8 +120,8 @@ extension SequenceType ${"" if preds else "where Self.Generator.Element : Equata
 %{
 if preds:
   comment = """
-  /// Return true iff `s` begins with elements equivalent to those of
-  /// `prefix`, using `isEquivalent` as the equivalence test.
+  /// Return true iff `self` begins with elements equivalent to those of
+  /// `other`, using `isEquivalent` as the equivalence test.
   ///
   /// Requires: `isEquivalent` is an `equivalence relation
   /// <http://en.wikipedia.org/wiki/Equivalence_relation>`_"""
@@ -131,16 +131,16 @@ else:
 }%
   ${comment}
   final public func _prext_startsWith<
-    S : SequenceType where S.${GElement} == ${GElement}
+    OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
-    prefix: S${"," if preds else ""}
+    other: OtherSequence${"," if preds else ""}
 %   if preds:
     @noescape isEquivalent: (${GElement}, ${GElement}) -> Bool
 %   end
   ) -> Bool {
-    var prefixGenerator = prefix.generate()
+    var otherGenerator = other.generate()
     for e0 in self {
-      if let e1? = prefixGenerator.next() {
+      if let e1? = otherGenerator.next() {
         if ${"!isEquivalent(e0, e1)" if preds else "e0 != e1"} {
           return false
         }
@@ -149,7 +149,7 @@ else:
         return true
       }
     }
-    return prefixGenerator.next() != nil ? false : true
+    return otherGenerator.next() != nil ? false : true
   }
 }
 
@@ -168,28 +168,28 @@ extension SequenceType ${"" if preds else "where Self.Generator.Element : Equata
 %{
 if preds:
   comment = """
-  /// Return true iff `a1` and `a2` contain equivalent elements, using
+  /// Return true iff `self` and `other` contain equivalent elements, using
   /// `isEquivalent` as the equivalence test.
   ///
   /// Requires: `isEquivalent` is an `equivalence relation
   /// <http://en.wikipedia.org/wiki/Equivalence_relation>`_"""
 else:
   comment = """
-  /// Return `true` iff `self` and `s` contain the same elements in the
+  /// Return `true` iff `self` and `other` contain the same elements in the
   /// same order."""
 }%
 
   ${comment}
   final public func _prext_equalElements<
-    S : SequenceType where S.${GElement} == ${GElement}
+    OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
-    s: S${"," if preds else ""}
+    other: OtherSequence${"," if preds else ""}
 %   if preds:
     @noescape isEquivalent: (${GElement}, ${GElement}) -> Bool
 %   end
   ) -> Bool {
     var g1 = self.generate()
-    var g2 = s.generate()
+    var g2 = other.generate()
     while true {
       switch (g1.next(), g2.next()) {
       case let (e1?, e2?):
@@ -225,36 +225,36 @@ extension SequenceType ${"" if preds else "where Self.Generator.Element : Compar
 %{
 if preds:
   comment = """
-  /// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
+  /// Return true iff `self` precedes `other` in a lexicographical ("dictionary")
   /// ordering, using `isOrderedBefore` as the comparison between elements.
   ///
   /// Requires: isOrderedBefore` is a `strict weak ordering
   /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
-  /// over the elements of `a1` and `a2`."""
+  /// over the elements of `self` and `other`."""
 else:
   comment = """
-  /// Return true iff a1 precedes a2 in a lexicographical ("dictionary")
+  /// Return true iff `self` precedes `other` in a lexicographical ("dictionary")
   /// ordering, using "<" as the comparison between elements."""
 }%
 
   ${comment}
   final public func _prext_lexicographicalCompare<
-    S : SequenceType where S.${GElement} == ${GElement}
+    OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
-    s: S${"," if preds else ""}
+    other: OtherSequence${"," if preds else ""}
 %   if preds:
-    @noescape isOrderedBefore less: (${GElement}, ${GElement}) -> Bool
+    @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
 %   end
   ) -> Bool {
     var g1 = self.generate()
-    var g2 = s.generate()
+    var g2 = other.generate()
     while true {
       if let e1? = g1.next() {
         if let e2? = g2.next() {
-          if ${"less(e1, e2)" if preds else "e1 < e2"} {
+          if ${"isOrderedBefore(e1, e2)" if preds else "e1 < e2"} {
             return true
           }
-          if ${"less(e2, e1)" if preds else "e2 < e1"} {
+          if ${"isOrderedBefore(e2, e1)" if preds else "e2 < e1"} {
             return false
           }
           continue // equivalent
@@ -441,8 +441,10 @@ extension SequenceType {
   /// Returns a sequence of pairs built out of two underlying sequences,
   /// where the elements of the `i`\ th pair are the `i`\ th elements
   /// of each underlying sequence.
-  final public func _prext_zip<S : SequenceType>(s: S) -> Zip2<Self, S> {
-    return Zip2(self, s)
+  final public func _prext_zip<OtherSequence : SequenceType>(
+    other: OtherSequence
+  ) -> Zip2<Self, OtherSequence> {
+    return Zip2(self, other)
   }
 }
 
