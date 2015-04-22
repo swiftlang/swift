@@ -423,18 +423,6 @@ public:
     return buf;
   }
 
-  
-  void emitDebugValue(SILValue v, SILGenFunction &gen) {
-    // Emit a debug_value[_addr] instruction to record the start of this value's
-    // lifetime.
-    SILLocation PrologueLoc(vd);
-    PrologueLoc.markAsPrologue();
-    if (address.isValid())
-      gen.B.createDebugValueAddr(PrologueLoc, v);
-    else
-      gen.B.createDebugValue(PrologueLoc, v);
-  }
-
   SILValue getAddressOrNull() const override {
     return address;
   }
@@ -448,7 +436,14 @@ public:
       address = value;
     gen.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
-    emitDebugValue(value, gen);
+    // Emit a debug_value[_addr] instruction to record the start of this value's
+    // lifetime.
+    SILLocation PrologueLoc(vd);
+    PrologueLoc.markAsPrologue();
+    if (address.isValid())
+      gen.B.createDebugValueAddr(PrologueLoc, value);
+    else
+      gen.B.createDebugValue(PrologueLoc, value);
   }
   
   void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
