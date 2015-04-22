@@ -446,3 +446,23 @@ func testEnumReabstraction(x: Any) {
   f()
 }
 
+// CHECK-LABEL: sil hidden @_TF16if_while_binding22let_else_tuple_bindingFGSqTSiSi__Si
+func let_else_tuple_binding(a : (Int, Int)?) -> Int {
+
+// CHECK-NEXT: bb0(%0 : $Optional<(Int, Int)>):
+// CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>  // let a
+// CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.Some!enumelt.1: bb1, default bb2
+
+  let (x, y)? = a else { }
+  return x
+
+// CHECK: bb1(%3 : $(Int, Int)):
+// CHECK-NEXT:   %4 = tuple_extract %3 : $(Int, Int), 0
+// CHECK-NEXT:   debug_value %4 : $Int  // let x
+// CHECK-NEXT:   %6 = tuple_extract %3 : $(Int, Int), 1
+// CHECK-NEXT:   debug_value %6 : $Int  // let y
+// CHECK-NEXT:   return %4 : $Int
+}
+
+
+

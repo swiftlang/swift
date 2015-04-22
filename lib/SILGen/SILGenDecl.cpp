@@ -101,9 +101,30 @@ namespace {
         sub->finishInitialization(gen);
     }
     
-    void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                             SILLocation loc, SILGenFunction &gen) override {
-      llvm_unreachable("tuple initialization not destructured?!");
+    void copyOrInitValueInto(ManagedValue valueMV, bool isInit, SILLocation loc,
+                             SILGenFunction &SGF) override {
+      // A scalar value is being copied into the tuple, break it into elements
+      // and assign/init each element in turn.
+      SILValue value = valueMV.forward(SGF);
+      auto sourceType = cast<TupleType>(valueMV.getSwiftType());
+      auto sourceSILType = value.getType();
+      for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
+        SILType fieldTy = sourceSILType.getTupleElementType(i);
+        auto &fieldTL = SGF.getTypeLowering(fieldTy);
+        
+        SILValue member;
+        if (value.getType().isAddress()) {
+          member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
+          if (!fieldTL.isAddressOnly())
+            member = SGF.B.createLoad(loc, member);
+        } else {
+          member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
+        }
+        
+        auto elt = SGF.emitManagedRValueWithCleanup(member, fieldTL);
+        
+        subInitializations[i]->copyOrInitValueInto(elt, isInit, loc, SGF);
+      }
     }
   };
 } // end anonymous namespace
