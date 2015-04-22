@@ -7,26 +7,26 @@ import Builtin
 // CHECK-LABEL: sil @test_jump_threading
 // CHECK: bb4(%{{[0-9]+}} : $Builtin.Int64): 
 // CHECK-NEXT: br bb1
-sil @test_jump_threading : $@thin (Builtin.Int1) -> () { 
+sil @test_jump_threading : $@convention(thin)  (Builtin.Int1) -> () { 
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb2, bb3
 
 // Blocks are handled from last to first. Block bb1 is placed here so that its argument
 // is not optimized before jump threading is done in bb2 and bb3.
 bb1(%i4 : $Builtin.Int64):
-  %f3 = function_ref @get_condition : $@thin (Builtin.Int64) -> Builtin.Int1
-  %c1 = apply %f3(%i3) : $@thin (Builtin.Int64) -> Builtin.Int1
+  %f3 = function_ref @get_condition : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
+  %c1 = apply %f3(%i3) : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
   %i5 = integer_literal $Builtin.Int64, 27
   cond_br %c1, bb1(%i5 : $Builtin.Int64), bb5
 
 bb2:
-  %f1 = function_ref @get_int1 : $@thin () -> Builtin.Int64
-  %i1 = apply %f1() : $@thin () -> Builtin.Int64
+  %f1 = function_ref @get_int1 : $@convention(thin)  () -> Builtin.Int64
+  %i1 = apply %f1() : $@convention(thin)  () -> Builtin.Int64
   br bb4(%i1 : $Builtin.Int64)
 
 bb3:
-  %f2 = function_ref @get_int1 : $@thin () -> Builtin.Int64
-  %i2 = apply %f2() : $@thin () -> Builtin.Int64
+  %f2 = function_ref @get_int1 : $@convention(thin)  () -> Builtin.Int64
+  %i2 = apply %f2() : $@convention(thin)  () -> Builtin.Int64
   br bb4(%i2 : $Builtin.Int64)
 
 // Jump threading must not be done for this block because the argument %i3 is also
@@ -40,6 +40,6 @@ bb5:
 
 }
 
-sil @get_int1 : $@thin () -> Builtin.Int64
-sil @get_int2 : $@thin () -> Builtin.Int64
-sil @get_condition : $@thin (Builtin.Int64) -> Builtin.Int1
+sil @get_int1 : $@convention(thin)  () -> Builtin.Int64
+sil @get_int2 : $@convention(thin)  () -> Builtin.Int64
+sil @get_condition : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1

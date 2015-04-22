@@ -248,10 +248,10 @@ bb0(%0 : $Builtin.Int64):
 // CHECK: [[FUN:%[0-9]+]] = function_ref @test5 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
 // CHECK: [[FUN_RESULT:%[0-9]+]] = apply [[FUN]]([[INPUT]]) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
 // CHECK: return [[FUN_RESULT]] : $Builtin.Int64
-sil @test5 : $@thin(Builtin.Int64) -> Builtin.Int64 {
+sil @test5 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = function_ref @test5 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
-  %2 = apply %1(%0) : $@thin(Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
   return %2 : $Builtin.Int64
 }
 

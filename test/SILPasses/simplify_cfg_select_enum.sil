@@ -31,7 +31,7 @@ class Derived2 : Base { }
 // CHECK: integer_literal $Builtin.Int64, 2
 // CHECK: integer_literal $Builtin.Int64, 3
 // CHECK: return
-sil @test_checked_cast_br : $@thin (E, @owned Base, @owned Base, @owned Base, @owned Base) -> Builtin.Int64 { 
+sil @test_checked_cast_br : $@convention(thin) (E, @owned Base, @owned Base, @owned Base, @owned Base) -> Builtin.Int64 { 
 bb0(%0 : $E, %1 : $Base, %2 : $Base, %3 : $Base, %4 : $Base):
   %s1 = select_enum %0 : $E, case #E.A!enumelt: %1, default %2 : $Base
   checked_cast_br %s1 : $Base to $Derived1, bb1, bb2
@@ -65,7 +65,7 @@ bb5(%a3 : $Builtin.Int64):
 // CHECK: integer_literal $Builtin.Int64, 2
 // CHECK: integer_literal $Builtin.Int64, 3
 // CHECK: return
-sil @test_cond_br : $@thin (E, @owned Base, @owned Base, @owned Base, @owned Base) -> Builtin.Int64 { 
+sil @test_cond_br : $@convention(thin) (E, @owned Base, @owned Base, @owned Base, @owned Base) -> Builtin.Int64 { 
 bb0(%0 : $E, %1 : $Base, %2 : $Base, %3 : $Base, %4 : $Base):
   %t1 = integer_literal $Builtin.Int1, -1
   %f1 = integer_literal $Builtin.Int1, 0

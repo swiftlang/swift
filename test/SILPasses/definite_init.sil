@@ -248,7 +248,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // CHECK-LABEL: sil @assign_test_weak
-sil @assign_test_weak : $@thin() -> () {
+sil @assign_test_weak : $@convention(thin) () -> () {
 bb0:
   // Assignments of weak pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
@@ -287,7 +287,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @assign_test_unowned
-sil @assign_test_unowned : $@thin() -> () {
+sil @assign_test_unowned : $@convention(thin) () -> () {
 bb0:
   // Assignments of unowned pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
@@ -669,42 +669,42 @@ struct MyStruct : P {}
 //CHECK-NEXT: load
 //CHECK:  return
 sil @self_init_assert_instruction : $@convention(thin) (Int, @thin MyStruct.Type) -> MyStruct {
-bb0(%0 : $Int, %1 : $@thin MyStruct.Type):
-  %2 = alloc_stack $MyStruct  // var self         // users: %3, %10
-  %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct // users: %8, %9
-  debug_value %0 : $Int  // let i                 // id: %4
+  bb0(%0 : $Int, %1 : $@thin MyStruct.Type):
+    %2 = alloc_stack $MyStruct  // var self         // users: %3, %10
+     %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct // users: %8, %9
+     debug_value %0 : $Int  // let i                 // id: %4
 
-  %6 = function_ref @selfinit : $@convention(thin) () -> MyStruct
-  %7 = apply %6() : $@convention(thin) () -> MyStruct
-  assign %7 to %3 : $*MyStruct
-  %9 = load %3 : $*MyStruct
-  dealloc_stack %2#0 : $*@local_storage MyStruct
-  return %9 : $MyStruct
+     %6 = function_ref @selfinit : $@convention(thin) () -> MyStruct
+       %7 = apply %6() : $@convention(thin) () -> MyStruct
+                         assign %7 to %3 : $*MyStruct
+                         %9 = load %3 : $*MyStruct
+                         dealloc_stack %2#0 : $*@local_storage MyStruct
+                         return %9 : $MyStruct
 }
 
 sil @selfinit : $@convention(thin) () -> MyStruct // user: %7
 
 struct MyStruct2 {
   var x: P
-  init(delegate: ())
-  init()
+    init(delegate: ())
+    init()
 }
 
 sil @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
 
-// <rdar://problem/18089574> Protocol member in struct + delegating init miscompilation
-// CHECK-LABEL: @self_init_copyaddr
-sil @self_init_copyaddr : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> () {
-bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
-  // CHECK: [[SELF:%[0-9]+]] = alloc_stack $MyStruct2
-  %2 = alloc_stack $MyStruct2  // var self
-  %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct2
-  %6 = metatype $@thin MyStruct2.Type
-  %7 = function_ref @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
-  %8 = alloc_stack $MyStruct2
+  // <rdar://problem/18089574> Protocol member in struct + delegating init miscompilation
+  // CHECK-LABEL: @self_init_copyaddr
+  sil @self_init_copyaddr : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> () {
+    bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
+      // CHECK: [[SELF:%[0-9]+]] = alloc_stack $MyStruct2
+      %2 = alloc_stack $MyStruct2  // var self
+       %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct2
+       %6 = metatype $@thin MyStruct2.Type
+       %7 = function_ref @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
+       %8 = alloc_stack $MyStruct2
 
-  // Make sure this copy_addr ends up being an initialization.
-  apply %7(%8#1, %6) : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
+       // Make sure this copy_addr ends up being an initialization.
+       apply %7(%8#1, %6) : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Type) -> ()
   copy_addr [take] %8#1 to %3 : $*MyStruct2
   dealloc_stack %8#0 : $*@local_storage MyStruct2
 

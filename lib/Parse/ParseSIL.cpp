@@ -893,8 +893,7 @@ bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams,
   P.parseTypeAttributeList(attrs);
 
   // Global functions are implicitly @convention(thin) if not specified otherwise.
-  if (IsFuncDecl && !(attrs.has(TAK_thick) || attrs.has(TAK_thin) ||
-                      attrs.has(TAK_objc_block) || attrs.has(TAK_convention))) {
+  if (IsFuncDecl && !attrs.has(TAK_convention)) {
     // Use a random location.
     attrs.setAttr(TAK_convention, P.PreviousLoc);
     attrs.convention = "thin";

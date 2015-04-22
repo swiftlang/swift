@@ -346,7 +346,7 @@ bb0:
 }
 
 // CHECK-LABEL: @test_union_data_case : $@convention(thin) (Int) -> Beth {
-sil [fragile] @test_union_data_case : $@thin Int -> Beth {
+sil [fragile] @test_union_data_case : $@convention(thin) Int -> Beth {
 bb0(%0 : $Int):
   // CHECK: %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
   %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
@@ -848,7 +848,7 @@ sil [fragile] @takes_unnamed_closure : $@convention(thin) (@callee_owned () -> I
 sil [fragile] @takes_int64_float32 : $@convention(thin) (Int, Float32) -> ()
 
 // CHECK-LABEL: sil public_external [fragile] @test_partial_apply : $@convention(thin) (Float) -> @callee_owned (Int) -> () {
-sil [fragile] @test_partial_apply : $@thin Float32 -> @callee_owned Int -> () {
+sil [fragile] @test_partial_apply : $@convention(thin) Float32 -> @callee_owned Int -> () {
 bb0(%0 : $Float32):
   %1 = function_ref @takes_int64_float32 : $@convention(thin) (Int, Float) -> ()
   // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@convention(thin) (Int, Float) -> ()
@@ -913,7 +913,7 @@ public func serialize_all() {
 }
 
 // CHECK: sil public_external [fragile] @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
-sil [fragile] @cond_fail_test : $@thin Builtin.Int1 -> () {
+sil [fragile] @cond_fail_test : $@convention(thin) Builtin.Int1 -> () {
 entry(%0 : $Builtin.Int1):
   // CHECK: cond_fail %0 : $Builtin.Int1
   cond_fail %0 : $Builtin.Int1
@@ -922,7 +922,7 @@ entry(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil public_external [fragile] @block_storage_type
-sil [fragile] @block_storage_type : $@thin Int -> @convention(block) () -> () {
+sil [fragile] @block_storage_type : $@convention(thin) Int -> @convention(block) () -> () {
 entry(%0 : $Int):
   // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
   %s = alloc_stack $@block_storage Int
@@ -1028,7 +1028,7 @@ struct GenericStruct<T> {
 }
 
 // CHECK-LABEL: @extract_generic_struct
-sil [fragile] @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64 {
+sil [fragile] @extract_generic_struct : $@convention(thin) GenericStruct<Int64> -> Int64 {
 entry(%0 : $GenericStruct<Int64>):
   // CHECK: %1 = struct_extract %0 : $GenericStruct<Int64>, #GenericStruct.x
   %1 = struct_extract %0 : $GenericStruct<Int64>, #GenericStruct.x
@@ -1233,7 +1233,7 @@ bb0:
   %31 = function_ref @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
   %33 = function_ref @_TFV6struct5AlephCfMS0_FT_S0_ : $@convention(thin) (@thin Aleph.Type) -> Aleph
   %35 = function_ref @test_union_empty_case : $@convention(thin) () -> Beth
-  %37 = function_ref @test_union_data_case : $@thin Int -> Beth
+  %37 = function_ref @test_union_data_case : $@convention(thin) Int -> Beth
   %39 = function_ref @test_union_addr_empty_case : $@convention(thin) (@out Gimel) -> ()
   %41 = function_ref @test_union_addr_data_case : $@convention(thin) (@out Gimel, @in Q) -> ()
   %43 = function_ref @_TF5tuple5floatFT1xSf_T_ : $@convention(thin) (Float32) -> ()
@@ -1271,20 +1271,20 @@ bb0:
   %130 = function_ref @noinline_callee : $@convention(thin) () -> Int
   %132 = function_ref @always_inline_callee : $@convention(thin) () -> Int
   %131 = function_ref @test_semantics : $@convention(thin) () -> ()
-  %111 = function_ref @test_partial_apply : $@thin Float32 -> @callee_owned Int -> ()
+  %111 = function_ref @test_partial_apply : $@convention(thin) Float32 -> @callee_owned Int -> ()
   %113 = function_ref @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
   %115 = function_ref @test_mark_fn_escape : $@convention(thin) () -> ()
   %117 = function_ref @test_copy_release_value : $@convention(thin) (X) -> (X)
-  %118 = function_ref @cond_fail_test : $@thin Builtin.Int1 -> ()
+  %118 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
 
-  %124 = function_ref @block_storage_type : $@thin Int -> @convention(block) () -> ()
+  %124 = function_ref @block_storage_type : $@convention(thin) Int -> @convention(block) () -> ()
   %125 = function_ref @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject)
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
   %126 = function_ref @protocol_conversion : $@convention(thin) () -> @owned Protocol
   %120 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (@out Int, Int) -> (), Int) -> Int
   %122 = function_ref @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()
-  %123 = function_ref @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64
+  %123 = function_ref @extract_generic_struct : $@convention(thin) GenericStruct<Int64> -> Int64
   %128 = function_ref @select_enum : $@convention(thin) (@in Beth) -> ()
   %228 = function_ref @existential_box : $@convention(thin) (SomeError) -> ()
   %129 = function_ref @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> ()

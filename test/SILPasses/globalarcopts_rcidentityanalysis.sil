@@ -376,7 +376,7 @@ sil_global [fragile] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 // CHECK: raw_pointer_to_ref
 // CHECK: strong_retain
 // CHECK: return
-sil @dont_strip_rawpointer_to_address : $@thin(FakeOptional<Builtin.NativeObject>) -> () {
+sil @dont_strip_rawpointer_to_address : $@convention(thin) (FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : $FakeOptional<Builtin.NativeObject>):
   %2 = global_addr @_swiftEmptyArrayStorage : $*_SwiftEmptyArrayStorage
   %3 = address_to_pointer %2 : $*_SwiftEmptyArrayStorage to $Builtin.RawPointer

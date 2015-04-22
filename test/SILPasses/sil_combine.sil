@@ -757,7 +757,7 @@ class C3 : C2 {}
 // CHECK-NEXT: bb0
 // CHECK-NEXT: upcast
 // CHECK-NEXT: return
-sil @upcast_upcast_merge : $@thin(C3) -> C1 {
+sil @upcast_upcast_merge : $@convention(thin)(C3) -> C1 {
 bb0(%0 : $C3):
   %1 = upcast %0 : $C3 to $C2
   %2 = upcast %1 : $C2 to $C1
@@ -1207,7 +1207,7 @@ bb0(%0 : $E):
 // CHECK: bb0
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: return
-sil @unchecked_ref_cast_upcast_combine : $@thin E -> Builtin.NativeObject {
+sil @unchecked_ref_cast_upcast_combine : $@convention(thin) E -> Builtin.NativeObject {
 bb0(%0 : $E):
   %1 = upcast %0 : $E to $B
   %2 = unchecked_ref_cast %1 : $B to $Builtin.NativeObject

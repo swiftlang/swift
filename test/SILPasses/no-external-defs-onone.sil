@@ -6,34 +6,34 @@
 // CHECK-NOT: public_external_unused_test
 
 
-sil public_external @public_external_test : $@thin () -> () {
+sil public_external @public_external_test : $@convention(thin)  () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden_external @hidden_external_test : $@thin () -> () {
+sil hidden_external @hidden_external_test : $@convention(thin)  () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared_external @shared_external_test : $@thin () -> () {
+sil shared_external @shared_external_test : $@convention(thin)  () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil public_external @public_external_unused_test : $@thin () -> () {
+sil public_external @public_external_unused_test : $@convention(thin)  () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil public @use_all_symbols : $@thin () -> () {
-  %0 = function_ref @public_external_test : $@thin () -> ()
-  %1 = function_ref @hidden_external_test : $@thin () -> ()
-  %2 = function_ref @shared_external_test : $@thin () -> ()
+sil public @use_all_symbols : $@convention(thin)  () -> () {
+  %0 = function_ref @public_external_test : $@convention(thin)  () -> ()
+  %1 = function_ref @hidden_external_test : $@convention(thin)  () -> ()
+  %2 = function_ref @shared_external_test : $@convention(thin)  () -> ()
 
-  apply %0() : $@thin () -> ()
-  apply %1() : $@thin () -> ()
-  apply %2() : $@thin () -> ()
+  apply %0() : $@convention(thin)  () -> ()
+  apply %1() : $@convention(thin)  () -> ()
+  apply %2() : $@convention(thin)  () -> ()
 
   %24 = tuple()
   return %24 : $()

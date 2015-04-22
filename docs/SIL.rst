@@ -1388,7 +1388,7 @@ ARC Objective-C. Selector families and the ``ns_consumed``,
 ``ns_returns_retained``, etc. attributes from imported Objective-C definitions
 are honored.
 
-Applying an ``@objc_block`` value does not consume the block.
+Applying a ``@convention(block)`` value does not consume the block.
 
 Method Currying
 ```````````````
@@ -2237,7 +2237,7 @@ copy_block
 
   sil-instruction :: 'copy_block' sil-operand
 
-  %1 = copy_block %0 : $@objc_block T -> U
+  %1 = copy_block %0 : $@convention(block) T -> U
 
 Performs a copy of an Objective-C block. Unlike retains of other
 reference-counted types, this can produce a different value from the operand
@@ -3542,9 +3542,9 @@ in the following ways:
   subclass of the source type's corresponding tuple element.
 
 The function types may also differ in attributes, with the following
-exceptions:
+caveats:
 
-- The ``cc``, ``thin``, and ``objc_block`` attributes cannot be changed.
+- The ``convention`` attribute cannot be changed.
 - A ``@noreturn`` function may be converted to a non-``@noreturn``
   type and vice-versa.
 
@@ -3582,8 +3582,8 @@ thin_to_thick_function
 
   sil-instruction ::= 'thin_to_thick_function' sil-operand 'to' sil-type
 
-  %1 = thin_to_thick_function %0 : $@thin T -> U to $T -> U
-  // %0 must be of a thin function type $@thin T -> U
+  %1 = thin_to_thick_function %0 : $@convention(thin) T -> U to $T -> U
+  // %0 must be of a thin function type $@convention(thin) T -> U
   // The destination type must be the corresponding thick function type
   // %1 will be of type $T -> U
 

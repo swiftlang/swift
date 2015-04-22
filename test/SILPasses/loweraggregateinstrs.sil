@@ -112,7 +112,7 @@ bb0(%0 : $*(S, S2, C1)):
 
 // Do not do anything.
 /*
-sil @expand_destroy_addr_addressonly : $@thin<T> (@inout T) -> () {
+sil @expand_destroy_addr_addressonly : $@convention(thin) <T> (@inout T) -> () {
 bb0(%0 : $*T):
   destroy_addr %0 : $*T
   %1 = tuple()
@@ -307,7 +307,7 @@ bb0(%0 : $*(S, S2, C1, E), %1 : $*(S, S2, C1, E)):
 
 // Do not do anything.
 /*
-sil @expand_copy_addr_addressonly : $@thin<T> (@inout T) -> () {
+sil @expand_copy_addr_addressonly : $@convention(thin) <T> (@inout T) -> () {
 bb0(%0 : $*T):
   copy_addr %0 : $*T
   %1 = tuple()

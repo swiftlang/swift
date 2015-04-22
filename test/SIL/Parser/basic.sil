@@ -467,7 +467,7 @@ class GenericClass<Q> {
 }
 
 // CHECK: sil @bound_generic_class_ref_element_addr : $@convention(thin) (GenericClass<Int>) -> Int {
-sil @bound_generic_class_ref_element_addr : $@thin GenericClass<Int> -> Int {
+sil @bound_generic_class_ref_element_addr : $@convention(thin)  GenericClass<Int> -> Int {
 entry(%0 : $GenericClass<Int>):
   // CHECK: %1 = ref_element_addr %0 : $GenericClass<Int>, #GenericClass.member
   %1 = ref_element_addr %0 : $GenericClass<Int>, #GenericClass.member
@@ -950,7 +950,7 @@ sil @takes_unnamed_closure : $@convention(thin) (@callee_owned () -> Int) -> () 
 sil @takes_int64_float32 : $@convention(thin) (Int, Float32) -> ()
 
 // CHECK-LABEL: sil @test_partial_apply : $@convention(thin) (Float) -> @callee_owned (Int) -> () {
-sil @test_partial_apply : $@thin Float -> @callee_owned Int -> () {
+sil @test_partial_apply : $@convention(thin)  Float -> @callee_owned Int -> () {
 bb0(%0 : $Float):
   %1 = function_ref @takes_int64_float32 : $@convention(thin) (Int, Float) -> ()
   // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@convention(thin) (Int, Float) -> ()
@@ -1130,7 +1130,7 @@ bb0(%0 : $Int, %1 : $*P):
 }
 
 // CHECK-LABEL: sil @block_storage_type
-sil @block_storage_type : $@thin Int -> @convention(block) () -> () {
+sil @block_storage_type : $@convention(thin)  Int -> @convention(block) () -> () {
 entry(%0 : $Int):
   // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
   %s = alloc_stack $@block_storage Int

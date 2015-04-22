@@ -94,7 +94,7 @@ bb0(%0 : $C):
 
 // CHECK: define [[REF]]* @unchecked_ref_cast_cast([[C_CLASS]]*)
 // CHECK:   bitcast [[C_CLASS]]* {{%.*}} to [[REF]]*
-sil @unchecked_ref_cast_cast : $@thin C -> Builtin.NativeObject {
+sil @unchecked_ref_cast_cast : $@convention(thin) C -> Builtin.NativeObject {
 entry(%c : $C):
   %r = unchecked_ref_cast %c : $C to $Builtin.NativeObject
   return %r : $Builtin.NativeObject
@@ -102,7 +102,7 @@ entry(%c : $C):
 
 // CHECK: define [[OBJCOBJ]]* @ref_to_objc_pointer_cast([[C_CLASS]]*)
 // CHECK:   bitcast [[C_CLASS]]* %0 to [[OBJCOBJ]]*
-sil @ref_to_objc_pointer_cast : $@thin C -> Builtin.UnknownObject {
+sil @ref_to_objc_pointer_cast : $@convention(thin) C -> Builtin.UnknownObject {
 entry(%c : $C):
   %r = unchecked_ref_cast %c : $C to $Builtin.UnknownObject
   return %r : $Builtin.UnknownObject

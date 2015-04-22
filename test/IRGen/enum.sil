@@ -2380,7 +2380,7 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 enum Optionable<T> {
   case Some(T), None
 }
-sil @optional_optional_class_protocol : $@thin Optionable<Optionable<PC>> -> Builtin.Int1 {
+sil @optional_optional_class_protocol : $@convention(thin) Optionable<Optionable<PC>> -> Builtin.Int1 {
 entry(%o : $Optionable<Optionable<PC>>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0

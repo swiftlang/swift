@@ -242,10 +242,10 @@ bb0(%0 : $T):
   return %2 : $Base
 }
 
-sil @specialize_generic_upcast : $@thin(@owned Base) -> @owned Base {
+sil @specialize_generic_upcast : $@convention(thin)(@owned Base) -> @owned Base {
 bb0(%0 : $Base):
-  %1 = function_ref @generic_upcast : $@thin<T where T : Base> (@owned T) -> @owned Base
-  %2 = apply %1<Base>(%0) : $@thin<T where T : Base> (@owned T) -> @owned Base
+  %1 = function_ref @generic_upcast : $@convention(thin)<T where T : Base> (@owned T) -> @owned Base
+  %2 = apply %1<Base>(%0) : $@convention(thin)<T where T : Base> (@owned T) -> @owned Base
   return %2 : $Base
 }
 

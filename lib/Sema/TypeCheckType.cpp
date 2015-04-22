@@ -1348,8 +1348,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     if (options & TR_SILType) {
-      // TODO: Coalesce the representation attributes into a single 'convention'
-      // attribute.
       SILFunctionType::Representation rep;
 
       if (attrs.hasConvention()) {
@@ -1390,16 +1388,25 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                       "cc");
         }
       } else {
-        // Handle the old attributes.
-        // TODO: Warning and fixit to migrate.
-        if (thin)
-          rep = SILFunctionType::Representation::Thin;
-        else if (block)
+        // Error on the old @thin, @cc, and @objc_block attributes in SIL mode.
+        if (thin) {
+          TC.diagnose(attrs.getLoc(TAK_thin),
+                      diag::sil_deprecated_convention_attribute,
+                      "thin", "thin");
           rep = SILFunctionType::Representation::Block;
-        else
+        } else if (block) {
+          TC.diagnose(attrs.getLoc(TAK_thin),
+                      diag::sil_deprecated_convention_attribute,
+                      "objc_block", "block");
+          rep = SILFunctionType::Representation::Block;
+        } else {
           rep = SILFunctionType::Representation::Thick;
+        }
 
         if (attrs.hasDeprecatedCC()) {
+          TC.diagnose(attrs.getLoc(TAK_cc),
+                      diag::sil_deprecated_convention_attribute,
+                      "cc", attrs.getDeprecatedCC());
           if (attrs.getDeprecatedCC() == "cdecl") {
             if (rep == SILFunctionType::Representation::Thin)
               rep = SILFunctionType::Representation::CFunctionPointer;
@@ -1422,6 +1429,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                         diag::unsupported_cc_representation_combo);
           }
         }
+        
+        //
       }
       
       // Resolve the function type directly with these attributes.

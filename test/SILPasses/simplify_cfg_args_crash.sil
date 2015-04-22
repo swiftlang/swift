@@ -13,7 +13,7 @@ enum E {
 // Check that we don't crash in simplifyToSelectValue (rdar://problem/20037686)
 
 // CHECK-LABEL: @test
-sil public @test : $@thin(Builtin.Int64, @inout E) -> () {
+sil public @test : $@convention(thin) (Builtin.Int64, @inout E) -> () {
 
 bb0(%0 : $Builtin.Int64, %x : $*E):
   %1 = integer_literal $Builtin.Int64, 0

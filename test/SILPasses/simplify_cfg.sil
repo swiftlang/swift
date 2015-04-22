@@ -1321,7 +1321,7 @@ class E : B {}
 // CHECK: [[RET:%.*]] = tuple ()
 // CHECK: return [[RET]] : $()
 
-sil @checked_cast_anyobject_metatypeinst_to_class : $@thin() -> () {
+sil @checked_cast_anyobject_metatypeinst_to_class : $@convention(thin)() -> () {
 bb0:
   %0 = metatype $@thick AnyObject.Protocol
   checked_cast_br %0 : $@thick AnyObject.Protocol to $@thick B.Type, bb1, bb2
@@ -1343,7 +1343,7 @@ bb3:
 // CHECK: cond_fail [[COND]]
 // CHECK-NOT: bb
 // CHECK: return
-sil @remove_cond_fail_trueblock : $@thin(Builtin.Int1) -> () {
+sil @remove_cond_fail_trueblock : $@convention(thin)(Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 bb1:
@@ -1364,7 +1364,7 @@ bb2:
 // CHECK: cond_fail [[NOTCOND]]
 // CHECK-NOT: bb
 // CHECK: return
-sil @remove_cond_fail_falseblock : $@thin(Builtin.Int1) -> () {
+sil @remove_cond_fail_falseblock : $@convention(thin)(Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb2, bb1
 

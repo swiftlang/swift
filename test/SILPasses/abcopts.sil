@@ -23,7 +23,7 @@ struct IntTupleStruct {
 }
 
 // CHECK-LABEL: sil @abcopt_singleblock
-sil @abcopt_singleblock : $@thin(@inout ArrayInt, @inout ArrayInt) -> () {
+sil @abcopt_singleblock : $@convention(thin) (@inout ArrayInt, @inout ArrayInt) -> () {
 bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %100 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned ArrayInt) -> Bool
   %101 = load %0 : $*ArrayInt
@@ -100,8 +100,8 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // Not redundant same index and array but unknown function in between.
   retain_value %5 : $Builtin.NativeObject
   %21 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
-  %22 = function_ref @unknown_func : $@thin() -> ()
-  %23 = apply %22() : $@thin() -> ()
+  %22 = function_ref @unknown_func : $@convention(thin) () -> ()
+  %23 = apply %22() : $@convention(thin) () -> ()
   retain_value %5 : $Builtin.NativeObject
   %24 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
