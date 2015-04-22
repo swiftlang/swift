@@ -30,3 +30,9 @@ cscope.out
 #==============================================================================#
 # Swift performance test suite.
 benchmark/PerfTestSuite
+
+# Generated docs
+docs/_build
+
+# Finder metadata
+.DS_Store
