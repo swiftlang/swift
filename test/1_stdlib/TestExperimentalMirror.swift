@@ -400,8 +400,10 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
 
   class X : A {}
 
-  // B inherits A indirectly through X
-  class B : X {
+  class Y : X {}
+
+  // B inherits A indirectly through X and Y
+  class B : Y {
     var b: UInt = 42
     override func customMirror() -> Mirror {
       return Mirror(
@@ -414,11 +416,16 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
   }
 
   let b = Mirror(reflecting: B())
-  expectNotEmpty(b.superclassMirror())
-  // Not the behavior we eventually want, but expected until the other
-  // behavior is implemented.
-  expectEqual("aye", first(b.superclassMirror()!.children)!.label)
-  expectEmpty(b.superclassMirror()!.superclassMirror())
+  if let y? = expectNotEmpty(b.superclassMirror()) {
+    if let x? = expectNotEmpty(y.superclassMirror()) {
+      expectEqual(0, count(x.children))
+      if let a? = expectNotEmpty(x.superclassMirror()) {
+        if let aye? = expectNotEmpty(first(a.children)) {
+          expectEqual("aye", aye.label)
+        }
+      }
+    }
+  }
 }
 
 //===--- End Class Support ------------------------------------------------===//

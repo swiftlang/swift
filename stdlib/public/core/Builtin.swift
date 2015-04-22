@@ -417,3 +417,11 @@ func _getSuperclass(t: AnyClass) -> AnyClass? {
     _swift_getSuperclass_nonNull(unsafeBitCast(t, COpaquePointer.self)),
     AnyClass.self)
 }
+
+/// Return the superclass of `t`, if any.  The result is nil if `t` is
+/// not a class, is a root class, or is a class protocol.
+@inline(__always)
+public // @testable
+func _getSuperclass(t: Any.Type) -> AnyClass? {
+  return (t as? AnyClass).flatMap { _getSuperclass($0) }
+}
