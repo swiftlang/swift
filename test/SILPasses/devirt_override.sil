@@ -52,8 +52,8 @@ bb0:
   %11 = upcast %0 : $MD5 to $Hash
   %21 = unchecked_ref_cast %11 : $Hash to $MD5
   %61 = upcast %21 : $MD5 to $Hash 
-  // CHECK-DISABLED: function_ref @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@convention(method) (@owned Hash) -> ()
-  // CHECK-DISABLED: apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@owned Hash) -> ()
+  // CHECK: function_ref @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@convention(method) (@guaranteed Hash) -> ()
+  // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@guaranteed Hash) -> ()
   %62 = class_method %61 : $Hash, #Hash.update!1 : Hash -> () -> () , $@convention(method) (@guaranteed Hash) -> ()
   %135 = apply %62(%61) : $@convention(method) (@guaranteed Hash) -> ()
   %17 = tuple ()

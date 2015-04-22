@@ -18,10 +18,10 @@ class Foo : Bar {
 sil_global @x : $Bar
 
 // CHECK-LABEL: sil @function_with_cm_with_cast
-// CHECK-NOT-DISABLED: class_method
-// CHECK-DISABLED: [[REF:%.*]] = function_ref @_TFC4main3Bar4pingfS0_FT_T_
-// CHECK-DISABLED: [[SELF:%.*]] = upcast
-// CHECK-DISABLED: apply [[REF]]([[SELF]])
+// CHECK-NOT: class_method
+// CHECK: [[REF:%.*]] = function_ref @_TFC4main3Bar4pingfS0_FT_T_
+// CHECK: [[SELF:%.*]] = upcast
+// CHECK: apply [[REF]]([[SELF]])
 // CHECK: return
 sil @function_with_cm_with_cast : $@convention(thin) () -> () {
 bb0:

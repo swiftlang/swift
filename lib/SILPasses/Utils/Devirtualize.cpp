@@ -33,10 +33,15 @@ STATISTIC(NumWitnessDevirt, "Number of witness_method applies devirtualized");
 //                         Class Method Optimization
 //===----------------------------------------------------------------------===//
 
-// Is the value passed in actually an instruction that allows us to infer the
-// correct dynamic type for the value?
-bool isConstructor(SILValue S) {
-  return isa<AllocRefInst>(S) || isa<MetatypeInst>(S);
+// Attempt to get the constructor for S, returning a null SILValue()
+// if we cannot find it.
+static SILValue getConstructor(SILValue S) {
+  S = S.stripCasts();
+
+  if (isa<AllocRefInst>(S) || isa<MetatypeInst>(S))
+    return S;
+
+  return SILValue();
 }
 
 /// Return bound generic type for the unbound type Superclass,
@@ -553,8 +558,8 @@ SILInstruction *swift::tryDevirtualizeApply(ApplyInst *AI) {
       return tryDevirtualizeClassMethod(AI, CMI->getOperand());
 
     // Try to search for the point of construction.
-    if (isConstructor(CMI->getOperand().stripUpCasts()))
-      return tryDevirtualizeClassMethod(AI, CMI->getOperand().stripUpCasts());
+    if (auto Constructor = getConstructor(CMI->getOperand()))
+      return tryDevirtualizeClassMethod(AI, Constructor);
   }
 
   return nullptr;
