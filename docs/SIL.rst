@@ -585,22 +585,39 @@ Some additional meaningful categories of type:
 SILGen does not always map Swift function types one-to-one to SIL function
 types. Function types are transformed in order to encode additional attributes:
 
-- The **calling convention** of the function, indicated by the
+- The **convention** of the function, indicated by the
 
   .. parsed-literal::
 
-    @cc(*convention*)
+    @convention(*convention*)
 
-  attribute—where *convention* can currently be ``swift``, ``method``,
-  ``cdecl``, or ``objc_method``\ —describing a machine-level calling convention
-  below the concern of SIL.
+  attribute. This is similar to the language-level ``@convention``
+  attribute, though SIL extends the set of supported conventions with 
+  additional distinctions not exposed at the language level:
 
-- The **thinness** of the function reference, indicated by the ``@thin``
-  attribute, which tracks whether a function reference requires a context value
-  to reference captured closure state. Standalone functions and methods are
-  always ``@thin``, but function-local functions or closure expressions that
-  capture context are thick. Partial applications of curried functions or
-  methods are also thick.
+  - ``@convention(thin)`` indicates a "thin" function reference, which uses
+    the Swift calling convention with no special "self" or "context" parameters.
+  - ``@convention(thick)`` indicates a "thick" function reference, which
+    uses the Swift calling convention and carries a reference-counted context
+    object used to represent captures or other state required by the function.
+  - ``@convention(block)`` indicates an Objective-C compatible block reference.
+    The function value is represented as a reference to the block object,
+    which is an ``id``-compatible Objective-C object that embeds its invocation
+    function within the object. The invocation function uses the C calling
+    convention.
+  - ``@convention(c)`` indicates a C function reference. The function value
+    carries no context and uses the C calling convention.
+  - ``@convention(objc_method)`` indicates an Objective-C method implementation.
+    The function uses the C calling convention, with the SIL-level ``self``
+    parameter (by SIL convention mapped to the final formal parameter)
+    mapped to the ``self`` and ``_cmd`` arguments of the implementation.
+  - ``@convention(method)`` indicates a Swift instance method implementation.
+    The function uses the Swift calling convention, using the special ``self``
+    parameter.
+  - ``@convention(witness_method)`` indicates a Swift protocol method
+    implementation. The function's polymorphic convention is emitted in such
+    a way as to guarantee that it is polymorphic across all possible
+    implementors of the protocol.
 
 - The **fully uncurried representation** of the function type, with
   all of the curried argument clauses flattened into a single argument
@@ -609,9 +626,6 @@ types. Function types are transformed in order to encode additional attributes:
   exact representation depends on the function's `calling
   convention`_, which determines the exact ordering of currying
   clauses.  Methods are treated as a form of curried function.
-
-TODO: Type-checking of cc and thin attributes will move into Swift's
-type-checker and out of SIL eventually.
 
 Layout Compatible Types
 ```````````````````````
