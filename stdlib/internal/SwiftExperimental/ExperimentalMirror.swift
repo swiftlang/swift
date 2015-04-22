@@ -223,9 +223,9 @@ public struct Mirror {
   >(
     _ subject: T,
     children: C,
+    displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .Generated,
-    defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated,
-    displayStyle: DisplayStyle? = nil
+    defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated
   ) {
     self._subjectType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
@@ -275,9 +275,9 @@ public struct Mirror {
   >(
     _ subject: T,
     unlabeledChildren: C,
+    displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .Generated,
-    defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated,
-    displayStyle: DisplayStyle? = nil
+    defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated
   ) {
     self._subjectType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
@@ -320,9 +320,9 @@ public struct Mirror {
   public init<T>(
     _ subject: T,
     children: DictionaryLiteral<String, Any>,
+    displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .Generated,
-    defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated,
-    displayStyle: DisplayStyle? = nil
+    defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated
   ) {
     self._subjectType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
