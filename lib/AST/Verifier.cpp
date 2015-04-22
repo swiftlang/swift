@@ -1220,7 +1220,7 @@ struct ASTNodeBase {};
     void verifyChecked(DynamicMemberRefExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicMemberRefExpr", E);
 
-      // The base of a dynamic emmber reference cannot be an
+      // The base of a dynamic member reference cannot be an
       // existential type.
       if (E->getBase()->getType()->getLValueOrInOutObjectType()
             ->isAnyExistentialType()) {
