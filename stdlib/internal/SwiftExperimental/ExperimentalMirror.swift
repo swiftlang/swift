@@ -125,7 +125,7 @@ public struct Mirror {
       self = customized.customMirror()
     }
     else {
-      self = Mirror(Swift.reflect(subject), subjectType: subject.dynamicType)
+      self = Mirror(Swift.reflect(subject), subjectStaticType: subject.dynamicType)
     }
   }
   
@@ -169,7 +169,7 @@ public struct Mirror {
     case (.Generated, let subjectClass?) : return {
         // Find the right legacy superclass mirror (inefficient, but works)
         
-        // get a mirror for the most-derived type
+        // get a legacy mirror for the most-derived type
         var derivedMirror = reflect(subject)
         // get the most-derived type
         var derivedClass: AnyClass? = subject.dynamicType as? AnyClass
@@ -179,7 +179,7 @@ public struct Mirror {
           let superclass: AnyClass? = _getSuperclass(derived)
           if subjectClass == derived  {
             if superclass == nil { break } // I don't think this can happen
-            return Mirror(superMirror, subjectType: superclass!)
+            return Mirror(superMirror, subjectStaticType: superclass!)
           }
           derivedMirror = superMirror
           derivedClass = superclass
@@ -227,7 +227,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .Generated,
     defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated
   ) {
-    self._subjectType = T.self
+    self._subjectStaticType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
       
@@ -280,7 +280,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .Generated,
     defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated
   ) {
-    self._subjectType = T.self
+    self._subjectStaticType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
       
@@ -326,7 +326,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .Generated,
     defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated
   ) {
-    self._subjectType = T.self
+    self._subjectStaticType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
       
@@ -349,7 +349,7 @@ public struct Mirror {
   }
 
   internal let _makeSuperclassMirror: ()->Mirror?
-  internal let _subjectType: Any.Type
+  internal let _subjectStaticType: Any.Type
   internal let _defaultDescendantRepresentation: DefaultDescendantRepresentation
 }
 
@@ -520,13 +520,13 @@ extension Mirror {
   /// appropriate performance. To avoid this pitfall, convert mirrors
   /// to use the new style, which only present forward traversal in
   /// general.
-  internal init(_ oldMirror: MirrorType, subjectType: Any.Type) {
+  internal init(_ oldMirror: MirrorType, subjectStaticType: Any.Type) {
     // FIXME: this may be wrong for intermediate mirrors
-    self._subjectType = oldMirror.value.dynamicType
-    if let subjectClass? = subjectType as? AnyClass {
+    self._subjectStaticType = oldMirror.value.dynamicType
+    if let subjectStaticClass? = subjectStaticType as? AnyClass {
       self._makeSuperclassMirror = {
         oldMirror._legacySuperMirror().map {
-          Mirror($0, subjectType: _getSuperclass(subjectClass)!)
+          Mirror($0, subjectStaticType: _getSuperclass(subjectStaticClass)!)
         }
       }
     }
