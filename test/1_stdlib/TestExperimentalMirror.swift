@@ -377,10 +377,8 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Direct") {
     override func customMirror() -> Mirror {
       return Mirror(
         self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized(
-          // FIXME: should be "super.customMirror", but for <rdar://20598526>.
-          {super.customMirror()} 
-        ))
+        ancestorRepresentation: .Customized(super.customMirror)
+        )
     }
   }
 
@@ -408,10 +406,7 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
     override func customMirror() -> Mirror {
       return Mirror(
         self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized(
-          // FIXME: should be "super.customMirror", but for <rdar://20598526>.
-          {super.customMirror()} 
-        ))
+        ancestorRepresentation: .Customized(super.customMirror))
     }
   }
 
@@ -448,10 +443,7 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
     override func customMirror() -> Mirror {
       return Mirror(
         self, children: [ "bee": b ],
-        ancestorRepresentation: .Customized(
-          // FIXME: should be "super.customMirror", but for <rdar://20598526>.
-          {super.customMirror()} 
-        ))
+        ancestorRepresentation: .Customized(super.customMirror))
     }
   }
 
