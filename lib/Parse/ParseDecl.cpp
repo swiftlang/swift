@@ -1182,7 +1182,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 
   // In just-checking mode, we only need additional parsing for the "cc"
   // attribute.  (Note that we're never in just-checking mode in SIL mode.)
-  if (justChecking && attr != TAK_cc)
+  if (justChecking)
     return false;
 
   switch (attr) {
@@ -1263,41 +1263,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     break;
   }
 
-  // Deprecated 'cc' attribute.
-  case TAK_cc: {
-    // Parse the cc name in parens.
-    SourceLoc beginLoc = Tok.getLoc(), nameLoc, endLoc;
-    StringRef name;
-    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (Tok.is(tok::identifier)) {
-        nameLoc = Tok.getLoc();
-        name = Tok.getText();
-        consumeToken();
-      } else if (!justChecking) {
-        diagnose(Tok, diag::cc_attribute_expected_name);
-      }
-
-      // Parse the ')'.  We can't use parseMatchingToken if we're in
-      // just-checking mode.
-      if (!justChecking) {
-        parseMatchingToken(tok::r_paren, endLoc,
-                           diag::cc_attribute_expected_rparen,
-                           beginLoc);
-      } else if (!consumeIf(tok::r_paren)) {
-        return true;
-      }
-    } else if (!justChecking) {
-      diagnose(Tok, diag::cc_attribute_expected_lparen);
-    }
-
-    // Don't validate the CC in just-checking mode.
-    if (justChecking) return false;
-    
-    if (!name.empty())
-      Attributes.deprecatedCC = name;
-    return false;
-  }
-  
   // Convention attribute.
   case TAK_convention: {
     // Parse the convention name in parens.

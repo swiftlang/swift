@@ -219,9 +219,6 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   if (Attrs.has(TAK_objc_block))   Printer << "@objc_block ";
   if (Attrs.has(TAK_thin))         Printer << "@thin ";
   if (Attrs.has(TAK_thick))        Printer << "@thick ";
-  if (Attrs.deprecatedCC.hasValue()) {
-    Printer << "@cc(" << Attrs.deprecatedCC.getValue() << ")";
-  }
   if (Attrs.convention.hasValue()) {
     Printer << "@convention(" << Attrs.convention.getValue() << ")";
   }

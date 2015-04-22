@@ -204,7 +204,6 @@ public:
   /// AtLoc - This is the location of the first '@' in the attribute specifier.
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
-  Optional<StringRef> deprecatedCC = None;
   Optional<StringRef> convention = None;
 
   // For an opened existential type, the known ID.
@@ -249,9 +248,6 @@ public:
     return true;
   }
   
-  bool hasDeprecatedCC() const { return deprecatedCC.hasValue(); }
-  StringRef getDeprecatedCC() const { return *deprecatedCC; }
-
   bool hasConvention() const { return convention.hasValue(); }
   StringRef getConvention() const { return *convention; }
   

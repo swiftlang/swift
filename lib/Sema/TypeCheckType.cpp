@@ -1284,7 +1284,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Pass down the variable function type attributes to the
   // function-type creator.
   static const TypeAttrKind FunctionAttrs[] = {
-    TAK_objc_block, TAK_cc, TAK_convention, TAK_thin, TAK_noreturn,
+    TAK_objc_block, TAK_convention, TAK_thin, TAK_noreturn,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape
   };
 
@@ -1310,7 +1310,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     for (auto silOnlyAttr : {TAK_thin, TAK_thick}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
-    checkUnsupportedAttr(TAK_cc);
   }
   
   bool hasFunctionAttr = false;
@@ -1382,11 +1381,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                       diag::convention_with_deprecated_representation_attribute,
                       "objc_block");
         }
-        if (attrs.has(TAK_cc)) {
-          TC.diagnose(attrs.getLoc(TAK_cc),
-                      diag::convention_with_deprecated_representation_attribute,
-                      "cc");
-        }
       } else {
         // Error on the old @thin, @cc, and @objc_block attributes in SIL mode.
         if (thin) {
@@ -1402,35 +1396,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         } else {
           rep = SILFunctionType::Representation::Thick;
         }
-
-        if (attrs.hasDeprecatedCC()) {
-          TC.diagnose(attrs.getLoc(TAK_cc),
-                      diag::sil_deprecated_convention_attribute,
-                      "cc", attrs.getDeprecatedCC());
-          if (attrs.getDeprecatedCC() == "cdecl") {
-            if (rep == SILFunctionType::Representation::Thin)
-              rep = SILFunctionType::Representation::CFunctionPointer;
-            else if (rep == SILFunctionType::Representation::Block)
-              /* OK */;
-            else
-              TC.diagnose(attrs.getLoc(TAK_cc),
-                          diag::unsupported_cc_representation_combo);
-          } else if (attrs.getDeprecatedCC() == "method"
-                     && rep == SILFunctionType::Representation::Thin) {
-            rep = SILFunctionType::Representation::Method;
-          } else if (attrs.getDeprecatedCC() == "objc_method"
-                    && rep == SILFunctionType::Representation::Thin) {
-            rep = SILFunctionType::Representation::ObjCMethod;
-          } else if (attrs.getDeprecatedCC() == "witness_method"
-                    && rep == SILFunctionType::Representation::Thin) {
-            rep = SILFunctionType::Representation::WitnessMethod;
-          } else {
-            TC.diagnose(attrs.getLoc(TAK_cc),
-                        diag::unsupported_cc_representation_combo);
-          }
-        }
-        
-        //
       }
       
       // Resolve the function type directly with these attributes.
@@ -1439,9 +1404,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       
       ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     } else {
-      if (attrs.hasDeprecatedCC())
-        TC.diagnose(attrs.getLoc(TAK_cc), diag::attribute_not_supported);
-
       FunctionType::Representation rep;
       if (attrs.hasConvention()) {
         auto parsedRep =
@@ -1494,7 +1456,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     for (auto i : FunctionAttrs)
       attrs.clearAttribute(i);
-    attrs.deprecatedCC = None;
     attrs.convention = None;
   } else if (hasFunctionAttr) {
     for (auto i : FunctionAttrs) {

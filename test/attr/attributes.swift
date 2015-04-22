@@ -115,9 +115,6 @@ class transparentOnCalssVar2 {
   }
 };
 
-@cc   // expected-error {{attribute can only be applied to types, not declarations}}
-func zim(x: UnicodeScalar) {}
-
 @thin  // expected-error {{attribute can only be applied to types, not declarations}}
 func testThinDecl() -> () {}
 
@@ -193,9 +190,8 @@ func func_result_attr() -> @xyz Int {       // expected-error {{unknown attribut
   return 4
 }
 
-// @thin and @cc are only accepted in SIL.
+// @thin is not supported except in SIL.
 var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
-var ccFunc : @cc(cdecl) () -> () // expected-error {{attribute is not supported}}
 
 @inline(never) func nolineFunc() {}
 @inline(never) var noinlineVar : Int // expected-error {{@inline(never) cannot be applied to this declaration}}
