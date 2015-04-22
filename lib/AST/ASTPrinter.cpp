@@ -3000,3 +3000,10 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   }
   }
 }
+
+void Substitution::print(llvm::raw_ostream &os,
+                         const PrintOptions &PO) const {
+  Archetype->print(os, PO);
+  os << " = ";
+  Replacement->print(os, PO);
+}

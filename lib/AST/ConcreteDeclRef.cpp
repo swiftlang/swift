@@ -52,6 +52,25 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
 
       os << sub.getArchetype()->getFullName()
          << "=" << sub.getReplacement().getString();
+
+      if (sub.getConformances().size()) {
+        os << '[';
+        bool isFirst = true;
+        for (const auto *c : sub.getConformances()) {
+          if (isFirst) {
+            isFirst = false;
+          } else {
+            os << ", ";
+          }
+
+          if (c) {
+            c->printName(os);
+          } else {
+            os << "nullptr";
+          }
+        }
+        os << ']';
+      }
     }
     os << ']';
   }
