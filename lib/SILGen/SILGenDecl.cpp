@@ -247,8 +247,8 @@ namespace {
 /// An initialization of a local 'var'.
 class LocalVariableInitialization : public SingleBufferInitialization {
   /// The local variable decl being initialized.
-  VarDecl *Var;
-  SILGenFunction &Gen;
+  VarDecl *decl;
+  SILGenFunction &SGF;
 
   /// The cleanup we pushed to deallocate the local variable before it
   /// gets initialized.
@@ -262,17 +262,39 @@ public:
   /// Sets up an initialization for the allocated box. This pushes a
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
-  LocalVariableInitialization(VarDecl *var, SILGenFunction &gen)
-    : Var(var), Gen(gen) {
+  LocalVariableInitialization(VarDecl *decl, bool NeedsMarkUninit,
+                              SILGenFunction &SGF)
+    : decl(decl), SGF(SGF) {
+    assert(decl->getDeclContext()->isLocalContext() &&
+           "can't emit a local var for a non-local var decl");
+    assert(decl->hasStorage() && "can't emit storage for a computed variable");
+    assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
+
+    SILType lType = SGF.getLoweredType(decl->getType()->getRValueType());
+
+    // The variable may have its lifetime extended by a closure, heap-allocate
+    // it using a box.
+    AllocBoxInst *allocBox = SGF.B.createAllocBox(decl, lType);
+    auto box = SILValue(allocBox, 0);
+    auto addr = SILValue(allocBox, 1);
+
+    // Mark the memory as uninitialized, so DI will track it for us.
+    if (NeedsMarkUninit)
+      addr = SGF.B.createMarkUninitializedVar(decl, addr);
+
+    /// Remember that this is the memory location that we're emitting the
+    /// decl to.
+    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(addr, box);
+
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
-    gen.Cleanups.pushCleanupInState<DestroyLocalVariable>(CleanupState::Dormant,
-                                                          var);
-    ReleaseCleanup = gen.Cleanups.getTopCleanup();
+    SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(CleanupState::Dormant,
+                                                          decl);
+    ReleaseCleanup = SGF.Cleanups.getTopCleanup();
 
     // Push a cleanup to deallocate the local variable.
-    gen.Cleanups.pushCleanup<DeallocateUninitializedLocalVariable>(var);
-    DeallocCleanup = gen.Cleanups.getTopCleanup();
+    SGF.Cleanups.pushCleanup<DeallocateUninitializedLocalVariable>(decl);
+    DeallocCleanup = SGF.Cleanups.getTopCleanup();
   }
 
   ~LocalVariableInitialization() override {
@@ -280,15 +302,15 @@ public:
   }
 
   SILValue getAddressOrNull() const override {
-    assert(Gen.VarLocs.count(Var) && "did not emit var?!");
-    return Gen.VarLocs[Var].value;
+    assert(SGF.VarLocs.count(decl) && "did not emit var?!");
+    return SGF.VarLocs[decl].value;
   }
 
-  void finishInitialization(SILGenFunction &gen) override {
+  void finishInitialization(SILGenFunction &SGF) override {
     assert(!DidFinish &&
            "called LocalVariableInitialization::finishInitialization twice!");
-    Gen.Cleanups.setCleanupState(DeallocCleanup, CleanupState::Dead);
-    Gen.Cleanups.setCleanupState(ReleaseCleanup, CleanupState::Active);
+    SGF.Cleanups.setCleanupState(DeallocCleanup, CleanupState::Dead);
+    SGF.Cleanups.setCleanupState(ReleaseCleanup, CleanupState::Active);
     DidFinish = true;
   }
 };
@@ -1028,28 +1050,8 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
 /// Create a LocalVariableInitialization for the uninitialized var.
 InitializationPtr SILGenFunction::
 emitLocalVariableWithCleanup(VarDecl *vd, bool NeedsMarkUninit) {
-  assert(vd->getDeclContext()->isLocalContext() &&
-         "can't emit a local var for a non-local var decl");
-  assert(vd->hasStorage() && "can't emit storage for a computed variable");
-  assert(!VarLocs.count(vd) && "Already have an entry for this decl?");
-
-  SILType lType = getLoweredType(vd->getType()->getRValueType());
-
-  // The variable may have its lifetime extended by a closure, heap-allocate it
-  // using a box.
-  AllocBoxInst *allocBox = B.createAllocBox(vd, lType);
-  auto box = SILValue(allocBox, 0);
-  auto addr = SILValue(allocBox, 1);
-
-  // Mark the memory as uninitialized, so DI will track it for us.
-  if (NeedsMarkUninit)
-    addr = B.createMarkUninitializedVar(vd, addr);
-
-  /// Remember that this is the memory location that we're emitting the
-  /// decl to.
-  VarLocs[vd] = SILGenFunction::VarLoc::get(addr, box);
-
-  return InitializationPtr(new LocalVariableInitialization(vd, *this));
+  return InitializationPtr(new LocalVariableInitialization(vd, NeedsMarkUninit,
+                                                           *this));
 }
 
 /// Create an Initialization for an uninitialized temporary.
