@@ -921,17 +921,17 @@ public:
   /// Compute the set of substitutions required to map the given type
   /// to the provided "opened" type.
   ///
-  /// Either the generic type (\c origType) must either be a
-  /// \c GenericFunctionType, in which case it's generic requirements will be
-  /// used to compute the required substitutions, or \c dc must be a generic
-  /// context, in which case it's generic requirements will be used.
+  /// Either the generic type (\c origType) must be a \c GenericFunctionType,
+  /// in which case it's generic requirements will be used to compute the
+  /// required substitutions, or \c dc must be a generic context, in which
+  /// case it's generic requirements will be used.
   ///
   /// \param origType The generic type.
   ///
   /// \param openedType The type to which this reference to the given
   /// generic function type was opened.
   ///
-  /// \param dc          The declaration context that owns the generic type
+  /// \param dc The declaration context that owns the generic type
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
