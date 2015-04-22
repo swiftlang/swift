@@ -79,6 +79,7 @@ set(SWIFTLIB_ESSENTIAL
   Repeat.swift
   Reverse.swift.gyb
   Runtime.swift.gyb
+  Sequence.swift
   SequenceAlgorithms.swift.gyb
   ShadowProtocols.swift
   Shims.swift
