@@ -103,8 +103,19 @@ func testSubtypeArgument2(x1: (fn: (String -> Int)) -> Int,
 
 // Closures
 var c1 = {() throws -> Int in 0}
-
 var c2 : () throws -> Int = c1 // ok
 var c3 : () -> Int = c1 // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c4 : () -> Int = {() throws -> Int in 0} // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c5 : () -> Int = { try 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
+var c6 : () throws -> Int = { do { try 0 } ; return 0 }
+var c7 : () -> Int = { do { try 0 } ; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
+var c8 : () -> Int = { do { try 0  } catch _ { var x = 0 } ; return 0 }
+
+// Initializers
+struct A {
+    init(doomed: ()) throws {}
+}
+
+func fi1() throws {
+    A(doomed: ())
+}
