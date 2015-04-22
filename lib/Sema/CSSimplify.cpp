@@ -2246,19 +2246,6 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
     
     return SolutionKind::Error;
   }
-  
-  auto extInfo = FunctionType::ExtInfo();
-  
-  // Check to see if the initializer's overload group throws.
-  for (auto ctor : ctors) {
-    if (auto innerFnTy = ctor->getType()->getAs<AnyFunctionType>()->
-                             getResult()->getAs<AnyFunctionType>()) {
-      if (innerFnTy->throws()) {
-        extInfo = extInfo.withThrows();
-        break;
-      }
-    }
-  }
 
   auto &context = getASTContext();
   auto name = context.Id_init;
@@ -2271,7 +2258,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(valueType, name,
-                           FunctionType::get(tv, resultType, extInfo),
+                           FunctionType::get(tv, resultType),
                            getConstraintLocator(
                              locator, 
                              ConstraintLocator::ConstructorMember));
