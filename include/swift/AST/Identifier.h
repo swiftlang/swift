@@ -438,6 +438,34 @@ public:
   /// \param scratch Scratch space to use.
   StringRef getString(llvm::SmallVectorImpl<char> &scratch) const;
 
+  /// Ask whether this selector is a nullary selector (taking no
+  /// arguments) whose name matches the given piece.
+  bool isNullarySelector(StringRef piece) const {
+    if (Storage.isSimpleName()) {
+      return Storage.getBaseName().str() == piece;
+    } else {
+      return false;
+    }
+  }
+
+  /// Ask whether this selector is a non-nullary selector matching the
+  /// given literal pieces.
+  bool isNonNullarySelector(ArrayRef<StringRef> pieces) const {
+    if (Storage.isSimpleName()) {
+      return false;
+    }
+
+    ArrayRef<Identifier> args = Storage.getArgumentNames();
+    if (args.size() != pieces.size())
+      return false;
+
+    for (size_t i = 0, e = args.size(); i != e; ++i) {
+      if (args[i].str() != pieces[i])
+        return false;
+    }
+    return true;
+  }
+
   void *getOpaqueValue() const { return Storage.getOpaqueValue(); }
   static ObjCSelector getFromOpaqueValue(void *p) {
     return ObjCSelector(DeclName::getFromOpaqueValue(p));

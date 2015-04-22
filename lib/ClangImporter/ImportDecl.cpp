@@ -2988,32 +2988,9 @@ namespace {
                               bool &variadic) {
       auto &C = Impl.SwiftContext;
       
-      // Map UIActionSheet and UIAlertView's designated initializers to
-      // non-variadic versions that drop the variadic parameter.
-      Identifier _UIActionSheetInitPieces[] = {
-        C.getIdentifier("initWithTitle"),
-        C.getIdentifier("delegate"),
-        C.getIdentifier("cancelButtonTitle"),
-        C.getIdentifier("destructiveButtonTitle"),
-        C.getIdentifier("otherButtonTitles"),
-      };
-      ArrayRef<Identifier> UIActionSheetInitPieces = _UIActionSheetInitPieces;
-      ObjCSelector UIActionSheetInit(C, UIActionSheetInitPieces.size(),
-                                     UIActionSheetInitPieces);
-      
-      Identifier _UIAlertViewInitPieces[] = {
-        C.getIdentifier("initWithTitle"),
-        C.getIdentifier("message"),
-        C.getIdentifier("delegate"),
-        C.getIdentifier("cancelButtonTitle"),
-        C.getIdentifier("otherButtonTitles"),
-      };
-      ArrayRef<Identifier> UIAlertViewInitPieces = _UIAlertViewInitPieces;
-      ObjCSelector UIAlertViewInit(C, UIAlertViewInitPieces.size(),
-                                   UIAlertViewInitPieces);
-      
-      if (variadic
-          && (selector == UIActionSheetInit || selector == UIAlertViewInit)) {
+      // Map a few initializers to non-variadic versions that drop the
+      // variadic parameter.
+      if (variadic && shouldMakeSelectorNonVariadic(selector)) {
         selector = ObjCSelector(C, selector.getNumArgs() - 1,
                                 selector.getSelectorPieces().slice(0,
                                       selector.getSelectorPieces().size() - 1));
@@ -3022,6 +2999,27 @@ namespace {
       }
       
       return Impl.mapSelectorToDeclName(selector, /*initializer*/true);
+    }
+
+    static bool shouldMakeSelectorNonVariadic(ObjCSelector selector) {
+      // This is UIActionSheet's designated initializer.
+      if (selector.isNonNullarySelector({ "initWithTitle",
+                                          "delegate",
+                                          "cancelButtonTitle",
+                                          "destructiveButtonTitle",
+                                          "otherButtonTitles" }))
+        return true;
+
+      // This is UIAlertView's designated initializer.
+      if (selector.isNonNullarySelector({ "initWithTitle",
+                                          "message",
+                                          "delegate",
+                                          "cancelButtonTitle",
+                                          "otherButtonTitles" }))
+        return true;
+
+      // Nothing else for now.
+      return false;
     }
 
     /// \brief Given an imported method, try to import it as a constructor.
