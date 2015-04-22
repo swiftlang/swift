@@ -424,7 +424,7 @@ void irgen::emitMetatypeToObjectDowncast(IRGenFunction &IGF,
 }
 
 
-/// Emit a checked cast to an Objective-C protocol or protocol composition.
+/// Emit a checked cast to a protocol or protocol composition.
 void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
                                   llvm::Value *value,
                                   SILType srcType,

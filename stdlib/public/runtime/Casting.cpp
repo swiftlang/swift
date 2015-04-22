@@ -1506,7 +1506,6 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
   return result;
 }
 
-#if SWIFT_OBJC_INTEROP
 /// Perform a dynamic cast of a metatype to a metatype.
 ///
 /// Note that the check is whether 'metatype' is an *instance of*
@@ -1805,6 +1804,7 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   _failCorruptType(srcType);
 }
 
+#if SWIFT_OBJC_INTEROP
 extern "C" const ProtocolDescriptor _TMpSs10_ErrorType;
 
 static const WitnessTable *findErrorTypeWitness(const Metadata *srcType) {
@@ -1905,22 +1905,14 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                                      flags);
 
   case MetadataKind::Metatype:
-#if SWIFT_OBJC_INTEROP
     return _dynamicCastToMetatype(dest, src, srcType,
                                   cast<MetatypeMetadata>(targetType),
                                   flags);
-#else
-    return _fail(src, srcType, targetType, flags);
-#endif
     
   case MetadataKind::ExistentialMetatype:
-#if SWIFT_OBJC_INTEROP
     return _dynamicCastToExistentialMetatype(dest, src, srcType,
                                  cast<ExistentialMetatypeMetadata>(targetType),
                                              flags);
-#else
-    return _fail(src, srcType, targetType, flags);
-#endif
 
   case MetadataKind::Struct:
   case MetadataKind::Enum:
