@@ -13,7 +13,6 @@ add_swift_library(swiftSwiftPrivatePthreadExtras SHARED IS_STDLIB
   # filename.
   SwiftPrivatePthreadExtras.swift
   PthreadBarriers.swift
-  SwiftBlockToCFunctionThunks.cpp
 
   SWIFT_MODULE_DEPENDS ${swift_private_pthread_extras_module_depends}
   SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
