@@ -89,17 +89,15 @@ extension SequenceType ${"" if preds else "where Self.Generator.Element : Compar
 %   end
   ) -> ${GElement}? {
     var g = generate()
-    if var result? = g.next() {
-      for e in GeneratorSequence(g) {
+    var result? = g.next() else { return nil }
+    for e in GeneratorSequence(g) {
 %   if preds:
-        if isOrderedBefore(result, e) { result = e }
+      if isOrderedBefore(result, e) { result = e }
 %   else:
-        if e > result { result = e }
+      if e > result { result = e }
 %   end
-      }
-      return result
     }
-    return nil
+    return result
   }
 }
 
