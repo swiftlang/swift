@@ -2896,8 +2896,8 @@ extern "C" const ClassMetadata *_swift_getSuperclass_nonNull(
   const ClassMetadata *theClass
 ) {
   if (theClass->isAnyExistentialType())
-    return nil;
+    return nullptr;
   const auto super = theClass->SuperClass;
-  return super != getRootSuperclass() ? super : nullptr ;
+  return super != getRootSuperclass() ? super : nullptr;
 }
 
