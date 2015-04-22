@@ -1,8 +1,6 @@
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %s -o %t.out
 // RUN: %target-run %t.out | FileCheck %s
 
-// XFAIL: linux
-
 // General Mutable, CollectionType, Value-Type Collections
 // =================================================
 //
