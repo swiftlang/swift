@@ -263,8 +263,19 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   // not the same as the number of expected generic parameters.
   if (GenCalleeType->isPolymorphic()) {
     auto GenericSig = GenCalleeType->getGenericSignature();
-    auto CalleeGenericParamsNum = GenericSig->getGenericParams().size();
-    if (CalleeGenericParamsNum != Subs.size())
+    // Get the number of expected generic parameters, which
+    // is a sum of the number of explicit generic parameters
+    // and the number of their recursive member types exposed
+    // through protocol requirements.
+    auto DepTypes = GenericSig->getAllDependentTypes();
+    unsigned ExpectedGenParamsNum = 0;
+
+    for (auto DT: DepTypes) {
+      (void)DT;
+      ExpectedGenParamsNum++;
+    }
+
+    if (ExpectedGenParamsNum != Subs.size())
       return false;
   }
 
