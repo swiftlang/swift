@@ -1798,6 +1798,9 @@ ERROR(convention_with_deprecated_representation_attribute,attribute_parsing,none
       (StringRef))
 ERROR(unsupported_convention,type_parsing,none,
       "convention '%0' not supported", (StringRef))
+WARNING(deprecated_convention_attribute,type_parsing,none,
+        "'@%0' attribute is deprecated; '@convention(%1)' should be used "
+        "instead", (StringRef, StringRef))
 
 // SIL
 ERROR(sil_local_storage_nested, decl_parsing,none,
@@ -1820,7 +1823,7 @@ ERROR(unsupported_cc_representation_combo,type_parsing,none,
 ERROR(unsupported_sil_convention,type_parsing,none,
       "convention '%0' not supported in SIL", (StringRef))
 ERROR(sil_deprecated_convention_attribute,type_parsing,none,
-      "'%0' attribute is deprecated; '@convention(%1)' must be used instead",
+      "'@%0' attribute is deprecated; '@convention(%1)' must be used instead",
       (StringRef, StringRef))
 
 // SIL Metatypes

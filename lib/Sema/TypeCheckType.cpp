@@ -1434,14 +1434,34 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                       "objc_block");
         }
       } else {
+        auto fixDeprecatedAttribute = [&](TypeAttrKind kind,
+                                          StringRef oldName,
+                                          StringRef newName) {
+          auto start = attrs.getLoc(kind);
+          
+          SmallString<32> fixitString;
+          {
+            llvm::raw_svector_ostream os(fixitString);
+            os << "convention(" << newName << ")";
+            os.flush();
+          }
+          
+          TC.diagnose(start, diag::deprecated_convention_attribute,
+                      oldName, newName)
+            .highlight(start)
+            .fixItReplace(start, fixitString);
+        };
+      
         // Handle the old attributes.
-        // TODO: Warning and fixit to migrate.
-        if (thin)
+        if (thin) {
           rep = FunctionType::Representation::Thin;
-        else if (block)
+          fixDeprecatedAttribute(TAK_thin, "thin", "thin");
+        } else if (block) {
           rep = FunctionType::Representation::Block;
-        else
+          fixDeprecatedAttribute(TAK_objc_block, "objc_block", "block");
+        } else {
           rep = FunctionType::Representation::Swift;
+        }
       }
       
       // Resolve the function type directly with these attributes.
