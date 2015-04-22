@@ -373,8 +373,8 @@ class PatternMatchEmission {
 
   SILGenFunction &SGF;
   
-  /// PatternMatchStmt - The 'switch', 'if', or while that we're emitting this
-  /// pattern match for.
+  /// PatternMatchStmt - The 'switch', or do-catch statement that we're emitting
+  /// this pattern match for.
   Stmt *PatternMatchStmt;
   CleanupsDepth PatternMatchStmtDepth;
   llvm::MapVector<CaseStmt*, std::pair<SILBasicBlock*, bool>> SharedCases;
@@ -2114,7 +2114,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
 
 
 /// Emit a sequence of catch clauses.
-void SILGenFunction::emitCatchDispatch(Stmt *S, ManagedValue exn,
+void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
                                        ArrayRef<CatchStmt*> clauses,
                                        JumpDest catchFallthroughDest) {
   auto completionHandler = [&](PatternMatchEmission &emission,
