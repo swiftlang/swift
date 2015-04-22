@@ -105,6 +105,8 @@ ERROR(error_mode_requires_one_input_file,frontend,none,
   "this mode requires a single input file", ())
 ERROR(error_mode_requires_an_input_file,frontend,none,
   "this mode requires at least one input file", ())
+ERROR(error_mode_requires_one_sil_multi_sib,frontend,none,
+  "this mode requires .sil for primary-file and only .sib for other inputs", ())
 
 ERROR(error_no_output_filename_specified,frontend,none,
   "an output filename was not specified for a mode which requires an output "

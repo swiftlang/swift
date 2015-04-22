@@ -32,6 +32,7 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
@@ -1278,6 +1279,17 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
                                                   other->getLoc())) {
           std::swap(current, other);
         }
+      }
+
+      // If we're currently looking at a .sil and the conflicting declaration
+      // comes from a .sib, don't error since we won't be considering the sil
+      // from the .sib. So it's fine for the .sil to shadow it, since that's the
+      // one we want.
+      if (currentFile->Kind == SourceFileKind::SIL) {
+        auto *otherFile = dyn_cast<SerializedASTFile>(
+            other->getDeclContext()->getModuleScopeContext());
+        if (otherFile && otherFile->isSIB())
+          continue;
       }
 
       tc.diagnose(current, diag::invalid_redecl, current->getFullName());

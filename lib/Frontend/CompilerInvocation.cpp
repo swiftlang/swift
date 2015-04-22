@@ -198,6 +198,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     // treat the input as SIL.
     StringRef Input(Opts.InputFilenames[0]);
     TreatAsSIL = llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
+  } else if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename()) {
+    // If we have a primary input and it's a filename with extension "sil",
+    // treat the input as SIL.
+    StringRef Input(Opts.InputFilenames[Opts.PrimaryInput->Index]);
+    TreatAsSIL = llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
 
   // If we have exactly one input filename, and its extension is "bc" or "ll",
@@ -214,6 +219,22 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     if (!Opts.InputFilenames.empty()) {
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
+    }
+  } else if (TreatAsSIL && Opts.PrimaryInput.hasValue()) {
+    // If we have the SIL as our primary input, we can waive the one file
+    // requirement as long as all the other inputs are SIBs.
+    if (Opts.PrimaryInput.hasValue()) {
+      for (unsigned i = 0, e = Opts.InputFilenames.size(); i != e; ++i) {
+        if (i == Opts.PrimaryInput->Index)
+          continue;
+
+        StringRef File(Opts.InputFilenames[i]);
+        if (!llvm::sys::path::extension(File).endswith(SIB_EXTENSION)) {
+          Diags.diagnose(SourceLoc(),
+                         diag::error_mode_requires_one_sil_multi_sib);
+          return true;
+        }
+      }
     }
   } else if (TreatAsSIL) {
     if (Opts.InputFilenames.size() != 1) {
