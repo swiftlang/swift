@@ -275,3 +275,6 @@ enum A012_AttachToEntities {
 // CHECK: swift:[[@LINE-1]]:8: Func/A380_SubstitutionReference.f0 {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="8"><Name>f0()</Name><USR>s:FC14swift_ide_test26A380_SubstitutionReference2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa |bbb| ccc.</Para></Abstract></Function>]
 }
 
+/// Cool operator
+func &&(x: Float, y: Float) -> Float { return x }
+// CHECK: swift:[[@LINE-1]]:6: Func/&& {{.*}} FullCommentAsXML=[<Function file="{{[^"]+}}swift" line="[[@LINE-1]]" column="6"><Name>&amp;&amp;(_:_:)</Name><USR>s:ZF14swift_ide_testoi2aaFTSfSf_Sf</USR><Declaration>func &amp;&amp;(x: Float, y: Float) -&gt; Float</Declaration><Abstract><Para>Cool operator</Para></Abstract></Function>]

@@ -359,8 +359,12 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
   auto *VD = dyn_cast<ValueDecl>(D);
 
   OS << "<Name>";
-  if (VD && VD->hasName())
-    OS << VD->getFullName();
+  if (VD && VD->hasName()) {
+    llvm::SmallString<64> SS;
+    llvm::raw_svector_ostream NameOS(SS);
+    NameOS << VD->getFullName();
+    appendWithXMLEscaping(OS, NameOS.str());
+  }
   OS << "</Name>";
 
   if (VD) {
