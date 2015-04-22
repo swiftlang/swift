@@ -2380,6 +2380,29 @@ SequenceTypeAlgorithms.test("first") {
 }
 
 //===----------------------------------------------------------------------===//
+// last
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("last") {
+  if true {
+    let s = MinimalBidirectionalCollection<OpaqueValue<Int>>([])
+    expectEmpty(s._prext_last)
+  }
+  if true {
+    let s = MinimalBidirectionalCollection<OpaqueValue<Int>>([
+      OpaqueValue<Int>(1, identity: 10),
+      OpaqueValue<Int>(2, identity: 20)
+    ])
+    if let result? = s._prext_last {
+      expectEqual(2, result.value)
+      expectEqual(20, result.identity)
+    } else {
+      expectUnreachable()
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // count()
 //===----------------------------------------------------------------------===//
 

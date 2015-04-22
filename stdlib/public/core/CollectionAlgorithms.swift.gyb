@@ -42,6 +42,16 @@ extension CollectionType {
 }
 
 //===----------------------------------------------------------------------===//
+// last
+//===----------------------------------------------------------------------===//
+
+extension CollectionType where Self.Index : BidirectionalIndexType {
+  final public var _prext_last: Generator.Element? {
+    return _prext_isEmpty ? nil : self[endIndex.predecessor()]
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // find()
 //===----------------------------------------------------------------------===//
 

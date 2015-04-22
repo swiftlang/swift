@@ -194,7 +194,8 @@ public func first<C: CollectionType>(x: C) -> C.Generator.Element? {
 public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
   x: C
 ) -> C.Generator.Element? {
-  return isEmpty(x) ? nil : x[x.endIndex.predecessor()]
+  // FIXME(prext): remove this function when protocol extensions land.
+  return x._prext_last
 }
 
 /// A *collection* that supports subscript assignment.
