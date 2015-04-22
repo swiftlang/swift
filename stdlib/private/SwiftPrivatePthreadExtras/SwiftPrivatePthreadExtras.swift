@@ -21,37 +21,42 @@ import Darwin
 import Glibc
 #endif
 
-@asmname("swift_stdlib_getExecuteBlockFunctionPtr_VoidPtr_VoidPtr")
-func _stdlib_getExecuteBlockFunctionPtr_VoidPtr_VoidPtr()
-  -> CFunctionPointer<((UnsafeMutablePointer<()>) -> UnsafeMutablePointer<()>)>
-
-@asmname("swift_stdlib_getTypeMetadata")
-func _stdlib_getTypeMetadata<T>(_: T.Type) -> UnsafePointer<Void>
-
-public struct ExecuteSwiftClosureContext<Argument, Result> {
-  let argumentTypeMetadata: UnsafePointer<Void>
-  let resultTypeMetadata: UnsafePointer<Void>
-  let closure: ((Argument) -> Result)
-  let arg: Argument
+/// An abstract base class to encapsulate the context necessary to invoke
+/// a block from pthread_create.
+internal class PthreadBlockContext {
+  /// Execute the block, and return an `UnsafeMutablePointer` to memory
+  /// allocated with `UnsafeMutablePointer.alloc` containing the result of the
+  /// block.
+  func run() -> UnsafeMutablePointer<Void> { fatalError("abstract") }
 }
 
-/// Execute a Swift closure with a given argument.
-///
-/// :param: closureAndArg closure and its argument.  The function takes
-///   ownership of this pointer.
-@asmname("swift_stdlib_executeSwiftClosure")
-public // COMPILER_INTRINSIC
-func _stdlib_executeSwiftClosure<Param, Result>(
-  context: UnsafeMutablePointer<ExecuteSwiftClosureContext<Param, Result>>
-) -> UnsafeMutablePointer<Result> {
-  let closure = context.memory.closure
-  let arg = context.memory.arg
-  context.destroy()
-  context.dealloc(1)
+internal class PthreadBlockContextImpl<Argument, Result>: PthreadBlockContext {
+  let block: (Argument) -> Result
+  let arg: Argument
 
-  var result = UnsafeMutablePointer<Result>.alloc(1)
-  result.initialize(closure(arg))
-  return result
+  init(block: (Argument) -> Result, arg: Argument) {
+    self.block = block
+    self.arg = arg
+    super.init()
+  }
+
+  override func run() -> UnsafeMutablePointer<Void> {
+    let result = UnsafeMutablePointer<Result>.alloc(1)
+    result.initialize(block(arg))
+    return UnsafeMutablePointer(result)
+  }
+}
+
+/// Entry point for `pthread_create` that invokes a block context.
+internal func invokeBlockContext(
+  contextAsVoidPointer: UnsafeMutablePointer<Void>
+) -> UnsafeMutablePointer<Void> {
+  // The context is passed in +1; we're responsible for releasing it.
+  let contextAsOpaque = COpaquePointer(contextAsVoidPointer)
+  let context = Unmanaged<PthreadBlockContext>.fromOpaque(contextAsOpaque)
+    .takeRetainedValue()
+
+  return context.run()
 }
 
 /// Block-based wrapper for `pthread_create`.
@@ -60,18 +65,16 @@ public func _stdlib_pthread_create_block<Argument, Result>(
   start_routine: (Argument) -> Result,
   arg: Argument
 ) -> (CInt, pthread_t?) {
-
-  let thunk = _stdlib_getExecuteBlockFunctionPtr_VoidPtr_VoidPtr()
-  var thunkArg =
-    UnsafeMutablePointer<ExecuteSwiftClosureContext<Argument, Result>>.alloc(1)
-  thunkArg.initialize(ExecuteSwiftClosureContext(
-    argumentTypeMetadata: _stdlib_getTypeMetadata(Argument.self),
-    resultTypeMetadata: _stdlib_getTypeMetadata(Result.self),
-    closure: start_routine,
-    arg: arg))
+  let context = PthreadBlockContextImpl(block: start_routine, arg: arg)
+  // We hand ownership off to `invokeBlockContext` through its void context
+  // argument.
+  let contextAsOpaque = Unmanaged.passRetained(context)
+    .toOpaque()
+  let contextAsVoidPointer = UnsafeMutablePointer<Void>(contextAsOpaque)
 
   var threadID = pthread_t()
-  let result = pthread_create(&threadID, attr, thunk, thunkArg)
+  let result = pthread_create(&threadID, attr,
+    invokeBlockContext, contextAsVoidPointer)
   if result == 0 {
     return (result, threadID)
   } else {

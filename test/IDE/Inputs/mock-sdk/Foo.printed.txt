@@ -100,7 +100,7 @@ func fooFunc3(a: Int32, b: Float, c: Double, d: UnsafeMutablePointer<Int32>) -> 
 */
 func fooFuncWithBlock(blk: ((Float) -> Int32)!)
 
-func fooFuncWithFunctionPointer(fptr: CFunctionPointer<((Float) -> Int32)>)
+func fooFuncWithFunctionPointer(fptr: (@convention(c) (Float) -> Int32)!)
 
 @noreturn func fooFuncNoreturn1()
 @noreturn func fooFuncNoreturn2()
