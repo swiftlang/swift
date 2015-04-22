@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift
 
+// REQUIRES: objc_interop
+
 import SwiftPrivate
 import StdlibUnittest
 import Foundation
