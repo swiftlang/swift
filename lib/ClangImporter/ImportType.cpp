@@ -1362,7 +1362,8 @@ considerErrorImport(ClangImporter::Implementation &importer,
                     const clang::ObjCMethodDecl *clangDecl,
                     DeclName &methodName,
                     ArrayRef<const clang::ParmVarDecl *> params,
-                    Type &importedResultType) {
+                    Type &importedResultType,
+                    SpecialMethodKind methodKind) {
   // Respect the compiler option.
   if (!importer.ErrorHandling) return None;
 
@@ -1408,7 +1409,11 @@ considerErrorImport(ClangImporter::Implementation &importer,
       break;
     }
 
-    // Adjust the declaration name to remove the parameter.
+    // Adjust the declaration name to remove the parameter, unless
+    // this was the first parameter of a constructor.
+    if (methodKind == SpecialMethodKind::Constructor && index == 0)
+      return errorInfo;
+
     SmallVector<Identifier, 8> newParamNames;
     newParamNames.append(paramNames.begin(),
                          paramNames.begin() + index);
@@ -1494,12 +1499,32 @@ Type ClangImporter::Implementation::importMethodType(
     return Type();
 
   auto errorInfo = considerErrorImport(*this, clangDecl, methodName, params,
-                                       swiftResultTy);
+                                       swiftResultTy, kind);
 
   // Import the parameters.
   SmallVector<TupleTypeElt, 4> swiftArgParams;
   SmallVector<TupleTypeElt, 4> swiftBodyParams;
   SmallVector<TuplePatternElt, 4> bodyPatternElts;
+
+  auto addEmptyTupleParameter = [&](Identifier argName) {
+    // It doesn't actually matter which DeclContext we use, so just
+    // use the imported header unit.
+    auto type = TupleType::getEmpty(SwiftContext);
+    auto var = new (SwiftContext) ParamDecl(/*IsLet*/ true,
+                                            SourceLoc(), argName,
+                                            SourceLoc(), argName, type,
+                                            ImportedHeaderUnit);
+    Pattern *pattern = new (SwiftContext) NamedPattern(var);
+    pattern->setType(type);
+    pattern = new (SwiftContext) TypedPattern(pattern,
+                                              TypeLoc::withoutLoc(type));
+    pattern->setType(type);
+
+    bodyPatternElts.push_back(TuplePatternElt(pattern));
+    swiftArgParams.push_back(TupleTypeElt(type, argName));
+    swiftBodyParams.push_back(TupleTypeElt(type, argName));
+  };
+
   auto argNames = methodName.getArgumentNames();
   llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
   unsigned nameIndex = 0;
@@ -1573,6 +1598,14 @@ Type ClangImporter::Implementation::importMethodType(
     // into the parameter type.
     if (errorInfo && paramIndex == errorInfo->ParamIndex) {
       errorInfo->ParamType = swiftParamTy->getCanonicalType();
+
+      // Unless this is the first argument of a constructor, in which
+      // case build an argument with () type.  We have to do this here
+      // in case there were trailing closure arguments.
+      if (kind == SpecialMethodKind::Constructor && paramIndex == 0) {
+        addEmptyTupleParameter(argNames[nameIndex]);
+        ++nameIndex;
+      }
       continue;
     }
 
@@ -1629,23 +1662,7 @@ Type ClangImporter::Implementation::importMethodType(
   // argument name, synthesize a Void parameter with that name.
   if (kind == SpecialMethodKind::Constructor && params.empty() && 
       argNames.size() == 1) {
-    // It doesn't actually matter which DeclContext we use, so just use the
-    // imported header unit.
-    auto argName = argNames[0];
-    auto type = TupleType::getEmpty(SwiftContext);
-    auto var = new (SwiftContext) ParamDecl(/*IsLet*/ true,
-                                            SourceLoc(), argName,
-                                            SourceLoc(), argName, type,
-                                            ImportedHeaderUnit);
-    Pattern *pattern = new (SwiftContext) NamedPattern(var);
-    pattern->setType(type);
-    pattern = new (SwiftContext) TypedPattern(pattern,
-                                              TypeLoc::withoutLoc(type));
-    pattern->setType(type);
-    
-    bodyPatternElts.push_back(TuplePatternElt(pattern));
-    swiftArgParams.push_back(TupleTypeElt(type, argName));
-    swiftBodyParams.push_back(TupleTypeElt(type, argName));
+    addEmptyTupleParameter(argNames[0]);
   }
 
   // Form the parameter tuple.
