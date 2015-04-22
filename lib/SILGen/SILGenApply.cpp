@@ -775,38 +775,37 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
 /// reference are flattened into a single SIL apply to the most uncurried entry
 /// point fitting the call site, avoiding pointless intermediate closure
 /// construction.
-class SILGenApply : public Lowering::ExprVisitor<SILGenApply>
-{
+class SILGenApply : public Lowering::ExprVisitor<SILGenApply> {
 public:
-  SILGenFunction &gen;
-  Optional<Callee> callee;
+  SILGenFunction &SGF;
+  Optional<Callee> ApplyCallee;
   ArgumentSource SelfParam;
   Expr *SelfApplyExpr = nullptr;
-  std::vector<ApplyExpr*> callSites;
-  Expr *sideEffect = nullptr;
-  unsigned callDepth = 0;
+  std::vector<ApplyExpr*> CallSites;
+  Expr *SideEffect = nullptr;
+  unsigned CallDepth = 0;
 
   SILGenApply(SILGenFunction &gen)
-    : gen(gen)
+    : SGF(gen)
   {}
 
   void setCallee(Callee &&c) {
-    assert((SelfParam ? callDepth == 1 : callDepth == 0)
+    assert((SelfParam ? CallDepth == 1 : CallDepth == 0)
            && "setting callee at non-zero call depth?!");
-    assert(!callee && "already set callee!");
-    callee.emplace(std::move(c));
+    assert(!ApplyCallee && "already set callee!");
+    ApplyCallee.emplace(std::move(c));
   }
 
   void setSideEffect(Expr *sideEffectExpr) {
-    assert(!sideEffect && "already set side effect!");
-    sideEffect = sideEffectExpr;
+    assert(!SideEffect && "already set side effect!");
+    SideEffect = sideEffectExpr;
   }
 
   void setSelfParam(ArgumentSource &&theSelfParam, Expr *theSelfApplyExpr) {
     assert(!SelfParam && "already set this!");
     SelfParam = std::move(theSelfParam);
     SelfApplyExpr = theSelfApplyExpr;
-    ++callDepth;
+    ++CallDepth;
   }
 
   void decompose(Expr *e) {
@@ -853,7 +852,7 @@ public:
                                     siteType->getExtInfo());
     };
 
-    for (auto callSite : callSites) {
+    for (auto callSite : CallSites) {
       addSite(callSite, false);
     }
     // The self application might be a MemberRefExpr if "self" is an archetype.
@@ -874,7 +873,7 @@ public:
     auto *t = e->getType()->castTo<AnyFunctionType>();
     bool isTransparent = t->getExtInfo().isAutoClosure();
 
-    ManagedValue fn = gen.emitRValueAsSingleValue(e);
+    ManagedValue fn = SGF.emitRValueAsSingleValue(e);
     auto origType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
     setCallee(Callee::forIndirect(fn, origType, getSubstFnType(), isTransparent,
                                   e));
@@ -896,7 +895,7 @@ public:
       }
     }
     // TODO: preserve the function pointer at its original abstraction level
-    ManagedValue fn = gen.emitRValueAsSingleValue(e);
+    ManagedValue fn = SGF.emitRValueAsSingleValue(e);
     auto origType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
     setCallee(Callee::forIndirect(fn, origType, getSubstFnType(),
                                   isTransparent, e));
@@ -909,10 +908,10 @@ public:
     } else if (applyInitDelegation(e)) {
       // Already done
     } else {
-      callSites.push_back(e);
+      CallSites.push_back(e);
       visit(e->getFn());
     }
-    ++callDepth;
+    ++CallDepth;
   }
 
   /// Given a metatype value for the type, allocate an Objective-C
@@ -936,17 +935,17 @@ public:
                                                   MetatypeRepresentation::ObjC);
       }
       selfMetaObjC = ManagedValue(
-                       gen.B.emitThickToObjCMetatype(
+                       SGF.B.emitThickToObjCMetatype(
                          loc, selfMeta.getValue(),
-                         gen.SGM.getLoweredType(objcMetaType)),
+                         SGF.SGM.getLoweredType(objcMetaType)),
                        selfMeta.getCleanup());
     }
 
     // Allocate the object.
-    return ManagedValue(gen.B.createAllocRefDynamic(
+    return ManagedValue(SGF.B.createAllocRefDynamic(
                           loc,
                           selfMetaObjC.getValue(),
-                          gen.SGM.getLoweredType(type),
+                          SGF.SGM.getLoweredType(type),
                           /*objc=*/true),
                           selfMetaObjC.getCleanup());
   }
@@ -966,7 +965,7 @@ public:
       if (e->getAccessSemantics() != AccessSemantics::Ordinary) {
         isDynamicallyDispatched = false;
       } else {
-        switch (gen.getMethodDispatch(afd)) {
+        switch (SGF.getMethodDispatch(afd)) {
         case MethodDispatch::Class:
           isDynamicallyDispatched = true;
           break;
@@ -979,13 +978,13 @@ public:
       if (isa<FuncDecl>(afd) && isDynamicallyDispatched) {
         kind = SILDeclRef::Kind::Func;
       } else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
-        ApplyExpr *thisCallSite = callSites.back();
+        ApplyExpr *thisCallSite = CallSites.back();
         // Required constructors are dynamically dispatched when the 'self'
         // value is not statically derived.
         if (ctor->isRequired() &&
             thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
             !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
-          if (gen.SGM.requiresObjCDispatch(afd)) {
+          if (SGF.SGM.requiresObjCDispatch(afd)) {
             // When we're performing Objective-C dispatch, we don't have an
             // allocating constructor to call. So, perform an alloc_ref_dynamic
             // and pass that along to the initializer.
@@ -1000,17 +999,17 @@ public:
       }
 
       if (isDynamicallyDispatched) {
-        ApplyExpr *thisCallSite = callSites.back();
-        callSites.pop_back();
-        RValue self = gen.emitRValue(thisCallSite->getArg());
+        ApplyExpr *thisCallSite = CallSites.back();
+        CallSites.pop_back();
+        RValue self = SGF.emitRValue(thisCallSite->getArg());
 
         // If we require a dynamic allocation of the object here, do so now.
         if (requiresAllocRefDynamic) {
           SILLocation loc = thisCallSite->getArg();
           auto selfValue = allocateObjCObject(
-                             std::move(self).getAsSingleValue(gen, loc),
+                             std::move(self).getAsSingleValue(SGF, loc),
                              loc);
-          self = RValue(gen, loc, selfValue.getType().getSwiftRValueType(),
+          self = RValue(SGF, loc, selfValue.getType().getSwiftRValueType(),
                         selfValue);
         }
 
@@ -1021,19 +1020,19 @@ public:
         SILDeclRef constant(afd, kind.getValue(),
                             SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                            gen.SGM.requiresObjCDispatch(afd));
+                            SGF.SGM.requiresObjCDispatch(afd));
 
-        setCallee(Callee::forClassMethod(gen, selfValue,
+        setCallee(Callee::forClassMethod(SGF, selfValue,
                                          constant, getSubstFnType(), e));
 
         // setSelfParam bumps the callDepth, but we aren't really past the
         // 'self' call depth in this case.
-        --callDepth;
+        --CallDepth;
 
         // If there are substitutions, add them.
         if (e->getDeclRef().isSpecialized()) {
-          callee->setSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
-                                   callDepth);
+          ApplyCallee->setSubstitutions(SGF, e, e->getDeclRef().getSubstitutions(),
+                                   CallDepth);
         }
 
         return;
@@ -1054,39 +1053,39 @@ public:
     SILDeclRef constant(e->getDecl(),
                         SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         gen.SGM.requiresObjCDispatch(e->getDecl()));
+                         SGF.SGM.requiresObjCDispatch(e->getDecl()));
 
     // Obtain a reference for a local closure.
-    if (gen.LocalFunctions.count(constant)) {
+    if (SGF.LocalFunctions.count(constant)) {
       ManagedValue localFn =
-        gen.emitRValueForDecl(e, e->getDeclRef(), e->getType(),
+        SGF.emitRValueForDecl(e, e->getDeclRef(), e->getType(),
                               AccessSemantics::Ordinary);
       auto type = cast<AnyFunctionType>(e->getType()->getCanonicalType());
       setCallee(Callee::forIndirect(localFn, type, type, false, e));
 
     // Otherwise, stash the SILDeclRef.
     } else {
-      setCallee(Callee::forDirect(gen, constant, getSubstFnType(), e));
+      setCallee(Callee::forDirect(SGF, constant, getSubstFnType(), e));
     }
 
     // If there are substitutions, add them.
     if (e->getDeclRef().isSpecialized()) {
-      callee->setSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
-                               callDepth);
+      ApplyCallee->setSubstitutions(SGF, e, e->getDeclRef().getSubstitutions(),
+                               CallDepth);
     }
   }
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
     // FIXME: We might need to go through ObjC dispatch for references to
     // constructors imported from Clang (which won't have a direct entry point)
     // or to delegate to a designated initializer.
-    setCallee(Callee::forDirect(gen,
+    setCallee(Callee::forDirect(SGF,
                 SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer),
                                 getSubstFnType(), e));
 
     // If there are substitutions, add them.
     if (e->getDeclRef().isSpecialized())
-      callee->setSubstitutions(gen, e, e->getDeclRef().getSubstitutions(),
-                               callDepth);
+      ApplyCallee->setSubstitutions(SGF, e, e->getDeclRef().getSubstitutions(),
+                               CallDepth);
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
@@ -1145,7 +1144,7 @@ public:
         // initializer. We need to allocate the object ourselves.
         kind = SILDeclRef::Kind::Initializer;
 
-        auto metatype = std::move(selfValue).getAsSingleValue(gen);
+        auto metatype = std::move(selfValue).getAsSingleValue(SGF);
         auto allocated = allocateObjCObject(metatype, e->getBase());
         auto allocatedType = allocated.getType().getSwiftRValueType();
         selfValue = ArgumentSource(e->getBase(),
@@ -1163,13 +1162,13 @@ public:
     // application, because it doesn't look like a call site in the AST, but a
     // member ref.
     CanFunctionType substFnType;
-    if (!callSites.empty() || dyn_cast_or_null<ApplyExpr>(SelfApplyExpr))
+    if (!CallSites.empty() || dyn_cast_or_null<ApplyExpr>(SelfApplyExpr))
       substFnType = getSubstFnType();
     else
       substFnType = cast<FunctionType>(e->getType()->getCanonicalType());
 
     // Prepare the callee.  This can modify both selfValue and subs.
-    Callee theCallee = prepareArchetypeCallee(gen, e, constant, selfValue,
+    Callee theCallee = prepareArchetypeCallee(SGF, e, constant, selfValue,
                                               substFnType, subs);
 
     setSelfParam(std::move(selfValue), e);
@@ -1177,7 +1176,7 @@ public:
 
     // If there are substitutions, add them now.
     if (!subs.empty()) {
-      callee->setSubstitutions(gen, e, subs, callDepth);
+      ApplyCallee->setSubstitutions(SGF, e, subs, CallDepth);
     }
   }
 
@@ -1201,7 +1200,7 @@ public:
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     Expr *arg = apply->getArg();
-    ManagedValue super = gen.emitRValueAsSingleValue(arg);
+    ManagedValue super = SGF.emitRValueAsSingleValue(arg);
 
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
@@ -1211,7 +1210,7 @@ public:
       constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,
                          SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         gen.SGM.requiresObjCSuperDispatch(ctorRef->getDecl()));
+                         SGF.SGM.requiresObjCSuperDispatch(ctorRef->getDecl()));
 
       if (ctorRef->getDeclRef().isSpecialized())
         substitutions = ctorRef->getDeclRef().getSubstitutions();
@@ -1220,7 +1219,7 @@ public:
       constant = SILDeclRef(declRef->getDecl(),
                          SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         gen.SGM.requiresObjCSuperDispatch(declRef->getDecl()));
+                         SGF.SGM.requiresObjCSuperDispatch(declRef->getDecl()));
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
@@ -1228,7 +1227,7 @@ public:
       llvm_unreachable("invalid super callee");
 
     CanType superFormalType = arg->getType()->getCanonicalType();
-    setSelfParam(ArgumentSource(arg, RValue(gen, apply, superFormalType, super)),
+    setSelfParam(ArgumentSource(arg, RValue(SGF, apply, superFormalType, super)),
                  apply);
 
     SILValue superMethod;
@@ -1237,17 +1236,16 @@ public:
       while (auto *UI = dyn_cast<UpcastInst>(Input))
         Input = UI->getOperand();
       // ObjC super calls require dynamic dispatch.
-      setCallee(Callee::forSuperMethod(gen, Input, constant,
+      setCallee(Callee::forSuperMethod(SGF, Input, constant,
                                        getSubstFnType(), fn));
     } else {
       // Native Swift super calls are direct.
-      setCallee(Callee::forDirect(gen, constant,
-                                  getSubstFnType(), fn));
+      setCallee(Callee::forDirect(SGF, constant, getSubstFnType(), fn));
     }
 
     // If there are any substitutions for the callee, apply them now.
     if (!substitutions.empty())
-      callee->setSubstitutions(gen, fn, substitutions, callDepth-1);
+      ApplyCallee->setSubstitutions(SGF, fn, substitutions, CallDepth-1);
   }
 
   /// Try to emit the given application as initializer delegation.
@@ -1274,23 +1272,23 @@ public:
     // If we're using the allocating constructor, we need to pass along the
     // metatype.
     if (useAllocatingCtor) {
-      self = ManagedValue::forUnmanaged(gen.emitMetatypeOfValue(expr, arg));
+      self = ManagedValue::forUnmanaged(SGF.emitMetatypeOfValue(expr, arg));
     } else {
-      self = gen.emitRValueAsSingleValue(arg);
+      self = SGF.emitRValueAsSingleValue(arg);
     }
 
     CanType selfFormalType = arg->getType()->getCanonicalType();
-    setSelfParam(ArgumentSource(arg, RValue(gen, expr, selfFormalType, self)),
+    setSelfParam(ArgumentSource(arg, RValue(SGF, expr, selfFormalType, self)),
                  expr);
 
     // Determine the callee. For structs and enums, this is the allocating
     // constructor (because there is no initializing constructor). For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
-    if (gen.getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class) {
+    if (SGF.getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
       setCallee(Callee::forClassMethod(
-                  gen,
+                  SGF,
                   self.getValue(),
                   SILDeclRef(ctorRef->getDecl(),
                              useAllocatingCtor
@@ -1298,11 +1296,11 @@ public:
                                : SILDeclRef::Kind::Initializer,
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             gen.SGM.requiresObjCDispatch(ctorRef->getDecl())),
+                             SGF.SGM.requiresObjCDispatch(ctorRef->getDecl())),
                   getSubstFnType(), fn));
     } else {
       // Directly call the peer constructor.
-      setCallee(Callee::forDirect(gen,
+      setCallee(Callee::forDirect(SGF,
                                   SILDeclRef(ctorRef->getDecl(),
                                              useAllocatingCtor
                                                ? SILDeclRef::Kind::Allocator
@@ -1313,21 +1311,21 @@ public:
       // even if the underlying implementation is @transparent.  This is a hack
       // but is important because transparent inlining happends before DI, and
       // DI needs to see the call to the delegated constructor.
-      callee->setTransparent(false);
+      ApplyCallee->setTransparent(false);
     }
 
     // Set up the substitutions, if we have any.
     if (ctorRef->getDeclRef().isSpecialized())
-      callee->setSubstitutions(gen, fn,
+      ApplyCallee->setSubstitutions(SGF, fn,
                                ctorRef->getDeclRef().getSubstitutions(),
-                               callDepth-1);
+                               CallDepth-1);
 
     return true;
   }
 
   Callee getCallee() {
-    assert(callee && "did not find callee?!");
-    return *std::move(callee);
+    assert(ApplyCallee && "did not find callee?!");
+    return *std::move(ApplyCallee);
   }
 
   /// Ignore parentheses and implicit conversions.
@@ -1386,7 +1384,7 @@ public:
 
     // Since we'll be collapsing this call site, make sure there's another
     // call site that will actually perform the invocation.
-    if (callSites.empty())
+    if (CallSites.empty())
       return false;
 
     // Only @objc methods can be forced.
@@ -1398,10 +1396,10 @@ public:
     auto emitDynamicMemberRef = [&] {
       // We found it. Emit the base.
       ManagedValue base =
-        gen.emitRValueAsSingleValue(dynamicMemberRef->getBase());
+        SGF.emitRValueAsSingleValue(dynamicMemberRef->getBase());
 
       setSelfParam(ArgumentSource(dynamicMemberRef->getBase(),
-                                  RValue(gen, dynamicMemberRef,
+                                  RValue(SGF, dynamicMemberRef,
                                     base.getType().getSwiftRValueType(), base)),
                    dynamicMemberRef);
 
@@ -1411,14 +1409,14 @@ public:
                         SILDeclRef::ConstructAtNaturalUncurryLevel,
                         /*isObjC=*/true);
 
-      setCallee(Callee::forDynamic(gen, base.getValue(), member,
+      setCallee(Callee::forDynamic(SGF, base.getValue(), member,
                                    getSubstFnType(), e));
     };
 
     // When we have an open existential, open it and then emit the
     // member reference.
     if (openExistential) {
-      gen.emitOpenExistential(openExistential,
+      SGF.emitOpenExistential(openExistential,
                               [&](Expr*) { emitDynamicMemberRef(); });
     } else {
       emitDynamicMemberRef();
@@ -3078,8 +3076,8 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   apply.decompose(e);
 
   // Evaluate and discard the side effect if present.
-  if (apply.sideEffect)
-    gen.emitRValue(apply.sideEffect);
+  if (apply.SideEffect)
+    gen.emitRValue(apply.SideEffect);
 
   // Build the call.
   // Pass the writeback scope on to CallEmission so it can thread scopes through
@@ -3092,7 +3090,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
                          apply.SelfApplyExpr->getType());
 
   // Apply arguments from call sites, innermost to outermost.
-  for (auto site = apply.callSites.rbegin(), end = apply.callSites.rend();
+  for (auto site = apply.CallSites.rbegin(), end = apply.CallSites.rend();
        site != end;
        ++site) {
     emission.addCallSite(*site);
