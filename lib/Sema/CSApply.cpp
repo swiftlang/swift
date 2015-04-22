@@ -115,8 +115,7 @@ Type Solution::computeSubstitutions(
   if (auto genericFn = origType->getAs<GenericFunctionType>()) {
     requirements = genericFn->getRequirements();
   } else {
-    requirements = dc->getDeclaredTypeOfContext()->getAnyNominal()
-                     ->getGenericRequirements();
+    requirements = dc->getGenericSignatureOfContext()->getRequirements();
   }
 
   for (const auto &req : requirements) {
