@@ -36,18 +36,85 @@ func != (t0: Any.Type, t1: Any.Type) -> Bool {
 ///
 /// Mirrors are used by playgrounds and the debugger.
 public struct Mirror {
-  public enum SuperclassRepresentation {
+  /// Representation of descendant classes that don't override
+  /// `customMirror()`
+  ///
+  /// A `CustomReflectable` class can control whether its mirror will
+  /// represent descendant classes that don't override
+  /// `customMirror()`, by initializing the mirror with a
+  /// `DefaultDescendantRepresentation`.
+  ///
+  /// Note that the effect of this setting goes no deeper than the
+  /// nearest descendant class that overrides `customMirror()`, which
+  /// in turn can determine representation of *its* descendants.
+  public enum DefaultDescendantRepresentation {
+  /// Generate a default mirror for descendant classes that don't
+  /// override `customMirror()`.  
+  ////
+  /// This case is the default.
   case Generated
-  case Customized(()->Mirror)
+
+  /// Suppress the representation of descendant classes that don't
+  /// override `customMirror()`.  
+  ///
+  /// This option may be useful at the root of a class cluster, where
+  /// implementation details of descendants should generally not be
+  /// visible to clients.  
   case Suppressed
   }
 
+  /// Representation of ancestor classes
+  ///
+  /// A `CustomReflectable` class can control how its mirror will
+  /// represent ancestor classes by initializing the mirror with a
+  /// `AncestorRepresentation`.
+  public enum AncestorRepresentation {
+  /// Generate a default mirror for all ancestor classes.  This is the
+  /// default behavior.
+  ///
+  /// Note: this option bypasses any implementation of `customMirror`
+  /// that may be supplied by a `CustomReflectable` ancestor, so this
+  /// is typically not the right option for a `customMirror`implementation 
+    
+  /// Generate a default mirror for all ancestor classes.
+  ///
+  /// This case is the default.
+  ///
+  /// **Note:** this option generates default mirrors even for
+  /// ancestor classes that may implement `CustomReflectable`\ 's
+  /// `customMirror` requirement.  To avoid dropping an ancestor class
+  /// customization, an override of `customMirror()` should pass
+  /// `ancestorRepresentation: .Customized(super.customMirror)` when
+  /// initializing its `Mirror`.
+  case Generated
+
+  /// Use the nearest ancestor's implementation of `customMirror()` to
+  /// create a mirror for that ancestor.  Other classes derived from
+  /// such an ancestor are given a default mirror.
+  ///
+  /// The payload for this option should always be
+  /// "`super.customMirror`":
+  ///
+  /// .. parsed-literal::
+  ///
+  ///   func customMirror() -> Mirror {
+  ///     return Mirror(
+  ///       self,
+  ///       children: ["someProperty": self.someProperty], 
+  ///       ancestorRepresentation: .Customized(**super.customMirror**))
+  ///   }
+  case Customized(()->Mirror)
+
+  /// Suppress the representation of all ancestor classes.  The
+  /// resulting `Mirror`\ 's `superclassMirror()` is `nil`.
+  case Suppressed
+  }
 
   /// Initialize a mirror that reflects upon the given `subject`.
   ///
   /// If the dynamic type of `subject` conforms to
   /// `CustomReflectable`, returns the result of calling its
-  /// `customMirror` method.  Otherwise, returns a mirror generated
+  /// `customMirror` method.  Otherwise, returns a mirror synthesized
   /// for `subject` by the language.
   ///
   /// Note: If the dynamic type of `subject` has value semantics,
@@ -97,11 +164,10 @@ public struct Mirror {
   static func _noSuperclassMirror() -> Mirror? { return nil }
   
   internal static func _superclassGenerator<T: Any>(
-    subject: T, _ superclassRepresentation: SuperclassRepresentation
+    subject: T, _ ancestorRepresentation: AncestorRepresentation
   ) -> ()->Mirror? {
-    switch superclassRepresentation {
-    case .Suppressed: return Mirror._noSuperclassMirror
-    case .Generated: return {
+    switch (ancestorRepresentation, T.self as? AnyClass) {
+    case (.Generated, let subjectClass?) : return {
         // Find the right legacy superclass mirror (inefficient, but works)
         
         // get a mirror for the most-derived type
@@ -109,10 +175,10 @@ public struct Mirror {
         // get the most-derived type
         var derivedClass: AnyClass? = subject.dynamicType as? AnyClass
 
-        // Walk up the chain of mirrors/classes until we find T.self
+        // Walk up the chain of mirrors/classes until we find subjectClass
         while let (superMirror?, derived?) = (derivedMirror._legacySuperMirror(), derivedClass) {
           let superclass: AnyClass? = _getSuperclass(derived)
-          if derived == T.self {
+          if subjectClass == derived  {
             if superclass == nil { break } // I don't think this can happen
             return Mirror(superMirror, subjectType: superclass!)
           }
@@ -121,9 +187,10 @@ public struct Mirror {
         }
         return nil
       }
-    case .Customized(let overridden): return {
-        overridden()
-      }
+    case (.Customized(let createSuperMirror), let subjectClass?):
+      return { createSuperMirror() }
+    default:
+      return Mirror._noSuperclassMirror
     }
   }
   
@@ -141,12 +208,12 @@ public struct Mirror {
   >(
     _ subject: T,
     children: C,
-    superclassRepresentation: SuperclassRepresentation = .Generated,
+    ancestorRepresentation: AncestorRepresentation = .Generated,
     displayStyle: DisplayStyle? = nil
   ) {
     self._subjectType = T.self
-    self._createSuperclassMirror = Mirror._superclassGenerator(
-      subject, superclassRepresentation)
+    self._makeSuperclassMirror = Mirror._superclassGenerator(
+      subject, ancestorRepresentation)
       
     self.children = Children(children)
     self.displayStyle = displayStyle
@@ -175,12 +242,12 @@ public struct Mirror {
   >(
     _ subject: T,
     unlabeledChildren: C,
-    superclassRepresentation: SuperclassRepresentation = .Generated,
+    ancestorRepresentation: AncestorRepresentation = .Generated,
     displayStyle: DisplayStyle? = nil
   ) {
     self._subjectType = T.self
-    self._createSuperclassMirror = Mirror._superclassGenerator(
-      subject, superclassRepresentation)
+    self._makeSuperclassMirror = Mirror._superclassGenerator(
+      subject, ancestorRepresentation)
       
     self.children = Children(
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
@@ -197,12 +264,12 @@ public struct Mirror {
   public init<T>(
     _ subject: T,
     children: DictionaryLiteral<String, Any>,
-    superclassRepresentation: SuperclassRepresentation = .Generated,
+    ancestorRepresentation: AncestorRepresentation = .Generated,
     displayStyle: DisplayStyle? = nil
   ) {
     self._subjectType = T.self
-    self._createSuperclassMirror = Mirror._superclassGenerator(
-      subject, superclassRepresentation)
+    self._makeSuperclassMirror = Mirror._superclassGenerator(
+      subject, ancestorRepresentation)
       
     self.children = Children(
       lazy(children).map { Child(label: $0.0, value: $0.1) }
@@ -218,10 +285,10 @@ public struct Mirror {
   public let displayStyle: DisplayStyle?
 
   public func superclassMirror() -> Mirror? {
-    return _createSuperclassMirror()
+    return _makeSuperclassMirror()
   }
 
-  internal let _createSuperclassMirror: ()->Mirror?
+  internal let _makeSuperclassMirror: ()->Mirror?
   internal let _subjectType: Any.Type
 }
 
@@ -396,14 +463,14 @@ extension Mirror {
     // FIXME: this may be wrong for intermediate mirrors
     self._subjectType = oldMirror.value.dynamicType
     if let subjectClass? = subjectType as? AnyClass {
-      self._createSuperclassMirror = {
+      self._makeSuperclassMirror = {
         oldMirror._legacySuperMirror().map {
           Mirror($0, subjectType: _getSuperclass(subjectClass)!)
         }
       }
     }
     else {
-      self._createSuperclassMirror = Mirror._noSuperclassMirror
+      self._makeSuperclassMirror = Mirror._noSuperclassMirror
     }
     self.children = Children(LegacyChildren(oldMirror))
     self.displayStyle = DisplayStyle(legacy: oldMirror.disposition)
@@ -440,7 +507,7 @@ extension PlaygroundQuickLook {
   /// If the dynamic type of `subject` conforms to
   /// `CustomPlaygroundQuickLookable`, returns the result of calling
   /// its `customPlaygroundQuickLook` method.  Otherwise, returns
-  /// a `PlaygroundQuickLook` generated for `subject` by the
+  /// a `PlaygroundQuickLook` synthesized for `subject` by the
   /// language.  Note: in some cases the result may be
   /// `.Text(String(reflecting: subject))`.
   ///

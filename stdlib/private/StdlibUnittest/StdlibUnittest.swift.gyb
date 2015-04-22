@@ -392,13 +392,14 @@ public func expectEmpty<T>(
 public func expectNotEmpty<T>(
     value: Optional<T>,
     file: String = __FILE__, line: UWord = __LINE__
-) {
+) -> T? {
   if value == nil {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     println("expected optional to be non-empty")
     println()
   }
+  return value
 }
 
 public func expectCrashLater() {
