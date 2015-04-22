@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 sil_stage canonical
 
@@ -48,9 +48,10 @@ entry(%0 : $AnyObject):
   try_apply %1(%0) : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType),
     normal bb1, error bb2
 
-// CHECK:      [[T0:%.*]] = phi %objc_object* [ [[RESULT]],
-// CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* [[T0]])
-// CHECK-NEXT: br label [[CONT:%[0-9]+]]
+// CHECK:             [[T0:%.*]] = phi %objc_object* [ [[RESULT]],
+// CHECK-objc-NEXT:   call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* [[T0]])
+// CHECK-native-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%objc_object*)*)(%objc_object* [[T0]])
+// CHECK-NEXT:        br label [[CONT:%[0-9]+]]
 bb1(%2 : $AnyObject):
   strong_release %2 : $AnyObject
   br bb3
