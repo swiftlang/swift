@@ -96,14 +96,6 @@ public:
   /// addElement(). The RValue will not be complete until all the elements have
   /// been added.
   explicit RValue(CanType type);
-
-  /// Create an RValue form a managed value and a cantype. Equivalent to
-  /// calling:
-  ///
-  /// auto R = RValue(type);
-  /// R.addElement(gen, element, type, l);
-  explicit RValue(SILGenFunction &gen, ManagedValue element,
-                  CanType type, SILLocation l);
   
   /// True if the rvalue has been completely initialized by adding all its
   /// elements.
