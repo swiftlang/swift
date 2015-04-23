@@ -23,7 +23,7 @@ public func count <T : CollectionType>(x: T) -> T.Index.Distance {
 ///
 /// Its requirements are inherited by `CollectionType` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _CollectionType : _SequenceType {
+public protocol _CollectionType : SequenceType {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a

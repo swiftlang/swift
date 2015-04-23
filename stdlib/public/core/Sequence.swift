@@ -37,14 +37,6 @@ public protocol GeneratorType {
   mutating func next() -> Element?
 }
 
-/// This protocol is an implementation detail of `SequenceType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `SequenceType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _SequenceType {
-}
-
 public protocol _SequenceDefaultsType {
   /// A type that provides the *sequence*\ 's iteration interface and
   /// encapsulates its iteration state.
@@ -80,7 +72,7 @@ extension _SequenceDefaultsType {
 /// Its requirements are inherited by `SequenceType` and thus must
 /// be satisfied by types conforming to that protocol.
 public protocol _Sequence_Type
-  : _SequenceType, _SequenceDefaultsType {
+  : _SequenceDefaultsType {
 
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
@@ -169,7 +161,7 @@ public struct _PreprocessingPass {}
 // Default implementation of `_preprocessingPass` for Sequences.  Do not
 // use this operator directly; call `_preprocessingPass(s)` instead
 public func ~> <
-  T : _SequenceType, R
+  T : _Sequence_Type, R
 >(s: T, _: (_PreprocessingPass, ( (T)->R ))) -> R? {
   return nil
 }
