@@ -474,6 +474,16 @@ Example::
     // close occurs here, at the end of the formal scope.
   }
 
+If there are multiple defer statements in a scope, they are guaranteed
+to be executed in reverse order of appearance.  That is::
+
+  let file1 = open("hello.txt")
+  defer close(file1)
+  let file2 = open("world.txt")
+  defer close(file2)
+  ...
+  // file2 will be closed first.
+
 A potential extension is to provide a convenient way to mark that a
 defer action should only be taken if an error is thrown.  This is a
 convenient shorthand for controlling the action with a flag.  We will
