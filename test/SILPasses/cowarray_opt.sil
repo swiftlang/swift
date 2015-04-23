@@ -334,3 +334,33 @@ bb10:
   return %7 : $()
 }
 
+// CHECK: sil @cow_handle_array_address_load
+// CHECK: bb0({{.*}}):
+// CHECK:   apply
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK-NOT: apply
+// CHECK: bb2
+
+sil @cow_handle_array_address_load : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  %2 = load %0 : $*MyArray<MyStruct>
+  %3 = struct_element_addr %0 : $*MyArray<MyStruct>, #MyArray.buffer
+  %4 = struct_element_addr %3 : $*ArrayIntBuffer, #ArrayIntBuffer.storage
+  br bb1
+
+bb1:
+  %6 = load %4 : $*Builtin.NativeObject
+  strong_retain %6 : $Builtin.NativeObject
+  %8 = load %1 : $*Builtin.Int1
+  strong_release %6 : $Builtin.NativeObject
+  %10 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %11 = apply %10(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %12 = enum $Optional<MyArray<MyStruct>>, #Optional.Some!enumelt.1, %2 : $MyArray<MyStruct>
+  %13 = mark_dependence %1 : $*Builtin.Int1 on %12 : $Optional<MyArray<MyStruct>>
+  cond_br %8, bb1, bb2
+
+bb2:
+  %15 = tuple ()
+  return %15 : $()
+}
