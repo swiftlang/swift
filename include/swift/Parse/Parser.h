@@ -1160,6 +1160,7 @@ public:
   ParserResult<Stmt> parseStmtIfConfig(BraceItemListKind Kind
                                         = BraceItemListKind::Brace);
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
+  ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo);
   ParserResult<CatchStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtFor(LabeledStmtInfo LabelInfo);

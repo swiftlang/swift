@@ -378,14 +378,14 @@ func testForStmt() {
 }
 
 
-func testDoWhile() {
+func testRepeatWhile() {
   var m = 0;
-  do {
+  repeat {
     m++
   } while (m < 200)
   
   
-  // CHECK-LABEL: sil hidden @_TF13sil_locations11testDoWhileFT_T_
+  // CHECK-LABEL: sil hidden @_TF13sil_locations15testRepeatWhileFT_T_
   // CHECK: br         {{.*}} line:[[@LINE-6]]:3
   // CHECK: cond_br {{.*}} line:[[@LINE-5]]:11
   // Loop back branch:

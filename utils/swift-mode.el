@@ -41,8 +41,8 @@
                     "private" "public" "internal" "override")
                   'words) . font-lock-keyword-face)
    ;; Statements
-   `(,(regexp-opt '("if" "in" "else" "for" "do" "while" "return" "break"
-                    "continue" "switch" "case")
+   `(,(regexp-opt '("if" "in" "else" "for" "do" "repeat" "while" "return"
+                    "break" "continue" "switch" "case")
                   'words) . font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)

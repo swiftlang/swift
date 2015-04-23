@@ -76,8 +76,8 @@ for i = 0; i == 0; ++i {}
 while var v? = o, z? = o where v > z {}
 // CHECK: <while>while <elem-condexpr>v == 0</elem-condexpr> <brace>{}</brace></while>
 while v == 0 {}
-// CHECK: <do-while>do <brace>{}</brace> while <elem-expr>v == 0</elem-expr></do-while>
-do {} while v == 0
+// CHECK: <repeat-while>repeat <brace>{}</brace> while <elem-expr>v == 0</elem-expr></repeat-while>
+repeat {} while v == 0
 // CHECK: <if>if <elem-condexpr>var v? = o, z? = o where v > z</elem-condexpr> <brace>{}</brace></if>
 if var v? = o, z? = o where v > z {}
 

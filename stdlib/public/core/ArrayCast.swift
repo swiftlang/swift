@@ -154,7 +154,7 @@ internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
   var p = buf.baseAddress
   
 ElementwiseBridging:
-  do {
+  repeat {
     for object: SourceElement in source {
       let value = Swift._conditionallyBridgeFromObjectiveC(
         unsafeBitCast(object, AnyObject.self), TargetElement.self)

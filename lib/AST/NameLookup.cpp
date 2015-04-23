@@ -339,7 +339,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitWhileStmt(WhileStmt *S) {
     visit(S->getBody());
   }
-  void visitDoWhileStmt(DoWhileStmt *S) {
+  void visitRepeatWhileStmt(RepeatWhileStmt *S) {
     visit(S->getBody());
   }
   void visitDoStmt(DoStmt *S) {

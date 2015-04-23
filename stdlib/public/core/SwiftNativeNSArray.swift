@@ -165,7 +165,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   internal override func withUnsafeBufferOfObjects<R>(
     @noescape body: UnsafeBufferPointer<AnyObject> -> R
   ) -> R {
-    do {
+    repeat {
       var buffer: UnsafeBufferPointer<AnyObject>
       
       // If we've already got a buffer of bridged objects, just use it

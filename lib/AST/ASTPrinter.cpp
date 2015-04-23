@@ -1822,7 +1822,7 @@ void PrintAST::visitWhileStmt(WhileStmt *stmt) {
   visit(stmt->getBody());
 }
 
-void PrintAST::visitDoWhileStmt(DoWhileStmt *stmt) {
+void PrintAST::visitRepeatWhileStmt(RepeatWhileStmt *stmt) {
   Printer << "do ";
   visit(stmt->getBody());
   Printer << " while ";

@@ -61,8 +61,8 @@ struct MapRegionCounters : public ASTWalker {
       CounterMap[IS->getThenStmt()] = NextCounter++;
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       CounterMap[WS->getBody()] = NextCounter++;
-    } else if (auto *DWS = dyn_cast<DoWhileStmt>(S)) {
-      CounterMap[DWS->getBody()] = NextCounter++;
+    } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+      CounterMap[RWS->getBody()] = NextCounter++;
     } else if (auto *FS = dyn_cast<ForStmt>(S)) {
       CounterMap[FS->getBody()] = NextCounter++;
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
@@ -443,9 +443,9 @@ public:
         assignCounter(E, CounterExpr::Ref(getCurrentCounter()));
       assignCounter(WS->getBody());
 
-    } else if (auto *DWS = dyn_cast<DoWhileStmt>(S)) {
-      assignCounter(DWS, CounterExpr::Zero());
-      assignCounter(DWS->getBody());
+    } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+      assignCounter(RWS, CounterExpr::Zero());
+      assignCounter(RWS->getBody());
 
     } else if (auto *FS = dyn_cast<ForStmt>(S)) {
       assignCounter(FS, CounterExpr::Zero());

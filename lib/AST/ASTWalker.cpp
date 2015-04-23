@@ -940,18 +940,18 @@ Stmt *Traversal::visitWhileStmt(WhileStmt *WS) {
   return WS;
 }
 
-Stmt *Traversal::visitDoWhileStmt(DoWhileStmt *DWS) {
-  if (Stmt *S2 = doIt(DWS->getBody()))
-    DWS->setBody(S2);
+Stmt *Traversal::visitRepeatWhileStmt(RepeatWhileStmt *RWS) {
+  if (Stmt *S2 = doIt(RWS->getBody()))
+    RWS->setBody(S2);
   else
     return nullptr;
 
-  if (Expr *E2 = doIt(DWS->getCond()))
-    DWS->setCond(E2);
+  if (Expr *E2 = doIt(RWS->getCond()))
+    RWS->setCond(E2);
   else
     return nullptr;
 
-  return DWS;
+  return RWS;
 }
 
 Stmt *Traversal::visitForStmt(ForStmt *FS) {

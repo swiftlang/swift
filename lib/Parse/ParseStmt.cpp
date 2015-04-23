@@ -35,6 +35,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_if:
   case tok::kw_while:
   case tok::kw_do:
+  case tok::kw_repeat:
   case tok::kw_for:
   case tok::kw_break:
   case tok::kw_continue:
@@ -491,6 +492,7 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseLineDirective();
   case tok::kw_while:  return parseStmtWhile(LabelInfo);
+  case tok::kw_repeat: return parseStmtRepeat(LabelInfo);
   case tok::kw_do:     return parseStmtDo(LabelInfo);
   case tok::kw_for:    return parseStmtFor(LabelInfo);
   case tok::kw_switch: return parseStmtSwitch(LabelInfo);
@@ -1215,11 +1217,52 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
                                       Body.get()));
 }
 
+///
+///   stmt-repeat:
+///     (identifier ':')? 'repeat' stmt-brace 'while' expr
+ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
+  SourceLoc repeatLoc = consumeToken(tok::kw_repeat);
+
+  ParserStatus status;
+
+  ParserResult<BraceStmt> body =
+      parseBraceItemList(diag::expected_lbrace_after_repeat);
+  status |= body;
+  if (status.hasCodeCompletion())
+    return makeParserResult<Stmt>(status, nullptr);
+  if (body.isNull())
+    body = makeParserResult(
+        body, BraceStmt::create(Context, repeatLoc, {}, PreviousLoc, true));
+
+  SourceLoc whileLoc;
+
+  if (!consumeIf(tok::kw_while, whileLoc)) {
+    diagnose(whileLoc, diag::expected_while_after_repeat_body);
+    return makeParserError();
+  }
+
+  ParserResult<Expr> condition;
+  if (Tok.is(tok::l_brace)) {
+    SourceLoc lbraceLoc = Tok.getLoc();
+    diagnose(whileLoc, diag::missing_condition_after_while);
+    condition = makeParserErrorResult(new (Context) ErrorExpr(lbraceLoc));
+  } else {
+    condition = parseExpr(diag::expected_expr_repeat_while);
+    status |= condition;
+    if (condition.isNull() || condition.hasCodeCompletion())
+      return makeParserResult<Stmt>(status, nullptr); // FIXME: better recovery
+  }
+
+  return makeParserResult(
+      status,
+      new (Context) RepeatWhileStmt(labelInfo, repeatLoc, condition.get(),
+                                    whileLoc, body.get()));
+}
+
 /// 
 ///   stmt-do:
 ///     (identifier ':')? 'do' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace stmt-catch+
-///     (identifier ':')? 'do' stmt-brace 'while' expr
 ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
   SourceLoc doLoc = consumeToken(tok::kw_do);
 
@@ -1270,13 +1313,17 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
                          new (Context) DoStmt(labelInfo, doLoc, body.get()));
   }
 
+  // But if we do, advise the programmer that it's 'repeat' now.
+  diagnose(doLoc, diag::do_while_now_repeat_while)
+    .fixItReplace(doLoc, "repeat");
+  status.setIsParseError();
   ParserResult<Expr> condition;
   if (Tok.is(tok::l_brace)) {
     SourceLoc lbraceLoc = Tok.getLoc();
     diagnose(whileLoc, diag::missing_condition_after_while);
     condition = makeParserErrorResult(new (Context) ErrorExpr(lbraceLoc));
   } else {
-    condition = parseExpr(diag::expected_expr_do_while);
+    condition = parseExpr(diag::expected_expr_repeat_while);
     status |= condition;
     if (condition.isNull() || condition.hasCodeCompletion())
       return makeParserResult<Stmt>(status, nullptr); // FIXME: better recovery
@@ -1284,7 +1331,7 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
 
   return makeParserResult(
       status,
-      new (Context) DoWhileStmt(labelInfo, doLoc, condition.get(), whileLoc,
+      new (Context) RepeatWhileStmt(labelInfo, doLoc, condition.get(), whileLoc,
                                 body.get()));
 }
 

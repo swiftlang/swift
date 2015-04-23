@@ -36,7 +36,7 @@ struct _ConcatenateSequenceGenerator<
   /// has returned `nil`.
   public // @testable
   mutating func next() -> Outer.Element.Generator.Element? {
-    do {
+    repeat {
       if _fastPath(_inner != nil) {
         let ret = _inner!.next()
         if _fastPath(ret != nil) {

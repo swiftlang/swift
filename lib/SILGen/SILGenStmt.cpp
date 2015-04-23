@@ -472,7 +472,7 @@ void StmtEmitter::visitCatchStmt(CatchStmt *S) {
   llvm_unreachable("catch statement outside of context?");
 }
 
-void StmtEmitter::visitDoWhileStmt(DoWhileStmt *S) {
+void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   // Create a new basic block and jump into it.
   SILBasicBlock *loopBB = createBasicBlock();
   SGF.B.emitBlock(loopBB, S);

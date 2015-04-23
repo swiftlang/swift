@@ -943,7 +943,7 @@ private:
       case SyntaxStructureKind::ForEachStatement: return "foreach";
       case SyntaxStructureKind::ForStatement: return "for";
       case SyntaxStructureKind::WhileStatement: return "while";
-      case SyntaxStructureKind::DoWhileStatement: return "do-while";
+      case SyntaxStructureKind::RepeatWhileStatement: return "repeat-while";
       case SyntaxStructureKind::IfStatement: return "if";
       case SyntaxStructureKind::SwitchStatement: return "switch";
       case SyntaxStructureKind::CaseStatement: return "case";

@@ -12,7 +12,7 @@ syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
 syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 
-syn keyword swiftKeyword break case continue default do else for if in static switch return where while public internal private skipwhite
+syn keyword swiftKeyword break case continue default do else for if in static switch repeat return where while public internal private skipwhite
 
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 syn region swiftTypeAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftTypeName

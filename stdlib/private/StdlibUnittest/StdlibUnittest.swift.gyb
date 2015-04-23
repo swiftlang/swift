@@ -580,7 +580,7 @@ struct _ParentProcess {
         errorfds.set(_childStderr.fd)
       }
       var ret: CInt
-      do {
+      repeat {
         ret = _stdlib_select(&readfds, &writefds, &errorfds, nil)
       } while ret == -1  &&  errno == EINTR
       if ret <= 0 {

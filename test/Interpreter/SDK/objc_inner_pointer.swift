@@ -30,7 +30,7 @@ func hangCanary(o: AnyObject) {
 println("NSData:")
 autoreleasepool {
   var bytes: UnsafeMutablePointer<UInt8>
-  do {
+  repeat {
     let data = NSData(bytes: [2, 3, 5, 7] as [UInt8], length: 4)
     hangCanary(data)
     bytes = UnsafeMutablePointer<UInt8>(data.bytes)
@@ -45,7 +45,7 @@ autoreleasepool {
 println("AnyObject:")
 autoreleasepool {
   var bytes: UnsafeMutablePointer<UInt8>
-  do {
+  repeat {
     let data = NSData(bytes: [11, 13, 17, 19] as [UInt8], length: 4)
     hangCanary(data)
     let dataAsAny: AnyObject = data

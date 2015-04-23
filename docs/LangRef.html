@@ -2273,6 +2273,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     stmt ::= <a href="#stmt-semicolon">stmt-semicolon</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
     stmt ::= <a href="#stmt-while">stmt-while</a>
+    stmt ::= <a href="#stmt-repeat-while">stmt-repeat-while</a>
     stmt ::= <a href="#stmt-for-c-style">stmt-for-c-style</a>
     stmt ::= <a href="#stmt-for-each">stmt-for-each</a>
     stmt ::= <a href="#stmt-switch">stmt-switch</a>
@@ -2408,14 +2409,14 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   </pre>
 
   <!-- ===================================================================== -->
-  <h3 id="stmt-do-while">'do-while' Statement</h3>
+  <h3 id="stmt-repeat-while">'repeat-while' Statement</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-do-while ::= 'do' <a href="#brace-item-list">brace-item-list</a> 'while' '<a href="#expr">expr</a>
+    stmt-repeat-while ::= 'repeat' <a href="#brace-item-list">brace-item-list</a> 'while' '<a href="#expr">expr</a>
   </pre>
   
-  <p>'do-while' statements provide simple loop construct which (on each
+  <p>'repeat-while' statements provide simple loop construct which (on each
   iteration of the loop) evaluates the body, then evaluates the condition,
   getting the 'boolValue' property of the result if the result not a 'Bool',
   then determines whether to keep looping. (Internally, the standard library
@@ -2427,11 +2428,11 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <p>Some examples include:</p>
   
   <pre class="example">
-    do {
+    repeat {
       /*...*/
     } while true
     
-    do {
+    repeat {
       X = 3
     } while X == 4
   </pre>

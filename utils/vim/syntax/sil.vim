@@ -17,7 +17,7 @@ syn match swiftDecimal /\<[-+]\?[0-9]\+\>/
 syn match swiftTypeName /\$\*\<\?[A-Z][a-zA-Z0-9_]*\>/
 syn match swiftVarName /%\<[A-z[a-z_0-9]\+\(#[0-9]\+\)\?\>/
 
-syn keyword swiftKeyword break case continue default do else for if in static switch return where while skipwhite
+syn keyword swiftKeyword break case continue default do else for if in static switch repeat return where while skipwhite
 
 syn keyword swiftKeyword sil internal thunk skipwhite
 syn keyword swiftKeyword public hidden private shared public_external hidden_external skipwhite

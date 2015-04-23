@@ -221,10 +221,10 @@ func testWhile4(fooObject: FooStruct) {
   while let z = #^COND_WHILE_4^#
 }
 
-func testDoWhile1(fooObject: FooStruct) {
+func testRepeatWhile1(fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
-  do {
+  repeat {
   } while #^COND_DO_WHILE_1^#
 }
 

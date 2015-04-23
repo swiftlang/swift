@@ -59,7 +59,7 @@ println()
 _ = { [Canary(), Canary(), Canary()] }()
 
 // Create an array of (String, Bool) pairs. <rdar://problem/16916422>
-do {
+repeat {
   let x: [(String, Bool)] = [("foo", true)]
   println(x[0].0) // CHECK: foo
   println(x[0].1) // CHECK: true

@@ -22,7 +22,7 @@ extension vU1024: IntegerLiteralConvertible, CustomStringConvertible, Equatable 
     var digits: [Character] = []
     var intermediate = self
     var digit: vU1024 = 0
-    do {
+    repeat {
       (intermediate, digit) = quorem(intermediate, 10)
       digits.append(Character(UnicodeScalar(Int(digit) + 48)))
     } while intermediate != 0

@@ -35,8 +35,8 @@
    '("\\b[$][*]?[A-Z][z-aA-Z_[0-9]*\\b" . font-lock-type-face)
 
    ;; Statements
-   `(,(regexp-opt '("if" "in" "else" "for" "do" "while" "return" "break"
-                    "continue" "switch" "case")
+   `(,(regexp-opt '("if" "in" "else" "for" "do" "repeat" "while" "return"
+                    "break" "continue" "switch" "case")
                   'words) . font-lock-keyword-face)
    ;; SIL Stage
    '("sil_stage" . font-lock-keyword-face)

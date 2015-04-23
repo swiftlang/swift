@@ -1110,7 +1110,7 @@ public:
     OS << ')';
   }
 
-  void visitDoWhileStmt(DoWhileStmt *S) {
+  void visitRepeatWhileStmt(RepeatWhileStmt *S) {
     OS.indent(Indent) << "(do_while_stmt\n";
     printRec(S->getBody());
     OS << '\n';

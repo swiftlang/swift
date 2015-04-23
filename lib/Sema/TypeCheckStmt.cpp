@@ -394,18 +394,18 @@ public:
     
     return WS;
   }
-  Stmt *visitDoWhileStmt(DoWhileStmt *DWS) {
+  Stmt *visitRepeatWhileStmt(RepeatWhileStmt *RWS) {
     {
-      AddLabeledStmt loopNest(*this, DWS);
-      Stmt *S = DWS->getBody();
+      AddLabeledStmt loopNest(*this, RWS);
+      Stmt *S = RWS->getBody();
       if (typeCheckStmt(S)) return 0;
-      DWS->setBody(S);
+      RWS->setBody(S);
     }
     
-    Expr *E = DWS->getCond();
+    Expr *E = RWS->getCond();
     if (TC.typeCheckCondition(E, DC)) return 0;
-    DWS->setCond(E);
-    return DWS;
+    RWS->setCond(E);
+    return RWS;
   }
   Stmt *visitForStmt(ForStmt *FS) {
     // Type check any var decls in the initializer.

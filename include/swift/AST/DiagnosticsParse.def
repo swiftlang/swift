@@ -768,13 +768,22 @@ ERROR(missing_condition_after_while,stmt_parsing,none,
 ERROR(expected_lbrace_after_while,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'while' condition", ())
 
-// Do/While Statement
-ERROR(expected_lbrace_after_do,stmt_parsing,PointsToFirstBadToken,
-      "expected '{' after 'do'", ())
-ERROR(expected_expr_do_while,stmt_parsing,PointsToFirstBadToken,
-      "expected expression in 'do-while' condition", ())
+// Repeat/While Statement
+ERROR(expected_lbrace_after_repeat,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'repeat'", ())
+ERROR(expected_while_after_repeat_body,stmt_parsing,PointsToFirstBadToken,
+      "expected 'while' after body of 'repeat' statement", ())
+ERROR(expected_expr_repeat_while,stmt_parsing,PointsToFirstBadToken,
+      "expected expression in 'repeat-while' condition", ())
+ERROR(missing_condition_after_repeat_while,stmt_parsing,none,
+      "missing condition in a 'repeat-while' statement", ())
+
+ERROR(do_while_now_repeat_while,stmt_parsing,none,
+      "'do-while' statement is not allowed; use 'repeat-while' instead", ())
 
 // Do/Catch Statement
+ERROR(expected_lbrace_after_do,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'do'", ())
 ERROR(expected_lbrace_after_catch,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'catch' pattern", ())
 ERROR(expected_catch_where_expr,stmt_parsing,PointsToFirstBadToken,

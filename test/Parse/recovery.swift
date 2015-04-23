@@ -121,14 +121,14 @@ func missingControllingExprInWhile() {
   while { { } } // expected-error{{missing condition in a 'while' statement}} expected-error{{braced block of statements is an unused closure}} expected-error {{type of expression is ambiguous without more context}}
 }
 
-func missingControllingExprInDoWhile() {
-  do {
+func missingControllingExprInRepeatWhile() {
+  repeat {
   } while // expected-error {{missing condition in a 'while' statement}}
   { // expected-error {{braced block of statements is an unused closure}} expected-error {{expression resolves to an unused function}}
-    missingControllingExprInDoWhile();
+    missingControllingExprInRepeatWhile();
   }
 
-  do {
+  repeat {
   } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}}
 }
 

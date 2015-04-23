@@ -209,7 +209,7 @@ while (true) {
 
 func resyncParserB3() {}
 
-do {
+repeat {
   #^TOP_LEVEL_STMT_3^#
 } while true
 

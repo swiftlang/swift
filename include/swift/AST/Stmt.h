@@ -545,21 +545,22 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::While; }
 };
   
-/// DoWhileStmt - do/while statement. After type-checking, the condition is of
-/// type Builtin.Int1.
-class DoWhileStmt : public LabeledStmt {
-  SourceLoc DoLoc, WhileLoc;
+/// RepeatWhileStmt - repeat/while statement. After type-checking, the
+/// condition is of type Builtin.Int1.
+class RepeatWhileStmt : public LabeledStmt {
+  SourceLoc RepeatLoc, WhileLoc;
   Stmt *Body;
   Expr *Cond;
   
 public:
-  DoWhileStmt(LabeledStmtInfo LabelInfo, SourceLoc DoLoc, Expr *Cond,
+  RepeatWhileStmt(LabeledStmtInfo LabelInfo, SourceLoc RepeatLoc, Expr *Cond,
               SourceLoc WhileLoc, Stmt *Body, Optional<bool> implicit = None)
-    : LabeledStmt(StmtKind::DoWhile, getDefaultImplicitFlag(implicit, DoLoc),
+    : LabeledStmt(StmtKind::RepeatWhile,
+                  getDefaultImplicitFlag(implicit, RepeatLoc),
                   LabelInfo),
-      DoLoc(DoLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
+      RepeatLoc(RepeatLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
   
-  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
+  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(RepeatLoc); }
   SourceLoc getEndLoc() const;
   
   Stmt *getBody() const { return Body; }
@@ -568,7 +569,7 @@ public:
   Expr *getCond() const { return Cond; }
   void setCond(Expr *e) { Cond = e; }
   
-  static bool classof(const Stmt *S) {return S->getKind() == StmtKind::DoWhile;}
+  static bool classof(const Stmt *S) {return S->getKind() == StmtKind::RepeatWhile;}
 };
 
 /// ForStmt - for statement.  After type-checking, the condition is of

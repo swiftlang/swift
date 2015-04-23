@@ -171,9 +171,9 @@ public:
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
         return transformWhileStmt(llvm::cast<WhileStmt>(S));
       }
-    case StmtKind::DoWhile: {
+    case StmtKind::RepeatWhile: {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
-        return transformDoWhileStmt(llvm::cast<DoWhileStmt>(S));
+        return transformRepeatWhileStmt(llvm::cast<RepeatWhileStmt>(S));
       }
     case StmtKind::For: {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
@@ -221,15 +221,15 @@ public:
     return WS;
   }
 
-  DoWhileStmt *transformDoWhileStmt(DoWhileStmt *DWS) {
-    if (Stmt *B = DWS->getBody()) {
+  RepeatWhileStmt *transformRepeatWhileStmt(RepeatWhileStmt *RWS) {
+    if (Stmt *B = RWS->getBody()) {
       Stmt *NB = transformStmt(B);
       if (NB != B) {
-        DWS->setBody(NB);
+        RWS->setBody(NB);
       }
     }
       
-    return DWS;
+    return RWS;
   }
 
   ForStmt *transformForStmt(ForStmt *FS) {

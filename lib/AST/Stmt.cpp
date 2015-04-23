@@ -174,7 +174,7 @@ bool LabeledStmt::isPossibleContinueTarget() const {
 
   case StmtKind::Do:
   case StmtKind::DoCatch:
-  case StmtKind::DoWhile:
+  case StmtKind::RepeatWhile:
   case StmtKind::For:
   case StmtKind::ForEach:
   case StmtKind::While:
@@ -195,7 +195,7 @@ bool LabeledStmt::requiresLabelOnJump() const {
   case StmtKind::DoCatch:
     return true;
 
-  case StmtKind::DoWhile:
+  case StmtKind::RepeatWhile:
   case StmtKind::For:
   case StmtKind::ForEach:
   case StmtKind::Switch:
@@ -273,7 +273,7 @@ IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
            implicit) {
 }
 
-SourceLoc DoWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
+SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 
 SourceRange CaseLabelItem::getSourceRange() const {
   if (auto *E = getGuardExpr())

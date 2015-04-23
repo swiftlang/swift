@@ -89,7 +89,7 @@ enum class SyntaxStructureKind : uint8_t {
   ForEachStatement,
   ForStatement,
   WhileStatement,
-  DoWhileStatement,
+  RepeatWhileStatement,
   IfStatement,
   SwitchStatement,
   CaseStatement,

@@ -123,7 +123,7 @@ func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
 // CHECK-LABEL: sil hidden  @_TF10statements18loop_with_continue
 
 func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
-  do {
+  repeat {
     if (x < 42) {
      bar(x);
      continue;

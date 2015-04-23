@@ -75,6 +75,7 @@ KEYWORD(sil_coverage_map)  // This is only enabled when parsing .sil files.
 // Statement keywords.
 STMT_KEYWORD(if)
 STMT_KEYWORD(do)
+STMT_KEYWORD(repeat)
 STMT_KEYWORD(else)
 STMT_KEYWORD(for)
 STMT_KEYWORD(in)

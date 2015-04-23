@@ -64,7 +64,7 @@ func _insertionSort<
       // Look backwards for x's position in the sorted sequence,
       // moving elements forward to make room.
       var i = sortedEnd
-      do {
+      repeat {
         let predecessor: C.Generator.Element = elements[i.predecessor()]
 
         // if x doesn't belong before y, we've found its position
@@ -130,14 +130,14 @@ func _partition<
   // * pivot <= elements[i] for i in hi..range.endIndex
 
 Loop: while true {
-  FindLo: do {
+  FindLo: repeat {
       while ++lo != hi {
         if !${cmp("elements[lo]", "pivot", p)} { break FindLo }
       }
       break Loop
     } while false
 
-  FindHi: do {
+  FindHi: repeat {
       while --hi != lo {
         if ${cmp("elements[hi]", "pivot", p)} { break FindHi }
       }

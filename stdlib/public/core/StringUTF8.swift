@@ -298,7 +298,7 @@ func == (lhs: String.UTF8View.Index, rhs: String.UTF8View.Index) -> Bool {
   // Match up bytes in the buffer
   var buffer = (lhs._buffer, rhs._buffer)
   var isContinuation: Bool
-  do {
+  repeat {
     let unit = (
       UTF8.CodeUnit(truncatingBitPattern: buffer.0), 
       UTF8.CodeUnit(truncatingBitPattern: buffer.1))

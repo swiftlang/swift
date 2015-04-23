@@ -224,30 +224,36 @@ func WhileStmt1() {
   var x = 42
 }
 
-//===--- Do-while statement.
-
-func DoWhileStmt1() {
-  do {} while true
-
-  do {} while false
-
-  do { break } while true
-  do { continue } while true
-}
-
-func DoWhileStmt2() {
-  do // expected-error {{expected '{' after 'do'}}
-}
-
-func DoWhileStmt3() {
+//===-- Do statement.
+func DoStmt() {
   // This is just a 'do' statement now.
   do {
   }
 }
 
-func DoWhileStmt4() {
-  do {
-  } while + // expected-error {{unary operator cannot be separated from its operand}} expected-error {{expected expression in 'do-while' condition}}
+func DoWhileStmt() {
+  do { // expected-error {{'do-while' statement is not allowed; use 'repeat-while' instead}}
+  } while true
+}
+
+//===--- Repeat-while statement.
+
+func RepeatWhileStmt1() {
+  repeat {} while true
+
+  repeat {} while false
+
+  repeat { break } while true
+  repeat { continue } while true
+}
+
+func RepeatWhileStmt2() {
+  repeat // expected-error {{expected '{' after 'repeat'}}
+}
+
+func RepeatWhileStmt4() {
+  repeat {
+  } while + // expected-error {{unary operator cannot be separated from its operand}} expected-error {{expected expression in 'repeat-while' condition}}
 }
 
 func brokenSwitch(x: Int) -> Int {

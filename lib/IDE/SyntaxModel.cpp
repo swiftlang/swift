@@ -457,12 +457,12 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     }
     pushStructureNode(SN, S);
 
-  } else if (auto *DoWhileS = dyn_cast<DoWhileStmt>(S)) {
+  } else if (auto *RepeatWhileS = dyn_cast<RepeatWhileStmt>(S)) {
     SyntaxStructureNode SN;
-    SN.Kind = SyntaxStructureKind::DoWhileStatement;
+    SN.Kind = SyntaxStructureKind::RepeatWhileStatement;
     SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
-    if (DoWhileS->getCond()) {
-      addExprElem(SyntaxStructureElementKind::Expr, DoWhileS->getCond(), SN);
+    if (RepeatWhileS->getCond()) {
+      addExprElem(SyntaxStructureElementKind::Expr, RepeatWhileS->getCond(), SN);
     }
     pushStructureNode(SN, S);
 
