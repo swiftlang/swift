@@ -32,10 +32,10 @@ r1[UInt(0)] // expected-error {{cannot subscript a value of type 'Range<UInt>' w
 r1[0]       // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Int'}}
 r2[0]       // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Int'}}
 r3[0]       // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Int'}}
-r0[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
-r1[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
-r2[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
-r3[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
-(10..<100)[0]           // expected-error {{cannot subscript a value of type '(Range<Int>)' with an index of type 'Int'}}
-(UInt(10)...100)[0..<4] // FIXME-error {{cannot subscript a value of type '(Range<UInt>)' with an index of type 'Range<Int>'}}
+r0[0..<4]   // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
+r1[0..<4]   // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
+r2[0..<4]   // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
+r3[0..<4]   // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
+(10..<100)[0]           // expected-error {{HalfOpenInterval<T>' does not have a member named 'subscript'}}
+(UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type '(Range<UInt>)' with an index of type 'Range<Int>'}}
 
