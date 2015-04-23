@@ -1588,10 +1588,19 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       UserListTy Users;
       // If the uninitialized array is only written into then it can be removed.
       if (recursivelyCollectArrayWritesInstr(Users, AI)) {
-        // Erase all of the reference counting instructions and the array
-        // allocation instruction.
-        for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
-          eraseInstFromFunction(**rit);
+        // Erase all of the stores to the dead array, the reference counting
+        // instructions on the array and the allocation-apply itself.
+        for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit) {
+          SILInstruction *I = *rit;
+          if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
+            // We must release all stored values (because they are not stored
+            // anymore).
+            SILValue V = SI->getSrc();
+            SILBuilder BuilderAtStore(SI);
+            BuilderAtStore.emitReleaseValueOperation(SI->getLoc(), V);
+          }
+          eraseInstFromFunction(*I);
+        }
       }
     }
   }

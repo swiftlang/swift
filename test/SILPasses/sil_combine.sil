@@ -1747,6 +1747,30 @@ sil_vtable ZZZ {
   #ZZZ.init!initializer.1: _TFC4main3ZZZcfMS0_FT_S0_	// main.ZZZ.init (main.ZZZ.Type)() -> main.ZZZ
 }
 
+// CHECK-LABEL: test_dead_array
+// CHECK: bb0(%0 : $ZZZ):
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @test_dead_array : $@convention(thin) (@owned ZZZ) -> () {
+bb0(%0 : $ZZZ):
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = function_ref @_allocate_uninitialized_ZZZ : $@convention(thin) (Builtin.Word) -> @owned (Array<ZZZ>, Builtin.RawPointer)
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.Word) -> @owned (Array<ZZZ>, Builtin.RawPointer)
+  %4 = tuple_extract %3 : $(Array<ZZZ>, Builtin.RawPointer), 0
+  %5 = tuple_extract %3 : $(Array<ZZZ>, Builtin.RawPointer), 1
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to $*ZZZ
+  store %0 to %6 : $*ZZZ
+  %8 = struct_extract %4 : $Array<ZZZ>, #Array._buffer
+  %9 = struct_extract %8 : $_ArrayBuffer<ZZZ>, #_ArrayBuffer._storage
+  %10 = struct_extract %9 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCoreType>, #_BridgeStorage.rawValue
+  strong_release %10 : $Builtin.BridgeObject
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil [_semantics "array.uninitialized"] @_allocate_uninitialized_ZZZ : $@convention(thin) (Builtin.Word) -> @owned (Array<ZZZ>, Builtin.RawPointer)
+
 // CHECK-LABEL: sil @merge_structextract_uncheckedenumdata_and_ref_bitcasts : $@convention(thin) (Builtin.NativeObject) -> Builtin.NativeObject {
 // CHECK: bb0({{%[0-9]+}} : $Builtin.NativeObject):
 // CHECK-NEXT: return
