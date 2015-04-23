@@ -148,7 +148,7 @@ protected:
     if (!OpenedExistentialSubs.empty()) {
       auto &F = getBuilder().getFunction();
       ty = ty.subst(F.getModule().getSwiftModule(), OpenedExistentialSubs,
-                    /*ignore missing*/ false, nullptr)->getCanonicalType();
+                    None)->getCanonicalType();
     }
     return ty;
   }

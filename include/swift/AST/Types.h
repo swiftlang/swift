@@ -2540,8 +2540,8 @@ public:
   ///
   /// The API is comparable to Type::subst.
   SILParameterInfo subst(Module *module, TypeSubstitutionMap &substitutions,
-                         bool ignoreMissing, LazyResolver *resolver) const {
-    Type type = getType().subst(module, substitutions, ignoreMissing, resolver);
+                         SubstOptions options) const {
+    Type type = getType().subst(module, substitutions, options);
     return getWithType(type->getCanonicalType());
   }
 
@@ -2635,8 +2635,8 @@ public:
   ///
   /// The API is comparable to Type::subst.
   SILResultInfo subst(Module *module, TypeSubstitutionMap &substitutions,
-                      bool ignoreMissing, LazyResolver *resolver) const {
-    Type type = getType().subst(module, substitutions, ignoreMissing, resolver);
+                      SubstOptions options) const {
+    Type type = getType().subst(module, substitutions, options);
     return getWithType(type->getCanonicalType());
   }
 

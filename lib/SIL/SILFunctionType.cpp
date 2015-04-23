@@ -1723,7 +1723,7 @@ namespace {
                .getSwiftRValueType() == origType);
 
       CanType substType =
-        origType.subst(TheASTModule, Subs, true, nullptr)->getCanonicalType();
+        origType.subst(TheASTModule, Subs, None)->getCanonicalType();
 
       // If the substitution didn't change anything, we know that the
       // original type was a lowered type, so we're good.

@@ -169,8 +169,9 @@ Type Solution::computeSubstitutions(
 
       // Each witness marker starts a new substitution.
       currentArchetype = firstArchetype;
-      currentReplacement = tc.substType(currentModule, req.getFirstType(),
-                                        typeSubstitutions);
+      currentReplacement = req.getFirstType().subst(currentModule,
+                                                    typeSubstitutions,
+                                                    None);
       break;
     }
   }
@@ -1498,9 +1499,10 @@ namespace {
             conformance, tc.Context.getIdentifier("_ObjectiveCType"), nullptr);
 
         // Create a substitution for the dependent type.
-        Substitution NewDepTypeSubst(fn->getGenericParams()->getAllArchetypes()[1],
-                                     DepTypeSubst->getReplacement(),
-                                     DepTypeSubst->getConformances());
+        Substitution NewDepTypeSubst(
+                       fn->getGenericParams()->getAllArchetypes()[1],
+                       DepTypeSubst->getReplacement(),
+                       DepTypeSubst->getConformances());
 
         Subs.push_back(NewDepTypeSubst);
       }
@@ -1513,8 +1515,8 @@ namespace {
         = fn->getGenericSignatureOfContext()->getGenericParams()[0];
       subMap[genericParam->getCanonicalType()->castTo<SubstitutableType>()]
         = valueType;
-      fnRef->setType(fn->getInterfaceType().subst(dc->getParentModule(),
-                                                  subMap, false, &tc));
+      fnRef->setType(fn->getInterfaceType().subst(dc->getParentModule(), subMap,
+                                                  None));
 
       // Form the arguments.
       Expr *args[2] = {
@@ -6594,7 +6596,7 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   subMap[genericParam->getCanonicalType()->castTo<SubstitutableType>()] =
       unwrappedOptionalType;
   fnRef->setType(fn->getInterfaceType().subst(
-      constraintSystem->DC->getParentModule(), subMap, false, &tc));
+      constraintSystem->DC->getParentModule(), subMap, None));
 
   Expr *call = new (ctx) CallExpr(fnRef, expr, /*Implicit=*/true);
 

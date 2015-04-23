@@ -287,10 +287,8 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   auto conformingDC = getDeclContext();
   auto conformingModule = conformingDC->getParentModule();
   auto specializedType
-    = genericWitness.getReplacement().subst(conformingModule,
-                                       substitutionMap,
-                                       /*ignoreMissing=*/false,
-                                       resolver);
+    = genericWitness.getReplacement().subst(conformingModule, substitutionMap,
+                                            None);
 
   // If the type witness was unchanged, just copy it directly.
   if (specializedType.getPointer() == genericWitness.getReplacement().getPointer()) {

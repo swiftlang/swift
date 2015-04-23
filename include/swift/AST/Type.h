@@ -47,6 +47,38 @@ class TypeWalker;
 /// replacements.
 typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
 
+/// Options for performing substitutions into a type.
+class SubstOptions {
+public:
+  /// Describes the kind of options.
+  enum OptionsKind : unsigned {
+    /// If a type cannot be produced because some member type is
+    /// missing, return the identity type rather than a null type.
+    IgnoreMissing = 0x01,
+  };
+
+private:
+  unsigned Options;
+
+public:
+  SubstOptions() : Options(0) { }
+  SubstOptions(NoneType) : Options(0) { }
+  SubstOptions(OptionsKind options) : Options(options) { }
+
+  /// Whether to ignore missing member types.
+  bool ignoreMissing() const { return Options & IgnoreMissing; }
+
+  friend SubstOptions &operator|=(SubstOptions &lhs, const SubstOptions &rhs) {
+    lhs.Options |= rhs.Options;
+    return lhs;
+  }
+};
+
+inline SubstOptions::OptionsKind operator|(SubstOptions::OptionsKind lhs,
+                                           SubstOptions::OptionsKind rhs) {
+  return static_cast<SubstOptions::OptionsKind>(lhs | rhs);
+}
+
 /// Type - This is a simple value object that contains a pointer to a type
 /// class.  This is potentially sugared.  We use this throughout the codebase
 /// instead of a raw "TypeBase*" to disable equality comparison, which is unsafe
@@ -115,15 +147,11 @@ public:
   /// \param substitutions The mapping from substitutable types to their
   /// replacements.
   ///
-  /// \param ignoreMissing Whether we should ignore missing substitutions
-  /// (keeping the original type) rather than returning an error.
-  ///
-  /// \param resolver A lazy resolver used to find member types, form
-  /// protocol conformances, etc.
+  /// \param options Options that affect the substitutions.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(Module *module, TypeSubstitutionMap &substitutions,
-             bool ignoreMissing, LazyResolver *resolver) const;
+             SubstOptions options) const;
 
   bool isPrivateStdlibType() const;
 

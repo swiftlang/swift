@@ -435,8 +435,7 @@ Type TypeBase::eraseOpenedExistential(Module *module,
 
   TypeSubstitutionMap substitutions;
   substitutions[opened] = opened->getOpenedExistentialType();
-  return Type(this).subst(module, substitutions, false,
-                          getASTContext().getLazyResolver());
+  return Type(this).subst(module, substitutions, None);
 }
 
 void
@@ -1498,8 +1497,7 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
   }
 
   // Perform substitutions into the base type.
-  return superclassTy.subst(module, substitutions, /*ignoreMissing=*/false,
-                            resolver);
+  return superclassTy.subst(module, substitutions, None);
 }
 
 bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
@@ -1942,8 +1940,8 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
   assert(args.empty()
          && "number of args did not match number of generic params");
   
-  Type input = getInput().subst(module, map, true, nullptr);
-  Type result = getResult().subst(module, map, true, nullptr);
+  Type input = getInput().subst(module, map, SubstOptions::IgnoreMissing);
+  Type result = getResult().subst(module, map, SubstOptions::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
@@ -1967,8 +1965,8 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
   TypeSubstitutionMap map
     = getGenericParams().getSubstitutionMap(subs);
   
-  Type input = getInput().subst(module, map, true, nullptr);
-  Type result = getResult().subst(module, map, true, nullptr);
+  Type input = getInput().subst(module, map, SubstOptions::IgnoreMissing);
+  Type result = getResult().subst(module, map, SubstOptions::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
@@ -1982,8 +1980,8 @@ GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Type> args) const {
     subs.insert(std::make_pair(params[i], args[i]));
   }
   
-  Type input = getInput().subst(M, subs, true, nullptr);
-  Type result = getResult().subst(M, subs, true, nullptr);
+  Type input = getInput().subst(M, subs, SubstOptions::IgnoreMissing);
+  Type result = getResult().subst(M, subs, SubstOptions::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
@@ -2042,19 +2040,23 @@ const {
         continue;
         
       // Otherwise, substitute the constrained types.
-      unappliedReqts.push_back(Requirement(RequirementKind::SameType,
-                           reqt.getFirstType().subst(M, subs, true, nullptr),
-                           reqt.getSecondType().subst(M, subs, true, nullptr)));
+      unappliedReqts.push_back(
+        Requirement(RequirementKind::SameType,
+                    reqt.getFirstType().subst(M, subs,
+                                              SubstOptions::IgnoreMissing),
+                    reqt.getSecondType().subst(M, subs,
+                                               SubstOptions::IgnoreMissing)));
       continue;
     }
     }
     unappliedReqts.push_back(reqt);
   }
   
-  GenericSignature *sig = GenericSignature::get(unappliedParams, unappliedReqts);
+  GenericSignature *sig = GenericSignature::get(unappliedParams,
+                                                unappliedReqts);
   
-  Type input = getInput().subst(M, subs, true, nullptr);
-  Type result = getResult().subst(M, subs, true, nullptr);
+  Type input = getInput().subst(M, subs, SubstOptions::IgnoreMissing);
+  Type result = getResult().subst(M, subs, SubstOptions::IgnoreMissing);
   return GenericFunctionType::get(sig, input, result, getExtInfo());
 }
 
@@ -2098,8 +2100,8 @@ GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
   TypeSubstitutionMap subs
     = getGenericSignature()->getSubstitutionMap(args);
 
-  Type input = getInput().subst(M, subs, true, nullptr);
-  Type result = getResult().subst(M, subs, true, nullptr);
+  Type input = getInput().subst(M, subs, SubstOptions::IgnoreMissing);
+  Type result = getResult().subst(M, subs, SubstOptions::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
@@ -2107,7 +2109,7 @@ static Type getMemberForBaseType(Module *module,
                                  Type substBase,
                                  AssociatedTypeDecl *assocType,
                                  Identifier name,
-                                 LazyResolver *resolver) {
+                                 SubstOptions options) {
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
@@ -2147,11 +2149,11 @@ static Type getMemberForBaseType(Module *module,
   }
 
   // If we know the associated type, look in the witness table.
+  LazyResolver *resolver = assocType->getASTContext().getLazyResolver();
   if (assocType) {
     auto proto = assocType->getProtocol();
     // FIXME: Introduce substituted type node here?
-    auto conformance = module->lookupConformance(substBase, proto,
-                                                 resolver);
+    auto conformance = module->lookupConformance(substBase, proto, resolver);
     switch (conformance.getInt()) {
     case ConformanceKind::DoesNotConform:
     case ConformanceKind::UncheckedConforms:
@@ -2181,14 +2183,14 @@ Type DependentMemberType::substBaseType(Module *module,
     return this;
 
   return getMemberForBaseType(module, substBase, getAssocType(), getName(),
-                              resolver);
+                              None);
 }
 
 Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
-                 bool ignoreMissing, LazyResolver *resolver) const {
+                 SubstOptions options) const {
   /// Return the original type or a null type, depending on the 'ignoreMissing'
   /// flag.
-  auto failed = [&](Type t){ return ignoreMissing? t : Type(); };
+  auto failed = [&](Type t){ return options.ignoreMissing() ? t : Type(); };
   
   return transform([&](Type type) -> Type {
     assert(!isa<SILFunctionType>(type.getPointer()) &&
@@ -2200,12 +2202,11 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
-      auto newBase = depMemTy->getBase()
-        .subst(module, substitutions, ignoreMissing, resolver);
+      auto newBase = depMemTy->getBase().subst(module, substitutions, options);
       
       if (Type r = getMemberForBaseType(module, newBase,
                                         depMemTy->getAssocType(),
-                                        depMemTy->getName(), resolver))
+                                        depMemTy->getName(), options))
         return r;
 
       return failed(type);
@@ -2229,8 +2230,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
       return type;
 
     // Substitute into the parent type.
-    Type substParent = Type(parent).subst(module, substitutions, ignoreMissing,
-                                          resolver);
+    Type substParent = Type(parent).subst(module, substitutions, options);
     if (!substParent)
       return Type();
 
@@ -2242,13 +2242,11 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     AssociatedTypeDecl *assocType = nullptr;
     if (auto archetype = substOrig->getAs<ArchetypeType>()) {
       assocType = archetype->getAssocType();
-      
-//      if (archetype == substOrig)
-//        return type;
     }
     
+    
     if (Type r = getMemberForBaseType(module, substParent, assocType,
-                                      substOrig->getName(), resolver))
+                                      substOrig->getName(), options))
       return r;
     return failed(type);
   });
@@ -2348,9 +2346,7 @@ Type TypeBase::getTypeOfMember(Module *module, Type memberType,
     return memberType;
 
   // Perform the substitutions.
-  LazyResolver *resolver = memberDC->getASTContext().getLazyResolver();
-  return memberType.subst(module, substitutions, /*ignoreMissing=*/false,
-                          resolver);
+  return memberType.subst(module, substitutions, None);
 }
 
 Identifier DependentMemberType::getName() const {

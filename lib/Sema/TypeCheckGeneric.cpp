@@ -879,7 +879,7 @@ Type TypeChecker::getInterfaceTypeFromInternalType(DeclContext *dc, Type type) {
     }
   }
 
-  return substType(dc->getParentModule(), type, substitutions);
+  return type.subst(dc->getParentModule(), substitutions, None);
 }
 
 bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
@@ -911,7 +911,7 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
 
     // Substitute our deductions into the archetype type to produce the
     // concrete type we need to evaluate.
-    Type T = substType(DC->getParentModule(), archetype, Substitutions);
+    Type T = Type(archetype).subst(DC->getParentModule(), Substitutions, None);
     if (!T)
       return true;
 

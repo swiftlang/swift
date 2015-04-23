@@ -2996,11 +2996,10 @@ void ConformanceChecker::resolveTypeWitnesses() {
       }
     }
 
-    Type defaultType = TC.substType(
+    Type defaultType = assocType->getDefaultDefinitionLoc().getType().subst(
                          DC->getParentModule(),
-                         assocType->getDefaultDefinitionLoc().getType(),
                          substitutions,
-                         /*IgnoreMissing=*/true);
+                         SubstOptions::IgnoreMissing);
     if (!defaultType)
       return Type();
 

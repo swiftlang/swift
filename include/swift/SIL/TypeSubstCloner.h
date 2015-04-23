@@ -70,7 +70,7 @@ protected:
   }
 
   CanType remapASTType(CanType ty) {
-    return ty.subst(SwiftMod, SubsMap, false, nullptr)->getCanonicalType();
+    return ty.subst(SwiftMod, SubsMap, None)->getCanonicalType();
   }
 
   Substitution remapSubstitution(Substitution sub) {

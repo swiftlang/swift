@@ -491,20 +491,6 @@ public:
                             bool isSpecialized,
                             GenericTypeResolver *resolver = nullptr);
 
-  /// \brief Substitute the given archetypes for their substitution types
-  /// within the given type.
-  ///
-  /// \param IgnoreMissing Ignore missing mappings; useful when something else
-  /// may establish those mappings later, e.g., as in protocol conformance.
-  ///
-  /// \returns The substituted type, or null if the substitution failed.
-  ///
-  /// FIXME: We probably want to have both silent and loud failure modes.
-  /// However, the only possible failure now is from array slice types, which
-  /// occur simply because we don't have Array<T> yet.
-  Type substType(Module *module, Type T, TypeSubstitutionMap &Substitutions,
-                 bool IgnoreMissing = false);
-
   /// \brief Apply generic arguments to the given type.
   ///
   /// \param type The unbound generic type to which to apply arguments.

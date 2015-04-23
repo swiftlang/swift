@@ -2082,13 +2082,6 @@ Type TypeResolver::buildProtocolType(ProtocolTypeRepr *repr,
   return MetatypeType::get(instanceType, storedRepr);
 }
 
-
-Type TypeChecker::substType(Module *module, Type type,
-                            TypeSubstitutionMap &Substitutions,
-                            bool IgnoreMissing) {
-  return type.subst(module, Substitutions, IgnoreMissing, this);
-}
-
 Type TypeChecker::substMemberTypeWithBase(Module *module,
                                           const ValueDecl *member,
                                           Type baseTy, bool isTypeReference) {

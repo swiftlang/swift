@@ -76,6 +76,7 @@ namespace swift {
   using llvm::raw_ostream;
   using llvm::APInt;
   using llvm::APFloat;
+  using llvm::NoneType;
 } // end namespace swift
 
 #endif

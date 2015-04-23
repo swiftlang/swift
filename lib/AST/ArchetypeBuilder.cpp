@@ -1108,17 +1108,16 @@ public:
       case RequirementKind::SameType: {
         auto firstType = req.getFirstType().subst(&Builder.getModule(), 
                                                   substitutions,
-                                                  true,
-                                                  Builder.getLazyResolver());
+                                                  SubstOptions::IgnoreMissing);
         if (!firstType)
           break;
 
         auto firstPA = Builder.resolveArchetype(firstType);
 
-        auto secondType = req.getSecondType().subst(&Builder.getModule(), 
-                                                    substitutions,
-                                                    true,
-                                                    Builder.getLazyResolver());
+        auto secondType = req.getSecondType().subst(
+                            &Builder.getModule(), 
+                            substitutions,
+                            SubstOptions::IgnoreMissing);
         if (!secondType)
           break;
         auto secondPA = Builder.resolveArchetype(secondType);
@@ -1141,10 +1140,10 @@ public:
       }
 
       case RequirementKind::Conformance: {
-        auto subjectType = req.getFirstType().subst(&Builder.getModule(),
-                                                    substitutions,
-                                                    true,
-                                                    Builder.getLazyResolver());
+        auto subjectType = req.getFirstType().subst(
+                             &Builder.getModule(),
+                             substitutions,
+                             SubstOptions::IgnoreMissing);
         if (!subjectType)
           break;
 

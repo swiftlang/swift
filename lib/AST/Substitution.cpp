@@ -83,8 +83,7 @@ Substitution Substitution::subst(Module *module,
                                  TypeSubstitutionMap &subMap,
                                  ArchetypeConformanceMap &conformanceMap) const {
   // Substitute the replacement.
-  Type substReplacement
-    = Replacement.subst(module, subMap, /*ignoreMissing*/false, nullptr);
+  Type substReplacement = Replacement.subst(module, subMap, None);
   assert(substReplacement && "substitution replacement failed");
 
   if (substReplacement->isEqual(Replacement))
