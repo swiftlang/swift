@@ -48,9 +48,6 @@ getTypeWitnessByName(ProtocolConformance *conformance,
     return nullptr;
 
   assert(conformance && "Missing conformance information");
-  if (!conformance->hasTypeWitness(assocType, resolver)) {
-    return nullptr;
-  }
   return &conformance->getTypeWitness(assocType, resolver);
 }
 
