@@ -15,7 +15,13 @@ func calls(arg: @convention(c) Int -> Int, x: Int) -> Int {
 // CHECK:         [[RESULT:%.*]] = apply %0(%1)
 // CHECK:         return [[RESULT]]
 
+func calls_no_args(arg: @convention(c) () -> Int) -> Int {
+  return arg()
+}
+
 func global(x: Int) -> Int { return x }
+
+func no_args() -> Int { return 42 }
 
 // CHECK-LABEL: sil hidden @_TF19c_function_pointers27pointers_to_swift_functionsFSiT_
 func pointers_to_swift_functions(x: Int) {
@@ -34,5 +40,9 @@ func pointers_to_swift_functions(x: Int) {
   // CHECK:   [[CLOSURE_C:%.*]] = function_ref @_TToFF19c_function_pointers27pointers_to_swift_functionsFSiT_U_FSiSi
   // CHECK:   apply {{.*}}([[CLOSURE_C]], [[X]])
   calls({ $0 + 1 }, x)
+
+  calls_no_args(no_args)
+  // CHECK:   [[NO_ARGS_C:%.*]] = function_ref @_TToF19c_function_pointers7no_argsFT_Si
+  // CHECK:   apply {{.*}}([[NO_ARGS_C]])
 }
 

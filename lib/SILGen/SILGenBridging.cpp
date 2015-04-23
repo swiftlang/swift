@@ -706,7 +706,6 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   // Emit the other arguments, taking ownership of arguments if necessary.
   auto inputs = objcInfo->getParametersWithoutIndirectResult();
   auto nativeInputs = swiftInfo->getParametersWithoutIndirectResult();
-  assert(!inputs.empty());
   assert(inputs.size() ==
            nativeInputs.size() + unsigned(foreignError.hasValue()));
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
