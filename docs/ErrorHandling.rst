@@ -275,9 +275,13 @@ marked ``throws`` is a static compiler error.
 Catching errors
 ---------------
 
-A ``catch`` clause includes a pattern that matches the error.  This
-pattern can use any of the standard pattern-matching tools provided by
-``switch`` statements in Swift, including boolean ``where`` conditions.
+A ``catch`` clause includes an optional pattern that matches the
+error.  This pattern can use any of the standard pattern-matching
+tools provided by ``switch`` statements in Swift, including boolean
+``where`` conditions.  The pattern can be omitted; if so, a ``where``
+condition is still permitted.  If the pattern is omitted, or if it
+does not bind a different name to the error, the name ``error`` is
+automatically bound to the error as if with a ``let`` pattern.
 
 The ``try`` keyword is used for other purposes which it seems to fit far
 better (see below), so ``catch`` clauses are instead attached to a
