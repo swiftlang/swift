@@ -272,7 +272,9 @@ struct True : Bool_ {}
 postfix func <*> <B:Bool_>(_: Test<B>) -> Int? { return .None }
 postfix func <*> (_: Test<True>) -> String? { return .None }
 
-class Test<C: Bool_> : MetaFunction {} // picks first <*>
+class Test<C: Bool_> : MetaFunction {
+  typealias Result = Int
+} // picks first <*>
 typealias Inty = Test<True>.Result 
 var iy : Inty = 5 // okay, because we picked the first <*>
 var iy2 : Inty = "hello" // expected-error{{'String' is not convertible to 'Inty'}}

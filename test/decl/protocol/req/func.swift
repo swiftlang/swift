@@ -21,8 +21,9 @@ struct X1b : P1 {
 
 // Function with an associated type
 protocol P2 {
-  typealias Assoc : P1
-  func f1(x: Assoc) // expected-note {{protocol requires function 'f1' with type '(X2x.Assoc) -> ()'}} expected-note{{protocol requires function 'f1' with type 'Assoc -> ()'}} expected-note{{protocol requires function 'f1' with type 'Assoc -> ()'}} expected-note{{multiple matching functions named 'f1' with type '(X2z.Assoc) -> ()'}}
+  typealias Assoc : P1 // expected-note{{ambiguous inference of associated type 'Assoc': 'X1a' vs. 'X1b'}}
+  // expected-note@-1{{protocol requires nested type 'Assoc'}}
+  func f1(x: Assoc) // expected-note{{protocol requires function 'f1' with type 'Assoc -> ()'}} expected-note{{protocol requires function 'f1' with type 'Assoc -> ()'}}
 }
 
 // Exact match.
@@ -67,7 +68,7 @@ struct X2w : P2 { // expected-error{{type 'X2w' does not conform to protocol 'P2
 
 // Deduction of type that doesn't meet requirements
 struct X2x : P2 { // expected-error{{type 'X2x' does not conform to protocol 'P2'}}
-  func f1(#x: Int) { } // expected-note{{candidate has non-matching type '(x: Int) -> ()'}}
+  func f1(#x: Int) { }
 }
 
 // Mismatch in parameter types
@@ -78,8 +79,8 @@ struct X2y : P2 { // expected-error{{type 'X2y' does not conform to protocol 'P2
 
 // Ambiguous deduction
 struct X2z : P2 { // expected-error{{type 'X2z' does not conform to protocol 'P2'}}
-  func f1(x: X1a) { } // expected-note{{candidate exactly matches [with Assoc = (X1a)]}}
-  func f1(x: X1b) { } // expected-note{{candidate exactly matches [with Assoc = (X1b)]}}
+  func f1(x: X1a) { } // expected-note{{matching requirement 'f1' to this declaration inferred associated type to 'X1a'}}
+  func f1(x: X1b) { } // expected-note{{matching requirement 'f1' to this declaration inferred associated type to 'X1b'}}
 }
 
 // Protocol with prefix unary function
@@ -236,14 +237,14 @@ protocol P11 {
 }
 
 protocol P12 {
-  typealias Index : P1
-  func getIndex() -> Index // expected-note{{protocol requires function 'getIndex()' with type '() -> X12.Index'}}
+  typealias Index : P1 // expected-note{{unable to infer associated type 'Index' for protocol 'P12'}}
+  func getIndex() -> Index
 }
 
 struct XIndexType : P11 { }
 
 struct X12 : P12 { // expected-error{{type 'X12' does not conform to protocol 'P12'}}
-  func getIndex() -> XIndexType { return XIndexType() } // expected-note{{candidate has non-matching type '() -> XIndexType'}}
+  func getIndex() -> XIndexType { return XIndexType() } // expected-note{{inferred type 'XIndexType' (by matching requirement 'getIndex()') is invalid: does not conform to 'P1'}}
 }
 
-func ==(x: X12.Index, y: X12.Index) -> Bool { return true } // expected-error 2{{'Index' is not a member type of 'X12'}}
+func ==(x: X12.Index, y: X12.Index) -> Bool { return true }

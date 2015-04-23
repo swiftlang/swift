@@ -1122,6 +1122,12 @@ public:
   ValueDecl *deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
                                        ValueDecl *Requirement);
   
+  /// Derive an implicit type witness for the given associated type in
+  /// the conformance of the given nominal type to some known
+  /// protocol.
+  Type deriveTypeWitness(NominalTypeDecl *nominal,
+                         AssociatedTypeDecl *assocType);
+
   /// \brief Given a set of archetype substitutions, verify and record all of
   /// the required protocol-conformance relationships.
   bool checkSubstitutions(TypeSubstitutionMap &Substitutions,
@@ -1154,11 +1160,14 @@ public:
   /// \param dc The context that needs the member.
   /// \param isKnownPrivate If true, this lookup is counted as a private
   /// dependency.
+  /// \param allowProtocolMembers If true, allow lookup to find members of
+  /// protocols and protocol extensions.
   ///
   /// \returns The result of name lookup.
   LookupTypeResult lookupMemberType(Type type, Identifier name,
                                     DeclContext *dc,
-                                    bool isKnownPrivate = false);
+                                    bool isKnownPrivate = false,
+                                    bool allowProtocolMembers = true);
 
   /// \brief Look up the constructors of the given type.
   ///

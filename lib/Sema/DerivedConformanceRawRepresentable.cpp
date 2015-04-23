@@ -73,28 +73,13 @@ static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
   return clone;
 }
 
-static TypeDecl *deriveRawRepresentable_Raw(TypeChecker &tc,
-                                            EnumDecl *enumDecl) {
+static Type deriveRawRepresentable_Raw(TypeChecker &tc, EnumDecl *enumDecl) {
   // enum SomeEnum : SomeType {
   //   @derived
   //   typealias Raw = SomeType
   // }
-  ASTContext &C = tc.Context;
-
   auto rawInterfaceType = enumDecl->getRawType();
-  auto rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl,
-                                                      rawInterfaceType);
-  auto rawTypeDecl = new (C) TypeAliasDecl(SourceLoc(),
-                                   C.Id_RawValue,
-                                   SourceLoc(),
-                                   TypeLoc::withoutLoc(rawType),
-                                   enumDecl);
-  rawTypeDecl->setImplicit();
-  rawTypeDecl->setType(rawType);
-  rawTypeDecl->setInterfaceType(rawInterfaceType);
-  rawTypeDecl->setAccessibility(enumDecl->getFormalAccess());
-  enumDecl->addMember(rawTypeDecl);
-  return rawTypeDecl;
+  return ArchetypeBuilder::mapTypeIntoContext(enumDecl, rawInterfaceType);
 }
 
 DeclRefExpr *
@@ -534,11 +519,44 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   
   if (requirement->getName() == tc.Context.Id_init)
     return deriveRawRepresentable_init(tc, enumDecl);
-
-  if (requirement->getName() == tc.Context.Id_RawValue)
-    return deriveRawRepresentable_Raw(tc, enumDecl);
   
   tc.diagnose(requirement->getLoc(),
               diag::broken_raw_representable_requirement);
   return nullptr;
 }
+
+Type DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
+                                                NominalTypeDecl *type,
+                                                AssociatedTypeDecl *assocType) {
+  // Check preconditions. These should already have been diagnosed by
+  // type-checking but we may still get here after recovery.
+  
+  // The type must be an enum.
+  auto enumDecl = dyn_cast<EnumDecl>(type);
+  if (!enumDecl)
+    return nullptr;
+  
+  // It must have a valid raw type.
+  if (!enumDecl->hasRawType())
+    return nullptr;
+  if (!enumDecl->getInherited().empty() &&
+      enumDecl->getInherited().front().isError())
+    return nullptr;
+  
+  // There must be enum elements.
+  if (enumDecl->getAllElements().empty())
+    return nullptr;
+
+  for (auto elt : enumDecl->getAllElements())
+    tc.validateDecl(elt);
+
+  if (assocType->getName() == tc.Context.Id_RawValue) {
+    return deriveRawRepresentable_Raw(tc, enumDecl);
+  }
+  
+  tc.diagnose(assocType->getLoc(),
+              diag::broken_raw_representable_requirement);
+  return nullptr;
+}
+
+

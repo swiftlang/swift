@@ -117,6 +117,7 @@ enum Recovery4 {
 }
 
 enum RawTypeEmpty : Int {} // expected-error {{an enum with no cases cannot declare a raw type}}
+// expected-error@-1{{type 'RawTypeEmpty' does not conform to protocol 'RawRepresentable'}}
 
 enum Raw : Int {
   case Ankeny, Burnside
@@ -132,13 +133,14 @@ enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw ty
 }
 
 enum RawTypeNotLiteralConvertible : Array<Int> { // expected-error {{raw type 'Array<Int>' is not convertible from any literal}}
+  // expected-error@-1{{type 'RawTypeNotLiteralConvertible' does not conform to protocol 'RawRepresentable'}}
   case Ladd, Elliott, Sixteenth, Harrison
 }
 
 enum RawTypeCircularityA : RawTypeCircularityB, IntegerLiteralConvertible { // expected-error {{circular enum raw types 'RawTypeCircularityA' -> 'RawTypeCircularityB' -> 'RawTypeCircularityA'}} FIXME: expected-error{{RawRepresentable}}
   case Morrison, Belmont, Madison, Hawthorne
 
-  init(integerLiteral value: Int) { // expected-error{{initializer 'init(integerLiteral:)' has different argument names from those required by protocol 'RawRepresentable' ('init(rawValue:)')}}
+  init(integerLiteral value: Int) {
     self = .Morrison
   }
 }

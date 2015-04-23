@@ -42,6 +42,6 @@ class MFSynthesizedSubClass3 : MFSynthesizedClass1 { }
 
 extension MFSynthesizedSubClass4 : AnyObjectRefinement { }
 
-enum MFSynthesizedEnum1 : Int { }
+enum MFSynthesizedEnum1 : Int { case a }
 extension MFSynthesizedEnum2 : RawRepresentable { }
 

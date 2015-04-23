@@ -9,7 +9,7 @@ func bad_containers_1(bc: BadContainer1) {
 }
 
 struct BadContainer2 : SequenceType { // expected-error{{type 'BadContainer2' does not conform to protocol '_Sequence_Type'}} expected-error{{type 'BadContainer2' does not conform to protocol 'SequenceType'}} expected-error{{type 'BadContainer2' does not conform to protocol '_SequenceDefaultsType'}}
-  var generate : Int // expected-note 3{{candidate is not a function}}
+  var generate : Int
 }
 
 func bad_containers_2(bc: BadContainer2) {
@@ -17,7 +17,7 @@ func bad_containers_2(bc: BadContainer2) {
 }
 
 struct BadContainer3 : SequenceType { // expected-error{{type 'BadContainer3' does not conform to protocol '_Sequence_Type'}} expected-error{{type 'BadContainer3' does not conform to protocol 'SequenceType'}} expected-error{{type 'BadContainer3' does not conform to protocol '_SequenceDefaultsType'}}
-  func generate() { } // expected-note 3{{candidate has non-matching type '() -> ()'}}
+  func generate() { } // expected-note{{inferred type '()' (by matching requirement 'generate()') is invalid: does not conform to 'GeneratorType'}}
 }
 
 func bad_containers_3(bc: BadContainer3) {

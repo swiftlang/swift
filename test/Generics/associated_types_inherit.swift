@@ -11,7 +11,7 @@ class E { }
 
 protocol P {
   typealias Assoc : C
-  func getAssoc() -> Assoc // expected-note{{protocol requires function 'getAssoc()' with type '() -> X2.Assoc'}}
+  func getAssoc() -> Assoc // expected-note{{protocol requires function 'getAssoc()' with type '() -> E'}}
 }
 
 struct X1 : P {

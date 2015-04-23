@@ -22,7 +22,7 @@ var xAssoc2: X.AssocType2 = X()
 // Dependent default definition for associated types that doesn't meet
 // requirements.
 protocol P3 {
-  typealias AssocType3 : P1 = Self // expected-note{{default associated type definition 'X2' does not conform to 'P1'}}
+  typealias AssocType3 : P1 = Self // expected-note{{default type 'X2' for associated type 'AssocType3' (from protocol 'P3') does not conform to 'P1'}}
 }
 
 extension X : P3 { } // okay

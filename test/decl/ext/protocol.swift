@@ -427,22 +427,7 @@ func testPTypeAlias1() {
 }
 
 // Defaulted implementations to satisfy a requirement.
-protocol PTypeAliasSuper1 {
-}
-
 struct TypeAliasHelper<T> { }
-
-extension PTypeAliasSuper1 {
-  typealias Helper = TypeAliasHelper<Self>
-}
-
-protocol PTypeAliasSub1 : PTypeAliasSuper1 {
-  typealias Helper
-}
-
-struct STypeAliasSub1a : PTypeAliasSub1 { }
-
-struct STypeAliasSub1b<T, U> : PTypeAliasSub1 { }
 
 protocol PTypeAliasSuper2 {
 }

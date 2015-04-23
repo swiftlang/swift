@@ -61,6 +61,7 @@ func testGenericInherit() {
 
 struct SS<T> : T { } // expected-error{{inheritance from non-protocol type 'T'}}
 enum SE<T> : T { case X } // expected-error{{raw type 'T' is not convertible from any literal}}
+// expected-error@-1{{type 'SE<T>' does not conform to protocol 'RawRepresentable'}}
 
 // Also need Equatable for init?(RawValue)
 enum SE2<T : IntegerLiteralConvertible> 

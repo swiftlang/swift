@@ -37,7 +37,15 @@ namespace DerivedConformance {
 ValueDecl *deriveRawRepresentable(TypeChecker &tc,
                                   NominalTypeDecl *type,
                                   ValueDecl *requirement);
-  
+
+/// Derive a RawRepresentable type witness for an enum, if it has a valid
+/// raw type and raw values for all of its cases.
+///
+/// \returns the derived member, which will also be added to the type.
+Type deriveRawRepresentable(TypeChecker &tc,
+                            NominalTypeDecl *type,
+                            AssociatedTypeDecl *assocType);
+
 /// Derive an Equatable requirement for a type.
 ///
 /// Currently this is only implemented for enums without associated values.

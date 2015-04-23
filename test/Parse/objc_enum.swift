@@ -17,6 +17,7 @@
 }
 
 @objc enum NonIntegerRawType: Float { // expected-error{{'@objc' enum raw type 'Float' is not an integer type}}
+  // expected-error@-1{{type 'NonIntegerRawType' does not conform to protocol 'RawRepresentable'}}
   case Zim = 1.0, Zang = 1.5, Zung = 2.0
 }
 

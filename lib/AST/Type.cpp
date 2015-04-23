@@ -2153,16 +2153,8 @@ static Type getMemberForBaseType(Module *module,
       return Type();
 
     case ConformanceKind::Conforms:
-      switch (conformance.getPointer()->getState()) {
-      case ProtocolConformanceState::Invalid:
-        return Type();
-
-      case ProtocolConformanceState::Incomplete:
-      case ProtocolConformanceState::Checking:
-      case ProtocolConformanceState::Complete:
-        return conformance.getPointer()->getTypeWitness(assocType,
-                                                     resolver).getReplacement();
-      }
+      return conformance.getPointer()->getTypeWitness(assocType,
+                                                      resolver).getReplacement();
     }
   }
 

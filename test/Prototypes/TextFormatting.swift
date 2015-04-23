@@ -88,7 +88,7 @@ func ~> <T:XDebugPrintable> (x: T, _: __PrintedFormat) -> T.DebugRepresentation 
 /// to do is declare conformance to XPrintable, and there's nothing to
 /// implement.
 protocol XPrintable: XDebugPrintable {
-  typealias PrintRepresentation: XStreamable // = DebugRepresentation
+  typealias PrintRepresentation: XStreamable = DebugRepresentation
 
   /// \brief produce a "pretty" textual representation that can be
   /// distinct from the debug format.  For example,

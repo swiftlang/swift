@@ -53,9 +53,6 @@ NOTE(while_converting_subscript_index,sema,none,
 // Constraint solver diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(does_not_conform_to_constraint,sema,none,
-      "type %0 does not conform to protocol %1", (Type, Type))
-
 ERROR(cannot_find_appropriate_overload,sema,none,
       "could not find an overload for '%0' that accepts the supplied "
       "arguments", (StringRef))
@@ -789,14 +786,29 @@ NOTE(ambiguous_witnesses_wrong_name,sema_tcd,none,
 NOTE(no_witnesses_type,sema_tcd,none,
      "protocol requires nested type %0", (Identifier))
 NOTE(default_assocated_type_req_fail,sema_tcd,none,
-     "default associated type definition %0 does not conform to %1", 
-     (Type, Type))
+     "default type %0 for associated type %1 (from protocol %2) "
+     "does not conform to %3",
+     (Type, DeclName, Type, Type))
 ERROR(associated_type_access,sema_tcd,none,
       "associated type in %select{PRIVATE|an internal|a public}0 protocol "
       "uses %select{a private|an internal|PUBLIC}1 type in its "
       "%select{default definition|requirement}2 ",
       (Accessibility, Accessibility, unsigned))
 
+NOTE(bad_associated_type_deduction,sema_tcd,none,
+     "unable to infer associated type %0 for protocol %1",
+     (DeclName, DeclName))
+NOTE(associated_type_deduction_witness_failed,sema_tcd,none,
+     "inferred type %1 (by matching requirement %0) is invalid: "
+     "does not conform to %2",
+     (DeclName, Type, DeclName))
+NOTE(ambiguous_associated_type_deduction,sema_tcd,none,
+     "ambiguous inference of associated type %0: %1 vs. %2",
+     (DeclName, Type, Type))
+NOTE(associated_type_deduction_witness,sema_tcd,none,
+     "matching requirement %0 to this declaration inferred associated type to "
+     "%1",
+     (DeclName, Type))
 NOTE(ambiguous_witnesses_type,sema_tcd,none,
      "multiple matching types named %0", (Identifier))
 NOTE(protocol_witness_exact_match,sema_tcd,none,

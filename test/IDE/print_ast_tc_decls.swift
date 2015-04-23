@@ -1028,8 +1028,8 @@ enum d2300_EnumDeclWithValues1 : Int {
 // PASS_COMMON-NEXT: {{^}}  case EDV2_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV2_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
-// PASS_COMMON-NEXT: {{^}}  init?(rawValue: Int){{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias RawValue = Int
+// PASS_COMMON-NEXT: {{^}}  init?(rawValue: Int){{$}}
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
@@ -1041,8 +1041,8 @@ enum d2400_EnumDeclWithValues2 : Double {
 // PASS_COMMON-NEXT: {{^}}  case EDV3_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV3_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
-// PASS_COMMON-NEXT: {{^}}  init?(rawValue: Double){{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias RawValue = Double
+// PASS_COMMON-NEXT: {{^}}  init?(rawValue: Double){{$}}
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Double { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 

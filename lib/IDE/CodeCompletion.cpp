@@ -1723,7 +1723,7 @@ public:
     Builder.setAssociatedDecl(TAD);
     addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
-    if (TAD->hasUnderlyingType())
+    if (TAD->hasUnderlyingType() && !TAD->getUnderlyingType()->is<ErrorType>())
       addTypeAnnotation(Builder, TAD->getUnderlyingType());
     else {
       addTypeAnnotation(Builder, TAD->getDeclaredType());

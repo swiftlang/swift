@@ -126,7 +126,8 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
 
 LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
                                                DeclContext *dc,
-                                               bool isKnownPrivate) {
+                                               bool isKnownPrivate,
+                                               bool allowProtocolMembers) {
   LookupTypeResult result;
 
   // Look through an inout type.
@@ -142,9 +143,12 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
          
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  unsigned options = NL_QualifiedDefault | NL_ProtocolMembers;
+  unsigned options = NL_QualifiedDefault;
   if (isKnownPrivate)
     options |= NL_KnownNonCascadingDependency;
+  if (allowProtocolMembers)
+    options |= NL_ProtocolMembers;    
+
   if (!dc->lookupQualified(type, name, options, this, decls))
     return result;
 
@@ -193,7 +197,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
       ProtocolConformance *conformance = nullptr;
       if (!conformsToProtocol(type, protocol, dc, isKnownPrivate,
                               &conformance) ||
-          !conformance || !conformance->hasTypeWitness(assocType, nullptr)) {
+          !conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
       }

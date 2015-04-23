@@ -100,6 +100,7 @@ protocol P7 : P6 {
 func ~> <T:P6>(x: T, _: S7a) -> S7b { return S7b() }
 
 struct S7b : P7 {
+  typealias Assoc = S7b
   func foo<Target: P5>(inout target: Target) {}
 }
 
