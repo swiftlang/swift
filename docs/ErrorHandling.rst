@@ -59,7 +59,7 @@ A **universal error** is theoretically recoverable, but by its nature
 the language can't help the programmer anticipate where it will come
 from.  A **logic failure** arises from a programmer mistake and should
 not be recoverable at all.  In our system, these kinds of errors are
-are reported either with Objective-C/C++ exceptions or simply by
+reported either with Objective-C/C++ exceptions or simply by
 logging a message and calling ``abort()``.  Both kinds of error are
 discussed extensively in the rationale.  Having considered them
 carefully, we believe that we can address them in a later release
@@ -112,7 +112,7 @@ proposal works like it does in exception handling, and people are
 inevitably going to make the connection.  Given that, we couldn't find
 a compelling reason to deviate from the ``throw`` / ``catch`` legacy.
 
-This document just contains the basic proposal and is will be very
+This document just contains the basic proposal and will be very
 light on rationale.  We considered many different languages and
 programming environments as part of making this proposal, and there's
 an extensive discussion of them in the separate rationale document.
@@ -161,23 +161,21 @@ function.  This function has type ``(Int) -> (Int) throws -> Int``::
 
   func jerry(i: Int)(j: Int) throws -> Int {
 
-A function type cannot throw is a subtype of a function that can, so
-you can use a function that can't throw anywhere you could use a
-function that can::
+``throws`` is tracked as part of the type system: a function value
+must also declare whether it can throw.  Functions that cannot throw
+are a subtype of functions that can, so you can use a function that
+can't throw anywhere you could use a function that can::
 
   func rachel() -> Int { return 12 }
   func donna(generator: () throws -> Int) -> Int { ... }
 
   donna(rachel)
 
-Swift should use statically-enforced typed propagation.  By default,
-functions should not be able to throw.  A call to a function which can
-throw within a context that is not allowed to throw should be rejected
-by the compiler.
+The reverse is not true, since the caller would not be prepared to
+handle the error.
 
-Function types should indicate whether the function throws; this needs
-to be tracked even for first-class function values.  Functions which
-do not throw are subtypes of functions that throw.
+A call to a function which can throw within a context that is not
+allowed to throw is rejected by the compiler.
 
 It isn't possible to overload functions solely based on whether the
 functions throw.  That is, this is not legal::
@@ -410,8 +408,9 @@ To concisely indicate that a call is known to not actually throw at
 runtime, ``try`` can be decorated with ``!``, turning the error check
 into a runtime assertion that the call does not throw.
 
-For the purposes of checking error coverage, no calls within a
-``try!`` throw.
+For the purposes of checking that all errors are handled, a ``try!``
+expression is considered to handle any error originating from within
+its operand.
 
 ``try!`` is otherwise exactly like ``try``: it can appear in exactly
 the same positions and doesn't affect the type of an expression.
@@ -426,13 +425,13 @@ specific use cases (e.g. handling a specific call differently within a
 context that otherwise allows propagation).
 
 As such, the Swift standard library should provide a standard
-Rust-like :code:``Result<T>`` enum, along with API for working with it,
+Rust-like ``Result<T>`` enum, along with API for working with it,
 e.g.:
 
 - A function to evaluate an error-producing closure and capture the
-  result as a :code:``Result<T>``.
+  result as a ``Result<T>``.
 
-- A function to unpack a :code:``Result<T>`` by either returning its
+- A function to unpack a ``Result<T>`` by either returning its
   value or propagating the error in the current context.
 
 This is something that composes on top of the basic model, but that
@@ -616,10 +615,10 @@ Higher-order polymorphism
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We should make it easy to write higher-order functions that behave
-polymorphically w.r.t. whether their arguments throw.  This can be
-done in a fairly simple way: a function can declare that it throws if
-any of a set of named arguments do.  As an example (using strawman
-syntax)::
+polymorphically with respect to whether their arguments throw.  This
+can be done in a fairly simple way: a function can declare that it
+throws if any of a set of named arguments do.  As an example (using
+strawman syntax)::
 
   func map<T,U>(array: [T], fn: T -> U) throwsIf(fn) -> [U] {
     ...
@@ -680,10 +679,10 @@ statements like ``if`` don't require the outer statement to be marked.
 It would be better if the compiler didn't require the outer ``try``.
 
 On the other hand, the "statement-like" story already has a number of
-other holes: for example, ``break``, ``continue``, ``return`` behave
-differently in them than in statements.  In the future, we may
-consider fixing that; that fix will also need to address the
-error-propagation problem.
+other holes: for example, ``break``, ``continue``, and ``return``
+behave differently in the argument closure than in statements.  In the
+future, we may consider fixing that; that fix will also need to
+address the error-propagation problem.
 
 ``using``
 ~~~~~~~~~
