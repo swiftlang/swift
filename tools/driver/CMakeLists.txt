@@ -50,7 +50,7 @@ swift_install_in_component(compiler
     FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
     DESTINATION "bin")
 
-if(SWIFT_HOST_VARIANT STREQUAL "LINUX")
+if(SWIFT_HOST_VARIANT STREQUAL "linux")
 # No need for this on other platforms.
   swift_install_in_component(compiler
       FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract"

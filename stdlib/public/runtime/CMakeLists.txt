@@ -84,6 +84,11 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       # FIXME: We will need a different linker script for 32-bit builds.
       configure_file(
           "swift.ld" "${SWIFTLIB_DIR}/${arch_subdir}/swift.ld" COPYONLY)
+
+      swift_install_in_component(compiler
+          FILES "swift.ld"
+          DESTINATION "lib/swift/${arch_subdir}")
+
     endforeach()
   endif()
 endforeach()
