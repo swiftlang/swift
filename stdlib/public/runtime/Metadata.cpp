@@ -1338,6 +1338,7 @@ namespace {
   };
 }
 
+#if SWIFT_OBJC_INTEROP
 static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
   assert(((alignMask + 1) & alignMask) == 0 &&
          "not an alignment mask!");
@@ -1347,6 +1348,7 @@ static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
     log2++;
   return log2;
 }
+#endif
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
