@@ -112,7 +112,7 @@ set(SWIFT_STDLIB_DYLIB_EXTRA_INSTALL_PATHS "" CACHE STRING
 # User-configurable Darwin-specific options.
 #
 
-option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT_REQUIRED
+option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether CrashReporterClient library should be a required dependency (build will fail if it is not found)"
     FALSE)
 
@@ -524,7 +524,7 @@ foreach(SDK ${SWIFT_SDKS})
         NAMES CrashReporterClient
         PATHS "${SWIFT_SDK_${SDK}_PATH}/usr/local/lib"
         NO_DEFAULT_PATH)
-    if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT_REQUIRED AND
+    if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT AND
        NOT SWIFT_HAVE_CRASH_REPORTER_CLIENT)
       message(FATAL_ERROR
           "CrashReporterClient library is required, but it was not found")
