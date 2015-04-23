@@ -367,7 +367,6 @@ class G {
 // CHECK:   [[CALLBACK:%.*]] = load [[TEMP]]#1 :
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>)
-// CHECK:   strong_release [[ADDR_OWNER]]
 // CHECK:   release_value [[TUPLE]]
 // CHECK:   return [[RESULT]]
 

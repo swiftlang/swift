@@ -582,12 +582,10 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
 
 /// Produce a singular RValue for a load from the specified property.  This
 /// is designed to work with RValue ManagedValue bases that are either +0 or +1.
-ManagedValue SILGenFunction::
-emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
-                          bool isSuper, VarDecl *field,
-                          ArrayRef<Substitution> substitutions,
-                          AccessSemantics semantics,
-                          Type propTy, SGFContext C) {
+ManagedValue SILGenFunction::emitRValueForPropertyLoad(
+    SILLocation loc, ManagedValue base, bool isSuper, VarDecl *field,
+    ArrayRef<Substitution> substitutions, AccessSemantics semantics,
+    Type propTy, SGFContext C, bool isGuaranteedValid) {
   AccessStrategy strategy =
     field->getAccessStrategy(semantics, AccessKind::Read);
 
@@ -630,7 +628,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   if (base.getType().getSwiftRValueType()->hasReferenceSemantics()) {
     LValue LV = emitPropertyLValue(loc, base, field, AccessKind::Read,
                                    AccessSemantics::DirectToStorage);
-    return emitLoadOfLValue(loc, std::move(LV), C);
+    return emitLoadOfLValue(loc, std::move(LV), C, isGuaranteedValid);
   }
 
   // rvalue MemberRefExprs are produced in two cases: when accessing a 'let'
@@ -1639,6 +1637,129 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   return result;
 }
 
+namespace {
+
+/// A helper function with context that tries to emit member refs of nominal
+/// types avoiding the conservative lvalue logic.
+class NominalTypeMemberRefRValueEmitter {
+  using SelfTy = NominalTypeMemberRefRValueEmitter;
+
+  MemberRefExpr *Expr;
+  SGFContext Context;
+  NominalTypeDecl *Base;
+  VarDecl *Field;
+
+  bool BaseIsValueType;
+  bool BaseIsGuaranteed;
+  bool FieldIsImmutable;
+
+  NominalTypeMemberRefRValueEmitter(MemberRefExpr *Expr, SGFContext Context,
+                                    NominalTypeDecl *Base, VarDecl *Field,
+                                    bool BaseIsValueType, bool BaseIsGuaranteed,
+                                    bool FieldIsImmutable)
+      : Expr(Expr), Context(Context), Base(Base), Field(Field),
+        BaseIsValueType(BaseIsValueType), BaseIsGuaranteed(BaseIsGuaranteed),
+        FieldIsImmutable(FieldIsImmutable) {}
+
+public:
+  /// A failable constructor that returns the emitter if it is legal to emit the
+  /// member ref RValue. None otherwise.
+  static Optional<NominalTypeMemberRefRValueEmitter>
+  create(MemberRefExpr *E, SGFContext C, NominalTypeDecl *B);
+
+  /// Emit the RValue.
+  RValue emit(SILGenFunction &SGF) const;
+
+  NominalTypeMemberRefRValueEmitter(const SelfTy &) = default;
+  NominalTypeMemberRefRValueEmitter(SelfTy &&) = default;
+  ~NominalTypeMemberRefRValueEmitter() = default;
+
+private:
+  SGFContext getBaseSGFContext() const;
+  SGFContext getFieldSGFContext() const;
+};
+
+} // end anonymous namespace
+
+Optional<NominalTypeMemberRefRValueEmitter>
+NominalTypeMemberRefRValueEmitter::create(MemberRefExpr *E, SGFContext C,
+                                          NominalTypeDecl *B) {
+  auto *field = cast<VarDecl>(E->getMember().getDecl());
+
+  // Right now we only handle AccessStrategy. Just return false. When we are
+  // able to handle other cases in emit, this check should be removed and a
+  // switch should be added to emit that dispatches to helper methods.
+  AccessStrategy strategy =
+      field->getAccessStrategy(E->getAccessSemantics(), AccessKind::Read);
+  if (strategy != AccessStrategy::Storage)
+    return None;
+
+  NominalTypeMemberRefRValueEmitter Result{E, C, B, field, false, false, false};
+
+  // If we have a struct, we are always allowed to emit base at +0 since a
+  // struct is immutable.
+  if (isa<StructDecl>(B)) {
+    Result.BaseIsGuaranteed = C.isGuaranteedPlusZeroOk();
+    Result.BaseIsValueType = true;
+    Result.FieldIsImmutable = field->isLet();
+    return Result;
+  }
+
+  // Next check if we have a class with a let field. If we don't there is
+  // nothing further we can do. We need to emit via an lvalue.
+  //
+  // If the field is a var, we have to allow for it to be overridden by a
+  // computed var in a subclass so we can not use a ref_element_addr. We do not
+  // support computed lets.
+  auto *Cls = dyn_cast<ClassDecl>(B);
+  if (!Cls || !field->isLet())
+    return None;
+
+  Result.BaseIsGuaranteed = C.isGuaranteedPlusZeroOk();
+  Result.FieldIsImmutable = true;
+
+  return Result;
+}
+
+RValue NominalTypeMemberRefRValueEmitter::emit(SILGenFunction &SGF) const {
+  ManagedValue base =
+      SGF.emitRValueAsSingleValue(Expr->getBase(), getBaseSGFContext());
+  ManagedValue result = SGF.emitRValueForPropertyLoad(
+      Expr, base, Expr->isSuper(), Field, Expr->getMember().getSubstitutions(),
+      Expr->getAccessSemantics(), Expr->getType(), getFieldSGFContext(),
+      BaseIsGuaranteed);
+  return RValue(SGF, Expr, result);
+}
+
+SGFContext NominalTypeMemberRefRValueEmitter::getBaseSGFContext() const {
+  // If our base is a value type, then we know that it has immediate SGFContext
+  // since it is immutable.
+  if (BaseIsValueType)
+    return SGFContext::AllowImmediatePlusZero;
+
+  // Otherwise we have a reference type implying that we must emit the base as a
+  // guaranteed parameter.
+  return SGFContext::AllowGuaranteedPlusZero;
+}
+
+SGFContext NominalTypeMemberRefRValueEmitter::getFieldSGFContext() const {
+  // If Base is a value type that is guaranteed, we can always emit as immediate
+  // plus zero since even if we have a var binding to the value type, the var
+  // binding can never be reassigned.
+  if (BaseIsValueType && BaseIsGuaranteed)
+    return SGFContext::AllowImmediatePlusZero;
+
+  // If we have a reference type, check if the field is immutable. If the field
+  // is immutable then we can emit the field at guaranteed plus zero.
+  if (!BaseIsValueType && BaseIsGuaranteed && FieldIsImmutable) {
+    return SGFContext::AllowGuaranteedPlusZero;
+  }
+
+  // We are unable to emit better code. Be conservative and just use the passed
+  // in context.
+  return Context;
+}
+
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
@@ -1658,22 +1779,12 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
     return SGF.emitApplyExpr(E, C);
   }
 
-  // Check to see if we should do this with a simple struct_extract.
-  auto field = cast<VarDecl>(E->getMember().getDecl());
-  if (E->getBase()->getType()->getStructOrBoundGenericStruct()) {
-    AccessStrategy strategy =
-      field->getAccessStrategy(E->getAccessSemantics(), AccessKind::Read);
-    if (strategy == AccessStrategy::Storage) {
-      ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase(),
-                                          SGFContext::AllowImmediatePlusZero);
-      ManagedValue result =
-        SGF.emitRValueForPropertyLoad(E, base, E->isSuper(), field,
-                                      E->getMember().getSubstitutions(),
-                                      E->getAccessSemantics(),
-                                      E->getType(), C);
-      return RValue(SGF, E, result);
-    }
-  }
+  // If we have a nominal type decl as our base, try to use special logic to
+  // emit the base rvalue's member using special logic that will let us avoid
+  // extra retains and releases.
+  if (auto *N = E->getBase()->getType()->getNominalOrBoundGenericNominal())
+    if (auto Emitter = NominalTypeMemberRefRValueEmitter::create(E, C, N))
+      return Emitter.getValue().emit(SGF);
 
   // Everything else should use the l-value logic.
 

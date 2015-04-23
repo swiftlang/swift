@@ -151,7 +151,7 @@ public:
   /// the +0/+1-ness is.
   SGFContext withFollowingProjection() const {
     SGFContext copy;
-    copy.state.setInt(copy.state.getInt());
+    copy.state.setInt(state.getInt());
     return copy;
   }
 };
@@ -863,9 +863,9 @@ public:
   ManagedValue emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                                          bool isSuper, VarDecl *property,
                                          ArrayRef<Substitution> substitutions,
-                                         AccessSemantics semantics,
-                                         Type propTy, SGFContext C);
-
+                                         AccessSemantics semantics, Type propTy,
+                                         SGFContext C,
+                                         bool isGuaranteedValid = false);
 
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
@@ -963,9 +963,9 @@ public:
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    AccessKind accessKind);
-  ManagedValue emitLoadOfLValue(SILLocation loc, LValue &&src,
-                                SGFContext C);
-  
+  ManagedValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
+                                bool isGuaranteedValid = false);
+
   /// Emit a reference to a method from within another method of the type, and
   /// gather all the substitutions necessary to invoke it, without
   /// dynamic dispatch.
