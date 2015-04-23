@@ -1471,7 +1471,7 @@ public:
   /// matching our criteria on the way back up the spine of of the tree.
   bool walkToNodePost(ASTNode Node) {
     if (!InnermostMatchingNode.hasValue() && Predicate(Node, Parent)) {
-      assert((Node.getSourceRange().isInvalid() && FoundTarget) ||
+      assert(Node.getSourceRange().isInvalid() ||
              SM.rangeContains(Node.getSourceRange(), TargetRange));
 
       InnermostMatchingNode = Node;
