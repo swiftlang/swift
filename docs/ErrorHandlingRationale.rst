@@ -443,9 +443,7 @@ conventional guarantee that later calls won't spuriously overwrite the
 variable.
 
 A common alternative in functional languages is to return an ``Either``
-type:
-
-.. code-block:: rust
+type::
 
   trait Writer {
     fn write_line(&mut self, s: &str) -> Result<(), IoError>;
@@ -455,9 +453,7 @@ This forces the caller to deal with the error if they want to use the
 result.  This works well unless the call does not really have a
 meaningful result (as ``write_line`` does not); then it depends on
 whether language makes it easy to accidentally ignore results.  It
-also tends to create a lot of awkward nesting:
-
-.. code-block:: rust
+also tends to create a lot of awkward nesting::
 
   fn parse_two_ints_and_add_them() {
     match parse_int() {
