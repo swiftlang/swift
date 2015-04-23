@@ -2727,10 +2727,14 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
     }
 
     bool visitNominalType(CanNominalType reqNominal, Type witnessType) {
-      if (auto witnessNominal = witnessType->getAs<NominalType>()) {
-        if (reqNominal->getDecl() != witnessNominal->getDecl())
-          return false;
+      // If the witness type is nominal and refers to a different
+      // nominal type, the match fails.
+      auto witnessNominalDecl = witnessType->getAnyNominal();
+      if (witnessNominalDecl && witnessNominalDecl != reqNominal->getDecl()) {
+        return true;
+      }
 
+      if (auto witnessNominal = witnessType->getAs<NominalType>()) {
         if (reqNominal.getParent())
           return visit(reqNominal.getParent(), witnessNominal->getParent());
 
@@ -2804,12 +2808,14 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
     TRIVIAL_CASE(UnboundGenericType)
 
     bool visitBoundGenericType(CanBoundGenericType reqBGT, Type witnessType) {
+      // If the witness type is nominal and refers to a different
+      // nominal type, the match fails.
+      auto witnessNominalDecl = witnessType->getAnyNominal();
+      if (witnessNominalDecl && witnessNominalDecl != reqBGT->getDecl()) {
+        return true;
+      }
+
       if (auto witnessBGT = witnessType->getAs<BoundGenericType>()) {
-        if (reqBGT->getDecl() != witnessBGT->getDecl() ||
-            reqBGT->getGenericArgs().size() 
-              != witnessBGT->getGenericArgs().size())
-          return false;
-        
         if (reqBGT->getParent() && 
             visit(reqBGT.getParent(), witnessBGT->getParent()))
           return true;
@@ -2823,7 +2829,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
         return false;
       }
 
-      return false;
+      return !witnessType->isDependentType();
     }
 
     TRIVIAL_CASE(TypeVariableType)
