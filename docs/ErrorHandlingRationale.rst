@@ -1757,12 +1757,12 @@ Examples::
     // close occurs here, at the end of the formal scope.
   }
 
-We may want to consider provide a convenient way to mark that a
-``defer`` action should only be taken if an error is thrown.  This is a
+We should consider providing a convenient way to mark that a ``defer``
+action should only be taken if an error is thrown.  This is a
 convenient shorthand for controlling the action with a flag that's
-only set to true at the end of an operation.  The flag approach
-is often more useful, since it allows the action to be taken for
-*any* early exit, e.g. a ``return``, not just for error propagation.
+only set to true at the end of an operation.  The flag approach is
+often more useful, since it allows the action to be taken for *any*
+early exit, e.g. a ``return``, not just for error propagation.
 
 ``using``
 ~~~~~~~~~
