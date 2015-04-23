@@ -252,6 +252,23 @@ public func expectOptionalEqual${Generic}(
 
 %for ComparableType in ['Int']:
 
+public func expectLT(
+  expected: ${ComparableType}, actual: ${ComparableType},
+  stackTrace: SourceLocStack? = nil,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  if !(expected < actual) {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    _printStackTrace(stackTrace)
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    if collectMoreInfo != nil { println(collectMoreInfo!()) }
+    println()
+  }
+}
+
 public func expectLE(
   expected: ${ComparableType}, actual: ${ComparableType},
   stackTrace: SourceLocStack? = nil,
@@ -1893,6 +1910,36 @@ public func expectEqualsUnordered<
     file: file, line: line, collectMoreInfo: collectMoreInfo)
 }
 
+public func expectEqualsUnordered<
+  Expected : SequenceType,
+  Actual : SequenceType
+  where
+  Expected.Generator.Element == Actual.Generator.Element,
+  Expected.Generator.Element : Comparable
+>(
+  expected: Expected, actual: Actual,
+  stackTrace: SourceLocStack? = nil,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  func compare(
+    lhs: Expected.Generator.Element,
+    rhs: Expected.Generator.Element
+  ) -> ExpectedComparisonResult {
+    if lhs < rhs {
+      return .LT
+    }
+    if lhs == rhs {
+      return .EQ
+    }
+    return .GT
+  }
+  expectEqualsUnordered(
+    expected, actual, compare,
+    stackTrace: stackTrace.map { $0.withCurrentLoc() },
+    file: file, line: line, collectMoreInfo: collectMoreInfo)
+}
+
 public func expectEqualsUnordered<T : Comparable>(
   expected: [T], actual: [T],
   stackTrace: SourceLocStack? = nil,
@@ -2327,12 +2374,14 @@ public func == (
 // Minimal***Collection
 //===----------------------------------------------------------------------===//
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%  Self = 'Minimal%sCollection' % traversal
-%  Index = 'Minimal%sIndex' % traversal
+% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%   for mutable in [ False, True ]:
+// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
+%     Self = 'Minimal%s%sCollection' % ('Mutable' if mutable else '', traversal)
+%     Index = 'Minimal%sIndex' % traversal
 
 /// A minimal implementation of `CollectionType` with extra checks.
-public struct ${Self}<T> : CollectionType {
+public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'CollectionType'} {
   public init<S : SequenceType where S.Generator.Element == T>(
     _ s: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
@@ -2373,7 +2422,14 @@ public struct ${Self}<T> : CollectionType {
   }
 
   public subscript(i: ${Index}) -> T {
-    return _elements[i.position]
+    get {
+      return _elements[i.position]
+    }
+%     if mutable:
+    set {
+      _elements[i.position] = newValue
+    }
+%     end
   }
 
   public func _prext_underestimateCount() -> Int {
@@ -2382,10 +2438,11 @@ public struct ${Self}<T> : CollectionType {
 
   public var underestimatedCount: Int
 
-  internal let _elements: [T]
+  internal var _elements: [T]
 }
 
-%end
+%   end
+% end
 
 //===----------------------------------------------------------------------===//
 // Minimal***RangeReplaceableCollectionType

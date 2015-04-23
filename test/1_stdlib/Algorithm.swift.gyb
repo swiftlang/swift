@@ -2686,5 +2686,319 @@ SequenceTypeAlgorithms.test("indices") {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// partition()
+//===----------------------------------------------------------------------===//
+
+func _forAllPermutationsImpl(
+  index: Int, size: Int,
+  inout perm: [Int], inout visited: [Bool],
+  body: ([Int]) -> ()
+) {
+  if index == size {
+    body(perm)
+    return
+  }
+
+  for i in 0..<size {
+    if visited[i] {
+      continue
+    }
+    visited[i] = true
+    perm[index] = i
+    _forAllPermutationsImpl(index + 1, size, &perm, &visited, body)
+    visited[i] = false
+  }
+}
+
+/// Generate all permutations.
+func forAllPermutations(size: Int, body: ([Int]) -> ()) {
+  if size == 0 {
+    return
+  }
+
+  var permutation = [Int](count: size, repeatedValue: 0)
+  var visited = [Bool](count: size, repeatedValue: false)
+  _forAllPermutationsImpl(0, size, &permutation, &visited, body)
+}
+
+/// Generate all permutations.
+func forAllPermutations<S : SequenceType>(
+  sequence: S, body: ([S.Generator.Element]) -> ()
+) {
+  let data = Array(sequence)
+  forAllPermutations(data.count) {
+    (indices: [Int]) in
+    body(indices._prext_map { data[$0] })
+    return ()
+  }
+}
+
+SequenceTypeAlgorithms.test("forAllPermutations") {
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations(0) {
+      permutations.append($0)
+    }
+    expectEqualSequence([] as [[Int]], permutations, { $0 == $1 })
+  }
+
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations(1) {
+      permutations.append($0)
+    }
+    expectEqualSequence([ [ 0 ] ], permutations, { $0 == $1 })
+  }
+
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations(2) {
+      permutations.append($0)
+    }
+    expectEqualSequence(
+      [
+        [ 0, 1 ],
+        [ 1, 0 ]
+      ],
+      permutations,
+      { $0 == $1 })
+  }
+
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations(3) {
+      permutations.append($0)
+    }
+    expectEqualSequence(
+      [
+        [ 0, 1, 2 ],
+        [ 0, 2, 1 ],
+        [ 1, 0, 2 ],
+        [ 1, 2, 0 ],
+        [ 2, 0, 1 ],
+        [ 2, 1, 0 ],
+      ],
+      permutations,
+      { $0 == $1 })
+  }
+
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations([ 10, 20, 30 ]) {
+      permutations.append($0)
+    }
+    expectEqualSequence(
+      [
+        [ 10, 20, 30 ],
+        [ 10, 30, 20 ],
+        [ 20, 10, 30 ],
+        [ 20, 30, 10 ],
+        [ 30, 10, 20 ],
+        [ 30, 20, 10 ],
+      ],
+      permutations,
+      { $0 == $1 })
+  }
+}
+
+public struct CustomComparableValue : Equatable, Comparable {
+  public static var timesEqualEqualWasCalled: Int = 0
+  public static var timesLessWasCalled: Int = 0
+
+  public static var equalImpl: (Int, Int) -> Bool = { $0 == $1 }
+  public static var lessImpl: (Int, Int) -> Bool = { $0 < $1 }
+
+  public var value: Int
+  public var identity: Int
+
+  public init(_ value: Int) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Int, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+}
+
+public func == (
+  lhs: CustomComparableValue,
+  rhs: CustomComparableValue
+) -> Bool {
+  ++CustomComparableValue.timesEqualEqualWasCalled
+  return CustomComparableValue.equalImpl(lhs.value, rhs.value)
+}
+
+public func < (
+  lhs: CustomComparableValue,
+  rhs: CustomComparableValue
+) -> Bool {
+  ++CustomComparableValue.timesLessWasCalled
+  return CustomComparableValue.lessImpl(lhs.value, rhs.value)
+}
+
+struct PartitionExhaustiveTest {
+  let sequence: [Int]
+  let loc: SourceLoc
+
+  init(
+    _ sequence: [Int],
+    file: String = __FILE__, line: UWord = __LINE__
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let partitionExhaustiveTests = [
+  PartitionExhaustiveTest([]),
+  PartitionExhaustiveTest([ 10 ]),
+  PartitionExhaustiveTest([ 10, 10 ]),
+  PartitionExhaustiveTest([ 10, 20 ]),
+  PartitionExhaustiveTest([ 10, 10, 10 ]),
+  PartitionExhaustiveTest([ 10, 10, 20 ]),
+  PartitionExhaustiveTest([ 10, 20, 20 ]),
+  PartitionExhaustiveTest([ 10, 20, 30 ]),
+  PartitionExhaustiveTest([ 10, 10, 10, 10 ]),
+  PartitionExhaustiveTest([ 10, 10, 10, 20 ]),
+  PartitionExhaustiveTest([ 10, 10, 20, 20 ]),
+  PartitionExhaustiveTest([ 10, 20, 30, 40 ]),
+  PartitionExhaustiveTest([ 10, 10, 10, 10, 10 ]),
+  PartitionExhaustiveTest([ 10, 10, 10, 20, 20 ]),
+  PartitionExhaustiveTest([ 10, 10, 10, 20, 30 ]),
+  PartitionExhaustiveTest([ 10, 10, 20, 20, 30 ]),
+  PartitionExhaustiveTest([ 10, 10, 20, 30, 40 ]),
+  PartitionExhaustiveTest([ 10, 20, 30, 40, 50 ]),
+  PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60 ]),
+  PartitionExhaustiveTest([ 10, 10, 10, 10, 10, 20, 20 ]),
+  PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60, 70 ]),
+]
+
+% for predicate in [ False, True ]:
+
+SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
+%   if not predicate:
+  CustomComparableValue.equalImpl = { $0 == $1 }
+  CustomComparableValue.lessImpl = { $0 < $1 }
+%   end
+
+  for test in partitionExhaustiveTests {
+    forAllPermutations(test.sequence) { (sequence) in
+%   for slice in [ False, True ]:
+      if true {
+%     if predicate:
+        var sequenceAsArray: [OpaqueValue<Int>] =
+          zip(sequence, 0..<sequence.count)._prext_map {
+            OpaqueValue($0, identity: $1)
+          }
+
+%       if slice:
+        sequenceAsArray.insert(
+          OpaqueValue(0xfffe, identity: 0xfffe), atIndex: 0)
+        sequenceAsArray.append(OpaqueValue(0xffff, identity: 0xffff))
+%       end
+
+        var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
+          sequenceAsArray)
+
+%       if slice:
+        let indices = s.startIndex.successor()..<s.endIndex.predecessor()
+%       else:
+        let indices = s._prext_indices
+%       end
+
+        let pivot = s._prext_partition(indices) { $0.value < $1.value }
+%     else:
+        var sequenceAsArray: [CustomComparableValue] =
+          zip(sequence, 0..<sequence.count)._prext_map {
+            CustomComparableValue($0, identity: $1)
+          }
+
+%       if slice:
+        sequenceAsArray.insert(
+          CustomComparableValue(0xfffe, identity: 0xfffe), atIndex: 0)
+        sequenceAsArray.append(CustomComparableValue(0xffff, identity: 0xffff))
+%       end
+
+        var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
+          sequenceAsArray)
+
+%       if slice:
+        let indices = s.startIndex.successor()..<s.endIndex.predecessor()
+%       else:
+        let indices = s._prext_indices
+%       end
+
+        let pivot = s._prext_partition(indices)
+%     end
+
+        // Check that we didn't lose any values.
+%       if slice:
+        expectEqual(0xfffe, s._prext_first!.identity)
+        expectEqual(0xffff, s._prext_last!.identity)
+        var identities = s._prext_map { $0.identity }
+        identities.removeLast()
+        identities.removeAtIndex(0)
+        expectEqualsUnordered(0..<sequence.count, identities)
+%       else:
+        expectEqualsUnordered(0..<sequence.count, s._prext_map { $0.identity })
+%     end
+
+        // All the elements in the first partition are less than the pivot
+        // value.
+        for i in indices.startIndex..<pivot {
+          expectLT(s[i].value, s[pivot].value)
+        }
+        // All the elements in the second partition are greater or equal to
+        // the pivot value.
+        for i in pivot..<indices.endIndex {
+          expectLE(s[pivot].value, s[i].value)
+        }
+      }
+%   end
+    }
+  }
+}
+
+% end
+
+% for predicate in [ False, True ]:
+
+SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
+  withInvalidOrderings { (comparisonPredicate) in
+    for i in 0..<7 {
+      forAllPermutations(i) { (sequence) in
+%   if predicate:
+        var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
+          sequence._prext_map { OpaqueValue($0) })
+        let pivot = s._prext_partition(s._prext_indices) {
+          comparisonPredicate($0.value, $1.value)
+        }
+%    else:
+        var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
+          sequence._prext_map { CustomComparableValue($0) })
+        CustomComparableValue.equalImpl = {
+          !comparisonPredicate($0, $1) &&
+          !comparisonPredicate($1, $0)
+        }
+        CustomComparableValue.lessImpl = {
+          comparisonPredicate($0, $1)
+        }
+        let pivot = s._prext_partition(s._prext_indices)
+%    end
+
+        // Weak postcondition: we didn't lose any values.
+        expectEqualsUnordered(0..<i, s._prext_map { $0.value })
+
+        expectTrue(0 <= s[pivot].value && s[pivot].value < i)
+      }
+    }
+  }
+}
+
+% end
+
 runAllTests()
 

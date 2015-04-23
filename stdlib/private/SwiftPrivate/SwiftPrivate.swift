@@ -51,13 +51,15 @@ public func randomShuffle<T>(a: _UnitTestArray<T>) -> _UnitTestArray<T> {
   return result
 }
 
-public func gather<T>(a: _UnitTestArray<T>, idx: _UnitTestArray<Int>) -> _UnitTestArray<T> {
-  var result = _UnitTestArray<T>()
-  result.reserveCapacity(a.count)
-  for i in 0..<a.count {
-    result.append(a[idx[i]])
-  }
-  return result
+public func gather<
+  C : CollectionType,
+  IndicesSequence : SequenceType
+  where
+  IndicesSequence.Generator.Element == C.Index
+>(
+  collection: C, indices: IndicesSequence
+) -> _UnitTestArray<C.Generator.Element> {
+  return _UnitTestArray(indices._prext_map { collection[$0] })
 }
 
 public func scatter<T>(a: _UnitTestArray<T>, idx: _UnitTestArray<Int>) -> _UnitTestArray<T> {

@@ -106,3 +106,59 @@ extension CollectionType {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// MutableCollectionType
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// partition()
+//===----------------------------------------------------------------------===//
+
+%{
+
+partitionDocComment = """\
+  /// Re-order the given `range` of elements in `self` and return
+  /// a pivot index *p*.
+  ///
+  /// Postcondition: for all *i* in `range.startIndex..<`\ *p*, and *j*
+  /// in *p*\ `..<range.endIndex`, `less(self[`\ *i*\ `],
+  /// self[`\ *j*\ `]) && !less(self[`\ *j*\ `], self[`\ *p*\ `])`.
+  /// Only returns `range.endIndex` when `self` is empty."""
+
+orderingRequirementForPredicate = """\
+  /// Requires: `isOrderedBefore` is a `strict weak ordering
+  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+  /// over `self`."""
+
+orderingRequirementForComparable = """\
+  /// Requires: The less-than operator (`func <`) defined in the `Comparable`
+  /// conformance is a `strict weak ordering
+  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+  /// over `self`."""
+
+}%
+
+extension MutableCollectionType
+  where Self.Index : RandomAccessIndexType, Self.${GElement} : Comparable {
+
+${partitionDocComment}
+  ///
+${orderingRequirementForComparable}
+  final public mutating func _prext_partition(range: Range<Index>) -> Index {
+    return _partition(&self, range)
+  }
+}
+
+extension MutableCollectionType where Self.Index : RandomAccessIndexType {
+
+${partitionDocComment}
+  ///
+${orderingRequirementForPredicate}
+  final public mutating func _prext_partition(
+    range: Range<Index>,
+    var isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+  ) -> Index {
+    return _partition(&self, range, &isOrderedBefore)
+  }
+}
+

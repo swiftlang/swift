@@ -102,7 +102,8 @@ public func partition<
   range: Range<C.Index> ${"," if p else ""}
   ${"var isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> C.Index {
-  return _partition(&elements, range ${", &isOrderedBefore" if p else ""})
+  // FIXME(prext): remove this function when protocol extensions land.
+  return elements._prext_partition(range ${", isOrderedBefore: isOrderedBefore" if p else ""})
 }
 
 func _partition<

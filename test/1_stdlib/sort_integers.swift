@@ -99,6 +99,8 @@ let partition_verifier : ([Int]) -> () = {
     }
 }
 
+// FIXME(prext): remove partition() together with the function when
+// protocol extensions land.  These tests have been migrated to the new API.
 permute(2, partition_verifier)
 permute(6, partition_verifier)
 permute(7, partition_verifier)
