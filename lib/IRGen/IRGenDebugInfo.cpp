@@ -196,11 +196,14 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
                       ? llvm::DIBuilder::LineTablesOnly
                       : llvm::DIBuilder::FullDebug);
 
-  if (IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
+  if (auto *MainFunc = IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
     IsLibrary = false;
-    EntryPointFn = DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
-        MainFile, MainFile, 0);
+    auto *MainIGM = IGM.dispatcher->getGenModule(MainFunc->getDeclContext());
+    if (MainIGM == &IGM) {
+      EntryPointFn = DBuilder.createReplaceableCompositeType(
+          llvm::dwarf::DW_TAG_subroutine_type, SWIFT_ENTRY_POINT_FUNCTION,
+          MainFile, MainFile, 0);
+    }
   }
 
   // Create a module for the current compile unit.

@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -module-name test -Xllvm -enable-static-init 
+// RUN: %target-swift-frontend -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -g -module-name test -Xllvm -enable-static-init 
 // RUN: %target-build-swift %t/main.o %t/mt_module.o -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 

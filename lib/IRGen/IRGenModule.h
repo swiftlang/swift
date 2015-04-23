@@ -128,6 +128,7 @@ public:
   {}
 
   /// Add an IRGenModule for a source file.
+  /// Should only be called from IRGenModule's constructor.
   void addGenModule(SourceFile *SF, IRGenModule *IGM);
   
   /// Get an IRGenModule for a source file.
@@ -545,7 +546,9 @@ private:                            \
   
 //--- Generic ---------------------------------------------------------------
 public:
-  IRGenModule(ASTContext &Context, llvm::LLVMContext &LLVMContext,
+  IRGenModule(IRGenModuleDispatcher *dispatcher, SourceFile *SF,
+              ASTContext &Context,
+              llvm::LLVMContext &LLVMContext,
               IRGenOptions &Opts, StringRef ModuleName,
               const llvm::DataLayout &DataLayout,
               const llvm::Triple &Triple,

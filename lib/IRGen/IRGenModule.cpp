@@ -91,7 +91,8 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   return ClangCodeGen;
 }
 
-IRGenModule::IRGenModule(ASTContext &Context,
+IRGenModule::IRGenModule(IRGenModuleDispatcher *dispatcher, SourceFile *SF,
+                         ASTContext &Context,
                          llvm::LLVMContext &LLVMContext,
                          IRGenOptions &Opts, StringRef ModuleName,
                          const llvm::DataLayout &DataLayout,
@@ -104,11 +105,13 @@ IRGenModule::IRGenModule(ASTContext &Context,
     Module(*ClangCodeGen->GetModule()),
     LLVMContext(Module.getContext()), DataLayout(DataLayout),
     Triple(Triple), TargetMachine(TargetMachine),
-    SILMod(SILMod), OutputFilename(OutputFilename), dispatcher(nullptr),
+    SILMod(SILMod), OutputFilename(OutputFilename), dispatcher(dispatcher),
     TargetInfo(SwiftTargetInfo::get(*this)),
     DebugInfo(0), ObjCInterop(Context.LangOpts.EnableObjCInterop),
     Types(*new TypeConverter(*this))
 {
+  dispatcher->addGenModule(SF, this);
+  
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
@@ -622,7 +625,6 @@ void IRGenModuleDispatcher::addGenModule(SourceFile *SF, IRGenModule *IGM) {
   if (!PrimaryIGM) {
     PrimaryIGM = IGM;
   }
-  IGM->dispatcher = this;
   Queue.push_back(IGM);
 }
 
