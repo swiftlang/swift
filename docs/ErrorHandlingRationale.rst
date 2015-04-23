@@ -1101,7 +1101,7 @@ and write an error object into the parameter (which should be ignored)
 and to report an error without creating an actual error object.
 Instead, whether the call failed is reported in the formal return
 value.  The most common convention is for a false ``BOOL`` result or
-null object result to mean an error, but ingenius programmers have
+null object result to mean an error, but ingenious programmers have
 come up with many other conventions, and there do exist APIs where a
 null object result is valid.
 
