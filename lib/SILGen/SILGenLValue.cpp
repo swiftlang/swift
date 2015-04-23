@@ -2438,9 +2438,9 @@ static PathComponent &&drillToLastComponent(SILGenFunction &SGF,
   return std::move(**(lv.end() - 1));
 }
 
-ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
-                                              SGFContext C,
-                                              bool isGuaranteedValid) {
+ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
+                                              LValue &&src,
+                                              SGFContext C) {
   // Any writebacks should be scoped to after the load.
   WritebackScope scope(*this);
 
@@ -2453,8 +2453,7 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
     addr = std::move(component.asPhysical())
              .offset(*this, loc, addr, AccessKind::Read);
     return emitLoad(loc, addr.getValue(),
-                    getTypeLowering(src.getTypeOfRValue()), C, IsNotTake,
-                    isGuaranteedValid);
+                    getTypeLowering(src.getTypeOfRValue()), C, IsNotTake);
   }
 
   // If the last component is logical, just emit a get.

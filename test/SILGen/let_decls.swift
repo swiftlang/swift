@@ -417,14 +417,18 @@ struct StructMemberTest {
   func testTupleMemberLoad() -> Int {
     return t.1.i
   }
+  //   FIXME: these retains and releases are unnecessary
   // CHECK-LABEL: sil hidden @{{.*}}testTupleMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
-  // CHECK-NEXT:   debug_value %0 : $StructMemberTest  // let self
-  // CHECK-NEXT:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
-  // CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 0
-  // CHECK-NEXT:   [[T2:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 1
-  // CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T2]] : $AnotherStruct, #AnotherStruct.i
-  // CHECK-NEXT:   return [[T3]] : $Int
+  // CHECK:   debug_value %0 : $StructMemberTest  // let self
+  // CHECK:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
+  // CHECK:   retain_value [[T0]]
+  // CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 0
+  // CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 1
+  // CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $AnotherStruct, #AnotherStruct.i
+  // CHECK:   release_value [[T2]] : $AnotherStruct
+  // CHECK-NOT:   release_value %0 : $StructMemberTest
+  // CHECK:   return [[T3]] : $Int
 
 }
 
