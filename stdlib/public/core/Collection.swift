@@ -110,6 +110,20 @@ extension _CollectionGeneratorDefaultsType {
   }
 }
 
+public protocol _CollectionSliceDefaultsType {
+  typealias Index : ForwardIndexType
+  typealias _Element
+  subscript(position: Index) -> _Element { get }
+  var startIndex: Index { get }
+  var endIndex: Index { get }
+}
+
+extension _CollectionSliceDefaultsType {
+  final public subscript(_prext_bounds: Range<Index>) -> _prext_Slice<Self> {
+    return _prext_Slice(_collection: self, bounds: _prext_bounds)
+  }
+}
+
 /// A multi-pass *sequence* with addressable positions.
 ///
 /// Positions are represented by an associated `Index` type.  Whereas
@@ -126,13 +140,19 @@ extension _CollectionGeneratorDefaultsType {
 ///   }
 public protocol CollectionType
   : _CollectionType, _CollectionDefaultsType,
-  _CollectionGeneratorDefaultsType, SequenceType {
+  _CollectionSliceDefaultsType,
+  _CollectionGeneratorDefaultsType,
+  SequenceType {
 
   /// Access the element indicated by `position`.
   ///
   /// Requires: `position` indicates a valid position in `self` and
   /// `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get}
+
+  typealias _prext_SubSlice
+
+  subscript(_prext_bounds: Range<Index>) -> _prext_SubSlice { get }
 
   /// Return the number of elements.
   ///

@@ -2341,6 +2341,155 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
 }
 
 //===----------------------------------------------------------------------===//
+// CollectionType.subscript(range:), CollectionType.SubSlice
+//===----------------------------------------------------------------------===//
+
+struct MinimalCollectionWithDefaultSlicing : CollectionType {
+  init(count: Int) {
+    self._count = count
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    return OpaqueValue(i.position + 1)
+  }
+
+  var _count: Int
+}
+
+func callGenericSlicing<C : CollectionType>(
+  collection: C,
+  bounds: Range<C.Index>
+) -> C._prext_SubSlice {
+  return collection[bounds]
+}
+
+// FIXME: need separate tests for the Slice type itself.
+SequenceTypeAlgorithms.test("subscript(range:)/DefaultImplementation") {
+  for count in [ 0, 5 ] {
+    let collection = MinimalCollectionWithDefaultSlicing(count: count)
+
+    if true {
+      // Check the return type of the function when called statically.
+      var slice = collection[collection.startIndex..<collection.endIndex]
+      expectType(
+        _prext_Slice<MinimalCollectionWithDefaultSlicing>.self,
+        &slice)
+    }
+
+    if true {
+      // Check the return type of the function when called generically.
+      var slice = callGenericSlicing(
+        collection,
+        collection.startIndex..<collection.endIndex)
+      expectType(
+        _prext_Slice<MinimalCollectionWithDefaultSlicing>.self,
+        &slice)
+    }
+
+    // FIXME: improve checkForwardCollection to check the SubSlice type.
+    checkForwardCollection(
+      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      collection,
+      { $0.value == $1.value },
+      SourceLocStack().withCurrentLoc())
+  }
+}
+
+struct MinimalCollectionWithCustomSlicing : CollectionType {
+  init(count: Int) {
+    self._count = count
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    return OpaqueValue(i.position + 1)
+  }
+
+  subscript(bounds: Range<MinimalForwardIndex>) -> CustomSlice {
+    return CustomSlice(
+      start: bounds.startIndex.position,
+      end: bounds.endIndex.position)
+  }
+
+  var _count: Int
+}
+
+struct CustomSlice : CollectionType {
+  init(start: Int, end: Int) {
+    self._start = start
+    self._end = end
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: _start,
+      startIndex: _start,
+      endIndex: _end)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: _end,
+      startIndex: _start,
+      endIndex: _end)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    return OpaqueValue(i.position + 1)
+  }
+
+  var _start: Int
+  var _end: Int
+}
+
+// FIXME: need separate tests for the Slice type itself.
+SequenceTypeAlgorithms.test("subscript(range:)/CustomImplementation") {
+  for count in [ 0, 5 ] {
+    let collection = MinimalCollectionWithCustomSlicing(count: count)
+
+    if true {
+      // Check the return type of the function when called statically.
+      var slice = collection[collection.startIndex..<collection.endIndex]
+      expectType(CustomSlice.self, &slice)
+    }
+
+    if true {
+      // Check the return type of the function when called generically.
+      var slice = callGenericSlicing(
+        collection,
+        collection.startIndex..<collection.endIndex)
+      expectType(CustomSlice.self, &slice)
+    }
+
+    // FIXME: improve checkForwardCollection to check the SubSlice type.
+    checkForwardCollection(
+      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      collection,
+      { $0.value == $1.value },
+      SourceLocStack().withCurrentLoc())
+  }
+}
+
+
+
+//===----------------------------------------------------------------------===//
 // isEmpty
 //===----------------------------------------------------------------------===//
 
