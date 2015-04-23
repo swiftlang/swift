@@ -36,6 +36,7 @@ class GenericSignature;
 class LazyResolver;
 class Module;
 class NominalTypeDecl;
+class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
 class ProtocolDecl;
 class StructDecl;
@@ -58,18 +59,32 @@ public:
   };
 
 private:
-  unsigned Options;
+  unsigned Options = 0;
+  NormalProtocolConformance *Conformance = nullptr;
 
 public:
-  SubstOptions() : Options(0) { }
-  SubstOptions(NoneType) : Options(0) { }
-  SubstOptions(OptionsKind options) : Options(options) { }
+  SubstOptions() { }
+  SubstOptions(NoneType) { }
+  SubstOptions(OptionsKind options,
+               NormalProtocolConformance *conformance = nullptr)
+    : Options(options), Conformance(conformance) { }
 
   /// Whether to ignore missing member types.
   bool ignoreMissing() const { return Options & IgnoreMissing; }
 
+  /// Retrieve the protocol conformance whose not-already-available
+  /// type witnesses will be treated as missing.
+  NormalProtocolConformance *getSkippedConformance() const {
+    return Conformance;
+  }
+
   friend SubstOptions &operator|=(SubstOptions &lhs, const SubstOptions &rhs) {
     lhs.Options |= rhs.Options;
+    assert((!lhs.Conformance || !rhs.Conformance ||
+            lhs.Conformance == rhs.Conformance) &&
+           "skipped protocol conformance collision");
+    if (rhs.Conformance)
+      lhs.Conformance = rhs.Conformance;
     return lhs;
   }
 };

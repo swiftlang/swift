@@ -2589,23 +2589,34 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
 }
 
 /// Produce the type when matching a witness.
-static Type getWitnessTypeForMatching(TypeChecker &tc, Type model, 
-                                      ValueDecl *value) {
-  if (!value->getDeclContext()->isTypeContext())
-    return value->getInterfaceType();
+static Type getWitnessTypeForMatching(TypeChecker &tc,
+                                      NormalProtocolConformance *conformance,
+                                      ValueDecl *witness) {
+  if (!witness->hasType()) {
+    // Don't cause a recursive type-check of the witness.
+    // FIXME: We shouldn't need this.
+    if (witness->isBeingTypeChecked())
+      return Type();
 
-  // If the witness is in a superclass, map the base type up until we
-  // reach that superclass.
-  Type baseTy = model;
-  if (ClassDecl *targetClassDecl 
-      = value->getDeclContext()->isClassOrClassExtensionContext()) {
-    while (baseTy->getClassOrBoundGenericClass() != targetClassDecl)
-      baseTy = tc.getSuperClassOf(baseTy);
+    tc.validateDecl(witness);
   }
-  
-  Type type = value->getInterfaceType();
-  if (!type)
-    return nullptr;
+
+  if (witness->isInvalid())
+    return Type();
+
+  if (!witness->getDeclContext()->isTypeContext()) {
+    // FIXME: Could we infer from 'Self' to make these work?
+    return witness->getInterfaceType();
+  }
+
+  // Retrieve the set of substitutions to be applied to the witness.
+  Type model = conformance->getType();
+  TypeSubstitutionMap substitutions = model->getMemberSubstitutions(
+                                        witness->getDeclContext());
+  if (substitutions.empty())
+    return witness->getInterfaceType();
+
+  Type type = witness->getInterfaceType();
   
   // Strip off the requirements of a generic function type.
   // FIXME: This doesn't actually break recursion when substitution
@@ -2618,8 +2629,9 @@ static Type getWitnessTypeForMatching(TypeChecker &tc, Type model,
                              genericFn->getExtInfo());
   }
 
-  return baseTy->getTypeOfMember(value->getModuleContext(), type,
-                                 value->getDeclContext());
+  Module *module = conformance->getDeclContext()->getParentModule();
+  return type.subst(module, substitutions,
+                    SubstOptions(SubstOptions::IgnoreMissing, conformance));
 }
 
 /// Remove the 'self' type from the given type, if it's a method type.
@@ -2640,7 +2652,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   inferred.Witness = witness;
 
   // Compute the requirement and witness types we'll use for matching.
-  Type fullWitnessType = getWitnessTypeForMatching(TC, Adoptee, witness);
+  Type fullWitnessType = getWitnessTypeForMatching(TC, Conformance, witness);
   if (!fullWitnessType) {
     return inferred;
   }
