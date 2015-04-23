@@ -18,12 +18,8 @@ public func count <T : CollectionType>(x: T) -> T.Index.Distance {
   return x._prext_count()
 }
 
-/// This protocol is an implementation detail of `CollectionType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `CollectionType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _CollectionType : SequenceType {
+public protocol _CollectionDefaultsType
+  : SequenceType, _SequenceDefaultsType {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -53,9 +49,6 @@ public protocol _CollectionType : SequenceType {
   typealias _Element
   subscript(_i: Index) -> _Element {get}
 }
-
-public protocol _CollectionDefaultsType
-  : _CollectionType, _SequenceDefaultsType {}
 
 extension _CollectionDefaultsType {
   /// Return a value less than or equal to the number of elements in
@@ -125,8 +118,8 @@ extension _CollectionGeneratorDefaultsType {
 ///     let x = self[i]
 ///   }
 public protocol CollectionType
-  : _CollectionType, _CollectionDefaultsType,
-  _CollectionGeneratorDefaultsType, SequenceType {
+  : SequenceType, _CollectionDefaultsType,
+  _CollectionGeneratorDefaultsType {
 
   /// Access the element indicated by `position`.
   ///
