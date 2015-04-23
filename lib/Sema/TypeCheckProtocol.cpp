@@ -221,6 +221,10 @@ namespace {
     /// conformance has been completed checked.
     void resolveSingleWitness(ValueDecl *requirement);
 
+    /// Resolve the type witness for the given associated type as
+    /// directly as possible.
+    void resolveSingleTypeWitness(AssociatedTypeDecl *assocType);
+
     /// Check the entire protocol conformance, ensuring that all
     /// witnesses are resolved and emitting any diagnostics.
     void checkConformance();
@@ -3362,6 +3366,21 @@ void ConformanceChecker::resolveTypeWitnesses() {
   }
 }
 
+void ConformanceChecker::resolveSingleTypeWitness(
+       AssociatedTypeDecl *assocType) {
+  switch (resolveTypeWitnessViaLookup(assocType)) {
+  case ResolveWitnessResult::Success:
+  case ResolveWitnessResult::ExplicitFailed:
+    // We resolved this type witness one way or another.
+    return;
+
+  case ResolveWitnessResult::Missing:
+    // The type witness is still missing. Resolve all of the type witnesses.
+    resolveTypeWitnesses();
+    return;
+  }
+}
+
 void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Not a value witness");
   assert(!Conformance->hasWitness(requirement) && "Already resolved");
@@ -3736,7 +3755,7 @@ void TypeChecker::resolveTypeWitness(
   ConformanceChecker checker(
                        *this, 
                        const_cast<NormalProtocolConformance*>(conformance));
-  checker.resolveTypeWitnesses();
+  checker.resolveSingleTypeWitness(assocType);
 }
 
 void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,

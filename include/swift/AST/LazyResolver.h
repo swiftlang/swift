@@ -51,7 +51,7 @@ public:
   /// resolveWitness aren't lazy enough.
   virtual void checkConformance(NormalProtocolConformance *conformance) = 0;
 
-  /// Resolve the type witness for the given associated type within the given
+  /// Resolve the type witnesses for the given associated type within the given
   /// protocol conformance.
   virtual void resolveTypeWitness(const NormalProtocolConformance *conformance,
                                   AssociatedTypeDecl *assocType) = 0;
