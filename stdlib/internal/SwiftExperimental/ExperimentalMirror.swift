@@ -27,11 +27,11 @@ func != (t0: Any.Type, t1: Any.Type) -> Bool {
 // without the ObjC Runtime.
 
 /// Representation of the sub-structure and optional "display style"
-/// of any arbitrary instance.
+/// of any arbitrary subject instance.
 ///
 /// Describes the parts---such as stored properties, collection
 /// elements, tuple elements, or the active enumeration case---that
-/// make up any given instance.  May also supply a "display style"
+/// make up a particular instance.  May also supply a "display style"
 /// property that suggests how this structure might be rendered.
 ///
 /// Mirrors are used by playgrounds and the debugger.
@@ -408,14 +408,14 @@ extension Mirror {
   /// A `String` argument selects the first `Child` with a matching label.
   /// An integer argument *n* select the *n*\ th `Child`.  For example::
   ///
-  ///   var d = reflect(x).descendant(1, "two", 3)
+  ///   var d = Mirror(reflecting: x).descendant(1, "two", 3)
   ///
   /// is equivalent to:
   ///
   /// .. parsed-literal::
   ///
   ///   var d = nil
-  ///   let children = reflect(x).children
+  ///   let children = Mirror(reflecting: x).children
   ///   let p0 = advance(children.startIndex, **1**, children.endIndex)
   ///   if p0 != children.endIndex {
   ///     let grandChildren = reflect(children[p0].value).children
@@ -628,7 +628,7 @@ extension PlaygroundQuickLook {
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
   public init(reflecting subject: Any) {
-    if let customized? = subject as? CustomPlaygroundQuickLookable {
+    if let customized as CustomPlaygroundQuickLookable = subject {
       self = customized.customPlaygroundQuickLook()
     }
     else {
@@ -750,24 +750,24 @@ extension String {
   }
 
   /// Initialize `self` with a detailed textual representation of
-  /// `instance`, suitable for debugging.
+  /// `subject`, suitable for debugging.
   ///
   /// * If `T` conforms to `CustomDebugStringConvertible`, the result
-  ///   is `instance`\ 's `debugDescription`
+  ///   is `subject`\ 's `debugDescription`
   ///
   /// * Otherwise, if `T` conforms to `CustomStringConvertible`, the result
-  ///   is `instance`\ 's `description`
+  ///   is `subject`\ 's `description`
   ///
   /// * Otherwise, if `T` conforms to `Streamable`, the result is
-  ///   obtained by calling `instance.writeTo(s)` on an empty string s.
+  ///   obtained by calling `subject.writeTo(s)` on an empty string s.
   ///
   /// * Otherwise, an unspecified result is supplied automatically by
   ///   the Swift standard library.
   ///
   /// See Also: `String.init<T>(T)`
-  public init<T>(reflecting instance: T) {
+  public init<T>(reflecting subject: T) {
     self.init()
-    debugPrint(instance, &self)
+    debugPrint(subject, &self)
   }
 }
 */
