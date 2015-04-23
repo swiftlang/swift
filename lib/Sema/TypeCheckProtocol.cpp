@@ -2626,9 +2626,10 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
   auto setup = [&]() -> std::tuple<Optional<RequirementMatch>, Type, Type> {
     fullWitnessType = removeSelfParam(witness, fullWitnessType);
-    return { None, 
-             removeSelfParam(req, req->getInterfaceType()),
-             fullWitnessType };
+    return std::make_tuple(
+        None,
+        removeSelfParam(req, req->getInterfaceType()),
+        fullWitnessType);
   };
 
   /// Visits a requirement type to match it to a potential witness for
