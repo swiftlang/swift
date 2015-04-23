@@ -121,8 +121,10 @@ public:
     // TODO: set up Outputs appropriately.
     types::ID PrimaryOutputType = Cmd.getOutput().getPrimaryOutputType();
     if (PrimaryOutputType != types::TY_Nothing) {
-      Outputs.push_back(OutputPair(PrimaryOutputType,
-                           Cmd.getOutput().getPrimaryOutputFilename()));
+      for (const std::string &OutputFileName : Cmd.getOutput().
+                                                 getPrimaryOutputFilenames()) {
+        Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName));
+      }
     }
     types::forAllTypes([&](types::ID Ty) {
       const std::string &Output =
