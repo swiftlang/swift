@@ -2135,14 +2135,19 @@ static Type getMemberForBaseType(Module *module,
     return Type();
   }
 
-  // If we know the associated type, look in the witness table.
-  if (assocType) {
-    // If the parent is dependent, create a dependent member type.
-    if (substBase->is<GenericTypeParamType>() || substBase->is<DependentMemberType>()) {
+  // If the parent is dependent, create a dependent member type.
+  if (substBase->is<GenericTypeParamType>() ||
+      substBase->is<DependentMemberType>()) {
+    if (assocType)
       return DependentMemberType::get(substBase, assocType,
                                       substBase->getASTContext());
-    }
+    else
+      return DependentMemberType::get(substBase, name,
+                                      substBase->getASTContext());
+  }
 
+  // If we know the associated type, look in the witness table.
+  if (assocType) {
     auto proto = assocType->getProtocol();
     // FIXME: Introduce substituted type node here?
     auto conformance = module->lookupConformance(substBase, proto,
@@ -2153,8 +2158,8 @@ static Type getMemberForBaseType(Module *module,
       return Type();
 
     case ConformanceKind::Conforms:
-      return conformance.getPointer()->getTypeWitness(assocType,
-                                                      resolver).getReplacement();
+      return conformance.getPointer()->getTypeWitness(assocType, resolver)
+               .getReplacement();
     }
   }
 
@@ -2174,17 +2179,6 @@ Type DependentMemberType::substBaseType(Module *module,
                                         LazyResolver *resolver) {
   if (substBase.getPointer() == getBase().getPointer())
     return this;
-
-  // If the base remains dependent after substitution, so do we.
-  if (substBase->is<GenericTypeParamType>() ||
-      substBase->is<DependentMemberType>()) {
-    if (getAssocType())
-      return DependentMemberType::get(substBase, getAssocType(),
-                                      getASTContext());
-    else
-      return DependentMemberType::get(substBase, getName(),
-                                      getASTContext());
-  }
 
   return getMemberForBaseType(module, substBase, getAssocType(), getName(),
                               resolver);
@@ -2209,10 +2203,11 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
       auto newBase = depMemTy->getBase()
         .subst(module, substitutions, ignoreMissing, resolver);
       
-      // Resolve the member relative to the substituted base.
-      if (Type r = depMemTy->substBaseType(module, newBase, resolver)) {
+      if (Type r = getMemberForBaseType(module, newBase,
+                                        depMemTy->getAssocType(),
+                                        depMemTy->getName(), resolver))
         return r;
-      }
+
       return failed(type);
     }
     
