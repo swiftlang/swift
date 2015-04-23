@@ -515,22 +515,23 @@ if(LIBXML2_FOUND)
 endif()
 
 # Find CrashReporterClient.
-foreach(SDK ${SWIFT_SDKS})
-  foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
-    set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    unset(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
-    unset(SWIFT_HAVE_CRASH_REPORTER_CLIENT CACHE)
-    find_library(SWIFT_HAVE_CRASH_REPORTER_CLIENT
-        NAMES CrashReporterClient
-        PATHS "${SWIFT_SDK_${SDK}_PATH}/usr/local/lib"
-        NO_DEFAULT_PATH)
-    if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT AND
-       NOT SWIFT_HAVE_CRASH_REPORTER_CLIENT)
-      message(FATAL_ERROR
-          "CrashReporterClient library is required, but it was not found")
-    endif()
+if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT)
+  foreach(SDK ${SWIFT_SDKS})
+    foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
+      set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
+      unset(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
+      unset(SWIFT_HAVE_CRASH_REPORTER_CLIENT CACHE)
+      find_library(SWIFT_HAVE_CRASH_REPORTER_CLIENT
+          NAMES CrashReporterClient
+          PATHS "${SWIFT_SDK_${SDK}_PATH}/usr/local/lib"
+          NO_DEFAULT_PATH)
+      if(NOT SWIFT_HAVE_CRASH_REPORTER_CLIENT)
+        message(FATAL_ERROR
+            "CrashReporterClient library is required, but it was not found")
+      endif()
+    endforeach()
   endforeach()
-endforeach()
+endif()
 
 #
 # Set up global CMake variables for API notes.
