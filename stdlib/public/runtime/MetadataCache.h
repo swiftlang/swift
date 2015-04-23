@@ -98,6 +98,7 @@ protected:
   CacheEntry() = default;
 
 public:
+  template<typename...ImplArgs>
   static Impl *allocate(const void * const *arguments,
                         size_t numArguments, size_t payloadSize) {
     void *buffer = permanentAlloc(sizeof(Impl)  +

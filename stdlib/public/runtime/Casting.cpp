@@ -143,7 +143,7 @@ static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
 static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
                                    std::string &result) {
 
-  if (func->NumArguments == 1) {
+  if (func->getNumArguments() == 1) {
     auto firstArgument = func->getArguments()[0].getPointer();
     bool isInout = func->getArguments()[0].getFlag();
 
@@ -163,13 +163,13 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
     }
   } else {
       result += "(";
-      for (size_t i = 0; i < func->NumArguments; ++i) {
+      for (size_t i = 0; i < func->getNumArguments(); ++i) {
         auto arg = func->getArguments()[i].getPointer();
         bool isInout = func->getArguments()[i].getFlag();
         if (isInout)
           result += "inout ";
         _buildNameForMetadata(arg, TypeSyntaxLevel::TypeSimple, result);
-        if (i < func->NumArguments - 1) {
+        if (i < func->getNumArguments() - 1) {
           result += ", ";
         }
       }
@@ -181,7 +181,7 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
   }
 
   result += " -> ";
-  _buildNameForMetadata(func->ResultType.getPointer(),
+  _buildNameForMetadata(func->ResultType,
                         TypeSyntaxLevel::Type,
                         result);
 }
@@ -238,50 +238,26 @@ static void _buildNameForMetadata(const Metadata *type,
     result += ".Type";
     return;
   }
-  case MetadataKind::Block: {
-    if (level >= TypeSyntaxLevel::TypeSimple)
-      result += "(";
-
-    result += "@convention(block) ";
-
-    auto func = static_cast<const FunctionTypeMetadata *>(type);
-    _buildFunctionTypeName(func, result);
-
-    if (level >= TypeSyntaxLevel::TypeSimple)
-      result += ")";
-    return;
-  }
-  case MetadataKind::ThinFunction: {
-    if (level >= TypeSyntaxLevel::TypeSimple)
-      result += "(";
-
-    result += "@convention(thin) ";
-
-    auto func = static_cast<const FunctionTypeMetadata *>(type);
-    _buildFunctionTypeName(func, result);
-
-    if (level >= TypeSyntaxLevel::TypeSimple)
-      result += ")";
-    return;
-  }
-  case MetadataKind::CFunction: {
-    if (level >= TypeSyntaxLevel::TypeSimple)
-      result += "(";
-
-    result += "@convention(c) ";
-
-    auto func = static_cast<const FunctionTypeMetadata *>(type);
-    _buildFunctionTypeName(func, result);
-
-    if (level >= TypeSyntaxLevel::TypeSimple)
-      result += ")";
-    return;
-  }
   case MetadataKind::Function: {
     if (level >= TypeSyntaxLevel::TypeSimple)
       result += "(";
 
     auto func = static_cast<const FunctionTypeMetadata *>(type);
+    
+    switch (func->getConvention()) {
+    case FunctionMetadataConvention::Swift:
+      break;
+    case FunctionMetadataConvention::Thin:
+      result += "@convention(thin) ";
+      break;
+    case FunctionMetadataConvention::Block:
+      result += "@convention(block) ";
+      break;
+    case FunctionMetadataConvention::CFunctionPointer:
+      result += "@convention(c) ";
+      break;
+    }
+    
     _buildFunctionTypeName(func, result);
 
     if (level >= TypeSyntaxLevel::TypeSimple)
@@ -318,7 +294,6 @@ static void _buildNameForMetadata(const Metadata *type,
   }
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
-  case MetadataKind::PolyFunction:
     break;
   }
   result += "<<<invalid type>>>";
@@ -511,14 +486,10 @@ static bool _conformsToProtocol(const OpaqueValue *value,
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Metatype:
     case MetadataKind::Function:
-    case MetadataKind::CFunction:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::Block: // FIXME
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
     case MetadataKind::Enum:
     case MetadataKind::Opaque:
-    case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
       return false;
@@ -573,15 +544,11 @@ static bool _conformsToProtocol(const OpaqueValue *value,
   case MetadataKind::Existential: // FIXME
   case MetadataKind::ExistentialMetatype: // FIXME
   case MetadataKind::Function:
-  case MetadataKind::CFunction:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::Block: // FIXME
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     return false;
@@ -679,14 +646,10 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
 
   // Non-polymorphic types.
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     outValue = value;
@@ -743,14 +706,10 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     return;
@@ -778,14 +737,10 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Existential:
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::ForeignClass:
-  case MetadataKind::Block:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
     return nullptr;
@@ -811,14 +766,10 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Existential:
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::ForeignClass:
-  case MetadataKind::Block:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject: {
     std::string sourceName = nameForMetadata(metatype);
@@ -924,13 +875,9 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       break;
 
     case MetadataKind::Function:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::CFunction:
-    case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
     case MetadataKind::Opaque:
-    case MetadataKind::PolyFunction:
     case MetadataKind::Tuple:
       // Will never succeed.
       return _fail(src, srcType, targetType, flags);
@@ -1067,15 +1014,11 @@ swift::swift_dynamicCastUnknownClass(const void *object,
   }
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     return nullptr;
@@ -1125,15 +1068,11 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
       
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
@@ -1187,15 +1126,11 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::CFunction:
-    case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
     case MetadataKind::Opaque:
-    case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
       return nullptr;
@@ -1220,15 +1155,11 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::CFunction:
-    case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
     case MetadataKind::Opaque:
-    case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
       return nullptr;
@@ -1238,15 +1169,11 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     // The cast succeeds only if the metadata pointers are statically
@@ -1303,15 +1230,11 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::CFunction:
-    case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
     case MetadataKind::Opaque:
-    case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
       swift_dynamicCastFailure(sourceType, targetType);
@@ -1337,15 +1260,11 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::CFunction:
-    case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Enum:
     case MetadataKind::Opaque:
-    case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
       swift_dynamicCastFailure(sourceType, targetType);
@@ -1354,15 +1273,11 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Metatype:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     // The cast succeeds only if the metadata pointers are statically
@@ -1648,14 +1563,10 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
   }
 
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     return _fail(src, srcType, targetType, flags);
@@ -1816,14 +1727,10 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
     if (flags & DynamicCastFlags::Unconditional) {
@@ -1917,14 +1824,10 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
 
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::CFunction:
-    case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Opaque:
-    case MetadataKind::PolyFunction:
     case MetadataKind::Tuple:
       return _fail(src, srcType, targetType, flags);
     }
@@ -1973,14 +1876,10 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::CFunction:
-    case MetadataKind::Block:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
     case MetadataKind::Metatype:
     case MetadataKind::Opaque:
-    case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
       break;
@@ -1990,13 +1889,9 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
 
   // The non-polymorphic types.
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Tuple:
     // If there's an exact type match, we're done.
     if (srcType == targetType) {
@@ -2536,6 +2431,12 @@ static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
       return static_cast<const ExistentialTypeMetadata *>(xmT->InstanceType)
         ->isObjC();
     return false;
+  }
+  
+  // Blocks are ObjC objects.
+  if (kind == MetadataKind::Function) {
+    auto fT = static_cast<const FunctionTypeMetadata *>(T);
+    return fT->getConvention() == FunctionMetadataConvention::Block;
   }
 #endif
 

@@ -311,15 +311,6 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
     case MetadataKind::Function:
       new (result) String("(Function)");
       break;
-    case MetadataKind::ThinFunction:
-      new (result) String("(Thin Function)");
-      break;
-    case MetadataKind::CFunction:
-      new (result) String("(C Function)");
-      break;
-    case MetadataKind::PolyFunction:
-      new (result) String("(Polymorphic Function)");
-      break;
     case MetadataKind::Existential:
       new (result) String("(Existential)");
       break;
@@ -334,9 +325,6 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
       break;
     case MetadataKind::ForeignClass:
       new (result) String("(Foreign Class)");
-      break;
-    case MetadataKind::Block:
-      new (result) String("(Block)");
       break;
     case MetadataKind::HeapLocalVariable:
       new (result) String("(Heap Local Variable)");
@@ -979,15 +967,11 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   /// TODO: Implement specialized mirror witnesses for all kinds.
   case MetadataKind::Enum:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::Existential:
     return std::make_tuple(
         T, &OpaqueMirrorMetadata, &OpaqueMirrorWitnessTable);
       
   // Types can't have these kinds.
-  case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
     swift::crash("Swift mirror lookup failure");
@@ -1036,9 +1020,6 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Opaque:
   case MetadataKind::Enum:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::Metatype:
     break;
       
@@ -1074,7 +1055,6 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
     break;
       
   // Types can't have these kinds.
-  case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
     swift::crash("Swift mirror lookup failure");
@@ -1196,9 +1176,6 @@ static void swift_stdlib_getDemangledTypeNameImpl(OpaqueValue *value,
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
   case MetadataKind::ObjCClassWrapper:
@@ -1206,7 +1183,6 @@ static void swift_stdlib_getDemangledTypeNameImpl(OpaqueValue *value,
     return swift_stdlib_getDemangledMetatypeName(dynamicType, result);
 
   // Values should never use these metadata kinds.
-  case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
     assert(false);

@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
 
-// REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
 sil_stage canonical
@@ -20,7 +19,7 @@ entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):
 // CHECK-LABEL: define %C10objc_block3Foo* @call_block(%objc_block*, %C10objc_block3Foo*) {
 // CHECK:       entry:
 // CHECK:         %2 = getelementptr inbounds %objc_block, %objc_block* %0, i32 0, i32 3
-// CHECK:         %3 = load i8*, i8** %2, align 8
+// CHECK:         %3 = load i8*, i8** %2
 // CHECK:         %4 = bitcast i8* %3 to i8* (%objc_block*, i8*)*
 // CHECK:         %5 = bitcast %C10objc_block3Foo* %1 to i8*
 // CHECK:         %6 = call i8* %4(%objc_block* %0, i8* %5)
@@ -38,5 +37,6 @@ entry(%b : $*@convention(block) () -> ()):
 }
 
 // CHECK-LABEL: define void @generic_with_block(%objc_block**)
-// CHECK:         call %swift.type* @swift_getBlockTypeMetadata
+// --                                                                               0x100_0001 = block convention, 1 arg
+// CHECK:         call %swift.type* @swift_getFunctionTypeMetadata1([[WORD:i(64|32)]] 16777217
 

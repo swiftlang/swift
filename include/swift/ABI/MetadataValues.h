@@ -46,9 +46,6 @@ enum class MetadataKind : uintptr_t {
   /// A monomorphic function.
   Function      = 10,
 
-  /// A polymorphic function.
-  PolyFunction  = 11,
-
   /// An existential type.
   Existential   = 12,
 
@@ -64,18 +61,6 @@ enum class MetadataKind : uintptr_t {
   /// A foreign class, such as a Core Foundation class.
   ForeignClass = 16,
   
-  /// An Objective-C block type.
-  Block = 17,
-
-  /// A thin function type.
-  ThinFunction = 18,
-  
-  /// A C function type.
-  CFunction = 19,
-
-  // Array types?
-  // L-value types?
-
   /// After this point start the non-type metadata.
   NonTypeMetadata_First = 64,
 
@@ -402,6 +387,64 @@ public:
   
   int_type getIntValue() const {
     return Data;
+  }
+};
+
+/// Convention values for function type metadata.
+enum class FunctionMetadataConvention: uint8_t {
+  Swift = 0,
+  Block = 1,
+  Thin = 2,
+  CFunctionPointer = 3,
+};
+
+/// Flags in a function type metadata record.
+class FunctionTypeFlags {
+  typedef size_t int_type;
+  enum : int_type {
+    NumArgumentsMask = 0x00FFFFFFU,
+    ConventionMask   = 0x0F000000U,
+    ConventionShift  = 24U,
+    ThrowsMask       = 0x10000000U,
+  };
+  int_type Data;
+  
+  constexpr FunctionTypeFlags(int_type Data) : Data(Data) {}
+public:
+  constexpr FunctionTypeFlags() : Data(0) {}
+
+  constexpr FunctionTypeFlags withNumArguments(unsigned numArguments) const {
+    return FunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
+  }
+  
+  constexpr FunctionTypeFlags withConvention(FunctionMetadataConvention c) const {
+    return FunctionTypeFlags((Data & ~ConventionMask)
+                             | (int_type(c) << ConventionShift));
+  }
+  
+  constexpr FunctionTypeFlags withThrows(bool throws) const {
+    return FunctionTypeFlags((Data & ~ThrowsMask)
+                             | (throws ? ThrowsMask : 0));
+  }
+  
+  unsigned getNumArguments() const {
+    return Data & NumArgumentsMask;
+  }
+  
+  FunctionMetadataConvention getConvention() const {
+    return FunctionMetadataConvention((Data&ConventionMask) >> ConventionShift);
+  }
+  
+  bool throws() const {
+    return bool(Data & ThrowsMask);
+  }
+  
+  int_type getIntValue() const {
+    return Data;
+  }
+  
+  static FunctionTypeFlags fromIntValue(int_type Data) {
+    return FunctionTypeFlags(Data);
   }
 };
 

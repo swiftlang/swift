@@ -834,17 +834,13 @@ public:
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
-    case MetadataKind::Block:
       return true;
-        
+
+    case MetadataKind::Function:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
-    case MetadataKind::Function:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::CFunction:
-    case MetadataKind::PolyFunction:
     case MetadataKind::Existential:
     case MetadataKind::Metatype:
     case MetadataKind::ExistentialMetatype:
@@ -866,15 +862,11 @@ public:
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
-    case MetadataKind::Block:
     case MetadataKind::Struct:
     case MetadataKind::Enum:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
-    case MetadataKind::ThinFunction:
-    case MetadataKind::CFunction:
-    case MetadataKind::PolyFunction:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::ErrorObject:
       return false;
@@ -1501,16 +1493,11 @@ struct StructMetadata : public Metadata {
 /// The structure of function type metadata.
 struct FunctionTypeMetadata : public Metadata {
   using Argument = FlaggedPointer<const Metadata *, 0>;
-  using Result = FlaggedPointer<const Metadata *, 0>;
 
-  /// The number of arguments to the function.
-  unsigned NumArguments : 31;
-  
-  /// Whether or not this function type throws.
-  unsigned Throws : 1;
+  FunctionTypeFlags Flags;
 
   /// The type metadata for the result type.
-  Result ResultType;
+  const Metadata *ResultType;
 
   Argument *getArguments() {
     return reinterpret_cast<Argument *>(this + 1);
@@ -1520,13 +1507,14 @@ struct FunctionTypeMetadata : public Metadata {
     return reinterpret_cast<const Argument *>(this + 1);
   }
   
-  bool throws() const { return Throws; }
+  size_t getNumArguments() const { return Flags.getNumArguments(); }
+  FunctionMetadataConvention getConvention() const {
+    return Flags.getConvention();
+  }
+  bool throws() const { return Flags.throws(); }
 
   static bool classof(const Metadata *metadata) {
-    return metadata->getKind() == MetadataKind::Function ||
-           metadata->getKind() == MetadataKind::ThinFunction ||
-           metadata->getKind() == MetadataKind::CFunction ||
-           metadata->getKind() == MetadataKind::Block;
+    return metadata->getKind() == MetadataKind::Function;
   }
 };
 
@@ -2063,23 +2051,22 @@ swift_allocateGenericValueMetadata(GenericMetadata *pattern,
   
 /// \brief Fetch a uniqued metadata for a function type.
 extern "C" const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata(size_t numArguments,
-                              const void * argsAndResult []);
+swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]);
 
 extern "C" const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata0(const Metadata *resultMetadata);
-
-extern "C" const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata1(const void *arg0,
+swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
+                               const void *arg0,
                                const Metadata *resultMetadata);
 
 extern "C" const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata2(const void *arg0,
+swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
+                               const void *arg0,
                                const void *arg1,
                                const Metadata *resultMetadata);
 
 extern "C" const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata3(const void *arg0,
+swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
+                               const void *arg0,
                                const void *arg1,
                                const void *arg2,
                                const Metadata *resultMetadata);

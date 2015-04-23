@@ -868,17 +868,13 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
   case MetadataKind::Existential:
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::ForeignClass:
-  case MetadataKind::Block:
     swift_dynamicCastFailure(type, nameForMetadata(type).c_str(),
                              protocols[0], protocol_getName(protocols[0]));
       
-  case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
     assert(false && "not type metadata");
@@ -918,16 +914,12 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
   case MetadataKind::Existential:
   case MetadataKind::Metatype:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::ForeignClass:
-  case MetadataKind::Block:
     return nullptr;
       
-  case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
     assert(false && "not type metadata");

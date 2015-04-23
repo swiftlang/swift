@@ -295,155 +295,118 @@ namespace {
 }
 
 /// The uniquing structure for function type metadata.
-namespace {
-  MetadataCache<FunctionCacheEntry> FunctionTypes;
-  MetadataCache<FunctionCacheEntry> ThinFunctionTypes;
-  MetadataCache<FunctionCacheEntry> CFunctionTypes;
+static MetadataCache<FunctionCacheEntry> FunctionTypes;
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
+                                      const void *arg0,
+                                      const Metadata *result) {
+  assert(flags.getNumArguments() == 1
+         && "wrong number of arguments in function metadata flags?!");
+  const void *flagsArgsAndResult[] = {
+    reinterpret_cast<const void*>(flags.getIntValue()),
+    arg0,
+    static_cast<const void *>(result)                      
+  };                                                       
+  return swift_getFunctionTypeMetadata(flagsArgsAndResult);
+}                                                          
+const FunctionTypeMetadata *                               
+swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
+                                      const void *arg0,
+                                      const void *arg1,
+                                      const Metadata *result) {
+  assert(flags.getNumArguments() == 2
+         && "wrong number of arguments in function metadata flags?!");
+  const void *flagsArgsAndResult[] = {
+    reinterpret_cast<const void*>(flags.getIntValue()),
+    arg0,
+    arg1,                                                  
+    static_cast<const void *>(result)                      
+  };                                                       
+  return swift_getFunctionTypeMetadata(flagsArgsAndResult);
+}                                                          
+const FunctionTypeMetadata *                               
+swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
+                                      const void *arg0,
+                                      const void *arg1,
+                                      const void *arg2,
+                                      const Metadata *result) {
+  assert(flags.getNumArguments() == 3
+         && "wrong number of arguments in function metadata flags?!");
+  const void *flagsArgsAndResult[] = {
+    reinterpret_cast<const void*>(flags.getIntValue()),
+    arg0,                                                  
+    arg1,                                                  
+    arg2,                                                  
+    static_cast<const void *>(result)                      
+  };                                                       
+  return swift_getFunctionTypeMetadata(flagsArgsAndResult);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]) {
+  auto flags = FunctionTypeFlags::fromIntValue(size_t(flagsArgsAndResult[0]));
+
+  unsigned numArguments = flags.getNumArguments();
+
+  // Pick a value witness table appropriate to the function convention.
+  // All function types of a given convention have the same value semantics,
+  // so they share a value witness table.
+  const ValueWitnessTable *valueWitnesses;
+  switch (flags.getConvention()) {
+  case FunctionMetadataConvention::Swift:
+    valueWitnesses = &_TWVFT_T_;
+    break;
+  case FunctionMetadataConvention::Thin:
+  case FunctionMetadataConvention::CFunctionPointer:
+    valueWitnesses = &_TWVXfT_T_;
+    break;
+  case FunctionMetadataConvention::Block:
 #if SWIFT_OBJC_INTEROP
-  MetadataCache<FunctionCacheEntry> BlockTypes;
+    // Blocks are ObjC objects, so can share the Builtin.UnknownObject value
+    // witnesses.
+    valueWitnesses = &_TWVBO;
+#else
+    assert(false && "objc block without objc interop?");
 #endif
-
-  const FunctionTypeMetadata *
-  _getFunctionTypeMetadata(size_t numArguments,
-                           const void * argsAndResult [],
-                           MetadataKind Kind,
-                           MetadataCache<FunctionCacheEntry> &Cache,
-                           const ValueWitnessTable &ValueWitnesses) {
-    // Search the cache.
-
-    // N argument types (with inout bit set)
-    // and 1 result type (a tuple with M elements)
-    auto entry = Cache.findOrAdd(argsAndResult, numArguments + 1,
-      [&]() -> FunctionCacheEntry* {
-        // Create a new entry for the cache.
-        auto entry = FunctionCacheEntry::allocate(
-          argsAndResult,
-          numArguments + 1,
-          numArguments * sizeof(FunctionTypeMetadata::Argument));
-
-        auto metadata = entry->getData();
-        metadata->setKind(Kind);
-        metadata->ValueWitnesses = &ValueWitnesses;
-        metadata->NumArguments = numArguments;
-        metadata->ResultType = FunctionTypeMetadata::Argument::getFromOpaqueValue(
-          argsAndResult[numArguments]);
-        metadata->Throws = metadata->ResultType.getFlag();
-
-        for (size_t i = 0; i < numArguments; ++i) {
-          auto arg = FunctionTypeMetadata::Argument::getFromOpaqueValue(
-            argsAndResult[i]);
-          metadata->getArguments()[i] = arg;
-        }
-
-        return entry;
-      });
-
-    return entry->getData();
-  }
-}
-
-/// A macro to define convenience accessors for 0, 1, 2, and
-/// 3-argument function metadata.
-#define DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(KIND)                     \
-  const FunctionTypeMetadata *                                          \
-  swift::swift_get##KIND##Metadata0(const Metadata *result) {           \
-    const void *argsAndResult[] = {                                     \
-      static_cast<const void *>(result)                                 \
-    };                                                                  \
-    return swift_get##KIND##Metadata(0, argsAndResult);                 \
-  }                                                                     \
-  const FunctionTypeMetadata *                                          \
-  swift::swift_get##KIND##Metadata1(const void *arg0,                   \
-                                    const Metadata *result) {           \
-    const void *argsAndResult[] = {                                     \
-      arg0,                                                             \
-      static_cast<const void *>(result)                                 \
-    };                                                                  \
-    return swift_get##KIND##Metadata(1, argsAndResult);                 \
-  }                                                                     \
-  const FunctionTypeMetadata *                                          \
-  swift::swift_get##KIND##Metadata2(const void *arg0,                   \
-                                    const void *arg1,                   \
-                                    const Metadata *result) {           \
-    const void *argsAndResult[] = {                                     \
-      arg0,                                                             \
-      arg1,                                                             \
-      static_cast<const void *>(result)                                 \
-    };                                                                  \
-    return swift_get##KIND##Metadata(2, argsAndResult);                 \
-  }                                                                     \
-  const FunctionTypeMetadata *                                          \
-  swift::swift_get##KIND##Metadata3(const void *arg0,                   \
-                                    const void *arg1,                   \
-                                    const void *arg2,                   \
-                                    const Metadata *result) {           \
-    const void *argsAndResult[] = {                                     \
-      arg0,                                                             \
-      arg1,                                                             \
-      arg2,                                                             \
-      static_cast<const void *>(result)                                 \
-    };                                                                  \
-    return swift_get##KIND##Metadata(3, argsAndResult);                 \
+    break;
   }
 
-const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata(size_t numArguments,
-                                     const void *argsAndResult[]) {
+  // Search the cache.
 
-  return _getFunctionTypeMetadata(numArguments,
-                                  argsAndResult,
-                                  MetadataKind::Function,
-                                  FunctionTypes,
-                                  _TWVFT_T_);
+  unsigned numKeyArguments =
+  // 1 flags word,
+    1 +
+  // N argument types (with inout bit set),
+    numArguments +
+  // and 1 result type
+    1;
+  auto entry = FunctionTypes.findOrAdd(flagsArgsAndResult, numKeyArguments,
+    [&]() -> FunctionCacheEntry* {
+      // Create a new entry for the cache.
+      auto entry = FunctionCacheEntry::allocate(
+        flagsArgsAndResult,
+        numKeyArguments,
+        numArguments * sizeof(FunctionTypeMetadata::Argument));
+
+      auto metadata = entry->getData();
+      metadata->setKind(MetadataKind::Function);
+      metadata->ValueWitnesses = valueWitnesses;
+      metadata->Flags = flags;
+      metadata->ResultType = reinterpret_cast<const Metadata *>(
+                                          flagsArgsAndResult[1 + numArguments]);
+
+      for (size_t i = 0; i < numArguments; ++i) {
+        auto arg = FunctionTypeMetadata::Argument::getFromOpaqueValue(
+          flagsArgsAndResult[i+1]);
+        metadata->getArguments()[i] = arg;
+      }
+
+      return entry;
+    });
+
+  return entry->getData();
 }
-
-DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(FunctionType)
-
-const FunctionTypeMetadata *
-swift::swift_getThinFunctionTypeMetadata(size_t numArguments,
-                                         const void *argsAndResult[]) {
-
-  return _getFunctionTypeMetadata(numArguments,
-                                  argsAndResult,
-                                  MetadataKind::ThinFunction,
-                                  ThinFunctionTypes,
-                                  _TWVXfT_T_);
-}
-
-DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(ThinFunctionType)
-
-const FunctionTypeMetadata *
-swift::swift_getCFunctionTypeMetadata(size_t numArguments,
-                                         const void *argsAndResult[]) {
-
-  return _getFunctionTypeMetadata(numArguments,
-                                  argsAndResult,
-                                  MetadataKind::CFunction,
-                                  CFunctionTypes,
-                                  _TWVXfT_T_);
-}
-
-DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(CFunctionType)
-
-// Only define the block-type accessors if we need ObjC interop.
-#if SWIFT_OBJC_INTEROP
-
-const FunctionTypeMetadata *
-swift::swift_getBlockTypeMetadata(size_t numArguments,
-                                  const void *argsAndResult[]) {
-  return _getFunctionTypeMetadata(numArguments,
-                                  argsAndResult,
-                                  MetadataKind::Block,
-                                  BlockTypes,
-                                  _TWVBO);
-}
-
-DEFINE_FUNCTION_CONVENIENCE_ACCESSORS(BlockType)
-
-#endif // SWIFT_OBJC_INTEROP
-
-#undef DEFINE_FUNCTION_CONVENIENCE_ACCESSORS
-
 
 /*** Tuples ****************************************************************/
 
@@ -2224,10 +2187,6 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
@@ -2265,10 +2224,6 @@ Metadata::getClassObject() const {
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
-  case MetadataKind::ThinFunction:
-  case MetadataKind::CFunction:
-  case MetadataKind::Block:
-  case MetadataKind::PolyFunction:
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:

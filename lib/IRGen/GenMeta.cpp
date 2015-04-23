@@ -672,14 +672,6 @@ namespace {
       // type metadata.
       auto metadata = IGF.emitTypeMetadataRef(type->getResult()->
                                               getCanonicalType());
-      if (type->throws()) {
-        auto metadataInt = IGF.Builder.CreatePtrToInt(metadata,
-                                                      IGF.IGM.SizeTy);
-        auto returnsFlag = llvm::ConstantInt::get(IGF.IGM.SizeTy, 1);
-        auto marked = IGF.Builder.CreateOr(metadataInt, returnsFlag);
-        return IGF.Builder.CreateIntToPtr(marked, metadata->getType());
-      }
-      
       return metadata;
     }
 
@@ -712,39 +704,30 @@ namespace {
       if (inputTuple && !inputTuple->isMaterializable())
         numArguments = inputTuple->getNumElements();
 
-      llvm::Constant *getMetadataFn = [&] {
-        switch (type->getRepresentation()) {
-        case AnyFunctionType::Representation::Thin:
-          switch (numArguments) {
-          case 1: return IGF.IGM.getGetThinFunctionMetadata1Fn();
-          case 2: return IGF.IGM.getGetThinFunctionMetadata2Fn();
-          case 3: return IGF.IGM.getGetThinFunctionMetadata3Fn();
-          default: return IGF.IGM.getGetThinFunctionMetadataFn();
-          }
-        case AnyFunctionType::Representation::Swift:
-          switch (numArguments) {
-          case 1: return IGF.IGM.getGetFunctionMetadata1Fn();
-          case 2: return IGF.IGM.getGetFunctionMetadata2Fn();
-          case 3: return IGF.IGM.getGetFunctionMetadata3Fn();
-          default: return IGF.IGM.getGetFunctionMetadataFn();
-          }
-        case AnyFunctionType::Representation::Block:
-          switch (numArguments) {
-          case 1: return IGF.IGM.getGetBlockMetadata1Fn();
-          case 2: return IGF.IGM.getGetBlockMetadata2Fn();
-          case 3: return IGF.IGM.getGetBlockMetadata3Fn();
-          default: return IGF.IGM.getGetBlockMetadataFn();
-          }
-        case AnyFunctionType::Representation::CFunctionPointer:
-          switch (numArguments) {
-          case 1: return IGF.IGM.getGetCFunctionMetadata1Fn();
-          case 2: return IGF.IGM.getGetCFunctionMetadata2Fn();
-          case 3: return IGF.IGM.getGetCFunctionMetadata3Fn();
-          default: return IGF.IGM.getGetCFunctionMetadataFn();
-          }
-        }
-        llvm_unreachable("bad function representation");
-      }();
+      // Map the convention to a runtime metadata value.
+      FunctionMetadataConvention metadataConvention;
+      switch (type->getRepresentation()) {
+      case FunctionTypeRepresentation::Swift:
+        metadataConvention = FunctionMetadataConvention::Swift;
+        break;
+      case FunctionTypeRepresentation::Thin:
+        metadataConvention = FunctionMetadataConvention::Thin;
+        break;
+      case FunctionTypeRepresentation::Block:
+        metadataConvention = FunctionMetadataConvention::Block;
+        break;
+      case FunctionTypeRepresentation::CFunctionPointer:
+        metadataConvention = FunctionMetadataConvention::CFunctionPointer;
+        break;
+      }
+      
+      auto flagsVal = FunctionTypeFlags()
+        .withNumArguments(numArguments)
+        .withConvention(metadataConvention)
+        .withThrows(type->throws());
+      
+      auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                          flagsVal.getIntValue());
 
       switch (numArguments) {
         case 1: {
@@ -752,9 +735,10 @@ namespace {
             extractAndMarkInOut(inputTuple.getElementType(0))
           : extractAndMarkInOut(type.getInput());
 
-          auto call = IGF.Builder.CreateCall2(getMetadataFn,
-                                              arg0,
-                                              resultMetadata);
+          auto call = IGF.Builder.CreateCall3(
+                                            IGF.IGM.getGetFunctionMetadata1Fn(),
+                                            flags, arg0,
+                                            resultMetadata);
           call->setDoesNotThrow();
           call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(CanType(type), call);
@@ -763,9 +747,10 @@ namespace {
         case 2: {
           auto arg0 = extractAndMarkInOut(inputTuple.getElementType(0));
           auto arg1 = extractAndMarkInOut(inputTuple.getElementType(1));
-          auto call = IGF.Builder.CreateCall3(getMetadataFn,
-                                              arg0, arg1,
-                                              resultMetadata);
+          auto call = IGF.Builder.CreateCall4(
+                                            IGF.IGM.getGetFunctionMetadata2Fn(),
+                                            flags, arg0, arg1,
+                                            resultMetadata);
           call->setDoesNotThrow();
           call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(CanType(type), call);
@@ -775,38 +760,45 @@ namespace {
           auto arg0 = extractAndMarkInOut(inputTuple.getElementType(0));
           auto arg1 = extractAndMarkInOut(inputTuple.getElementType(1));
           auto arg2 = extractAndMarkInOut(inputTuple.getElementType(2));
-          auto call = IGF.Builder.CreateCall4(getMetadataFn,
-                                              arg0, arg1, arg2,
-                                              resultMetadata);
+          auto call = IGF.Builder.CreateCall5(
+                                            IGF.IGM.getGetFunctionMetadata3Fn(),
+                                            flags, arg0, arg1, arg2,
+                                            resultMetadata);
           call->setDoesNotThrow();
           call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(CanType(type), call);
         }
 
         default:
-          llvm::Value *pointerToFirstArg = nullptr;
           auto arguments = inputTuple.getElementTypes();
           auto arrayTy = llvm::ArrayType::get(IGF.IGM.Int8PtrTy,
-                                              arguments.size());
+                                              arguments.size() + 2);
           Address buffer = IGF.createAlloca(arrayTy,
                                             IGF.IGM.getPointerAlignment(),
                                             "function-arguments");
+          Address pointerToFirstArg = IGF.Builder.CreateStructGEP(buffer, 0,
+                                                                   Size(0));
+          Address flagsPtr = IGF.Builder.CreateBitCast(pointerToFirstArg,
+                                               IGF.IGM.SizeTy->getPointerTo());
+          IGF.Builder.CreateStore(flags, flagsPtr);
+          
           for (size_t i = 0; i < arguments.size(); ++i) {
-            auto argMetadata = extractAndMarkInOut(inputTuple.getElementType(i));
-            Address argPtr = IGF.Builder.CreateStructGEP(buffer,
-                                                         i,
-                                                         IGF.IGM.getPointerSize());
+            auto argMetadata = extractAndMarkInOut(
+                                                  inputTuple.getElementType(i));
+            Address argPtr = IGF.Builder.CreateStructGEP(buffer, i + 1,
+                                                      IGF.IGM.getPointerSize());
             IGF.Builder.CreateStore(argMetadata, argPtr);
 
-            if (i == 0) pointerToFirstArg = argPtr.getAddress();
           }
+          Address resultPtr = IGF.Builder.CreateStructGEP(buffer,
+                                                    arguments.size() + 1,
+                                                    IGF.IGM.getPointerSize());
+          resultPtr = IGF.Builder.CreateBitCast(resultPtr,
+                                     IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+          IGF.Builder.CreateStore(resultMetadata, resultPtr);
 
-          llvm::Value *args[] = {
-            llvm::ConstantInt::get(IGF.IGM.SizeTy, numArguments),
-            pointerToFirstArg,
-            resultMetadata
-          };
-          auto call = IGF.Builder.CreateCall(getMetadataFn, args);
+          auto call = IGF.Builder.CreateCall(IGF.IGM.getGetFunctionMetadataFn(),
+                                             pointerToFirstArg.getAddress());
           call->setDoesNotThrow();
           call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(type, call);
