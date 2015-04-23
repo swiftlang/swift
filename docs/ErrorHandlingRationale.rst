@@ -1384,6 +1384,26 @@ declaration or type::
     return i + j
   }
 
+The reason to use a keyword here is that it's much nicer for function
+declarations, which generally outnumber function types by at least an
+order of magnitude.  A punctuation mark would be easily lost or
+mistaken amidst all the other punctuation in a function declaration,
+especially if the punctuation mark were something like ``!`` that can
+validly appear at the end of a parameter type.  It makes sense for the
+keyword to appear close to the return type, as it's essentially a part
+of the result and a programmer should be able to see both parts in the
+same glance.  The keyword appears before the arrow for the simple
+reason that the arrow is optional (along with the rest of the return
+type) in function and initializer declarations; having the keyword
+appear in slightly different places based on the presence of a return
+type would be silly and would making adding a non-void return type
+feel awkward.  The keyword itself should be descriptive, and it's
+particularly nice for it to be a form of the verb used by the throwing
+expression, conjugated as if performed by the function itself.  Thus,
+``throw`` becomes ``throws``; if we used ``raise`` instead, this would
+be ``raises``, which I personally find unappealing for reasons I'm not
+sure I can put a name to.
+
 It shouldn't be possible to overload functions solely based on whether
 the functions throw.  That is, this is not legal::
 
