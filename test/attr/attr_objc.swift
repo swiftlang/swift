@@ -1104,11 +1104,11 @@ class infer_instanceVar1 {
 // CHECK-NOT: @objc{{.*}}Optional_fail
 
   // CHECK-LABEL: @objc var var_CFunctionPointer_1: CFunctionPointer<() -> ()>
-  var var_CFunctionPointer_1: CFunctionPointer<() -> ()>
+  var var_CFunctionPointer_1: CFunctionPointer<() -> ()> // expected-warning{{deprecated}}
   // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_1: CFunctionPointer<Int>
-  var var_CFunctionPointer_invalid_1: CFunctionPointer<Int>
+  var var_CFunctionPointer_invalid_1: CFunctionPointer<Int> // expected-warning{{deprecated}}
   // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: CFunctionPointer<PlainStruct -> Int>
-  var var_CFunctionPointer_invalid_2: CFunctionPointer<PlainStruct -> Int>
+  var var_CFunctionPointer_invalid_2: CFunctionPointer<PlainStruct -> Int> // expected-warning{{deprecated}}
 
   weak var var_Weak1: Class_ObjC1?
   weak var var_Weak2: Protocol_ObjC1?
@@ -1543,7 +1543,7 @@ class HasNSManaged {
   func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {}
   // CHECK-LABEL: {{^}} @objc func mutableAutoreleasingUnsafeMutablePointerToAnyObject(p: AutoreleasingUnsafeMutablePointer<AnyObject>) {
 
-  func cFunctionPointer(p: CFunctionPointer<() -> ()>) {}
+  func cFunctionPointer(p: CFunctionPointer<() -> ()>) {} // expected-warning{{deprecated}}
   // CHECK-LABEL: {{^}} @objc func cFunctionPointer(p: CFunctionPointer<() -> ()>)
 }
 

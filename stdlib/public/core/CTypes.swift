@@ -155,12 +155,9 @@ public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
 
 /// The family of C function pointer types.
 ///
-/// In imported APIs, `T` is a Swift function type such as
-/// `(Int)->String`.
-/// 
-/// Though not directly useful in Swift, `CFunctionPointer<T>` can be
-/// used to safely pass a C function pointer, received from one C or
-/// Objective-C API, to another C or Objective-C API.
+/// This type is deprecated. Instead of `CFunctionType<(T) -> U>`, a native
+/// function type with the C convention can be used, `@convention(c) (T) -> U`.
+@availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
 public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
   var value: COpaquePointer
 
@@ -195,6 +192,7 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
   }
 }
 
+@availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
 extension CFunctionPointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
@@ -202,6 +200,7 @@ extension CFunctionPointer : CustomDebugStringConvertible {
   }
 }
 
+@availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
 public func ==<T>(lhs: CFunctionPointer<T>, rhs: CFunctionPointer<T>) -> Bool {
   return lhs.value == rhs.value
 }
@@ -211,6 +210,7 @@ extension COpaquePointer {
   ///
   /// .. Warning:: This is a fundamentally unsafe operation, equivalent to
   ///      `unsafeBitCast(value, COpaquePointer.self)`
+  @availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
   public init<T>(_ value: CFunctionPointer<T>) {
     self = value.value
   }
