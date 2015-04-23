@@ -15,6 +15,8 @@ Contents
    AccessControl
    DriverInternals
    DriverParseableOutput
+   ErrorHandling
+   ErrorHandlingRationale
    Generics
    LogicalObjects
    Namespace Level Vars and Top Level Code
