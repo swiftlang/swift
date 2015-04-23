@@ -37,7 +37,7 @@ public struct Mirror {
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
   public init(reflecting instance: Any) {
-    if let customized? = instance as? CustomReflectable {
+    if let customized as CustomReflectable = instance {
       self = customized.customMirror()
     }
     else {
@@ -218,7 +218,7 @@ extension Mirror {
     for e in [first] + rest {
       let children = Mirror(reflecting: result).children
       let position: Children.Index
-      if let label? = e as? String {
+      if let label as String = e {
         position = _find(children) { $0.label == label } ?? children.endIndex
       }
       else if let offset? = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
@@ -347,7 +347,7 @@ extension PlaygroundQuickLook {
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
   public init(reflecting instance: Any) {
-    if let customized? = instance as? CustomPlaygroundQuickLookable {
+    if let customized as CustomPlaygroundQuickLookable = instance {
       self = customized.customPlaygroundQuickLook()
       return
     }

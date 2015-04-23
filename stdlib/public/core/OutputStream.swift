@@ -138,17 +138,17 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
 public func _print_unlocked<T, TargetStream : OutputStreamType>(
     value: T, inout target: TargetStream
 ) {
-  if let streamableObject? = value as? Streamable {
+  if let streamableObject as Streamable = value {
     streamableObject.writeTo(&target)
     return
   }
 
-  if var printableObject? = value as? CustomStringConvertible {
+  if var printableObject as CustomStringConvertible = value {
     printableObject.description.writeTo(&target)
     return
   }
 
-  if let debugPrintableObject? = value as? CustomDebugStringConvertible {
+  if let debugPrintableObject as CustomDebugStringConvertible = value {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
@@ -280,7 +280,7 @@ public func toDebugString<T>(x: T) -> String {
 public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
     value: T, inout target: TargetStream
 ) {
-  if let debugPrintableObject? = value as? CustomDebugStringConvertible {
+  if let debugPrintableObject as CustomDebugStringConvertible = value {
     debugPrintableObject.debugDescription.writeTo(&target)
     return
   }
@@ -290,7 +290,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
     return
   }
 
-  if let streamableObject? = value as? Streamable {
+  if let streamableObject as Streamable = value {
     streamableObject.writeTo(&target)
     return
   }

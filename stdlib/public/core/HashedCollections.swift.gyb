@@ -2326,8 +2326,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   /// The storage for bridged ${Self} elements, if present.
   internal var _heapBufferBridged:
     BridgedNativeStorage.StorageImpl.HeapBufferStorage? {
-    if let ref? =
-      _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
+    if let ref? = _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
       // FIXME: this cast is invalid.
       return unsafeBitCast(
         ref,

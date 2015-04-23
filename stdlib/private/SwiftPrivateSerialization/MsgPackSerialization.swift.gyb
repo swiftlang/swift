@@ -71,7 +71,7 @@ internal func _toMsgPackVariant<
     Value.Generator.Element : Serializable${value_kind}Type
 >(inout value: Value) -> MsgPackVariant {
 %   if value_kind == 'Scalar':
-  if let byteBlob? = value as? [UInt8] {
+  if let byteBlob as [UInt8] = value {
     return .Binary(byteBlob)
   }
 %   end

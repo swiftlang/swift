@@ -121,7 +121,7 @@ public struct Mirror {
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
   public init(reflecting subject: Any) {
-    if let customized? = subject as? CustomReflectable {
+    if let customized as CustomReflectable = subject {
       self = customized.customMirror()
     }
     else {
@@ -445,7 +445,7 @@ extension Mirror {
     for e in [first] + rest {
       let children = Mirror(reflecting: result).children
       let position: Children.Index
-      if let label? = e as? String {
+      if let label as String = e {
         position = _find(children) { $0.label == label } ?? children.endIndex
       }
       else if let offset? = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
