@@ -1725,7 +1725,7 @@ sil @_TFC4main3ZZZD : $@convention(method) (@owned ZZZ) -> ()
 sil @_TFC4main3ZZZcfMS0_FT_S0_ : $@convention(method) (@owned ZZZ) -> @owned ZZZ
 sil @_TFC4main3ZZZCfMS0_FT_S0_ : $@convention(thin) (@thick ZZZ.Type) -> @owned ZZZ
 
-//CHECK-LABLE: test_delete_readonly_function
+//CHECK-LABEL: test_delete_readonly_function
 //CHECK-NOT: apply 
 //CHECK: strong_release %0
 //CHECK-NEXT: tuple
