@@ -2259,22 +2259,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
   });
 }
 
-Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
-                               LazyResolver *resolver, Type memberType) {
-  // If no member type was provided, use the member's type.
-  if (!memberType)
-    memberType = member->getInterfaceType();
-
-  return getTypeOfMember(module, memberType, member->getDeclContext());
-}
-
-Type TypeBase::getTypeOfMember(Module *module, Type memberType,
-                               DeclContext *memberDC) {
-  // If the member is not part of a type, there's nothing to substitute.
-  if (!memberDC->isTypeContext())
-    return memberType;
-
-  LazyResolver *resolver = memberDC->getASTContext().getLazyResolver();
+TypeSubstitutionMap TypeBase::getMemberSubstitutions(DeclContext *dc) {
 
   // Ignore lvalues in the base type.
   Type baseTy(getRValueType());
@@ -2284,28 +2269,33 @@ Type TypeBase::getTypeOfMember(Module *module, Type memberType,
     baseTy = metaBase->getInstanceType()->getRValueType();
   }
 
+  // The resulting set of substitutions. Always use this to ensure we
+  // don't miss out on NRVO anywhere.
+  TypeSubstitutionMap substitutions;
+
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
-  if (memberDC->isProtocolOrProtocolExtensionContext()) {
+  if (dc->isProtocolOrProtocolExtensionContext()) {
     // We only substitute into archetypes for now for protocols.
     // FIXME: This seems like an odd restriction. Whatever is depending on
     // this, shouldn't.
-    if (!baseTy->is<ArchetypeType>() && isa<ProtocolDecl>(memberDC))
-      return memberType;
+    if (!baseTy->is<ArchetypeType>() && isa<ProtocolDecl>(dc))
+      return substitutions;
 
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
-    TypeSubstitutionMap substitutions;
-    substitutions[memberDC->getProtocolSelf()->getArchetype()] = baseTy;
-    substitutions[memberDC->getProtocolSelf()->getDeclaredType()
+    substitutions[dc->getProtocolSelf()->getArchetype()] = baseTy;
+    substitutions[dc->getProtocolSelf()->getDeclaredType()
                     ->getCanonicalType()->castTo<GenericTypeParamType>()]
       = baseTy;
-    return memberType.subst(module, substitutions, /*ignoreMissing=*/false,
-                            resolver);
+    return substitutions;
   }
 
+  // Extract the lazy resolver.
+  LazyResolver *resolver = dc->getASTContext().getLazyResolver();
+
   // Find the superclass type with the context matching that of the member.
-  auto ownerNominal = memberDC->getDeclaredTypeOfContext()->getAnyNominal();
+  auto ownerNominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
   while (baseTy->getAnyNominal() != ownerNominal) {
     baseTy = baseTy->getSuperclass(resolver);
     assert(baseTy && "Couldn't find appropriate context");
@@ -2313,11 +2303,10 @@ Type TypeBase::getTypeOfMember(Module *module, Type memberType,
 
   // If the base type isn't specialized, there's nothing to substitute.
   if (!baseTy->isSpecialized())
-    return memberType;
+    return substitutions;
 
   // Gather all of the substitutions for all levels of generic arguments.
-  TypeSubstitutionMap substitutions;
-  GenericParamList *curGenericParams = memberDC->getGenericParamsOfContext();
+  GenericParamList *curGenericParams = dc->getGenericParamsOfContext();
   while (baseTy) {
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
@@ -2340,7 +2329,31 @@ Type TypeBase::getTypeOfMember(Module *module, Type memberType,
     baseTy = baseTy->castTo<NominalType>()->getParent();
   }
 
-  // Perform the substitution.
+  return substitutions;
+}
+
+Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
+                               LazyResolver *resolver, Type memberType) {
+  // If no member type was provided, use the member's type.
+  if (!memberType)
+    memberType = member->getInterfaceType();
+
+  return getTypeOfMember(module, memberType, member->getDeclContext());
+}
+
+Type TypeBase::getTypeOfMember(Module *module, Type memberType,
+                               DeclContext *memberDC) {
+  // If the member is not part of a type, there's nothing to substitute.
+  if (!memberDC->isTypeContext())
+    return memberType;
+
+  // Compute the set of member substitutions to apply.
+  TypeSubstitutionMap substitutions = getMemberSubstitutions(memberDC);
+  if (substitutions.empty())
+    return memberType;
+
+  // Perform the substitutions.
+  LazyResolver *resolver = memberDC->getASTContext().getLazyResolver();
   return memberType.subst(module, substitutions, /*ignoreMissing=*/false,
                           resolver);
 }

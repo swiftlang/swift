@@ -648,6 +648,24 @@ public:
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
 
+  /// Determine the set of substitutions that should be applied to a
+  /// type spelled within the given DeclContext to treat it as a
+  /// member of this type.
+  ///
+  /// For example, given:
+  /// \code
+  /// struct X<T, U> { }
+  /// extension X {
+  ///   typealias SomeArray = [T];
+  /// }
+  /// \endcode
+  ///
+  /// Asking for the member substitutions of \c X<Int,String> within
+  /// the context of the extension above will produce substitutions T
+  /// -> Int and U -> String suitable for mapping the type of
+  /// \c SomeArray.
+  TypeSubstitutionMap getMemberSubstitutions(DeclContext *dc);
+
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
   ///
