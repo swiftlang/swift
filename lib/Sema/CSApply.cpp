@@ -1622,8 +1622,10 @@ namespace {
                                             tc.Context.Id_MaxBuiltinIntegerType,
                                             NLKind::QualifiedLookup,
                                             lookupResults);
-        if (lookupResults.size() == 1)
+        if (lookupResults.size() == 1) {
           MaxIntegerTypeDecl = dyn_cast<TypeAliasDecl>(lookupResults.front());
+          tc.validateDecl(MaxIntegerTypeDecl);
+        }
       }
       if (!MaxIntegerTypeDecl ||
           !MaxIntegerTypeDecl->getUnderlyingType()->is<BuiltinIntegerType>()) {

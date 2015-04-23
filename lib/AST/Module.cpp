@@ -694,7 +694,8 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     auto type = Type(archetype).subst(module, substitutions,
                                       /*ignoreMissing=*/hasTypeVariables,
                                       resolver);
-    assert(type && "Unable to perform type substitution");
+    if (!type)
+      type = ErrorType::get(module->getASTContext());
 
     SmallVector<ProtocolConformance *, 4> conformances;
     if (type->is<TypeVariableType>() || type->isDependentType()) {
@@ -714,7 +715,9 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
           conformances.push_back(nullptr);
           break;
         case ConformanceKind::DoesNotConform:
-          llvm_unreachable("Couldn't find conformance");
+          if (type->is<ErrorType>())
+            conformances.push_back(nullptr);
+          break;
         }
       }
     }

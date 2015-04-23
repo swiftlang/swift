@@ -1670,16 +1670,9 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
           ? conformingNominal->getLoc()
           : cast<ExtensionDecl>(conformingDC)->getLoc();
 
-    auto normal = ctx.getConformance(conformingType, protocol, conformanceLoc,
+    conformance = ctx.getConformance(conformingType, protocol, conformanceLoc,
                                      conformingDC,
                                      ProtocolConformanceState::Incomplete);
-
-    // FIXME: Fully check the conformance. We shouldn't need this.
-    if (resolver) {
-      resolver->checkConformance(normal);
-    }
-
-    conformance = normal;
   }
 
   // Record the conformance.

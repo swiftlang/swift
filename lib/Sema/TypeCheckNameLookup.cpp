@@ -63,6 +63,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
   assert(!type->is<TupleType>());
 
   // Local function that handles protocol members found via name lookup.
+  SmallVector<ValueDecl *, 4> protocolMembers;
   auto handleProtocolMembers = [&]() {
     if (!considerProtocolMembers)
       return;
@@ -71,7 +72,13 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
     // FIXME: This will eventually be the correct place to apply derived
     // conformances.
     result.filter([&](ValueDecl *value) -> bool {
-      return !isa<ProtocolDecl>(value->getDeclContext());
+      // Filter out and record all members of protocols.
+      if (isa<ProtocolDecl>(value->getDeclContext())) {
+        protocolMembers.push_back(value);
+        return false;
+      }
+
+      return true;
     });
   };
 
@@ -92,29 +99,22 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
     this->forceExternalDeclMembers(nominalLookupType);
 
     bool anyChange = false;
-    for (auto proto : nominalLookupType->getProtocols()) {
-      if (!nominalLookupType->derivesProtocolConformance(proto))
-        continue;
+    for (auto member : protocolMembers) {
+      auto proto = cast<ProtocolDecl>(member->getDeclContext());
+      ProtocolConformance *conformance = nullptr;
+      if (conformsToProtocol(type, proto, dc, isKnownPrivate, &conformance) &&
+          conformance) {
+        // FIXME: Just swap in this result, once
+        // forceExternalDeclMembers() is dead.
+        (void)conformance->getWitness(member, this);
 
-      Type protoType = proto->getDeclaredType();
-      if (isMetatype)
-        protoType = MetatypeType::get(protoType);
-
-      SmallVector<ValueDecl *, 4> requirements;
-      if (dc->lookupQualified(protoType, name, options, this, requirements)) {
-        // If the protocol contains the member we're looking for, force the
-        // conformance to be derived.
-        // FIXME: We don't actually need to emit the definitions here.
-        if (conformsToProtocol(nominalLookupType->getDeclaredTypeInContext(),
-                               proto, dc, isKnownPrivate))
-          anyChange = true;
-
-        // Don't just break out of the loop, though...it's possible (though
-        // unlikely) that two protocols with derivable conformances both have
-        // functions with the same name but different types.
+        anyChange = true;
       }
     }
 
+    // Perform the lookup again.
+    // FIXME: This is only because forceExternalDeclMembers() might do something
+    // interesting.
     if (anyChange) {
       dc->lookupQualified(type, name, options, this, result.Results);
       handleProtocolMembers();

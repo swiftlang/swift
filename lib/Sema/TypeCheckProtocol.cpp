@@ -111,7 +111,7 @@ namespace {
     /// True if we shouldn't complain about problems with this conformance
     /// right now, i.e. if methods are being called outside
     /// checkConformance().
-    bool SuppressDiagnostics = true;
+    bool SuppressDiagnostics;
 
     /// Whether we've already complained about problems with this conformance.
     bool AlreadyComplained = false;
@@ -197,16 +197,18 @@ namespace {
            ValueDecl *requirement, bool isError,
            std::function<void(TypeChecker &, NormalProtocolConformance *)> fn);
 
+  public:
     /// Emit any diagnostics that have been delayed.
     void emitDelayedDiags();
 
-  public:
-    ConformanceChecker(TypeChecker &tc, NormalProtocolConformance *conformance)
+    ConformanceChecker(TypeChecker &tc, NormalProtocolConformance *conformance,
+                      bool suppressDiagnostics = true)
       : TC(tc), Conformance(conformance),
         Proto(conformance->getProtocol()),
         Adoptee(conformance->getType()), 
         DC(conformance->getDeclContext()),
-        Loc(conformance->getLoc()) { }
+        Loc(conformance->getLoc()),
+        SuppressDiagnostics(suppressDiagnostics) { }
 
     /// Resolve all of the type witnesses.
     void resolveTypeWitnesses();
@@ -2601,8 +2603,23 @@ static Type getWitnessTypeForMatching(TypeChecker &tc, Type model,
       baseTy = tc.getSuperClassOf(baseTy);
   }
   
-  return tc.substMemberTypeWithBase(value->getModuleContext(), value, baseTy,
-                                    false);
+  Type type = value->getInterfaceType();
+  if (!type)
+    return nullptr;
+  
+  // Strip off the requirements of a generic function type.
+  // FIXME: This doesn't actually break recursion when substitution
+  // looks for an inferred type witness, but it makes it far less
+  // common, because most of the recursion involves the requirements
+  // of the generic type.
+  if (auto genericFn = type->getAs<GenericFunctionType>()) {
+    type = FunctionType::get(genericFn->getInput(),
+                             genericFn->getResult(),
+                             genericFn->getExtInfo());
+  }
+
+  return baseTy->getTypeOfMember(value->getModuleContext(), type,
+                                 value->getDeclContext());
 }
 
 /// Remove the 'self' type from the given type, if it's a method type.
@@ -3615,13 +3632,24 @@ void ConformanceChecker::emitDelayedDiags() {
 static ProtocolConformance *
 checkConformsToProtocol(TypeChecker &TC,
                         NormalProtocolConformance *conformance) {
-  // If we're already checking this conformance, just return it.
-  if (conformance->getState() == ProtocolConformanceState::Checking ||
-      conformance->getState() == ProtocolConformanceState::Complete ||
-      conformance->getState() == ProtocolConformanceState::Invalid)
+  switch (conformance->getState()) {
+  case ProtocolConformanceState::Incomplete:
+    // Check the conformance below.
+    break;
+
+  case ProtocolConformanceState::Checking:
+  case ProtocolConformanceState::Complete:
+    // Nothing to do.
     return conformance;
 
-  // Eit ou5
+  case ProtocolConformanceState::Invalid:
+    // Emit any delayed diagnostics and return.
+    // FIXME: Should we complete checking to emit more diagnostics?
+    ConformanceChecker(TC, conformance, false).emitDelayedDiags();
+    return conformance;
+  }
+
+  // Dig out some of the fields from the conformance.
   Type T = conformance->getType();
   auto canT = T->getCanonicalType();
   DeclContext *DC = conformance->getDeclContext();
