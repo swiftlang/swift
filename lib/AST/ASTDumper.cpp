@@ -51,24 +51,44 @@ void RequirementRepr::dump() const {
   llvm::errs() << "\n";
 }
 
-void RequirementRepr::print(raw_ostream &out) const {
+void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
+  auto printTy = [&](const TypeLoc &TyLoc) {
+    if (AsWritten && TyLoc.getTypeRepr()) {
+      TyLoc.getTypeRepr()->print(out);
+    } else {
+      TyLoc.getType().print(out);
+    }
+  };
+
   switch (getKind()) {
   case RequirementKind::Conformance:
-    getSubject().print(out);
+    printTy(getSubjectLoc());
     out << " : ";
-    getConstraint().print(out);
+    printTy(getConstraintLoc());
     break;
 
   case RequirementKind::SameType:
-    getFirstType().print(out);
+    printTy(getFirstTypeLoc());
     out << " == ";
-    getSecondType().print(out);
+    printTy(getSecondTypeLoc());
     break;
 
   case RequirementKind::WitnessMarker:
     out << "witness marker for ";
-    getFirstType().print(out);
+    printTy(getFirstTypeLoc());
     break;
+  }
+}
+
+void RequirementRepr::print(raw_ostream &out) const {
+  printImpl(out, /*AsWritten=*/false);
+}
+
+void RequirementRepr::printAsWritten(raw_ostream &out) const {
+  if (!AsWrittenString.empty()) {
+    out << AsWrittenString;
+  } else {
+    printImpl(out, /*AsWritten=*/true);
   }
 }
 

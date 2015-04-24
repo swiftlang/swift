@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 194; // Last change: null_class
+const uint16_t VERSION_MINOR = 195; // Last change: include 'as written string' for GenericRequirementLayout
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1054,8 +1054,9 @@ namespace decls_block {
   using GenericRequirementLayout = BCRecordLayout<
     GENERIC_REQUIREMENT,
     GenericRequirementKindField, // requirement kind
-    BCArray<TypeIDField>         // types involved (two for conformance,
-                                 // same-type; one for value witness marker)
+    TypeIDField,                 // types involved (two for conformance,
+    TypeIDField,                 // same-type; one for value witness marker)
+    BCBlob                       // as written string
   >;
 
   /// Placeholder that marks the last generic requirement in the generic

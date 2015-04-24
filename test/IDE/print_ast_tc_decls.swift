@@ -38,7 +38,7 @@
 // FIXME: rdar://15167697
 // FIXME: FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_ONE_LINE -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PREFER_TYPE_PRINTING -strict-whitespace < %t.printed.txt
+// RUN: FileCheck %s -check-prefix=PREFER_TYPE_REPR_PRINTING -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 //

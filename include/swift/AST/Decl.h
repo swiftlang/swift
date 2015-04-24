@@ -879,12 +879,17 @@ class RequirementRepr {
   RequirementKind Kind : 2;
   bool Invalid : 1;
   TypeLoc Types[2];
+  /// Set during deserialization; used to print out the requirements accurately
+  /// for the generated interface.
+  StringRef AsWrittenString;
 
   RequirementRepr(SourceLoc SeparatorLoc, RequirementKind Kind,
                   TypeLoc FirstType, TypeLoc SecondType)
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       Types{FirstType, SecondType} { }
   
+  void printImpl(raw_ostream &OS, bool AsWritten) const;
+
 public:
   /// \brief Construct a new conformance requirement.
   ///
@@ -1016,10 +1021,20 @@ public:
     return SeparatorLoc;
   }
 
+  /// Set during deserialization; used to print out the requirements accurately
+  /// for the generated interface.
+  StringRef getAsWrittenString() const {
+    return AsWrittenString;
+  }
+  void setAsWrittenString(StringRef Str) {
+    AsWrittenString = Str;
+  }
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
   void print(raw_ostream &OS) const;
+  void printAsWritten(raw_ostream &OS) const;
 };
   
 template<typename T, ArrayRef<T> (GenericParamList::*accessor)() const>

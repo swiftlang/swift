@@ -900,25 +900,13 @@ void Serializer::writeRequirements(ArrayRef<Requirement> requirements) {
     return;
 
   auto reqAbbrCode = DeclTypeAbbrCodes[GenericRequirementLayout::Code];
-  for (const auto &req : requirements) { {
-    switch (req.getKind()) {
-    case RequirementKind::Conformance:
-    case RequirementKind::SameType:
-      GenericRequirementLayout::emitRecord(
-        Out, ScratchRecord, reqAbbrCode,
-        getRawStableRequirementKind(req.getKind()),
-        addTypeRef(req.getFirstType()),
-        addTypeRef(req.getSecondType()));
-      break;
-
-    case RequirementKind::WitnessMarker:
-      GenericRequirementLayout::emitRecord(
-        Out, ScratchRecord, reqAbbrCode,
-        getRawStableRequirementKind(req.getKind()),
-        llvm::makeArrayRef(addTypeRef(req.getFirstType())));
-      break;
-    }
-  }
+  for (const auto &req : requirements) {
+    GenericRequirementLayout::emitRecord(
+      Out, ScratchRecord, reqAbbrCode,
+      getRawStableRequirementKind(req.getKind()),
+      addTypeRef(req.getFirstType()),
+      addTypeRef(req.getSecondType()),
+      StringRef());
   }
 }
 
@@ -945,21 +933,27 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
   }
 
   abbrCode = abbrCodes[GenericRequirementLayout::Code];
+  SmallString<64> ReqStr;
   for (auto next : genericParams->getRequirements()) {
+    ReqStr.clear();
+    llvm::raw_svector_ostream ReqOS(ReqStr);
+    next.printAsWritten(ReqOS);
     switch (next.getKind()) {
     case RequirementKind::Conformance:
       GenericRequirementLayout::emitRecord(
                                       Out, ScratchRecord, abbrCode,
                                       GenericRequirementKind::Conformance,
                                       addTypeRef(next.getSubject()),
-                                      addTypeRef(next.getConstraint()));
+                                      addTypeRef(next.getConstraint()),
+                                      ReqOS.str());
       break;
     case RequirementKind::SameType:
       GenericRequirementLayout::emitRecord(
                                       Out, ScratchRecord, abbrCode,
                                       GenericRequirementKind::SameType,
                                       addTypeRef(next.getFirstType()),
-                                      addTypeRef(next.getSecondType()));
+                                      addTypeRef(next.getSecondType()),
+                                      ReqOS.str());
       break;
     case RequirementKind::WitnessMarker:
       llvm_unreachable("Can't show up in requirement representations");

@@ -548,6 +548,12 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
       Printer << ", ";
     }
 
+    auto asWrittenStr = req.getAsWrittenString();
+    if (!asWrittenStr.empty()) {
+      Printer << asWrittenStr;
+      continue;
+    }
+
     switch (req.getKind()) {
     case RequirementKind::Conformance:
       printTypeLoc(req.getSubjectLoc());

@@ -766,14 +766,14 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
     }
     case GENERIC_REQUIREMENT: {
       uint8_t rawKind;
-      ArrayRef<uint64_t> rawTypeIDs;
-      GenericRequirementLayout::readRecord(scratch, rawKind, rawTypeIDs);
+      uint64_t rawTypeIDs[2];
+      GenericRequirementLayout::readRecord(scratch, rawKind,
+                                           rawTypeIDs[0], rawTypeIDs[1]);
 
       mapArchetypes();
 
       switch (rawKind) {
       case GenericRequirementKind::Conformance: {
-        assert(rawTypeIDs.size() == 2);
         auto subject = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
         auto constraint = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
 
@@ -783,7 +783,6 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
         break;
       }
       case GenericRequirementKind::SameType: {
-        assert(rawTypeIDs.size() == 2);
         auto first = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
         auto second = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
 
@@ -804,6 +803,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
         // an error so that we don't actually try to generate code.
         error();
       }
+
+      requirements.back().setAsWrittenString(blobData);
 
       break;
     }
@@ -860,12 +861,12 @@ void ModuleFile::readGenericRequirements(
     switch (recordID) {
     case GENERIC_REQUIREMENT: {
       uint8_t rawKind;
-      ArrayRef<uint64_t> rawTypeIDs;
-      GenericRequirementLayout::readRecord(scratch, rawKind, rawTypeIDs);
+      uint64_t rawTypeIDs[2];
+      GenericRequirementLayout::readRecord(scratch, rawKind,
+                                           rawTypeIDs[0], rawTypeIDs[1]);
 
       switch (rawKind) {
       case GenericRequirementKind::Conformance: {
-        assert(rawTypeIDs.size() == 2);
         auto subject = getType(rawTypeIDs[0]);
         auto constraint = getType(rawTypeIDs[1]);
 
@@ -874,7 +875,6 @@ void ModuleFile::readGenericRequirements(
         break;
       }
       case GenericRequirementKind::SameType: {
-        assert(rawTypeIDs.size() == 2);
         auto first = getType(rawTypeIDs[0]);
         auto second = getType(rawTypeIDs[1]);
 
@@ -883,7 +883,6 @@ void ModuleFile::readGenericRequirements(
         break;
       }
       case GenericRequirementKind::WitnessMarker: {
-        assert(rawTypeIDs.size() == 1);
         auto first = getType(rawTypeIDs[0]);
 
         requirements.push_back(Requirement(RequirementKind::WitnessMarker,
