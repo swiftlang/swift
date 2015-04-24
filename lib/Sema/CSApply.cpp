@@ -1482,7 +1482,8 @@ namespace {
       
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
-      auto Conformances = tc.Context.Allocate<ProtocolConformance *>(conformance?1:0);
+      auto Conformances =
+        tc.Context.Allocate<ProtocolConformance *>(conformance?1:0);
 
       if (conformsToBridgedToObjectiveC)
         Conformances[0] = conformance;

@@ -98,11 +98,22 @@ public:
       return !MUI->isVar();
     return false;
   }
-  
+
+  /// True if the memory object is the 'self' argument of an initializer in a
+  /// protocol extension.
+  bool isProtocolInitSelf() const {
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+      if (MUI->isRootSelf() && isa<ArchetypeType>(getType()))
+        return true;
+    return false;
+  }
+
   // True if the memory object is the 'self' argument of a enum initializer.
   bool isEnumInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf() && isa<EnumDecl>(getType()->getAnyNominal()))
+      if (MUI->isRootSelf())
+        if (auto decl = getType()->getAnyNominal())
+          if (isa<EnumDecl>(decl))
         return true;
     return false;
   }
@@ -110,15 +121,20 @@ public:
   // True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf() && isa<StructDecl>(getType()->getAnyNominal()))
+      if (MUI->isRootSelf())
+        if (auto decl = getType()->getAnyNominal())
+          if (isa<StructDecl>(decl))
         return true;
     return false;
   }
 
   // True if the memory object is the 'self' argument of a class initializer.
   bool isClassInitSelf() const {
-    if (isAnyInitSelf() && isa<ClassDecl>(getType()->getAnyNominal()))
-      return true;
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+      if (!MUI->isVar())
+        if (auto decl = getType()->getAnyNominal())
+          if (isa<ClassDecl>(decl))
+            return true;
     return false;
   }
 

@@ -1000,7 +1000,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   if (auto *CA = dyn_cast<CopyAddrInst>(Inst)) {
     if (CA->isInitializationOfDest() &&
         !CA->getFunction()->getArguments().empty() &&
-        CA->getFunction()->getArgument(0) && CA->getDest()) {
+        SILValue(CA->getFunction()->getArgument(0)) == CA->getDest()) {
       if (TheMemory.isEnumInitSelf()) {
         if (!shouldEmitError(Inst)) return;
         diagnose(Module, Inst->getLoc(),

@@ -37,12 +37,15 @@ static unsigned getElementCountRec(CanType T,
   // Stored properties with tuple types are tracked with independent lifetimes
   // for each of the tuple members.
   if (IsSelfOfNonDelegatingInitializer) {
-    auto *NTD = cast<NominalTypeDecl>(T->getAnyNominal());
-    unsigned NumElements = 0;
-    for (auto *VD : NTD->getStoredProperties())
-      NumElements += getElementCountRec(VD->getType()->getCanonicalType(),
-                                        false);
-    return NumElements;
+    // Protocols never have a stored properties.
+    if (auto *NTD = cast_or_null<NominalTypeDecl>(T->getAnyNominal())) {
+
+      unsigned NumElements = 0;
+      for (auto *VD : NTD->getStoredProperties())
+        NumElements += getElementCountRec(VD->getType()->getCanonicalType(),
+                                          false);
+      return NumElements;
+    }
   }
 
   // Otherwise, it is a single element.
@@ -123,15 +126,16 @@ static CanType getElementTypeRec(CanType T, unsigned EltNo,
   // Stored properties with tuple types are tracked with independent lifetimes
   // for each of the tuple members.
   if (IsSelfOfNonDelegatingInitializer) {
-    auto *NTD = cast<NominalTypeDecl>(T->getAnyNominal());
-    for (auto *VD : NTD->getStoredProperties()) {
-      auto FieldType = VD->getType()->getCanonicalType();
-      unsigned NumFieldElements = getElementCountRec(FieldType, false);
-      if (EltNo < NumFieldElements)
-        return getElementTypeRec(FieldType, EltNo, false);
-      EltNo -= NumFieldElements;
+    if (auto *NTD = cast_or_null<NominalTypeDecl>(T->getAnyNominal())) {
+      for (auto *VD : NTD->getStoredProperties()) {
+        auto FieldType = VD->getType()->getCanonicalType();
+        unsigned NumFieldElements = getElementCountRec(FieldType, false);
+        if (EltNo < NumFieldElements)
+          return getElementTypeRec(FieldType, EltNo, false);
+        EltNo -= NumFieldElements;
+      }
+      llvm::report_fatal_error("invalid element number");
     }
-    llvm::report_fatal_error("invalid element number");
   }
 
   // Otherwise, it is a leaf element.
@@ -174,30 +178,32 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
     }
 
     // If this is the top level of a 'self' value, we flatten structs and
-    // classes. Stored properties with tuple types are tracked with independent
+    // classes.  Stored properties with tuple types are tracked with independent
     // lifetimes for each of the tuple members.
     if (IsSelf) {
-      auto *NTD = cast<NominalTypeDecl>(PointeeType->getAnyNominal());
-      if (isa<ClassDecl>(NTD) && Ptr.getType().isAddress())
-        Ptr = B.createLoad(Loc, Ptr);
-      for (auto *VD : NTD->getStoredProperties()) {
-        auto FieldType = VD->getType()->getCanonicalType();
-        unsigned NumFieldElements = getElementCountRec(FieldType, false);
-        if (EltNo < NumFieldElements) {
-          if (isa<StructDecl>(NTD))
-            Ptr = B.createStructElementAddr(Loc, Ptr, VD);
-          else {
-            assert(isa<ClassDecl>(NTD));
-            Ptr = B.createRefElementAddr(Loc, Ptr, VD);
-          }
+      if (auto *NTD =
+             cast_or_null<NominalTypeDecl>(PointeeType->getAnyNominal())) {
+        if (isa<ClassDecl>(NTD) && Ptr.getType().isAddress())
+          Ptr = B.createLoad(Loc, Ptr);
+        for (auto *VD : NTD->getStoredProperties()) {
+          auto FieldType = VD->getType()->getCanonicalType();
+          unsigned NumFieldElements = getElementCountRec(FieldType, false);
+          if (EltNo < NumFieldElements) {
+            if (isa<StructDecl>(NTD))
+              Ptr = B.createStructElementAddr(Loc, Ptr, VD);
+            else {
+              assert(isa<ClassDecl>(NTD));
+              Ptr = B.createRefElementAddr(Loc, Ptr, VD);
+            }
 
-          PointeeType = FieldType;
-          IsSelf = false;
-          break;
+            PointeeType = FieldType;
+            IsSelf = false;
+            break;
+          }
+          EltNo -= NumFieldElements;
         }
-        EltNo -= NumFieldElements;
+        continue;
       }
-      continue;
     }
 
     // Have we gotten to our leaf element?
@@ -250,17 +256,18 @@ getPathStringToElement(unsigned Element, std::string &Result) const {
 
   // If this is indexing into a field of 'self', look it up.
   if (IsSelfOfNonDelegatingInitializer) {
-    auto *NTD = cast<NominalTypeDecl>(getType()->getAnyNominal());
-    for (auto *VD : NTD->getStoredProperties()) {
-      auto FieldType = VD->getType()->getCanonicalType();
-      unsigned NumFieldElements = getElementCountRec(FieldType, false);
-      if (Element < NumFieldElements) {
-        Result += '.';
-        Result += VD->getName().str();
-        getPathStringToElementRec(FieldType, Element, Result);
-        return VD;
+    if (auto *NTD = cast_or_null<NominalTypeDecl>(getType()->getAnyNominal())) {
+      for (auto *VD : NTD->getStoredProperties()) {
+        auto FieldType = VD->getType()->getCanonicalType();
+        unsigned NumFieldElements = getElementCountRec(FieldType, false);
+        if (Element < NumFieldElements) {
+          Result += '.';
+          Result += VD->getName().str();
+          getPathStringToElementRec(FieldType, Element, Result);
+          return VD;
+        }
+        Element -= NumFieldElements;
       }
-      Element -= NumFieldElements;
     }
   }
 
@@ -283,13 +290,14 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   // can't have 'let' properties.
   if (!IsSelfOfNonDelegatingInitializer) return IsLet;
 
-  auto *NTD = cast<NominalTypeDecl>(getType()->getAnyNominal());
-  for (auto *VD : NTD->getStoredProperties()) {
-    auto FieldType = VD->getType()->getCanonicalType();
-    unsigned NumFieldElements = getElementCountRec(FieldType, false);
-    if (Element < NumFieldElements)
-      return VD->isLet();
-    Element -= NumFieldElements;
+  if (auto *NTD = cast_or_null<NominalTypeDecl>(getType()->getAnyNominal())) {
+    for (auto *VD : NTD->getStoredProperties()) {
+      auto FieldType = VD->getType()->getCanonicalType();
+      unsigned NumFieldElements = getElementCountRec(FieldType, false);
+      if (Element < NumFieldElements)
+        return VD->isLet();
+      Element -= NumFieldElements;
+    }
   }
 
   // Otherwise, we miscounted elements?

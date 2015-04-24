@@ -1047,3 +1047,19 @@ enum MyAwesomeEnum {
   }// expected-error {{return from enum initializer method without storing to 'self'}}
 }
 
+// <rdar://problem/20679379> DI crashes on initializers on protocol extensions
+extension SomeProtocol {
+  init?() {
+    let a = self  // expected-error {{variable 'self' used before being initialized}}
+    self = a
+  }
+
+  init(a : Int) {
+  } // expected-error {{return from initializer without initializing all stored properties}}
+  // expected-note@-1 {{'self' not initialized}}
+
+  init(c : Float) {
+    protoMe()   // expected-error {{variable 'self' used before being initialized}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+  // expected-note@-1 {{'self' not initialized}}
+}
