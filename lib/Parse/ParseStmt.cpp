@@ -694,6 +694,22 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     }
   }
 
+  // If this is a 'catch' clause and we have "catch {" or "catch where...",
+  // then we get an implicit "let error" pattern.
+  if (parsingContext == GuardedPatternContext::Catch &&
+      P.Tok.isAny(tok::l_brace, tok::kw_where)) {
+    auto loc = P.Tok.getLoc();
+    auto errorName = P.Context.getIdentifier("error");
+    auto var = new (P.Context) VarDecl(/*static*/ false, /*IsLet*/true,
+                                       loc, errorName, Type(),
+                                       P.CurDeclContext);
+    auto namePattern = new (P.Context) NamedPattern(var);
+    auto varPattern = new (P.Context) VarPattern(loc, /*isLet*/true,
+                                                 namePattern, /*implicit*/true);
+    patternResult = makeParserResult(varPattern);
+  }
+
+
   // Okay, if the special code-completion didn't kick in, parse a
   // matching pattern.
   if (patternResult.isNull()) {
