@@ -1418,6 +1418,23 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       });
   }
   assert(!refType->isDependentType() && "Cannot have a dependent type here");
+  
+  // If we're binding to an init member, the 'throws' need to line up between
+  // the bound and reference types.
+  if (choice.isDecl()) {
+    auto decl = choice.getDecl();
+    if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
+      auto boundFunctionType = boundType->getAs<AnyFunctionType>();
+        
+      if (boundFunctionType &&
+          CD->isBodyThrowing() != boundFunctionType->throws()) {
+        boundType = FunctionType::get(boundFunctionType->getInput(),
+                                      boundFunctionType->getResult(),
+                                      boundFunctionType->getExtInfo().
+                                                          withThrows());
+      }
+    }
+  }
 
   // Add the type binding constraint.
   addConstraint(ConstraintKind::Bind, boundType, refType, locator);

@@ -119,3 +119,10 @@ struct A {
 func fi1() throws {
     A(doomed: ())
 }
+
+struct B {
+ init() throws {}
+ init(foo: Int) {}
+}
+
+B(foo: 0)
