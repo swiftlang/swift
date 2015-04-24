@@ -22,12 +22,14 @@ public func _stdlib_isOSVersionAtLeast(
   patch: Builtin.Word
 ) -> Builtin.Int1 {
 #if os(OSX) || os(iOS)
-  let version = _swift_stdlib_operatingSystemVersion()
+  let runningVersion = _swift_stdlib_operatingSystemVersion()
+  let queryVersion = _SwiftNSOperatingSystemVersion(
+    majorVersion: Int(major),
+    minorVersion: Int(minor),
+    patchVersion: Int(patch)
+  )
 
-  let result =
-    (version.majorVersion >= Int(major)) &&
-    (version.minorVersion >= Int(minor)) &&
-    (version.patchVersion >= Int(patch))
+  let result = runningVersion >= queryVersion
   
   return result.value
 #else
@@ -36,4 +38,79 @@ public func _stdlib_isOSVersionAtLeast(
   // rdar://problem/18881232
   return false.value
 #endif
+}
+
+extension _SwiftNSOperatingSystemVersion : Comparable { }
+
+public func ==(
+  left: _SwiftNSOperatingSystemVersion,
+  right: _SwiftNSOperatingSystemVersion
+) -> Bool {
+  return left.majorVersion == right.majorVersion &&
+         left.minorVersion == right.minorVersion &&
+         left.patchVersion == right.patchVersion
+}
+
+/// Lexicographic comparison of version components.
+
+public func <(
+  left: _SwiftNSOperatingSystemVersion,
+  right: _SwiftNSOperatingSystemVersion
+) -> Bool {
+  if left.majorVersion > right.majorVersion {
+    return false
+  }
+
+  if left.majorVersion < right.majorVersion {
+    return true
+  }
+
+  if left.minorVersion > right.minorVersion {
+    return false
+  }
+
+  if left.minorVersion < right.minorVersion {
+    return true
+  }
+
+  if left.patchVersion > right.patchVersion {
+    return false
+  }
+
+  if left.patchVersion < right.patchVersion {
+    return true
+  }
+
+  return false
+}
+
+public func >=(
+  left: _SwiftNSOperatingSystemVersion,
+  right: _SwiftNSOperatingSystemVersion
+) -> Bool {
+  if left.majorVersion < right.majorVersion {
+    return false
+  }
+
+  if left.majorVersion > right.majorVersion {
+    return true
+  }
+
+  if left.minorVersion < right.minorVersion {
+    return false
+  }
+
+  if left.minorVersion > right.minorVersion {
+    return true
+  }
+
+  if left.patchVersion < right.patchVersion {
+    return false
+  }
+
+  if left.patchVersion > right.patchVersion {
+    return true
+  }
+
+  return true
 }

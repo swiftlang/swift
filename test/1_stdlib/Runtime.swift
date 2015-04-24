@@ -7,6 +7,7 @@ import Swift
 import StdlibUnittest
 import Foundation
 import CoreGraphics
+import SwiftShims
 
 var nsObjectCanaryCount = 0
 @objc class NSObjectCanary : NSObject {
@@ -1724,6 +1725,65 @@ ObjCConformsToProtocolTestSuite.test("cast/instance") {
 ObjCConformsToProtocolTestSuite.test("cast/metatype") {
   expectTrue(SomeClass.self is SomeObjCProto.Type)
   expectTrue(SomeSubclass.self is SomeObjCProto.Type)
+}
+
+var AvailabilityVersionsTestSuite = TestSuite("AvailabilityVersions")
+
+AvailabilityVersionsTestSuite.test("lexicographic_compare") {
+  func version(
+    major: Int,
+    minor: Int,
+    patch: Int
+  ) -> _SwiftNSOperatingSystemVersion {
+    return _SwiftNSOperatingSystemVersion(
+      majorVersion: major,
+      minorVersion: minor,
+      patchVersion: patch
+    )
+  }
+
+  checkComparable(.EQ, version(0, 0, 0), version(0, 0, 0))
+
+  checkComparable(.LT, version(0, 0, 0), version(0, 0, 1))
+  checkComparable(.LT, version(0, 0, 0), version(0, 1, 0))
+  checkComparable(.LT, version(0, 0, 0), version(1, 0, 0))
+
+  checkComparable(.LT,version(10, 9, 0), version(10, 10, 0))
+  checkComparable(.LT,version(10, 9, 11), version(10, 10, 0))
+  checkComparable(.LT,version(10, 10, 3), version(10, 11, 0))
+
+  checkComparable(.LT, version(8, 3, 0), version(9, 0, 0))
+
+  checkComparable(.LT, version(0, 11, 0), version(10, 10, 4))
+  checkComparable(.LT, version(0, 10, 0), version(10, 10, 4))
+  checkComparable(.LT, version(3, 2, 1), version(4, 3, 2))
+  checkComparable(.LT, version(1, 2, 3), version(2, 3, 1))
+
+  checkComparable(.EQ, version(10, 11, 12), version(10, 11, 12))
+
+  checkEquatable(true, version(1, 2, 3), version(1, 2, 3))
+  checkEquatable(false, version(1, 2, 3), version(1, 2, 42))
+  checkEquatable(false, version(1, 2, 3), version(1, 42, 3))
+  checkEquatable(false, version(1, 2, 3), version(42, 2, 3))
+}
+
+AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
+  func isAtLeastOS(major: Int, minor: Int, patch: Int) -> Bool {
+    return _getBool(_stdlib_isOSVersionAtLeast(major._builtinWordValue,
+                                               minor._builtinWordValue,
+                                               patch._builtinWordValue))
+  }
+
+// _stdlib_isOSVersionAtLeast is broken for AppleTV and
+// watchOS. rdar://problem/20234735
+#if os(OSX) || os(iOS)
+  // This test assumes that no version component on an OS we test upon
+  // will ever be greater than 1066 and that every major version will always
+  // be greater than 1.
+  expectFalse(isAtLeastOS(1066, 0, 0))
+  expectTrue(isAtLeastOS(0, 1066, 0))
+  expectTrue(isAtLeastOS(0, 0, 1066))
+#endif
 }
 
 runAllTests()
