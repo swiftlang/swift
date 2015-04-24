@@ -12,15 +12,18 @@
 import Swift
 
 // These are just here pending review.
-/// Return `true` iff `t0` is identical to `t1`
-func == (t0: Any.Type, t1: Any.Type) -> Bool {
+/// Return `true` iff `t0` is identical to `t1`; i.e. if they are both
+/// `nil` or they both represent the same type.
+public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return unsafeBitCast(t0, Int.self) == unsafeBitCast(t1, Int.self)
 }
 
-/// Return `false` iff `t0` is identical to `t1`
-func != (t0: Any.Type, t1: Any.Type) -> Bool {
+/// Return `false` iff `t0` is identical to `t1`; i.e. if they are both
+/// `nil` or they both represent the same type.
+public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return !(t0 == t1)
 }
+
 
 #if _runtime(_ObjC)
 // FIXME: ExistentialCollection needs to be supported before this will work
@@ -37,17 +40,12 @@ func != (t0: Any.Type, t1: Any.Type) -> Bool {
 /// Mirrors are used by playgrounds and the debugger.
 public struct Mirror {
   /// Representation of descendant classes that don't override
-  /// `customMirror()`
-  ///
-  /// A `CustomReflectable` class can control whether its mirror will
-  /// represent descendant classes that don't override
-  /// `customMirror()`, by initializing the mirror with a
-  /// `DefaultDescendantRepresentation`.
+  /// `customMirror()`.
   ///
   /// Note that the effect of this setting goes no deeper than the
   /// nearest descendant class that overrides `customMirror()`, which
   /// in turn can determine representation of *its* descendants.
-  public enum DefaultDescendantRepresentation {
+  internal enum DefaultDescendantRepresentation {
   /// Generate a default mirror for descendant classes that don't
   /// override `customMirror()`.  
   ////
@@ -63,11 +61,12 @@ public struct Mirror {
   case Suppressed
   }
 
-  /// Representation of ancestor classes
+  /// Representation of ancestor classes.
   ///
   /// A `CustomReflectable` class can control how its mirror will
   /// represent ancestor classes by initializing the mirror with a
-  /// `AncestorRepresentation`.
+  /// `AncestorRepresentation`.  This setting has no effect on mirrors
+  /// reflecting value type instances.
   public enum AncestorRepresentation {
   /// Generate a default mirror for all ancestor classes.  This is the
   /// default behavior.
@@ -214,20 +213,15 @@ public struct Mirror {
   /// using an optional `displayStyle`.
   ///
   /// If `subject` is not a class instance, `ancestorRepresentation`
-  /// and `defaultDescendantRepresentation` are ignored.  Otherwise:
+  /// is ignored.  Otherwise, `ancestorRepresentation` determines
+  /// whether ancestor classes will be represented and whether their
+  /// `customMirror` implementations will be used.  By default, a
+  /// representation is automatically generated and any `customMirror`
+  /// implementation is bypassed.  To prevent bypassing customized
+  /// ancestors, `customMirror` overrides should initialize the
+  /// `Mirror` with ::
   ///
-  /// * `defaultDescendantRepresentation` determines whether descendant
-  ///   classes that don't override `customMirror` will be represented.
-  ///   By default, a representation is automatically generated.
-  ///
-  /// * `ancestorRepresentation` determines whether ancestor classes
-  ///   will be represented and whether their `customMirror`
-  ///   implementations will be used.  By default, a representation is
-  ///   automatically generated and any `customMirror` implementation
-  ///   is bypassed.  To prevent bypassing customized ancestors,
-  ///   `customMirror` overrides should initialize the `Mirror` with ::
-  ///
-  ///     ancestorRepresentation: .Customized(super.customMirror))
+  ///     ancestorRepresentation: .Customized(super.customMirror)
   ///
   /// Note: the traversal protocol modeled by `children`\ 's indices
   /// (`ForwardIndexType`, `BidirectionalIndexType`, or
@@ -241,16 +235,16 @@ public struct Mirror {
     _ subject: T,
     children: C,
     displayStyle: DisplayStyle? = nil,
-    ancestorRepresentation: AncestorRepresentation = .Generated,
-    defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated
+    ancestorRepresentation: AncestorRepresentation = .Generated
   ) {
-    self._subjectType = T.self
+    self.subjectType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
       
     self.children = Children(children)
     self.displayStyle = displayStyle
-    self._defaultDescendantRepresentation = defaultDescendantRepresentation
+    self._defaultDescendantRepresentation
+      = subject is CustomLeafReflectable ? .Suppressed : .Generated
   }
 
   /// Represent `subject` with child values given by
@@ -267,20 +261,15 @@ public struct Mirror {
   ///   }
   ///
   /// If `subject` is not a class instance, `ancestorRepresentation`
-  /// and `defaultDescendantRepresentation` are ignored.  Otherwise:
+  /// is ignored.  Otherwise, `ancestorRepresentation` determines
+  /// whether ancestor classes will be represented and whether their
+  /// `customMirror` implementations will be used.  By default, a
+  /// representation is automatically generated and any `customMirror`
+  /// implementation is bypassed.  To prevent bypassing customized
+  /// ancestors, `customMirror` overrides should initialize the
+  /// `Mirror` with ::
   ///
-  /// * `defaultDescendantRepresentation` determines whether descendant
-  ///   classes that don't override `customMirror` will be represented.
-  ///   By default, a representation is automatically generated.
-  ///
-  /// * `ancestorRepresentation` determines whether ancestor classes
-  ///   will be represented and whether their `customMirror`
-  ///   implementations will be used.  By default, a representation is
-  ///   automatically generated and any `customMirror` implementation
-  ///   is bypassed.  To prevent bypassing customized ancestors,
-  ///   `customMirror` overrides should initialize the `Mirror` with ::
-  ///
-  ///     ancestorRepresentation: .Customized(super.customMirror))
+  ///     ancestorRepresentation: .Customized(super.customMirror)
   ///
   /// Note: the traversal protocol modeled by `children`\ 's indices
   /// (`ForwardIndexType`, `BidirectionalIndexType`, or
@@ -294,10 +283,9 @@ public struct Mirror {
     _ subject: T,
     unlabeledChildren: C,
     displayStyle: DisplayStyle? = nil,
-    ancestorRepresentation: AncestorRepresentation = .Generated,
-    defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated
+    ancestorRepresentation: AncestorRepresentation = .Generated
   ) {
-    self._subjectType = T.self
+    self.subjectType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
       
@@ -305,7 +293,8 @@ public struct Mirror {
       lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
     )
     self.displayStyle = displayStyle
-    self._defaultDescendantRepresentation = defaultDescendantRepresentation
+    self._defaultDescendantRepresentation
+      = subject is CustomLeafReflectable ? .Suppressed : .Generated
   }
 
   /// Represent `subject` with labeled structure described by
@@ -317,20 +306,15 @@ public struct Mirror {
   /// will exactly match that of the literal you pass.
   ///
   /// If `subject` is not a class instance, `ancestorRepresentation`
-  /// and `defaultDescendantRepresentation` are ignored.  Otherwise:
+  /// is ignored.  Otherwise, `ancestorRepresentation` determines
+  /// whether ancestor classes will be represented and whether their
+  /// `customMirror` implementations will be used.  By default, a
+  /// representation is automatically generated and any `customMirror`
+  /// implementation is bypassed.  To prevent bypassing customized
+  /// ancestors, `customMirror` overrides should initialize the
+  /// `Mirror` with ::
   ///
-  /// * `defaultDescendantRepresentation` determines whether descendant
-  ///   classes that don't override `customMirror` will be represented.
-  ///   By default, a representation is automatically generated.
-  ///
-  /// * `ancestorRepresentation` determines whether ancestor classes
-  ///   will be represented and whether their `customMirror`
-  ///   implementations will be used.  By default, a representation is
-  ///   automatically generated and any `customMirror` implementation
-  ///   is bypassed.  To prevent bypassing customized ancestors,
-  ///   `customMirror` overrides should initialize the `Mirror` with ::
-  ///
-  ///     ancestorRepresentation: .Customized(super.customMirror))
+  ///     ancestorRepresentation: .Customized(super.customMirror)
   ///
   /// Note: The resulting `Mirror`\ 's `children` may be upgraded to
   /// `AnyRandomAccessCollection` later.  See the failable
@@ -340,10 +324,9 @@ public struct Mirror {
     _ subject: T,
     children: DictionaryLiteral<String, Any>,
     displayStyle: DisplayStyle? = nil,
-    ancestorRepresentation: AncestorRepresentation = .Generated,
-    defaultDescendantRepresentation: DefaultDescendantRepresentation = .Generated
+    ancestorRepresentation: AncestorRepresentation = .Generated
   ) {
-    self._subjectType = T.self
+    self.subjectType = T.self
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
       
@@ -351,9 +334,16 @@ public struct Mirror {
       lazy(children).map { Child(label: $0.0, value: $0.1) }
     )
     self.displayStyle = displayStyle
-    self._defaultDescendantRepresentation = defaultDescendantRepresentation
+    self._defaultDescendantRepresentation
+      = subject is CustomLeafReflectable ? .Suppressed : .Generated
   }
   
+  /// The static type of the subject being reflected.
+  /// 
+  /// This type may differ from the subject's dynamic type when `self`
+  /// is the `superclassMirror()` of another mirror.
+  public let subjectType: Any.Type
+
   /// A collection of `Child` elements describing the structure of the
   /// reflected subject.
   public let children: Children
@@ -366,7 +356,6 @@ public struct Mirror {
   }
 
   internal let _makeSuperclassMirror: ()->Mirror?
-  internal let _subjectType: Any.Type
   internal let _defaultDescendantRepresentation: DefaultDescendantRepresentation
 }
 
@@ -383,6 +372,11 @@ public protocol CustomReflectable {
   /// unaffected by subsequent mutations of `self`.
   func customMirror() -> Mirror
 }
+
+/// A type that explicitly supplies its own Mirror but whose
+/// descendant classes are not represented in the Mirror unless they
+/// also override `customMirror()`.
+public protocol CustomLeafReflectable : CustomReflectable {}
 
 //===--- Addressing -------------------------------------------------------===//
 
@@ -542,7 +536,7 @@ internal extension Mirror {
     ancestor: Mirror,
     legacy legacyMirror: MirrorType? = nil
   ) {
-    if ancestor._subjectType == subjectClass
+    if ancestor.subjectType == subjectClass
       || ancestor._defaultDescendantRepresentation == .Suppressed {
       self = ancestor
     }
@@ -582,7 +576,7 @@ internal extension Mirror {
     else {
       self._makeSuperclassMirror = Mirror._noSuperclassMirror
     }
-    self._subjectType = subjectType
+    self.subjectType = subjectType
     self.children = Children(LegacyChildren(legacyMirror))
     self.displayStyle = DisplayStyle(legacy: legacyMirror.disposition)
     self._defaultDescendantRepresentation = .Generated
