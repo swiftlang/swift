@@ -732,7 +732,7 @@ extension _StringCore : RangeReplaceableCollectionType {
     Swift.removeRange(&self, subRange)
   }
 
-  public mutating func removeAll(keepCapacity: Bool = false) {
+  public mutating func removeAll(#keepCapacity: Bool = false) {
     Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
 }

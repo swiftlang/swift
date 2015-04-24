@@ -243,7 +243,7 @@ internal func _fromMsgPackVariant<
   Value : RangeReplaceableCollectionType
   where
     Value.Generator.Element : Serializable${value_kind}Type
->(msgPackVariant: MsgPackVariant, inout value: Value) {
+>(msgPackVariant: MsgPackVariant, inout _ value: Value) {
   switch msgPackVariant {
 %   if value_kind == 'Scalar':
   case .Binary(let byteBlob):
@@ -280,7 +280,7 @@ extension _MsgPackDeserializerImpl : ArraySerializerType {
 % for value_kind in [ 'Scalar', 'Array', 'Dictionary', 'FixedDictionary' ]:
 internal func _fromMsgPackVariant<
   Value : Serializable${value_kind}Type
->(msgPackVariant: MsgPackVariant, inout value: [String : Value]) {
+>(msgPackVariant: MsgPackVariant, inout _ value: [String : Value]) {
   switch msgPackVariant {
   case .Map(let m):
     value.removeAll()

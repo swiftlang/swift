@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-silgen -o - | FileCheck %s
 
-func standalone_generic<T>(x: T, y: T) -> T { return x }
+func standalone_generic<T>(x: T, _ y: T) -> T { return x }
 
 // CHECK: sil hidden @_TF16specialize_thunk21return_specialization
 func return_specialization() -> (x: Int, y: Int) -> Int {

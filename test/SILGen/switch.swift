@@ -850,7 +850,7 @@ func test_union_generic_instance(#u: Generic<Int, String>) {
 enum Foo { case A, B }
 
 // CHECK-LABEL: sil hidden @_TF6switch22test_switch_two_unionsFT1xOS_3Foo1yS0__T_
-func test_switch_two_unions(#x: Foo, #y: Foo) {
+func test_switch_two_unions(#x: Foo, y: Foo) {
   // CHECK:   [[T0:%.*]] = tuple (%0 : $Foo, %1 : $Foo)
   // CHECK:   [[X:%.*]] = tuple_extract [[T0]] : $(Foo, Foo), 0
   // CHECK:   [[Y:%.*]] = tuple_extract [[T0]] : $(Foo, Foo), 1
@@ -935,7 +935,7 @@ struct StructPatternTestAO {
 func ~=(a: P, b: P) -> Bool { return true }
 
 // CHECK-LABEL: sil hidden @_TF6switch22test_struct_pattern_aoFT1sVS_19StructPatternTestAO1pPS_1P__T_
-func test_struct_pattern_ao(#s: StructPatternTestAO, #p: P) {
+func test_struct_pattern_ao(#s: StructPatternTestAO, p: P) {
   // CHECK:   [[S:%.*]] = alloc_stack $StructPatternTestAO
   // CHECK:   copy_addr %0 to [initialization] [[S]]#1
   // CHECK:   [[T0:%.*]] = struct_element_addr [[S]]#1 : $*StructPatternTestAO, #StructPatternTestAO.x
@@ -1122,7 +1122,7 @@ func test_class_pattern_with_isa_2(#k: ClassPatternTest) {
 }
 
 // <rdar://problem/14826416>
-func rdar14826416<T, U>(#t: T, #u: U) {
+func rdar14826416<T, U>(#t: T, u: U) {
   switch t {
   case is Int: println("Int")
   case is U: println("U")
@@ -1139,7 +1139,7 @@ class Rdar14835992 {}
 class SubRdar14835992 : Rdar14835992 {}
 
 // CHECK-LABEL: sil hidden @_TF6switch12rdar14835992U___FT1tCS_12Rdar148359922ttQ_2uuQ0__T_
-func rdar14835992<T, U>(#t: Rdar14835992, #tt: T, #uu: U) {
+func rdar14835992<T, U>(#t: Rdar14835992, tt: T, uu: U) {
   switch t {
   case is SubRdar14835992: println("Sub")
   case is T: println("T")
@@ -1185,7 +1185,7 @@ enum ABC { case A, B, C }
 // CHECK:         function_ref @_TF6switch1dFT_T_
 // CHECK:       [[X_NOT_C]]:
 // CHECK:         function_ref @_TF6switch1eFT_T_
-func testTupleWildcards(x: ABC, y: ABC) {
+func testTupleWildcards(x: ABC, _ y: ABC) {
   switch (x, y) {
   case (.A, _):
     a()

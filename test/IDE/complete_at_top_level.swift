@@ -64,7 +64,7 @@ struct FooStruct {
 var fooObject : FooStruct
 
 func fooFunc1() {}
-func fooFunc2(a: Int, b: Double) {}
+func fooFunc2(a: Int, _ b: Double) {}
 
 func erroneous1(x: Undeclared) {}
 

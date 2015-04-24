@@ -14,7 +14,7 @@
 /// the elements of the `i`\ th pair are the `i`\ th elements of each
 /// underlying sequence.
 public func zip<S0: SequenceType, S1: SequenceType>(
-  s0: S0, s1: S1) -> Zip2<S0, S1> {
+  s0: S0, _ s1: S1) -> Zip2<S0, S1> {
   // FIXME(prext): remove this function when protocol extensions land.
   return s0._prext_zip(s1)
 }

@@ -85,7 +85,7 @@ func bufferID<T : _ArrayType>(x: T) -> BufferID {
 }
 
 func checkReallocation<T : _ArrayType>(
-  x: T, lastBuffer: BufferID, reallocationExpected: Bool
+  x: T, _ lastBuffer: BufferID, _ reallocationExpected: Bool
 ) -> BufferID {
   let currentBuffer = bufferID(x)
   if (currentBuffer != lastBuffer) != reallocationExpected {
@@ -100,7 +100,7 @@ func checkEqual<
   where 
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Equatable
->(a1: S1, a2: S2, expected: Bool) {
+>(a1: S1, _ a2: S2, _ expected: Bool) {
   if equal(a1, a2) != expected {
     let un = expected ? "un" : ""
     println("unexpectedly \(un)equal sequences!")
@@ -113,7 +113,7 @@ where T.Generator.Element == T._Buffer.Element,
           T._Buffer.Element == T.Element,
           T.Element == X,
           T.Index == Int
->(_: T.Type, label: String) {
+>(_: T.Type, _ label: String) {
   print("test: \(label)...")
 
   var x: T = [1, 2, 3, 4, 5]
@@ -141,7 +141,7 @@ where T.Generator.Element == T._Buffer.Element,
   checkEqual(x, y, false)
 
   func checkReallocations(
-    var a: T, growthDescription: String, growBy1: (inout _: T)->()
+    var a: T, _ growthDescription: String, _ growBy1: (inout _: T)->()
   ) -> () {
     var reallocations = 0
 

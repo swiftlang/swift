@@ -22,11 +22,11 @@ var closure6 = $0  // expected-error {{anonymous closure argument not contained 
 var closure7 : Int =
    { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
 
-func funcdecl1(a: Int, y: Int) {}
+func funcdecl1(a: Int, _ y: Int) {}
 func funcdecl3() -> Int {}
-func funcdecl4(a: ((Int)->Int), b: Int) {}
+func funcdecl4(a: ((Int)->Int), _ b: Int) {}
 
-func funcdecl5(a: Int, y: Int) {
+func funcdecl5(a: Int, _ y: Int) {
   // Pass in a closure containing the call to funcdecl3.
   funcdecl4({ funcdecl3() }, 12) // expected-error{{cannot invoke 'funcdecl4' with an argument list of type '(() -> _, Int)'}} expected-note{{expected an argument list of type '(((Int) -> Int), Int)'}}
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments

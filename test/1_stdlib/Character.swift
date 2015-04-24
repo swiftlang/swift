@@ -92,7 +92,7 @@ let testCharacters = [
   "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 10 bytes
 ]
 
-func randomGraphemeCluster(minSize: Int, maxSize: Int) -> String {
+func randomGraphemeCluster(minSize: Int, _ maxSize: Int) -> String {
   var n = pickRandom((minSize + 1)..<maxSize)
   var result = pickRandom(baseScalars)
   for i in 0..<n {

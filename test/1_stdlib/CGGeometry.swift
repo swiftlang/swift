@@ -4,18 +4,18 @@
 
 import CoreGraphics
 
-func print(r: CGPoint, prefix: String) {
+func print(r: CGPoint, _ prefix: String) {
   println("\(prefix) \(r.x) \(r.y)")
 }
-func print(r: CGSize, prefix: String) {
+func print(r: CGSize, _ prefix: String) {
   println("\(prefix) \(r.width) \(r.height)")
 }
 
-func print(r: CGVector, prefix: String) {
+func print(r: CGVector, _ prefix: String) {
   println("\(prefix) \(r.dx) \(r.dy)")
 }
 
-func print(r: CGRect, prefix: String) {
+func print(r: CGRect, _ prefix: String) {
   println("\(prefix) \(r.origin.x) \(r.origin.y) \(r.size.width) \(r.size.height)")
 }
 

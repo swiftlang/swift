@@ -12,7 +12,7 @@ class Other { }
 
 func acceptA(a: A) { }
 
-func f0<T : A>(obji: T, ai: A, bi: B) {
+func f0<T : A>(obji: T, _ ai: A, _ bi: B) {
   var obj = obji, a = ai, b = bi
   // Method access
   obj.foo()

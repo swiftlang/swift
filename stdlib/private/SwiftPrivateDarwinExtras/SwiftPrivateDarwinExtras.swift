@@ -17,7 +17,7 @@ import Darwin
 import Glibc
 #endif
 
-public func _stdlib_mkstemps(inout template: String, suffixlen: CInt) -> CInt {
+public func _stdlib_mkstemps(inout template: String, _ suffixlen: CInt) -> CInt {
   var utf8 = template.nulTerminatedUTF8
   let (fd, fileName) = utf8.withUnsafeMutableBufferPointer {
     (utf8) -> (CInt, String) in
@@ -78,8 +78,8 @@ public struct _stdlib_fd_set {
 }
 
 public func _stdlib_select(
-  inout readfds: _stdlib_fd_set, inout writefds: _stdlib_fd_set,
-  inout errorfds: _stdlib_fd_set, timeout: UnsafeMutablePointer<timeval>
+  inout readfds: _stdlib_fd_set, inout _ writefds: _stdlib_fd_set,
+  inout _ errorfds: _stdlib_fd_set, _ timeout: UnsafeMutablePointer<timeval>
 ) -> CInt {
   return readfds._data.withUnsafeMutableBufferPointer {
     (readfds) in

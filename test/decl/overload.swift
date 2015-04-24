@@ -118,9 +118,9 @@ class OverloadStaticFromBase_Derived : OverloadStaticFromBase {
 
 
 // Overloading of functions based on argument names only.
-func ovl_argname1(#x: Int, #y: Int) { }
-func ovl_argname1(#y: Int, #x: Int) { }
-func ovl_argname1(#a: Int, #b: Int) { }
+func ovl_argname1(#x: Int, y: Int) { }
+func ovl_argname1(#y: Int, x: Int) { }
+func ovl_argname1(#a: Int, b: Int) { }
 
 // Overloading with generics
 protocol P1 { }
@@ -190,9 +190,9 @@ class Initializers {
 
 // Default arguments
 // <rdar://problem/13338746>
-func sub(#x:Int64, #y:Int64) -> Int64 { return x - y } // expected-note 2{{'sub(x:y:)' previously declared here}}
+func sub(#x:Int64, y:Int64) -> Int64 { return x - y } // expected-note 2{{'sub(x:y:)' previously declared here}}
 func sub(#x:Int64, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
-func sub(x:Int64 = 0, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
+func sub(#x:Int64 = 0, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
 
 // <rdar://problem/13783231>
 struct NoneType {

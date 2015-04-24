@@ -410,7 +410,7 @@ extension String {
   /// reference the longest path that matches the `String`.
   /// Returns the actual number of matching paths.
   public func completePathIntoString(
-    _ outputName: UnsafeMutablePointer<String> = nil,
+    outputName: UnsafeMutablePointer<String> = nil,
     caseSensitive: Bool,
     matchesIntoArray: UnsafeMutablePointer<[String]> = nil,
     filterTypes: [String]? = nil

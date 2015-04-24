@@ -3,7 +3,7 @@
 
 import Swift
 
-func test_internal_checks_config(x: Int, y: Int) -> Int {
+func test_internal_checks_config(x: Int, _ y: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   println("internal check emitted")
 #endif

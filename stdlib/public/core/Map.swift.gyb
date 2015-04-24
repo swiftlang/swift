@@ -66,7 +66,7 @@ public struct MapSequenceView<Base : SequenceType, T> : SequenceType {
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 public func map<S : SequenceType, T>(
-  source: S, transform: (S.Generator.Element) -> T
+  source: S, _ transform: (S.Generator.Element) -> T
 ) -> [T] {
   // FIXME(prext): remove this function when protocol extensions land.
   return source._prext_map(transform)
@@ -75,7 +75,7 @@ public func map<S : SequenceType, T>(
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source` and flattening the result.
 public func flatMap<S : SequenceType, T>(
-  source: S, @noescape transform: (S.Generator.Element) -> [T]
+  source: S, @noescape _ transform: (S.Generator.Element) -> [T]
 ) -> [T] {
   // FIXME(prext): remove this function when protocol extensions land.
   return source._prext_flatMap(transform)
@@ -130,7 +130,7 @@ public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
 public func map<C : CollectionType, T>(
-  source: C, transform: (C.Generator.Element) -> T
+  source: C, _ transform: (C.Generator.Element) -> T
 ) -> [T] {
   // FIXME(prext): remove this function when protocol extensions land.
   return source._prext_map(transform)
@@ -139,7 +139,7 @@ public func map<C : CollectionType, T>(
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source` and flattening the result.
 public func flatMap<C : CollectionType, T>(
-  source: C, transform: (C.Generator.Element) -> [T]
+  source: C, _ transform: (C.Generator.Element) -> [T]
 ) -> [T] {
   // FIXME(prext): remove this function when protocol extensions land.
   return source._prext_flatMap(transform)

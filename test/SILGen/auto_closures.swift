@@ -54,13 +54,13 @@ public class Sub : Base {
 // CHECK: }
 // CHECK-LABEL: sil shared @_TFFF13auto_closures20closureInAutoclosureFTVS_4BoolS0__S0_u_KT_S0_U_FS0_S0_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-func compareBool(lhs: Bool, rhs: Bool) -> Bool { return false_ }
-func testBool(x: Bool, pred: (Bool) -> Bool) -> Bool {
+func compareBool(lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
+func testBool(x: Bool, _ pred: (Bool) -> Bool) -> Bool {
   return pred(x)
 }
 func delayBool(@autoclosure fn: () -> Bool) -> Bool {
   return fn()
 }
-func closureInAutoclosure(lhs: Bool, rhs: Bool) -> Bool {
+func closureInAutoclosure(lhs: Bool, _ rhs: Bool) -> Bool {
   return delayBool(testBool(lhs, { compareBool($0, rhs) }))
 }

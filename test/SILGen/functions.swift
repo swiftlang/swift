@@ -9,15 +9,15 @@ typealias Bool = Builtin.Int1
 var zero = getInt()
 func getInt() -> Int { return zero }
 
-func standalone_function(x: Int, y: Int) -> Int {
+func standalone_function(x: Int, _ y: Int) -> Int {
   return x
 }
 
-func higher_order_function(f: (x: Int, y: Int) -> Int, x: Int, y: Int) -> Int {
+func higher_order_function(f: (x: Int, y: Int) -> Int, _ x: Int, _ y: Int) -> Int {
   return f(x: x, y: y)
 }
 
-func higher_order_function2(f: (Int, Int) -> Int, x: Int, y: Int) -> Int {
+func higher_order_function2(f: (Int, Int) -> Int, _ x: Int, _ y: Int) -> Int {
   return f(x, y)
 }
 

@@ -266,7 +266,7 @@ func beginsWith2<
      where 
        E0.Element == E1.Element, 
        E0.Element : EqualComparable
-     >(e0: E0, e1: E1) -> Bool
+     >(e0: E0, _ e1: E1) -> Bool
 {
 }
 
@@ -275,7 +275,7 @@ func beginsWith3<
      where 
        S0.AssocP1.Element == S1.AssocP1.Element, 
        S1.AssocP1.Element : EqualComparable
-     >(seq1: S0, seq2: S1) -> Bool
+     >(seq1: S0, _ seq2: S1) -> Bool
 {
   return beginsWith2(seq1.getAssocP1(), seq2.getAssocP1())
 }

@@ -9,11 +9,11 @@ var f : (_:Int, byDividend:Int) -> Int = divide
 
 println(f(20, byDividend:2)) // CHECK: 10
 
-func divide(a: Int, byDividends b: Int, c: Int, thenAdd d: Int) -> Int {
+func divide(a: Int, byDividends b: Int, _ c: Int, thenAdd d: Int) -> Int {
     return a / b / c + d
 }
 
-func divide(a: Int, byDividends b: Int, c: Int, d: Int, thenAdd e: Int) -> Int {
+func divide(a: Int, byDividends b: Int, _ c: Int, _ d: Int, thenAdd e: Int) -> Int {
     return a / b / c / d + e
 }
 

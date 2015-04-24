@@ -16,7 +16,7 @@ var anyBar: AnyObject = Bar()
 println(anyBar.description())
 */
 
-func checkClassName(cls: AnyClass, name: String, mangled: String)
+func checkClassName(cls: AnyClass, _ name: String, _ mangled: String)
 {
   // Class's name should appear unmangled.
   assert(NSStringFromClass(cls) == name)
@@ -31,7 +31,7 @@ func checkClassName(cls: AnyClass, name: String, mangled: String)
   }
 }
 
-func checkProtocolName(proto: Protocol, name: String, mangled: String)
+func checkProtocolName(proto: Protocol, _ name: String, _ mangled: String)
 {
   // Protocol's name should appear unmangled.
   assert(NSStringFromProtocol(proto) == name)
@@ -44,7 +44,7 @@ func checkProtocolName(proto: Protocol, name: String, mangled: String)
   }
 }
 
-func checkIvarName(cls: AnyClass, name: String)
+func checkIvarName(cls: AnyClass, _ name: String)
 {
   assert(name == String.fromCString(ivar_getName(class_getInstanceVariable(cls, name))))
 }

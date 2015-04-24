@@ -54,7 +54,7 @@ func generic_metatypes<T : SomeProtocol>(x: T)
 // Inferring a variable's type from a call to a generic.
 struct Pair<T, U> { }
 
-func pair<T, U>(x: T, y: U) -> Pair<T, U> { }
+func pair<T, U>(x: T, _ y: U) -> Pair<T, U> { }
 
 var i : Int, f : Float
 var p = pair(i, f)

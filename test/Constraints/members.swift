@@ -181,7 +181,7 @@ protocol Numeric {
   func +(x: Self, y: Self) -> Self
 }
 
-func acceptBinaryFunc<T>(x: T, fn: (T, T) -> T) { }
+func acceptBinaryFunc<T>(x: T, _ fn: (T, T) -> T) { }
 
 func testNumeric<T : Numeric>(x: T) {
   acceptBinaryFunc(x, +) // expected-error{{partial application of generic method is not allowed}}

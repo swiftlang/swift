@@ -87,7 +87,7 @@ class Missile {
 }
 
 func checkPointerCorrectness(check: Check,
-  f: UnsafeMutablePointer<Missile> ->
+  _ f: UnsafeMutablePointer<Missile> ->
     (UnsafeMutablePointer<Missile>, count: Int) -> (),
   _ withMissiles: Bool = false) {
   let ptr = UnsafeMutablePointer<Missile>.alloc(4)

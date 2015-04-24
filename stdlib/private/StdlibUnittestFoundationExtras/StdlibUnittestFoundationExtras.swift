@@ -24,7 +24,7 @@ extension NSLocale {
 
 public func withOverriddenNSLocaleCurrentLocale<Result>(
   temporaryLocale: NSLocale,
-  body: () -> Result
+  _ body: () -> Result
 ) -> Result {
   let oldMethod = class_getClassMethod(
     NSLocale.self, Selector("currentLocale"))
@@ -48,7 +48,7 @@ public func withOverriddenNSLocaleCurrentLocale<Result>(
 
 public func withOverriddenNSLocaleCurrentLocale<Result>(
   temporaryLocaleIdentifier: String,
-  body: () -> Result
+  _ body: () -> Result
 ) -> Result {
   precondition(contains(
     NSLocale.availableLocaleIdentifiers(), temporaryLocaleIdentifier),

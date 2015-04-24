@@ -142,7 +142,7 @@ func _mixInt(value: Int) -> Int {
 /// possible, and it does not prevent malicious users from constructing data
 /// sets that will exhibit pathological collisions.
 public // @testable
-func _squeezeHashValue(hashValue: Int, resultRange: Range<Int>) -> Int {
+func _squeezeHashValue(hashValue: Int, _ resultRange: Range<Int>) -> Int {
   // Length of a Range<Int> does not fit into an Int, but fits into an UInt.
   // An efficient way to compute the length is to rely on two's complement
   // arithmetic.
@@ -164,7 +164,7 @@ func _squeezeHashValue(hashValue: Int, resultRange: Range<Int>) -> Int {
 }
 
 public // @testable
-func _squeezeHashValue(hashValue: Int, resultRange: Range<UInt>) -> UInt {
+func _squeezeHashValue(hashValue: Int, _ resultRange: Range<UInt>) -> UInt {
   let mixedHashValue = UInt(bitPattern: _mixInt(hashValue))
   let resultCardinality: UInt = resultRange.endIndex - resultRange.startIndex
   if _isPowerOf2(resultCardinality) {

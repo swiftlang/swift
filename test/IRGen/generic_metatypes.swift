@@ -43,7 +43,7 @@ func remapToGenericMetatypes() {
   genericMetatypes(Foo.self, Bar.self)
 }
 
-func genericMetatypes<T, U>(t: T.Type, u: U.Type) {}
+func genericMetatypes<T, U>(t: T.Type, _ u: U.Type) {}
 
 protocol Bas {}
 

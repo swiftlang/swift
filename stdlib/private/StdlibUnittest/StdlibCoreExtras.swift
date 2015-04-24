@@ -27,7 +27,7 @@ import Foundation
 // useful in tests, and stdlib does not have such facilities yet.
 //
 
-func findSubstring(string: String, substring: String) -> String.Index? {
+func findSubstring(string: String, _ substring: String) -> String.Index? {
   if substring.isEmpty {
     return string.startIndex
   }
@@ -70,7 +70,7 @@ func findSubstring(string: String, substring: String) -> String.Index? {
 }
 
 public func createTemporaryFile(
-  fileNamePrefix: String, fileNameSuffix: String, contents: String
+  fileNamePrefix: String, _ fileNameSuffix: String, _ contents: String
 ) -> String {
 #if _runtime(_ObjC)
   var fileName = NSTemporaryDirectory().stringByAppendingPathComponent(

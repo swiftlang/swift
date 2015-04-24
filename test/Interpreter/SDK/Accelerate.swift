@@ -44,7 +44,7 @@ func *(var x: vU1024, var y: vU1024) -> vU1024 {
   return result
 }
 
-func quorem(var x: vU1024, var y: vU1024) -> (vU1024, vU1024) {
+func quorem(var x: vU1024, var _ y: vU1024) -> (vU1024, vU1024) {
   var quo = vU1024()
   var rem = vU1024()
   vU1024Divide(&x, &y, &quo, &rem)

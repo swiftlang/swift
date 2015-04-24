@@ -89,7 +89,7 @@ func testPointers() {
 // side.
 
 func sqrt(x: Float) -> Float {}
-func atan2(x: Float, y: Float) -> Float {}
+func atan2(x: Float, _ y: Float) -> Float {}
 
 extension Point {
   func asPolar() -> (rho: Float, theta: Float) {

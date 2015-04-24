@@ -90,7 +90,7 @@ var _anyExpectFailed = false
 var _seenExpectCrash = false
 
 public func expectEqual<T : Equatable>(
-    expected: T, actual: T,
+    expected: T, _ actual: T,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
@@ -101,7 +101,7 @@ public func expectEqual<T : Equatable>(
 }
 
 public func expectEqual<T : Equatable, U : Equatable>(
-  expected: (T, U), actual: (T, U),
+  expected: (T, U), _ actual: (T, U),
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -115,7 +115,7 @@ public func expectEqual<T : Equatable, U : Equatable>(
 }
 
 public func expectEqual<T>(
-    expected: T, actual: T, equal: (T,T)->Bool,
+    expected: T, _ actual: T, _ equal: (T,T)->Bool,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
@@ -132,7 +132,7 @@ public func expectEqual<T>(
 }
 
 public func expectNotEqual<T : Equatable>(
-    expected: T, actual: T,
+    expected: T, _ actual: T,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
@@ -150,7 +150,7 @@ public func expectNotEqual<T : Equatable>(
 // Can not write a sane set of overloads using generics because of:
 // <rdar://problem/17015923> Array->NSArray implicit conversion insanity
 public func expectOptionalEqual<T : Equatable>(
-    expected: T, actual: T?,
+    expected: T, _ actual: T?,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -165,7 +165,7 @@ public func expectOptionalEqual<T : Equatable>(
 }
 
 public func expectEqual<T : Equatable>(
-    expected: T?, actual: T?,
+    expected: T?, _ actual: T?,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -190,7 +190,7 @@ public func expectEqual<T : Equatable>(
 %    ('<T, U : Equatable>', 'Dictionary<T, U>')]:
 
 public func expectEqual${Generic}(
-    expected: ${EquatableType}, actual: ${EquatableType},
+    expected: ${EquatableType}, _ actual: ${EquatableType},
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
@@ -206,7 +206,7 @@ public func expectEqual${Generic}(
 
 
 public func expectEqualSequence${Generic}(
-    expected: ${EquatableType}, actual: ${EquatableType},
+    expected: ${EquatableType}, _ actual: ${EquatableType},
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
@@ -236,7 +236,7 @@ func _expectNotEqual${Generic}(
 }
 
 public func expectOptionalEqual${Generic}(
-    expected: ${EquatableType}, actual: ${EquatableType}?,
+    expected: ${EquatableType}, _ actual: ${EquatableType}?,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if (actual == nil) || expected != actual! {
@@ -253,7 +253,7 @@ public func expectOptionalEqual${Generic}(
 %for ComparableType in ['Int']:
 
 public func expectLT(
-  expected: ${ComparableType}, actual: ${ComparableType},
+  expected: ${ComparableType}, _ actual: ${ComparableType},
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -270,7 +270,7 @@ public func expectLT(
 }
 
 public func expectLE(
-  expected: ${ComparableType}, actual: ${ComparableType},
+  expected: ${ComparableType}, _ actual: ${ComparableType},
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -287,7 +287,7 @@ public func expectLE(
 }
 
 public func expectGE(
-  expected: ${ComparableType}, actual: ${ComparableType},
+  expected: ${ComparableType}, _ actual: ${ComparableType},
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -305,7 +305,7 @@ public func expectGE(
 
 %end
 
-public func expectType<T>(_: T.Type, inout x: T) {}
+public func expectType<T>(_: T.Type, inout _ x: T) {}
 
 public func isSequenceType<X : SequenceType>(x: X) -> X { return x }
 public func expectIsBooleanType<X : BooleanType>(inout x: X) -> X { return x }
@@ -1243,7 +1243,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 //
 
 public func checkEquatable<T : Equatable>(
-  expectedEqual: Bool, lhs: T, rhs: T, stackTrace: SourceLocStack,
+  expectedEqual: Bool, _ lhs: T, _ rhs: T, _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
   // Test operator '==' that is found through witness tables.
@@ -1256,7 +1256,7 @@ public func checkEquatable<T : Equatable>(
 }
 
 public func checkEquatable<T : Equatable>(
-  expectedEqual: Bool, lhs: T, rhs: T,
+  expectedEqual: Bool, _ lhs: T, _ rhs: T,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
 ) {
@@ -1265,7 +1265,7 @@ public func checkEquatable<T : Equatable>(
 }
 
 public func checkHashable<T : Hashable>(
-  expectedEqual: Bool, lhs: T, rhs: T, stackTrace: SourceLocStack,
+  expectedEqual: Bool, _ lhs: T, _ rhs: T, _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
   // Test operator '==' that is found through witness tables.
@@ -1287,7 +1287,7 @@ public func checkHashable<T : Hashable>(
 }
 
 public func checkHashable<T : Hashable>(
-  expectedEqual: Bool, lhs: T, rhs: T,
+  expectedEqual: Bool, _ lhs: T, _ rhs: T,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
 ) {
@@ -1350,7 +1350,7 @@ extension ExpectedComparisonResult : CustomStringConvertible {
 
 public func checkComparable<T : Comparable>(
   expected: ExpectedComparisonResult,
-  lhs: T, rhs: T, stackTrace: SourceLocStack,
+  _ lhs: T, _ rhs: T, _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
   expectEqual(expected.isLT(), lhs < rhs,
@@ -1365,7 +1365,7 @@ public func checkComparable<T : Comparable>(
 
 public func checkComparable<T : Comparable>(
   expected: ExpectedComparisonResult,
-  lhs: T, rhs: T,
+  _ lhs: T, _ rhs: T,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
 ) {
@@ -1399,10 +1399,10 @@ public func checkGenerator<
   where ${Element} == G.Element
 >(
   expected: ${Expected},
-  generator: G,
-  sameValue: (${Element}, ${Element}) -> Bool,
+  _ generator: G,
+  _ sameValue: (${Element}, ${Element}) -> Bool,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  stackTrace: SourceLocStack,
+  _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
   // Copying a `GeneratorType` is allowed.
@@ -1433,9 +1433,9 @@ public func checkGenerator<
   where ${Element} == G.Element, ${Element} : Equatable
 >(
   expected: ${Expected},
-  generator: G,
+  _ generator: G,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  stackTrace: SourceLocStack,
+  _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
   checkGenerator(
@@ -1450,10 +1450,10 @@ public func checkSequence<
   where S.Generator.Element == ${Element}
 >(
   expected: ${Expected},
-  sequence: S,
-  sameValue: (${Element}, ${Element}) -> Bool,
+  _ sequence: S,
+  _ sameValue: (${Element}, ${Element}) -> Bool,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  stackTrace: SourceLocStack,
+  _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
   let expectedCount: Int = numericCast(count(expected))
@@ -1472,8 +1472,8 @@ public func checkSequence<
   where S.Generator.Element == ${Element}
 >(
   expected: ${Expected},
-  sequence: S,
-  sameValue: (${Element}, ${Element}) -> Bool,
+  _ sequence: S,
+  _ sameValue: (${Element}, ${Element}) -> Bool,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -1490,9 +1490,9 @@ public func checkSequence<
   where S.Generator.Element == ${Element}, ${Element} : Equatable
 >(
   expected: ${Expected},
-  sequence: S,
+  _ sequence: S,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  stackTrace: SourceLocStack,
+  _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
   checkSequence(
@@ -1507,7 +1507,7 @@ public func checkSequence<
   where S.Generator.Element == ${Element}, ${Element} : Equatable
 >(
   expected: ${Expected},
-  sequence: S,
+  _ sequence: S,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -1528,10 +1528,10 @@ public func check${traversal}Collection<
   C.Index : ${traversal}IndexType
 >(
   expected: ${Expected},
-  collection: C,
-  sameValue: (${Element}, ${Element}) -> Bool,
+  _ collection: C,
+  _ sameValue: (${Element}, ${Element}) -> Bool,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  stackTrace: SourceLocStack,
+  _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
   // A `CollectionType` is a multi-pass `SequenceType`.
@@ -1658,8 +1658,8 @@ public func check${traversal}Collection<
   C.Index : ${traversal}IndexType
 >(
   expected: ${Expected},
-  collection: C,
-  sameValue: (${Element}, ${Element}) -> Bool,
+  _ collection: C,
+  _ sameValue: (${Element}, ${Element}) -> Bool,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -1679,9 +1679,9 @@ public func check${traversal}Collection<
   ${Element} : Equatable
 >(
   expected: ${Expected},
-  collection: C,
+  _ collection: C,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  stackTrace: SourceLocStack,
+  _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
   check${traversal}Collection(
@@ -1699,7 +1699,7 @@ public func check${traversal}Collection<
   ${Element} : Equatable
 >(
   expected: ${Expected},
-  collection: C,
+  _ collection: C,
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -1723,7 +1723,7 @@ public func checkSliceableWithBidirectionalIndex<
   ${Element} : Equatable
 >(
   expected: ${Expected}, 
-  sliceable: S, stackTrace: SourceLocStack
+  _ sliceable: S, _ stackTrace: SourceLocStack
 ) {
   // A `Sliceable` is a `CollectionType`.
   checkBidirectionalCollection(expected, sliceable, stackTrace.withCurrentLoc())
@@ -1763,11 +1763,11 @@ public func checkSliceableWithBidirectionalIndex<
 
 % end
 
-public func nthIndex<C: CollectionType>(x: C, n: Int) -> C.Index {
+public func nthIndex<C: CollectionType>(x: C, _ n: Int) -> C.Index {
   return advance(x.startIndex, numericCast(n))
 }
 
-public func nth<C: CollectionType>(x: C, n: Int) -> C.Generator.Element {
+public func nth<C: CollectionType>(x: C, _ n: Int) -> C.Generator.Element {
   return x[nthIndex(x, n)]
 }
 
@@ -1778,7 +1778,7 @@ where
   C.Generator.Element : Equatable, C.Generator.Element == N.Generator.Element
 >(
   makeCollection: ()->C,
-  makeNewValues: (Int)->N
+  _ makeNewValues: (Int)->N
 ) {
   typealias A = C
 
@@ -1794,7 +1794,7 @@ where
       for newCount in 0..<(2 * oldCount) {
         let newValues = makeNewValues(newCount)
 
-        func reportFailure(inout a: A, message: String) {
+        func reportFailure(inout a: A, _ message: String) {
           println("\(message) when replacing indices \(ix)...\(jx)")
           println("  in \(_UnitTestArray(source)) with \(_UnitTestArray(newValues))")
           println("  yielding \(_UnitTestArray(a))")
@@ -1838,7 +1838,7 @@ public func expectEqualSequence<
   where Expected.Generator.Element == Actual.Generator.Element,
      Expected.Generator.Element : Equatable
 >(
-    expected: Expected, actual: Actual,
+    expected: Expected, _ actual: Actual,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
@@ -1856,7 +1856,7 @@ public func expectEqualSequence<
   where Expected.Generator.Element == Actual.Generator.Element,
      Expected.Generator.Element == (T, U)
 >(
-    expected: Expected, actual: Actual,
+    expected: Expected, _ actual: Actual,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
@@ -1872,8 +1872,8 @@ public func expectEqualSequence<
   Actual: SequenceType
   where Expected.Generator.Element == Actual.Generator.Element
 >(
-    expected: Expected, actual: Actual,
-    sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool,
+    expected: Expected, _ actual: Actual,
+    _ sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
@@ -1894,8 +1894,8 @@ public func expectEqualsUnordered<
     Actual : SequenceType
     where Expected.Generator.Element == Actual.Generator.Element
 >(
-    expected: Expected, actual: Actual,
-    compare: (Expected.Generator.Element, Expected.Generator.Element)
+    expected: Expected, _ actual: Actual,
+    _ compare: (Expected.Generator.Element, Expected.Generator.Element)
       -> ExpectedComparisonResult,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
@@ -1917,7 +1917,7 @@ public func expectEqualsUnordered<
   Expected.Generator.Element == Actual.Generator.Element,
   Expected.Generator.Element : Comparable
 >(
-  expected: Expected, actual: Actual,
+  expected: Expected, _ actual: Actual,
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -1941,7 +1941,7 @@ public func expectEqualsUnordered<
 }
 
 public func expectEqualsUnordered<T : Comparable>(
-  expected: [T], actual: [T],
+  expected: [T], _ actual: [T],
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -1978,7 +1978,7 @@ func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
 }
 
 public func expectEqualsUnordered<T : Comparable>(
-  expected: [(T, T)], actual: [(T, T)],
+  expected: [(T, T)], _ actual: [(T, T)],
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -2006,7 +2006,7 @@ public func expectEqualsUnordered<
       Expected.Generator.Element == Actual.Generator.Element,
       Expected.Generator.Element == (T, T)
 >(
-    expected: Expected, actual: Actual,
+    expected: Expected, _ actual: Actual,
     stackTrace: SourceLocStack? = nil,
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
@@ -2028,8 +2028,8 @@ public func expectEqualsUnordered<
 }*/
 
 public func expectEqualFunctionsForDomain<ArgumentType, Result : Equatable>(
-    arguments: [ArgumentType], function1: ArgumentType -> Result,
-    function2: ArgumentType -> Result
+    arguments: [ArgumentType], _ function1: ArgumentType -> Result,
+    _ function2: ArgumentType -> Result
 ) {
   for a in arguments {
     let expected = function1(a)
@@ -2043,9 +2043,9 @@ public func expectEqualFunctionsForDomain<ArgumentType, Result : Equatable>(
 public func expectEqualMethodsForDomain<
   SelfType, ArgumentType, Result : Equatable
 >(
-  selfs: [SelfType], arguments: [ArgumentType],
-  function1: SelfType -> ArgumentType -> Result,
-  function2: SelfType -> ArgumentType -> Result
+  selfs: [SelfType], _ arguments: [ArgumentType],
+  _ function1: SelfType -> ArgumentType -> Result,
+  _ function2: SelfType -> ArgumentType -> Result
 ) {
   for s in selfs {
     for a in arguments {
@@ -2059,7 +2059,7 @@ public func expectEqualMethodsForDomain<
 }
 
 public func expectEqualUnicodeScalars(
-  expected: _UnitTestArray<UInt32>, actual: String,
+  expected: _UnitTestArray<UInt32>, _ actual: String,
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
@@ -2078,7 +2078,7 @@ public func expectEqualUnicodeScalars(
 }
 
 public func expectPrinted<T>(
-  #expectedOneOf: _UnitTestArray<String>, object: T,
+  #expectedOneOf: _UnitTestArray<String>, _ object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   let actual = String(object)
@@ -2092,14 +2092,14 @@ public func expectPrinted<T>(
 }
 
 public func expectPrinted<T>(
-  expected: String, object: T,
+  expected: String, _ object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   expectPrinted(expectedOneOf: [expected], object, file: file, line: line)
 }
 
 public func expectDebugPrinted<T>(
-  #expectedOneOf: _UnitTestArray<String>, object: T,
+  #expectedOneOf: _UnitTestArray<String>, _ object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   let actual = String(reflecting: object)
@@ -2113,13 +2113,13 @@ public func expectDebugPrinted<T>(
 }
 
 public func expectDebugPrinted<T>(
-  expected: String, object: T,
+  expected: String, _ object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   expectDebugPrinted(expectedOneOf: [expected], object, file: file, line: line)
 }
 
-func compose<A, B, C>(f: A -> B, g: B -> C) -> A -> C {
+func compose<A, B, C>(f: A -> B, _ g: B -> C) -> A -> C {
   return { a in
     return g(f(a))
   }
@@ -2553,7 +2553,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
     )
   }
 
-  public mutating func removeAll(keepCapacity: Bool = false) {
+  public mutating func removeAll(#keepCapacity: Bool = false) {
     // Ignore the value of `keepCapacity`.
     elements.removeAll(keepCapacity: false)
   }

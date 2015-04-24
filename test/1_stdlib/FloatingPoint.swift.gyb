@@ -190,7 +190,7 @@ func getPositiveSubnormal_Float64() -> Float64 {
 
 func checkFloatingPointComparison_${FloatSelf}(
   expected: ExpectedComparisonResult,
-  lhs: ${FloatSelf}, rhs: ${FloatSelf}, stackTrace: SourceLocStack
+  _ lhs: ${FloatSelf}, _ rhs: ${FloatSelf}, _ stackTrace: SourceLocStack
 ) {
   let collectMoreInfo = { () -> String in
     "expected: lhs=\(lhs) \(expected) rhs=\(rhs)"

@@ -7,7 +7,7 @@ class MyClass {
 var global_cond: Bool = false
 
 func bar(x: Int) {}
-func foo(x: Int, y: Bool) {}
+func foo(x: Int, _ y: Bool) {}
 
 func assignment(var x: Int, var y: Int) {
   x = 42
@@ -98,7 +98,7 @@ func else_break(x: Int, y: Bool, z: Bool) {
 
 // CHECK-LABEL: sil hidden  @_TF10statements10else_break
 
-func loop_with_break(x: Int, y: Bool, z: Bool) -> Int {
+func loop_with_break(x: Int, _ y: Bool, _ z: Bool) -> Int {
   while (x > 2) {
    if (y) {
      bar(x);
@@ -281,7 +281,7 @@ label2:
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements23test_if_else_then_breakFTSbGSqCS_1C__T_
-func test_if_else_then_break(a : Bool, c : C?) {
+func test_if_else_then_break(a : Bool, _ c : C?) {
   label3:
   // CHECK: switch_enum %1 : $Optional<C>, case #Optional.Some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
   if let x? = c {

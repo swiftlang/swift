@@ -70,9 +70,10 @@ public func dump<T>(x: T, name: String? = nil, indent: Int = 0,
 
 /// Dump an object's contents using a mirror. User code should use dump().
 func _dump<TargetStream : OutputStreamType>(
-    x_opt: Any?, mirror: Mirror, name: String?, indent: Int, maxDepth: Int,
-    inout maxItemCounter: Int,
-    inout targetStream: TargetStream
+    x_opt: Any?, _ mirror: Mirror, _ name: String?, _ indent: Int,
+    _ maxDepth: Int,
+    inout _ maxItemCounter: Int,
+    inout _ targetStream: TargetStream
 ) {
   if maxItemCounter <= 0 { return }
   --maxItemCounter

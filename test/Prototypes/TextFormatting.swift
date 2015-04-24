@@ -180,7 +180,7 @@ struct _formatArgs {
   var radix: Int, fill: String, width: Int
 }
 
-func format(radix: Int = 10, fill: String = " ", width: Int = 0) -> _formatArgs {
+func format(#radix: Int = 10, fill: String = " ", width: Int = 0) -> _formatArgs {
   return _formatArgs(radix: radix, fill: fill, width: width)
 }
 
@@ -188,7 +188,7 @@ func format(radix: Int = 10, fill: String = " ", width: Int = 0) -> _formatArgs 
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
 func _writePositive<T:XPrintableInteger, S: XOutputStream>(
-  value: T, inout stream: S, args: _formatArgs) -> Int
+  value: T, inout _ stream: S, _ args: _formatArgs) -> Int
 {
 
   if value == 0 {
@@ -209,7 +209,7 @@ func _writePositive<T:XPrintableInteger, S: XOutputStream>(
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
 func _writeSigned<T:XPrintableInteger, S: XOutputStream>(
-  value: T, inout target: S, args: _formatArgs
+  value: T, inout _ target: S, _ args: _formatArgs
 ) {
   var width = 0
   var result = ""
@@ -275,11 +275,11 @@ struct StdoutStream : XOutputStream {
   }
 }
 
-func xprint<Target: XOutputStream, T: XStreamable>(inout target: Target, x: T) {
+func xprint<Target: XOutputStream, T: XStreamable>(inout target: Target, _ x: T) {
   x.writeTo(&target)
 }
 
-func xprint<Target: XOutputStream, T: XPrintable>(inout target: Target, x: T) {
+func xprint<Target: XOutputStream, T: XPrintable>(inout target: Target, _ x: T) {
   xprint(&target, x~>format())
 }
 
@@ -293,12 +293,12 @@ func xprint<T: XStreamable>(x: T) {
   xprint(&target, x)
 }
 
-func xprintln<Target: XOutputStream, T: XPrintable>(inout target: Target, x: T) {
+func xprintln<Target: XOutputStream, T: XPrintable>(inout target: Target, _ x: T) {
   xprint(&target, x)
   target.append("\n")
 }
 
-func xprintln<Target: XOutputStream, T: XStreamable>(inout target: Target, x: T) {
+func xprintln<Target: XOutputStream, T: XStreamable>(inout target: Target, _ x: T) {
   xprint(&target, x)
   target.append("\n")
 }

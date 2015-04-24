@@ -319,14 +319,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
                                      param.DefaultArg);
 
-      // A default argument implies that the name is API, making the
-      // back-tick redundant.
-      if (param.PoundLoc.isValid()) {
-        diagnose(param.PoundLoc, diag::parameter_backtick_default_arg)
-          .fixItRemove(param.PoundLoc);
-        param.PoundLoc = SourceLoc();
-      }
-
       if (param.EllipsisLoc.isValid()) {
         // The range of the complete default argument.
         SourceRange defaultArgRange;
@@ -419,7 +411,6 @@ mapParsedParameters(Parser &parser,
     // context.
     bool isKeywordArgumentByDefault;
     switch (paramContext) {
-    case Parser::ParameterContextKind::Function:
     case Parser::ParameterContextKind::Closure:
     case Parser::ParameterContextKind::Subscript:
     case Parser::ParameterContextKind::Operator:
@@ -430,24 +421,19 @@ mapParsedParameters(Parser &parser,
       isKeywordArgumentByDefault = true;
       break;
 
-    case Parser::ParameterContextKind::Method:
+    case Parser::ParameterContextKind::Function:
       isKeywordArgumentByDefault = !isFirstParameterClause || !isFirstParameter;
       break;
     }
-
-    // The presence of a default argument implies that this argument
-    // is a keyword argument.
-    if (param.DefaultArg)
-      isKeywordArgumentByDefault = true;
 
     // Local function that checks the argument and parameter name to see if they
     // are permissible, which may result in changes.
     auto checkArgNames = [&](Identifier argName, Identifier paramName)
                            -> std::pair<Identifier, Identifier> {
-      // If the first parameter of a method or initializer is a keyword argument
-      // and starts with "with", note that the "with" is implied.
+      // If the first parameter of a function or initializer is a keyword
+      // argument and starts with "with", note that the "with" is implied.
       if (!argName.empty() && isFirstParameter && isFirstParameterClause &&
-          (paramContext == Parser::ParameterContextKind::Method ||
+          (paramContext == Parser::ParameterContextKind::Function ||
            paramContext == Parser::ParameterContextKind::Initializer) &&
           argName.str().size() > 4 &&
           camel_case::getFirstWord(argName.str()) == "with") {
@@ -667,8 +653,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     ParameterContextKind paramContext;
     if (SimpleName.isOperator())
       paramContext = ParameterContextKind::Operator;
-    else if (CurDeclContext->isTypeContext())
-      paramContext = ParameterContextKind::Method;
     else
       paramContext = ParameterContextKind::Function;
 

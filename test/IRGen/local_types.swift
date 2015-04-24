@@ -34,7 +34,7 @@ public struct PatternStruct {
   })()
 }
 
-public func singleDefaultArgument(i: Int = {
+public func singleDefaultArgument(i i: Int = {
   // CHECK-DAG: @_TWVVFIF11local_types21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_27SingleDefaultArgumentStruct = hidden constant
   struct SingleDefaultArgumentStruct {
     let i: Int

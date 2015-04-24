@@ -19,7 +19,7 @@ func bridgedStatus<T>(_: T.Type) -> String {
     : "is unbridged"
 }
 
-func testBridging<T>(x: T, name: String) {
+func testBridging<T>(x: T, _ name: String) {
   println("\(name) \(bridgedStatus(T.self))")
   var b : String
   if let result? = _bridgeToObjectiveC(x) {

@@ -92,7 +92,7 @@ public typealias Printable = CustomStringConvertible
 /// using one of its conformances to `Streamable`,
 /// `CustomStringConvertible` or `CustomDebugStringConvertible`.
 func _adHocPrint<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    value: T, inout _ target: TargetStream
 ) {
   var mirror = reflect(value)
   // Checking the mirror kind is not a good way to implement this, but we don't
@@ -136,7 +136,7 @@ func _adHocPrint<T, TargetStream : OutputStreamType>(
 
 @inline(never)
 public func _print_unlocked<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    value: T, inout _ target: TargetStream
 ) {
   if let streamableObject as Streamable = value {
     streamableObject.writeTo(&target)
@@ -166,7 +166,7 @@ public func _print_unlocked<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 @inline(never)
 public func print<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    value: T, inout _ target: TargetStream
 ) {
   target._lock()
   _print_unlocked(value, &target)
@@ -184,7 +184,7 @@ public func print<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 @inline(never)
 public func println<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    value: T, inout _ target: TargetStream
 ) {
   target._lock()
   _print_unlocked(value, &target)
@@ -278,7 +278,7 @@ public func toDebugString<T>(x: T) -> String {
 
 @inline(never)
 public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    value: T, inout _ target: TargetStream
 ) {
   if let debugPrintableObject as CustomDebugStringConvertible = value {
     debugPrintableObject.debugDescription.writeTo(&target)
@@ -311,7 +311,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
 /// See also: `debugPrintln(x, &target)`
 @inline(never)
 public func debugPrint<T, TargetStream : OutputStreamType>(
-    value: T, inout target: TargetStream
+    value: T, inout _ target: TargetStream
 ) {
   target._lock()
   _debugPrint_unlocked(value, &target)
@@ -329,7 +329,7 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 /// See also: `debugPrint(x, &target)`
 @inline(never)
 public func debugPrintln<T, TargetStream : OutputStreamType>(
-    x: T, inout target: TargetStream
+    x: T, inout _ target: TargetStream
 ) {
   target._lock()
   _debugPrint_unlocked(x, &target)

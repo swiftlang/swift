@@ -4,7 +4,7 @@
 
 func doesEscape(fn : () -> Int) {}
 
-func takesGenericClosure<T>(a : Int, @noescape fn : () -> T) {}
+func takesGenericClosure<T>(a : Int, @noescape _ fn : () -> T) {}
 
 
 func takesNoEscapeClosure(@noescape fn : () -> Int) {
@@ -176,9 +176,9 @@ protocol P2 : P1 {
   typealias Element
 }
 
-func overloadedEach<O: P1, T>(source: O, transform: O.Element -> ()) {}
+func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> ()) {}
 
-func overloadedEach<P: P2, T>(source: P, transform: P.Element -> ()) {}
+func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> ()) {}
 
 struct S : P2 {
   typealias Element = Int

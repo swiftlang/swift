@@ -175,8 +175,8 @@ func rdar18330319(s: String, d: [String : AnyObject]) {
 }
 
 // rdar://problem/19551164
-func rdar19551164a(s: String, a: [String]) {}
-func rdar19551164b(s: NSString, a: NSArray) {
+func rdar19551164a(s: String, _ a: [String]) {}
+func rdar19551164b(s: NSString, _ a: NSArray) {
   rdar19551164a(s, a) // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{18-18= as String}}
   // expected-error@-1{{'NSArray' is not convertible to '[String]'; did you mean to use 'as!' to force downcast?}}{{21-21= as! [String]}}
 }

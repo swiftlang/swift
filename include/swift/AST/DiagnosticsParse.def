@@ -667,9 +667,6 @@ ERROR(parameter_inout_var_let,decl_parsing,none,
 WARNING(parameter_backtick_two_names,decl_parsing,none,
       "extraneous '#' in parameter; keyword argument and parameter name "
       "already specified separately", ())
-WARNING(parameter_backtick_default_arg,decl_parsing,none,
-      "extraneous '#' in parameter; default argument implies keyword argument",
-      ())
 WARNING(parameter_two_equivalent_names,decl_parsing,none,
         "'%0 %0' can be expressed more succinctly as '#%0'", (StringRef))
 WARNING(parameter_extraneous_backtick,decl_parsing,none,

@@ -6,13 +6,13 @@ public func getInput(#x: Int) -> Int {
   return x
 }
 
-public func getSecond(Int, #y: Int) -> Int {
+public func getSecond(Int, y: Int) -> Int {
   return y
 }
 
-public func useNested((x: Int, y: Int), #n: Int) {}
+public func useNested((x: Int, y: Int), n: Int) {}
 
-public func variadic(#x: Double, y: Int...) {}
+public func variadic(#x: Double, _ y: Int...) {}
 
 public func slice(#x: [Int]) {}
 public func optional(#x: Int?) {}
@@ -21,15 +21,15 @@ public func overloaded(#x: Int) {}
 public func overloaded(#x: Bool) {}
 
 // Generic functions.
-public func makePair<A, B>(#a: A, #b: B) -> (A, B) {
+public func makePair<A, B>(#a: A, b: B) -> (A, B) {
   return (a, b)
 }
 
-public func different<T : Equatable>(#a: T, #b: T) -> Bool {
+public func different<T : Equatable>(#a: T, b: T) -> Bool {
   return a != b
 }
 
-public func different2<T where T : Equatable>(#a: T, #b: T) -> Bool {
+public func different2<T where T : Equatable>(#a: T, b: T) -> Bool {
   return a != b
 }
 
@@ -46,7 +46,7 @@ public func differentWrapped<
   T : Wrapped, U : Wrapped
   where
   T.Value == U.Value
->(#a: T, #b: U) -> Bool {
+>(#a: T, b: U) -> Bool {
   return a.getValue() != b.getValue()
 }
 

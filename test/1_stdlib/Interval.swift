@@ -73,7 +73,7 @@ IntervalTestSuite.test("Overlaps") {
   
   func expectOverlaps<
     I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
-  >(expectation: Bool, lhs: I0, rhs: I1) {
+  >(expectation: Bool, _ lhs: I0, _ rhs: I1) {
     if expectation {
       expectTrue(overlaps(lhs, rhs))
       expectTrue(overlaps(rhs, lhs))

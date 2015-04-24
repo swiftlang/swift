@@ -67,8 +67,8 @@ func foo2<T : P2>(x: T) { println("P2") }
 func foo3<T : P1>(x: T) { println("P1") }
 func foo3<T : P3>(x: T) { println("P3") }
 
-func foo4<T : P3, U : P1>(x: T, y: U) { println("P3, P1") }
-func foo4<T : P3, U : P3>(x: T, y: U) { println("P3, P3") }
+func foo4<T : P3, U : P1>(x: T, _ y: U) { println("P3, P1") }
+func foo4<T : P3, U : P3>(x: T, _ y: U) { println("P3, P3") }
 
 func checkOverloadResolution() {
   println("overload resolution:")

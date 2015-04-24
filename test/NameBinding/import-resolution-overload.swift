@@ -13,7 +13,7 @@ import func overload_boolFunctions.scopedFunction
 
 struct LocalType {}
 func something(obj: LocalType) -> LocalType { return obj }
-func something(a: Int, b: Int, c: Int) -> () {}
+func something(a: Int, _ b: Int, _ c: Int) -> () {}
 
 var _ : Bool = something(true)
 var _ : Int = something(1)

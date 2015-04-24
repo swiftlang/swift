@@ -41,8 +41,8 @@ extension SCNGeometryElement {
 @asmname("SCN_Swift_SCNSceneSource_entryWithIdentifier")
 internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
   self_: AnyObject,
-  uid: NSString,
-  entryClass: AnyClass) -> AnyObject?
+  _ uid: NSString,
+  _ entryClass: AnyClass) -> AnyObject?
 
 @availability(iOS, introduced=8.0)
 @availability(OSX, introduced=10.8)

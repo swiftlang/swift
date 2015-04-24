@@ -228,7 +228,7 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
 
 /// Dump an object's contents using its mirror to the specified output stream.
 public func dump<T, TargetStream : OutputStreamType>(
-    x: T, inout targetStream: TargetStream,
+    x: T, inout _ targetStream: TargetStream,
     name: String? = nil, indent: Int = 0,
     maxDepth: Int = .max, maxItems: Int = .max
 ) -> T {
@@ -251,10 +251,10 @@ public func dump<T>(x: T, name: String? = nil, indent: Int = 0,
 
 /// Dump an object's contents using a mirror. User code should use dump().
 func _dumpWithMirror<TargetStream : OutputStreamType>(
-    mirror: MirrorType, name: String?, indent: Int, maxDepth: Int,
-    inout maxItemCounter: Int,
-    inout visitedItems: [ObjectIdentifier : Int],
-    inout targetStream: TargetStream
+    mirror: MirrorType, _ name: String?, _ indent: Int, _ maxDepth: Int,
+    inout _ maxItemCounter: Int,
+    inout _ visitedItems: [ObjectIdentifier : Int],
+    inout _ targetStream: TargetStream
 ) {
   if maxItemCounter <= 0 { return }
   --maxItemCounter
@@ -337,7 +337,7 @@ internal struct _LeafMirror<T>: MirrorType {
 
 @asmname("swift_MagicMirrorData_summary")
 func _swift_MagicMirrorData_summaryImpl(
-  metadata: Any.Type, result: UnsafeMutablePointer<String>
+  metadata: Any.Type, _ result: UnsafeMutablePointer<String>
 )
 
 public struct _MagicMirrorData {

@@ -30,7 +30,7 @@ where
 /// Compute the prefix sum of `seq`.
 public func scan<
   S : SequenceType, U
->(seq: S, initial: U, combine: (U, S.Generator.Element) -> U) -> _UnitTestArray<U> {
+>(seq: S, _ initial: U, _ combine: (U, S.Generator.Element) -> U) -> _UnitTestArray<U> {
   var result = _UnitTestArray<U>()
   result.reserveCapacity(underestimateCount(seq))
   var runningResult = initial
@@ -57,12 +57,12 @@ public func gather<
   where
   IndicesSequence.Generator.Element == C.Index
 >(
-  collection: C, indices: IndicesSequence
+  collection: C, _ indices: IndicesSequence
 ) -> _UnitTestArray<C.Generator.Element> {
   return _UnitTestArray(indices._prext_map { collection[$0] })
 }
 
-public func scatter<T>(a: _UnitTestArray<T>, idx: _UnitTestArray<Int>) -> _UnitTestArray<T> {
+public func scatter<T>(a: _UnitTestArray<T>, _ idx: _UnitTestArray<Int>) -> _UnitTestArray<T> {
   var result = a
   for i in 0..<a.count {
     result[idx[i]] = a[i]
@@ -71,7 +71,7 @@ public func scatter<T>(a: _UnitTestArray<T>, idx: _UnitTestArray<Int>) -> _UnitT
 }
 
 public func withArrayOfCStrings<R>(
-  args: _UnitTestArray<String>, body: (Array<UnsafeMutablePointer<CChar>>) -> R
+  args: _UnitTestArray<String>, _ body: (Array<UnsafeMutablePointer<CChar>>) -> R
 ) -> R {
 
   let argsLengths = _UnitTestArray(map(args) { count($0.utf8) + 1 })

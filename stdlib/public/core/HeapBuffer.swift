@@ -15,7 +15,7 @@ typealias _HeapObject = SwiftShims.HeapObject
 
 @asmname("swift_bufferAllocate")
 func _swift_bufferAllocate(
-  bufferType: AnyClass, size: Int, alignMask: Int) -> AnyObject
+  bufferType: AnyClass, _ size: Int, _ alignMask: Int) -> AnyObject
 
 /// A class containing an ivar "value" of type Value, and
 /// containing storage for an array of Element whose size is

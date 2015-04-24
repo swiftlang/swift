@@ -4,7 +4,7 @@ func takeIntToInt(f: (Int) -> Int) { }
 func takeIntIntToInt(f: (Int, Int) -> Int) { }
 
 // Anonymous arguments with inference
-func myMap<T, U>(array: [T], f: (T) -> U) -> [U] {}
+func myMap<T, U>(array: [T], _ f: (T) -> U) -> [U] {}
 
 func testMap(array: [Int]) {
   var farray = myMap(array, { Float($0) })

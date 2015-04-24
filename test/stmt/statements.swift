@@ -3,7 +3,7 @@
 /* block comments */
 /* /* nested too */ */
 
-func f1(a: Int, y: Int) {}
+func f1(a: Int, _ y: Int) {}
 func f2() {}
 func f3() -> Int {}
 

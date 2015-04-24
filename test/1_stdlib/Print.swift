@@ -57,7 +57,7 @@ func stdlibTypesHaveDescription() {
 var failed = false
 
 func printedIs<T>(
-    object: T, expected1: String, expected2: String? = nil,
+    object: T, _ expected1: String, expected2: String? = nil,
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   var actual = String(object)
@@ -75,7 +75,7 @@ func printedIs<T>(
 }
 
 func debugPrintedIs<T>(
-    object: T, expected1: String, expected2: String? = nil,
+    object: T, _ expected1: String, expected2: String? = nil,
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   var actual = ""
@@ -90,7 +90,7 @@ func debugPrintedIs<T>(
 }
 
 func assertEquals(
-    expected: String, actual: String,
+    expected: String, _ actual: String,
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
@@ -695,7 +695,7 @@ func test_ObjectPrinting() {
 test_ObjectPrinting()
 // CHECK: test_ObjectPrinting done
 
-func test_ThickMetatypePrintingImpl<T>(thickMetatype: T.Type, expected: String) {
+func test_ThickMetatypePrintingImpl<T>(thickMetatype: T.Type, _ expected: String) {
   printedIs(thickMetatype, expected)
   printedIs([ thickMetatype ], "[" + expected + "]")
 }

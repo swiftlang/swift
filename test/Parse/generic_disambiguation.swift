@@ -17,7 +17,7 @@ protocol Runcible {}
 protocol Fungible {}
 
 func meta<T>(m: T.Type) {}
-func meta2<T>(m: T.Type, x: Int) {}
+func meta2<T>(m: T.Type, _ x: Int) {}
 
 func generic<T>(x: T) {}
 

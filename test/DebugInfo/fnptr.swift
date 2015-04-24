@@ -7,7 +7,7 @@ func bar() {
     print ("bar()")
 }
 func baz(i: Float) -> Int { return 0; }
-func barz(i: Float, j: Float) -> Int { return 0; }
+func barz(i: Float, _ j: Float) -> Int { return 0; }
 func main() -> Int {
 
     // CHECK-DAG: !MDLocalVariable(tag: DW_TAG_auto_variable, name: "bar_function_pointer",{{.*}} line: [[@LINE+1]],{{.*}} type: !"[[BARPT:[^,]+]]"

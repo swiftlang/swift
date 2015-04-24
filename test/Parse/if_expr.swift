@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -dump-ast %s 2>&1 | FileCheck %s
 
 // CHECK: (func_decl "r13756261(_:_:)"
-func r13756261(x: Bool, y: Int) -> Int {
+func r13756261(x: Bool, _ y: Int) -> Int {
   // CHECK: (if_expr
   // CHECK:   (call_expr
   // CHECK:   (declref_expr
@@ -16,7 +16,7 @@ func r13756261(x: Bool, y: Int) -> Int {
 }
 
 // CHECK: (func_decl "r13756221(_:_:)"
-func r13756221(x: Bool, y: Int) -> Int {
+func r13756221(x: Bool, _ y: Int) -> Int {
   // CHECK: (if_expr
   // CHECK:   (call_expr
   // CHECK:   (declref_expr
@@ -34,7 +34,7 @@ func r13756221(x: Bool, y: Int) -> Int {
 }
 
 // CHECK: (func_decl "telescoping_if(_:_:)"
-func telescoping_if(x: Bool, y: Int) -> Int {
+func telescoping_if(x: Bool, _ y: Int) -> Int {
   // CHECK: (if_expr
   // CHECK:   (call_expr
   // CHECK:   (if_expr
@@ -71,7 +71,7 @@ func +<< (x: Bool, y: Bool) -> Bool {}
 func +== (x: Bool, y: Bool) -> Bool {}
 
 // CHECK: (func_decl "prec_above(_:_:_:)"
-func prec_above(x: Bool, y: Bool, z: Bool) -> Bool {
+func prec_above(x: Bool, _ y: Bool, _ z: Bool) -> Bool {
   // (x +>> y) ? (y +>> z) : ((x +>> y) ? (y +>> z) : (x +>> y))
   // CHECK: (if_expr
   // CHECK:   (binary_expr
@@ -84,7 +84,7 @@ func prec_above(x: Bool, y: Bool, z: Bool) -> Bool {
 }
 
 // CHECK: (func_decl "prec_below(_:_:_:)"
-func prec_below(x: Bool, y: Bool, z: Bool) -> Bool {
+func prec_below(x: Bool, _ y: Bool, _ z: Bool) -> Bool {
   // The middle arm of the ternary is max-munched, so this is:
   // ((x +<< (y ? (y +<< z) : x)) +<< (y ? (y +<< z) : x)) +<< y
   // CHECK: (binary_expr
@@ -104,7 +104,7 @@ func prec_below(x: Bool, y: Bool, z: Bool) -> Bool {
 }
 
 // CHECK: (func_decl "prec_equal(_:_:_:)"
-func prec_equal(x: Bool, y: Bool, z: Bool) -> Bool {
+func prec_equal(x: Bool, _ y: Bool, _ z: Bool) -> Bool {
   // The middle arm of the ternary is max-munched, so this is:
   // x +== (y ? (y +== z) : (x +== (y ? (y +== z) : (x +== y))))
   // CHECK: (binary_expr

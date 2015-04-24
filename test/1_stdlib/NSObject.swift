@@ -9,7 +9,7 @@ import Foundation
 // NSObject ==
 //===----------------------------------------------------------------------===//
 
-func printEquality<T : Equatable>(lhs: T, rhs: T, lhsName: String, rhsName: String) {
+func printEquality<T : Equatable>(lhs: T, _ rhs: T, _ lhsName: String, _ rhsName: String) {
   if lhs == lhs {
     println("\(lhsName) == \(lhsName)")
   }
@@ -24,7 +24,7 @@ func printEquality<T : Equatable>(lhs: T, rhs: T, lhsName: String, rhsName: Stri
   }
 }
 
-func printIdentity(lhs: AnyObject, rhs: AnyObject, lhsName: String, rhsName: String) {
+func printIdentity(lhs: AnyObject, _ rhs: AnyObject, _ lhsName: String, _ rhsName: String) {
   if lhs === lhs {
     println("\(lhsName) === \(lhsName)")
   }
@@ -118,7 +118,7 @@ println("done NSMutableString ==")
 // NSObject hashValue
 //===----------------------------------------------------------------------===//
 
-func printHashValue<T : Hashable>(x: T, name: String) {
+func printHashValue<T : Hashable>(x: T, _ name: String) {
   println("\(name) hashes to \(x.hashValue)")
 }
 

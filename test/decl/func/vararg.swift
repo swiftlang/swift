@@ -7,7 +7,7 @@ func f1(a: Int...) { for x in a {} }
 f1()
 f1(1)
 f1(1,2)
-func f2(a: Int, b: Int...) { for x in b {} }
+func f2(a: Int, _ b: Int...) { for x in b {} }
 f2(1)
 f2(1,2)
 f2(1,2,3)

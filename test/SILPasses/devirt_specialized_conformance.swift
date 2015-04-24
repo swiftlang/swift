@@ -28,10 +28,10 @@ class B<T> : P {
    }
  }
 
-func doSomething(p : P, x : Int32) {
+func doSomething(p : P, _ x : Int32) {
   p.doSomething(x)
 }
-func doSomething2<T : P>(t : T, x : Int32) {
+func doSomething2<T : P>(t : T, _ x : Int32) {
   t.doSomething(x)
 }
 

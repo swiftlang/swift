@@ -62,8 +62,8 @@ internal func invokeBlockContext(
 /// Block-based wrapper for `pthread_create`.
 public func _stdlib_pthread_create_block<Argument, Result>(
   attr: UnsafePointer<pthread_attr_t>,
-  start_routine: (Argument) -> Result,
-  arg: Argument
+  _ start_routine: (Argument) -> Result,
+  _ arg: Argument
 ) -> (CInt, pthread_t?) {
   let context = PthreadBlockContextImpl(block: start_routine, arg: arg)
   // We hand ownership off to `invokeBlockContext` through its void context
@@ -85,7 +85,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
 /// Block-based wrapper for `pthread_join`.
 public func _stdlib_pthread_join<Result>(
   thread: pthread_t,
-  resultType: Result.Type
+  _ resultType: Result.Type
 ) -> (CInt, Result?) {
   var threadResultPtr = UnsafeMutablePointer<Void>()
   let result = pthread_join(thread, &threadResultPtr)

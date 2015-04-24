@@ -36,13 +36,13 @@ public func maxElement<
 /// Complexity: O(\ `count(domain)`\ )
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
->(domain: C, value: C.Generator.Element) -> C.Index? {
+>(domain: C, _ value: C.Generator.Element) -> C.Index? {
   // FIXME(prext): remove this function when protocol extensions land.
   return domain._prext_find(value)
 }
 
 /// Return the lesser of `x` and `y`
-public func min<T : Comparable>(x: T, y: T) -> T {
+public func min<T : Comparable>(x: T, _ y: T) -> T {
   var r = x
   if y < x {
     r = y
@@ -51,7 +51,7 @@ public func min<T : Comparable>(x: T, y: T) -> T {
 }
 
 /// Return the least argument passed
-public func min<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
+public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var r = x
   if y < x {
     r = y
@@ -68,7 +68,7 @@ public func min<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
 }
 
 /// Return the greater of `x` and `y`
-public func max<T : Comparable>(x: T, y: T) -> T {
+public func max<T : Comparable>(x: T, _ y: T) -> T {
   var r = y
   if y < x {
     r = x
@@ -77,7 +77,7 @@ public func max<T : Comparable>(x: T, y: T) -> T {
 }
 
 /// Return the greatest argument passed
-public func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
+public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var r = y
   if y < x {
     r = x
@@ -106,7 +106,7 @@ public func split<S: Sliceable, R:BooleanType>(
   elements: S, 
   maxSplit: Int = Int.max,
   allowEmptySlices: Bool = false,
-  @noescape #isSeparator: (S.Generator.Element) -> R
+  @noescape isSeparator: (S.Generator.Element) -> R
   ) -> [S.SubSlice] {
 
   var result = Array<S.SubSlice>()
@@ -153,7 +153,7 @@ public func startsWith<
   where
     S0.Generator.Element == S1.Generator.Element,
     S0.Generator.Element : Equatable
->(s: S0, prefix: S1) -> Bool
+>(s: S0, _ prefix: S1) -> Bool
 {
   // FIXME(prext): remove this function when protocol extensions land.
   return s._prext_startsWith(prefix)
@@ -168,8 +168,8 @@ public func startsWith<
   S0 : SequenceType, S1 : SequenceType
   where
     S0.Generator.Element == S1.Generator.Element
->(s: S0, prefix: S1,
-  @noescape isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
+>(s: S0, _ prefix: S1,
+  @noescape _ isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
   -> Bool
 {
   // FIXME(prext): remove this function when protocol extensions land.
@@ -273,7 +273,7 @@ public func equal<
   where
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Equatable
->(a1: S1, a2: S2) -> Bool {
+>(a1: S1, _ a2: S2) -> Bool {
   // FIXME(prext): remove this function when protocol extensions land.
   return a1._prext_equalElements(a2)
 }
@@ -286,8 +286,8 @@ public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
     S1.Generator.Element == S2.Generator.Element
->(a1: S1, a2: S2,
-  @noescape isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
+>(a1: S1, _ a2: S2,
+  @noescape _ isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
   -> Bool {
   // FIXME(prext): remove this function when protocol extensions land.
   return a1._prext_equalElements(a2, isEquivalent: isEquivalent)
@@ -300,7 +300,7 @@ public func lexicographicalCompare<
   where 
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Comparable>(
-  a1: S1, a2: S2) -> Bool {
+  a1: S1, _ a2: S2) -> Bool {
   // FIXME(prext): remove this function when protocol extensions land.
   return a1._prext_lexicographicalCompare(a2)
 }
@@ -316,7 +316,7 @@ public func lexicographicalCompare<
   where 
     S1.Generator.Element == S2.Generator.Element
 >(
-  a1: S1, a2: S2,
+  a1: S1, _ a2: S2,
   @noescape isOrderedBefore less: (S1.Generator.Element, S1.Generator.Element)
   -> Bool
 ) -> Bool {
@@ -327,7 +327,7 @@ public func lexicographicalCompare<
 /// Return `true` iff an element in `seq` satisfies `predicate`.
 public func contains<
   S : SequenceType, L : BooleanType
->(seq: S, @noescape predicate: (S.Generator.Element) -> L) -> Bool {
+>(seq: S, @noescape _ predicate: (S.Generator.Element) -> L) -> Bool {
   // FIXME(prext): remove this function when protocol extensions land.
   return seq._prext_contains({ predicate($0).boolValue })
 }
@@ -335,7 +335,7 @@ public func contains<
 /// Return `true` iff `x` is in `seq`.
 public func contains<
   S : SequenceType where S.Generator.Element : Equatable
->(seq: S, x: S.Generator.Element) -> Bool {
+>(seq: S, _ x: S.Generator.Element) -> Bool {
   // FIXME(prext): remove this function when protocol extensions land.
   return seq._prext_contains(x)
 }
@@ -344,7 +344,7 @@ public func contains<
 /// accumulated value initialized to `initial` and each element of
 /// `sequence`, in turn.
 public func reduce<S : SequenceType, U>(
-  sequence: S, initial: U, @noescape combine: (U, S.Generator.Element) -> U
+  sequence: S, _ initial: U, @noescape _ combine: (U, S.Generator.Element) -> U
 ) -> U {
   // FIXME(prext): remove this function when protocol extensions land.
   return sequence._prext_reduce(initial, combine: combine)

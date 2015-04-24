@@ -95,7 +95,7 @@ public var singlePattern: Int {
   return 2
 }
 
-public func singleDefaultArgument(i: Int = {
+public func singleDefaultArgument(#i: Int = {
   //CHECK-DAG: VFIF10LocalTypes21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_27SingleDefaultArgumentStruct
   struct SingleDefaultArgumentStruct {
     let sdasi: Int

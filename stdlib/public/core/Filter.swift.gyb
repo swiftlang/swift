@@ -170,7 +170,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
 /// Return an `Array` containing the elements of `source`,
 /// in order, that satisfy the predicate `includeElement`.
 public func filter<S : SequenceType>(
-  source: S, includeElement: (S.Generator.Element) -> Bool
+  source: S, _ includeElement: (S.Generator.Element) -> Bool
 ) -> [S.Generator.Element] {
   // FIXME(prext): remove this function when protocol extensions land.
   return source._prext_filter(includeElement)
@@ -199,7 +199,7 @@ extension ${Self} {
 /// Return a lazy CollectionType containing the elements `x` of `source` for
 /// which `includeElement(x)` is `true`
 public func filter<C : CollectionType>(
-  source: C, includeElement: (C.Generator.Element)->Bool
+  source: C, _ includeElement: (C.Generator.Element)->Bool
 ) -> FilterCollectionView<C> {
   // FIXME(prext): remove this function when protocol extensions land.
   return FilterCollectionView(_base: source, _include: includeElement)

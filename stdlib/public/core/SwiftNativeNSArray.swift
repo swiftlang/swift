@@ -24,14 +24,14 @@ import SwiftShims
 /// Return true iff the given `index` is valid as a position, i.e. `0
 /// ≤ index ≤ count`
 @transparent
-internal func _isValidArrayIndex(index: Int, count: Int) -> Bool {
+internal func _isValidArrayIndex(index: Int, _ count: Int) -> Bool {
   return (index >= 0) && (index <= count)
 }
 
 /// Return true iff the given `index` is valid for subscripting, i.e.
 /// `0 ≤ index < count`
 @transparent
-internal func _isValidArraySubscript(index: Int, count: Int) -> Bool {
+internal func _isValidArraySubscript(index: Int, _ count: Int) -> Bool {
   return (index >= 0) && (index < count)
 }
 

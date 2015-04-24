@@ -18,8 +18,8 @@ var fi : F<Int>
 func f0(b : B) {}
 
 func ternary<T>(cond: Bool,
-                @autoclosure ifTrue: () -> T,
-                @autoclosure ifFalse: () -> T) -> T {}
+                @autoclosure _ ifTrue: () -> T,
+                @autoclosure _ ifFalse: () -> T) -> T {}
 
 f0(c)
 f0(a) // expected-error{{cannot invoke 'f0' with an argument list of type '(A)'}} expected-note {{expected an argument list of type '(B)'}}

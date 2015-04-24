@@ -17,7 +17,7 @@ extension Double : P {
 }
 
 func f0(x: Int, 
-       y: Float) { }
+        _ y: Float) { }
 
 func f1(_: (Int, Float) -> Int) { }
 
@@ -29,7 +29,7 @@ func f4(x: Int) -> Int { }
 
 func f5<T : P2>(_ : T) { }
 
-func f10<T : P, U : P where T.SomeType == U.SomeType>(t: T, u: U) {}
+func f10<T : P, U : P where T.SomeType == U.SomeType>(t: T, _ u: U) {}
 
 var i : Int
 var d : Double

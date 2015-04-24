@@ -5,6 +5,6 @@ import Foundation
 // argv as a const char**.
 @asmname("NSApplicationMain")
 public func NSApplicationMain(
-  argc: Int32, argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>>
+  argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>>
 ) -> Int32
 

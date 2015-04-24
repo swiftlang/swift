@@ -96,8 +96,8 @@ let startsWithTests = [
 
 // FIXME(prext): remove this function.
 func checkStartsWith(
-  expected: Bool, sequence: [Int], prefix: [Int],
-  stackTrace: SourceLocStack
+  expected: Bool, _ sequence: [Int], _ prefix: [Int],
+  _ stackTrace: SourceLocStack
 ) {
   expectEqual(expected, startsWith(sequence, prefix), stackTrace: stackTrace)
   expectEqual(
@@ -151,7 +151,7 @@ Algorithm.test("equal") {
 }
 
 Algorithm.test("equal/predicate") {
-  func compare(lhs: (Int, Int), rhs: (Int, Int)) -> Bool {
+  func compare(lhs: (Int, Int), _ rhs: (Int, Int)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1
   }
 
@@ -1151,14 +1151,14 @@ let findTests = [
 
 func callStaticContains(
   sequence: MinimalSequence<MinimalEquatableValue>,
-  element: MinimalEquatableValue
+  _ element: MinimalEquatableValue
 ) -> Bool {
   return sequence._prext_contains(element)
 }
 
 func callGenericContains<
   S : SequenceType where S.Generator.Element : Equatable
->(sequence: S, element: S.Generator.Element) -> Bool {
+>(sequence: S, _ element: S.Generator.Element) -> Bool {
   return sequence._prext_contains(element)
 }
 
@@ -1211,7 +1211,7 @@ struct SequenceWithCustomContainsMethod : SequenceType {
 
 func callStaticContains(
   sequence: SequenceWithCustomContainsMethod,
-  element: MinimalEquatableValue) -> Bool {
+  _ element: MinimalEquatableValue) -> Bool {
   return sequence._prext_contains(element)
 }
 
@@ -1233,7 +1233,7 @@ SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/CustomImplementati
 
 func callStaticContains(
   set: Set<MinimalHashableValue>,
-  element: MinimalHashableValue
+  _ element: MinimalHashableValue
 ) -> Bool {
   return set._prext_contains(element)
 }
@@ -1605,7 +1605,7 @@ struct ${CollectionType} : RangeReplaceableCollectionType {
     expectUnreachable()
   }
 
-  mutating func removeAll(keepCapacity: Bool = false) {
+  mutating func removeAll(#keepCapacity: Bool = false) {
     expectUnreachable()
   }
 
@@ -2367,7 +2367,7 @@ struct MinimalCollectionWithDefaultSlicing : CollectionType {
 
 func callGenericSlicing<C : CollectionType>(
   collection: C,
-  bounds: Range<C.Index>
+  _ bounds: Range<C.Index>
 ) -> C._prext_SubSlice {
   return collection[bounds]
 }
@@ -2648,14 +2648,14 @@ SequenceTypeAlgorithms.test("CollectionType.count()/${Implementation}Implementat
 
 func callStaticFind(
   collection: MinimalForwardCollection<MinimalEquatableValue>,
-  element: MinimalEquatableValue
+  _ element: MinimalEquatableValue
 ) -> MinimalForwardCollection<MinimalEquatableValue>.Index? {
   return collection._prext_find(element)
 }
 
 func callGenericFind<
   C : CollectionType where C.Generator.Element : Equatable
->(collection: C, element: C.Generator.Element) -> C.Index? {
+>(collection: C, _ element: C.Generator.Element) -> C.Index? {
   return collection._prext_find(element)
 }
 
@@ -2725,7 +2725,7 @@ struct CollectionWithCustomFindMethod : CollectionType {
 
 func callStaticFind(
   sequence: CollectionWithCustomFindMethod,
-  element: MinimalEquatableValue
+  _ element: MinimalEquatableValue
 ) -> CollectionWithCustomFindMethod.Index? {
   return sequence._prext_find(element)
 }
@@ -2752,13 +2752,13 @@ SequenceTypeAlgorithms.test("find/WhereElementIsEquatable/CustomImplementation/$
 // completely different line type-checks
 func callGenericFind_<
   C : CollectionType where C.Generator.Element : Equatable
->(collection: C, element: C.Generator.Element) -> C.Index? {
+>(collection: C, _ element: C.Generator.Element) -> C.Index? {
   return collection._prext_find(element)
 }
 
 func callStaticFind_(
   set: Set<MinimalHashableValue>,
-  element: MinimalHashableValue
+  _ element: MinimalHashableValue
 ) -> Set<MinimalHashableValue>.Index? {
   return set._prext_find(element)
 }
@@ -2840,9 +2840,9 @@ SequenceTypeAlgorithms.test("indices") {
 //===----------------------------------------------------------------------===//
 
 func _forAllPermutationsImpl(
-  index: Int, size: Int,
-  inout perm: [Int], inout visited: [Bool],
-  body: ([Int]) -> ()
+  index: Int, _ size: Int,
+  inout _ perm: [Int], inout _ visited: [Bool],
+  _ body: ([Int]) -> ()
 ) {
   if index == size {
     body(perm)

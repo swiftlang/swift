@@ -16,7 +16,7 @@ enum Policy {
   case Head(Int)
 }
 
-func extra2(#x: Int, #y: Int) { }
+func extra2(#x: Int, y: Int) { }
 
 func testExtra2(policy : Policy) {
   switch (policy)
@@ -42,7 +42,7 @@ X2(5).f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
 // Missing keywords
 // -------------------------------------------
 
-func allkeywords1(#x: Int, #y: Int) { }
+func allkeywords1(#x: Int, y: Int) { }
 
 // Missing keywords.
 allkeywords1(1, 2) // expected-error{{missing argument labels}}
@@ -57,14 +57,14 @@ GenericCtor<Int>()  // expected-error{{missing argument for parameter 't' in cal
 // -------------------------------------------
 // Extraneous keywords
 // -------------------------------------------
-func nokeywords1(x: Int, y: Int) { }
+func nokeywords1(x: Int, _ y: Int) { }
 
 nokeywords1(x: 1, y: 1) // expected-error{{extraneous argument labels 'x:y:' in call}}{{13-16=}}{{19-22=}}
 
 // -------------------------------------------
 // Some missing, some extraneous keywords
 // -------------------------------------------
-func somekeywords1(x: Int, #y: Int, #z: Int) { }
+func somekeywords1(x: Int, y: Int, z: Int) { }
 
 somekeywords1(x: 1, y: 2, z: 3) // expected-error{{extraneous argument label 'x:' in call}}{{15-18=}}
 somekeywords1(1, 2, 3) // expected-error{{missing argument labels 'y:z:' in call}}{{18-18=y: }}{{21-21=z: }}
@@ -80,7 +80,7 @@ allkeywords1(y: 1, x: 2) // expected-error{{argument 'x' must precede argument '
 // Default arguments
 // -------------------------------------------
 
-func defargs1(x: Int = 1, y: Int = 2, z: Int = 3) {}
+func defargs1(#x: Int = 1, y: Int = 2, z: Int = 3) {}
 
 // Using defaults (in-order)
 defargs1() 
@@ -99,7 +99,7 @@ defargs1(x: 1, z: 3, y: 2)
 defargs1(y: 2, x: 1)
 
 // Default arguments "boxed in".
-func defargs2(#first: Int, x: Int = 1, y: Int = 2, z: Int = 3, #last: Int) { }
+func defargs2(#first: Int, x: Int = 1, y: Int = 2, z: Int = 3, last: Int) { }
 
 // Using defaults in the middle (in-order, some missing)
 defargs2(first: 1, x: 1, z: 3, last: 4)
@@ -118,7 +118,7 @@ defargs2(first: 1, last: 4, x: 1) // expected-error{{argument 'x' must precede a
 // -------------------------------------------
 // Variadics
 // -------------------------------------------
-func variadics1(#x: Int, #y: Int, z: Int...) { }
+func variadics1(#x: Int, y: Int, _ z: Int...) { }
 
 // Using variadics (in-order, complete)
 variadics1(x: 1, y: 2)
@@ -130,7 +130,7 @@ variadics1(x: 1, y: 2, 1, 2, 3)
 // FIXME: Poor diagnostic.
 variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{cannot invoke 'variadics1' with an argument list of type '(Int, Int, Int, Int, Int, x: Int, y: Int)'}} expected-note{{expected an argument list of type '(x: Int, y: Int, [Int])'}}
 
-func variadics2(#x: Int, y: Int = 2, #z: Int...) { }
+func variadics2(#x: Int, y: Int = 2, z: Int...) { }
 
 // Using variadics (in-order, complete)
 variadics2(x: 1, y: 2, z: 1)
@@ -150,11 +150,11 @@ variadics2(z: 1, 2, 3, x: 1) // expected-error{{argument 'x' must precede argume
 // -------------------------------------------
 // FIXME: Diagnostics could be improved with all missing names, or
 // simply # of arguments required.
-func missingargs1(#x: Int, #y: Int, #z: Int) {}
+func missingargs1(#x: Int, y: Int, z: Int) {}
 
 missingargs1(x: 1, y: 2) // expected-error{{missing argument for parameter 'z' in call}}
 
-func missingargs2(#x: Int, #y: Int, z: Int) {}
+func missingargs2(#x: Int, y: Int, _ z: Int) {}
 missingargs2(x: 1, y: 2) // expected-error{{missing argument for parameter #3 in call}}
 
 // -------------------------------------------
@@ -171,11 +171,11 @@ extraargs1(x: 1, 2, 3) // expected-error{{extra argument in call}}
 // Argument name mismatch
 // -------------------------------------------
 
-func mismatch1(withFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
+func mismatch1(#thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
 
-mismatch1(foo: 5) // expected-error{{incorrect argument label in call (have 'foo:', expected 'withFoo:')}}
+mismatch1(foo: 5) // expected-error{{incorrect argument label in call (have 'foo:', expected 'thisFoo:')}}
 mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}}
-mismatch1(food: 1, zap: 2) // expected-error{{incorrect argument labels in call (have 'food:zap:', expected 'withFoo:bar:')}}
+mismatch1(food: 1, zap: 2) // expected-error{{incorrect argument labels in call (have 'food:zap:', expected 'thisFoo:bar:')}}
 
 // -------------------------------------------
 // Subscript keyword arguments
@@ -227,17 +227,17 @@ acceptAutoclosure(f: produceInt) // expected-error{{function produces expected t
 // -------------------------------------------
 // Trailing closures
 // -------------------------------------------
-func trailingclosure1(#x: Int, #f: () -> Int) {}
+func trailingclosure1(#x: Int, f: () -> Int) {}
 
 trailingclosure1(x: 1) { return 5 }
 trailingclosure1(1) { return 5 } // expected-error{{missing argument label 'x:' in call}}{{18-18=x: }}
 
 trailingclosure1(x: 1, { return 5 }) // expected-error{{missing argument label 'f:' in call}}
 
-func trailingclosure2(#x: Int, #f: (() -> Int)!...) {}
+func trailingclosure2(#x: Int, f: (() -> Int)!...) {}
 trailingclosure2(x: 5) { return 5 }
 
-func trailingclosure3(#x: Int, var #f: (() -> Int)!) {}
+func trailingclosure3(#x: Int, var f: (() -> Int)!) {}
 trailingclosure3(x: 5) { return 5 }
 
 func trailingclosure4(#f: () -> Int) {}

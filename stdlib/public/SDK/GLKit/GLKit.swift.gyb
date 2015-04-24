@@ -33,7 +33,7 @@ vectorElementNames = [
 // Do dirty pointer manipulations to index an opaque struct like an array.
 @inline(__always)
 public func _indexHomogeneousValue<TTT, T>(aggregate: UnsafePointer<TTT>,
-                                           index: Int) -> T {
+                                           _ index: Int) -> T {
   return UnsafePointer<T>(aggregate)[index]
 }
 

@@ -58,27 +58,27 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 
 @asmname("swift_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
-  prefix: UnsafePointer<UInt8>, prefixLength: UWord,
-  message: UnsafePointer<UInt8>, messageLength: UWord,
-  file: UnsafePointer<UInt8>, fileLength: UWord,
-  line: UWord)
+  prefix: UnsafePointer<UInt8>, _ prefixLength: UWord,
+  _ message: UnsafePointer<UInt8>, _ messageLength: UWord,
+  _ file: UnsafePointer<UInt8>, _ fileLength: UWord,
+  _ line: UWord)
 
 @asmname("swift_reportFatalError")
 func _reportFatalError(
-  prefix: UnsafePointer<UInt8>, prefixLength: UWord,
-  message: UnsafePointer<UInt8>, messageLength: UWord)
+  prefix: UnsafePointer<UInt8>, _ prefixLength: UWord,
+  _ message: UnsafePointer<UInt8>, _ messageLength: UWord)
 
 @asmname("swift_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
-  className: UnsafePointer<UInt8>, classNameLength: UWord,
-  initName: UnsafePointer<UInt8>, initNameLength: UWord,
-  file: UnsafePointer<UInt8>, fileLength: UWord,
-  line: UWord, column: UWord)
+  className: UnsafePointer<UInt8>, _ classNameLength: UWord,
+  _ initName: UnsafePointer<UInt8>, _ initNameLength: UWord,
+  _ file: UnsafePointer<UInt8>, _ fileLength: UWord,
+  _ line: UWord, _ column: UWord)
 
 @asmname("swift_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
-  className: UnsafePointer<UInt8>, classNameLength: UWord,
-  initName: UnsafePointer<UInt8>, initNameLength: UWord)
+  className: UnsafePointer<UInt8>, _ classNameLength: UWord,
+  _ initName: UnsafePointer<UInt8>, _ initNameLength: UWord)
 
 /// This function should be used only in the implementation of user-level
 /// assertions.
@@ -87,8 +87,8 @@ func _reportUnimplementedInitializer(
 /// bloats code.
 @noreturn @inline(never)
 func _assertionFailed(
-  prefix: StaticString, message: StaticString,
-  file: StaticString, line: UWord
+  prefix: StaticString, _ message: StaticString,
+  _ file: StaticString, _ line: UWord
 ) {
   prefix.withUTF8Buffer {
     (prefix) -> () in
@@ -114,8 +114,8 @@ func _assertionFailed(
 /// bloats code.
 @noreturn @inline(never)
 func _assertionFailed(
-  prefix: StaticString, message: String,
-  file: StaticString, line: UWord
+  prefix: StaticString, _ message: String,
+  _ file: StaticString, _ line: UWord
 ) {
   prefix.withUTF8Buffer {
     (prefix) -> () in
@@ -142,8 +142,8 @@ func _assertionFailed(
 /// bloats code.
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
-func _fatalErrorMessage(prefix: StaticString, message: StaticString,
-                        file: StaticString, line: UWord) {
+func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
+                        _ file: StaticString, _ line: UWord) {
 #if INTERNAL_CHECKS_ENABLED
   prefix.withUTF8Buffer {
     (prefix) in

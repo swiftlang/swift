@@ -137,7 +137,7 @@ class C {
 }
 import Foundation
 
-func isOSAtLeast(major: Int, minor: Int, patch: Int = 0) -> Bool {
+func isOSAtLeast(major: Int, _ minor: Int, patch: Int = 0) -> Bool {
   let vers = (majorVersion: major, minorVersion: minor, patchVersion: patch)
   // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
   if #available(iOS >= 8.0, OSX >= 10.10, *) {
@@ -150,7 +150,7 @@ func isOSAtLeast(major: Int, minor: Int, patch: Int = 0) -> Bool {
   return false
 }
 
-func expectTagged(s: NSString, expected: Bool) -> NSString {
+func expectTagged(s: NSString, _ expected: Bool) -> NSString {
 #if arch(x86_64)
   let mask: UWord = 0x8000000000000001
 #elseif arch(arm64)

@@ -1703,7 +1703,7 @@ let comparisonTests = [
 
 func checkStringComparison(
   expected: ExpectedComparisonResult,
-  lhs: String, rhs: String, stackTrace: SourceLocStack
+  _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
   // String / String
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
@@ -1746,7 +1746,7 @@ NSStringAPIs.test("String.{Equatable,Hashable,Comparable}") {
 
 func checkCharacterComparison(
   expected: ExpectedComparisonResult,
-  lhs: Character, rhs: Character, stackTrace: SourceLocStack
+  _ lhs: Character, _ rhs: Character, _ stackTrace: SourceLocStack
 ) {
   // Character / Character
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
@@ -1776,7 +1776,7 @@ NSStringAPIs.test("Character.{Equatable,Hashable,Comparable}") {
 }
 
 func checkHasPrefixHasSuffix(
-  lhs: String, rhs: String, stackTrace: SourceLocStack
+  lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
   if lhs == "" {
     return

@@ -694,8 +694,8 @@ public func transcode<
   OutputEncoding : UnicodeCodecType
   where InputEncoding.CodeUnit == Input.Element,
       OutputEncoding.CodeUnit == Output.Element>(
-  inputEncoding: InputEncoding.Type, outputEncoding: OutputEncoding.Type,
-  var input: Input, inout output: Output, #stopOnError: Bool
+  inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
+  var _ input: Input, inout _ output: Output, stopOnError: Bool
 ) -> Bool {
 
   // NB.  It is not possible to optimize this routine to a memcpy if
@@ -731,7 +731,7 @@ public func transcode<
 internal func _transcodeSomeUTF16AsUTF8<
   Input : CollectionType
   where Input.Generator.Element == UInt16>(
-  input: Input, startIndex: Input.Index
+  input: Input, _ startIndex: Input.Index
 ) -> (Input.Index, _StringCore.UTF8Chunk) {
   typealias UTF8Chunk = _StringCore.UTF8Chunk
 

@@ -131,7 +131,7 @@ func getZang(f: Foo) -> Bool {
 // CHECK:   return [[BOOL]]
 
 // @interface Foo -(void) setZang: (_Bool)b; @end
-func setZang(f: Foo, b: Bool) {
+func setZang(f: Foo, _ b: Bool) {
   f.setZang(b)
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging7setZangFTCSo3FooSb_T_

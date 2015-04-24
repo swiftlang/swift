@@ -29,7 +29,7 @@ func useIdentity(x: Int, y: Float, i32: Int32) {
 }
 
 // FIXME: Crummy diagnostic!
-func twoIdentical<T>(x: T, y: T) -> T {}
+func twoIdentical<T>(x: T, _ y: T) -> T {}
 
 func useTwoIdentical(xi: Int, yi: Float) {
   var x = xi, y = yi
@@ -44,7 +44,7 @@ func useTwoIdentical(xi: Int, yi: Float) {
 }
 
 func mySwap<T>(inout x: T,
-               inout y: T) {
+               inout _ y: T) {
   var tmp = x
   x = y
   y = tmp
@@ -72,7 +72,7 @@ func useTuples(x: Int, y: Float, z: (Float, Int)) {
   // representation.
 }
 
-func acceptFunction<T, U>(f: (T) -> U, t: T, u: U) {}
+func acceptFunction<T, U>(f: (T) -> U, _ t: T, _ u: U) {}
 
 func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
@@ -89,7 +89,7 @@ func testReturnTuple(x: Int, y: Float) {
 }
 
 
-func confusingArgAndParam<T, U>(f: (T) -> U, g: (U) -> T) {
+func confusingArgAndParam<T, U>(f: (T) -> U, _ g: (U) -> T) {
   confusingArgAndParam(g, f)
   confusingArgAndParam(f, g)
 }
@@ -191,7 +191,7 @@ protocol IsBefore {
   func isBefore(other: Self) -> Bool
 }
 
-func min2<T : IsBefore>(x: T, y: T) -> T {
+func min2<T : IsBefore>(x: T, _ y: T) -> T {
   if y.isBefore(x) { return y }
   return x
 }

@@ -151,7 +151,7 @@ public func join<
   C : ExtensibleCollectionType, S : SequenceType 
   where S.Generator.Element == C
 >(
-  separator: C, elements: S
+  separator: C, _ elements: S
 ) -> C {
   var result = C()
   let separatorSize = count(separator)

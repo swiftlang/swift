@@ -27,7 +27,7 @@
 /// Otherwise, requires that `end` is reachable from `start` by
 /// incrementation, and executes in O(N), where N is the function's
 /// result.
-public func distance<T : ForwardIndexType>(start: T, end: T) -> T.Distance {
+public func distance<T : ForwardIndexType>(start: T, _ end: T) -> T.Distance {
   return start~>_distanceTo(end)
 }
 
@@ -35,7 +35,7 @@ public func distance<T : ForwardIndexType>(start: T, end: T) -> T.Distance {
 /// models `RandomAccessIndexType`, executes in O(1).  Otherwise,
 /// executes in O(`abs(n)`).  If `T` does not model
 /// `BidirectionalIndexType`, requires that `n` is non-negative.
-public func advance<T : ForwardIndexType>(start: T, n: T.Distance) -> T {
+public func advance<T : ForwardIndexType>(start: T, _ n: T.Distance) -> T {
   return start~>_advance(n)
 }
 
@@ -43,7 +43,7 @@ public func advance<T : ForwardIndexType>(start: T, n: T.Distance) -> T {
 /// equals `end`.  If `T` models `RandomAccessIndexType`, executes in
 /// O(1).  Otherwise, executes in O(`abs(n)`).  If `T` does not model
 /// `BidirectionalIndexType`, requires that `n` is non-negative.
-public func advance<T : ForwardIndexType>(start: T, n: T.Distance, end: T) -> T {
+public func advance<T : ForwardIndexType>(start: T, _ n: T.Distance, _ end: T) -> T {
   return start~>_advance(n, end)
 }
 
@@ -62,7 +62,7 @@ public struct _Advance {}
 public func _advance<D>(n: D) -> (_Advance, (D)) {
   return (_Advance(), (n: n))
 }
-public func _advance<D, I>(n: D, end: I) -> (_Advance, (D, I)) {
+public func _advance<D, I>(n: D, _ end: I) -> (_Advance, (D, I)) {
   return (_Advance(), (n, end))
 }
 
@@ -192,7 +192,7 @@ public func ~> <T : _ForwardIndexType>(
 }
 
 internal
-func _advanceForward<T : _ForwardIndexType>(start: T, n: T.Distance) -> T {
+func _advanceForward<T : _ForwardIndexType>(start: T, _ n: T.Distance) -> T {
   _precondition(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
   var p = start
@@ -212,7 +212,7 @@ public func ~> <T : _ForwardIndexType>(
 
 internal
 func _advanceForward<T : _ForwardIndexType>(
-  start: T, n: T.Distance, end: T
+  start: T, _ n: T.Distance, _ end: T
 ) -> T {
   _precondition(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")

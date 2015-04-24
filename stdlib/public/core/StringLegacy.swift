@@ -67,12 +67,12 @@ extension String {
 /// Determines if `theString` starts with `prefix` comparing the strings under
 /// canonical equivalence.
 @asmname("swift_stdlib_NSStringHasPrefixNFD")
-func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, prefix: AnyObject) -> Bool
+func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, _ prefix: AnyObject) -> Bool
 
 /// Determines if `theString` ends with `suffix` comparing the strings under
 /// canonical equivalence.
 @asmname("swift_stdlib_NSStringHasSuffixNFD")
-func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, suffix: AnyObject) -> Bool
+func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, _ suffix: AnyObject) -> Bool
 
 extension String {
   /// Return `true` iff `self` begins with `prefix`

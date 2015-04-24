@@ -13,7 +13,7 @@ func takesConstVoidPointer(x: UnsafePointer<Void>) {}
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion16pointerToPointerFTGVSs20UnsafeMutablePointerSi_GVSs13UnsafePointerSi__T_
 // CHECK: bb0([[MP:%.*]] : $UnsafeMutablePointer<Int>, [[CP:%.*]] : $UnsafePointer<Int>):
 func pointerToPointer(mp: UnsafeMutablePointer<Int>,
-                      cp: UnsafePointer<Int>) {
+                      _ cp: UnsafePointer<Int>) {
   // There should be no conversion here
   takesMutablePointer(mp)
   // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointerFGVSs20UnsafeMutablePointerSi_T_

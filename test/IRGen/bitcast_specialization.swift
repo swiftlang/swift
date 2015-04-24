@@ -9,7 +9,7 @@
 public func myDictionaryBridge<
     SrcType, DestType
 >(
-    source: Dictionary<SrcType, Int>, keyBridgesDirectly : Bool
+    source: Dictionary<SrcType, Int>, _ keyBridgesDirectly : Bool
 ) -> DestType? {
 
   for (key, value) in source {

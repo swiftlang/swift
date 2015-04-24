@@ -1443,12 +1443,8 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
           Printer << ", ";
 
         // Determine whether the argument name is API by default.
-        bool ArgNameIsAPIByDefault = (CurrPattern == 0 &&
-                                      AFD->argumentNameIsAPIByDefault(i)) ||
-          CurrPattern > 0 ||
-          (BodyTuple->getElement(i).getDefaultArgKind() !=
-             DefaultArgumentKind::None &&
-           Options.PrintDefaultParameterPlaceholder);
+        bool ArgNameIsAPIByDefault
+          = CurrPattern > 0 || AFD->argumentNameIsAPIByDefault(i);
 
         printOneParameter(BodyTuple->getElement(i).getPattern(),
                           ArgNameIsAPIByDefault,
@@ -1465,8 +1461,8 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
       Printer << ")";
       continue;
     }
-    bool ArgNameIsAPIByDefault = (CurrPattern == 0 &&
-                                  AFD->argumentNameIsAPIByDefault(0));
+    bool ArgNameIsAPIByDefault
+      = CurrPattern > 0 || AFD->argumentNameIsAPIByDefault(0);
     auto *BodyParen = cast<ParenPattern>(BodyPatterns[CurrPattern]);
     Printer << "(";
     printOneParameter(BodyParen->getSubPattern(),

@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-func pipe<T>(input: AnySequence<T>, output: SinkOf<T>) {
+func pipe<T>(input: AnySequence<T>, _ output: SinkOf<T>) {
   for x in input {
     output.put(x)
   }

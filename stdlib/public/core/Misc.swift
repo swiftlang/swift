@@ -67,10 +67,10 @@ func _withUninitializedString<R>(
 }
 
 @asmname("swift_stdlib_getDemangledTypeName")
-public func _stdlib_getDemangledTypeNameImpl<T>(value: T, result: UnsafeMutablePointer<String>)
+public func _stdlib_getDemangledTypeNameImpl<T>(value: T, _ result: UnsafeMutablePointer<String>)
 
 @asmname("swift_stdlib_getDemangledMetatypeName")
-public func _stdlib_getDemangledMetatypeNameImpl(type: Any.Type, result: UnsafeMutablePointer<String>)
+public func _stdlib_getDemangledMetatypeNameImpl(type: Any.Type, _ result: UnsafeMutablePointer<String>)
 
 /// Returns the demangled name of a metatype.
 public func _typeName(type: Any.Type) -> String {
@@ -96,8 +96,8 @@ public func _stdlib_getDemangledTypeName<T>(value: T) -> String {
 @asmname("swift_stdlib_demangleName")
 func _stdlib_demangleNameImpl(
     mangledName: UnsafePointer<UInt8>,
-    mangledNameLength: UWord,
-    demangledName: UnsafeMutablePointer<String>)
+    _ mangledNameLength: UWord,
+    _ demangledName: UnsafeMutablePointer<String>)
 
 public func _stdlib_demangleName(mangledName: String) -> String {
   var mangledNameUTF8 = Array(mangledName.utf8)

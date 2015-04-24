@@ -79,7 +79,7 @@ extension Optional : CustomDebugStringConvertible {
 //   (x as T).map { ... }
 //
 /// Haskell's fmap for Optionals.
-public func map<T, U>(x: T?, @noescape f: (T)->U) -> U? {
+public func map<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
   // FIXME(prext): remove this function when protocol extensions land.
   switch x {
     case .Some(let y):
@@ -91,7 +91,7 @@ public func map<T, U>(x: T?, @noescape f: (T)->U) -> U? {
 
 
 /// Returns `f(self)!` iff `self` and `f(self)` are not nil.
-public func flatMap<T, U>(x: T?, @noescape f: (T)->U?) -> U? {
+public func flatMap<T, U>(x: T?, @noescape _ f: (T)->U?) -> U? {
   // FIXME(prext): remove this function when protocol extensions land.
   switch x {
   case .Some(let y):

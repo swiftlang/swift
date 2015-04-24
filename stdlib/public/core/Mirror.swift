@@ -255,7 +255,7 @@ extension Mirror.DisplayStyle {
   }
 }
 
-internal func _hasType(instance: Any, type: Any.Type) -> Bool {
+internal func _hasType(instance: Any, _ type: Any.Type) -> Bool {
   return unsafeBitCast(instance.dynamicType, Int.self)
     == unsafeBitCast(type, Int.self) 
 }
@@ -316,7 +316,7 @@ extension Mirror {
 /// Complexity: O(\ `count(domain)`\ )
 internal func _find<
   C: CollectionType
->(domain: C, predicate: (C.Generator.Element)->Bool) -> C.Index? {
+>(domain: C, _ predicate: (C.Generator.Element)->Bool) -> C.Index? {
   for i in indices(domain) {
     if predicate(domain[i]) {
       return i

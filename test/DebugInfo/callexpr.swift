@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -g -emit-ir -o - | FileCheck %s
 
-func foo(a : Int, b : Int) -> Int {
+func foo(a : Int, _ b : Int) -> Int {
   return a+b
 }
 

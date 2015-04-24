@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func myMap<T1, T2>(array: [T1], fn: (T1) -> T2) -> [T2] {}
+func myMap<T1, T2>(array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
 var intArray : [Int]
 
@@ -12,13 +12,13 @@ func foo(x: (Int, Int) -> Int) {}
 foo({$0}) // expected-error{{cannot invoke 'foo' with an argument list of type '((_) -> _)'}} expected-note{{expected an argument list of type '((Int, Int) -> Int)'}}
 
 struct X {}
-func mySort(array: [String], predicate: (String, String) -> Bool) -> [String] {}
-func mySort(array: [X], predicate: (X, X) -> Bool) -> [X] {}
+func mySort(array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
+func mySort(array: [X], _ predicate: (X, X) -> Bool) -> [X] {}
 var strings : [String]
 mySort(strings, { x, y in x < y })
 
 // Closures with inout arguments.
-func f0<T, U>(t: T, f: (inout T) -> U) -> U {
+func f0<T, U>(t: T, _ f: (inout T) -> U) -> U {
   var t2 = t;
   return f(&t2)
 }

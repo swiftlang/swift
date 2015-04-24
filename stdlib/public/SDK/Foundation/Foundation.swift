@@ -981,7 +981,7 @@ func NSLocalizedString(key: String,
                        tableName: String? = nil,
                        bundle: NSBundle = NSBundle.mainBundle(),
                        value: String = "",
-                       #comment: String) -> String {
+                       comment: String) -> String {
   return bundle.localizedStringForKey(key, value:value, table:tableName)
 }
 
@@ -989,7 +989,7 @@ func NSLocalizedString(key: String,
 // NSLog
 //===----------------------------------------------------------------------===//
 
-public func NSLog(format: String, args: CVarArgType...) {
+public func NSLog(format: String, _ args: CVarArgType...) {
   withVaList(args) { NSLogv(format, $0) }
 }
 

@@ -22,7 +22,7 @@ var raw = runcing.rawValue
 var eq = runcing == .QuinceSliced
 var hash = runcing.hashValue
 
-func testEm<E: Equatable>(x: E, y: E) {}
+func testEm<E: Equatable>(x: E, _ y: E) {}
 func hashEm<H: Hashable>(x: H) {}
 func rawEm<R: RawRepresentable>(x: R) {}
 

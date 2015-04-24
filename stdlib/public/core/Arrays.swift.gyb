@@ -580,7 +580,11 @@ extension ${Self} : _ArrayType {
     inout buffer: _Buffer, initializePointer: _InitializePointer<_Buffer.Element>
   ) {
     let oldCount = buffer.count
-    var newBuffer = Optional(_forceCreateUniqueMutableBuffer(&buffer, oldCount + 1, oldCount + 1))
+    var newBuffer = Optional(
+                      _forceCreateUniqueMutableBuffer(
+                        &buffer,
+                        oldCount + 1,
+                        oldCount + 1))
     _arrayOutOfPlaceUpdate(
       &buffer, &newBuffer, oldCount, 1, initializePointer)
   }
@@ -599,7 +603,7 @@ extension ${Self} : _ArrayType {
     // <rdar://problem/16954386> Type checker assertion: Unable to solve for
     // call to witness?
 
-    _${Self}Extend(&self, newElements)
+    _${Self}Extend(&self, sequence: newElements)
   }
 
   /// Remove an element from the end of the ${Self} in O(1).
@@ -639,7 +643,7 @@ extension ${Self} : _ArrayType {
   /// Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
   ///
   /// Complexity: O(\ `count(self)`\ ).
-  public mutating func removeAll(keepCapacity: Bool = false) {
+public mutating func removeAll(#keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
     }
@@ -860,7 +864,7 @@ func _arrayOutOfPlaceReplace<
   B: _ArrayBufferType, C: CollectionType
     where C.Generator.Element == B.Element, B.Index == Int
 >(
-  inout source: B, subRange: Range<Int>, newValues: C, insertCount: Int
+  inout source: B, _ subRange: Range<Int>, _ newValues: C, _ insertCount: Int
 ) {
   let growth = insertCount - count(subRange)
   let newCount = source.count + growth
@@ -878,7 +882,7 @@ func _arrayOutOfPlaceReplace<
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
 internal func _expectEnd<C : CollectionType>(
-  i: C.Index, s: C
+  i: C.Index, _ s: C
 ) {
   _debugPrecondition(
     i == s.endIndex,
@@ -889,7 +893,7 @@ internal func _expectEnd<C : CollectionType>(
 func _arrayNonSliceInPlaceReplace<
   B: _ArrayBufferType, C: CollectionType
   where C.Generator.Element == B.Element, B.Index == Int
->(inout target: B, subRange: Range<Int>, insertCount: Int, newValues: C) {
+>(inout target: B, _ subRange: Range<Int>, _ insertCount: Int, _ newValues: C) {
   let oldCount = target.count
   let eraseCount = count(subRange)
 
@@ -1055,7 +1059,7 @@ where C.Generator.Element == T
 
 @inline(never)
 func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
-  inout source: _Buffer, newCount: Int, requiredCapacity: Int
+  inout source: _Buffer, _ newCount: Int, _ requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   _sanityCheck(newCount >= 0)
   _sanityCheck(requiredCapacity >= newCount)
@@ -1086,10 +1090,10 @@ func _arrayOutOfPlaceUpdate<
     where Initializer.Element == _Buffer.Element
 >(
   inout source: _Buffer, 
-  inout dest: _ContiguousArrayBuffer<_Buffer.Element>?,
-  headCount: Int, // Count of initial source elements to copy/move
-  newCount: Int,  // Count of new elements to insert
-  initializeNewElements: Initializer
+  inout _ dest: _ContiguousArrayBuffer<_Buffer.Element>?,
+  _ headCount: Int, // Count of initial source elements to copy/move
+  _ newCount: Int,  // Count of new elements to insert
+  _ initializeNewElements: Initializer
 ) {
   _sanityCheck(headCount >= 0)
   _sanityCheck(newCount >= 0)
@@ -1164,7 +1168,7 @@ struct _IgnorePointer<T> : _PointerFunctionType {
 }
 
 func _arrayReserve<_Buffer: _ArrayBufferType>(
-  inout buffer: _Buffer, minimumCapacity: Int
+  inout buffer: _Buffer, _ minimumCapacity: Int
 ) {
   let count = buffer.count
   let requiredCapacity = max(count, minimumCapacity)
@@ -1197,7 +1201,7 @@ func _arrayAppendSequence<
   Buffer : _ArrayBufferType,
   S : SequenceType where S.Generator.Element == Buffer.Element
 >(
-  inout buffer: Buffer, newItems: S
+  inout buffer: Buffer, _ newItems: S
 ) {
   var stream = newItems.generate()
   var nextItem = stream.next()

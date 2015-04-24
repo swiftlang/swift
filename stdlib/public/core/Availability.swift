@@ -18,8 +18,8 @@ import SwiftShims
 /// generated code for API availability checking.
 public func _stdlib_isOSVersionAtLeast(
   major: Builtin.Word,
-  minor: Builtin.Word,
-  patch: Builtin.Word
+  _ minor: Builtin.Word,
+  _ patch: Builtin.Word
 ) -> Builtin.Int1 {
 #if os(OSX) || os(iOS)
   let runningVersion = _swift_stdlib_operatingSystemVersion()

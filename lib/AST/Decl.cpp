@@ -3276,16 +3276,16 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
 }
 
 bool AbstractFunctionDecl::argumentNameIsAPIByDefault(unsigned i) const {
-  // All initializer argument names are API by default.
+  // Initializers have argument labels.
   if (isa<ConstructorDecl>(this))
     return true;
 
   if (auto func = dyn_cast<FuncDecl>(this)) {
-    // No argument names for operators or global functions are API by default.
-    if (func->isOperator() || !func->getDeclContext()->isTypeContext())
+    // Operators do not have argument labels.
+    if (func->isOperator())
       return false;
 
-    // For methods, argument names after the first argument are API by default.
+    // Other functions have argument labels for every argument after the first.
     return i > 0;
   }
 

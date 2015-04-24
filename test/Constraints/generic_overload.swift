@@ -33,8 +33,8 @@ var f1_x1 = f1(x1)
 d = f1_x1
 
 // Overloading based on same-type constraints.
-func f2<T : P1, U : P1>(t: T, u: U) -> Int { return 0 }
-func f2<T : P1, U : P1 where T.Assoc == U.Assoc>(t : T, u : U) -> Double { return 0 }
+func f2<T : P1, U : P1>(t: T, _ u: U) -> Int { return 0 }
+func f2<T : P1, U : P1 where T.Assoc == U.Assoc>(t : T, _ u : U) -> Double { return 0 }
 
 var f2_x1_x1 = f2(x1, x1)
 d = f2_x1_x1

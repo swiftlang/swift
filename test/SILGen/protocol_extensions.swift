@@ -163,7 +163,7 @@ struct HasAP1 {
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions29testLogicalExistentialSetters
 // CHECK: bb0([[HASP1:%[0-9]+]] : $*HasAP1, [[B:%[0-9]+]] : $Bool)
-func testLogicalExistentialSetters(var hasAP1: HasAP1, b: Bool) {
+func testLogicalExistentialSetters(var hasAP1: HasAP1, _ b: Bool) {
   // CHECK: [[HASP1_BOX:%[0-9]+]] = alloc_box $HasAP1
   // CHECK-NEXT: copy_addr [take] [[HASP1]] to [initialization] [[HASP1_BOX]]#1 : $*HasAP1
   // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $P1
@@ -183,7 +183,7 @@ func testLogicalExistentialSetters(var hasAP1: HasAP1, b: Bool) {
 
 func plusOneP1() -> P1 {}
 
-// CHECK-LABEL: sil hidden @_TF19protocol_extensions38test_open_existential_semantics_opaqueFTPS_2P1_PS0___T_
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions38test_open_existential_semantics_opaque
 func test_open_existential_semantics_opaque(guaranteed: P1,
                                             var immediate: P1) {
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $P1
@@ -221,7 +221,7 @@ extension CP1 {
 
 func plusOneCP1() -> CP1 {}
 
-// CHECK-LABEL: sil hidden @_TF19protocol_extensions37test_open_existential_semantics_classFTPS_3CP1_PS0___T_
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions37test_open_existential_semantics_class
 func test_open_existential_semantics_class(guaranteed: CP1,
                                            var immediate: CP1) {
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $CP1

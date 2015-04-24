@@ -8,7 +8,7 @@ func searchForMe(x: Float) -> Float {
   return searchForMe(x);
 }
 
-@transparent func bar(x: Float, b: Bool) -> Float {
+@transparent func bar(x: Float, _ b: Bool) -> Float {
   if b {
     return baz(x)
   }

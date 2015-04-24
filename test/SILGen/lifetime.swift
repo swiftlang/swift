@@ -340,7 +340,7 @@ class RefWithProp {
 }
 
 // CHECK-LABEL: sil hidden @_TF8lifetime23logical_lvalue_lifetimeFTCS_11RefWithPropSiVS_3Val_T_ : $@convention(thin) (@owned RefWithProp, Int, Val) -> () {
-func logical_lvalue_lifetime(var r: RefWithProp, var i: Int, var v: Val) {
+func logical_lvalue_lifetime(var r: RefWithProp, var _ i: Int, var _ v: Val) {
   // CHECK: [[RADDR:%[0-9]+]] = alloc_box $RefWithProp
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val

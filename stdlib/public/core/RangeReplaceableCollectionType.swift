@@ -139,7 +139,7 @@ public protocol RangeReplaceableCollectionType
 /// Complexity: O(\ `count(x)`\ ).
 public func insert<
   C: RangeReplaceableCollectionType
->(inout x: C, newElement: C.Generator.Element, atIndex i: C.Index) {
+>(inout x: C, _ newElement: C.Generator.Element, atIndex i: C.Index) {
     x.replaceRange(i..<i, with: CollectionOfOne(newElement))
 }
 
@@ -151,7 +151,7 @@ public func insert<
 public func splice<
   C: RangeReplaceableCollectionType,
   S : CollectionType where S.Generator.Element == C.Generator.Element
->(inout x: C, newElements: S, atIndex i: C.Index) {
+>(inout x: C, _ newElements: S, atIndex i: C.Index) {
   x.replaceRange(i..<i, with: newElements)
 }
 
@@ -162,7 +162,7 @@ internal func _replaceRange<
   C0: RangeReplaceableCollectionType, C1: CollectionType
     where C0.Generator.Element == C1.Generator.Element
 >(
-  inout x: C0,  subRange: Range<C0.Index>, with newElements: C1
+  inout x: C0, _ subRange: Range<C0.Index>, with newElements: C1
 ) {
   x.replaceRange(subRange, with: newElements)
 }
@@ -174,7 +174,7 @@ internal func _replaceRange<
 /// Complexity: O(\ `count(x)`\ ).
 public func removeAtIndex<
   C: RangeReplaceableCollectionType
->(inout x: C, index: C.Index) -> C.Generator.Element {
+>(inout x: C, _ index: C.Index) -> C.Generator.Element {
   _precondition(!isEmpty(x), "can't remove from an empty collection")
   let result = x[index]
   _replaceRange(&x, index...index, with: EmptyCollection())
@@ -188,7 +188,7 @@ public func removeAtIndex<
 /// Complexity: O(\ `count(x)`\ ).
 public func removeRange<
   C: RangeReplaceableCollectionType
->(inout x: C, subRange: Range<C.Index>) {
+>(inout x: C, _ subRange: Range<C.Index>) {
   _replaceRange(&x, subRange, with: EmptyCollection())
 }
 
@@ -217,7 +217,7 @@ public func removeAll<
 public func extend<
   C: RangeReplaceableCollectionType,
   S : CollectionType where S.Generator.Element == C.Generator.Element
->(inout x: C, newElements: S) {
+>(inout x: C, _ newElements: S) {
   x.replaceRange(x.endIndex..<x.endIndex, with: newElements)
 }
 

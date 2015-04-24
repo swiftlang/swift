@@ -7,7 +7,7 @@ import CoreGraphics
 
 // verifiers
 
-func print3(op: String, d: Double, f: Float, g: CGFloat) {
+func print3(op: String, _ d: Double, _ f: Float, _ g: CGFloat) {
 #if arch(i386) || arch(arm)
   if (f != Float(g)  &&  f.isNaN != g.isNaN) {
     println("\(op)(CGFloat) got \(g) instead of \(f)")
@@ -20,7 +20,7 @@ func print3(op: String, d: Double, f: Float, g: CGFloat) {
   println("\(op) \(d) \(f) \(op)")
 }
 
-func print3(op: String, d: Bool, f: Bool, g: Bool) {
+func print3(op: String, _ d: Bool, _ f: Bool, _ g: Bool) {
 #if arch(i386) || arch(arm)
   if (f != g) {
     println("\(op)(CGFloat) got \(g) instead of \(f)")
@@ -33,7 +33,7 @@ func print3(op: String, d: Bool, f: Bool, g: Bool) {
   println("\(op) \(d) \(f) \(op)")
 }
 
-func print3(op: String, d: Int, f: Int, g: Int) {
+func print3(op: String, _ d: Int, _ f: Int, _ g: Int) {
 #if arch(i386) || arch(arm)
   if (f != g) {
     println("\(op)(CGFloat) got \(g) instead of \(f)")
@@ -46,8 +46,8 @@ func print3(op: String, d: Int, f: Int, g: Int) {
   println("\(op) \(d) \(f) \(op)")
 }
 
-func print6(op: String, d1: Double, d2: Double, 
-  f1: Float, f2: Float, g1: CGFloat, g2: CGFloat) 
+func print6(op: String, _ d1: Double, _ d2: Double, 
+  _ f1: Float, _ f2: Float, _ g1: CGFloat, _ g2: CGFloat) 
 {
 #if arch(i386) || arch(arm)
   if (f1 != Float(g1)  ||  f2 != Float(g2)) {
@@ -61,8 +61,8 @@ func print6(op: String, d1: Double, d2: Double,
   println("\(op) \(d1),\(d2) \(f1),\(f2) \(op)")
 }
 
-func print6(op: String, d1: Double, di: Int, 
-  f1: Float, fi: Int, g1: CGFloat, gi: Int)
+func print6(op: String, _ d1: Double, _ di: Int, 
+  _ f1: Float, _ fi: Int, _ g1: CGFloat, _ gi: Int)
 {
 #if arch(i386) || arch(arm)
   if (f1 != Float(g1)  ||  fi != gi) {

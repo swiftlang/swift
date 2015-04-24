@@ -20,11 +20,11 @@ class LogRecord {
   }
 }
 
-func $builtin_log<T>(object : T, name : String) -> AnyObject? {
+func $builtin_log<T>(object : T, _ name : String) -> AnyObject? {
   return LogRecord(api:"$builtin_log", object:object, name:name)
 }
 
-func $builtin_log_with_id<T>(object : T, name : String, id : Int) -> AnyObject? {
+func $builtin_log_with_id<T>(object : T, _ name : String, _ id : Int) -> AnyObject? {
   return LogRecord(api:"$builtin_log", object:object, name:name, id:id)
 }
 
@@ -44,7 +44,7 @@ func $builtin_println<T>(object: T) -> AnyObject? {
   return LogRecord(api:"$builtin_println", object:object)
 }
 
-func $builtin_send_data(object:AnyObject?, sl: Int, el: Int, sc: Int, ec: Int) {
+func $builtin_send_data(object:AnyObject?, _ sl: Int, _ el: Int, _ sc: Int, _ ec: Int) {
   let loc = "[\(sl):\(sc)-\(el):\(ec)]"
   println(loc + " " + (object as! LogRecord).text)
 }

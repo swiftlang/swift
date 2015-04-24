@@ -20,7 +20,7 @@
 // CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
 // CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]]) : $@convention(thin)
 // CHECK: return [[RESULT]] : $String
-func defarg1(i: Int = 17, #d: Double, s: String = "Hello") { }
+func defarg1(#i: Int = 17, d: Double, s: String = "Hello") { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments15testDefaultArg1FT_T_
 func testDefaultArg1() {
@@ -66,7 +66,7 @@ func testAutocloseFile() {
   autocloseFile()
 }
 
-func testMagicLiterals(file: String = __FILE__,
+func testMagicLiterals(#file: String = __FILE__,
                        function: String = __FUNCTION__,
                        line: Int = __LINE__,
                        column: Int = __COLUMN__) {}
@@ -153,7 +153,7 @@ func testSelectorCall(x: Int, withMagicLiterals y: Int) {
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments32testSelectorCallWithUnnamedPieceFTSiSi_T_
 // CHECK:         string_literal utf16 "testSelectorCallWithUnnamedPiece"
-func testSelectorCallWithUnnamedPiece(x: Int, y: Int) {
+func testSelectorCallWithUnnamedPiece(x: Int, _ y: Int) {
   testMagicLiterals()
 }
 
@@ -179,7 +179,7 @@ func testSubDefArg() -> SubDefArg {
 // CHECK-NOT: sil hidden @_TIFC17default_arguments9SubDefArgcFMS0_FT3intSi_S0_A_ : $@convention(thin) () -> Int
 
 // <rdar://problem/17379550>
-func takeDefaultArgUnnamed(_ x: Int = 5) { }
+func takeDefaultArgUnnamed(x: Int = 5) { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments25testTakeDefaultArgUnnamed
 func testTakeDefaultArgUnnamed(i: Int) {

@@ -152,7 +152,7 @@ FoundationTestSuite.test("NSURL") {
 // Pattern-matching
 //===----------------------------------------------------------------------===//
 
-func matchesEither(input: NSNumber, a: NSNumber, b: NSNumber) -> Bool {
+func matchesEither(input: NSNumber, _ a: NSNumber, _ b: NSNumber) -> Bool {
   switch input {
   case a, b:
     return true
@@ -193,7 +193,7 @@ FoundationTestSuite.test("rdar://17584531") {
   expectEqual("Optional(255)", String(dict2["id"]))
 }
 
-func staticAssertType<T>(_: T.Type, inout value: T) {}
+func staticAssertType<T>(_: T.Type, inout _ value: T) {}
 
 #if os(OSX)
 FoundationTestSuite.test("NSRectEdge/constants") {

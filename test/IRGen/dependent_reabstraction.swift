@@ -13,7 +13,7 @@ struct X<Y> : A {
   }
 }
 
-func foo<T: A>(x: T, y: T.B) {
+func foo<T: A>(x: T, _ y: T.B) {
   x.b(y)
 }
 

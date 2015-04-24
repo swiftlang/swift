@@ -68,7 +68,7 @@ public func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
 }
 
-func _roundUpToAlignment(offset: Int, alignment: Int) -> Int {
+func _roundUpToAlignment(offset: Int, _ alignment: Int) -> Int {
   _sanityCheck(offset >= 0)
   _sanityCheck(alignment > 0)
   _sanityCheck(_isPowerOf2(alignment))
@@ -241,7 +241,7 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
 // mandatory generic inlining.
 
 @transparent @_semantics("branchhint") internal
-func _branchHint<C: BooleanType>(actual: C, expected: Bool) -> Bool {
+func _branchHint<C: BooleanType>(actual: C, _ expected: Bool) -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.boolValue.value, expected.value))
 }
 
@@ -357,7 +357,7 @@ internal func _isObjCTaggedPointer(x: AnyObject) -> Bool {
 /// _objectPointerSpareBits == bits`
 @inline(__always)
 internal func _makeNativeBridgeObject(
-  nativeObject: AnyObject, bits: UInt
+  nativeObject: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
   _sanityCheck(
     (bits & _objectPointerIsObjCBit) == 0,
@@ -387,7 +387,7 @@ internal func _makeObjCBridgeObject(
 ///    _objectPointerIsObjCBit`.
 @inline(__always)
 internal func _makeBridgeObject(
-  object: AnyObject, bits: UInt
+  object: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
   _sanityCheck(!_isObjCTaggedPointer(object) || bits == 0,
     "Tagged pointers cannot be combined with bits")

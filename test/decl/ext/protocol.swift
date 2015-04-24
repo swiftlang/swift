@@ -77,7 +77,7 @@ protocol SelfP1 {
 protocol SelfP2 {
 }
 
-func acceptSelfP1<T, U : SelfP1 where U.AssocType == T>(t: T, u: U) -> T {
+func acceptSelfP1<T, U : SelfP1 where U.AssocType == T>(t: T, _ u: U) -> T {
   return t
 }
 

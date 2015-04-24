@@ -19,7 +19,7 @@ var o : AnyObject = c
 // Archetype To Archetype //
 ////////////////////////////
 
-func ArchetypeToArchetype<T1, T2>(#t: T1, #t2: T2) -> T2 {
+func ArchetypeToArchetype<T1, T2>(#t: T1, t2: T2) -> T2 {
   return t as! T2
 }
 
@@ -170,13 +170,13 @@ ArchetypeToConcreteConvertE(t: c)
 // Concrete to Archetype //
 ///////////////////////////
 
-func ConcreteToArchetypeConvertUInt8<T>(#t: UInt8, #t2: T) -> T {
+func ConcreteToArchetypeConvertUInt8<T>(#t: UInt8, t2: T) -> T {
   return t as! T
 }
-func ConcreteToArchetypeConvertC<T>(#t: C, #t2: T) -> T {
+func ConcreteToArchetypeConvertC<T>(#t: C, t2: T) -> T {
   return t as! T
 }
-func ConcreteToArchetypeConvertD<T>(#t: D, #t2: T) -> T {
+func ConcreteToArchetypeConvertD<T>(#t: D, t2: T) -> T {
   return t as! T
 }
 
@@ -261,11 +261,11 @@ ConcreteToArchetypeConvertD(t: d, t2: c)
 // Super To Archetype //
 ////////////////////////
 
-func SuperToArchetypeC<T>(#c : C, #t : T) -> T {
+func SuperToArchetypeC<T>(#c : C, t : T) -> T {
   return c as! T
 }
 
-func SuperToArchetypeD<T>(#d : D, #t : T) -> T {
+func SuperToArchetypeD<T>(#d : D, t : T) -> T {
   return d as! T
 }
 
@@ -314,7 +314,7 @@ SuperToArchetypeD(d: d, t: d)
 // Existential To Archetype //
 //////////////////////////////
 
-func ExistentialToArchetype<T>(#o : AnyObject, #t : T) -> T {
+func ExistentialToArchetype<T>(#o : AnyObject, t : T) -> T {
   return o as! T
 }
 

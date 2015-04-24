@@ -195,8 +195,8 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
 @asmname("swift_bridgeNonVerbatimFromObjectiveC")
 func _bridgeNonVerbatimFromObjectiveC<T>(
   x: AnyObject, 
-  nativeType: T.Type,
-  inout result: T?
+  _ nativeType: T.Type,
+  inout _ result: T?
 )
 
 /// Runtime optional to conditionall perform a bridge from an object to a value
@@ -209,8 +209,8 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
 @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(
   x: AnyObject, 
-  nativeType: T.Type,
-  inout result: T?
+  _ nativeType: T.Type,
+  inout _ result: T?
 ) -> Bool
 
 /// Determines if values of a given type can be converted to an Objective-C

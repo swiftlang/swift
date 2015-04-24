@@ -2,7 +2,7 @@
 
 // Test various tuple constraints.
 
-func f0(#x: Int, #y: Float) {}
+func f0(#x: Int, y: Float) {}
 
 var i : Int
 var j : Int
@@ -11,9 +11,9 @@ var f : Float
 func f1(#y: Float, rest: Int...) {}
 
 func f2(_: (x: Int, y: Int) -> Int) {}
-func f2xy(#x: Int, #y: Int) -> Int {}
-func f2ab(#a: Int, #b: Int) -> Int {}
-func f2yx(#y: Int, #x: Int) -> Int {}
+func f2xy(#x: Int, y: Int) -> Int {}
+func f2ab(#a: Int, b: Int) -> Int {}
+func f2yx(#y: Int, x: Int) -> Int {}
 
 func f3(x: (x: Int, y: Int) -> ()) {}
 func f3a(x: Int, y: Int) {}

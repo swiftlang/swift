@@ -134,7 +134,7 @@ public func ${ufunc}(x: ${T}) -> ${T} {
 
 % for T, CT, f, bfunc in TypedBinaryFunctions():
 @transparent
-public func ${bfunc}(lhs: ${T}, rhs: ${T}) -> ${T} {
+public func ${bfunc}(lhs: ${T}, _ rhs: ${T}) -> ${T} {
   return ${T}(${bfunc}${f}(${CT}(lhs), ${CT}(rhs)))
 }
 
@@ -197,7 +197,7 @@ public func modf(value: ${T}) -> (${T}, ${T}) {
 % # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
 % for T, CT, f in AllFloatTypes():
 @transparent
-public func ldexp(x: ${T}, n: Int) -> ${T} {
+public func ldexp(x: ${T}, _ n: Int) -> ${T} {
   return ${T}(ldexp${f}(${CT}(x), CInt(n)))
 }
 
@@ -234,7 +234,7 @@ public func ilogb(x: Double) -> Int {
 % # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
 % for T, CT, f in AllFloatTypes():
 @transparent
-public func scalbn(x: ${T}, n: Int) -> ${T} {
+public func scalbn(x: ${T}, _ n: Int) -> ${T} {
   return ${T}(scalbn${f}(${CT}(x), CInt(n)))
 }
 
@@ -260,7 +260,7 @@ public func lgamma(x: ${T}) -> (${T}, Int) {
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 @transparent
-public func remquo(x: ${T}, y: ${T}) -> (${T}, Int) {
+public func remquo(x: ${T}, _ y: ${T}) -> (${T}, Int) {
   var quo = CInt(0)
   let rem = remquo${f}(${CT}(x), ${CT}(y), &quo)
   return (${T}(rem), Int(quo))
@@ -278,7 +278,7 @@ public func nan(tag: String) -> ${T} {
 
 % for T, CT, f in OverlayFloatTypes():
 @transparent
-public func fma(x: ${T}, y: ${T}, z: ${T}) -> ${T} {
+public func fma(x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} {
   return ${T}(fma${f}(${CT}(x), ${CT}(y), ${CT}(z)))
 }
 
@@ -286,12 +286,12 @@ public func fma(x: ${T}, y: ${T}, z: ${T}) -> ${T} {
 
 % # These C functions only support double. The overlay fixes the Int parameter.
 @transparent
-public func jn(n: Int, x: Double) -> Double {
+public func jn(n: Int, _ x: Double) -> Double {
   return jn(CInt(n), x)
 }
 
 @transparent
-public func yn(n: Int, x: Double) -> Double {
+public func yn(n: Int, _ x: Double) -> Double {
   return yn(CInt(n), x)
 }
 

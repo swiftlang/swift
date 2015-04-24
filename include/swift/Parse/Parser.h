@@ -952,10 +952,8 @@ public:
   enum class ParameterContextKind {
     /// An operator.
     Operator,
-    /// A function that is not a method.
+    /// A function.
     Function,
-    /// A method.
-    Method,
     /// An initializer.
     Initializer,
     /// A closure.

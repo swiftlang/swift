@@ -7,7 +7,7 @@ func values(arg: @convention(c) Int -> Int) -> @convention(c) Int -> Int {
 // CHECK:       bb0(%0 : $@convention(c) (Int) -> Int):
 // CHECK:         return %0 : $@convention(c) (Int) -> Int
 
-func calls(arg: @convention(c) Int -> Int, x: Int) -> Int {
+func calls(arg: @convention(c) Int -> Int, _ x: Int) -> Int {
   return arg(x)
 }
 // CHECK-LABEL: sil hidden @_TF19c_function_pointers5callsFTcSiSiSi_Si

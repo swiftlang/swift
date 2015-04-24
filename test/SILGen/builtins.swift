@@ -475,7 +475,7 @@ func reinterpretAddrOnlyToTrivial<T>(t: T) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins27reinterpretAddrOnlyLoadableU__FTSiQ__TQ_Si_
-func reinterpretAddrOnlyLoadable<T>(a: Int, b: T) -> (T, Int) {
+func reinterpretAddrOnlyLoadable<T>(a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int
   // CHECK: store {{%.*}} to [[BUF]]#1
   // CHECK: unchecked_addr_cast [[BUF]]#1 : $*Int to $*T
@@ -488,7 +488,7 @@ func reinterpretAddrOnlyLoadable<T>(a: Int, b: T) -> (T, Int) {
 // CHECK-LABEL: sil hidden @_TF8builtins18castToBridgeObjectFTCS_1CBw_Bb
 // CHECK:         [[BO:%.*]] = ref_to_bridge_object {{%.*}} : $C, {{%.*}} : $Builtin.Word
 // CHECK:         return [[BO]]
-func castToBridgeObject(c: C, w: Builtin.Word) -> Builtin.BridgeObject {
+func castToBridgeObject(c: C, _ w: Builtin.Word) -> Builtin.BridgeObject {
   return Builtin.castToBridgeObject(c, w)
 }
 
@@ -509,7 +509,7 @@ func castBitPatternFromBridgeObject(bo: Builtin.BridgeObject) -> Builtin.Word {
 // CHECK:         [[T0:%.*]] = mark_dependence %0 : $Pointer on %1 : $ClassProto
 // CHECK-NEXT:    strong_release %1 : $ClassProto
 // CHECK-NEXT:    return [[T0]] : $Pointer
-func markDependence(v: Pointer, base: ClassProto) -> Pointer {
+func markDependence(v: Pointer, _ base: ClassProto) -> Pointer {
   return Builtin.markDependence(v, base)
 }
 

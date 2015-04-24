@@ -60,7 +60,7 @@ func ~> <I: F>(self_:I, (_Distance, (I))) -> Int {
 
 // This generic function is for user consumption; it dispatches to the
 // appropriate implementation for T.
-func distance<T: F>(x: T, y: T) -> Int {
+func distance<T: F>(x: T, _ y: T) -> Int {
   return x~>_distance(y)
 }
 

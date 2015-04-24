@@ -15,7 +15,7 @@ func printOpt<T>(subprint: T->())(x: T?) {
   }
 }
 
-func test(v: A????, cast: (A????) -> B?) {
+func test(v: A????, _ cast: (A????) -> B?) {
   printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
   print(" as? B: ")
   printOpt(printA)(x: cast(v))
@@ -34,7 +34,7 @@ test(.None, { $0 as? B })
 // CHECK: .Some(.None) as? B: .None
 // CHECK: .None as? B: .None
 
-func test(v: A????, cast: (A????) -> B??) {
+func test(v: A????, _ cast: (A????) -> B??) {
   printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
   print(" as? B?: ")
   printOpt(printOpt(printA))(x: cast(v))
@@ -53,7 +53,7 @@ test(.None, { $0 as? B? })
 // CHECK: .Some(.None) as? B?: .None
 // CHECK: .None as? B?: .None
 
-func test(v: A????, cast: (A????) -> B???) {
+func test(v: A????, _ cast: (A????) -> B???) {
   printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
   print(" as? B??: ")
   printOpt(printOpt(printOpt(printA)))(x: cast(v))

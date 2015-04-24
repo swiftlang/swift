@@ -232,7 +232,7 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 /// This function is part of the runtime because `Bool` type is bridged to
 /// `ObjCBool`, which is in Foundation overlay.
 @asmname("swift_stdlib_NSObject_isEqual")
-internal func _stdlib_NSObject_isEqual(lhs: AnyObject, rhs: AnyObject) -> Bool
+internal func _stdlib_NSObject_isEqual(lhs: AnyObject, _ rhs: AnyObject) -> Bool
 #endif
 
 //===--- Hacks and workarounds --------------------------------------------===//
@@ -650,7 +650,7 @@ public struct Set<T : Hashable> :
 /// a set and some sequence (which may itself be a `Set`).
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
-internal func _compareSets<T>(lhs: Set<T>, rhs: Set<T>) ->
+internal func _compareSets<T>(lhs: Set<T>, _ rhs: Set<T>) ->
   (isSubset: Bool, isEqual: Bool) {
   for member in lhs {
     if !rhs.contains(member) {

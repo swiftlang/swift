@@ -148,7 +148,7 @@ extension ClosedInterval {
 /// Returns `true` if `lhs` and `rhs` have a non-empty intersection
 public func overlaps<
   I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
->(lhs: I0, rhs: I1) -> Bool {
+>(lhs: I0, _ rhs: I1) -> Bool {
   return lhs.contains(rhs.start) || rhs.contains(lhs.start)
 }
 

@@ -1,6 +1,6 @@
 public func something(obj: Int) -> Int { return obj }
-public func something(a: Int, b: Int) -> (Int, Int) { return (a, b) }
-public func something(a: Int, b: Int, c: Int) -> (Int, Int, Int) { return (a, b, c) }
+public func something(a: Int, _ b: Int) -> (Int, Int) { return (a, b) }
+public func something(a: Int, _ b: Int, _ c: Int) -> (Int, Int, Int) { return (a, b, c) }
 
 public func ambiguousWithVar(_: Int) {}
 public func scopedVar(_: Int) {}

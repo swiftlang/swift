@@ -26,7 +26,7 @@ func modifyFooHeap(inout a: Int,
 // CHECK-DAG: ![[A]] = !MDLocalVariable(tag: DW_TAG_arg_variable, name: "a",{{.*}} line: [[@LINE-1]],{{.*}} type: !"_TtRSi"
 // CHECK-DAG: ![[B]] = !MDLocalVariable(tag: DW_TAG_arg_variable, name: "b",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
 // CHECK-DAG: ![[MYFLOAT]] = !MDDerivedType(tag: DW_TAG_typedef, name: "_Tta5inout7MyFloat",{{.*}} baseType: !"_TtSf"
-                   var b: MyFloat)
+                   var _ b: MyFloat)
 {
     if (b > 2.71) {
       a = a + 12// Set breakpoint here
@@ -43,7 +43,7 @@ func modifyFooHeap(inout a: Int,
 func modifyFoo(inout u: Int,
 // FOO-CHECK-DAG: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "v",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
 // FOO-CHECK-DAG: [[U]] = !MDLocalVariable(tag: DW_TAG_arg_variable, name: "u",{{.*}} line: [[@LINE-2]],{{.*}} type: !"_TtRSi"
-               var v: MyFloat)
+               var _ v: MyFloat)
 // FOO-CHECK-DAG: ![[MYFLOAT]] = !MDDerivedType(tag: DW_TAG_typedef, name: "_Tta5inout7MyFloat",{{.*}} baseType: !"_TtSf"
 {
     if (v > 2.71) {

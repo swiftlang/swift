@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-func andc<T : BooleanType>(x: Bool, y: T) -> Bool {
+func andc<T : BooleanType>(x: Bool, _ y: T) -> Bool {
   return x && !y.boolValue
 }
 

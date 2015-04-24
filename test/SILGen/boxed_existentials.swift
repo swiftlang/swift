@@ -83,7 +83,7 @@ func plusOneErrorType() -> _ErrorType { }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPSs10_ErrorType_PS0___T_
 // GUARANTEED-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPSs10_ErrorType_PS0___T_
 func test_open_existential_semantics(guaranteed: _ErrorType,
-                                     var immediate: _ErrorType) {
+                                     var _ immediate: _ErrorType) {
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $_ErrorType
   // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box $_ErrorType
 

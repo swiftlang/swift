@@ -94,7 +94,7 @@ public func precondition(
 ///   is a serious programming error.
 @inline(__always)
 public func assertionFailure(
-  @autoclosure _ message: () -> String = String(),
+  @autoclosure message: () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   if _isDebugAssertConfiguration() {
@@ -122,7 +122,7 @@ public func assertionFailure(
 ///   is a serious programming error.
 @transparent @noreturn
 public func preconditionFailure(
-  @autoclosure _ message: () -> String = String(),
+  @autoclosure message: () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode.  In release mode just trap.
@@ -137,7 +137,7 @@ public func preconditionFailure(
 /// Unconditionally print a `message` and stop execution.
 @transparent @noreturn
 public func fatalError(
-  @autoclosure _ message: () -> String = String(),
+  @autoclosure message: () -> String = String(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   _assertionFailed("fatal error", message(), file, line)
@@ -167,7 +167,7 @@ public func _precondition(
 
 @transparent @noreturn
 public func _preconditionFailure(
-  _ message: StaticString = StaticString(),
+  message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__) {
 
   _precondition(false, message, file:file, line: line)
@@ -217,7 +217,7 @@ public func _debugPrecondition(
 
 @transparent @noreturn
 public func _debugPreconditionFailure(
-  _ message: StaticString = StaticString(),
+  message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__) {
   if _isDebugAssertConfiguration() {
     _precondition(false, message, file: file, line: line)
@@ -245,7 +245,7 @@ public func _sanityCheck(
 
 @transparent @noreturn
 public func _sanityCheckFailure(
-  _ message: StaticString = StaticString(),
+  message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   _sanityCheck(false, message, file: file, line: line)

@@ -9,8 +9,8 @@ typealias MyInt = Int
 // FULL:  TypeAliasDecl '''MyInt''' swift_ide_test.MyInt.Type{{$}}
 
 func testVariableTypes(param: Int, inout param2: Double) {
-// CHECK: FuncDecl '''testVariableTypes''' (Int, inout Double) -> (){{$}}
-// FULL:  FuncDecl '''testVariableTypes''' (Swift.Int, inout Swift.Double) -> (){{$}}
+// CHECK: FuncDecl '''testVariableTypes''' (Int, inout param2: Double) -> (){{$}}
+// FULL:  FuncDecl '''testVariableTypes''' (Swift.Int, inout param2: Swift.Double) -> (){{$}}
 
   var a1 = 42
 // CHECK: VarDecl '''a1''' Int{{$}}
@@ -86,8 +86,8 @@ func testFuncType7(a: Int, withFloat b: Float) {}
 // FULL:  FuncDecl '''testFuncType7''' (Swift.Int, withFloat: Swift.Float) -> (){{$}}
 
 func testVariadicFuncType(a: Int, b: Float...) {}
-// CHECK: FuncDecl '''testVariadicFuncType''' (Int, Float...) -> (){{$}}
-// FULL:  FuncDecl '''testVariadicFuncType''' (Swift.Int, Swift.Float...) -> (){{$}}
+// CHECK: FuncDecl '''testVariadicFuncType''' (Int, b: Float...) -> (){{$}}
+// FULL:  FuncDecl '''testVariadicFuncType''' (Swift.Int, b: Swift.Float...) -> (){{$}}
 
 func testCurriedFuncType1(a: Int)(b: Float) {}
 // CHECK: FuncDecl '''testCurriedFuncType1''' (Int) -> (b: Float) -> (){{$}}
@@ -100,8 +100,8 @@ protocol QuxProtocol { typealias Qux }
 struct GenericStruct<A, B : FooProtocol> {}
 
 func testInGenericFunc1<A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>>(a: A, b: B, c: C) {
-// CHECK: FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, B, C) -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, B, C) -> (){{$}}
+// CHECK: FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
 
   var a1 = a
 // CHECK: VarDecl '''a1''' A{{$}}

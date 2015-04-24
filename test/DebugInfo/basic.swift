@@ -24,8 +24,8 @@
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]
 // CHECK-DAG: ![[FOO:[0-9]+]] = !MDSubprogram(name: "foo",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[FOOTYPE:[0-9]+]]
 public
-func foo(var a: Int64, var b: Int64) -> Int64 {
-     // CHECK-DAG: !MDLexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-1]], column: 47)
+func foo(var a: Int64, var _ b: Int64) -> Int64 {
+     // CHECK-DAG: !MDLexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-1]], column: 49)
      // CHECK-DAG: ![[ASCOPE:.*]] = !MDLocation(line: [[@LINE-2]], column: 14, scope: ![[FOO]])
      // Check that a is the first and b is the second argument.
      // CHECK-DAG: store i64 %0, i64* [[AVAL:.*]], align 8

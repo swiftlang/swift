@@ -9,7 +9,7 @@ func scalarWithCallerSideDefaults(x: Int, y: Int = __LINE__) {}
 func tupleWithDefaults(#x: (Int, Int), y: Int = 0, z: Int = 0) {}
 
 func variadicFirst(x: Int...) {}
-func variadicSecond(x: Int, y: Int...) {}
+func variadicSecond(x: Int, _ y: Int...) {}
 
 var x = 0
 // CHECK: [[X_ADDR:%.*]] = global_addr @_Tv20scalar_to_tuple_args1xSi : $*Int

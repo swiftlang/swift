@@ -19,8 +19,8 @@ struct GS {
 }
 GS(a: 5, b: 7)
 
-// Using the backtick to make a name API.
-func f1(#a: Int, #b: Int) { }
+// Using the hash to make a name API.
+func f1(#a: Int, b: Int) { }
 f1(a: 1, b: 2)
 
 func f2(#`class`: Int) { }

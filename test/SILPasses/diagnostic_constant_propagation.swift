@@ -38,11 +38,11 @@ func testArithmeticOverflow() {
 }
 
 @transparent 
-func myaddSigned(x: Int8, y: Int8, z: Int8) -> Int8 {
+func myaddSigned(x: Int8, _ y: Int8, _ z: Int8) -> Int8 {
   return x + y
 }
 @transparent 
-func myaddUnsigned(x: UInt8, y: UInt8, z: UInt8) -> UInt8 {
+func myaddUnsigned(x: UInt8, _ y: UInt8, _ z: UInt8) -> UInt8 {
   return x + y
 }
 
@@ -208,7 +208,7 @@ func testConvertOverflow() {
 }
 
 @transparent 
-func intConversionWrapperForUSCheckedConversion(x: UInt8, unused: UInt8) -> Int8 {
+func intConversionWrapperForUSCheckedConversion(x: UInt8, _ unused: UInt8) -> Int8 {
   return Int8(x)
 }
 @transparent 
@@ -388,12 +388,12 @@ func tryDouble() -> Int8 {
 }
 
 @transparent
-func add<T : SignedIntegerType>(left: T, right: T) -> T {
+func add<T : SignedIntegerType>(left: T, _ right: T) -> T {
   return left + right
 }
 
 @transparent
-func applyBinary<T : SignedIntegerType>(fn: (T, T)->(T), left: T, right: T) -> T {
+func applyBinary<T : SignedIntegerType>(fn: (T, T)->(T), _ left: T, _ right: T) -> T {
   return fn(left, right)
 }
 

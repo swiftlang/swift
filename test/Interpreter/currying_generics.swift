@@ -17,7 +17,7 @@ println(insult("😰")) // CHECK-NEXT: I'm with stupid ☞ 😰
 
 // rdar://problem/18988428
 
-func clamp<T: Comparable>(minValue: T, maxValue: T)(n: T) -> T {
+func clamp<T: Comparable>(minValue: T, _ maxValue: T)(n: T) -> T {
     return max(minValue, min(n, maxValue))
 }
 

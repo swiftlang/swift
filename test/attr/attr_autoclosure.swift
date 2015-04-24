@@ -62,10 +62,10 @@ protocol P2 : P1 {
   typealias Element
 }
 
-func overloadedEach<O: P1>(source: O, closure: () -> ()) {
+func overloadedEach<O: P1>(source: O, _ closure: () -> ()) {
 }
 
-func overloadedEach<P: P2>(source: P, closure: () -> ()) {
+func overloadedEach<P: P2>(source: P, _ closure: () -> ()) {
 }
 
 struct S : P2 {

@@ -200,7 +200,7 @@ class BridgedVerbatimRefType {
 
 func withSwiftObjectCanary<T>(
   createValue: () -> T,
-  check: (T) -> (),
+  _ check: (T) -> (),
   file: String = __FILE__, line: UWord = __LINE__
 ) {
   let stackTrace = SourceLocStack(SourceLoc(file, line))
@@ -1732,8 +1732,8 @@ var AvailabilityVersionsTestSuite = TestSuite("AvailabilityVersions")
 AvailabilityVersionsTestSuite.test("lexicographic_compare") {
   func version(
     major: Int,
-    minor: Int,
-    patch: Int
+    _ minor: Int,
+    _ patch: Int
   ) -> _SwiftNSOperatingSystemVersion {
     return _SwiftNSOperatingSystemVersion(
       majorVersion: major,
@@ -1768,7 +1768,7 @@ AvailabilityVersionsTestSuite.test("lexicographic_compare") {
 }
 
 AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
-  func isAtLeastOS(major: Int, minor: Int, patch: Int) -> Bool {
+  func isAtLeastOS(major: Int, _ minor: Int, _ patch: Int) -> Bool {
     return _getBool(_stdlib_isOSVersionAtLeast(major._builtinWordValue,
                                                minor._builtinWordValue,
                                                patch._builtinWordValue))

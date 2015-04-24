@@ -227,7 +227,7 @@ public func test_check_call_on_downcasted_instance() -> Bool {
 }
 
 @inline(never)
-func callIt(b3: Base3, b4: Base4, b5: Base5) {
+func callIt(b3: Base3, _ b4: Base4, _ b5: Base5) {
   b3.outer()
   b4.test()
   b5.test()

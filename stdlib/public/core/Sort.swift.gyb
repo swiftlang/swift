@@ -45,8 +45,8 @@ func _insertionSort<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout elements: C,
-  range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  _ range: Range<C.Index> ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
   if !range.isEmpty {
     let start = range.startIndex
@@ -99,8 +99,8 @@ public func partition<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout elements: C,
-  range: Range<C.Index> ${"," if p else ""}
-  ${"var isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  _ range: Range<C.Index> ${"," if p else ""}
+  ${"var _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> C.Index {
   // FIXME(prext): remove this function when protocol extensions land.
   return elements._prext_partition(range ${", isOrderedBefore: isOrderedBefore" if p else ""})
@@ -111,8 +111,8 @@ func _partition<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout elements: C,
-  range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  _ range: Range<C.Index> ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> C.Index {
   var lo = range.startIndex
   var hi = range.endIndex
@@ -157,8 +157,8 @@ func _introSort<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout elements: C,
-  range: Range<C.Index> ${"," if p else ""}
-  ${"isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  _ range: Range<C.Index> ${"," if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
 %   if p:
   var comp = isOrderedBefore
@@ -178,9 +178,9 @@ func _introSortImpl<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout elements: C,
-  range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""},
-  depthLimit: Int
+  _ range: Range<C.Index> ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""},
+  _ depthLimit: Int
 ) {
 
   // Insertion sort is better at handling smaller regions.
@@ -209,9 +209,9 @@ func _siftDown<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout elements: C,
-  index: C.Index,
-  range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  _ index: C.Index,
+  _ range: Range<C.Index> ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
   let countToIndex = count(range.startIndex..<index)
   let countFromIndex = count(index..<range.endIndex)
@@ -244,8 +244,8 @@ func _heapify<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout elements: C,
-  range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  _ range: Range<C.Index> ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
   // Here we build a heap starting from the lowest nodes and moving to the root.
   // On every step we sift down the current node to obey the max-heap property:
@@ -264,8 +264,8 @@ func _heapSort<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout elements: C,
-  range: Range<C.Index> ${"," if p else ""}
-  ${"inout isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  _ range: Range<C.Index> ${"," if p else ""}
+  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
   var hi = range.endIndex
   var lo = range.startIndex
@@ -298,7 +298,7 @@ public func sort<
   ${"" if p else ", C.Generator.Element : Comparable"}
 >(
   inout collection: C ${"," if p else ""}
-  ${"isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
   _introSort(&collection, indices(collection) ${", isOrderedBefore" if p else ""})
 }
@@ -309,7 +309,7 @@ ${sortIsUnstable}
 ///
 ${orderingRequirement}
 % if p:
-public func sort<T>(inout array: [T], isOrderedBefore: (T, T) -> Bool) {
+public func sort<T>(inout array: [T], _ isOrderedBefore: (T, T) -> Bool) {
 % else:
 public func sort<T : Comparable>(inout array: [T]) {
 % end
@@ -327,7 +327,7 @@ ${orderingRequirement}
 % if p:
 public func sort<T>(
   inout array: ContiguousArray<T>,
-  isOrderedBefore: (T, T) -> Bool
+  _ isOrderedBefore: (T, T) -> Bool
 ) {
 % else:
 public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
@@ -347,7 +347,7 @@ public func sorted<
   C: SequenceType${"" if p else " where C.Generator.Element : Comparable"}
 >(
   source: C ${"," if p else ""}
-  ${"isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> [C.Generator.Element] {
   var result = ContiguousArray(source)
   sort(&result ${", isOrderedBefore" if p else ""})
@@ -357,7 +357,7 @@ public func sorted<
 // for p in preds
 
 /// Exchange the values of `a` and `b`
-public func swap<T>(inout a : T, inout b : T) {
+public func swap<T>(inout a : T, inout _ b : T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
   let p1 = Builtin.addressof(&a)

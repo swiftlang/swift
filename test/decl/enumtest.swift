@@ -44,7 +44,7 @@ enum MaybeInt {
   init(_ i: Int) { self = MaybeInt.Some(i) }
 }
 
-func test2(a: Int, b: Int, c: MaybeInt) {
+func test2(a: Int, _ b: Int, _ c: MaybeInt) {
   var c = MaybeInt.Some(4)
   var d = MaybeInt.Some  // expected-error{{partial application of enum constructor is not allowed}}
   var e = MaybeInt.Some(b)

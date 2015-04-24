@@ -16,7 +16,7 @@ var Algorithm = TestSuite("Algorithm")
 // Check if one array is a correctly sorted version of another array.
 // We can't simply sort both arrays and compare them, because it is needed to
 // check correctness of sorting itself.
-func expectSortedCollection(sortedAry: [Int], originalAry: [Int]) {
+func expectSortedCollection(sortedAry: [Int], _ originalAry: [Int]) {
   expectEqual(sortedAry.count, originalAry.count)
   var sortedVals = [Int:Int]()
   var originalVals = [Int:Int]()
@@ -50,12 +50,12 @@ func expectSortedCollection(sortedAry: [Int], originalAry: [Int]) {
 
 func expectSortedCollection(
   sortedAry: [Int],
-  originalAry: ContiguousArray<Int>
+  _ originalAry: ContiguousArray<Int>
 ) {
   expectSortedCollection(sortedAry, Array(originalAry))
 }
 
-func expectSortedCollection(sortedAry: ArraySlice<Int>, originalAry: ArraySlice<Int>) {
+func expectSortedCollection(sortedAry: ArraySlice<Int>, _ originalAry: ArraySlice<Int>) {
   expectSortedCollection([Int](sortedAry), [Int](originalAry))
 }
 

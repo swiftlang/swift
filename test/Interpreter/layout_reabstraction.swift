@@ -87,7 +87,7 @@ println(x.apply())
 // CHECK-NEXT: foobar
 println(y.apply())
 
-func callAny<T>(f: Any, x: T) -> T {
+func callAny<T>(f: Any, _ x: T) -> T {
   return (f as! T -> T)(x)
 }
 

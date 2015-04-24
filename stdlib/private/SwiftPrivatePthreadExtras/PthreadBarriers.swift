@@ -59,8 +59,8 @@ public struct _stdlib_pthread_barrier_t {
 
 public func _stdlib_pthread_barrier_init(
   barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>,
-  attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>,
-  count: CUnsignedInt
+  _ attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>,
+  _ count: CUnsignedInt
 ) -> CInt {
   barrier.memory = _stdlib_pthread_barrier_t()
   if count == 0 {

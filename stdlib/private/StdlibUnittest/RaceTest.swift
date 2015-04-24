@@ -471,7 +471,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
 }
 
 func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
-  tid: Int, sharedState: _RaceTestSharedState<RT>
+  tid: Int, _ sharedState: _RaceTestSharedState<RT>
 ) {
   sharedState.trialBarrier.wait()
   let racingThreadCount = sharedState.racingThreadCount
@@ -494,7 +494,7 @@ func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
 
 public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   _: RT.Type,
-  #trials: Int,
+  trials: Int,
   threads: Int? = nil
 ) {
   let racingThreadCount = threads ?? max(2, _stdlib_getHardwareConcurrency())
@@ -545,13 +545,13 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   println(aggregatedEvaluations)
 }
 
-internal func _divideRoundUp(lhs: Int, rhs: Int) -> Int {
+internal func _divideRoundUp(lhs: Int, _ rhs: Int) -> Int {
   return (lhs + rhs) / rhs
 }
 
 public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   test: RT.Type,
-  #operations: Int,
+  operations: Int,
   threads: Int? = nil
 ) {
   let racingThreadCount = threads ?? max(2, _stdlib_getHardwareConcurrency())

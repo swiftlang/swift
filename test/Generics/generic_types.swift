@@ -4,7 +4,7 @@ protocol MyFormattedPrintable {
   func myFormat() -> String
 }
 
-func myPrintf(format: String, args: MyFormattedPrintable...) {}
+func myPrintf(format: String, _ args: MyFormattedPrintable...) {}
 
 extension Int : MyFormattedPrintable {
   func myFormat() -> String { return "" }

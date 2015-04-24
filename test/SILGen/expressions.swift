@@ -83,7 +83,7 @@ func literals() {
 // CHECK: string_literal utf8 "foo"
 
 func bar(x: Int) {}
-func bar(x: Int, y: Int) {}
+func bar(x: Int, _ y: Int) {}
 
 func call_one() {
   bar(42);

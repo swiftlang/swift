@@ -70,7 +70,7 @@ func _cocoaStringToSwiftString_NonASCII(
 /// `_CocoaStringType`, having the given minimum capacity.
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringToContiguous(
-  source: _CocoaStringType, range: Range<Int>, #minimumCapacity: Int
+  source: _CocoaStringType, _ range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   _sanityCheck(CFStringGetCharactersPtr(source) == nil,
     "Known contiguously-stored strings should already be converted to Swift")
@@ -92,7 +92,7 @@ internal func _cocoaStringToContiguous(
 /// storage of sufficient capacity.
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringReadAll(
-  source: _CocoaStringType, destination: UnsafeMutablePointer<UTF16.CodeUnit>
+  source: _CocoaStringType, _ destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) {
   CFStringGetCharacters(
     source, _swift_shims_CFRange(
@@ -101,7 +101,7 @@ internal func _cocoaStringReadAll(
 
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringSlice(
-  target: _StringCore, subRange: Range<Int>
+  target: _StringCore, _ subRange: Range<Int>
 ) -> _StringCore {
   _sanityCheck(target.hasCocoaBuffer)
   
@@ -120,7 +120,7 @@ internal func _cocoaStringSlice(
 
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringSubscript(
-  target: _StringCore, position: Int
+  target: _StringCore, _ position: Int
 ) -> UTF16.CodeUnit {
   let cfSelf: _swift_shims_CFStringRef = unsafeUnwrap(target.cocoaBuffer)
 

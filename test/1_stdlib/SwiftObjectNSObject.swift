@@ -33,7 +33,7 @@ class D : C {
 }
 
 @asmname("TestSwiftObjectNSObject") 
-func TestSwiftObjectNSObject(c: C, d: D)
+func TestSwiftObjectNSObject(c: C, _ d: D)
 
 TestSwiftObjectNSObject(C(), D())
 // does not return

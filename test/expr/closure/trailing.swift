@@ -1,10 +1,10 @@
 // RUN: %target-parse-verify-swift
 
 func takeFunc(f: (Int) -> Int) -> Int {}
-func takeValueAndFunc(value: Int, f: (Int) -> Int) {}
-func takeTwoFuncs(f: (Int) -> Int, g: (Int) -> Int) {}
-func takeFuncWithDefault(f : ((Int) -> Int)? = nil) {}
-func takeTwoFuncsWithDefaults(f1 : (Int -> Int)? = nil, f2 : (String -> String)? = nil) {}
+func takeValueAndFunc(value: Int, _ f: (Int) -> Int) {}
+func takeTwoFuncs(f: (Int) -> Int, _ g: (Int) -> Int) {}
+func takeFuncWithDefault(#f : ((Int) -> Int)? = nil) {}
+func takeTwoFuncsWithDefaults(#f1 : (Int -> Int)? = nil, f2 : (String -> String)? = nil) {}
 
 struct X {
   func takeFunc(f: (Int) -> Int) {}
@@ -89,7 +89,7 @@ func labeledArgumentAndTrailingClosure() {
 }
 
 // rdar://problem/17965209
-func rdar17965209(x: Int = 0, handler: (y: Int) -> ()) {}
+func rdar17965209(#x: Int = 0, _ handler: (y: Int) -> ()) {}
 func rdar17965209_test() {
   rdar17965209() {
     (y) -> () in

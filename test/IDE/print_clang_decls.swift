@@ -102,7 +102,7 @@
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
 // FOUNDATION-NEXT: @availability(*, unavailable)
-// FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, name: String)
+// FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, _ name: String)
 
 // CTYPESBITS-NOT: FooStruct1
 // CTYPESBITS: {{^}}typealias DWORD = Int32{{$}}
@@ -121,4 +121,4 @@
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}
 // CHECK-NULLABILITY:   func optArrayMethod() -> [AnyObject]?
 // CHECK-NULLABILITY: }
-// CHECK-NULLABILITY: func compare_classes(sc1: SomeClass, sc2: SomeClass, sc3: SomeClass!)
+// CHECK-NULLABILITY: func compare_classes(sc1: SomeClass, _ sc2: SomeClass, _ sc3: SomeClass!)

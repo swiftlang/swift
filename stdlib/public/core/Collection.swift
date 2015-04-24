@@ -390,7 +390,7 @@ public func dropLast<
 /// Complexity: O(1)+K when `S.Index` conforms to
 /// `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
 /// of slicing `s`.
-public func prefix<S: Sliceable>(s: S, maxLength: Int) -> S.SubSlice {
+public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
   return s[
     s.startIndex..<advance(
       s.startIndex, max(0, numericCast(maxLength)), s.endIndex)
@@ -408,7 +408,7 @@ public func prefix<S: Sliceable>(s: S, maxLength: Int) -> S.SubSlice {
 /// of slicing `s`.
 public func suffix<
   S: Sliceable where S.Index: BidirectionalIndexType
->(s: S, maxLength: Int) -> S.SubSlice {
+>(s: S, _ maxLength: Int) -> S.SubSlice {
   return s[
     advance(
       s.endIndex, -max(0, numericCast(maxLength)), s.startIndex)..<s.endIndex

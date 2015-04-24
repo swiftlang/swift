@@ -495,52 +495,52 @@ public func trunc(x: CGFloat) -> CGFloat {
 }
 
 @transparent
-public func atan2(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func atan2(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(atan2(lhs.native, rhs.native))
 }
 
 @transparent
-public func hypot(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func hypot(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(hypot(lhs.native, rhs.native))
 }
 
 @transparent
-public func pow(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func pow(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(pow(lhs.native, rhs.native))
 }
 
 @transparent
-public func fmod(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func fmod(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(fmod(lhs.native, rhs.native))
 }
 
 @transparent
-public func remainder(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func remainder(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(remainder(lhs.native, rhs.native))
 }
 
 @transparent
-public func copysign(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func copysign(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(copysign(lhs.native, rhs.native))
 }
 
 @transparent
-public func nextafter(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func nextafter(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(nextafter(lhs.native, rhs.native))
 }
 
 @transparent
-public func fdim(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func fdim(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(fdim(lhs.native, rhs.native))
 }
 
 @transparent
-public func fmax(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func fmax(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(fmax(lhs.native, rhs.native))
 }
 
 @transparent
-public func fmin(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
+public func fmin(lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(fmin(lhs.native, rhs.native))
 }
 
@@ -581,7 +581,7 @@ public func modf(x: CGFloat) -> (CGFloat, CGFloat) {
 }
 
 @transparent
-public func ldexp(x: CGFloat, n: Int) -> CGFloat {
+public func ldexp(x: CGFloat, _ n: Int) -> CGFloat {
   return CGFloat(ldexp(x.native, n))
 }
 
@@ -597,7 +597,7 @@ public func ilogb(x: CGFloat) -> Int {
 }
 
 @transparent
-public func scalbn(x: CGFloat, n: Int) -> CGFloat {
+public func scalbn(x: CGFloat, _ n: Int) -> CGFloat {
   return CGFloat(scalbn(x.native, n))
 }
 
@@ -608,7 +608,7 @@ public func lgamma(x: CGFloat) -> (CGFloat, Int) {
 }
 
 @transparent
-public func remquo(x: CGFloat, y: CGFloat) -> (CGFloat, Int) {
+public func remquo(x: CGFloat, _ y: CGFloat) -> (CGFloat, Int) {
   let (rem, quo) = remquo(x.native, y.native)
   return (CGFloat(rem), quo)
 }
@@ -619,7 +619,7 @@ public func nan(tag: String) -> CGFloat {
 }
 
 @transparent
-public func fma(x: CGFloat, y: CGFloat, z: CGFloat) -> CGFloat {
+public func fma(x: CGFloat, _ y: CGFloat, _ z: CGFloat) -> CGFloat {
   return CGFloat(fma(x.native, y.native, z.native))
 }
 
@@ -634,7 +634,7 @@ public func j1(x: CGFloat) -> CGFloat {
 }
 
 @transparent
-public func jn(n: Int, x: CGFloat) -> CGFloat {
+public func jn(n: Int, _ x: CGFloat) -> CGFloat {
   return CGFloat(jn(n, Double(x.native)))
 }
 
@@ -649,7 +649,7 @@ public func y1(x: CGFloat) -> CGFloat {
 }
 
 @transparent
-public func yn(n: Int, x: CGFloat) -> CGFloat {
+public func yn(n: Int, _ x: CGFloat) -> CGFloat {
   return CGFloat(yn(n, Double(x.native)))
 }
 

@@ -285,7 +285,7 @@ extension String {
 ///   * an unspecified value greater than zero  if `lhs > rhs`.
 @asmname("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
 public func _stdlib_compareNSStringDeterministicUnicodeCollation(
-  lhs: AnyObject, rhs: AnyObject
+  lhs: AnyObject, _ rhs: AnyObject
 )-> Int32
 #endif
 
@@ -846,7 +846,7 @@ extension String : RangeReplaceableCollectionType {
   /// :param: `keepCapacity`, if `true`, prevents the release of
   ///   allocated storage, which can be a useful optimization
   ///   when `self` is going to be grown again.
-  public mutating func removeAll(keepCapacity: Bool = false) {
+  public mutating func removeAll(#keepCapacity: Bool = false) {
     Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
 }

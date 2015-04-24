@@ -19,7 +19,7 @@ class AnotherClass : AProtocol {
 // CHECK-DAG: ![[T]] = !MDCompositeType(tag: DW_TAG_structure_type, name: "_TtQq_F12generic_args9aFunction{{.*}}
 // CHECK-DAG: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "y", arg: 2,{{.*}} type: ![[Q:.*]])
 // CHECK-DAG: ![[Q]] = !MDCompositeType(tag: DW_TAG_structure_type, name: "_TtQq0_F12generic_args9aFunction{{.*}}
-func aFunction<T : AProtocol, Q : AProtocol>(var x: T, var y: Q, z: String) {
+func aFunction<T : AProtocol, Q : AProtocol>(var x: T, var _ y: Q, _ z: String) {
      println("I am in \(z): \(x.f()) \(y.f())")
 }
 

@@ -8,7 +8,7 @@ func curriedSubtract(x: Int)(_ y: Int) -> Int {
   return x-y
 }
 
-func twice(f: (Int) -> Int, x: Int) -> Int {
+func twice(f: (Int) -> Int, _ x: Int) -> Int {
   return f(f(x))
 }
 

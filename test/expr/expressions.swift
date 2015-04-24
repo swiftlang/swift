@@ -87,7 +87,7 @@ var infixtest : () = 4 % 2 + 27 %% 123
 
 
 // The 'func' keyword gives a nice simplification for function definitions.
-func funcdecl1(a: Int, y: Int) {}
+func funcdecl1(a: Int, _ y: Int) {}
 func funcdecl2() {
   return funcdecl1(4, 2)
 }

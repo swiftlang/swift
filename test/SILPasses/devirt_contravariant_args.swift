@@ -68,7 +68,7 @@ class B3<T> : B2<T> {
 
 
 
-func doSomething<T : P>(b : B<T>, t : T) {
+func doSomething<T : P>(b : B<T>, _ t : T) {
   b.performSomething(t)
 }
 

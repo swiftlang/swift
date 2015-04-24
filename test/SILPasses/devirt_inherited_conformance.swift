@@ -81,11 +81,11 @@ class B3 : B {
   //}
 }
 
-func WhatShouldIDo<T : P>(t : T, x : Int32) {
+func WhatShouldIDo<T : P>(t : T, _ x : Int32) {
   t.doSomething(x)
 }
 
-func WhatShouldIDo2(p : P, x : Int32) {
+func WhatShouldIDo2(p : P, _ x : Int32) {
   p.doSomething(x)
 }
 
@@ -150,16 +150,16 @@ public func ---(lhs: C, rhs: C) -> Bool {
   return true
 }
 
-public func compareEquals<T:Equatable>(x: T, y:T) -> Bool {
+public func compareEquals<T:Equatable>(x: T, _ y:T) -> Bool {
   return x == y
 }
 
-public func compareMinMinMin<T:Simple>(x: T, y:T) -> Bool {
+public func compareMinMinMin<T:Simple>(x: T, _ y:T) -> Bool {
   return x --- y
 }
 
 
-public func compareComparable<T:Comparable>(x: T, y:T) -> Bool {
+public func compareComparable<T:Comparable>(x: T, _ y:T) -> Bool {
   return x.compare(x, y)
 }
 
@@ -196,7 +196,7 @@ public func testCompareComparable() -> Bool {
   return compareComparable(D(), D())
 }
 
-public func BooCall<T:Simple>(x:T, y:T) -> Bool {
+public func BooCall<T:Simple>(x:T, _ y:T) -> Bool {
   return x.boo(y, y) 
 }
 

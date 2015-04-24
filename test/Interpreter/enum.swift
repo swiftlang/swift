@@ -158,7 +158,7 @@ func unwrapTrivialGeneric<T, U>(tg: TrivialGeneric<T, U>) -> (T, U) {
   }
 }
 
-func wrapTrivialGeneric<T, U>(t: T, u: U) -> TrivialGeneric<T, U> {
+func wrapTrivialGeneric<T, U>(t: T, _ u: U) -> TrivialGeneric<T, U> {
   return .x(t, u)
 }
 
