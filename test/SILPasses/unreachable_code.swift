@@ -27,6 +27,11 @@ func whileTrue() {
   userCode() // expected-warning {{will never be executed}}
 }
 
+func whileTrueSilent() {
+  while true {
+  }
+}   // no warning!
+
 func whileTrueReachable(v: Int) -> () {
   var x = 0
   while true {
@@ -331,3 +336,8 @@ public func testFailingCast(s:String) -> Int {
    // how casts are lowered.
    return s as! Int // expected-warning {{cast from 'String' to unrelated type 'Int' always fails}}
 }
+
+
+while true {
+}
+ // no warning!
