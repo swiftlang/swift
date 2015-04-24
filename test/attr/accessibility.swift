@@ -112,24 +112,24 @@ public struct Properties {
   private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to read-only properties}}
   public(set) var defaultVis = 0 // expected-error {{internal property cannot have a public setter}}
 
-  public(set) subscript(#a: Int) -> Int { // expected-error {{internal subscript cannot have a public setter}}
+  public(set) subscript(a a: Int) -> Int { // expected-error {{internal subscript cannot have a public setter}}
     get { return 0 }
     set {}
   }
-  internal(set) private subscript(#b: Int) -> Int { // expected-error {{private subscript cannot have an internal setter}}
+  internal(set) private subscript(b b: Int) -> Int { // expected-error {{private subscript cannot have an internal setter}}
     get { return 0 }
     set {}
   }
-  private(set) subscript(#c: Int) -> Int {
+  private(set) subscript(c c: Int) -> Int {
     get { return 0 }
     set {}
   }
-  private(set) public subscript(#d: Int) -> Int {
+  private(set) public subscript(d d: Int) -> Int {
     get { return 0 }
     set {}
   }
 
-  private(set) subscript(#e: Int) -> Int { return 0 } // expected-error {{'private(set)' modifier cannot be applied to read-only subscripts}}
+  private(set) subscript(e e: Int) -> Int { return 0 } // expected-error {{'private(set)' modifier cannot be applied to read-only subscripts}}
 }
 
 private extension Properties {

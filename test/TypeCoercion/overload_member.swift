@@ -5,23 +5,23 @@ struct Y { }
 struct Z { }
 
 class A {
-  func f(#x: X) -> X { }
-  func f(#y: Y) -> Y { }
+  func f(x x: X) -> X { }
+  func f(y y: Y) -> Y { }
 
-  func g(#z: Z) -> X { } // expected-note 2{{found this candidate}}
-  func g(#z: Z) -> Y { } // expected-note 2{{found this candidate}}
+  func g(z z: Z) -> X { } // expected-note 2{{found this candidate}}
+  func g(z z: Z) -> Y { } // expected-note 2{{found this candidate}}
 
-  class func sf(#x: X) -> X { }
-  class func sf(#y: Y) -> Y { }
+  class func sf(x x: X) -> X { }
+  class func sf(y y: Y) -> Y { }
 
-  class func sg(#z: Z) -> X { } // expected-note 2{{found this candidate}}
-  class func sg(#z: Z) -> Y { } // expected-note 2{{found this candidate}}
+  class func sg(z z: Z) -> X { } // expected-note 2{{found this candidate}}
+  class func sg(z z: Z) -> Y { } // expected-note 2{{found this candidate}}
 
-  func mixed(#x: X) -> X { }
-  class func mixed(#y: Y) -> Y { }
+  func mixed(x x: X) -> X { }
+  class func mixed(y y: Y) -> Y { }
 
-  func mixed2(#z: Z) -> X { }
-  class func mixed2(#z: Z) -> Y { }
+  func mixed2(z z: Z) -> X { }
+  class func mixed2(z z: Z) -> Y { }
 }
 
 func test_method_overload(a: A, x: X, y: Y) {
@@ -90,7 +90,7 @@ func test_mixed_method_value_coerce(a: A) {
 }
 
 extension A {
-  func test_method_overload(#x: X, y: Y) {
+  func test_method_overload(x x: X, y: Y) {
     var x1 = self.f(x: x)
     x1 = x
     var x2 = f(x: x)
@@ -102,7 +102,7 @@ extension A {
     y2 = y
   }
 
-  func test_method_overload_coerce(inout #x: X, inout y: Y, z: Z) {
+  func test_method_overload_coerce(inout x x: X, inout y: Y, z: Z) {
     var fail = g(z: z) // expected-error{{ambiguous use of 'g'}}
     x = g(z: z)
     y = g(z: z)
@@ -114,7 +114,7 @@ extension A {
     var fp3 : (A) -> (X) -> X = A.f;
   }
 
-  func test_mixed_overload_coerce(inout #x: X, y: Y, z: Z) {
+  func test_mixed_overload_coerce(inout x x: X, y: Y, z: Z) {
     mixed2(z: z)
     x = mixed2(z: z)
   }
@@ -126,7 +126,7 @@ extension A {
     var fp4 : (A) -> (X) -> X = A.mixed;
   }
 
-  class func test_method_overload_static(#x: X, y: Y, z: Z) {
+  class func test_method_overload_static(x x: X, y: Y, z: Z) {
     var x1 = sf(x: x)
     x1 = x
 
@@ -134,7 +134,7 @@ extension A {
     y1 = y
   }
 
-  class func test_method_overload_coerce_static(inout #x: X, inout y: Y, z: Z) {
+  class func test_method_overload_coerce_static(inout x x: X, inout y: Y, z: Z) {
     var fail = sg(z: z) // expected-error{{ambiguous use of 'sg'}}
     x = sg(z: z)
     y = sg(z: z)
@@ -145,7 +145,7 @@ extension A {
     var fp2 : (Y) -> Y = sf;
   }
 
-  class func test_mixed_overload_static(#a: A, x: X, y: Y) {
+  class func test_mixed_overload_static(a a: A, x: X, y: Y) {
     mixed(x) // expected-error{{cannot invoke 'mixed' with an argument list of type '(X)'}}
     var x2 = mixed(a)(x: x)
     x2 = x
@@ -153,7 +153,7 @@ extension A {
     y2 = y
   }
 
-  class func test_mixed_overload_coerce_static(#y: Y, z: Z) {
+  class func test_mixed_overload_coerce_static(y y: Y, z: Z) {
     var y1 = mixed2(z: z)
     y1 = y
   }

@@ -51,7 +51,7 @@ struct X2e : P2 {
 // Select among overloads distinguished by name.
 struct X2f : P2 {
   typealias Assoc = X1a
-  func f1(#y: X1a) { }
+  func f1(y y: X1a) { }
   func f1(x: X1a) { }
 }
 
@@ -68,13 +68,13 @@ struct X2w : P2 { // expected-error{{type 'X2w' does not conform to protocol 'P2
 
 // Deduction of type that doesn't meet requirements
 struct X2x : P2 { // expected-error{{type 'X2x' does not conform to protocol 'P2'}}
-  func f1(#x: Int) { }
+  func f1(x x: Int) { }
 }
 
 // Mismatch in parameter types
 struct X2y : P2 { // expected-error{{type 'X2y' does not conform to protocol 'P2'}}
   typealias Assoc = X1a
-  func f1(#x: X1b) { } // expected-note{{candidate has non-matching type '(x: X1b) -> ()'}}
+  func f1(x x: X1b) { } // expected-note{{candidate has non-matching type '(x: X1b) -> ()'}}
 }
 
 // Ambiguous deduction
@@ -153,9 +153,9 @@ class X5c : P5 {
 
 // Names need to match up for an Objective-C protocol as well.
 class X5d : P5 { // expected-error{{type 'X5d' does not conform to protocol 'P5'}}
-  @objc func f2(#y: Int, withInt a: Int) {} // expected-note {{Objective-C method 'f2WithY:withInt:' provided by method 'f2(y:withInt:)' does not match the requirement's selector ('f2:withInt:')}}
+  @objc func f2(y y: Int, withInt a: Int) {} // expected-note {{Objective-C method 'f2WithY:withInt:' provided by method 'f2(y:withInt:)' does not match the requirement's selector ('f2:withInt:')}}
   // expected-note@-1{{Objective-C method 'f2WithY:withInt:' provided by method 'f2(y:withInt:)' does not match the requirement's selector ('f2:withOtherInt:')}}
-  @objc func f2(#y: Int, withOtherValue a: Int) {} // expected-note{{Objective-C method 'f2WithY:withOtherValue:' provided by method 'f2(y:withOtherValue:)' does not match the requirement's selector ('f2:withInt:')}}
+  @objc func f2(y y: Int, withOtherValue a: Int) {} // expected-note{{Objective-C method 'f2WithY:withOtherValue:' provided by method 'f2(y:withOtherValue:)' does not match the requirement's selector ('f2:withInt:')}}
   // expected-note@-1{{Objective-C method 'f2WithY:withOtherValue:' provided by method 'f2(y:withOtherValue:)' does not match the requirement's selector ('f2:withOtherInt:')}}
 }
 
@@ -189,7 +189,7 @@ extension Int : Crankable {}
 // Invalid witnesses.
 protocol P6 {
   func foo(x: Int)
-  func bar(#x: Int) // expected-note{{protocol requires function 'bar(x:)' with type '(x: Int) -> ()'}}
+  func bar(x x: Int) // expected-note{{protocol requires function 'bar(x:)' with type '(x: Int) -> ()'}}
 }
 struct X6 : P6 { // expected-error{{type 'X6' does not conform to protocol 'P6'}}
   func foo(x: Missing) { } // expected-error{{use of undeclared type 'Missing'}}

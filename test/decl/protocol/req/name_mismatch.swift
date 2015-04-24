@@ -27,7 +27,7 @@ struct S5 : P {
 struct Loadable { }
 
 protocol LabeledRequirement {
-  func method(#x: Loadable)
+  func method(x x: Loadable)
 }
 
 struct UnlabeledWitness : LabeledRequirement {

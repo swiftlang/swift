@@ -1341,19 +1341,13 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
     // Print argument name.
     auto ArgName = BodyPattern->getBoundName();
     auto BodyName = BodyPattern->getBodyName();
-    auto printArg = [&]{
-      if (!ArgName.empty() && !ArgNameIsAPIByDefault)
-        Printer << "#";
-      Printer.printName(ArgName);
-    };
-
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
-      printArg();
+      Printer.printName(ArgName);
       break;
-    case PrintOptions::ArgAndParamPrintingMode::BothIfDifferent:
-      if (ArgName == BodyName) {
-        printArg();
+    case PrintOptions::ArgAndParamPrintingMode::MatchSource:
+      if (ArgName == BodyName && ArgNameIsAPIByDefault) {
+        Printer.printName(ArgName);
         break;
       }
       if (ArgName.empty() && !ArgNameIsAPIByDefault) {

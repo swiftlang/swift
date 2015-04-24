@@ -6,8 +6,8 @@ class A {
   func do_b(x: Int) {}
   func do_b(x: Float) {}
 
-  func do_c(#x: Int) {} // expected-note 2 {{found this candidate}}
-  func do_c(#y: Int) {} // expected-note 2 {{found this candidate}}
+  func do_c(x x: Int) {} // expected-note 2 {{found this candidate}}
+  func do_c(y y: Int) {} // expected-note 2 {{found this candidate}}
 }
 
 func test0(a : A!) {

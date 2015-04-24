@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func foo(#x: Int = 0) {}
+func foo(x x: Int = 0) {}
 let bar = foo
 bar() // expected-error {{missing argument for parameter 'x'}}
 

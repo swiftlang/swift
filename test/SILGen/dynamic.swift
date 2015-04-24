@@ -11,7 +11,7 @@ class Foo: Proto {
   init(native: Int) {}
   func nativeMethod() {}
   var nativeProp: Int = 0
-  subscript(#native: Int) -> Int {
+  subscript(native native: Int) -> Int {
     get { return native }
     set {}
   }
@@ -21,7 +21,7 @@ class Foo: Proto {
   @objc init(objc: Int) {}
   @objc func objcMethod() {}
   @objc var objcProp: Int = 0
-  @objc subscript(#objc: AnyObject) -> Int {
+  @objc subscript(objc objc: AnyObject) -> Int {
     get { return 0 }
     set {}
   }
@@ -30,7 +30,7 @@ class Foo: Proto {
   dynamic init(dynamic: Int) {}
   dynamic func dynamicMethod() {}
   dynamic var dynamicProp: Int = 0
-  dynamic subscript(#dynamic: Int) -> Int {
+  dynamic subscript(dynamic dynamic: Int) -> Int {
     get { return dynamic }
     set {}
   }
@@ -43,15 +43,15 @@ class Foo: Proto {
 protocol Proto {
   func nativeMethod()
   var nativeProp: Int { get set }
-  subscript(#native: Int) -> Int { get set }
+  subscript(native native: Int) -> Int { get set }
 
   func objcMethod()
   var objcProp: Int { get set }
-  subscript(#objc: AnyObject) -> Int { get set }
+  subscript(objc objc: AnyObject) -> Int { get set }
 
   func dynamicMethod()
   var dynamicProp: Int { get set }
-  subscript(#dynamic: Int) -> Int { get set }
+  subscript(dynamic dynamic: Int) -> Int { get set }
 }
 
 // ObjC entry points for @objc and dynamic entry points
@@ -159,7 +159,7 @@ class Subclass: Foo {
     // CHECK:         function_ref @_TFC7dynamic3Foos10nativePropSi
   }
 
-  override subscript(#native: Int) -> Int {
+  override subscript(native native: Int) -> Int {
     get { return super[native: native] }
     // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg9subscriptFT6nativeSi_Si
     // CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT6nativeSi_Si
@@ -189,7 +189,7 @@ class Subclass: Foo {
     // CHECK:         function_ref @_TFC7dynamic3Foos8objcPropSi
   }
 
-  override subscript(#objc: AnyObject) -> Int {
+  override subscript(objc objc: AnyObject) -> Int {
     get { return super[objc: objc] }
     // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg9subscriptFT4objcPSs9AnyObject__Si
     // CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT4objcPSs9AnyObject__Si
@@ -220,7 +220,7 @@ class Subclass: Foo {
     // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.dynamicProp!setter.1.foreign :
   }
 
-  override subscript(#dynamic: Int) -> Int {
+  override subscript(dynamic dynamic: Int) -> Int {
     get { return super[dynamic: dynamic] }
     // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg9subscriptFT7dynamicSi_Si
     // CHECK:         super_method [volatile] {{%.*}} : $Subclass, #Foo.subscript!getter.1.foreign :

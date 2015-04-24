@@ -247,28 +247,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = SourceLoc();
       }
 
-      // Cannot have a back-tick and two names.
+      // Cannot have a pound and two names.
       if (param.PoundLoc.isValid() && param.SecondNameLoc.isValid()) {
         diagnose(param.PoundLoc, diag::parameter_backtick_two_names)
           .fixItRemove(param.PoundLoc);
         param.PoundLoc = SourceLoc();
-      }
-
-      // If we have two equivalent names, suggest using the back-tick.
-      if (param.FirstNameLoc.isValid() && param.SecondNameLoc.isValid() &&
-          param.FirstName == param.SecondName) {
-        StringRef name;
-        if (param.FirstName.empty())
-          name = "_";
-        else
-          name = param.FirstName.str();
-
-        SourceLoc afterFirst = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                          param.FirstNameLoc);
-        diagnose(param.FirstNameLoc, diag::parameter_two_equivalent_names,
-                 name)
-          .fixItInsert(param.FirstNameLoc, "#")
-          .fixItRemove(SourceRange(afterFirst, param.SecondNameLoc));
       }
 
       // (':' type)?
@@ -509,17 +492,33 @@ mapParsedParameters(Parser &parser,
 
         param.FirstNameLoc = SourceLoc();
       }
+
+      // If the first and second names are equivalent and non-empty, and we
+      // would have an argument label by default, complain.
+      if (isKeywordArgumentByDefault && param.FirstName == param.SecondName
+          && !param.FirstName.empty()) {
+        parser.diagnose(param.FirstNameLoc,
+                        diag::parameter_extraneous_double_up,
+                        param.FirstName)
+          .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
+      }
     } else {
-      // If it's an API name by default, or there was a back-tick, we have an
+      // If it's an API name by default, or there was a pound, we have an
       // API name.
       if (isKeywordArgumentByDefault || param.PoundLoc.isValid()) {
         argName = param.FirstName;
 
-        // If both are true, warn that the back-tick is unnecessary.
-        if (isKeywordArgumentByDefault && param.PoundLoc.isValid()) {
-          parser.diagnose(param.PoundLoc,
-                          diag::parameter_extraneous_backtick, argName)
-            .fixItRemove(param.PoundLoc);
+        // THe pound is going away. Complain.
+        if (param.PoundLoc.isValid()) {
+          if (isKeywordArgumentByDefault) {
+            parser.diagnose(param.PoundLoc, diag::parameter_extraneous_pound,
+                            argName)
+              .fixItRemove(param.PoundLoc);
+          } else {
+            parser.diagnose(param.PoundLoc, diag::parameter_pound_double_up,
+                            argName.str())
+              .fixItReplace(param.PoundLoc, (argName.str() + " ").str());
+          }
         }
       }
 

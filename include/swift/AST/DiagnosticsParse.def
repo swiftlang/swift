@@ -667,11 +667,15 @@ ERROR(parameter_inout_var_let,decl_parsing,none,
 WARNING(parameter_backtick_two_names,decl_parsing,none,
       "extraneous '#' in parameter; keyword argument and parameter name "
       "already specified separately", ())
-WARNING(parameter_two_equivalent_names,decl_parsing,none,
-        "'%0 %0' can be expressed more succinctly as '#%0'", (StringRef))
-WARNING(parameter_extraneous_backtick,decl_parsing,none,
-        "extraneous '#' in parameter: %0 is already the keyword argument name",
+WARNING(parameter_extraneous_double_up,decl_parsing,none,
+        "extraneous duplicate parameter name; %0 already has an argument "
+        "label", (Identifier))
+WARNING(parameter_extraneous_pound,decl_parsing,none,
+        "'#' has been removed from Swift; %0 already has an argument label",
         (Identifier))
+WARNING(parameter_pound_double_up,decl_parsing,none,
+        "'#' has been removed from Swift; double-up '%0 %0' to make the argument label "
+        "the same as the parameter name", (StringRef))
 WARNING(parameter_extraneous_empty_name,decl_parsing,none,
         "extraneous '_' in parameter: %0 has no keyword argument name",
         (Identifier))

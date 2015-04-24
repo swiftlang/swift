@@ -16,7 +16,7 @@ enum Policy {
   case Head(Int)
 }
 
-func extra2(#x: Int, y: Int) { }
+func extra2(x x: Int, y: Int) { }
 
 func testExtra2(policy : Policy) {
   switch (policy)
@@ -27,12 +27,12 @@ func testExtra2(policy : Policy) {
 }
 
 // Single missing keyword argument (scalar-to-tuple)
-func f2(#a: Int) { }
+func f2(a a: Int) { }
 f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
 
 struct X2 {
   init(a: Int) { }
-  func f2(#b: Int) { }
+  func f2(b b: Int) { }
 }
 X2(5).f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
 // expected-error @-1{{missing argument label 'b:' in call}}{{10-10=b: }}
@@ -42,7 +42,7 @@ X2(5).f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
 // Missing keywords
 // -------------------------------------------
 
-func allkeywords1(#x: Int, y: Int) { }
+func allkeywords1(x x: Int, y: Int) { }
 
 // Missing keywords.
 allkeywords1(1, 2) // expected-error{{missing argument labels}}
@@ -80,7 +80,7 @@ allkeywords1(y: 1, x: 2) // expected-error{{argument 'x' must precede argument '
 // Default arguments
 // -------------------------------------------
 
-func defargs1(#x: Int = 1, y: Int = 2, z: Int = 3) {}
+func defargs1(x x: Int = 1, y: Int = 2, z: Int = 3) {}
 
 // Using defaults (in-order)
 defargs1() 
@@ -99,7 +99,7 @@ defargs1(x: 1, z: 3, y: 2)
 defargs1(y: 2, x: 1)
 
 // Default arguments "boxed in".
-func defargs2(#first: Int, x: Int = 1, y: Int = 2, z: Int = 3, last: Int) { }
+func defargs2(first first: Int, x: Int = 1, y: Int = 2, z: Int = 3, last: Int) { }
 
 // Using defaults in the middle (in-order, some missing)
 defargs2(first: 1, x: 1, z: 3, last: 4)
@@ -118,7 +118,7 @@ defargs2(first: 1, last: 4, x: 1) // expected-error{{argument 'x' must precede a
 // -------------------------------------------
 // Variadics
 // -------------------------------------------
-func variadics1(#x: Int, y: Int, _ z: Int...) { }
+func variadics1(x x: Int, y: Int, _ z: Int...) { }
 
 // Using variadics (in-order, complete)
 variadics1(x: 1, y: 2)
@@ -130,7 +130,7 @@ variadics1(x: 1, y: 2, 1, 2, 3)
 // FIXME: Poor diagnostic.
 variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{cannot invoke 'variadics1' with an argument list of type '(Int, Int, Int, Int, Int, x: Int, y: Int)'}} expected-note{{expected an argument list of type '(x: Int, y: Int, [Int])'}}
 
-func variadics2(#x: Int, y: Int = 2, z: Int...) { }
+func variadics2(x x: Int, y: Int = 2, z: Int...) { }
 
 // Using variadics (in-order, complete)
 variadics2(x: 1, y: 2, z: 1)
@@ -150,11 +150,11 @@ variadics2(z: 1, 2, 3, x: 1) // expected-error{{argument 'x' must precede argume
 // -------------------------------------------
 // FIXME: Diagnostics could be improved with all missing names, or
 // simply # of arguments required.
-func missingargs1(#x: Int, y: Int, z: Int) {}
+func missingargs1(x x: Int, y: Int, z: Int) {}
 
 missingargs1(x: 1, y: 2) // expected-error{{missing argument for parameter 'z' in call}}
 
-func missingargs2(#x: Int, y: Int, _ z: Int) {}
+func missingargs2(x x: Int, y: Int, _ z: Int) {}
 missingargs2(x: 1, y: 2) // expected-error{{missing argument for parameter #3 in call}}
 
 // -------------------------------------------
@@ -162,7 +162,7 @@ missingargs2(x: 1, y: 2) // expected-error{{missing argument for parameter #3 in
 // -------------------------------------------
 // FIXME: Diagnostics could be improved with all extra arguments and
 // note pointing to the declaration being called.
-func extraargs1(#x: Int) {}
+func extraargs1(x x: Int) {}
 
 extraargs1(x: 1, y: 2) // expected-error{{extra argument 'y' in call}}
 extraargs1(x: 1, 2, 3) // expected-error{{extra argument in call}}
@@ -171,7 +171,7 @@ extraargs1(x: 1, 2, 3) // expected-error{{extra argument in call}}
 // Argument name mismatch
 // -------------------------------------------
 
-func mismatch1(#thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
+func mismatch1(thisFoo thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
 
 mismatch1(foo: 5) // expected-error{{incorrect argument label in call (have 'foo:', expected 'thisFoo:')}}
 mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}}
@@ -193,7 +193,7 @@ i = sub1[i]
 i = sub1[i: i] // expected-error{{extraneous argument label 'i:' in subscript}}
 
 struct Sub2 {
-  subscript (#d: Double) -> Double {
+  subscript (d d: Double) -> Double {
     get { return d }
   }
 }
@@ -220,27 +220,27 @@ func testClosures() {
   c2(1, 2)
 }
 
-func acceptAutoclosure(@autoclosure #f: () -> Int) { }
+func acceptAutoclosure(@autoclosure f f: () -> Int) { }
 func produceInt() -> Int { }
 acceptAutoclosure(f: produceInt) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
 
 // -------------------------------------------
 // Trailing closures
 // -------------------------------------------
-func trailingclosure1(#x: Int, f: () -> Int) {}
+func trailingclosure1(x x: Int, f: () -> Int) {}
 
 trailingclosure1(x: 1) { return 5 }
 trailingclosure1(1) { return 5 } // expected-error{{missing argument label 'x:' in call}}{{18-18=x: }}
 
 trailingclosure1(x: 1, { return 5 }) // expected-error{{missing argument label 'f:' in call}}
 
-func trailingclosure2(#x: Int, f: (() -> Int)!...) {}
+func trailingclosure2(x x: Int, f: (() -> Int)!...) {}
 trailingclosure2(x: 5) { return 5 }
 
-func trailingclosure3(#x: Int, var f: (() -> Int)!) {}
+func trailingclosure3(x x: Int, var f: (() -> Int)!) {}
 trailingclosure3(x: 5) { return 5 }
 
-func trailingclosure4(#f: () -> Int) {}
+func trailingclosure4(f f: () -> Int) {}
 trailingclosure4 { 5 }
 
 class MismatchOverloaded1 {
@@ -273,13 +273,13 @@ func testValuesOfFunctionType(f1: (_: Int, arg: Int) -> () ) {
 // -------------------------------------------
 // Literals
 // -------------------------------------------
-func string_literals1(#x: String) { }
+func string_literals1(x x: String) { }
 string_literals1(x: "hello")
 
-func int_literals1(#x: Int) { }
+func int_literals1(x x: Int) { }
 int_literals1(x: 1)
 
-func float_literals1(#x: Double) { }
+func float_literals1(x x: Double) { }
 float_literals1(x: 5)
 
 // -------------------------------------------

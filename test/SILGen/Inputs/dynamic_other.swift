@@ -3,7 +3,7 @@ class FromOtherFile: Proto {
   init(native: Int) {}
   func nativeMethod() {}
   var nativeProp: Int = 0
-  subscript(#native: Int) -> Int {
+  subscript(native native: Int) -> Int {
     get { return native }
     set {}
   }
@@ -13,7 +13,7 @@ class FromOtherFile: Proto {
   @objc init(objc: Int) {}
   @objc func objcMethod() {}
   @objc var objcProp: Int = 0
-  @objc subscript(#objc: Int) -> Int {
+  @objc subscript(objc objc: Int) -> Int {
     get { return objc }
     set {}
   }
@@ -22,7 +22,7 @@ class FromOtherFile: Proto {
   dynamic init(dynamic: Int) {}
   dynamic func dynamicMethod() {}
   dynamic var dynamicProp: Int = 0
-  dynamic subscript(#dynamic: Int) -> Int {
+  dynamic subscript(dynamic dynamic: Int) -> Int {
     get { return dynamic }
     set {}
   }

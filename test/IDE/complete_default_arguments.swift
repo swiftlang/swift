@@ -19,13 +19,13 @@ func freeFuncWithDefaultArgs1(
     a: Int, b: Int = 42, file: String = __FILE__, line: Int = __LINE__,
     column: Int = __COLUMN__, function: String = __FUNCTION__) {
 }
-func freeFuncWithDefaultArgs2(#file: String = __FILE__) {}
-func freeFuncWithDefaultArgs3(#a: Int = 0) {}
+func freeFuncWithDefaultArgs2(file file: String = __FILE__) {}
+func freeFuncWithDefaultArgs3(a a: Int = 0) {}
 func freeFuncWithDefaultArgs4(a: Int, b: Int = 0, c: Int = 0) {}
 
 struct A {
-  func methodWithDefaultArgs1(#a: Int = 0) {}
-  static func staticMethodWithDefaultArgs1(#a: Int = 0) {}
+  func methodWithDefaultArgs1(a a: Int = 0) {}
+  static func staticMethodWithDefaultArgs1(a a: Int = 0) {}
 }
 
 struct B {
@@ -33,11 +33,11 @@ struct B {
 }
 
 class C1 {
-  func methodWithDefaultArgs1(#a: Int = 0) {}
+  func methodWithDefaultArgs1(a a: Int = 0) {}
   func methodWithDefaultArgsInSub1(a: Int) {}
 }
 class C2 : C1 {
-  override func methodWithDefaultArgs1(#a: Int) {}
+  override func methodWithDefaultArgs1(a a: Int) {}
   override func methodWithDefaultArgsInSub1(a: Int = 0) {}
 }
 

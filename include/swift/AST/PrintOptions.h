@@ -141,13 +141,13 @@ struct PrintOptions {
 
   enum class ArgAndParamPrintingMode {
     ArgumentOnly,
-    BothIfDifferent,
+    MatchSource,
     BothAlways,
   };
 
   /// How to print the keyword argument and parameter name in functions.
   ArgAndParamPrintingMode ArgAndParamPrinting =
-      ArgAndParamPrintingMode::BothIfDifferent;
+      ArgAndParamPrintingMode::MatchSource;
 
   /// \brief Whether to print documentation comments attached to declarations.
   /// Note that this may print documentation comments from related declarations

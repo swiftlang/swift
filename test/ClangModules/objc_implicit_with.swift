@@ -9,8 +9,6 @@ class X {
   init(withFloat float: Float) { } // expected-error{{'with' is implied for the first parameter of an initializer; did you mean to name this parameter 'float'?}}{{8-18=}}
   init(withDouble d: Double) { } // expected-error{{'with' is implied for the first parameter of an initializer; did you mean to name this parameter 'double'?}}{{8-18=double}}
 
-  func doSomething(#withInt: Int) { } // expected-error{{'with' is implied for the first parameter of a method; did you mean to name this parameter 'int'?}}{{21-21=int }}{{20-21=}}
-  func doSomething(withFloat float: Float) { } // expected-error{{'with' is implied for the first parameter of a method; did you mean to name this parameter 'float'?}}{{20-30=}}{{30-30=#}}
   func doSomething(withDouble d: Double) { } // expected-error{{'with' is implied for the first parameter of a method; did you mean to name this parameter 'double'?}}{{20-30=double}}
 
   init(_ withString: String) { } // not corrected

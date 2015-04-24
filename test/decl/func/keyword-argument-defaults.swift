@@ -36,22 +36,22 @@ class PX : P {
 }
 
 // Default arguments have no effect on argument labels.
-func f3(a: Int, b: Int = 5, #c: Int = 6) { } // expected-warning{{extraneous '#' in parameter: 'c' is already the keyword argument name}}{{29-30=}}
+func f3(a: Int, b: Int = 5, c: Int = 6) { }
 // expected-note@-1{{'f3(_:b:c:)' previously declared here}}
-func f3(a: Int, b: Int, #c: Int) { } // expected-warning{{extraneous '#' in parameter: 'c' is already the keyword argument name}}{{25-26=}}
+func f3(a: Int, b: Int, c: Int) { }
 // expected-error@-1{{invalid redeclaration of 'f3(_:b:c:)'}}
 
 class DefArg {
   func f(a: Int = 17) { } // okay: no label implied
-  func f(#a: Int) { } // 
+  func f(a a: Int) { }
 }
 
 struct Subscripts1 {
-  subscript (#i: Int) -> Int {
+  subscript (i i: Int) -> Int {
     get { return i }
   }
 
-  subscript (#j: Int) -> Int {
+  subscript (j j: Int) -> Int {
     get { return j }
   }
 }
@@ -88,7 +88,7 @@ struct Y {
     get { return x }
   }
 
-  subscript (#y: String) -> String {
+  subscript (y y: String) -> String {
     get { return y }
   }
 }
@@ -110,3 +110,7 @@ func testSubscripts(i: Int, s: String, x: Y) {
   var s2 = x[y: s]
   var s3 = x[s]  // expected-error{{missing argument label 'y:' in subscript}}
 }
+
+// # is being removed
+func pound(#a: Int, // expected-warning{{'#' has been removed from Swift; double-up 'a a' to make the argument label the same as the parameter name}}{{12-13=a }}
+           #b: Int) { } // expected-warning{{'#' has been removed from Swift; 'b' already has an argument label}}{{12-13=}}

@@ -31,7 +31,7 @@ class A {
   func l(l: Int) {}
   func l(l: Float) {}
   func m(x: Int) {}
-  func m(#y: Int) {}
+  func m(y y: Int) {}
   func n(x: Int) {}
   subscript(i : Int) -> Int {
     get {}

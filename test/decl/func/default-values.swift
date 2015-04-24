@@ -3,7 +3,7 @@
 var func5 : (fn : (Int,Int) -> ()) -> () 
 
 // Default arguments for functions.
-func foo3(#a: Int = 2, b: Int = 3) {}
+func foo3(a a: Int = 2, b: Int = 3) {}
 func functionCall() {
   foo3(a: 4)
   foo3()
@@ -49,8 +49,8 @@ struct Outer<T> {
   struct Inner { // expected-error{{type 'Inner' nested in generic type}}
     struct VeryInner {// expected-error{{type 'VeryInner' nested in generic type}}
       init (i : Int = 17, f : Float = 1.5) { }
-      static func f(#i: Int = 17, f: Float = 1.5) { }
-      func g(#i: Int = 17, f: Float = 1.5) { }
+      static func f(i i: Int = 17, f: Float = 1.5) { }
+      func g(i i: Int = 17, f: Float = 1.5) { }
     }
   }
 }
