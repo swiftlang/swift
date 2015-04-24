@@ -132,6 +132,12 @@ ASTContext &SILFunction::getASTContext() const {
   return getModule().getASTContext();
 }
 
+bool SILFunction::shouldOptimize() const {
+  if (Module.getStage() == SILStage::Raw)
+    return true;
+  return !hasSemanticsString("optimize.sil.never");
+}
+
 Type SILFunction::mapTypeIntoContext(Type type) const {
   return ArchetypeBuilder::mapTypeIntoContext(getModule().getSwiftModule(),
                                               getContextGenericParams(),
