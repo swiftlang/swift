@@ -27,7 +27,7 @@ func _chiSquaredUniform1DFCritical(pValue: Double) -> Double {
 /// Perform chi-squared test for a discrete uniform distribution with
 /// 2 outcomes.
 public func chiSquaredUniform2(
-  trials: Int, observedACount: Int, pValue: Double
+  trials: Int, _ observedACount: Int, _ pValue: Double
 ) -> Bool {
 
   func square(x: Double) -> Double {

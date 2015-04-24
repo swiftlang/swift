@@ -14,7 +14,7 @@
 
 @availability(OSX, introduced=10.7)
 public func clSetKernelArgsListAPPLE(
-  kernel: cl_kernel, uint: cl_uint, args: CVarArgType...
+  kernel: cl_kernel, _ uint: cl_uint, _ args: CVarArgType...
 ) -> cl_int {
   // The variable arguments are num_args arguments that are the following:
   //      cl_uint arg_indx,

@@ -388,7 +388,7 @@ public struct Set<T : Hashable> :
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
   /// will not decrease.
-  public mutating func removeAll(keepCapacity: Bool = false) {
+  public mutating func removeAll(#keepCapacity: Bool = false) {
     _variantStorage.removeAll(keepCapacity: keepCapacity)
   }
 
@@ -1100,7 +1100,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// storage is released.  The default is `false`.
   ///
   /// Complexity: O(\ `count`\ ).
-  public mutating func removeAll(keepCapacity: Bool = false) {
+  public mutating func removeAll(#keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with
     // native storage.
