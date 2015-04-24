@@ -1286,6 +1286,19 @@ public:
   /// makes it a safe override, given the availability of the base declation.
   bool isAvailabilitySafeForOverride(ValueDecl *override, ValueDecl *base);
 
+  /// \brief Returns true if the availability of the witness
+  /// is sufficient to safely conform to the requirement in the context
+  /// the provided conformance.
+  bool isAvailabilitySafeForConformance(ValueDecl *witness,
+                                        ValueDecl *requirement,
+                                        NormalProtocolConformance *conformance);
+
+  /// Returns an over-approximation of the range of operating system versions
+  /// that could  the passed-in location location could be executing upon for
+  /// the target platform.
+  VersionRange overApproximateOSVersionsAtLocation(SourceLoc loc,
+                                                   const DeclContext *DC);
+
   /// Walk the AST to build the hierarchy of TypeRefinementContexts
   ///
   /// \param StartElem Where to start for incremental building of refinement

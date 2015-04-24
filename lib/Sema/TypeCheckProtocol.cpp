@@ -1600,7 +1600,8 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
   }
 
   if (!TC.getLangOpts().DisableAvailabilityChecking &&
-      !TC.isAvailabilitySafeForOverride(match.Witness, requirement)) {
+      !TC.isAvailabilitySafeForConformance(match.Witness, requirement,
+                                           Conformance)) {
     auto witness = match.Witness;
     diagnoseOrDefer(requirement, false,
       [witness, requirement](TypeChecker &tc,

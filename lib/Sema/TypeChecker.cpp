@@ -1255,14 +1255,10 @@ TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   return TRC;
 }
 
-/// Returns an over-approximation of the range of operating system versions
-/// that could  the passed-in location location could be executing upon for
-/// the target platform.
-static VersionRange overApproximateOSVersionsAtLocation(SourceLoc loc,
-                                                        const DeclContext *DC,
-                                                        TypeChecker &TC) {
+VersionRange
+TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
+                                                 const DeclContext *DC) {
   SourceFile *SF = DC->getParentSourceFile();
-  assert(SF);
 
   // If our source location is invalid (this may be synthesized code), climb
   // the decl context hierarchy until until we find a location that is valid,
@@ -1278,7 +1274,9 @@ static VersionRange overApproximateOSVersionsAtLocation(SourceLoc loc,
   // refined. For now, this is fine -- but if we ever synthesize #available(),
   // this will be a real problem.
 
-  VersionRange OverApproximateVersionRange = VersionRange::all();
+  // We can assume we are running on at least the minimum deployment target.
+  VersionRange OverApproximateVersionRange =
+      VersionRange::allGTE(getLangOpts().getMinPlatformVersion());
 
   while (DC && loc.isInvalid()) {
     const Decl *D = DC->getInnermostDeclarationDeclContext();
@@ -1288,29 +1286,22 @@ static VersionRange overApproximateOSVersionsAtLocation(SourceLoc loc,
     loc = D->getLoc();
 
     Optional<VersionRange> Range =
-        TypeChecker::annotatedAvailableRange(D, TC.Context);
+        TypeChecker::annotatedAvailableRange(D, Context);
 
     if (Range.hasValue()) {
-      // We're relying on a precise meet here to be over-approximate.
-      // This should really be a constrain operation.
-      OverApproximateVersionRange.meetWith(Range.getValue());
+      OverApproximateVersionRange.constrainWith(Range.getValue());
     }
 
     DC = D->getDeclContext();
   }
 
-  TypeRefinementContext *rootTRC = TC.getOrBuildTypeRefinementContext(SF);
-  TypeRefinementContext *TRC;
-  if (loc.isValid()) {
-    TRC = rootTRC->findMostRefinedSubContext(loc, TC.Context.SourceMgr);
-  } else {
-    // If we could not find a valid location, conservatively use the root
-    // refinement context.
-    TRC = rootTRC;
+  if (SF && loc.isValid()) {
+    TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
+    TypeRefinementContext *TRC =
+        rootTRC->findMostRefinedSubContext(loc, Context.SourceMgr);
+    OverApproximateVersionRange.constrainWith(TRC->getPotentialVersions());
   }
 
-  // Again, we're relying on a precise meet.
-  OverApproximateVersionRange.meetWith(TRC->getPotentialVersions());
   return OverApproximateVersionRange;
 }
 
@@ -1320,7 +1311,7 @@ bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
 
   VersionRange safeRangeUnderApprox = TypeChecker::availableRange(D, Context);
   VersionRange runningOSOverApprox = overApproximateOSVersionsAtLocation(
-      referenceLoc, referenceDC, *this);
+      referenceLoc, referenceDC);
   
   // The reference is safe if an over-approximation of the running OS
   // versions is fully contained within an under-approximation

@@ -5752,6 +5752,42 @@ bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
   return baseRange.isContainedIn(overrideRange);
 }
 
+bool TypeChecker::isAvailabilitySafeForConformance(
+    ValueDecl *witness, ValueDecl *requirement,
+    NormalProtocolConformance *conformance) {
+  DeclContext *DC = conformance->getDeclContext();
+
+  // We assume conformances in
+  // non-SourceFiles have already been checked for availability.
+  if (!DC->getParentSourceFile())
+    return true;
+
+  NominalTypeDecl *conformingDecl = DC->isNominalTypeOrNominalTypeExtensionContext();
+  assert(conformingDecl && "Must have conformining declaration");
+
+  // Make sure that any access of the witness through the protocol
+  // can only occur when the witness is available. That is, make sure that
+  // on every version where the conforming declaration is available, if the
+  // requirement is available then the witness is available as well.
+  // We do this by checking that (an over-approximation of) the intersection of
+  // the requirement's available range with the conforming declaration's
+  // available range is fully contained in (an over-approximation of) the
+  // intersection of the witnesses's available range with the conforming
+  // type's available range.
+  VersionRange witnessRange = TypeChecker::availableRange(witness, Context);
+  VersionRange requirementRange =
+      TypeChecker::availableRange(requirement, Context);
+
+  VersionRange rangeOfConformingDecl = overApproximateOSVersionsAtLocation(
+      conformingDecl->getLoc(), conformingDecl);
+
+  // Constrain over-approximates intersection of version ranges.
+  witnessRange.constrainWith(rangeOfConformingDecl);
+  requirementRange.constrainWith(rangeOfConformingDecl);
+
+  return requirementRange.isContainedIn(witnessRange);
+}
+
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   PrettyStackTraceDecl StackTrace("type-checking", D);
   checkForForbiddenPrefix(D);

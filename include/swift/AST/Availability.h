@@ -109,6 +109,17 @@ public:
     setLowerEndpoint(maxVersion);
   }
 
+  /// Mutates this range to be a best effort over-approximation of the
+  /// intersection of the concretizations of this version range and Other.
+  void constrainWith(const VersionRange &Other) {
+    // We can use the meet for this because the lattice is multiplicative
+    // with respect to concretization--that is, the concretization
+    // of Range1 meet Range2 is equal to the intersection of the
+    // concretization of Range1 and the concretization of Range2.
+    // This will change if we add (-Inf, v) to our version range lattice.
+    meetWith(Other);
+  }
+
   /// Returns a version range representing all versions.
   static VersionRange all() { return VersionRange(ExtremalRange::All); }
 

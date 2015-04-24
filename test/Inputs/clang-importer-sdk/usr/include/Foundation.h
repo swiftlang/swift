@@ -666,3 +666,13 @@ extern NSZone *NSCreateZone(NSUInteger startSize, NSUInteger granularity, BOOL c
 typedef struct NonNilableReferences {
   NSObject *__nonnull __unsafe_unretained obj;
 } NonNilableReferences;
+
+
+@protocol NSProtocolWithOptionalRequirement
+@optional
+-(void)optionalRequirement;
+@end
+
+@interface NSClassWithMethodFromNSProtocolWithOptionalRequirement
+-(void)optionalRequirement  __attribute__((availability(macosx, introduced=10.10)));
+@end
