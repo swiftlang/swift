@@ -176,6 +176,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
     SILFunction *ParentF = AI->getFunction();
     DominanceInfo *DT = DA->get(ParentF);
     auto PFI = ParentFuncs.find(ParentF);
+    ApplyInst *HoistAI = nullptr;
     if (PFI != ParentFuncs.end()) {
       // Found a replacement for this init call.
       // Ensure the replacement dominates the original call site.
@@ -188,14 +189,24 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       if (DomBB != CommonAI->getParent()) {
         CommonAI->moveBefore(DomBB->begin());
         placeFuncRef(CommonAI, DT);
+        
+        // Try to hoist the existing AI again if we move it to another block,
+        // e.g. from a loop exit into the loop.
+        HoistAI = CommonAI;
       }
       AI->replaceAllUsesWith(CommonAI);
       AI->eraseFromParent();
       HasChanged = true;
+    } else {
+      ParentFuncs[ParentF] = AI;
+      
+      // It's the first time we found a call to InitF in this function, so we
+      // try to hoist it out of any loop.
+      HoistAI = AI;
     }
-    else {
+    if (HoistAI) {
       // Move this call to the outermost loop preheader.
-      SILBasicBlock *BB = AI->getParent();
+      SILBasicBlock *BB = HoistAI->getParent();
       typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
       DomTreeNode *Node = DT->getNode(BB);
       while (Node) {
@@ -204,17 +215,16 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
           break;
         Node = Node->getIDom();
       }
-      if (BB == AI->getParent()) {
+      if (BB == HoistAI->getParent()) {
         // BB is either unreachable or not in a loop.
-        DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *AI
-              << "  in " << AI->getFunction()->getName() << "\n");
+        DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *HoistAI
+              << "  in " << HoistAI->getFunction()->getName() << "\n");
       }
       else {
-        DEBUG(llvm::dbgs() << "  hoisting: " << *AI
-              << "  in " << AI->getFunction()->getName() << "\n");
-        AI->moveBefore(BB->begin());
-        placeFuncRef(AI, DT);
-        ParentFuncs[ParentF] = AI;
+        DEBUG(llvm::dbgs() << "  hoisting: " << *HoistAI
+              << "  in " << HoistAI->getFunction()->getName() << "\n");
+        HoistAI->moveBefore(BB->begin());
+        placeFuncRef(HoistAI, DT);
         HasChanged = true;
       }
     }
