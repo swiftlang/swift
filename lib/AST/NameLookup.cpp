@@ -134,7 +134,6 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     for (unsigned firstIdx = 0, n = collidingDecls.second.size();
          firstIdx != n; ++firstIdx) {
       auto firstDecl = collidingDecls.second[firstIdx];
-      auto firstDC = firstDecl->getDeclContext();
       auto firstModule = firstDecl->getModuleContext();
       for (unsigned secondIdx = firstIdx + 1; secondIdx != n; ++secondIdx) {
         // Determine whether one module takes precedence over another.
@@ -167,31 +166,6 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
            shadowed.insert(secondDecl);
            continue;
          }
-        }
-         
-        // If the first and second declarations are in the same module,
-        // prefer one in the type itself vs. one in an extension.
-        // FIXME: Should redeclaration checking prevent this from happening?
-        if (firstModule == secondModule) {
-          auto secondDC = secondDecl->getDeclContext();
-
-          // If both declarations are in extensions, or both are in the
-          // type definition itself, there's nothing we can do.
-          if (isa<ExtensionDecl>(firstDC) == isa<ExtensionDecl>(secondDC))
-            continue;
-
-          // If the second declaration is in an extension, it is shadowed
-          // by the first declaration. 
-          if (isa<ExtensionDecl>(secondDC)) {
-            shadowed.insert(secondDecl);
-            continue;
-          }
-
-          // If the first declaration is in an extension, it is shadowed by
-          // the second declaration. There is no point in continuing to compare
-          // the first declaration to others.
-          shadowed.insert(firstDecl);
-          break;
         }
 
         // Prefer declarations in the current module over those in another
