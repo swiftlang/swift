@@ -260,63 +260,63 @@ bb5(%32 : $Builtin.Int32):                         // Preds: bb3 bb4
 }
 
 // Combine two init calls into one in the common dominator
-// CHECK-LABEL: sil @test_commond_dominator
+// CHECK-LABEL: sil @test_common_dominator
 // CHECK: bb0(%0 : $Builtin.Int1):
 // CHECK: apply
 // CHECK: bb1:
 // CHECK-NOT: apply
 // CHECK: return
-sil @test_commond_dominator : $@convention(thin) (Builtin.Int1) -> Int {
+sil @test_common_dominator : $@convention(thin) (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
   %1 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int
-  %4 = struct_element_addr %3 : $*Int, #Int.value
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %4 = struct_element_addr %3 : $*Int64, #Int64.value
   %5 = load %4 : $*Builtin.Int64
   cond_br %0, bb1, bb2(%5 : $Builtin.Int64)
 
 bb1:
   %8 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %9 = pointer_to_address %8 : $Builtin.RawPointer to $*Int
-  %10 = struct_element_addr %9 : $*Int, #Int.value
+  %9 = pointer_to_address %8 : $Builtin.RawPointer to $*Int64
+  %10 = struct_element_addr %9 : $*Int64, #Int64.value
   %11 = load %10 : $*Builtin.Int64
   br bb2(%11 : $Builtin.Int64)
 
 bb2(%18 : $Builtin.Int64):
-  %19 = struct $Int (%18 : $Builtin.Int64)
-  return %19 : $Int
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
+  return %19 : $Int64
 }
 
 // Combine two init calls into one in the common dominator
-// CHECK-LABEL: sil @test_commond_dominator2
+// CHECK-LABEL: sil @test_common_dominator2
 // CHECK: bb0(%0 : $Builtin.Int1):
 // CHECK: apply
 // CHECK: bb1:
 // CHECK-NOT: apply
 // CHECK: return
-sil @test_commond_dominator2 : $@convention(thin) (Builtin.Int1) -> Int {
+sil @test_common_dominator2 : $@convention(thin) (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 
 bb1:
   %1 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int
-  %4 = struct_element_addr %3 : $*Int, #Int.value
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %4 = struct_element_addr %3 : $*Int64, #Int64.value
   %5 = load %4 : $*Builtin.Int64
   br bb3(%5 : $Builtin.Int64)
 
 bb2:
   %11 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %12 = apply %11() : $@convention(thin) () -> Builtin.RawPointer
-  %13 = pointer_to_address %12 : $Builtin.RawPointer to $*Int
-  %14 = struct_element_addr %13 : $*Int, #Int.value
+  %13 = pointer_to_address %12 : $Builtin.RawPointer to $*Int64
+  %14 = struct_element_addr %13 : $*Int64, #Int64.value
   %15 = load %14 : $*Builtin.Int64
   br bb3(%15 : $Builtin.Int64)
 
 bb3(%18 : $Builtin.Int64):
-  %19 = struct $Int (%18 : $Builtin.Int64)
-  return %19 : $Int
+  %19 = struct $Int64 (%18 : $Builtin.Int64)
+  return %19 : $Int64
 }
 
 // Test a special case: If there is a call in a loop and in its exit block, which is located
@@ -327,24 +327,24 @@ bb3(%18 : $Builtin.Int64):
 // CHECK: bb1:
 // CHECK-NOT: apply
 // CHECK: return
-sil @test_loopexit_and_loop : $@convention(thin) (Builtin.Int1) -> Int {
+sil @test_loopexit_and_loop : $@convention(thin) (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
   br bb2
 
 bb1:
   %1 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int
-  %4 = struct_element_addr %3 : $*Int, #Int.value
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %4 = struct_element_addr %3 : $*Int64, #Int64.value
   %5 = load %4 : $*Builtin.Int64
-  %r1 = struct $Int (%5 : $Builtin.Int64)
-  return %r1 : $Int
+  %r1 = struct $Int64 (%5 : $Builtin.Int64)
+  return %r1 : $Int64
 
 bb2:
   %11 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %12 = apply %11() : $@convention(thin) () -> Builtin.RawPointer
-  %13 = pointer_to_address %12 : $Builtin.RawPointer to $*Int
-  %14 = struct_element_addr %13 : $*Int, #Int.value
+  %13 = pointer_to_address %12 : $Builtin.RawPointer to $*Int64
+  %14 = struct_element_addr %13 : $*Int64, #Int64.value
   %15 = load %14 : $*Builtin.Int64
   cond_br %0, bb2, bb1
 }
