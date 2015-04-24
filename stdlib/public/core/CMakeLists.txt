@@ -83,6 +83,7 @@ set(SWIFTLIB_ESSENTIAL
   SequenceAlgorithms.swift.gyb
   ShadowProtocols.swift
   Shims.swift
+  Slice.swift
   Sort.swift.gyb
   StaticString.swift
   Stride.swift
