@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 public struct _prext_Slice<
-  UnderlyingCollection : _CollectionSliceDefaultsType
+  UnderlyingCollection : _CollectionDefaultsType
 > : CollectionType {
 
   public typealias Index = UnderlyingCollection.Index

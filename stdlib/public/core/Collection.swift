@@ -103,15 +103,7 @@ extension _CollectionGeneratorDefaultsType {
   }
 }
 
-public protocol _CollectionSliceDefaultsType {
-  typealias Index : ForwardIndexType
-  typealias _Element
-  subscript(position: Index) -> _Element { get }
-  var startIndex: Index { get }
-  var endIndex: Index { get }
-}
-
-extension _CollectionSliceDefaultsType {
+extension _CollectionDefaultsType {
   final public subscript(_prext_bounds: Range<Index>) -> _prext_Slice<Self> {
     return _prext_Slice(_collection: self, bounds: _prext_bounds)
   }
@@ -133,7 +125,6 @@ extension _CollectionSliceDefaultsType {
 ///   }
 public protocol CollectionType
   : SequenceType, _CollectionDefaultsType,
-  _CollectionSliceDefaultsType,
   _CollectionGeneratorDefaultsType {
 
   /// Access the element indicated by `position`.
