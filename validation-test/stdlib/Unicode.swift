@@ -122,8 +122,8 @@ struct ArraySinkOf<T> : SinkType {
 }
 
 func checkDecodeUTF<Codec : UnicodeCodecType>(
-    codec: Codec.Type, expectedHead: [UInt32],
-    expectedRepairedTail: [UInt32], utfStr: [Codec.CodeUnit]
+    codec: Codec.Type, _ expectedHead: [UInt32],
+    _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {
   if true {
     var decoded = ArraySinkOf<UInt32>()
@@ -159,14 +159,14 @@ func checkDecodeUTF<Codec : UnicodeCodecType>(
 
 func checkDecodeUTF8(
     expectedHead: [UInt32],
-    expectedRepairedTail: [UInt32], utf8Str: [UInt8]
+    _ expectedRepairedTail: [UInt32], _ utf8Str: [UInt8]
 ) -> AssertionResult {
   return checkDecodeUTF(UTF8.self, expectedHead, expectedRepairedTail, utf8Str)
 }
 
 func checkDecodeUTF16(
     expectedHead: [UInt32],
-    expectedRepairedTail: [UInt32], utf16Str: [UInt16]
+    _ expectedRepairedTail: [UInt32], _ utf16Str: [UInt16]
 ) -> AssertionResult {
   return checkDecodeUTF(UTF16.self, expectedHead, expectedRepairedTail,
       utf16Str)
@@ -174,13 +174,14 @@ func checkDecodeUTF16(
 
 func checkDecodeUTF32(
     expectedHead: [UInt32],
-    expectedRepairedTail: [UInt32], utf32Str: [UInt32]
+    _ expectedRepairedTail: [UInt32], _ utf32Str: [UInt32]
 ) -> AssertionResult {
   return checkDecodeUTF(UTF32.self, expectedHead, expectedRepairedTail,
       utf32Str)
 }
 
-func checkEncodeUTF8(expected: [UInt8], scalars: [UInt32]) -> AssertionResult {
+func checkEncodeUTF8(expected: [UInt8],
+                     _ scalars: [UInt32]) -> AssertionResult {
   var encoded = ArraySinkOf<UInt8>()
   var g = EOFCountingGenerator(scalars)
   let hadError =
@@ -2166,15 +2167,15 @@ class NonContiguousNSString : NSString {
   var _value: [UInt16]
 }
 
-func checkUTF8View(expected: [UInt8], subject: String,
-    stackTrace: SourceLocStack) {
+func checkUTF8View(expected: [UInt8], _ subject: String,
+    _ stackTrace: SourceLocStack) {
   checkForwardCollection(
     expected, subject.utf8,
     stackTrace.withCurrentLoc())
 }
 
-func checkUTF16View(expected: [UInt16], subject: String,
-    stackTrace: SourceLocStack) {
+func checkUTF16View(expected: [UInt16], _ subject: String,
+    _ stackTrace: SourceLocStack) {
   checkSliceableWithBidirectionalIndex(expected, subject.utf16,
       stackTrace.withCurrentLoc())
 }

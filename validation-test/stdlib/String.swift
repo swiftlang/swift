@@ -25,7 +25,7 @@ StringTests.test("sizeof") {
 }
 
 func checkUnicodeScalarViewIteration(
-    expectedScalars: [UInt32], str: String
+    expectedScalars: [UInt32], _ str: String
 ) {
   if true {
     var us = str.unicodeScalars

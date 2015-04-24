@@ -31,7 +31,7 @@ SetTestSuite.tearDown {
   expectNoLeaksOfDictionaryKeysValues()
 }
 
-func getCOWFastSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<Int> {
+func getCOWFastSet(members: [Int] = [1010, 2020, 3030]) -> Set<Int> {
   var s = Set<Int>(minimumCapacity: 10)
   for member in members {
     s.insert(member)
@@ -40,7 +40,7 @@ func getCOWFastSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<Int> {
   return s
 }
 
-func getCOWSlowSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<TestKeyTy> {
+func getCOWSlowSet(members: [Int] = [1010, 2020, 3030]) -> Set<TestKeyTy> {
   var s = Set<TestKeyTy>(minimumCapacity: 10)
   for member in members {
     s.insert(TestKeyTy(member))
@@ -49,7 +49,7 @@ func getCOWSlowSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<TestKeyTy> {
   return s
 }
 
-func helperDeleteThree(k1: TestKeyTy, k2: TestKeyTy, k3: TestKeyTy) {
+func helperDeleteThree(k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
   var s1 = Set<TestKeyTy>(minimumCapacity: 10)
 
   s1.insert(k1)
@@ -114,14 +114,14 @@ func isCocoaSet<T : Hashable>(s: Set<T>) -> Bool {
   return !isNativeSet(s)
 }
 
-func equalsUnordered(lhs: Set<Int>, rhs: Set<Int>) -> Bool {
+func equalsUnordered(lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
   return equal(sorted(lhs), sorted(rhs)) {
     $0 == $1
   }
 }
 
 /// Get an NSSet of TestObjCKeyTy values
-func getAsNSSet(_ members: [Int] = [1010, 2020, 3030]) -> NSSet {
+func getAsNSSet(members: [Int] = [1010, 2020, 3030]) -> NSSet {
   let nsArray = NSMutableArray()
   for member in members {
     nsArray.addObject(TestObjCKeyTy(member))
@@ -130,7 +130,7 @@ func getAsNSSet(_ members: [Int] = [1010, 2020, 3030]) -> NSSet {
 }
 
 /// Get an NSMutableSet of TestObjCKeyTy values
-func getAsNSMutableSet(_ members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
+func getAsNSMutableSet(members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
   let nsArray = NSMutableArray()
   for member in members {
     nsArray.addObject(TestObjCKeyTy(member))
@@ -139,7 +139,7 @@ func getAsNSMutableSet(_ members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
 }
 
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
-func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
+func getBridgedVerbatimSet(members: [Int] = [1010, 2020, 3030])
   -> Set<NSObject> {
   var nss = getAsNSSet(members)
   let result: Set<NSObject> = _convertNSSetToSet(nss)
@@ -148,7 +148,7 @@ func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
 }
 
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by native storage
-func getNativeBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
+func getNativeBridgedVerbatimSet(members: [Int] = [1010, 2020, 3030]) ->
   Set<NSObject> {
   let result: Set<NSObject> = Set(members.map({ TestObjCKeyTy($0) }))
   expectTrue(isNativeSet(result))
@@ -164,7 +164,7 @@ func getHugeBridgedVerbatimSet() -> Set<NSObject> {
 }
 
 /// Get a Set<TestBridgedKeyTy> backed by native storage
-func getBridgedNonverbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
+func getBridgedNonverbatimSet(members: [Int] = [1010, 2020, 3030]) ->
   Set<TestBridgedKeyTy> {
   var nss = getAsNSSet(members)
   let identity1 = unsafeBitCast(nss, Word.self)
@@ -212,7 +212,7 @@ func getBridgedNSSetOfRefTypesBridgedVerbatim() -> NSSet {
 }
 
 func getBridgedNSSet_ValueTypesCustomBridged(
-  numElements: Int = 3
+  #numElements: Int = 3
 ) -> NSSet {
   expectTrue(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
 

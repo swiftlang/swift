@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // https://gist.github.com/tenderlove/66ff6ae1feed92ac37f2
 
-func a(x: Any, y: Any) -> (((Any, Any) -> Any) -> Any) {
+func a(x: Any, _ y: Any) -> (((Any, Any) -> Any) -> Any) {
     return {
         (m: (Any, Any) -> Any) -> Any in
         return m(x, y)

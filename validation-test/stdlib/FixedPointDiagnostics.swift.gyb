@@ -111,7 +111,7 @@ func testMixedSignArithmetic() {
 % end
 }
 
-func testOps<T : IntegerArithmeticType>(x: T, y: T) -> T {
+func testOps<T : IntegerArithmeticType>(x: T, _ y: T) -> T {
   let a = x + y
   let s = x - y
   let m = x * y

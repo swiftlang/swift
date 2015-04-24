@@ -42,9 +42,9 @@ func isNativeNSArray(d: NSArray) -> Bool {
 
 // Compare two arrays as sets.
 func equalsUnordered<T : Comparable>(
-  lhs: Array<(T, T)>, rhs: Array<(T, T)>
+  lhs: Array<(T, T)>, _ rhs: Array<(T, T)>
 ) -> Bool {
-  func comparePair(lhs: (T, T), rhs: (T, T)) -> Bool {
+  func comparePair(lhs: (T, T), _ rhs: (T, T)) -> Bool {
     return lexicographicalCompare([ lhs.0, lhs.1 ], [ rhs.0, rhs.1 ])
   }
   return equal(sorted(lhs, comparePair), sorted(rhs, comparePair)) {
@@ -53,7 +53,7 @@ func equalsUnordered<T : Comparable>(
   }
 }
 
-func equalsUnordered<T : Comparable>(lhs: [T], rhs: [T]) -> Bool {
+func equalsUnordered<T : Comparable>(lhs: [T], _ rhs: [T]) -> Bool {
   return equal(sorted(lhs), sorted(rhs))
 }
 
@@ -523,7 +523,7 @@ func == (lhs: TestBridgedEquatableValueTy, rhs: TestBridgedEquatableValueTy) -> 
 ///
 /// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
 func expectAutoreleasedKeysAndValues(
-  opt: (Int, Int) = (0, 0), unopt: (Int, Int) = (0, 0)) {
+  #opt: (Int, Int) = (0, 0), unopt: (Int, Int) = (0, 0)) {
   var expectedKeys = 0
   var expectedValues = 0
 #if arch(i386)
@@ -545,7 +545,7 @@ func expectAutoreleasedKeysAndValues(
 ///
 /// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
 func expectAutoreleasedValues(
-  opt: Int = 0, unopt: Int = 0) {
+  #opt: Int = 0, unopt: Int = 0) {
   expectAutoreleasedKeysAndValues(opt: (0, opt), unopt: (0, unopt))
 }
 
@@ -601,7 +601,7 @@ func getBridgedEmptyNSDictionary() -> NSDictionary {
 }
 
 func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
-  numElements: Int = 3
+  #numElements: Int = 3
 ) -> NSDictionary {
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
@@ -620,7 +620,7 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
 func slurpFastEnumerationFromSwift<
   S : SinkType where S.Element == AnyObject
 >(
-  a: NSArray, fe: NSFastEnumeration, inout sink: S, maxItems: Int? = nil
+  a: NSArray, _ fe: NSFastEnumeration, inout _ sink: S, maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
 
@@ -663,7 +663,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
 func slurpFastEnumerationFromSwift<
   S : SinkType where S.Element == AnyObjectTuple2
 >(
-  d: NSDictionary, fe: NSFastEnumeration, inout sink: S, maxItems: Int? = nil
+  d: NSDictionary, _ fe: NSFastEnumeration, inout _ sink: S,
+  maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
 
@@ -704,8 +705,8 @@ func slurpFastEnumerationFromSwift<
 func slurpFastEnumerationOfNSEnumeratorFromSwift<
   S : SinkType where S.Element == AnyObject
 >(
-  a: NSArray, enumerator: NSEnumerator, inout sink: S,
-  #maxFastEnumerationItems: Int
+  a: NSArray, _ enumerator: NSEnumerator, inout _ sink: S,
+  maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
     a, enumerator, &sink, maxItems: maxFastEnumerationItems)
@@ -717,8 +718,8 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift<
 func slurpFastEnumerationOfNSEnumeratorFromSwift<
   S : SinkType where S.Element == AnyObjectTuple2
 >(
-  d: NSDictionary, enumerator: NSEnumerator, inout sink: S,
-  #maxFastEnumerationItems: Int
+  d: NSDictionary, _ enumerator: NSEnumerator, inout _ sink: S,
+  maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
     d, enumerator, &sink, maxItems: maxFastEnumerationItems)
@@ -734,7 +735,7 @@ import SlurpFastEnumeration
 func slurpFastEnumerationFromObjC<
   S : SinkType where S.Element == AnyObject
 >(
-  a: NSArray, fe: NSFastEnumeration, inout sink: S
+  a: NSArray, _ fe: NSFastEnumeration, inout _ sink: S
 ) {
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(a, fe, objcValues)
@@ -776,7 +777,7 @@ func < (
 }
 
 func _equalsWithoutElementIdentity(
-  lhs: [ExpectedArrayElement], rhs: [ExpectedArrayElement]
+  lhs: [ExpectedArrayElement], _ rhs: [ExpectedArrayElement]
 ) -> Bool {
   func stripIdentity(
     list: [ExpectedArrayElement]
@@ -799,10 +800,10 @@ func _makeExpectedArrayContents(
 
 func _checkArrayFastEnumerationImpl(
   expected: [Int],
-  a: NSArray,
-  makeEnumerator: () -> NSFastEnumeration,
-  useEnumerator: (NSArray, NSFastEnumeration, (AnyObject)->()) -> (),
-  convertValue: (AnyObject) -> Int
+  _ a: NSArray,
+  _ makeEnumerator: () -> NSFastEnumeration,
+  _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject)->()) -> (),
+  _ convertValue: (AnyObject) -> Int
 ) {
   var expectedContentsWithoutIdentity =
     _makeExpectedArrayContents(expected)
@@ -835,8 +836,8 @@ func _checkArrayFastEnumerationImpl(
 
 func checkArrayFastEnumerationFromSwift(
   expected: [Int],
-  a: NSArray, makeEnumerator: () -> NSFastEnumeration,
-  convertValue: (AnyObject) -> Int
+  _ a: NSArray, _ makeEnumerator: () -> NSFastEnumeration,
+  _ convertValue: (AnyObject) -> Int
 ) {
   _checkArrayFastEnumerationImpl(
     expected, a, makeEnumerator,
@@ -849,8 +850,8 @@ func checkArrayFastEnumerationFromSwift(
 
 func checkArrayFastEnumerationFromObjC(
   expected: [Int],
-  a: NSArray, makeEnumerator: () -> NSFastEnumeration,
-  convertValue: (AnyObject) -> Int
+  _ a: NSArray, _ makeEnumerator: () -> NSFastEnumeration,
+  _ convertValue: (AnyObject) -> Int
 ) {
   _checkArrayFastEnumerationImpl(
     expected, a, makeEnumerator,
@@ -863,9 +864,9 @@ func checkArrayFastEnumerationFromObjC(
 
 func checkArrayEnumeratorPartialFastEnumerationFromSwift(
   expected: [Int],
-  a: NSArray,
-  #maxFastEnumerationItems: Int,
-  convertValue: (AnyObject) -> Int
+  _ a: NSArray,
+  maxFastEnumerationItems: Int,
+  _ convertValue: (AnyObject) -> Int
 ) {
   _checkArrayFastEnumerationImpl(
     expected, a, { a.objectEnumerator() },
@@ -921,7 +922,7 @@ func _makeExpectedSetContents(
 }
 
 func _equalsUnorderedWithoutElementIdentity(
-  lhs: [ExpectedSetElement], rhs: [ExpectedSetElement]
+  lhs: [ExpectedSetElement], _ rhs: [ExpectedSetElement]
 ) -> Bool {
   func stripIdentity(
     list: [ExpectedSetElement]
@@ -934,10 +935,10 @@ func _equalsUnorderedWithoutElementIdentity(
 
 func _checkSetFastEnumerationImpl(
   expected: [Int],
-  s: NSSet,
-  makeEnumerator: () -> NSFastEnumeration,
-  useEnumerator: (NSSet, NSFastEnumeration, (AnyObject)->()) -> (),
-  convertMember: (AnyObject) -> Int
+  _ s: NSSet,
+  _ makeEnumerator: () -> NSFastEnumeration,
+  _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject)->()) -> (),
+  _ convertMember: (AnyObject) -> Int
 ) {
   var expectedContentsWithoutIdentity =
     _makeExpectedSetContents(expected)
@@ -970,7 +971,7 @@ func _checkSetFastEnumerationImpl(
 func slurpFastEnumerationFromObjC<
   S : SinkType where S.Element == AnyObject
 >(
-  s: NSSet, fe: NSFastEnumeration, inout sink: S
+  s: NSSet, _ fe: NSFastEnumeration, inout _ sink: S
 ) {
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(s, fe, objcValues)
@@ -982,8 +983,8 @@ func slurpFastEnumerationFromObjC<
 func slurpFastEnumerationOfNSEnumeratorFromSwift<
   S : SinkType where S.Element == AnyObject
 >(
-  s: NSSet, enumerator: NSEnumerator, inout sink: S,
-  #maxFastEnumerationItems: Int
+  s: NSSet, _ enumerator: NSEnumerator, inout _ sink: S,
+  maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
     s, enumerator, &sink, maxItems: maxFastEnumerationItems)
@@ -995,7 +996,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift<
 func slurpFastEnumerationFromSwift<
   S : SinkType where S.Element == AnyObject
 >(
-  s: NSSet, fe: NSFastEnumeration, inout sink: S, maxItems: Int? = nil
+  s: NSSet, _ fe: NSFastEnumeration, inout _ sink: S, maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
 
@@ -1035,8 +1036,8 @@ func slurpFastEnumerationFromSwift<
 
 func checkSetFastEnumerationFromSwift(
   expected: [Int],
-  s: NSSet, makeEnumerator: () -> NSFastEnumeration,
-  convertMember: (AnyObject) -> Int
+  _ s: NSSet, _ makeEnumerator: () -> NSFastEnumeration,
+  _ convertMember: (AnyObject) -> Int
 ) {
   _checkSetFastEnumerationImpl(
     expected, s, makeEnumerator,
@@ -1049,8 +1050,8 @@ func checkSetFastEnumerationFromSwift(
 
 func checkSetFastEnumerationFromObjC(
   expected: [Int],
-  s: NSSet, makeEnumerator: () -> NSFastEnumeration,
-  convertMember: (AnyObject) -> Int
+  _ s: NSSet, _ makeEnumerator: () -> NSFastEnumeration,
+  _ convertMember: (AnyObject) -> Int
 ) {
   _checkSetFastEnumerationImpl(
     expected, s, makeEnumerator,
@@ -1063,9 +1064,9 @@ func checkSetFastEnumerationFromObjC(
 
 func checkSetEnumeratorPartialFastEnumerationFromSwift(
   expected: [Int],
-  s: NSSet,
-  #maxFastEnumerationItems: Int,
-  convertMember: (AnyObject) -> Int
+  _ s: NSSet,
+  maxFastEnumerationItems: Int,
+  _ convertMember: (AnyObject) -> Int
 ) {
   _checkSetFastEnumerationImpl(
     expected, s, { s.objectEnumerator() },
@@ -1082,7 +1083,7 @@ func checkSetEnumeratorPartialFastEnumerationFromSwift(
 func slurpFastEnumerationFromObjC<
   S : SinkType where S.Element == AnyObjectTuple2
 >(
-  d: NSDictionary, fe: NSFastEnumeration, inout sink: S
+  d: NSDictionary, _ fe: NSFastEnumeration, inout _ sink: S
 ) {
   let objcPairs = NSMutableArray()
   slurpFastEnumerationOfDictionaryFromObjCImpl(d, fe, objcPairs)
@@ -1135,7 +1136,7 @@ func < (
 }
 
 func _equalsUnorderedWithoutElementIdentity(
-  lhs: [ExpectedDictionaryElement], rhs: [ExpectedDictionaryElement]
+  lhs: [ExpectedDictionaryElement], _ rhs: [ExpectedDictionaryElement]
 ) -> Bool {
   func stripIdentity(
     list: [ExpectedDictionaryElement]
@@ -1158,11 +1159,11 @@ func _makeExpectedDictionaryContents(
 
 func _checkDictionaryFastEnumerationImpl(
   expected: [(Int, Int)],
-  d: NSDictionary,
-  makeEnumerator: () -> NSFastEnumeration,
-  useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2)->()) -> (),
-  convertKey: (AnyObject) -> Int,
-  convertValue: (AnyObject) -> Int
+  _ d: NSDictionary,
+  _ makeEnumerator: () -> NSFastEnumeration,
+  _ useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2)->()) -> (),
+  _ convertKey: (AnyObject) -> Int,
+  _ convertValue: (AnyObject) -> Int
 ) {
   var expectedContentsWithoutIdentity =
     _makeExpectedDictionaryContents(expected)
@@ -1196,9 +1197,9 @@ func _checkDictionaryFastEnumerationImpl(
 
 func checkDictionaryFastEnumerationFromSwift(
   expected: [(Int, Int)],
-  d: NSDictionary, makeEnumerator: () -> NSFastEnumeration,
-  convertKey: (AnyObject) -> Int,
-  convertValue: (AnyObject) -> Int
+  _ d: NSDictionary, _ makeEnumerator: () -> NSFastEnumeration,
+  _ convertKey: (AnyObject) -> Int,
+  _ convertValue: (AnyObject) -> Int
 ) {
   _checkDictionaryFastEnumerationImpl(
     expected, d, makeEnumerator,
@@ -1211,9 +1212,9 @@ func checkDictionaryFastEnumerationFromSwift(
 
 func checkDictionaryFastEnumerationFromObjC(
   expected: [(Int, Int)],
-  d: NSDictionary, makeEnumerator: () -> NSFastEnumeration,
-  convertKey: (AnyObject) -> Int,
-  convertValue: (AnyObject) -> Int
+  _ d: NSDictionary, _ makeEnumerator: () -> NSFastEnumeration,
+  _ convertKey: (AnyObject) -> Int,
+  _ convertValue: (AnyObject) -> Int
 ) {
   _checkDictionaryFastEnumerationImpl(
     expected, d, makeEnumerator,
@@ -1226,10 +1227,10 @@ func checkDictionaryFastEnumerationFromObjC(
 
 func checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
   expected: [(Int, Int)],
-  d: NSDictionary,
-  #maxFastEnumerationItems: Int,
-  convertKey: (AnyObject) -> Int,
-  convertValue: (AnyObject) -> Int
+  _ d: NSDictionary,
+  maxFastEnumerationItems: Int,
+  _ convertKey: (AnyObject) -> Int,
+  _ convertValue: (AnyObject) -> Int
 ) {
   _checkDictionaryFastEnumerationImpl(
     expected, d, { d.keyEnumerator() },
@@ -1243,7 +1244,7 @@ func checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
 }
 
 func getBridgedNSArrayOfRefTypeVerbatimBridged(
-  numElements: Int = 3,
+  #numElements: Int = 3,
   capacity: Int? = nil
 ) -> NSArray {
   assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
@@ -1263,7 +1264,7 @@ func getBridgedNSArrayOfRefTypeVerbatimBridged(
 }
 
 func getBridgedNSArrayOfValueTypeCustomBridged(
-  numElements: Int = 3,
+  #numElements: Int = 3,
   capacity: Int? = nil
 ) -> NSArray {
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))

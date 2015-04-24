@@ -919,7 +919,7 @@ DictionaryTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
 // Native dictionary tests.
 //===---
 
-func helperDeleteThree(k1: TestKeyTy, k2: TestKeyTy, k3: TestKeyTy) {
+func helperDeleteThree(k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
   var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
 
   d1[k1] = TestValueTy(1010)
@@ -2219,7 +2219,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
-  func helper(nd1: Dictionary<Int, Int>, nd2: Dictionary<Int, Int>, expectedEq: Bool) {
+  func helper(nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {
     var d1 = getBridgedVerbatimEquatableDictionary(nd1)
     var identity1 = unsafeBitCast(d1, Word.self)
     assert(isCocoaDictionary(d1))
