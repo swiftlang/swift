@@ -1054,7 +1054,7 @@ llvm::GlobalValue::VISIBILITY##Visibility }
   case SILLinkage::SharedExternal: return RESULT(LinkOnceODR, Hidden);
   case SILLinkage::Hidden: return RESULT(External, Hidden);
   case SILLinkage::Private:
-    if (IGM.dispatcher->hasMultipleIGMs()) {
+    if (IGM.dispatcher.hasMultipleIGMs()) {
       // In case of multiple llvm modules (in multi-threaded compilation) all
       // private decls must be visible from other files.
       return RESULT(External, Hidden);
@@ -1392,7 +1392,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   // number for it; make sure to insert it in that position relative
   // to other ordered functions.
   if (hasOrderNumber) {
-    orderNumber = dispatcher->getFunctionOrder(f);
+    orderNumber = dispatcher.getFunctionOrder(f);
     if (auto emittedFunctionIterator
           = EmittedFunctionsByOrder.findLeastUpperBound(orderNumber))
       insertBefore = *emittedFunctionIterator;
@@ -1400,7 +1400,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     // Also, if we have a lazy definition for it, be sure to queue that up.
     if (!forDefinition &&
         !isPossiblyUsedExternally(f->getLinkage(), SILMod->isWholeModule()))
-      dispatcher->addLazyFunction(f);
+      dispatcher.addLazyFunction(f);
   }
     
   llvm::AttributeSet attrs;
@@ -1661,7 +1661,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // If this is a use, and the type metadata is emitted lazily,
   // trigger lazy emission of the metadata.
   if (!definitionType && isTypeMetadataEmittedLazily(concreteType)) {
-    dispatcher->addLazyTypeMetadata(concreteType);
+    dispatcher.addLazyTypeMetadata(concreteType);
   }
 
   // When indirect, this is always a pointer variable and has no

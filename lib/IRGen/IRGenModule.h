@@ -265,7 +265,7 @@ public:
   llvm::TargetMachine *TargetMachine;
   SILModule *SILMod;
   llvm::SmallString<128> OutputFilename;
-  IRGenModuleDispatcher *dispatcher;
+  IRGenModuleDispatcher &dispatcher;
   
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
@@ -546,7 +546,12 @@ private:                            \
   
 //--- Generic ---------------------------------------------------------------
 public:
-  IRGenModule(IRGenModuleDispatcher *dispatcher, SourceFile *SF,
+  
+  /// The constructor.
+  ///
+  /// The \p SF is the source file for which the llvm module is generated when
+  /// doing multi-threaded whole-module compilation. Otherwise it is null.
+  IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
               ASTContext &Context,
               llvm::LLVMContext &LLVMContext,
               IRGenOptions &Opts, StringRef ModuleName,

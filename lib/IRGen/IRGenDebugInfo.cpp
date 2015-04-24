@@ -198,7 +198,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 
   if (auto *MainFunc = IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
     IsLibrary = false;
-    auto *MainIGM = IGM.dispatcher->getGenModule(MainFunc->getDeclContext());
+    auto *MainIGM = IGM.dispatcher.getGenModule(MainFunc->getDeclContext());
     
     // Don't create the function type if we are in a different llvm module than
     // the module where @main is defined. This is the case for non-primary

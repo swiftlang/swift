@@ -2023,7 +2023,7 @@ void
 IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
                           NominalTypeDecl::StoredPropertyRange storedProperties,
                           llvm::Function *fn) {
-  dispatcher->addLazyFieldTypeAccessor(type, storedProperties, fn, this);
+  dispatcher.addLazyFieldTypeAccessor(type, storedProperties, fn, this);
 }
 
 void

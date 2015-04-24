@@ -91,7 +91,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   return ClangCodeGen;
 }
 
-IRGenModule::IRGenModule(IRGenModuleDispatcher *dispatcher, SourceFile *SF,
+IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
                          ASTContext &Context,
                          llvm::LLVMContext &LLVMContext,
                          IRGenOptions &Opts, StringRef ModuleName,
@@ -110,7 +110,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher *dispatcher, SourceFile *SF,
     DebugInfo(0), ObjCInterop(Context.LangOpts.EnableObjCInterop),
     Types(*new TypeConverter(*this))
 {
-  dispatcher->addGenModule(SF, this);
+  dispatcher.addGenModule(SF, this);
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());

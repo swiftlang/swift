@@ -414,7 +414,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Create the IR emitter.
   IRGenModuleDispatcher dispatcher;
   const llvm::Triple &Triple = M->Ctx.LangOpts.Target;
-  IRGenModule IGM(&dispatcher, nullptr, M->Ctx, LLVMContext, Opts, ModuleName,
+  IRGenModule IGM(dispatcher, nullptr, M->Ctx, LLVMContext, Opts, ModuleName,
                   *DataLayout, Triple,
                   TargetMachine, SILMod, Opts.getSingleOutputFilename());
 
@@ -540,7 +540,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
   
     // Create the IR emitter.
-    IRGenModule *IGM = new IRGenModule(&dispatcher, nextSF, M->Ctx, *Context,
+    IRGenModule *IGM = new IRGenModule(dispatcher, nextSF, M->Ctx, *Context,
                                        Opts, ModuleName, *DataLayout, Triple,
                                        TargetMachine, SILMod, *OutputIter++);
     IGMcreated = true;
