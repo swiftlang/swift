@@ -1594,9 +1594,8 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
                                        const RequirementMatch &match) {
   // If we already recorded this witness, don't do so again.
   if (Conformance->hasWitness(requirement)) {
-    // FIXME: disabled because it triggers in code-completion
-    // assert(Conformance->getWitness(requirement, nullptr).getDecl() ==
-    //         match.Witness && "Deduced different witnesses?");
+    assert(Conformance->getWitness(requirement, nullptr).getDecl() ==
+             match.Witness && "Deduced different witnesses?");
     return;
   }
 

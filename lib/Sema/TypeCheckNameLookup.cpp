@@ -98,7 +98,6 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
     // lookup.
     this->forceExternalDeclMembers(nominalLookupType);
 
-    bool anyChange = false;
     for (auto member : protocolMembers) {
       auto proto = cast<ProtocolDecl>(member->getDeclContext());
       ProtocolConformance *conformance = nullptr;
@@ -107,18 +106,14 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
         // FIXME: Just swap in this result, once
         // forceExternalDeclMembers() is dead.
         (void)conformance->getWitness(member, this);
-
-        anyChange = true;
       }
     }
 
     // Perform the lookup again.
     // FIXME: This is only because forceExternalDeclMembers() might do something
     // interesting.
-    if (anyChange) {
-      dc->lookupQualified(type, name, options, this, result.Results);
-      handleProtocolMembers();
-    }
+    dc->lookupQualified(type, name, options, this, result.Results);
+    handleProtocolMembers();
   }
 
   return result;
