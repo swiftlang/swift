@@ -3,6 +3,7 @@ add_swift_library(swiftSwiftExperimental SHARED IS_STDLIB
   # filename.
   SwiftExperimental.swift
   ExperimentalMirror.swift
+  ExperimentalDump.swift
 
   SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all -parse-stdlib
   INSTALL_IN_COMPONENT stdlib-experimental)
