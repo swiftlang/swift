@@ -142,8 +142,9 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
         // If one declaration is in a protocol or extension thereof and the
         // other is not, prefer the one that is not.
-        if (firstDecl->getDeclContext()->isProtocolOrProtocolExtensionContext()
-              != secondDecl->getDeclContext()
+        if ((bool)firstDecl->getDeclContext()
+              ->isProtocolOrProtocolExtensionContext()
+              != (bool)secondDecl->getDeclContext()
                    ->isProtocolOrProtocolExtensionContext()) {
           if (firstDecl->getDeclContext()
                 ->isProtocolOrProtocolExtensionContext()) {

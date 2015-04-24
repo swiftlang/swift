@@ -397,6 +397,20 @@ func testSomeCollections(sc1: SomeCollection1, sc2: SomeCollection2) {
   ig = MyIndexedGenerator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot assign a value of type 'MyIndexedGenerator<SomeCollection2>' to a value of type 'OtherIndexedGenerator<SomeCollection2>'}}
 }
 
+public protocol PConforms3 {}
+extension PConforms3 {
+  final public var z: Int {
+    return 0
+  }
+}
+
+public protocol PConforms4 : PConforms3 {
+  var z: Int { get }
+}
+
+struct PConforms4Impl : PConforms4 {}
+let pc4z = PConforms4Impl().z
+
 // ----------------------------------------------------------------------------
 // Typealiases in protocol extensions.
 // ----------------------------------------------------------------------------
