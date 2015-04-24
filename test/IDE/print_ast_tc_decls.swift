@@ -1254,3 +1254,11 @@ public func ParamAttrs3(@noescape a : () -> ()) {
   a()
 }
 
+// Protocol extensions
+
+protocol ProtocolToExtend {
+  typealias Assoc
+}
+
+extension ProtocolToExtend where Self.Assoc == Int {}
+// PREFER_TYPE_REPR_PRINTING: extension ProtocolToExtend where Self.Assoc == Int {

@@ -1098,6 +1098,9 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
       Printer.printTypeRef(nominal, nominal->getName());
     });
   printInherited(decl);
+  if (auto *GPs = decl->getGenericParams()) {
+    printWhereClause(GPs->getRequirements());
+  }
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
   }
