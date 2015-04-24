@@ -91,8 +91,8 @@ extension _CollectionDefaultsType {
 /// be satisfied by types conforming to that protocol.
 public protocol _CollectionGeneratorDefaultsType {
   typealias Index : ForwardIndexType
-  typealias Element
-  subscript(position: Index) -> Element { get }
+  typealias _Element
+  subscript(position: Index) -> _Element { get }
   var startIndex: Index { get }
   var endIndex: Index { get }
 }
@@ -259,7 +259,7 @@ public struct IndexingGenerator<
   /// element exists.
   ///
   /// Requires: no preceding call to `self.next()` has returned `nil`.
-  public mutating func next() -> C.Element? {
+  public mutating func next() -> C._Element? {
     return _position == _elements.endIndex
     ? .None : .Some(_elements[_position++])
   }
