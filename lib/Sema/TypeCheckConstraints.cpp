@@ -683,13 +683,12 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
     if (TE->hasTrailingClosure() ||
-        // FIXME: Handle tuple element names too.
-        TE->hasElementNames() ||
         // FIXME: Decide what to do about ().  It could be a type or an expr.
         TE->getNumElements() == 0)
       return nullptr;
 
     SmallVector<TypeRepr *, 4> Elts;
+    unsigned EltNo = 0;
     for (auto Elt : TE->getElements()) {
       auto *eltTE = dyn_cast<TypeExpr>(Elt);
       if (!eltTE) return nullptr;
@@ -697,7 +696,15 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
              "This doesn't work on implicit TypeExpr's, the "
              "TypeExpr should have been built correctly in the first place");
 
-      Elts.push_back(eltTE->getTypeRepr());
+      // If the tuple element has a label, propagate it.
+      auto *eltTR = eltTE->getTypeRepr();
+      Identifier name = TE->getElementName(EltNo);
+      if (!name.empty())
+        eltTR = new (TC.Context) NamedTypeRepr(name, eltTR,
+                                               TE->getElementNameLoc(EltNo));
+
+      Elts.push_back(eltTR);
+     ++EltNo;
     }
     auto *NewTypeRepr =
       new (TC.Context) TupleTypeRepr(TC.Context.AllocateCopy(Elts),

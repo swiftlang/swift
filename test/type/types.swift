@@ -131,3 +131,11 @@ y14 = z14
 y15 = z15
 y16 = z16
 y17 = z17
+
+
+// Type repr formation.
+// <rdar://problem/20075582> Swift does not support short form of dictionaries with tuples (not forming TypeExpr)
+let tupleTypeWithNames = (age:Int, count:Int)(4, 5)
+let dictWithTuple = [String: (age:Int, count:Int)]()
+
+
