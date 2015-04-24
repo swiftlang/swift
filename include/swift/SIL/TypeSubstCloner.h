@@ -127,12 +127,13 @@ protected:
     auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 
     // Handle recursions by replacing the apply to the callee with an apply to
-    // the newly specialized function.
+    // the newly specialized function, but only if substitutions are the same.
     SILBuilder &Builder = getBuilder();
     SILValue CalleeVal = Inst->getCallee();
     if (!Inlining) {
       FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
-      if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
+      if (FRI && FRI->getReferencedFunction() == Inst->getFunction() &&
+          Inst->getSubstitutions() == this->ApplySubs) {
         FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                         &Builder.getFunction());
         ApplyInst *NAI =
