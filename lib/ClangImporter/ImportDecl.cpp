@@ -3146,20 +3146,26 @@ namespace {
 
       // Determine the failability of this initializer.
       OptionalTypeKind failability = OTK_ImplicitlyUnwrappedOptional;
-        
-      // If the return type provides nullability inforomation, map it
-      // to failability information.
-      if (auto nullability = objcMethod->getReturnType()->getNullability(
-                               Impl.getClangASTContext())) {
-        failability = Impl.translateNullability(*nullability);
-      } else {
-        // If the method is known to have nullability information for
-        // its return type, use that.
-        if (auto known = Impl.getKnownObjCMethod(objcMethod)) {
-          if (known->NullabilityAudited) {
-            failability = Impl.translateNullability(known->getReturnTypeInfo());
+      auto fnType = type->getAs<AnyFunctionType>();
+      
+      // If the function throws, it cannot be failable.
+      if (!fnType->throws()) {
+        // If the return type provides nullability inforomation, map it
+        // to failability information.
+        if (auto nullability = objcMethod->getReturnType()->getNullability(
+                                 Impl.getClangASTContext())) {
+          failability = Impl.translateNullability(*nullability);
+        } else {
+          // If the method is known to have nullability information for
+          // its return type, use that.
+          if (auto known = Impl.getKnownObjCMethod(objcMethod)) {
+            if (known->NullabilityAudited) {
+              failability = Impl.translateNullability(known->getReturnTypeInfo());
+            }
           }
         }
+      } else {
+        failability = OTK_None;
       }
 
       // Determine the type of the result.
