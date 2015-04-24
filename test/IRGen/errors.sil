@@ -16,6 +16,7 @@ sil @throws : $@convention(thin) () -> @error _ErrorType {
   %0 = function_ref @create_error : $@convention(thin) () -> @owned _ErrorType
   %1 = apply %0() : $@convention(thin) () -> @owned _ErrorType
 
+  // CHECK-NEXT: call void @swift_willThrow
   // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
   // CHECK-NEXT: ret void
   throw %1 : $_ErrorType
@@ -66,3 +67,17 @@ bb3:
   %4 = tuple ()
   return %4 : $()
 }
+
+enum ColorError : _ErrorType {
+  case Red, Green, Blue
+}
+
+// CHECK-LABEL: TestCallToWillThrowCallBack
+// CHECK: call void @swift_willThrow(%swift.error* %0)
+// CHECK: store %swift.error* %0
+// CHECK: ret i64 undef
+sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned _ErrorType) -> (Int, @error _ErrorType) {
+bb0(%0 : $_ErrorType):
+  throw %0 : $_ErrorType                        // id: %3
+}
+

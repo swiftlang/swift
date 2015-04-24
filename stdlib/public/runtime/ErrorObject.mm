@@ -415,3 +415,12 @@ extern "C" auto *_swift_errorRelease = _swift_errorRelease_;
 void swift::swift_errorRelease(SwiftError *error) {
   return _swift_errorRelease(error);
 }
+
+
+static void _swift_willThrow_(SwiftError *error) { }
+
+extern "C" auto *_swift_willThrow = _swift_willThrow_;
+
+void swift::swift_willThrow(SwiftError *error) {
+  return _swift_willThrow(error);
+}

@@ -162,6 +162,7 @@ extern "C" void swift_getErrorValue(const SwiftError *errorObject,
 /// Retain and release SwiftError boxes.
 extern "C" SwiftError *swift_errorRetain(SwiftError *object);
 extern "C" void swift_errorRelease(SwiftError *object);
+extern "C" void swift_willThrow(SwiftError *object);
 
 #if SWIFT_OBJC_INTEROP
 

@@ -97,9 +97,9 @@ swift::swift_errorRetain(SwiftError *object) {
   return static_cast<SwiftError*>(swift_retain(object));
 }
 
-void
-swift::swift_errorRelease(SwiftError *object) {
+void swift::swift_errorRelease(SwiftError *object) {
   swift_release(object);
 }
 
+void swift::swift_willThrow(SwiftError *object) { }
 #endif
