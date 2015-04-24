@@ -26,7 +26,7 @@
 using namespace swift;
 
 llvm::cl::opt<bool> EnableStaticInitializer("enable-static-init",
-                                            llvm::cl::init(false));
+                                            llvm::cl::init(true));
 
 namespace {
 /// Optimize the placement of global initializers.
