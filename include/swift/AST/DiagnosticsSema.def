@@ -1724,6 +1724,56 @@ ERROR(isa_pattern_value,sema_tcp,none,
       "downcast pattern value of type %0 cannot be used", (Type))
 
 //------------------------------------------------------------------------------
+// Error-handling diagnostics
+//------------------------------------------------------------------------------
+
+
+
+ERROR(try_unhandled,sema,none,
+      "errors thrown from here are not handled", ())
+ERROR(tryless_throwing_call_unhandled,sema,none,
+      "call can throw, but it is not marked with 'try' and "
+      "the error is not handled", ())
+ERROR(throw_in_nonthrowing_function,sema,none,
+      "error is not handled because the enclosing function "
+      "is not declared 'throws'", ())
+
+ERROR(throwing_call_in_nonthrowing_autoclosure,sema,none,
+      "call can throw, but it is executed in a non-throwing "
+      "autoclosure",())
+ERROR(tryless_throwing_call_in_nonthrowing_autoclosure,sema,none,
+      "call can throw, but it is not marked with 'try' and "
+      "it is executed in a non-throwing autoclosure",())
+ERROR(throw_in_nonthrowing_autoclosure,sema,none,
+      "error is not handled because it is thrown in a non-throwing "
+      "autoclosure", ())
+
+ERROR(try_unhandled_in_nonexhaustive_catch,sema,none,
+      "errors thrown from here are not handled because the "
+      "enclosing catch is not exhaustive", ())
+ERROR(tryless_throwing_call_in_nonexhaustive_catch,sema,none,
+      "call can throw, but it is not marked with 'try' and "
+      "the enclosing catch is not exhaustive", ())
+ERROR(throwing_call_in_nonexhaustive_catch,sema,none,
+      "call can throw, but the enclosing catch is not exhaustive", ())
+ERROR(throw_in_nonexhaustive_catch,sema,none,
+      "error is not handled because the enclosing catch is not exhaustive", ())
+
+ERROR(throwing_call_in_illegal_context,sema,none,
+      "call can throw, but errors cannot be thrown out of %0",
+      (StringRef))
+ERROR(throw_in_illegal_context,sema,none,
+      "errors cannot be thrown out of %0", (StringRef))
+
+ERROR(throwing_call_without_try,sema,none,
+      "call can throw but is not marked with 'try'", ())
+WARNING(no_throw_in_try,sema,none,
+        "no calls to throwing functions occur within 'try' expression", ())
+
+WARNING(no_throw_in_catch,sema,none,
+        "no errors are thrown in the 'do' block", ())
+
+//------------------------------------------------------------------------------
 // Type Check Types
 //------------------------------------------------------------------------------
 
