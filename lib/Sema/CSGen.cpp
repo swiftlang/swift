@@ -1674,13 +1674,13 @@ namespace {
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           
           // If we've found a 'try', record it and terminate the traversal.
-          if (dyn_cast<TryExpr>(expr)) {
+          if (isa<TryExpr>(expr)) {
             FoundTry = true;
             return { false, nullptr };
           }
           
           // Do not recurse into other closures.
-          if (dyn_cast<ClosureExpr>(expr))
+          if (isa<ClosureExpr>(expr))
             return { false, expr };
           
           return { true, expr };
@@ -1688,10 +1688,10 @@ namespace {
         
         bool walkToDeclPre(Decl *decl) override {
           // Do not walk into function or type declarations.
-          if (dyn_cast<AbstractFunctionDecl>(decl) ||
-              dyn_cast<AbstractStorageDecl>(decl) ||
-              dyn_cast<OperatorDecl>(decl) ||
-              dyn_cast<TypeDecl>(decl))
+          if (isa<AbstractFunctionDecl>(decl) ||
+              isa<AbstractStorageDecl>(decl) ||
+              isa<OperatorDecl>(decl) ||
+              isa<TypeDecl>(decl))
             return false;
           
           return true;
