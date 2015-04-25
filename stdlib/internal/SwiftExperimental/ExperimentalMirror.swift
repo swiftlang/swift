@@ -24,11 +24,6 @@ public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return !(t0 == t1)
 }
 
-
-#if _runtime(_ObjC)
-// FIXME: ExistentialCollection needs to be supported before this will work
-// without the ObjC Runtime.
-
 /// Representation of the sub-structure and optional "display style"
 /// of any arbitrary subject instance.
 ///
@@ -722,7 +717,6 @@ extension DictionaryLiteral : CollectionType {
   }
 }
 */
-#endif
 
 /*
 extension String {  

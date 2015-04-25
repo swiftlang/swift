@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
 // FIXME: ExistentialCollection needs to be supported before this will work
 // without the ObjC Runtime.
 
@@ -446,7 +445,6 @@ extension DictionaryLiteral : CollectionType {
     return IndexingGenerator(self)
   }
 }
-#endif
 
 extension String {  
   /// Initialize `self` with the textual representation of `instance`.
