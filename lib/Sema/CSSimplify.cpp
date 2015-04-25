@@ -3488,6 +3488,13 @@ retry:
                    locator.withPathElement(ConstraintLocator::FunctionResult))
           == SolutionKind::Error)
       return SolutionKind::Error;
+
+    // If our type constraints is for a FunctionType, move over the @noescape
+    // flag.
+    if (func1->isNoEscape() && !func2->isNoEscape()) {
+      auto &extraExtInfo = extraFunctionAttrs[func2];
+      extraExtInfo = extraExtInfo.withNoEscape();
+    }
     return SolutionKind::Solved;
   }
 

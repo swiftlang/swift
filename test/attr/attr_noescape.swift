@@ -206,3 +206,16 @@ func callerOfDefaultParams(@noescape g: () -> ()) {
   calleeWithDefaultParameters(g)
 }
 
+
+
+// <rdar://problem/19773562> Closures executed immediately { like this }() are not automatically @noescape
+class NoEscapeImmediatelyApplied {
+  func f() {
+    // Shouldn't require "self.", the closure is obviously @noescape.
+    let x = { return ivar }()
+  }
+  
+  final var ivar  = 42
+}
+
+

@@ -847,7 +847,7 @@ public:
 
   /// \brief The set of type bindings.
   llvm::SmallDenseMap<TypeVariableType *, Type> typeBindings;
-
+  
   /// \brief The set of overload choices along with their types.
   llvm::SmallDenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
 
@@ -1388,7 +1388,7 @@ private:
     /// processing this constraint system.
     SavedTypeVariableBindings savedBindings;
 
-    /// The best solution computed so far.
+     /// The best solution computed so far.
     Optional<Score> BestScore;
 
     /// The number of the solution attempt we're looking at.
@@ -1424,6 +1424,12 @@ public:
   /// associated types), which need to be replaced.
   TypeVariableType *SelfTypeVar = nullptr;
 
+  /// \brief The set of additional attributes inferred for a FunctionType.  Note
+  /// that this is not state kept as part of SolverState, so it only supports
+  /// function attributes that need to be set invariant of the actual typing of
+  /// the solution.
+  llvm::SmallDenseMap<FunctionType*, FunctionType::ExtInfo> extraFunctionAttrs;
+  
 private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
@@ -2204,10 +2210,11 @@ public:
   /// type equivalence requirements aren't introduced between comparisons.
   Type simplifyType(Type type){
     llvm::SmallPtrSet<TypeVariableType *, 16> substituting;
-    return simplifyType(type, substituting);
+   return simplifyType(type, substituting);
   }
 
 private:
+
   /// \brief Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
   ///
@@ -2221,7 +2228,7 @@ private:
   /// type equivalence requirements aren't introduced between comparisons.
   Type simplifyType(Type type,
                     llvm::SmallPtrSet<TypeVariableType *, 16> &substituting);
-
+  
   /// \brief Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.

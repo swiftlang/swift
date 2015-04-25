@@ -1498,31 +1498,67 @@ Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
 Type ConstraintSystem::simplifyType(Type type,
        llvm::SmallPtrSet<TypeVariableType *, 16> &substituting) {
   return type.transform([&](Type type) -> Type {
-            if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
-              tvt = getRepresentative(tvt);
-              if (auto fixed = getFixedType(tvt)) {
-                if (substituting.insert(tvt).second) {
-                  auto result = simplifyType(fixed, substituting);
-                  substituting.erase(tvt);
-                  return result;
-                }
-              }
+    if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
+      tvt = getRepresentative(tvt);
+      if (auto fixed = getFixedType(tvt)) {
+        if (substituting.insert(tvt).second) {
+          auto result = simplifyType(fixed, substituting);
+          substituting.erase(tvt);
+          return result;
+        }
+      }
+      
+      return tvt;
+    }
 
-              return tvt;
-            }
-                            
-            return type;
-         });
+    // If this is a FunctionType and we inferred new function attributes, apply
+    // them.
+    if (auto ft = dyn_cast<FunctionType>(type.getPointer())) {
+      auto it = extraFunctionAttrs.find(ft);
+      if (it != extraFunctionAttrs.end()) {
+        auto extInfo = ft->getExtInfo();
+        if (it->second.isNoEscape())
+          extInfo = extInfo.withNoEscape();
+        if (it->second.isNoReturn())
+          extInfo = extInfo.withIsNoReturn();
+        if (it->second.throws())
+          extInfo = extInfo.withThrows();
+        return FunctionType::get(ft->getInput(), ft->getResult(), extInfo);
+      }
+    }
+    
+
+    return type;
+  });
 }
 
 Type Solution::simplifyType(TypeChecker &tc, Type type) const {
   return type.transform([&](Type type) -> Type {
-             if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
-               auto known = typeBindings.find(tvt);
-               assert(known != typeBindings.end());
-               type = known->second;
-             }
+    if (auto tvt = dyn_cast<TypeVariableType>(type.getPointer())) {
+      auto known = typeBindings.find(tvt);
+      assert(known != typeBindings.end());
+      return known->second;
+    }
 
-             return type;
-           });
+    // If this is a FunctionType and we inferred new function attributes, apply
+    // them.
+    if (auto ft = dyn_cast<FunctionType>(type.getPointer())) {
+      auto &CS = getConstraintSystem();
+      auto it = CS.extraFunctionAttrs.find(ft);
+      if (it != CS.extraFunctionAttrs.end()) {
+        auto extInfo = ft->getExtInfo();
+        if (it->second.isNoEscape())
+          extInfo = extInfo.withNoEscape();
+        if (it->second.isNoReturn())
+          extInfo = extInfo.withIsNoReturn();
+        if (it->second.throws())
+          extInfo = extInfo.withThrows();
+        return FunctionType::get(simplifyType(tc, ft->getInput()),
+                                 simplifyType(tc, ft->getResult()),
+                                 extInfo);
+      }
+    }
+
+    return type;
+  });
 }

@@ -119,9 +119,8 @@ func anon_read_only_capture(var x: Int) -> Int {
 
   return ({ x })()
   // -- func expression
-  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures22anon_read_only_capture.*]] : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int
-  // CHECK: retain [[XBOX]]#0
-  // CHECK: [[ANON_CLOSURE:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]]#0, [[XBOX]]#1)
+  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures22anon_read_only_capture.*]] : $@convention(thin) (@inout Int) -> Int
+  // CHECK: [[ANON_CLOSURE:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]]#1)
   // -- apply expression
   // CHECK: [[RET:%[0-9]+]] = apply [[ANON_CLOSURE]]()
   // -- cleanup
@@ -129,9 +128,8 @@ func anon_read_only_capture(var x: Int) -> Int {
   // CHECK: return [[RET]]
 }
 // CHECK: sil shared @[[CLOSURE_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
+// CHECK: bb0([[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[X:%[0-9]+]] = load [[XADDR]]
-// CHECK: release [[XBOX]]
 // CHECK: return [[X]]
 
 // CHECK-LABEL: sil hidden @_TF8closures21small_closure_capture
@@ -141,9 +139,8 @@ func small_closure_capture(var x: Int) -> Int {
 
   return { x }()
   // -- func expression
-  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures21small_closure_capture.*]] : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int
-  // CHECK: retain [[XBOX]]#0
-  // CHECK: [[ANON_CLOSURE:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]]#0, [[XBOX]]#1)
+  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures21small_closure_capture.*]] : $@convention(thin) (@inout Int) -> Int
+  // CHECK: [[ANON_CLOSURE:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]]#1)
   // -- apply expression
   // CHECK: [[RET:%[0-9]+]] = apply [[ANON_CLOSURE]]()
   // -- cleanup
@@ -151,9 +148,8 @@ func small_closure_capture(var x: Int) -> Int {
   // CHECK: return [[RET]]
 }
 // CHECK: sil shared @[[CLOSURE_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
+// CHECK: bb0([[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[X:%[0-9]+]] = load [[XADDR]]
-// CHECK: release [[XBOX]]
 // CHECK: return [[X]]
 
 
@@ -168,7 +164,7 @@ func small_closure_capture_with_argument(var x: Int) -> (y: Int) -> Int {
   // CHECK: [[ANON_CLOSURE_APP:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]]#0, [[XBOX]]#1)
   // -- return
   // CHECK: release [[XBOX]]#0
-  // CHECK: return [[ANON_CLOSURE]]
+  // CHECK: return [[ANON_CLOSURE_APP]]
 }
 // CHECK: sil shared @[[CLOSURE_NAME]] : $@convention(thin) (Int, @owned Builtin.NativeObject, @inout Int) -> Int
 // CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
@@ -213,8 +209,8 @@ class SomeClass {
 class SomeGenericClass<T> {
   deinit {
     var i: Int = zero
-    // CHECK: [[C1REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassd{{.*}} : $@convention(thin) <τ_0_0> (@owned Builtin.NativeObject, @inout Int) -> Int
-    // CHECK: [[C1SPEC:%[0-9]+]] = partial_apply [[C1REF]]<T>([[IBOX:%[0-9]+]]#0, [[IBOX]]#1) : $@convention(thin) <τ_0_0> (@owned Builtin.NativeObject, @inout Int) -> Int
+    // CHECK: [[C1REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassd{{.*}} : $@convention(thin) <τ_0_0> (@inout Int) -> Int
+    // CHECK: [[C1SPEC:%[0-9]+]] = partial_apply [[C1REF]]<T>([[IBOX:%[0-9]+]]#1) : $@convention(thin) <τ_0_0> (@inout Int) -> Int
     // CHECK: apply [[C1SPEC]]() : $@callee_owned () -> Int
     var x = { i + zero } ()
 
@@ -224,7 +220,7 @@ class SomeGenericClass<T> {
     var y = { zero } ()
   }
 
-  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU{{.*}} : $@convention(thin) <T> (@owned Builtin.NativeObject, @inout Int) -> Int
+  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU{{.*}} : $@convention(thin) <T> (@inout Int) -> Int
 
   // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU0_FT{{.*}} : $@convention(thin) <T> () -> Int
 }

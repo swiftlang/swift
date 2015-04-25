@@ -1700,8 +1700,7 @@ namespace {
         std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
           
           // Do not walk into the 'do' clause of a do/catch statement.
-          if (isa<BraceStmt>(stmt) &&
-              Parent.getAsStmt() &&
+          if (isa<BraceStmt>(stmt) && Parent.getAsStmt() &&
               isa<DoCatchStmt>(Parent.getAsStmt())) {
             return { false, stmt };
           }
@@ -1933,8 +1932,14 @@ namespace {
         // type of this expression.
         CS.setFavoredType(expr, outputTy.getPointer());
       }
+
+      // A direct call to a ClosureExpr makes it noescape.
+      FunctionType::ExtInfo extInfo;
+      if (isa<ClosureExpr>(fnExpr->getSemanticsProvidingExpr()))
+        extInfo = extInfo.withNoEscape();
       
-      auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);
+      auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy,
+                                      extInfo);
 
       CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
         expr->getFn()->getType(),
