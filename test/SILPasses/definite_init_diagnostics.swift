@@ -1063,3 +1063,25 @@ extension SomeProtocol {
   } // expected-error {{return from initializer without initializing all stored properties}}
   // expected-note@-1 {{'self' not initialized}}
 }
+
+
+
+// Lvalue check when the archetypes are not the same.
+struct LValueCheck<T> {
+  let x = 0  // expected-note {{initial value already provided in 'let' declaration}}
+}
+
+extension LValueCheck<A> {
+  init(newY: Int) {
+    x = 42  // expected-error {{immutable value 'self.x' may only be initialized once}}
+  }
+}
+
+// <rdar://problem/20477982> Accessing let-property with default value in init() can throw spurious error
+struct DontLoadFullStruct {
+  let x: Int = 1
+  let y: Int
+  init() {
+    y = x  // ok!
+  }
+}

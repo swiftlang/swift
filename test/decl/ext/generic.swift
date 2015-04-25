@@ -62,7 +62,7 @@ struct LValueCheck<T> {
 
 extension LValueCheck<A> {
   init(newY: Int) {
-    x = 42   // expected-error {{cannot assign to 'x' in 'self'}}
+    x = 42
   }
 }
 

@@ -2844,11 +2844,6 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
   // SIL level passes.  If the 'let' property has an initializer, it can never
   // be reassigned, so we model it as not settable here.
   if (isLet()) {
-    // If the decl has an explicitly written initializer with a pattern binding,
-    // then it isn't settable.
-    if (getParentInitializer() != nullptr)
-      return false;
-
     // If the decl has a value bound to it but has no PBD, then it is
     // initialized.
     if (hasNonPatternBindingInit())
@@ -2859,7 +2854,7 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
       return false;
     
     // Properties in structs/classes are only ever mutable in their designated
-    // initializer.
+    // initializer(s).
     if (getDeclContext()->isTypeContext()) {
       auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC);
       if (!CD) return false;
@@ -2890,6 +2885,11 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
       if (getDeclContext() != UseDC)
         return false;
     }
+    
+    // If the decl has an explicitly written initializer with a pattern binding,
+    // then it isn't settable.
+    if (getParentInitializer() != nullptr)
+      return false;
   }
 
   return ::isSettable(this);
