@@ -14,16 +14,27 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// METADATAKIND(Name, Value)
+///   Represents a swift native runtime metadata kind. Name is the Name of the
+///   metadata kind and Value is the integral value used to identify the value.
 #ifndef METADATAKIND
-#define METADATAKIND(name, value)
+#define METADATAKIND(Name, Value)
 #endif
 
+/// ABSTRACTMETADATAKIND(Name, Start, End)
+///   Represents an abstraction categorization of a range of metadata kind
+///   values. Name is the identifier of the range and Start, End are the
+///   beginning and end of the range.
 #ifndef ABSTRACTMETADATAKIND
-#define ABSTRACTMETADATAKIND(name, start, end)
+#define ABSTRACTMETADATAKIND(Name, Start, End)
 #endif
 
+/// NOMINALTYPEMETADATAKIND(Name, Value)
+///   Represents the native metadata kind for a swift nominal type. Name is the
+///   name of the kind and Value is the integral value used to identify the
+///   value. Delegates to METADATAKIND if not defined.
 #ifndef NOMINALTYPEMETADATAKIND
-#define NOMINALTYPEMETADATAKIND(name, value) METADATAKIND(name, value)
+#define NOMINALTYPEMETADATAKIND(Name, Value) METADATAKIND(Name, Value)
 #endif
 
 /// A class type.
