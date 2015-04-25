@@ -1,0 +1,76 @@
+//===--- MetadataKind.def --------------------------------------*- C++ -*--===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This is a file that enables metaprogramming with metadata kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef METADATAKIND
+#define METADATAKIND(name, value)
+#endif
+
+#ifndef ABSTRACTMETADATAKIND
+#define ABSTRACTMETADATAKIND(name, start, end)
+#endif
+
+#ifndef NOMINALTYPEMETADATAKIND
+#define NOMINALTYPEMETADATAKIND(name, value) METADATAKIND(name, value)
+#endif
+
+/// A class type.
+NOMINALTYPEMETADATAKIND(Class, 0)
+
+/// A struct type.
+NOMINALTYPEMETADATAKIND(Struct, 1)
+
+/// An enum type.
+/// If we add reference enums, that needs to go here.
+NOMINALTYPEMETADATAKIND(Enum, 2)
+
+/// A type whose value is not exposed in the metadata system.
+METADATAKIND(Opaque, 8)
+
+/// A tuple.
+METADATAKIND(Tuple, 9)
+
+/// A monomorphic function.
+METADATAKIND(Function, 10)
+
+/// An existential type.
+METADATAKIND(Existential, 12)
+
+/// A metatype.
+METADATAKIND(Metatype, 13)
+
+/// An ObjC class wrapper.
+METADATAKIND(ObjCClassWrapper, 14)
+
+/// An existential metatype.
+METADATAKIND(ExistentialMetatype, 15)
+
+/// A foreign class, such as a Core Foundation class.
+METADATAKIND(ForeignClass, 16)
+  
+/// A heap-allocated local variable.
+METADATAKIND(HeapLocalVariable, 64)
+
+/// A native error object.
+METADATAKIND(ErrorObject, 65)
+
+/// All metadata kinds in this range are non-isa metadata. Any "metadata" values
+/// outside of this range are objective-c class isa pointers. These isa pointers
+/// are of course not "true" swift metadata.
+ABSTRACTMETADATAKIND(NonIsaMetadata, Class, ErrorObject)
+
+#undef ABSTRACTMETADATAKIND
+#undef NOMINALTYPEMETADATAKIND
+#undef METADATAKIND

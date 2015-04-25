@@ -1,4 +1,4 @@
-//===--- Leaks.cpp --------------------------------------------------------===//
+//===--- Leaks.mm ----------------------------------------*- C++ -*--------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -125,60 +125,26 @@ static void dumpSwiftHeapObjects() {
 
     const char *kindDescriptor = "";
     switch (Metadata->getKind()) {
-    case MetadataKind::Class:
-      kindDescriptor = "Class";
-      break;
-    case MetadataKind::ObjCClassWrapper:
-      kindDescriptor = "ObjCClassWrapper";
-      break;
-    case MetadataKind::ForeignClass:
-      kindDescriptor = "ForeignClass";
-      break;
-    case MetadataKind::Block:
-      kindDescriptor = "Block";
-      break;
-    case MetadataKind::Struct:
-      kindDescriptor = "Struct";
-      break;
-    case MetadataKind::Enum:
-      kindDescriptor = "Enum";
-      break;
-    case MetadataKind::Opaque:
-      kindDescriptor = "Opaque";
-      break;
-    case MetadataKind::Tuple:
-      kindDescriptor = "Tuple";
-      break;
-    case MetadataKind::Function:
-      kindDescriptor = "Function";
-      break;
-    case MetadataKind::ThinFunction:
-      kindDescriptor = "ThinFunction";
-      break;
-    case MetadataKind::PolyFunction:
-      kindDescriptor = "PolyFunction";
-      break;
-    case MetadataKind::Existential:
-      kindDescriptor = "Existential";
-      break;
-    case MetadataKind::Metatype:
-      kindDescriptor = "Metatype";
-      break;
-    case MetadataKind::ExistentialMetatype:
-      kindDescriptor = "ExistentialMetatype";
-      break;
-    case MetadataKind::HeapLocalVariable:
-      kindDescriptor = "HeapLocalVariable";
-      break;
+#define METADATAKIND(name, value)                                              \
+  case MetadataKind::name:                                                     \
+    kindDescriptor = #name;                                                    \
+    break;
+#include "swift/ABI/MetadataKind.def"
     }
 
     if (const NominalTypeDescriptor *NTD =
             Metadata->getNominalTypeDescriptor()) {
-      fprintf(stderr, "{\"type\": \"nominal\", \"name\": \"%s\", \"kind\": \"%s\"}" , NTD->Name, kindDescriptor);
+      fprintf(stderr, "{"
+                      "\"type\": \"nominal\", "
+                      "\"name\": \"%s\", "
+                      "\"kind\": \"%s\""
+                      "}",
+              NTD->Name, kindDescriptor);
       continue;
     }
 
-    fprintf(stderr, "{\"type\": \"unknown\", \"kind\": \"%s\"}", kindDescriptor);
+    fprintf(stderr, "{\"type\": \"unknown\", \"kind\": \"%s\"}",
+            kindDescriptor);
   }
 }
 

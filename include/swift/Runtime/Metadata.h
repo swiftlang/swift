@@ -810,7 +810,8 @@ private:
 public:
   /// Get the metadata kind.
   MetadataKind getKind() const {
-    if (Kind > MetadataKind::MetadataKind_Last)
+    if (Kind > MetadataKind::NonIsaMetadata_End ||
+        Kind < MetadataKind::NonIsaMetadata_Start)
       return MetadataKind::Class;
     return Kind;
   }
@@ -823,10 +824,7 @@ public:
   /// Is this a class object--the metadata record for a Swift class (which also
   /// serves as the class object), or the class object for an ObjC class (which
   /// is not metadata)?
-  bool isClassObject() const {
-    return Kind > MetadataKind::MetadataKind_Last
-      || Kind == MetadataKind::Class;
-  }
+  bool isClassObject() const { return getKind() == MetadataKind::Class; }
   
   /// Does the given metadata kind represent metadata for some kind of class?
   static bool isAnyKindOfClass(MetadataKind k) {
