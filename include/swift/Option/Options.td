@@ -197,10 +197,6 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
-def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
-  Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Split imported Objective-C selectors based on prepositions">;
-
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;

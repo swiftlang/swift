@@ -235,7 +235,6 @@ public:
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
 
-  const bool SplitPrepositions;
   const bool InferImplicitProperties;
   const bool ImportForwardDeclarations;
   const bool ErrorHandling;

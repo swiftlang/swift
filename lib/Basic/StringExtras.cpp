@@ -35,15 +35,6 @@ PrepositionKind swift::getPrepositionKind(StringRef word) {
   return PK_None;
 }
 
-bool swift::isLinkingVerb(StringRef word) {
-#define LINKING_VERB(Word)                      \
-  if (word.equals_lower(#Word))                 \
-    return true;
-#include "LinkingVerbs.def"
-
-  return false;
-}
-
 void WordIterator::computeNextPosition() const {
   assert(Position < String.size() && "Already at end of string");
 

@@ -146,10 +146,6 @@ option(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
 # User-configurable experimental options.  Do not use in production builds.
 #
 
-option(SWIFT_SPLIT_OBJC_SELECTORS
-    "Split Objective-C selectors when building the standard library"
-    FALSE)
-
 set(SWIFT_EXPERIMENTAL_EXTRA_FLAGS "" CACHE STRING
     "Extra flags to pass when compiling swift files.  Use this option *only* for one-off experiments")
 

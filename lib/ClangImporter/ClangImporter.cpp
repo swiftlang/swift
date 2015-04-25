@@ -69,18 +69,6 @@ STATISTIC(NumNullaryInitMethodsMadeUnary,
           "nullary Objective-C init methods turned into unary initializers");
 STATISTIC(NumMultiMethodNames,
           "multi-part selector method names imported");
-STATISTIC(NumPrepositionSplitMethodNames,
-          "selectors where the first selector piece was split on a "
-          "preposition");
-STATISTIC(NumLinkingVerbNonSplits,
-          "selectors where splitting was prevented by a linking verb ");
-STATISTIC(NumLinkingVerbNonSplitsPreposition,
-          "selectors where preposition splitting was prevented by a linking "
-          "verb ");
-STATISTIC(NumPrepositionTrailingFirstPiece,
-          "selectors where the first piece ends in a preposition");
-STATISTIC(NumSelectorsNotSplit,
-          "selectors that were not split (for any reason)");
 STATISTIC(NumMethodsMissingFirstArgName,
           "selectors where the first argument name is missing");
 STATISTIC(NumFactoryMethodsNullary,
@@ -797,7 +785,6 @@ Module *ClangImporter::getImportedHeaderModule() const {
 ClangImporter::Implementation::Implementation(ASTContext &ctx,
                                               const ClangImporterOptions &opts)
   : SwiftContext(ctx),
-    SplitPrepositions(ctx.LangOpts.SplitPrepositions),
     InferImplicitProperties(opts.InferImplicitProperties),
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
     ErrorHandling(opts.ErrorHandling)
@@ -1073,69 +1060,6 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
            camel_case::toLowercaseWord(selector.substr(index), buffer) };
 }
 
-/// Split the first selector piece into a function name and first
-/// parameter name, if possible.
-///
-/// \param selector The selector piece to split.
-/// \param scratch Scratch space to use when forming strings.
-///
-/// \returns a (function name, first parameter name) pair describing
-/// the split. If no split is possible, the function name will be \c
-/// selector and the parameter name will be empty.
-static std::pair<StringRef, StringRef> 
-splitFirstSelectorPiece(StringRef selector,
-                        SmallVectorImpl<char> &scratch) {
-  // Get the camelCase words in this selector.
-  auto words = camel_case::getWords(selector);
-  if (words.empty())
-    return { selector, "" };
-
-  // If "init" is the first word, we have an initializer.
-  if (*words.begin() == "init") {
-    return splitSelectorPieceAt(selector, 4, scratch);
-  }
-
-  // Scan words from the back of the selector looking for a
-  // preposition.
-  auto lastPrep = words.rbegin();
-  auto end = words.rend();
-  for (; lastPrep != end; ++lastPrep) {
-    // If we found a linking verb, don't split.
-    if (isLinkingVerb(*lastPrep)) {
-      ++NumLinkingVerbNonSplits;
-      return { selector, "" };
-    }
-
-    if (getPrepositionKind(*lastPrep) != PK_None) {
-      // Found a preposition.
-      break;
-    }
-  }
-
-  // If we found a preposition, split here.
-  if (lastPrep != end) {
-    // .. unless there is a linking verb.
-    for (auto i = std::next(lastPrep); i != end; ++i) {
-      // If we found a linking verb, don't split.
-      if (isLinkingVerb(*i)) {
-        ++NumLinkingVerbNonSplitsPreposition;
-        return { selector, "" };
-      }
-    }
-
-    ++NumPrepositionSplitMethodNames;
-    if (lastPrep == words.rbegin())
-      ++NumPrepositionTrailingFirstPiece;
-    return splitSelectorPieceAt(selector,
-                                std::prev(lastPrep.base()).getPosition(),
-                                scratch);
-  }
-
-  // We did not find a preposition. None to split.
-  ++NumSelectorsNotSplit;
-  return { selector, "" };
-}
-
 /// Import an argument name.
 static Identifier importArgName(ASTContext &ctx, StringRef name, bool dropWith){
   // Simple case: empty name.
@@ -1179,20 +1103,8 @@ static Identifier importArgName(ASTContext &ctx, StringRef name, bool dropWith){
     return ctx.getIdentifier(camel_case::toLowercaseWord(argName, scratch));
   }
 
-  // If the first word isn't a non-directional preposition, lowercase
-  // it to form the argument name.
-  if (!ctx.LangOpts.SplitPrepositions ||
-      getPrepositionKind(firstWord) != PK_Nondirectional)
-    return ctx.getIdentifier(camel_case::toLowercaseWord(name, scratch));
-
-  // The first word is a non-directional preposition.
-
-  // If there's only one word, we're left with no argument name.
-  if (firstWord.size() == name.size())
-    return Identifier();
-  
-  return ctx.getIdentifier(
-           camel_case::toLowercaseWord(name.substr(firstWord.size()), scratch));
+  /// Lowercase the first word to form the argument name.
+  return ctx.getIdentifier(camel_case::toLowercaseWord(name, scratch));
 }
 
 /// Map an Objective-C selector name to a Swift method name.
@@ -1230,14 +1142,6 @@ static DeclName mapSelectorName(ASTContext &ctx,
     baseName = ctx.Id_init;
     argumentNames.push_back(
       importArgName(ctx, firstPieceText.substr(4), /*dropWith=*/true));
-  } else if (ctx.LangOpts.SplitPrepositions) {
-    llvm::SmallString<16> scratch;
-    StringRef funcName, firstArgName;
-    std::tie(funcName, firstArgName) = splitFirstSelectorPiece(firstPieceText,
-                                                               scratch);
-    baseName = ctx.getIdentifier(funcName);
-    argumentNames.push_back(importArgName(ctx, firstArgName,
-                                          /*dropWith=*/false));
   } else {
     baseName = firstPiece;
     argumentNames.push_back(Identifier());
@@ -1368,30 +1272,6 @@ DeclName ClangImporter::Implementation::mapSelectorToDeclName(
            ObjCSelector selector,
            bool isInitializer)
 {
-  // If we haven't computed any selector mappings before, load the
-  // default mappings.
-  if (SelectorMappings.empty() && SplitPrepositions) {
-    // Function object that creates a selector.
-    CreateSelector createSelector(SwiftContext);
-
-#define MAP_SELECTOR(Selector, ForMethod, ForInitializer, BaseName, ArgNames) \
-    {                                                                   \
-      auto selector = createSelector Selector;                          \
-      CreateMethodName createMethodName(SwiftContext, BaseName);        \
-      auto methodName = createMethodName ArgNames;                      \
-      assert((ForMethod || ForInitializer) &&                           \
-             "Must be for a method or initializer");                    \
-      assert(selector.getNumArgs() == methodName.getArgumentNames().size()); \
-      if (ForMethod)                                                    \
-        SelectorMappings[{selector, false}] = methodName;               \
-      if (ForInitializer) {                                             \
-        assert(methodName.getBaseName() == SwiftContext.Id_init);       \
-        SelectorMappings[{selector, true}] = methodName;                \
-      }                                                                 \
-    }
-#include "MappedNames.def"
-  }
-
   // Check whether we've already mapped this selector.
   auto known = SelectorMappings.find({selector, isInitializer});
   if (known != SelectorMappings.end())

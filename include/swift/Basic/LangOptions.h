@@ -108,9 +108,6 @@ namespace swift {
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
 
-    /// Whether to split imported Objective-C selectors into Swift method names.
-    bool SplitPrepositions = false;
-
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;

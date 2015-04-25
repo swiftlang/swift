@@ -1130,12 +1130,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           
           Locs.push_back({NameLoc, consumeToken(tok::colon)});
 
-          // If we aren't splitting prepositions, add entry for the
-          // unwritten first argument name.
-          if (!Context.LangOpts.SplitPrepositions) {
-            Locs.push_back({SourceLoc(), SourceLoc()});
-            ArgumentNames.push_back(Identifier()); 
-          }
+          // Add entry for the unwritten first argument name.
+          Locs.push_back({SourceLoc(), SourceLoc()});
+          ArgumentNames.push_back(Identifier());
           while (Tok.isIdentifierOrUnderscore() && peekToken().is(tok::colon)) {
             Identifier SelName;
             if (Tok.is(tok::identifier))

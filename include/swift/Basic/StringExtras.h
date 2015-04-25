@@ -36,10 +36,6 @@ namespace swift {
   /// ignoring case.
   PrepositionKind getPrepositionKind(StringRef word);
 
-  /// Determine whether this is a linking verb, which does not express an 
-  /// action, but links a subject to more information about the subject.
-  bool isLinkingVerb(StringRef word);
-
   namespace camel_case {
     class WordIterator;
 

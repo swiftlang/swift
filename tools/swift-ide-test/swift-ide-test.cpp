@@ -237,11 +237,6 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-SplitObjCSelectors("split-objc-selectors",
-                   llvm::cl::desc("Split Objective-C selectors"),
-                   llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 ImplicitProperties("enable-objc-implicit-properties",
                    llvm::cl::desc("Implicitly import Objective-C getter/setter pairs as properties"),
                    llvm::cl::init(false));
@@ -2285,7 +2280,6 @@ int main(int argc, char *argv[]) {
     options::EnableSourceImport;
   InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =
     options::ImportObjCHeader;
-  InitInvok.getLangOptions().SplitPrepositions |= options::SplitObjCSelectors;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=

@@ -118,7 +118,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
-  inputArgs.AddLastArg(arguments, options::OPT_split_objc_selectors);
   inputArgs.AddLastArg(arguments, options::OPT_solver_memory_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
