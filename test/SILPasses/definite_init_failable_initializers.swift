@@ -48,7 +48,7 @@ class RootClass {
   init() { x = 0; y = 0 }
 
   convenience init?(failBeforeDelegation: Bool) {
-    if failBeforeDelegation { return nil }  // expected-error{{failable convenience initializer must delegate to self.init() before returning nil}}
+    if failBeforeDelegation { return nil } // ok
     self.init()
   }
 
@@ -73,7 +73,7 @@ class RootClass {
   }
 
   convenience init?(failBeforeFailableDelegation: Bool) {
-    if failBeforeFailableDelegation { return nil }     // expected-error {{failable convenience initializer must delegate to self.init() before returning nil}}
+    if failBeforeFailableDelegation { return nil }     // ok
 
     self.init(failBeforeInitialization: ())
   }
@@ -126,8 +126,7 @@ class SubClass: RootClass {
   }
 
   convenience init?(failBeforeDelegation: Bool) {
-    if failBeforeDelegation { return nil }
-    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
+    if failBeforeDelegation { return nil } // ok
     self.init()
   }
 
@@ -138,7 +137,6 @@ class SubClass: RootClass {
 
   convenience init?(failBeforeFailableDelegation: Bool) {
     if failBeforeFailableDelegation { return nil }
-    // expected-error@-1{{failable convenience initializer must delegate to self.init() before returning nil}}
     self.init(failBeforeInitialization: ())
   }
 
