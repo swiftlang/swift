@@ -629,7 +629,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
     d.enumerateKeysAndObjectsUsingBlock {
-      (anyObjectKey: AnyObject!, anyObjectValue: AnyObject!,
+      (anyObjectKey: AnyObject, anyObjectValue: AnyObject,
        stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(
           key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
@@ -890,7 +890,7 @@ extension Set : _ObjectiveCBridgeable {
     // `Set<T>` where `T` is a value type may not be backed by an NSSet.
     var builder = _SetBuilder<T>(count: s.count)
     s.enumerateObjectsUsingBlock {
-      (anyObjectMember: AnyObject!, stop: UnsafeMutablePointer<ObjCBool>) in
+      (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(anyObjectMember, T.self))
     }
     result = builder.take()
