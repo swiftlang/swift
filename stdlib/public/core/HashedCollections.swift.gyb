@@ -265,7 +265,7 @@ internal struct _UnmanagedAnyObjectArray {
 
 /// Header part of the native storage for `Set`.
 internal struct _SetBody {
-  init(capacity: Int) {
+  internal init(capacity: Int) {
     self.capacity = capacity
   }
 
@@ -288,9 +288,9 @@ internal struct _SetElement<T> {
 public struct Set<T : Hashable> :
   Hashable, CollectionType, ArrayLiteralConvertible {
 
-  typealias _Self = Set<T>
-  typealias _VariantStorage = _VariantSetStorage<T>
-  typealias _NativeStorage = _NativeSetStorage<T>
+  internal typealias _Self = Set<T>
+  internal typealias _VariantStorage = _VariantSetStorage<T>
+  internal typealias _NativeStorage = _NativeSetStorage<T>
   public typealias Element = T
   public typealias Index = SetIndex<T>
   public typealias GeneratorType = SetGenerator<T>
@@ -307,13 +307,13 @@ public struct Set<T : Hashable> :
   }
 
   /// Private initializer.
-  init(_nativeStorage: _NativeSetStorage<T>) {
+  internal init(_nativeStorage: _NativeSetStorage<T>) {
     _variantStorage = _VariantStorage.Native(
       _NativeStorage.Owner(nativeStorage: _nativeStorage))
   }
 
   /// Private initializer.
-  init(_nativeStorageOwner: _NativeSetStorageOwner<T>) {
+  internal init(_nativeStorageOwner: _NativeSetStorageOwner<T>) {
     _variantStorage = .Native(_nativeStorageOwner)
   }
 
@@ -650,8 +650,8 @@ public struct Set<T : Hashable> :
 /// a set and some sequence (which may itself be a `Set`).
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
-internal func _compareSets<T>(lhs: Set<T>, _ rhs: Set<T>) ->
-  (isSubset: Bool, isEqual: Bool) {
+internal func _compareSets<T>(lhs: Set<T>, _ rhs: Set<T>)
+  -> (isSubset: Bool, isEqual: Bool) {
   for member in lhs {
     if !rhs.contains(member) {
       return (false, false)
@@ -776,8 +776,8 @@ internal func _stdlib_NSSet_allObjects(nss: _NSSetType) ->
 ///
 /// Requires: `BaseValue` is a base class or base @objc
 /// protocol (such as `AnyObject`) of `DerivedValue`.
-public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>) ->
-  Set<BaseValue> {
+public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>)
+  -> Set<BaseValue> {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
@@ -795,7 +795,8 @@ public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>) ->
 /// - precondition: `SwiftValue` is bridged to Objective-C
 /// and requires non-trivial bridging.
 public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
-source: Set<SwiftValue>) -> Set<ObjCValue> {
+  source: Set<SwiftValue>
+) -> Set<ObjCValue> {
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
@@ -825,8 +826,8 @@ source: Set<SwiftValue>) -> Set<ObjCValue> {
 ///
 /// - precondition: `DerivedValue` is a subtype of `BaseValue` and both
 /// are reference types.
-public func _setDownCast<BaseValue, DerivedValue>(source: Set<BaseValue>) ->
-  Set<DerivedValue> {
+public func _setDownCast<BaseValue, DerivedValue>(source: Set<BaseValue>)
+  -> Set<DerivedValue> {
 
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
@@ -852,7 +853,8 @@ public func _setDownCast<BaseValue, DerivedValue>(source: Set<BaseValue>) ->
 /// - precondition: `DerivedValue` is a subtype of `BaseValue` and both
 /// are reference types.
 public func _setDownCastConditional<BaseValue, DerivedValue>(
-  source: Set<BaseValue>) -> Set<DerivedValue>? {
+  source: Set<BaseValue>
+) -> Set<DerivedValue>? {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
@@ -872,7 +874,8 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
 /// - precondition: at least one of `SwiftValue` is a bridged value
 /// type, and the corresponding `ObjCValue` is a reference type.
 public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
-  source: Set<ObjCValue>) -> Set<SwiftValue> {
+  source: Set<ObjCValue>
+) -> Set<SwiftValue> {
   let result: Set<SwiftValue>? = _setBridgeFromObjectiveCConditional(source)
   _precondition(result != nil, "This set cannot be bridged from Objective-C")
   return result!
@@ -1340,9 +1343,9 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 /// - precondition: `SwiftKey` and `SwiftValue` are bridged to Objective-C,
 /// and at least one of them requires non-trivial bridging.
 public func _dictionaryBridgeToObjectiveC<
-    SwiftKey, SwiftValue, ObjCKey, ObjCValue
+  SwiftKey, SwiftValue, ObjCKey, ObjCValue
 >(
-    source: Dictionary<SwiftKey, SwiftValue>
+  source: Dictionary<SwiftKey, SwiftValue>
 ) -> Dictionary<ObjCKey, ObjCValue> {
   _sanityCheck(
     !_isBridgedVerbatimToObjectiveC(SwiftKey.self) ||
@@ -1394,7 +1397,7 @@ public func _dictionaryBridgeToObjectiveC<
 /// - precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 /// a subtype of `BaseValue`, and all of these types are reference types.
 public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
-    source: Dictionary<BaseKey, BaseValue>
+  source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue> {
   _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
@@ -1433,9 +1436,9 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
 /// - precondition: `DerivedKey` is a subtype of `BaseKey`, `DerivedValue` is
 /// a subtype of `BaseValue`, and all of these types are reference types.
 public func _dictionaryDownCastConditional<
-    BaseKey, BaseValue, DerivedKey, DerivedValue
+  BaseKey, BaseValue, DerivedKey, DerivedValue
 >(
-    source: Dictionary<BaseKey, BaseValue>
+  source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue>? {
   _sanityCheck(_isClassOrObjCExistential(BaseKey.self))
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
@@ -1465,7 +1468,7 @@ public func _dictionaryDownCastConditional<
 public func _dictionaryBridgeFromObjectiveC<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
-    source: Dictionary<ObjCKey, ObjCValue>
+  source: Dictionary<ObjCKey, ObjCValue>
 ) -> Dictionary<SwiftKey, SwiftValue> {
   let result: Dictionary<SwiftKey, SwiftValue>? =
     _dictionaryBridgeFromObjectiveCConditional(source)
@@ -1483,7 +1486,7 @@ public func _dictionaryBridgeFromObjectiveC<
 public func _dictionaryBridgeFromObjectiveCConditional<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue
 >(
-    source: Dictionary<ObjCKey, ObjCValue>
+  source: Dictionary<ObjCKey, ObjCValue>
 ) -> Dictionary<SwiftKey, SwiftValue>? {
   _sanityCheck(
     _isClassOrObjCExistential(ObjCKey.self) ||
@@ -1986,8 +1989,9 @@ internal struct _BridgedNative${Self}Storage {
 /// Specifically, we can not have @objc members in a generic class.  When this
 /// limitation is gone, this class can be folded into
 /// `_Native${Self}StorageNSEnumerator`.
-@objc internal class _Native${Self}StorageKeyNSEnumeratorBase
-    : _SwiftNativeNSEnumerator, _NSEnumeratorType {
+@objc
+internal class _Native${Self}StorageKeyNSEnumeratorBase
+  : _SwiftNativeNSEnumerator, _NSEnumeratorType {
 
   internal init(dummy: (Int, ())) {}
 
@@ -1997,7 +2001,9 @@ internal struct _BridgedNative${Self}Storage {
 
   internal func bridgingCountByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int, dummy: ()
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int,
+    dummy: ()
   ) -> Int {
     _sanityCheckFailure("'countByEnumeratingWithState' should be overridden")
   }
@@ -2029,14 +2035,16 @@ internal struct _BridgedNative${Self}Storage {
   @objc
   internal func countByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int
   ) -> Int {
     return bridgingCountByEnumeratingWithState(
-        state, objects: objects, count: count, dummy: ())
+      state, objects: objects, count: count, dummy: ())
   }
 }
 
-@objc final internal class _Native${Self}StorageKeyNSEnumerator<
+@objc
+final internal class _Native${Self}StorageKeyNSEnumerator<
   ${TypeParametersDecl}
 >
   : _Native${Self}StorageKeyNSEnumeratorBase {
@@ -2075,7 +2083,9 @@ internal struct _BridgedNative${Self}Storage {
 
   internal override func bridgingCountByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int, dummy: ()
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int,
+    dummy: ()
   ) -> Int {
     var theState = state.memory
     if theState.state == 0 {
@@ -2105,7 +2115,8 @@ internal struct _BridgedNative${Self}Storage {
 /// Specifically, we can not have objc members in a generic class.  When this
 /// limitation is gone, this class can be folded into
 /// `_Native${Self}StorageOwner`.
-@objc internal class _Native${Self}StorageOwnerBase
+@objc
+internal class _Native${Self}StorageOwnerBase
   : _SwiftNativeNS${Self}, _NS${Self}CoreType {
 
   internal override init() {}
@@ -2131,7 +2142,9 @@ internal struct _BridgedNative${Self}Storage {
 
   internal func bridgingCountByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int, dummy: ()
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int,
+    dummy: ()
   ) -> Int {
     _sanityCheckFailure("'countByEnumeratingWithState' should be overridden")
   }
@@ -2146,10 +2159,7 @@ internal struct _BridgedNative${Self}Storage {
   //
 
   @objc
-  internal required init(
-    objects: UnsafePointer<AnyObject?>,
-    count: Int
-  ) {
+  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
@@ -2160,7 +2170,7 @@ internal struct _BridgedNative${Self}Storage {
 
   @objc
   internal func member(object: AnyObject) -> AnyObject? {
-    return bridgingObjectForKey(object, dummy:())
+    return bridgingObjectForKey(object, dummy: ())
   }
 
   @objc
@@ -2178,10 +2188,11 @@ internal struct _BridgedNative${Self}Storage {
   @objc
   internal func countByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int
   ) -> Int {
     return bridgingCountByEnumeratingWithState(
-    state, objects: objects, count: count, dummy: ())
+      state, objects: objects, count: count, dummy: ())
   }
 
 %elif Self == 'Dictionary':
@@ -2226,21 +2237,26 @@ internal struct _BridgedNative${Self}Storage {
   @objc
   internal func countByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int
   ) -> Int {
     return bridgingCountByEnumeratingWithState(
-        state, objects: objects, count: count, dummy: ())
+      state, objects: objects, count: count, dummy: ())
   }
 
   @objc
-  internal func getObjects(objects: UnsafeMutablePointer<AnyObject>,
-    andKeys keys: UnsafeMutablePointer<AnyObject>) {
+  internal func getObjects(
+    objects: UnsafeMutablePointer<AnyObject>,
+    andKeys keys: UnsafeMutablePointer<AnyObject>
+  ) {
     bridgedAllKeysAndValues(objects, keys)
   }
 
   @objc
-  internal func bridgedAllKeysAndValues(objects: UnsafeMutablePointer<AnyObject>,
-    _ keys: UnsafeMutablePointer<AnyObject>) {
+  internal func bridgedAllKeysAndValues(
+    objects: UnsafeMutablePointer<AnyObject>,
+    _ keys: UnsafeMutablePointer<AnyObject>
+  ) {
     _sanityCheckFailure("'bridgedAllKeysAndValues' should be overridden")
   }
 %end
@@ -2414,8 +2430,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
 %elif Self == 'Dictionary':
 
-  internal func _getBridgedValue(i: _Native${Self}Index<${TypeParameters}>) ->
-    AnyObject {
+  internal func _getBridgedValue(i: _Native${Self}Index<${TypeParameters}>)
+    -> AnyObject {
     if _fastPath(_isClassOrObjCExistential(Value.self)) {
       return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i).1)
     }
@@ -2425,7 +2441,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   internal override func bridgedAllKeysAndValues(
     objects: UnsafeMutablePointer<AnyObject>,
-    _ keys: UnsafeMutablePointer<AnyObject>) {
+    _ keys: UnsafeMutablePointer<AnyObject>
+  ) {
     bridgeEverything()
     // the user is expected to provide a buffer of the correct size
     var i = 0 // position in the input buffer
@@ -2481,8 +2498,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     return (nativeStorage.count, ())
   }
 
-  internal override func bridgingObjectForKey(aKey: AnyObject, dummy: ()) ->
-    AnyObject? {
+  internal override func bridgingObjectForKey(aKey: AnyObject, dummy: ())
+    -> AnyObject? {
     let nativeKey = _forceBridgeFromObjectiveC(aKey, Key.self)
     let (i, found) = nativeStorage._find(
       nativeKey, nativeStorage._bucket(nativeKey))
@@ -2498,7 +2515,9 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 
   internal override func bridgingCountByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>, count: Int, dummy: ()
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int,
+    dummy: ()
   ) -> Int {
     var theState = state.memory
     if theState.state == 0 {
@@ -2904,7 +2923,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
   }
 
   internal mutating func nativeUpdateValue(
-      value: Value, forKey key: Key
+    value: Value, forKey key: Key
   ) -> Value? {
     var (i, found) = native._find(key, native._bucket(key))
 
@@ -2955,7 +2974,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
   /// - parameter idealBucket: The ideal bucket for the element being deleted.
   /// - parameter offset: The offset of the element that will be deleted.
   internal mutating func nativeDeleteImpl(
-      nativeStorage: NativeStorage, idealBucket: Int, offset: Int
+    nativeStorage: NativeStorage, idealBucket: Int, offset: Int
   ) {
     // remove the element
     nativeStorage[offset] = .None
@@ -3275,8 +3294,9 @@ internal struct _Cocoa${Self}Index : ForwardIndexType, Comparable {
   }
 
   internal init(_ cocoa${Self}: _NS${Self}Type,
-       _ allKeys: _HeapBuffer<Int, AnyObject>,
-       _ currentKeyIndex: Int) {
+    _ allKeys: _HeapBuffer<Int, AnyObject>,
+    _ currentKeyIndex: Int
+  ) {
     self.cocoa${Self} = cocoa${Self}
     self.allKeys = allKeys
     self.currentKeyIndex = currentKeyIndex
@@ -3669,7 +3689,7 @@ internal struct ${Self}MirrorPosition<${TypeParametersDecl}> {
 
 }
 
-internal func ==<${TypeParametersDecl}> (
+internal func == <${TypeParametersDecl}> (
   lhs: ${Self}MirrorPosition<${TypeParameters}>, rhs : Int
 ) -> Bool {
   return lhs._intPos == rhs
@@ -3806,8 +3826,7 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
 
 #if _runtime(_ObjC)
 extension ${Self} {
-  public func _bridgeToObjectiveCImpl()
-    -> _NS${Self}CoreType {
+  public func _bridgeToObjectiveCImpl() -> _NS${Self}CoreType {
     switch _variantStorage {
     case _Variant${Self}Storage.Native(let nativeOwner):
 %if Self == 'Set':
