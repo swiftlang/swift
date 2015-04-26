@@ -21,6 +21,7 @@
 #include <utility>
 
 namespace swift {
+
 class DominanceInfo;
 
 /// \brief For each of the given instructions, if they are dead delete them
@@ -110,6 +111,23 @@ SILInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 bool tryCheckedCastBrJumpThreading(TermInst *Term, DominanceInfo *DT,
                                    SmallVectorImpl<SILBasicBlock *> &BBs);
 
+/// A structure containing callbacks that are called when an instruction is
+/// removed or added.
+struct InstModCallbacks {
+  using CallbackTy = std::function<void (SILInstruction *)>;
+  CallbackTy DeleteInst = [](SILInstruction *I) {
+    I->eraseFromParent();
+  };
+  CallbackTy CreatedNewInst = [](SILInstruction *){};
+
+  InstModCallbacks(CallbackTy DeleteInst, CallbackTy CreatedNewInst)
+    : DeleteInst(DeleteInst), CreatedNewInst(CreatedNewInst) {}
+  InstModCallbacks() = default;
+  ~InstModCallbacks() = default;
+  InstModCallbacks(const InstModCallbacks &) = default;
+  InstModCallbacks(InstModCallbacks &&) = default;
+};
+
 /// If Closure is a partial_apply or thin_to_thick_function with only local
 /// ref count users and a set of post-dominating releases:
 ///
@@ -118,7 +136,9 @@ bool tryCheckedCastBrJumpThreading(TermInst *Term, DominanceInfo *DT,
 ///    captured args if we have a partial_apply.
 ///
 /// In the future this should be extended to be less conservative with users.
-bool tryDeleteDeadClosure(SILInstruction *Closure);
+bool
+tryDeleteDeadClosure(SILInstruction *Closure,
+                     InstModCallbacks Callbacks = InstModCallbacks());
 
 /// This helper class represents the lifetime of a single
 /// SILValue. The value itself is held and the lifetime endpoints of

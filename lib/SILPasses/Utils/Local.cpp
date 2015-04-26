@@ -593,16 +593,17 @@ static bool isARCOperationRemovableIfObjectIsDead(const SILInstruction *I) {
 /// found by Tracker.
 static void
 releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
-                                      ReleaseTracker &Tracker) {
+                                      ReleaseTracker &Tracker,
+                                      InstModCallbacks &Callbacks) {
   SILBuilder Builder(PAI);
   SILModule &M = PAI->getModule();
   SILLocation Loc = PAI->getLoc();
-  auto *PAITy =
+  auto PAITy =
     dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
 
   // Emit a destroy value for each captured closure argument.
   ArrayRef<SILParameterInfo> Params = PAITy->getParameters();
-  ArrayRef<SILValue> Args = PAI->getArguments();
+  auto Args = PAI->getArguments();
   unsigned Delta = Params.size() - Args.size();
   assert(Delta <= Params.size() && "Error, more Args to partial apply than "
                                    "params in its interface.");
@@ -627,20 +628,23 @@ releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
       // Otherwise, we need to destroy the argument. If we have a value, perform a
       // release_value.
       if (Arg.getType().isObject()) {
-        Builder->createReleaseValue(Loc, Arg)
-          ->setDebugScope(PAI->getDebugScope());
+        auto *RVI = Builder.createReleaseValue(Loc, Arg);
+        RVI->setDebugScope(PAI->getDebugScope());
+        Callbacks.CreatedNewInst(RVI);
         continue;
       }
 
       // Otherwise put in a destroy_addr.
-      Builder->createDestroyAddr(Loc, Arg)
-        ->setDebugScope(PAI->getDebugScope());
+      auto *DAI = Builder.createDestroyAddr(Loc, Arg);
+      DAI->setDebugScope(PAI->getDebugScope());
+      Callbacks.CreatedNewInst(DAI);
     }
   }
 }
 
 /// TODO: Generalize this to general objects.
-bool swift::tryDeleteDeadClosure(SILInstruction *Closure) {
+bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
+                                 InstModCallbacks Callbacks) {
   // We currently only handle locally identified values that do not escape. We
   // also assume that the partial apply does not capture any addresses.
   if (!isa<PartialApplyInst>(Closure) && !isa<ThinToThickFunctionInst>(Closure))
@@ -661,18 +665,18 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure) {
   // If we have a partial_apply, release each captured argument at each one of
   // the final release locations of the partial apply.
   if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
-    releaseCapturedArgsOfDeadPartialApply(PAI, Tracker);
+    releaseCapturedArgsOfDeadPartialApply(PAI, Tracker, Callbacks);
 
   // Then delete all user instructions.
   for (auto *User : Tracker.getTrackedUsers()) {
     assert(User->getNumTypes() == 0 && "We expect only ARC operations without "
                                        "results. This is true b/c of "
                                        "isARCOperationRemovableIfObjectIsDead");
-    User->eraseFromParent();
+    Callbacks.DeleteInst(User);
   }
 
   // Finally delete the closure.
-  Closure->eraseFromParent();
+  Callbacks.DeleteInst(Closure);
 
   return true;
 }
