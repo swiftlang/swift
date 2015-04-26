@@ -507,77 +507,17 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
                                                           PAI->getCallee(),
                                                           PAI->getType());
 
-  // Delete dead closures of this form:
-  //
-  // %X = partial_apply %x(...)
-  // BB:
-  // strong_retain %X
-  // strong_release %X
-  // strong_release %X // <-- Post dominating release.
-
-  SmallVector<RefCountingInst *, 16> RCToDelete;
-  auto *PostDomRelease = hasOnlyRetainReleaseUsers(PAI, RCToDelete);
-  if (!PostDomRelease)
-    return nullptr;
-
-  SILLocation Loc = PAI->getLoc();
-
-  SILFunctionType *ClosureTy =
-    dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
-  if (!ClosureTy)
-    return nullptr;
-
-  // Emit a destroy value for each captured closure argument.
-  ArrayRef<SILParameterInfo> Params = ClosureTy->getParameters();
-  auto Args = PAI->getArguments();
-  unsigned Delta = Params.size() - Args.size();
-  assert(Delta <= Params.size() && "Error, more Args to partial apply than "
-                                   "params in its interface.");
-
-  // Set the insertion point of the release_value to be that of the post
-  // dominating release, which is the end of the lifetime of the partial_apply.
-  auto OrigInsertPoint = Builder->getInsertionPoint();
-  Builder->setInsertionPoint(PostDomRelease);
-
-  SILModule &M = PAI->getModule();
-
-  for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
-    SILValue Arg = Args[AI];
-    SILParameterInfo Param = Params[AI + Delta];
-
-    // If we have a trivial type, we do not need to put in any extra releases.
-    if (Arg.getType().isTrivial(M))
-      continue;
-
-    // If we have a non-trivial type and the argument is passed in @inout, we do
-    // not need to destroy it here. This is something that is implicit in the
-    // partial_apply design that will be revisited when partial_apply is
-    // redesigned.
-    if (Param.isIndirectInOut())
-      continue;
-
-    // Otherwise, we need to destroy the argument. If we have a value, perform a
-    // release_value.
-    if (Arg.getType().isObject()) {
-        Builder->createReleaseValue(Loc, Arg)
-          ->setDebugScope(PAI->getDebugScope());
-        continue;
-    }
-
-    // Otherwise put in a destroy_addr.
-    Builder->createDestroyAddr(Loc, Arg)
-      ->setDebugScope(PAI->getDebugScope());
-  }
-
-  // Reset the insert point.
-  Builder->setInsertionPoint(OrigInsertPoint);
-
-  // Delete the strong_release/retains.
-  for (auto *RC : RCToDelete)
-    eraseInstFromFunction(*RC);
-
-  // Delete the partial_apply.
-  return eraseInstFromFunction(*PAI);
+  // Try to delete dead closures.
+  tryDeleteDeadClosure(PAI,
+                       InstModCallbacks({
+                         [this](SILInstruction *DeadInst) {
+                           eraseInstFromFunction(*DeadInst);
+                         },
+                         [this](SILInstruction *NewInst) {
+                           Worklist.add(NewInst);
+                         }
+                       }));
+  return nullptr;
 }
 
 SILInstruction *

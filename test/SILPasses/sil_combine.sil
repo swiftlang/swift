@@ -1449,7 +1449,7 @@ sil @partial_apply_nothing : $@convention(thin) () -> () {
 // CHECK-NEXT: function_ref partial_apply_generic_func
 // CHECK-NEXT: function_ref @partial_apply_generic_func
 // CHECK-NEXT: partial_apply
-sil @partial_apply_without_subs_or_args_is_thin_to_thick : $@convention(thin) () -> (@callee_owned () -> ()) {
+sil @partial_apply_without_subs_or_args_is_thin_to_thick : $@convention(thin) () -> (@callee_owned () -> (), @callee_owned (Builtin.Int32) -> (), @callee_owned () -> ()) {
 bb0:
   %0 = function_ref @partial_apply_nothing : $@convention(thin) () -> ()
   %1 = partial_apply %0() : $@convention(thin) () -> ()
@@ -1458,7 +1458,8 @@ bb0:
   %4 = partial_apply %2(%3) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> ()
   %5 = function_ref @partial_apply_generic_func : $@convention(thin) <T> () -> ()
   %6 = partial_apply %5<Builtin.Int32>() : $@convention(thin) <T> () -> ()
-  return %1 : $@callee_owned () -> ()
+  %7 = tuple(%1 : $@callee_owned () -> (), %4 : $@callee_owned (Builtin.Int32) -> (), %6 : $@callee_owned () -> ())
+  return %7 : $(@callee_owned () -> (), @callee_owned (Builtin.Int32) -> (), @callee_owned () -> ())
 }
 
 /// Global initializers might have side-effects. We cannot delete such unused
