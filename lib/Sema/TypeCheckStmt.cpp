@@ -192,9 +192,14 @@ public:
   // Scope information for control flow statements
   // (break, continue, fallthrough).
 
-  /// The level of loop nesting. 'break' and 'continue' are valid only in scopes
-  /// where this is greater than one.
-  SmallVector<LabeledStmt*, 2> ActiveLabeledStmts;
+  /// This keeps track of interesting statements which are the target of
+  /// (potentially labeled) break & continue, and defer statements which have
+  /// limitations on their body.
+  SmallVector<Stmt*, 2> ActiveLabeledStmts;
+  
+  /// If we're inside the emission of a 'defer' statement, this is the location
+  /// of it.
+  SourceLoc DeferLoc;
 
   /// The level of 'switch' nesting. 'fallthrough' is valid only in scopes where
   /// this is greater than one.
@@ -212,22 +217,26 @@ public:
 
   struct AddLabeledStmt {
     StmtChecker &SC;
-    AddLabeledStmt(StmtChecker &SC, LabeledStmt *LS) : SC(SC) {
+    AddLabeledStmt(StmtChecker &SC, Stmt *S) : SC(SC) {
       // Verify that we don't have label shadowing.
-      if (!LS->getLabelInfo().Name.empty())
-        for (auto PrevLS : SC.ActiveLabeledStmts) {
-          if (PrevLS->getLabelInfo().Name == LS->getLabelInfo().Name) {
-            SC.TC.diagnose(LS->getLabelInfo().Loc,
-                        diag::label_shadowed, LS->getLabelInfo().Name);
-            SC.TC.diagnose(PrevLS->getLabelInfo().Loc,
-                           diag::invalid_redecl_prev, 
-                           PrevLS->getLabelInfo().Name);
+      if (auto *LS = dyn_cast<LabeledStmt>(S)) {
+        if (!LS->getLabelInfo().Name.empty())
+          for (auto PrevS : SC.ActiveLabeledStmts) {
+            auto *PrevLS = dyn_cast<LabeledStmt>(PrevS);
+            if (PrevLS &&
+                PrevLS->getLabelInfo().Name == LS->getLabelInfo().Name) {
+              SC.TC.diagnose(LS->getLabelInfo().Loc,
+                             diag::label_shadowed, LS->getLabelInfo().Name);
+              SC.TC.diagnose(PrevLS->getLabelInfo().Loc,
+                             diag::invalid_redecl_prev,
+                             PrevLS->getLabelInfo().Name);
+            }
           }
-        }
-
+      }
+      
       // In any case, remember that we're in this labeled statement so that
       // break and continue are aware of it.
-      SC.ActiveLabeledStmts.push_back(LS);
+      SC.ActiveLabeledStmts.push_back(S);
     }
     ~AddLabeledStmt() {
       SC.ActiveLabeledStmts.pop_back();
@@ -290,13 +299,22 @@ public:
   Stmt *visitReturnStmt(ReturnStmt *RS) {
     if (!TheFunc.hasValue()) {
       TC.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
-      return 0;
+      return nullptr;
     }
 
     Type ResultTy = TheFunc->getBodyResultType();
     if (!ResultTy || ResultTy->is<ErrorType>())
-      return 0;
+      return nullptr;
 
+    // Do not allow exiting a defer with a return.
+    for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
+         I != E; ++I) {
+      if (isa<DeferStmt>(*I)) {
+        TC.diagnose(RS->getReturnLoc(), diag::jump_out_of_defer, "return");
+        return nullptr;
+      }
+    }
+    
     if (!RS->hasResult()) {
       if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context)))
         TC.diagnose(RS->getReturnLoc(), diag::return_expr_missing);
@@ -342,12 +360,16 @@ public:
     RS->setResult(E);
     
     if (failed)
-      return 0;
-
+      return nullptr;
+    
     return RS;
   }
   
   Stmt *visitDeferStmt(DeferStmt *DS) {
+    /// Remember that we're inside of a 'defer' statement, so we can diagnose
+    /// invalid exits out of it.
+    AddLabeledStmt nest(*this, DS);
+
     BraceStmt *S = DS->getBody();
     if (typeCheckStmt(S)) return 0;
     DS->setBody(S);
@@ -584,28 +606,32 @@ public:
 
   Stmt *visitBreakStmt(BreakStmt *S) {
     LabeledStmt *Target = nullptr;
-    // Pick the nearest break target that matches the specified name.
-    if (S->getTargetName().empty()) {
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        // 'break' with no label looks through non-loop structures
-        // except 'switch'.
-        if (!(*I)->requiresLabelOnJump()) {
-          Target = *I;
-          break;
-        }
+    for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
+         I != E; ++I) {
+      auto *ParentStmt = *I;
+      if (isa<DeferStmt>(ParentStmt)) {
+        TC.diagnose(S->getLoc(), diag::jump_out_of_defer, "break");
+        return nullptr;
       }
 
-    } else {
-      // Scan inside out until we find something with the right label.
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        if (S->getTargetName() == (*I)->getLabelInfo().Name) {
-          Target = *I;
-          break;
+      // Pick the nearest break target that matches the specified name.
+      if (auto *ParentLS = dyn_cast<LabeledStmt>(ParentStmt)) {
+        if (S->getTargetName().empty()) {
+          // 'break' with no label looks through non-loop structures
+          // except 'switch'.
+          if (!ParentLS->requiresLabelOnJump()) {
+            Target = ParentLS;
+            break;
+          }
+        } else {
+          if (S->getTargetName() == ParentLS->getLabelInfo().Name) {
+            Target = ParentLS;
+            break;
+          }
         }
       }
     }
+    
     if (!Target) {
       auto diagid = diag::break_outside_loop;
 
@@ -624,29 +650,33 @@ public:
 
   Stmt *visitContinueStmt(ContinueStmt *S) {
     LabeledStmt *Target = nullptr;
-    // Scan to see if we are in any non-switch labeled statements (loops).  Scan
-    // inside out.
-    if (S->getTargetName().empty()) {
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        // 'continue' with no label ignores non-loop structures.
-        if (!(*I)->requiresLabelOnJump() &&
-            (*I)->isPossibleContinueTarget()) {
-          Target = *I;
-          break;
-        }
+    for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
+         I != E; ++I) {
+      auto *ParentStmt = *I;
+      if (isa<DeferStmt>(ParentStmt)) {
+        TC.diagnose(S->getLoc(), diag::jump_out_of_defer, "continue");
+        return nullptr;
       }
-    } else {
-      // Scan inside out until we find something with the right label.
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        if (S->getTargetName() == (*I)->getLabelInfo().Name) {
-          Target = *I;
-          break;
+
+      // Scan to see if we are in any non-switch labeled statements (loops).  Scan
+      // inside out.
+      if (auto *ParentLS = dyn_cast<LabeledStmt>(ParentStmt)) {
+        if (S->getTargetName().empty()) {
+          // 'continue' with no label ignores non-loop structures.
+          if (!ParentLS->requiresLabelOnJump() &&
+              ParentLS->isPossibleContinueTarget()) {
+            Target = ParentLS;
+            break;
+          }
+        } else {
+          if (S->getTargetName() == ParentLS->getLabelInfo().Name) {
+            Target = ParentLS;
+            break;
+          }
         }
       }
     }
-
+    
     if (!Target) {
       TC.diagnose(S->getLoc(), diag::continue_outside_loop);
       return nullptr;
@@ -827,7 +857,16 @@ public:
 
   Stmt *visitFailStmt(FailStmt *S) {
     // These are created as part of type-checking "return" in an initializer.
-    // There is nothing more to do.
+
+    // Do not allow exiting a defer with a failure.
+    for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
+         I != E; ++I) {
+      if (isa<DeferStmt>(*I)) {
+        TC.diagnose(S->getLoc(), diag::jump_out_of_defer, "return nil");
+        return nullptr;
+      }
+    }
+    
     return S;
   }
 };

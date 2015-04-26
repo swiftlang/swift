@@ -1624,6 +1624,12 @@ ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
 ERROR(assignment_unresolved_expr,sema_tcs,none,
       "cannot assign to %0 in %1", (Identifier, Identifier))
 
+// defer stmt.
+ERROR(jump_out_of_defer,sema_tcs,none,
+      "'%0' cannot transfer control out of a defer statement",
+      (StringRef))
+
+
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,
       "SequenceType protocol definition is broken", ())
