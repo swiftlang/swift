@@ -2149,8 +2149,10 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   llvm::Value *exn = getLoweredSingletonExplosion(i->getOperand());
 
   // Place a call to swift_willThrow(), to allow the debugger to place a
-  // breakpoint.
-  emitWillThrowCall(*this, IGM.getWillThrowFn(), exn);
+  // breakpoint in unoptimized builds.
+  if (!IGM.Opts.Optimize) {
+    emitWillThrowCall(*this, IGM.getWillThrowFn(), exn);
+  }
 
   Builder.CreateStore(exn, getCallerErrorResultSlot());
 

@@ -1,0 +1,19 @@
+// RUN: %target-swift-frontend %s -O -emit-ir | FileCheck %s 
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+enum ColorError : _ErrorType {
+  case Red, Green, Blue
+}
+
+// CHECK-LABEL: TestCallToWillThrowCallBack
+// CHECK-NOT: call void @swift_willThrow(%swift.error* %0)
+// CHECK: ret i64 undef
+sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned _ErrorType) -> (Int, @error _ErrorType) {
+bb0(%0 : $_ErrorType):
+  throw %0 : $_ErrorType                        // id: %3
+}
+
