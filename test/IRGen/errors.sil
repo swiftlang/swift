@@ -75,8 +75,8 @@ enum ColorError : _ErrorType {
 // CHECK-LABEL: TestCallToWillThrowCallBack
 // CHECK: call void @swift_willThrow(%swift.error* %0)
 // CHECK: store %swift.error* %0
-// CHECK: ret {{i(64|32)}} undef
-sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned _ErrorType) -> (Int, @error _ErrorType) {
+// CHECK: ret i64 undef
+sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned _ErrorType) -> (Int64, @error _ErrorType) {
 bb0(%0 : $_ErrorType):
   throw %0 : $_ErrorType                        // id: %3
 }
