@@ -774,9 +774,17 @@ extension Set {
   /// The provided `NSSet` will be copied to ensure that the copy can
   /// not be mutated by other code.
   public init(_cocoaSet: _NSSetType) {
-    let cfValue = unsafeBitCast(_cocoaSet, CFSet.self)
-    let copy = CFSetCreateCopy(nil, cfValue)
-    self = Set(_immutableCocoaSet: unsafeBitCast(copy, _NSSetType.self))
+    _sanityCheck(_isBridgedVerbatimToObjectiveC(T.self),
+      "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
+    // FIXME: We would like to call CFSetCreateCopy() to avoid doing an
+    // objc_msgSend() for instances of CoreFoundation types.  We can't do that
+    // today because CFSetCreateCopy() copies dictionary contents
+    // unconditionally, resulting in O(n) copies even for immutable dictionaries.
+    //
+    // <rdar://problem/20697680> CFSetCreateCopy() does not call copyWithZone:
+    self = Set(
+      _immutableCocoaSet:
+        unsafeBitCast(_cocoaSet.copyWithZone(nil), _NSSetType.self))
   }
 }
 

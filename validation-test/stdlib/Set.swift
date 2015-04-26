@@ -1111,6 +1111,53 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
   }
 }
 
+@objc
+class CustomImmutableNSSet : NSSet {
+  init(_privateInit: ()) {
+    super.init()
+  }
+
+  override init() {
+    expectUnreachable()
+    super.init()
+  }
+
+  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
+    expectUnreachable()
+    super.init(objects: objects, count: count)
+  }
+
+  required init(coder aDecoder: NSCoder) {
+    fatalError("init(coder:) not implemented by CustomImmutableNSSet")
+  }
+
+  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+    ++CustomImmutableNSSet.timesCopyWithZoneWasCalled
+    return self
+  }
+
+  override func member(object: AnyObject) -> AnyObject? {
+    ++CustomImmutableNSSet.timesMemberWasCalled
+    return getAsNSSet([ 1010, 1020, 1030 ]).member(object)
+  }
+
+  override func objectEnumerator() -> NSEnumerator {
+    ++CustomImmutableNSSet.timesObjectEnumeratorWasCalled
+    return getAsNSSet([ 1010, 1020, 1030 ]).objectEnumerator()
+  }
+
+  override var count: Int {
+    ++CustomImmutableNSSet.timesCountWasCalled
+    return 3
+  }
+
+  static var timesCopyWithZoneWasCalled = 0
+  static var timesMemberWasCalled = 0
+  static var timesObjectEnumeratorWasCalled = 0
+  static var timesCountWasCalled = 0
+}
+
+
 SetTestSuite.test("BridgedFromObjC.Verbatim.SetIsCopied") {
   var (s, nss) = getBridgedVerbatimSetAndNSMutableSet()
   var identity1 = unsafeBitCast(s, Word.self)
@@ -1138,6 +1185,87 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
 }
+
+
+SetTestSuite.test("BridgedFromObjC.Verbatim.NSSetIsRetained") {
+  var nss: NSSet = NSSet(set: getAsNSSet([ 1010, 1020, 1030 ]))
+
+  var s: Set<NSObject> = _convertNSSetToSet(nss)
+
+  var bridgedBack: NSSet = _convertSetToNSSet(s)
+
+  expectEqual(
+    unsafeBitCast(nss, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nss)
+  _fixLifetime(s)
+  _fixLifetime(bridgedBack)
+}
+
+SetTestSuite.test("BridgedFromObjC.Nonverbatim.NSSetIsCopied") {
+  var nss: NSSet = NSSet(set: getAsNSSet([ 1010, 1020, 1030 ]))
+
+  var s: Set<TestBridgedKeyTy> = _convertNSSetToSet(nss)
+
+  var bridgedBack: NSSet = _convertSetToNSSet(s)
+
+  expectNotEqual(
+    unsafeBitCast(nss, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nss)
+  _fixLifetime(s)
+  _fixLifetime(bridgedBack)
+}
+
+
+SetTestSuite.test("BridgedFromObjC.Verbatim.ImmutableSetIsRetained") {
+  var nss: NSSet = CustomImmutableNSSet(_privateInit: ())
+
+  CustomImmutableNSSet.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSSet.timesMemberWasCalled = 0
+  CustomImmutableNSSet.timesObjectEnumeratorWasCalled = 0
+  CustomImmutableNSSet.timesCountWasCalled = 0
+  var s: Set<NSObject> = _convertNSSetToSet(nss)
+  expectEqual(1, CustomImmutableNSSet.timesCopyWithZoneWasCalled)
+  expectEqual(0, CustomImmutableNSSet.timesMemberWasCalled)
+  expectEqual(0, CustomImmutableNSSet.timesObjectEnumeratorWasCalled)
+  expectEqual(0, CustomImmutableNSSet.timesCountWasCalled)
+
+  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  expectEqual(
+    unsafeBitCast(nss, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nss)
+  _fixLifetime(s)
+  _fixLifetime(bridgedBack)
+}
+
+SetTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableSetIsCopied") {
+  var nss: NSSet = CustomImmutableNSSet(_privateInit: ())
+
+  CustomImmutableNSSet.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSSet.timesMemberWasCalled = 0
+  CustomImmutableNSSet.timesObjectEnumeratorWasCalled = 0
+  CustomImmutableNSSet.timesCountWasCalled = 0
+  var s: Set<TestBridgedKeyTy> = _convertNSSetToSet(nss)
+  expectEqual(0, CustomImmutableNSSet.timesCopyWithZoneWasCalled)
+  expectEqual(0, CustomImmutableNSSet.timesMemberWasCalled)
+  expectEqual(1, CustomImmutableNSSet.timesObjectEnumeratorWasCalled)
+  expectNotEqual(0, CustomImmutableNSSet.timesCountWasCalled)
+
+  var bridgedBack: NSSet = _convertSetToNSSet(s)
+  expectNotEqual(
+    unsafeBitCast(nss, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nss)
+  _fixLifetime(s)
+  _fixLifetime(bridgedBack)
+}
+
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.IndexForMember") {
   var s = getBridgedVerbatimSet()
@@ -1843,7 +1971,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   var s2 = getBridgedVerbatimSet([])
   var identity2 = unsafeBitCast(s2, Word.self)
   expectTrue(isCocoaSet(s2))
-  expectNotEqual(identity1, identity2)
+  expectEqual(identity1, identity2)
 
   expectEqual(s1, s2)
   expectEqual(identity1, unsafeBitCast(s1, Word.self))
