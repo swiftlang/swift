@@ -849,8 +849,12 @@ Stmt *Traversal::visitReturnStmt(ReturnStmt *RS) {
 }
 
 Stmt *Traversal::visitDeferStmt(DeferStmt *DS) {
-  if (Stmt *Body = doIt(DS->getBody()))
-    DS->setBody(cast<BraceStmt>(Body));
+  if (doIt(DS->getPatternBinding()) ||
+      doIt(DS->getTempDecl()))
+    return nullptr;
+
+  if (Expr *Call = doIt(DS->getCallExpr()))
+    DS->setCallExpr(Call);
   else
     return nullptr;
   return DS;

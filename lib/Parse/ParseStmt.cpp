@@ -636,15 +636,73 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 ParserResult<Stmt> Parser::parseStmtDefer() {
   SourceLoc DeferLoc = consumeToken(tok::kw_defer);
   
-  ParserResult<BraceStmt> Body =
-    parseBraceItemList(diag::expected_lbrace_after_defer);
-  if (Body.isNull())
-    return nullptr;
+  // Macro expand out the defer into a closure and call, which we can typecheck
+  // and emit where needed.
+  //
+  // The AST representation for a defer statement is a bit weird.  We retain the
+  // brace statement that the user wrote, but actually model this as if they
+  // wrote:
+  //
+  //    @noescape let tmpClosure = { body }
+  //    tmpClosure()   // This is emitted on each path that needs to run this.
+  //
+  // As such, the body of the 'defer' is actually type checked within the
+  // closure's DeclContext.
+  unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
+  auto params = TuplePattern::create(Context, SourceLoc(), {}, SourceLoc());
+  
+  auto closure
+    = new (Context) ClosureExpr(params, /*throwsLoc*/SourceLoc(),
+                                /*arrowLoc*/SourceLoc(), /*inLoc*/SourceLoc(),
+                                /*resultType*/TypeLoc(), discriminator,
+                                CurDeclContext);
+  closure->setIsDeferBody();
   
   ParserStatus Status;
-  Status |= Body;
+  {
+    // Change the DeclContext for any variables declared in the defer to be within
+    // the defer closure.
+    ParseFunctionBody cc(*this, closure);
+    
+    ParserResult<BraceStmt> Body =
+      parseBraceItemList(diag::expected_lbrace_after_defer);
+    if (Body.isNull())
+      return nullptr;
+    Status |= Body;
+    closure->setBody(Body.get(), /*hasSingleExprBody*/false);
+  }
   
-  auto DS = new (Context) DeferStmt(DeferLoc, Body.get());
+  SourceLoc loc = closure->getBody()->getStartLoc();
+  
+  // Create the tmpClosure variable and pattern binding.
+  auto tempDecl = new (Context) VarDecl(/*static*/ false, /*let*/ true,
+                                        loc,Context.getIdentifier("tmpClosure"),
+                                        Type(), CurDeclContext);
+  tempDecl->setImplicit(true);
+  auto bindingPattern = new (Context) NamedPattern(tempDecl, /*implicit*/true);
+  
+  // The type of the closure is forced to be "@noescape () -> ()".
+  auto voidTy = TupleType::getEmpty(Context);
+  auto closureTy =
+    FunctionType::get(voidTy, voidTy, FunctionType::ExtInfo().withNoEscape());
+  
+  auto typePattern = new (Context) TypedPattern(bindingPattern,
+                                                TypeLoc::withoutLoc(closureTy),
+                                                /*implicit*/true);
+  auto bindingDecl = PatternBindingDecl::create(Context, /*static*/ SourceLoc(),
+                                                StaticSpellingKind::None, loc,
+                                                typePattern, closure,
+                                                CurDeclContext);
+  bindingDecl->setImplicit(true);
+  
+  // Form the call, which will be emitted on any path that needs to run the
+  // code.
+  auto DRE = new (Context) DeclRefExpr(tempDecl, loc, /*Implicit*/true,
+                                       AccessSemantics::DirectToStorage);
+  auto args = TupleExpr::createEmpty(Context, loc, loc, true);
+  auto call = new (Context) CallExpr(DRE, args, /*implicit*/true);
+  
+  auto DS = new (Context) DeferStmt(DeferLoc, bindingDecl, tempDecl, call);
   return makeParserResult(Status, DS);
 }
 

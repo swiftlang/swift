@@ -1787,7 +1787,7 @@ void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
 
 void PrintAST::visitDeferStmt(DeferStmt *stmt) {
   Printer << "defer ";
-  visit(stmt->getBody());
+  visit(stmt->getBodyAsWritten());
 }
 
 void PrintAST::visitIfStmt(IfStmt *stmt) {

@@ -1593,8 +1593,13 @@ ERROR(decl_closure_noescape_use,tce_sema,none,
 // Type Check Statements
 //------------------------------------------------------------------------------
 
+ERROR(jump_out_of_defer,sema_tcs,none,
+      "'%0' cannot transfer control out of a defer statement",
+      (StringRef))
+
 ERROR(return_invalid_outside_func,sema_tcs,none,
       "return invalid outside of a func", ())
+
 ERROR(return_expr_missing,sema_tcs,none,
       "non-void function should return a value", ())
 ERROR(return_non_failable_init,sema_tcs,none,
@@ -1623,12 +1628,6 @@ ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
 
 ERROR(assignment_unresolved_expr,sema_tcs,none,
       "cannot assign to %0 in %1", (Identifier, Identifier))
-
-// defer stmt.
-ERROR(jump_out_of_defer,sema_tcs,none,
-      "'%0' cannot transfer control out of a defer statement",
-      (StringRef))
-
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,

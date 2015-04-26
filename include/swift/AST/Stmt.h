@@ -181,22 +181,48 @@ public:
 ///
 ///    defer { cleanUp() }
 ///
+/// The AST representation for a defer statement is a bit weird.  We model this
+/// as if they wrote:
+///
+///    @noescape let tmpClosure = { body }
+///    tmpClosure()   // This is emitted on each path that needs to run this.
+///
+/// As such, the body of the 'defer' is actually type checked within the
+/// closure's DeclContext.
+///
 class DeferStmt : public Stmt {
   SourceLoc DeferLoc;
-  BraceStmt *Body;
+  
+  /// This is the pattern binding, which includes the initializer (a closure
+  /// expr).
+  PatternBindingDecl *patternBinding;
+  
+  /// This is the bound temp variable.
+  VarDecl *tempDecl;
+
+  /// This is the invocation of the closure, which is to be emitted on any error
+  /// paths.
+  Expr *callExpr;
   
 public:
-  DeferStmt(SourceLoc DeferLoc, BraceStmt *Body)
+  DeferStmt(SourceLoc DeferLoc, PatternBindingDecl *patternBinding,
+            VarDecl *tempDecl, Expr *callExpr)
     : Stmt(StmtKind::Defer, /*implicit*/false),
-  DeferLoc(DeferLoc), Body(Body) {}
+      DeferLoc(DeferLoc), patternBinding(patternBinding), tempDecl(tempDecl),
+      callExpr(callExpr) {}
   
   SourceLoc getDeferLoc() const { return DeferLoc; }
   
   SourceLoc getStartLoc() const { return DeferLoc; }
   SourceLoc getEndLoc() const;
-  
-  BraceStmt *getBody() const { return Body; }
-  void setBody(BraceStmt *body) { Body = body; }
+
+  PatternBindingDecl *getPatternBinding() const { return patternBinding; }
+  VarDecl *getTempDecl() const { return tempDecl; }
+  Expr *getCallExpr() const { return callExpr; }
+  void setCallExpr(Expr *E) { callExpr = E; }
+
+  /// Dig the original users's body of the defer out for AST fidelity.
+  BraceStmt *getBodyAsWritten() const;
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Defer; }
 };

@@ -364,11 +364,7 @@ func test_defer(a : Int) {
   defer { while false { break } }
 
   // Not ok.
-  while false {
-    defer {
-      break  // expected-error {{'break' cannot transfer control out of a defer statement}}
-    }
-  }
+  while false { defer { break } }   // expected-error {{'break' cannot transfer control out of a defer statement}}
   defer { return }  // expected-error {{'return' cannot transfer control out of a defer statement}}
 }
 

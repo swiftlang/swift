@@ -264,11 +264,11 @@ namespace {
   // body of a defer, and it is disabled at the end.  If it ever needs to be
   // emitted, it crashes the compiler because Sema missed something.
   class DeferEscapeCheckerCleanup : public Cleanup {
-    BraceStmt *body;
+    SourceLoc deferLoc;
   public:
-    DeferEscapeCheckerCleanup(BraceStmt *body) : body(body) {}
+    DeferEscapeCheckerCleanup(SourceLoc deferLoc) : deferLoc(deferLoc) {}
     void emit(SILGenFunction &SGF, CleanupLocation l) override {
-      SGF.SGM.diagnose(body->getStartLoc(), diag::defer_cannot_be_exited);
+      SGF.SGM.diagnose(deferLoc, diag::defer_cannot_be_exited);
     }
   };
 }
@@ -276,14 +276,16 @@ namespace {
 
 namespace {
   class DeferCleanup : public Cleanup {
-    BraceStmt *body;
+    SourceLoc deferLoc;
+    Expr *call;
   public:
-    DeferCleanup(BraceStmt *body) : body(body) {}
+    DeferCleanup(SourceLoc deferLoc, Expr *call)
+      : deferLoc(deferLoc), call(call) {}
     void emit(SILGenFunction &SGF, CleanupLocation l) override {
-      SGF.Cleanups.pushCleanup<DeferEscapeCheckerCleanup>(body);
+      SGF.Cleanups.pushCleanup<DeferEscapeCheckerCleanup>(deferLoc);
       auto TheCleanup = SGF.Cleanups.getTopCleanup();
 
-      SGF.emitStmt(body);
+      SGF.emitIgnoredExpr(call);
       
       if (SGF.B.hasValidInsertionPoint())
         SGF.Cleanups.setCleanupState(TheCleanup, CleanupState::Dead);
@@ -293,7 +295,11 @@ namespace {
 
 
 void StmtEmitter::visitDeferStmt(DeferStmt *S) {
-  SGF.Cleanups.pushCleanup<DeferCleanup>(S->getBody());
+  // Emit the closure for the defer, along with its binding.
+  SGF.visitPatternBindingDecl(S->getPatternBinding());
+
+  // Register a cleanup to invoke the closure on any exit paths.
+  SGF.Cleanups.pushCleanup<DeferCleanup>(S->getDeferLoc(), S->getCallExpr());
 }
 
 

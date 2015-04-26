@@ -1086,7 +1086,11 @@ public:
   
   void visitDeferStmt(DeferStmt *S) {
     OS.indent(Indent) << "(defer_stmt\n";
-    printRec(S->getBody());
+    printRec(S->getPatternBinding());
+    OS << '\n';
+    printRec(S->getTempDecl());
+    OS << '\n';
+    printRec(S->getCallExpr());
     OS << ')';
   }
 

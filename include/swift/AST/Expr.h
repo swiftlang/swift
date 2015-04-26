@@ -2837,6 +2837,9 @@ class ClosureExpr : public AbstractClosureExpr {
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
+  /// True if this is the body of a defer.
+  bool IsDeferBody = false;
+  
 public:
   ClosureExpr(Pattern *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
               SourceLoc inLoc, TypeLoc explicitResultType,
@@ -2890,6 +2893,10 @@ public:
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
 
+  
+  void setIsDeferBody() { IsDeferBody = true; }
+  bool isDeferBody() const { return IsDeferBody; }
+  
   /// \brief Retrieve the location of the \c '->' for closures with an
   /// explicit result type.
   SourceLoc getArrowLoc() const {

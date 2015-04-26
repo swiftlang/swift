@@ -699,7 +699,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitFailStmt(FailStmt *) {}
   void visitReturnStmt(ReturnStmt *) {}
   void visitDeferStmt(DeferStmt *DS) {
-    visit(DS->getBody());
+    // Nothing in the defer is visible.
   }
   void visitIfStmt(IfStmt *S) {
     for (auto entry : S->getCond())
