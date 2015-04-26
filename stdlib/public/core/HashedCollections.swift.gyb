@@ -2159,11 +2159,8 @@ internal struct _BridgedNative${Self}Storage {
   }
 
   @objc
-  internal func member(member: AnyObject?) -> AnyObject? {
-    if let nonNullKey? = member {
-      return bridgingObjectForKey(nonNullKey, dummy:())
-    }
-    return nil
+  internal func member(object: AnyObject) -> AnyObject? {
+    return bridgingObjectForKey(object, dummy:())
   }
 
   @objc

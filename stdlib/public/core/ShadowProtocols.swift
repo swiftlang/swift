@@ -135,7 +135,7 @@ public protocol _NSSetCoreType :
   init(objects: UnsafePointer<AnyObject?>, count: Int)
 
   var count: Int { get }
-  func member(member: AnyObject?) -> AnyObject?
+  func member(object: AnyObject) -> AnyObject?
   func objectEnumerator() -> _NSEnumeratorType
 
   // We also override the following methods for efficiency.
