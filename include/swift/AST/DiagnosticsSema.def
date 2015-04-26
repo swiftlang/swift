@@ -1672,7 +1672,9 @@ ERROR(decl_cannot_fail_no_else_allowed,sema_tcd,none,
       "'else' condition is unreachable, variable binding always succeeds", ())
 ERROR(invalid_pattern,sema_tcd,none,
       "invalid pattern", ())
-
+WARNING(var_pattern_didnt_bind_variables, sema_tcp,none,
+        "'%0' pattern has no effect; sub-pattern didn't bind any variables",
+        (StringRef))
 
 ERROR(pattern_type_mismatch_context,sema_tcp,none,
       "type annotation does not match contextual type %0", (Type))

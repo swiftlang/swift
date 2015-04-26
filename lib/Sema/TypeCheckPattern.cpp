@@ -241,6 +241,21 @@ public:
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
     P->setSubPattern(visit(P->getSubPattern()));
+    
+    // If the var pattern has no variables bound underneath it, then emit a
+    // warning that the var/let is pointless.
+    if (!DiagnosedError && !P->isImplicit()) {
+      bool HasVariable = false;
+      P->forEachVariable([&](VarDecl *VD) { HasVariable = true; });
+      
+      if (!HasVariable) {
+        TC.diagnose(P->getLoc(), diag::var_pattern_didnt_bind_variables,
+                    P->isLet() ? "let" : "var")
+          .highlight(P->getSubPattern()->getSourceRange())
+          .fixItRemove(P->getLoc());
+      }
+    }
+    
     return P;
   }
 

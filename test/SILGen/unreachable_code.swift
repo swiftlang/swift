@@ -65,7 +65,7 @@ func testUnreachableCase1(a : Tree) {
   switch a {
   case let Leaf:
     return
-  case let .Branch(_):  // expected-warning {{case will never be executed}}
+  case .Branch(_):  // expected-warning {{case will never be executed}}
     return
   }
 }
@@ -74,7 +74,7 @@ func testUnreachableCase2(a : Tree) {
   switch a {
   case let Leaf:
     fallthrough
-  case let .Branch(_):
+  case .Branch(_):
     return
   }
 }
@@ -83,7 +83,7 @@ func testUnreachableCase3(a : Tree) {
   switch a {
   case _:
     break
-  case let .Branch(_):  // expected-warning {{case will never be executed}}
+  case .Branch(_):  // expected-warning {{case will never be executed}}
     return
   }
 }
@@ -92,7 +92,7 @@ func testUnreachableCase4(a : Tree) {
   switch a {
   case .Leaf(_):
     return
-  case let .Branch(_):
+  case .Branch(_):
     return
   }
 }

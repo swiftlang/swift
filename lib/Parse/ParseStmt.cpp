@@ -890,6 +890,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       else {
         Pattern = parseMatchingPatternAsLetOrVar(IsLet, VarLoc,
                                                  /*isExprBasic*/ true);
+        if (auto *P = Pattern.getPtrOrNull())
+          P->setImplicit();  // The let/var pattern is part of the statement.
         Pattern = parseOptionalPatternTypeAnnotation(Pattern);
       }
       Status |= Pattern;
