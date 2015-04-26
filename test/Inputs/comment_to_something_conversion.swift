@@ -1,5 +1,3 @@
-import Foundation
-
 // This is an input file for comment-to-{XML,Doxygen} conversion tests.
 //
 // Please keep this file in alphabetical order!
