@@ -296,8 +296,8 @@ func testSelectorStyleArguments1(var x: Int, var bar y: Int) {
 }
 
 func testSelectorStyleArguments2(let x: Int, let bar y: Int) {
-  ++x  // expected-error {{unary operator '++' cannot be applied to an operand of type 'Int'}}
-  ++y  // expected-error {{unary operator '++' cannot be applied to an operand of type 'Int'}}
+  ++x  // expected-error {{cannot pass 'let' value 'x' to mutating unary operator '++'}}
+  ++y  // expected-error {{cannot pass 'let' value 'y' to mutating unary operator '++'}}
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}

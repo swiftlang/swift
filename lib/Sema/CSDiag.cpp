@@ -1836,31 +1836,75 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
   if (isErrorTypeKind(argType))
     return true;
   
-  auto argTyName = getUserFriendlyTypeName(argType);
-  
-  std::string overloadName;
-  
+  ValueDecl *CandidatePtr = nullptr; // temporary for the ArrayRef to reference.
+  ArrayRef<ValueDecl *> Candidates;
+
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(applyExpr->getFn())) {
-    overloadName = declRefExpr->getDecl()->getNameStr();
+    CandidatePtr = declRefExpr->getDecl();
+    Candidates = CandidatePtr;
   } else if (auto overloadedDRE =
              dyn_cast<OverloadedDeclRefExpr>(applyExpr->getFn())) {
-    overloadName = overloadedDRE->getDecls()[0]->getNameStr();
+    Candidates = overloadedDRE->getDecls();
   } else if (overloadConstraint) {
-    overloadName = overloadConstraint->getOverloadChoice().
-    getDecl()->getName().str();
+    CandidatePtr = overloadConstraint->getOverloadChoice().getDecl();
+    Candidates = CandidatePtr;
   } else {
     llvm_unreachable("unrecognized unop function kind");
   }
+
+  std::string overloadName = Candidates[0]->getNameStr();
+  assert(!overloadName.empty() && !Candidates.empty());
+  auto argTyName = getUserFriendlyTypeName(argType);
+
   
-  assert(!overloadName.empty());
+  expr->setType(ErrorType::get(CS->getASTContext()));
+  
+  // A common error is to apply an operator that only has inout forms (e.g. ++)
+  // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
+  // case.
+  if (!argType->isLValueType()) {
+    bool allAreLValues = true;
+    for (auto decl : Candidates) {
+      auto fnType = decl->getType()->getAs<AnyFunctionType>();
+      if (fnType && !fnType->getInput()->is<InOutType>()) {
+        allAreLValues = false;
+        break;
+      }
+    }
+    
+    if (allAreLValues) {
+      // Ok, that's the problem.  Special case it further based on what the
+      // actual expression is.
+      if (auto *DRE =
+            dyn_cast<DeclRefExpr>(argExpr->getSemanticsProvidingExpr()))
+        if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+          unsigned DiagCase;
+          
+          if (VD->isLet())
+            DiagCase = 0;
+          else if (VD->hasAccessorFunctions() && !VD->getSetter())
+            DiagCase = 1;
+          else
+            DiagCase = 2;
+          
+          CS->TC.diagnose(argExpr->getLoc(),
+                          diag::cannot_apply_lvalue_unop_to_rvalue_vardecl,
+                          overloadName, VD->getName(), DiagCase);
+          return true;
+        }
+      
+      CS->TC.diagnose(argExpr->getLoc(),
+                      diag::cannot_apply_lvalue_unop_to_rvalue,
+                      overloadName, argTyName);
+      return true;
+    }
+  }
   
   // FIXME: Note that we don't currently suggest a partially matching overload.
   CS->TC.diagnose(argExpr->getLoc(),
                   diag::cannot_apply_unop_to_arg,
                   overloadName,
                   argTyName);
-  
-  expr->setType(ErrorType::get(CS->getASTContext()));
   
   return true;
 }

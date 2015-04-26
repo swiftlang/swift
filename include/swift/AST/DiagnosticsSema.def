@@ -89,6 +89,15 @@ ERROR(cannot_apply_unop_to_arg,sema,none,
       "unary operator '%0' cannot be applied to an operand of type '%1'",
       (StringRef, StringRef))
 
+ERROR(cannot_apply_lvalue_unop_to_rvalue,sema,none,
+      "cannot pass immutable value of type '%1' to mutating unary operator '%0'",
+      (StringRef, StringRef))
+
+ERROR(cannot_apply_lvalue_unop_to_rvalue_vardecl,sema_tcs,none,
+      "cannot pass %select{'let' value|get-only property|}2 %1 to mutating"
+      " unary operator '%0'",
+      (StringRef, Identifier, unsigned))
+
 ERROR(cannot_subscript_with_index,sema,none,
       "cannot subscript a value of type '%0' with an index of type '%1'",
       (StringRef, StringRef))

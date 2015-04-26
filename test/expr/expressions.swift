@@ -517,8 +517,14 @@ func unaryOps(inout i8: Int8, inout i64: Int64) {
   ++i64
   --i8
 
-  // FIXME: Weird diagnostic.
-  ++Int64(5) // expected-error{{unary operator '++' cannot be applied to an operand of type 'Int64'}}
+  ++Int64(5) // expected-error{{cannot pass immutable value of type 'Int64' to mutating unary operator '++'}}
+  
+  // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
+  let a = i8
+  ++a // expected-error {{cannot pass 'let' value 'a' to mutating unary operator '++'}}
+  
+  var b : Int { get { }}
+  ++b  // expected-error {{cannot pass get-only property 'b' to mutating unary operator '++'}}
 }
 
 //===----------------------------------------------------------------------===//
