@@ -439,68 +439,6 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   return nullptr;
 }
 
-#if 0
-/// Returns the post-dominating release of a series of cancelling
-/// retain/releases on the partial apply if there are no other users than the
-/// retain/release.
-/// Currently, this only handles the case where all retain/releases are in the
-/// same basic block.
-static StrongReleaseInst *
-hasOnlyRetainReleaseUsers(PartialApplyInst *PAI,
-                          SmallVectorImpl<RefCountingInst *> &RCsToDelete) {
-  SILBasicBlock *BB = nullptr;
-  SmallPtrSet<RefCountingInst *, 16> RCs;
-
-  // Collect all reference counting users.
-  for (auto *Opd : PAI->getUses()) {
-
-    // Reference counting instruction.
-    if (auto *RCounting = dyn_cast<RefCountingInst>(Opd->getUser())) {
-      if (!isa<StrongRetainInst>(RCounting) &&
-          !isa<StrongReleaseInst>(RCounting))
-        return nullptr;
-
-      RCs.insert(RCounting);
-      // Check that we are in the same BB (we don't handle any multi BB case).
-      if (!BB)
-        BB = RCounting->getParent();
-      else if (BB != RCounting->getParent())
-        return nullptr;
-    } else
-      return nullptr;
-  }
-
-  // Need to have a least one release.
-  if (!BB)
-    return nullptr;
-
-  // Find the postdominating release. For now we only handle the single BB case.
-  RefCountingInst *PostDom = nullptr;
-  unsigned RetainCount = 0;
-  unsigned ReleaseCount = 0;
-  for (auto &Inst : *BB) {
-    auto *RCounting = dyn_cast<RefCountingInst>(&Inst);
-    if (!RCounting)
-      continue;
-    // One of the retain/releases on the partial apply.
-    if (RCs.count(RCounting)) {
-      PostDom = RCounting;
-      RetainCount += isa<StrongRetainInst>(&Inst);
-      ReleaseCount += isa<StrongReleaseInst>(&Inst);
-    }
-  }
-
-  // The retain release count better match up.
-  if (RetainCount != (ReleaseCount - 1))
-    return nullptr;
-
-  RCsToDelete.append(RCs.begin(), RCs.end());
-
-  assert(isa<StrongReleaseInst>(PostDom) && "Post dominating retain?!");
-  return dyn_cast<StrongReleaseInst>(PostDom);
-}
-#endif
-
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function.
