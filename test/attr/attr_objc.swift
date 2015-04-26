@@ -1876,3 +1876,9 @@ class SubclassThrowsObjCName : ThrowsObjCName {
   // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   override func method9(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 }
+
+
+// <rdar://problem/17686979> "var" arguments are rejected for @objc conformance
+class VarPatternIsOkForObjC {
+  @objc func foo(var x: Int) {}
+}
