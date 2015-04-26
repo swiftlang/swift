@@ -576,12 +576,13 @@ SILInstruction *swift::tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B) {
 //                              Closure Deletion
 //===----------------------------------------------------------------------===//
 
-static bool isARCOperationRemovableIfObjectIsDead(const SILInstruction *I) {
+static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   switch (I->getKind()) {
   case ValueKind::StrongRetainInst:
   case ValueKind::StrongReleaseInst:
   case ValueKind::RetainValueInst:
   case ValueKind::ReleaseValueInst:
+  case ValueKind::DebugValueInst:
     return true;
   default:
     return false;
@@ -655,7 +656,7 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
   // that we are locally identified and non-escaping since we only allow for
   // specific ARC users.
   ReleaseTracker Tracker([](const SILInstruction *I) -> bool {
-    return isARCOperationRemovableIfObjectIsDead(I);
+    return useDoesNotKeepClosureAlive(I);
   });
 
   // Find the ARC Users and the final retain, release.

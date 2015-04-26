@@ -130,65 +130,25 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
 
-    // Look through remaining uses of the partial apply inst to find at most one
-    // strong release instruction.
-    StrongReleaseInst *SRI = nullptr;
-    DebugValueInst *DVI = nullptr;
-    for (auto UI = PAI->use_begin(), UE = PAI->use_end(); UI != UE; ++UI) {
-      if (SRI == nullptr && isa<StrongReleaseInst>(UI.getUser())) {
-        SRI = cast<StrongReleaseInst>(UI.getUser());
-        assert(SRI->getOperand() == SILValue(PAI, 0));
-      } else if (DVI == nullptr && isa<DebugValueInst>(UI.getUser())) {
-        DVI = cast<DebugValueInst>(UI.getUser());
-      } else
-        return;
-    }
+    SILValue Callee = PAI->getCallee();
+    if (!tryDeleteDeadClosure(PAI))
+      return;
+    CalleeValue = Callee;
+  }
 
-    // If there is a strong release of the partial apply, then replace it with
-    // releases of the captured arguments.
-    if (SRI) {
-      SILBuilderWithScope<16> B(SRI);
-      for (auto &CaptureArg : CaptureArgs)
-        if (!CaptureArg.getType().isAddress())
-          B.emitReleaseValueOperation(SRI->getLoc(), CaptureArg);
-      SRI->eraseFromParent();
-    }
-
-    // Remove a debug_value if present.
-    if (DVI)
-      DVI->eraseFromParent();
-
-    CalleeValue = PAI->getCallee();
-    assert(PAI->use_empty());
-    PAI->eraseFromParent();
-  } else if (auto *TTTFI =
-               dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
+  if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
-
-    // Look through remaining uses of the thin-to-thick inst to find at most one
-    // strong release instruction.
-    StrongReleaseInst *SRI = nullptr;
-    for (auto UI = TTTFI->use_begin(), UE = TTTFI->use_end(); UI != UE; ++UI) {
-      if (SRI == nullptr && isa<StrongReleaseInst>(UI.getUser())) {
-        SRI = cast<StrongReleaseInst>(UI.getUser());
-        assert(SRI->getOperand() == SILValue(TTTFI, 0));
-      } else
-        return;
-    }
-
-    // If there is a strong release of the thin-to-thick function, erase it.
-    if (SRI)
-      SRI->eraseFromParent();
-
-    CalleeValue = TTTFI->getOperand();
-    assert(TTTFI->use_empty());
-    TTTFI->eraseFromParent();
+    SILValue Callee = TTTFI->getCallee();
+    if (!tryDeleteDeadClosure(TTTFI))
+      return;
+    CalleeValue = Callee;
   }
 
   if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
-    if (FRI->use_empty())
-      FRI->eraseFromParent();
+    if (!FRI->use_empty())
+      return;
+    FRI->eraseFromParent();
   }
 }
 
