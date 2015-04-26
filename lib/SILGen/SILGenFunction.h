@@ -679,6 +679,7 @@ public:
   /// \param L           The SILLocation which should be accosocated with
   ///                    cleanup instructions.
   void prepareEpilog(Type returnType, bool isThrowing, CleanupLocation L);
+  void prepareRethrowEpilog(CleanupLocation l);
   
   /// \brief Branch to and emit the epilog basic block. This will fuse
   /// the epilog to the current basic block if the epilog bb has no predecessor.
@@ -1075,8 +1076,10 @@ public:
                                     ManagedValue fn,
                                     ArrayRef<ManagedValue> args,
                                     CanType resultType,
-                                    bool transparent = false,
-                    Optional<SILFunctionTypeRepresentation> overrideRep = None);
+                                    bool transparent,
+                    Optional<SILFunctionTypeRepresentation> overrideRep,
+                    const Optional<ForeignErrorConvention> &foreignError);
+
 
   ManagedValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                            FuncDecl *fn,

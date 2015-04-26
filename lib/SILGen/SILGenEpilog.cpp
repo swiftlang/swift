@@ -33,11 +33,15 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 
   if (isThrowing) {
-    auto exnType = SILType::getExceptionType(getASTContext());
-    SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-    new (F.getModule()) SILArgument(rethrowBB, exnType);
-    ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), CleanupL);
+    prepareRethrowEpilog(CleanupL);
   }
+}
+
+void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
+  auto exnType = SILType::getExceptionType(getASTContext());
+  SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
+  new (F.getModule()) SILArgument(rethrowBB, exnType);
+  ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 
 std::pair<Optional<SILValue>, SILLocation>

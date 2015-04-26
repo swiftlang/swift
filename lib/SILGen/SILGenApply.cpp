@@ -1881,12 +1881,13 @@ ManagedValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
                                                   ArrayRef<ManagedValue> args,
                                                   CanType resultType,
                                                   bool transparent,
-                           Optional<SILFunctionTypeRepresentation> overrideRep){
+                           Optional<SILFunctionTypeRepresentation> overrideRep,
+                     const Optional<ForeignErrorConvention> &foreignError){
   auto fnType = fn.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
   return emitApply(loc, fn, {}, args, fnType,
                    AbstractionPattern(resultType), resultType,
-                   transparent, overrideRep, None, SGFContext());
+                   transparent, overrideRep, foreignError, SGFContext());
 }
 
 /// Count the number of SILParameterInfos that are needed in order to

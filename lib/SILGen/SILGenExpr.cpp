@@ -1895,7 +1895,8 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
       auto fnRef = gen.emitFunctionRef(E, generator);
       auto resultType = tupleType.getElementType(i);
       auto apply = gen.emitMonomorphicApply(E, fnRef, {}, resultType,
-                                            generator.isTransparent());
+                                            generator.isTransparent(),
+                                            None, None);
       apply.forwardInto(gen, E,
                         subInitializations[i].get()->getAddressOrNull());
       subInitializations[i]->finishInitialization(gen);

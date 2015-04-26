@@ -110,3 +110,20 @@ extension NSObject {
     throw NSError()
   }
 }
+
+let fn = ErrorProne.fail
+// CHECK-LABEL: sil shared @_TTOZFCSo10ErrorProne4failFMS_FzT_T_ : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_owned () -> @error _ErrorType
+// CHECK:      [[T0:%.*]] = function_ref @_TTOZFCSo10ErrorProne4failfMS_FzT_T_ : $@convention(thin) (@thick ErrorProne.Type) -> @error _ErrorType
+// CHECK-NEXT: [[T1:%.*]] = partial_apply [[T0]](%0)
+// CHECK-NEXT: return [[T1]]
+
+// CHECK-LABEL: sil shared @_TTOZFCSo10ErrorProne4failfMS_FzT_T_ : $@convention(thin) (@thick ErrorProne.Type) -> @error _ErrorType {
+// CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
+// CHECK:      [[METHOD:%.*]] = class_method [volatile] [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : ErrorProne.Type -> () throws -> () , $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> Bool
+// CHECK:      [[TEMP:%.*]] = alloc_stack $Optional<NSError>
+// CHECK:      [[RESULT:%.*]] = apply [[METHOD]]({{%.*}}, [[SELF]])
+// CHECK:      cond_br
+// CHECK:      return
+// CHECK:      [[T0:%.*]] = load [[TEMP]]#1
+// CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
+// CHECK:      throw [[T1]]

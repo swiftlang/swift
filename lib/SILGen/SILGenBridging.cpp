@@ -200,7 +200,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
   assert(!funcTy->hasIndirectResult()
          && "block thunking func with indirect result not supported");
   ManagedValue result = gen.emitMonomorphicApply(loc, fn, args,
-                         funcTy->getSILResult().getSwiftRValueType());
+                         funcTy->getSILResult().getSwiftRValueType(),
+                                                 false, None, None);
 
   // Bridge the result back to ObjC.
   result = gen.emitNativeToBridgedValue(loc, result,
@@ -422,7 +423,8 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
   ManagedValue result = gen.emitMonomorphicApply(loc, block, args,
                          funcTy->getSILResult().getSwiftRValueType(),
                          /*transparent*/ false,
-                         /*override CC*/ SILFunctionTypeRepresentation::Block);
+                         /*override CC*/ SILFunctionTypeRepresentation::Block,
+                         /*foreign error*/ None);
 
   // Return the result at +1.
   auto &resultTL = gen.getTypeLowering(funcTy->getSILResult());
@@ -877,4 +879,153 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   }
 
   emitObjCReturnValue(*this, loc, result, objcResultTy);
+}
+
+static SILValue
+getThunkedForeignFunctionRef(SILGenFunction &gen,
+                             SILLocation loc,
+                             SILDeclRef foreign,
+                             ArrayRef<ManagedValue> args,
+                             const SILConstantInfo &foreignCI) {
+  assert(!foreign.isCurried
+         && "should not thunk calling convention when curried");
+
+  // Produce a class_method when thunking ObjC methods.
+  auto foreignTy = foreignCI.SILFnType;
+  if (foreignTy->getRepresentation()
+        == SILFunctionTypeRepresentation::ObjCMethod) {
+    SILValue thisArg = args.back().getValue();
+
+    return gen.B.createClassMethod(loc, thisArg, foreign,
+                         SILType::getPrimitiveObjectType(foreignCI.SILFnType),
+                                   /*volatile*/ true);
+  }
+  // Otherwise, emit a function_ref.
+  return gen.emitGlobalFunctionRef(loc, foreign);
+}
+
+/// Generate code to emit a thunk with native conventions that calls a
+/// function with foreign conventions.
+void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
+  assert(!thunk.isForeign && "foreign-to-native thunks only");
+
+  // Wrap the function in its original form.
+
+  auto fd = cast<AbstractFunctionDecl>(thunk.getDecl());
+  auto nativeCI = getConstantInfo(thunk);
+  auto nativeFormalResultTy = nativeCI.LoweredInterfaceType.getResult();
+  auto nativeFnTy = F.getLoweredFunctionType();
+  assert(nativeFnTy == nativeCI.SILFnType);
+
+  // Find the foreign error convention.
+  Optional<ForeignErrorConvention> foreignError;
+  if (nativeFnTy->hasErrorResult()) {
+    foreignError = fd->getForeignErrorConvention();
+    assert(foreignError && "couldn't find foreign error convention!");
+  }
+
+  // Forward the arguments.
+  auto forwardedPatterns = fd->getBodyParamPatterns();
+
+  // For allocating constructors, 'self' is a metatype, not the 'self' value
+  // formally present in the constructor body.
+  Type allocatorSelfType;
+  if (thunk.kind == SILDeclRef::Kind::Allocator) {
+    allocatorSelfType = forwardedPatterns[0]->getType();
+    forwardedPatterns = forwardedPatterns.slice(1);
+  }
+
+  SmallVector<SILValue, 8> params;
+  for (auto *paramPattern : reversed(forwardedPatterns))
+    bindParametersForForwarding(paramPattern, params);
+
+  if (allocatorSelfType) {
+    auto selfMetatype = CanMetatypeType::get(allocatorSelfType->getCanonicalType(),
+                                             MetatypeRepresentation::Thick);
+    auto selfArg = new (F.getModule()) SILArgument(
+                                 F.begin(),
+                                 SILType::getPrimitiveObjectType(selfMetatype),
+                                 fd->getImplicitSelfDecl());
+    params.push_back(selfArg);
+  }
+
+  // Set up the throw destination if necessary.
+  CleanupLocation cleanupLoc(fd);
+  if (foreignError) {
+    prepareRethrowEpilog(cleanupLoc);
+  }
+
+  SILValue result;
+  {
+    Scope scope(Cleanups, fd);
+
+    SILDeclRef foreignDeclRef = thunk.asForeign(true);
+    SILConstantInfo foreignCI = getConstantInfo(foreignDeclRef);
+    auto foreignFnTy = foreignCI.SILFnType;
+
+    // Bridge all the arguments.
+    SmallVector<ManagedValue, 8> args;
+    unsigned foreignArgIndex = 0;
+
+    // A helper function to add a function error argument in the
+    // appropriate position.
+    auto maybeAddForeignErrorArg = [&] {
+      if (foreignError &&
+          foreignArgIndex == foreignError->getErrorParameterIndex()) {
+        args.push_back(ManagedValue());
+        foreignArgIndex++;
+      }
+    };
+
+    for (unsigned nativeParamIndex : indices(params)) {
+      // Bring the parameter to +1.
+      auto paramValue = params[nativeParamIndex];
+      auto thunkParam = nativeFnTy->getParameters()[nativeParamIndex];
+      // TODO: Could avoid a retain if the bridged parameter is also +0 and
+      // doesn't require a bridging conversion.
+      ManagedValue param;
+      switch (thunkParam.getConvention()) {
+      case ParameterConvention::Direct_Owned:
+        param = emitManagedRValueWithCleanup(paramValue);
+        break;
+      case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Direct_Unowned:
+        param = emitManagedRetain(fd, paramValue);
+        break;
+      case ParameterConvention::Direct_Deallocating:
+        param = ManagedValue::forUnmanaged(paramValue);
+        break;
+      case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Guaranteed:
+      case ParameterConvention::Indirect_Out:
+      case ParameterConvention::Indirect_Inout:
+        llvm_unreachable("indirect args in foreign thunked method not implemented");
+      }
+
+      maybeAddForeignErrorArg();
+
+      SILType foreignArgTy =
+        foreignFnTy->getParameters()[foreignArgIndex++].getSILType();
+      args.push_back(emitNativeToBridgedValue(fd, param,
+                                SILFunctionTypeRepresentation::CFunctionPointer,
+                                AbstractionPattern(param.getSwiftType()),
+                                param.getSwiftType(),
+                                foreignArgTy.getSwiftRValueType()));
+    }
+
+    maybeAddForeignErrorArg();
+
+    // Call the original.
+    auto fn = getThunkedForeignFunctionRef(*this, fd, foreignDeclRef, args,
+                                           foreignCI);
+    result = emitMonomorphicApply(fd, ManagedValue::forUnmanaged(fn),
+                                  args,
+                                  nativeFormalResultTy,
+                                  false, None, foreignError)
+      .forward(*this);
+  }
+  B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(fd), result);
+
+  // Emit the throw destination.
+  emitRethrowEpilog(fd);
 }
