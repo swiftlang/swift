@@ -3388,6 +3388,57 @@ func getDerivedAPIsDictionary() -> Dictionary<Int, Int> {
 
 var DictionaryDerivedAPIs = TestSuite("DictionaryDerivedAPIs")
 
+@objc
+class MockDictionaryWithCustomCount : NSDictionary {
+  init(count: Int) {
+    self._count = count
+    super.init()
+  }
+
+  override init() {
+    expectUnreachable()
+    super.init()
+  }
+
+  override init(
+    objects: UnsafePointer<AnyObject?>,
+    forKeys keys: UnsafePointer<NSCopying?>,
+    count: Int) {
+    expectUnreachable()
+    super.init(objects: objects, forKeys: keys, count: count)
+  }
+
+  required init(coder aDecoder: NSCoder) {
+    fatalError("init(coder:) not implemented by MockDictionaryWithCustomCount")
+  }
+
+  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+    // Ensure that copying this dictionary produces an object of the same
+    // dynamic type.
+    return self
+  }
+
+  override func objectForKey(aKey: AnyObject) -> AnyObject? {
+    expectUnreachable()
+    return NSObject()
+  }
+
+  override var count: Int {
+    ++MockDictionaryWithCustomCount.timesCountWasCalled
+    return _count
+  }
+
+  var _count: Int = 0
+
+  static var timesCountWasCalled = 0
+}
+
+func getMockDictionaryWithCustomCount(#count: Int)
+  -> Dictionary<NSObject, AnyObject> {
+
+  return MockDictionaryWithCustomCount(count: count) as Dictionary
+}
+
 DictionaryDerivedAPIs.test("isEmpty") {
   if true {
     var empty = Dictionary<Int, Int>()
@@ -3396,6 +3447,38 @@ DictionaryDerivedAPIs.test("isEmpty") {
   if true {
     var d = getDerivedAPIsDictionary()
     expectFalse(d.isEmpty)
+  }
+}
+
+func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
+  return collection._prext_isEmpty
+}
+
+DictionaryDerivedAPIs.test("isEmpty/ImplementationIsCustomized") {
+  if true {
+    var d = getMockDictionaryWithCustomCount(count: 0)
+    MockDictionaryWithCustomCount.timesCountWasCalled = 0
+    expectTrue(d._prext_isEmpty)
+    expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
+  }
+  if true {
+    var d = getMockDictionaryWithCustomCount(count: 0)
+    MockDictionaryWithCustomCount.timesCountWasCalled = 0
+    expectTrue(callGenericIsEmpty(d))
+    expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
+  }
+
+  if true {
+    var d = getMockDictionaryWithCustomCount(count: 4)
+    MockDictionaryWithCustomCount.timesCountWasCalled = 0
+    expectFalse(d._prext_isEmpty)
+    expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
+  }
+  if true {
+    var d = getMockDictionaryWithCustomCount(count: 4)
+    MockDictionaryWithCustomCount.timesCountWasCalled = 0
+    expectFalse(callGenericIsEmpty(d))
+    expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
 }
 

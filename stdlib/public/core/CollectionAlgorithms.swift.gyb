@@ -19,18 +19,6 @@ GElement = "Generator.Element"
 }%
 
 //===----------------------------------------------------------------------===//
-// isEmpty
-//===----------------------------------------------------------------------===//
-
-extension CollectionType {
-  /// Returns `true` iff `self` is empty.
-  final public var _prext_isEmpty: Bool {
-    // FIXME: dynamic dispatch for Set and Dictionary.
-    return startIndex == endIndex
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // first
 //===----------------------------------------------------------------------===//
 

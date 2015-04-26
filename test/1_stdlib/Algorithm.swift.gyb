@@ -2487,23 +2487,112 @@ SequenceTypeAlgorithms.test("subscript(range:)/CustomImplementation") {
   }
 }
 
-
-
 //===----------------------------------------------------------------------===//
 // isEmpty
 //===----------------------------------------------------------------------===//
 
-SequenceTypeAlgorithms.test("isEmpty") {
+struct MinimalCollectionWithDefaultIsEmpty : CollectionType {
+  init(count: Int) {
+    self._count = count
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return MinimalForwardIndex(
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    expectUnreachable()
+    return OpaqueValue(i.position + 1)
+  }
+
+  var _count: Int
+}
+
+func callStaticIsEmpty(
+  collection: MinimalCollectionWithDefaultIsEmpty
+) -> Bool {
+  return collection._prext_isEmpty
+}
+
+func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
+  return collection._prext_isEmpty
+}
+
+% for dispatch in [ 'Static', 'Generic' ]:
+
+SequenceTypeAlgorithms.test("isEmpty/DefaultImplementation/${dispatch}") {
   if true {
-    let s = MinimalForwardCollection<OpaqueValue<Int>>([])
-    expectTrue(s._prext_isEmpty)
+    let s = MinimalCollectionWithDefaultIsEmpty(count: 0)
+    expectTrue(call${dispatch}IsEmpty(s))
   }
   if true {
-    let s = MinimalForwardCollection<OpaqueValue<Int>>(
-      [ 1 ]._prext_map { OpaqueValue($0) })
-    expectFalse(s._prext_isEmpty)
+    let s = MinimalCollectionWithDefaultIsEmpty(count: 1)
+    expectFalse(call${dispatch}IsEmpty(s))
   }
 }
+
+% end
+
+struct MinimalCollectionWithCustomIsEmpty : CollectionType {
+  static var timesIsEmptyWasColled: Int = 0
+
+  init(count: Int) {
+    self._count = count
+  }
+
+  var startIndex: MinimalForwardIndex {
+    expectUnreachable()
+    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalForwardIndex {
+    expectUnreachable()
+    return MinimalForwardIndex(
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    expectUnreachable()
+    return OpaqueValue(i.position + 1)
+  }
+
+  var _prext_isEmpty: Bool {
+    ++MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled
+    return _count == 0
+  }
+
+  var _count: Int
+}
+
+func callStaticIsEmpty(
+  collection: MinimalCollectionWithCustomIsEmpty
+) -> Bool {
+  return collection._prext_isEmpty
+}
+
+% for dispatch in [ 'Static', 'Generic' ]:
+
+SequenceTypeAlgorithms.test("isEmpty/DefaultImplementation/${dispatch}") {
+  if true {
+    let s = MinimalCollectionWithCustomIsEmpty(count: 0)
+    MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled = 0
+    expectTrue(call${dispatch}IsEmpty(s))
+    expectEqual(1, MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled)
+  }
+  if true {
+    let s = MinimalCollectionWithCustomIsEmpty(count: 1)
+    MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled = 0
+    expectFalse(call${dispatch}IsEmpty(s))
+    expectEqual(1, MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled)
+  }
+}
+
+% end
 
 //===----------------------------------------------------------------------===//
 // first

@@ -3354,12 +3354,97 @@ SetTestSuite.test("first") {
   expectEmpty(emptySet.first)
 }
 
+@objc
+class MockSetWithCustomCount : NSSet {
+  init(count: Int) {
+    self._count = count
+    super.init()
+  }
+
+  override init() {
+    expectUnreachable()
+    super.init()
+  }
+
+  override init( objects: UnsafePointer<AnyObject?>, count: Int) {
+    expectUnreachable()
+    super.init(objects: objects, count: count)
+  }
+
+  required init(coder aDecoder: NSCoder) {
+    fatalError("init(coder:) not implemented by MockSetWithCustomCount")
+  }
+
+  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+    // Ensure that copying this set produces an object of the same
+    // dynamic type.
+    return self
+  }
+
+  override func member(object: AnyObject) -> AnyObject? {
+    expectUnreachable()
+    return object
+  }
+
+  override func objectEnumerator() -> NSEnumerator {
+    expectUnreachable()
+    return getAsNSSet([ 1010, 1020, 1030 ]).objectEnumerator()
+  }
+
+  override var count: Int {
+    ++MockSetWithCustomCount.timesCountWasCalled
+    return _count
+  }
+
+  var _count: Int = 0
+
+  static var timesCountWasCalled = 0
+}
+
+func getMockSetWithCustomCount(#count: Int)
+  -> Set<NSObject> {
+
+  return MockSetWithCustomCount(count: count) as Set
+}
+
+func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
+  return collection._prext_isEmpty
+}
+
 SetTestSuite.test("isEmpty") {
   let s1 = Set([1010, 2020, 3030])
   expectFalse(s1.isEmpty)
 
   let emptySet = Set<Int>()
   expectTrue(emptySet.isEmpty)
+}
+
+SetTestSuite.test("isEmpty/ImplementationIsCustomized") {
+  if true {
+    var d = getMockSetWithCustomCount(count: 0)
+    MockSetWithCustomCount.timesCountWasCalled = 0
+    expectTrue(d._prext_isEmpty)
+    expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
+  }
+  if true {
+    var d = getMockSetWithCustomCount(count: 0)
+    MockSetWithCustomCount.timesCountWasCalled = 0
+    expectTrue(callGenericIsEmpty(d))
+    expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
+  }
+
+  if true {
+    var d = getMockSetWithCustomCount(count: 4)
+    MockSetWithCustomCount.timesCountWasCalled = 0
+    expectFalse(d._prext_isEmpty)
+    expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
+  }
+  if true {
+    var d = getMockSetWithCustomCount(count: 4)
+    MockSetWithCustomCount.timesCountWasCalled = 0
+    expectFalse(callGenericIsEmpty(d))
+    expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
+  }
 }
 
 SetTestSuite.test("count") {

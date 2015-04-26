@@ -51,6 +51,12 @@ public protocol _CollectionDefaultsType
 }
 
 extension _CollectionDefaultsType {
+  /// Returns `true` iff `self` is empty.
+  final public var _prext_isEmpty: Bool {
+    // FIXME: dynamic dispatch for Set and Dictionary.
+    return startIndex == endIndex
+  }
+
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
@@ -136,6 +142,9 @@ public protocol CollectionType
   typealias _prext_SubSlice
 
   subscript(_prext_bounds: Range<Index>) -> _prext_SubSlice { get }
+
+  /// Returns `true` iff `self` is empty.
+  var _prext_isEmpty: Bool { get }
 
   /// Return the number of elements.
   ///

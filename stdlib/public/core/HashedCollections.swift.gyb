@@ -621,7 +621,7 @@ public struct Set<T : Hashable> :
 
   /// `true` if the set is empty.
   public var isEmpty: Bool {
-    return count == 0
+    return _prext_isEmpty
   }
 
   public var hashValue: Int {
@@ -643,6 +643,15 @@ public struct Set<T : Hashable> :
 
   public func _customFindEquatableElement(member: T) -> Index?? {
     return Optional(indexOf(member))
+  }
+
+  //
+  // CollectionType conformance
+  //
+
+  /// `true` if the set is empty.
+  public var _prext_isEmpty: Bool {
+    return count == 0
   }
 }
 
@@ -1150,7 +1159,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// True iff `count == 0`
   public var isEmpty: Bool {
-    return count == 0
+    return _prext_isEmpty
   }
 
   /// A collection containing just the keys of `self`
@@ -1171,6 +1180,16 @@ public struct Dictionary<Key : Hashable, Value> :
     LazyForwardCollection<MapCollectionView<Dictionary, Value>> {
     return lazy(self).map { $0.1 }
   }
+
+  //
+  // CollectionType conformance
+  //
+
+  /// True iff `count == 0`
+  public var _prext_isEmpty: Bool {
+    return count == 0
+  }
+
 }
 
 public func == <Key : Equatable, Value : Equatable>(
