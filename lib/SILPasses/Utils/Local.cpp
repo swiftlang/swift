@@ -588,6 +588,57 @@ static bool isARCOperationRemovableIfObjectIsDead(const SILInstruction *I) {
   }
 }
 
+/// For each captured argument of PAI, decrement the ref count of the captured
+/// argument as appropriate at each of the post dominated release locations
+/// found by Tracker.
+static void
+releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
+                                      ReleaseTracker &Tracker) {
+  SILBuilder Builder(PAI);
+  SILModule &M = PAI->getModule();
+  SILLocation Loc = PAI->getLoc();
+  auto *PAITy =
+    dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
+
+  // Emit a destroy value for each captured closure argument.
+  ArrayRef<SILParameterInfo> Params = PAITy->getParameters();
+  ArrayRef<SILValue> Args = PAI->getArguments();
+  unsigned Delta = Params.size() - Args.size();
+  assert(Delta <= Params.size() && "Error, more Args to partial apply than "
+                                   "params in its interface.");
+
+  for (auto *FinalRelease : Tracker.getFinalReleases()) {
+    Builder.setInsertionPoint(FinalRelease);
+    for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
+      SILValue Arg = Args[AI];
+      SILParameterInfo Param = Params[AI + Delta];
+
+      // If we have a trivial type, we do not need to put in any extra releases.
+      if (Arg.getType().isTrivial(M))
+        continue;
+
+      // If we have a non-trivial type and the argument is passed in @inout, we do
+      // not need to destroy it here. This is something that is implicit in the
+      // partial_apply design that will be revisited when partial_apply is
+      // redesigned.
+      if (Param.isIndirectInOut())
+        continue;
+
+      // Otherwise, we need to destroy the argument. If we have a value, perform a
+      // release_value.
+      if (Arg.getType().isObject()) {
+        Builder->createReleaseValue(Loc, Arg)
+          ->setDebugScope(PAI->getDebugScope());
+        continue;
+      }
+
+      // Otherwise put in a destroy_addr.
+      Builder->createDestroyAddr(Loc, Arg)
+        ->setDebugScope(PAI->getDebugScope());
+    }
+  }
+}
+
 /// TODO: Generalize this to general objects.
 bool swift::tryDeleteDeadClosure(SILInstruction *Closure) {
   // We currently only handle locally identified values that do not escape. We
@@ -609,18 +660,8 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure) {
 
   // If we have a partial_apply, release each captured argument at each one of
   // the final release locations of the partial apply.
-  SILBuilder Builder(Closure);
-  SILModule &M = Closure->getModule();
-  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure)) {
-    for (auto *FinalRelease : Tracker.getFinalReleases()) {
-      Builder.setInsertionPoint(FinalRelease);
-      for (SILValue Arg : PAI->getArguments()) {
-        if (Arg.getType().isTrivial(M))
-          continue;
-        Builder.createReleaseValue(FinalRelease->getLoc(), Arg);
-      }
-    }
-  }
+  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
+    releaseCapturedArgsOfDeadPartialApply(PAI, Tracker);
 
   // Then delete all user instructions.
   for (auto *User : Tracker.getTrackedUsers()) {
