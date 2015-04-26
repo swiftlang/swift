@@ -439,6 +439,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   return nullptr;
 }
 
+#if 0
 /// Returns the post-dominating release of a series of cancelling
 /// retain/releases on the partial apply if there are no other users than the
 /// retain/release.
@@ -498,6 +499,7 @@ hasOnlyRetainReleaseUsers(PartialApplyInst *PAI,
   assert(isa<StrongReleaseInst>(PostDom) && "Post dominating retain?!");
   return dyn_cast<StrongReleaseInst>(PostDom);
 }
+#endif
 
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // partial_apply without any substitutions or arguments is just a
