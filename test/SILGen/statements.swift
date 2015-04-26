@@ -429,3 +429,57 @@ func test_do_labeled() {
   // CHECK: apply [[BAR]](
   bar(4)
 }
+
+
+func callee1() {}
+func callee2() {}
+func callee3() {}
+
+// CHECK-LABEL: sil hidden @_TF10statements11defer_test1FT_T_
+func defer_test1() {
+  defer { callee1() }
+  defer { callee2() }
+  callee3()
+  
+  // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3FT_T_
+  // CHECK: apply [[C3]]
+  // CHECK: [[C2:%.*]] = function_ref @{{.*}}callee2FT_T_
+  // CHECK: apply [[C2]]
+  // CHECK: [[C1:%.*]] = function_ref @{{.*}}callee1FT_T_
+  // CHECK: apply [[C1]]
+}
+
+// CHECK-LABEL: sil hidden @_TF10statements11defer_test2FSbT_
+func defer_test2(cond : Bool) {
+  // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3FT_T_
+  // CHECK: apply [[C3]]
+  // CHECK: br [[LOOP:bb[0-9]+]]
+  callee3()
+  
+// CHECK: [[LOOP]]:
+// test the condition.
+// CHECK:  [[CONDTRUE:%.*]] = apply {{.*}}(%0)
+// CHECK: cond_br [[CONDTRUE]], [[BODY:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+  while cond {
+// CHECK: [[BODY]]:
+  // CHECK: [[C2:%.*]] = function_ref @{{.*}}callee2FT_T_
+  // CHECK: apply [[C2]]
+  // CHECK: [[C1:%.*]] = function_ref @{{.*}}callee1FT_T_
+  // CHECK: apply [[C1]]
+  // CHECK: br [[EXIT]]
+    defer { callee1() }
+    callee2()
+    break
+  }
+  
+// CHECK: [[EXIT]]:
+// CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3FT_T_
+// CHECK: apply [[C3]]
+
+  callee3()
+}
+
+
+
+
+

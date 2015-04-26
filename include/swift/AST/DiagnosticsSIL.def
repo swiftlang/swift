@@ -91,6 +91,8 @@ ERROR(unhandled_throw_from_apply,sil_gen,none,
 ERROR(nonexhaustive_catch,sil_gen,none,
       "'catch' patterns must be exhaustive in function not marked "
       "with 'throws'", ())
+ERROR(defer_cannot_be_exited,sil_gen,none,
+      "defer statement is not allowed to be exited", ())
 
 // Definite initialization diagnostics.
 NOTE(variable_defined_here,sil_analysis,none,

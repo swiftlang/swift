@@ -258,8 +258,42 @@ void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
     SGF.emitReturnExpr(Loc, S->getResult());
 }
 
+namespace {
+  // This is a little cleanup that ensures that there are no jumps out of a
+  // defer body.  The cleanup is only active and installed when emitting the
+  // body of a defer, and it is disabled at the end.  If it ever needs to be
+  // emitted, it crashes the compiler because Sema missed something.
+  class DeferEscapeCheckerCleanup : public Cleanup {
+    BraceStmt *body;
+  public:
+    DeferEscapeCheckerCleanup(BraceStmt *body) : body(body) {}
+    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+      SGF.SGM.diagnose(body->getStartLoc(), diag::defer_cannot_be_exited);
+    }
+  };
+}
+
+
+namespace {
+  class DeferCleanup : public Cleanup {
+    BraceStmt *body;
+  public:
+    DeferCleanup(BraceStmt *body) : body(body) {}
+    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+      SGF.Cleanups.pushCleanup<DeferEscapeCheckerCleanup>(body);
+      auto TheCleanup = SGF.Cleanups.getTopCleanup();
+
+      SGF.emitStmt(body);
+      
+      if (SGF.B.hasValidInsertionPoint())
+        SGF.Cleanups.setCleanupState(TheCleanup, CleanupState::Dead);
+    }
+  };
+}
+
+
 void StmtEmitter::visitDeferStmt(DeferStmt *S) {
-  llvm_unreachable("defer emission not implemented yet");
+  SGF.Cleanups.pushCleanup<DeferCleanup>(S->getBody());
 }
 
 
