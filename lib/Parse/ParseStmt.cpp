@@ -1163,7 +1163,7 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
 
     foundActive |= ClauseIsActive;
     
-    if (!Tok.isAtStartOfLine())
+    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
       diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
 
     SmallVector<ASTNode, 16> Elements;
@@ -1187,8 +1187,7 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
     HadMissingEnd = true;
     EndLoc = PreviousLoc;
     skipUntilConfigBlockClose();
-  }
-  else if (!Tok.isAtStartOfLine())
+  } else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
     diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
 
   

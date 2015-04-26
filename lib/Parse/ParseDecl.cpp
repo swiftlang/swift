@@ -2311,7 +2311,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 
     foundActive |= ClauseIsActive;
 
-    if (!Tok.isAtStartOfLine())
+    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
       diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
 
     Optional<Scope> scope;
@@ -2349,7 +2349,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     HadMissingEnd = true;
     skipUntilConfigBlockClose();
   }
-  else if (!Tok.isAtStartOfLine())
+  else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
     diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
 
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
