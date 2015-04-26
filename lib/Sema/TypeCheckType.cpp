@@ -2228,6 +2228,10 @@ static unsigned getObjCDiagnosticAttrKind(ObjCReason Reason) {
 static bool isParamRepresentableInObjC(TypeChecker &TC,
                                        const DeclContext *DC,
                                        const Pattern *P) {
+  // Look through var patterns.
+  if (auto *VP = dyn_cast<VarPattern>(P))
+    P = VP->getSubPattern();
+  
   auto *TP = dyn_cast<TypedPattern>(P);
   if (!TP)
     return false;
