@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s | FileCheck %s
+// REQUIRES: kraken
 
 // Make sure that we are able to inline try-apply instructions.
 

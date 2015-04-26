@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
+// REQUIRES: kraken
 
 // Make sure we can swap two values in an array without retaining anything.
 
