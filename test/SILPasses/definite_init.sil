@@ -832,7 +832,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $RootClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [delegatingself] %2#1 : $*RootClassWithNontrivialStoredProperties
   store %0 to %4 : $*RootClassWithNontrivialStoredProperties
-  strong_release %2#0 : $Builtin.NativeObject  // expected-error {{failable convenience initializer must delegate to self.init() before returning nil}}
+  strong_release %2#0 : $Builtin.NativeObject
 
   %13 = tuple ()
   return %13 : $()
@@ -851,7 +851,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [delegatingself] %2#1 : $*DerivedClassWithNontrivialStoredProperties
   store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
-  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{failable convenience initializer must delegate to self.init() before returning nil}}
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties 
   dealloc_stack %2#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
