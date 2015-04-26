@@ -2590,9 +2590,9 @@ static LiteralExpr *getAutoIncrementedLiteralExpr(TypeChecker &TC,
     nextVal.toStringSigned(nextValStr);
     auto expr = new (TC.Context)
       IntegerLiteralExpr(TC.Context.AllocateCopy(StringRef(nextValStr)),
-                         forElt->getLoc(), /*Implicit=*/true);
+                         SourceLoc(), /*Implicit=*/true);
     if (negative)
-      expr->setNegative(forElt->getLoc());
+      expr->setNegative(SourceLoc());
     
     return expr;
   }

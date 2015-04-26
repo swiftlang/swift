@@ -485,6 +485,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
     // from ObjC interoperability code. Currently, we treat NSUInteger as
     // Int.
     if (Loc.getSourceLoc().isInvalid()) {
+ 
       // Otherwise emit the appropriate diagnostic and set ResultsInError.
       if (Literal)
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
@@ -502,22 +503,17 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
 
     // Otherwise report the overflow error.
     if (Literal) {
-      bool SrcTySigned, DstTySigned;
-      std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
-      SmallString<10> SrcAsString;
-      SrcVal.toString(SrcAsString, /*radix*/10, SrcTySigned);
-
       // Try to print user-visible types if they are available.
       if (!UserDstTy.isNull()) {
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                 diag::integer_literal_overflow, UserDstTy, SrcAsString);
+                 diag::integer_literal_overflow, UserDstTy);
       // Otherwise, print the Builtin Types.
       } else {
         bool SrcTySigned, DstTySigned;
         std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow_builtin_types,
-                 DstTySigned, DstTy, SrcAsString);
+                 DstTySigned, DstTy);
       }
     } else {
       if (Builtin.ID == BuiltinValueKind::SUCheckedConversion) {
@@ -643,13 +639,10 @@ case BuiltinValueKind::id:
       if (!ResultsInError.hasValue())
         return nullptr;
 
-      SmallString<10> SrcAsString;
-      SrcVal.toString(SrcAsString, /*radix*/10, true /*isSigned*/);
-      
       // Otherwise emit our diagnostics and then return nullptr.
       diagnose(M.getASTContext(), Loc.getSourceLoc(),
                diag::integer_literal_overflow,
-               CE ? CE->getType() : DestTy, SrcAsString);
+               CE ? CE->getType() : DestTy);
       ResultsInError = Optional<bool>(true);
       return nullptr;
     }

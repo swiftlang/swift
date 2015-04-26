@@ -272,11 +272,11 @@ func testArithmeticOverflow_Int_64bit() {
     // Literals.
     var t1: Int = 0x7fff_ffff_ffff_ffff // OK
     var t2: Int = 0x8000_0000_0000_0000
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}} overflows when stored into 'Int'{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal overflows when stored into 'Int'{{$}}
 
     var t3: Int = -0x8000_0000_0000_0000 // OK
     var t4: Int = -0x8000_0000_0000_0001
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}} overflows when stored into 'Int'{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal overflows when stored into 'Int'{{$}}
   }
 
   if true {
@@ -409,12 +409,12 @@ func testArithmeticOverflow_UInt_64bit() {
     var t3: UInt = 0xffff_ffff_ffff_ffff
 
     var t4: UInt = -1
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}} overflows when stored into 'UInt'{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal overflows when stored into 'UInt'{{$}}
     // FIXME: Bad diagnostic:
     // <rdar://problem/19623566> Obscure diagnostic for assigning negative numbers to unsigned
 
     var t5: UInt = -0xffff_ffff_ffff_ffff
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}} overflows when stored into 'UInt'{{$}}
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal overflows when stored into 'UInt'{{$}}
     // FIXME: Bad diagnostic:
     // <rdar://problem/19623566> Obscure diagnostic for assigning negative numbers to unsigned
   }
