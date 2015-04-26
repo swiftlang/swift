@@ -353,6 +353,20 @@ func test_let_else(x : Int, y : Int??, cond : Bool) {
 }
 
 
+// "defer"
+
+func test_defer(a : Int) {
+  
+  defer { VoidReturn1() }
+  defer { breakContinue(1)+42 }
+  
+  // Ok:
+  defer { while false { break } }
+
+  // Not ok.
+  while false { defer { break } }
+  defer { return }
+}
 
 
 

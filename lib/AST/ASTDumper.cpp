@@ -1083,6 +1083,12 @@ public:
     }
     OS << ')';
   }
+  
+  void visitDeferStmt(DeferStmt *S) {
+    OS.indent(Indent) << "(defer_stmt\n";
+    printRec(S->getBody());
+    OS << ')';
+  }
 
   void visitIfStmt(IfStmt *S) {
     OS.indent(Indent) << "(if_stmt\n";

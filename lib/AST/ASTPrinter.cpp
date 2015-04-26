@@ -1785,6 +1785,11 @@ void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
   }
 }
 
+void PrintAST::visitDeferStmt(DeferStmt *stmt) {
+  Printer << "defer ";
+  visit(stmt->getBody());
+}
+
 void PrintAST::visitIfStmt(IfStmt *stmt) {
   Printer << "if ";
   // FIXME: print condition

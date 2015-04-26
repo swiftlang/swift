@@ -175,6 +175,32 @@ public:
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Return;}
 };
+  
+/// DeferStmt - A 'defer' statement.  This runs the substatement it contains
+/// when the enclosing scope is exited.
+///
+///    defer { cleanUp() }
+///
+class DeferStmt : public Stmt {
+  SourceLoc DeferLoc;
+  BraceStmt *Body;
+  
+public:
+  DeferStmt(SourceLoc DeferLoc, BraceStmt *Body)
+    : Stmt(StmtKind::Defer, /*implicit*/false),
+  DeferLoc(DeferLoc), Body(Body) {}
+  
+  SourceLoc getDeferLoc() const { return DeferLoc; }
+  
+  SourceLoc getStartLoc() const { return DeferLoc; }
+  SourceLoc getEndLoc() const;
+  
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *body) { Body = body; }
+  
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Defer; }
+};
+ 
 
   
 /// This represents an entry in an "if" or "while" condition.  Pattern bindings

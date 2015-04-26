@@ -32,6 +32,7 @@ bool Parser::isStartOfStmt() {
   switch (Tok.getKind()) {
   default: return false;
   case tok::kw_return:
+  case tok::kw_defer:
   case tok::kw_if:
   case tok::kw_while:
   case tok::kw_do:
@@ -483,6 +484,9 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::kw_return:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtReturn();
+  case tok::kw_defer:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    return parseStmtDefer();
   case tok::kw_if:
     return parseStmtIf(LabelInfo);
   case tok::pound_if:
@@ -622,6 +626,26 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
   }
 
   return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
+}
+
+/// parseStmtDefer
+///
+///   stmt-defer:
+///     'defer' brace-stmt
+///
+ParserResult<Stmt> Parser::parseStmtDefer() {
+  SourceLoc DeferLoc = consumeToken(tok::kw_defer);
+  
+  ParserResult<BraceStmt> Body =
+    parseBraceItemList(diag::expected_lbrace_after_defer);
+  if (Body.isNull())
+    return nullptr;
+  
+  ParserStatus Status;
+  Status |= Body;
+  
+  auto DS = new (Context) DeferStmt(DeferLoc, Body.get());
+  return makeParserResult(Status, DS);
 }
 
 namespace {

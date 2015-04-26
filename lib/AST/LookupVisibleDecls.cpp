@@ -698,6 +698,9 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitFallthroughStmt(FallthroughStmt *) {}
   void visitFailStmt(FailStmt *) {}
   void visitReturnStmt(ReturnStmt *) {}
+  void visitDeferStmt(DeferStmt *DS) {
+    visit(DS->getBody());
+  }
   void visitIfStmt(IfStmt *S) {
     for (auto entry : S->getCond())
       if (auto *PBD = entry.getBinding())

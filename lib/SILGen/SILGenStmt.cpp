@@ -258,6 +258,13 @@ void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
     SGF.emitReturnExpr(Loc, S->getResult());
 }
 
+void StmtEmitter::visitDeferStmt(DeferStmt *S) {
+  llvm_unreachable("defer emission not implemented yet");
+}
+
+
+
+
 void StmtEmitter::visitIfStmt(IfStmt *S) {
   Scope condBufferScope(SGF.Cleanups, S);
   

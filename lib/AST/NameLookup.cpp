@@ -302,6 +302,10 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitFallthroughStmt(FallthroughStmt *) {}
   void visitFailStmt(FailStmt *) {}
   void visitReturnStmt(ReturnStmt *) {}
+  void visitDeferStmt(DeferStmt *DS) {
+    visit(DS->getBody());
+  }
+
   void visitIfStmt(IfStmt * S) {
     visit(S->getThenStmt());
     if (S->getElseStmt())

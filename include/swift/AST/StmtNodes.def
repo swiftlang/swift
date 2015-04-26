@@ -42,6 +42,7 @@
 
 STMT(Brace, Stmt)
 STMT(Return, Stmt)
+STMT(Defer, Stmt)
 ABSTRACT_STMT(Labeled, Stmt)
   ABSTRACT_STMT(LabeledConditional, LabeledStmt)
     LABELED_STMT(If, LabeledConditionalStmt)

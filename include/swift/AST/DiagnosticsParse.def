@@ -728,6 +728,10 @@ ERROR(expected_close_after_else,stmt_parsing,none,
 ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'return' statement", ())
 
+// Defer Statement
+ERROR(expected_lbrace_after_defer,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'defer'", ())
+
 // If/While Conditions
 ERROR(expected_expr_conditional_letbinding,stmt_parsing,none,
       "expected 'let' or 'var' in conditional", ())

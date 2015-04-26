@@ -73,6 +73,7 @@ KEYWORD(sil_witness_table) // This is only enabled when parsing .sil files.
 KEYWORD(sil_coverage_map)  // This is only enabled when parsing .sil files.
 
 // Statement keywords.
+STMT_KEYWORD(defer)
 STMT_KEYWORD(if)
 STMT_KEYWORD(do)
 STMT_KEYWORD(repeat)

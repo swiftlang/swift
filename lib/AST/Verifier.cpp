@@ -700,6 +700,9 @@ struct ASTNodeBase {};
 
       verifyCheckedBase(S);
     }
+    void verifyChecked(DeferStmt *S) {
+      verifyCheckedBase(S);
+    }
 
     void verifyChecked(FailStmt *S) {
       // Dig out the initializer we're in (if we are).

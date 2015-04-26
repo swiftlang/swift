@@ -158,6 +158,10 @@ SourceLoc ReturnStmt::getEndLoc() const {
   return (Result ? Result->getEndLoc() : ReturnLoc);
 }
 
+SourceLoc DeferStmt::getEndLoc() const {
+  return Body->getEndLoc();
+}
+
 bool LabeledStmt::isPossibleContinueTarget() const {
   switch (getKind()) {
 #define LABELED_STMT(ID, PARENT)

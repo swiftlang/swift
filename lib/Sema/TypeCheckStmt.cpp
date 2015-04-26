@@ -347,6 +347,13 @@ public:
     return RS;
   }
   
+  Stmt *visitDeferStmt(DeferStmt *DS) {
+    BraceStmt *S = DS->getBody();
+    if (typeCheckStmt(S)) return 0;
+    DS->setBody(S);
+    return DS;
+  }
+  
   Stmt *visitIfStmt(IfStmt *IS) {
     StmtCondition C = IS->getCond();
     if (TC.typeCheckCondition(C, DC)) return 0;

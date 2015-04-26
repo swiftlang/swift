@@ -848,6 +848,14 @@ Stmt *Traversal::visitReturnStmt(ReturnStmt *RS) {
   return RS;
 }
 
+Stmt *Traversal::visitDeferStmt(DeferStmt *DS) {
+  if (Stmt *Body = doIt(DS->getBody()))
+    DS->setBody(cast<BraceStmt>(Body));
+  else
+    return nullptr;
+  return DS;
+}
+
 Stmt *Traversal::visitIfStmt(IfStmt *IS) {
   if (doIt(IS->getCond()))
     return nullptr;
