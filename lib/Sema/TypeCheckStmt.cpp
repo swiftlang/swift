@@ -197,10 +197,6 @@ public:
   /// limitations on their body.
   SmallVector<Stmt*, 2> ActiveLabeledStmts;
   
-  /// If we're inside the emission of a 'defer' statement, this is the location
-  /// of it.
-  SourceLoc DeferLoc;
-
   /// The level of 'switch' nesting. 'fallthrough' is valid only in scopes where
   /// this is greater than one.
   unsigned SwitchLevel = 0;
