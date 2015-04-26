@@ -1261,6 +1261,55 @@ func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKey
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
+@objc
+class CustomImmutableNSDictionary : NSDictionary {
+  init(_privateInit: ()) {
+    super.init()
+  }
+
+  override init() {
+    expectUnreachable()
+    super.init()
+  }
+
+  override init(
+    objects: UnsafePointer<AnyObject?>,
+    forKeys keys: UnsafePointer<NSCopying?>,
+    count: Int) {
+    expectUnreachable()
+    super.init(objects: objects, forKeys: keys, count: count)
+  }
+
+  required init(coder aDecoder: NSCoder) {
+    fatalError("init(coder:) not implemented by CustomImmutableNSDictionary")
+  }
+
+  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+    ++CustomImmutableNSDictionary.timesCopyWithZoneWasCalled
+    return self
+  }
+
+  override func objectForKey(aKey: AnyObject) -> AnyObject? {
+    ++CustomImmutableNSDictionary.timesObjectForKeyWasCalled
+    return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).objectForKey(aKey)
+  }
+
+  override func keyEnumerator() -> NSEnumerator {
+    ++CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled
+    return getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]).keyEnumerator()
+  }
+
+  override var count: Int {
+    ++CustomImmutableNSDictionary.timesCountWasCalled
+    return 3
+  }
+
+  static var timesCopyWithZoneWasCalled = 0
+  static var timesObjectForKeyWasCalled = 0
+  static var timesKeyEnumeratorWasCalled = 0
+  static var timesCountWasCalled = 0
+}
+
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
   var (d, nsd) = getBridgedVerbatimDictionaryAndNSMutableDictionary()
   var identity1 = unsafeBitCast(d, Word.self)
@@ -1309,6 +1358,90 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
     assert(kv.0 == TestBridgedKeyTy(10))
     assert(kv.1.value == 1010)
   }
+}
+
+
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
+  var nsd: NSDictionary = NSDictionary(dictionary:
+    getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]))
+
+  var d: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(nsd)
+
+  var bridgedBack: NSDictionary = _convertDictionaryToNSDictionary(d)
+
+  expectEqual(
+    unsafeBitCast(nsd, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nsd)
+  _fixLifetime(d)
+  _fixLifetime(bridgedBack)
+}
+
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
+  var nsd: NSDictionary = NSDictionary(dictionary:
+    getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ]))
+
+  var d: [TestBridgedKeyTy : TestBridgedValueTy] =
+    _convertNSDictionaryToDictionary(nsd)
+
+  var bridgedBack: NSDictionary = _convertDictionaryToNSDictionary(d)
+
+  expectNotEqual(
+    unsafeBitCast(nsd, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nsd)
+  _fixLifetime(d)
+  _fixLifetime(bridgedBack)
+}
+
+
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained") {
+  var nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
+
+  CustomImmutableNSDictionary.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSDictionary.timesObjectForKeyWasCalled = 0
+  CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled = 0
+  CustomImmutableNSDictionary.timesCountWasCalled = 0
+  var d: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(nsd)
+  expectEqual(1, CustomImmutableNSDictionary.timesCopyWithZoneWasCalled)
+  expectEqual(0, CustomImmutableNSDictionary.timesObjectForKeyWasCalled)
+  expectEqual(0, CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled)
+  expectEqual(0, CustomImmutableNSDictionary.timesCountWasCalled)
+
+  var bridgedBack: NSDictionary = _convertDictionaryToNSDictionary(d)
+  expectEqual(
+    unsafeBitCast(nsd, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nsd)
+  _fixLifetime(d)
+  _fixLifetime(bridgedBack)
+}
+
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopied") {
+  var nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
+
+  CustomImmutableNSDictionary.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSDictionary.timesObjectForKeyWasCalled = 0
+  CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled = 0
+  CustomImmutableNSDictionary.timesCountWasCalled = 0
+  var d: [TestBridgedKeyTy : TestBridgedValueTy] =
+    _convertNSDictionaryToDictionary(nsd)
+  expectEqual(0, CustomImmutableNSDictionary.timesCopyWithZoneWasCalled)
+  expectEqual(3, CustomImmutableNSDictionary.timesObjectForKeyWasCalled)
+  expectEqual(1, CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled)
+  expectNotEqual(0, CustomImmutableNSDictionary.timesCountWasCalled)
+
+  var bridgedBack: NSDictionary = _convertDictionaryToNSDictionary(d)
+  expectNotEqual(
+    unsafeBitCast(nsd, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nsd)
+  _fixLifetime(d)
+  _fixLifetime(bridgedBack)
 }
 
 

@@ -543,11 +543,19 @@ extension Dictionary {
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
   public init(_cocoaDictionary: _NSDictionaryType) {
-    let cfValue = unsafeBitCast(_cocoaDictionary, CFDictionary.self)
-    let copy = CFDictionaryCreateCopy(nil, cfValue)
+    _sanityCheck(
+      _isBridgedVerbatimToObjectiveC(Key.self) &&
+      _isBridgedVerbatimToObjectiveC(Value.self),
+      "Dictionary be backed by NSDictionary storage only when both key and value are bridged verbatim to Objective-C")
+    // FIXME: We would like to call CFDictionaryCreateCopy() to avoid doing an
+    // objc_msgSend() for instances of CoreFoundation types.  We can't do that
+    // today because CFDictionaryCreateCopy() copies dictionary contents
+    // unconditionally, resulting in O(n) copies even for immutable dictionaries.
+    //
+    // <rdar://problem/20690755> CFDictionaryCreateCopy() does not call copyWithZone:
     self = Dictionary(
       _immutableCocoaDictionary:
-        unsafeBitCast(copy, _NSDictionaryType.self))
+        unsafeBitCast(_cocoaDictionary.copyWithZone(nil), _NSDictionaryType.self))
   }
 }
 
