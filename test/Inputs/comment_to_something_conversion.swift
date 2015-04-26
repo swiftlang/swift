@@ -217,7 +217,7 @@ func f1(first: Int) {}
 /// - parameter third:
 ///   Bbb.
 func f2(first: Int, second: Double, third: Float) {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2(_:second:third:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f2FS0_FTSi6secondSd5thirdSf_T_</USR><Declaration>func f2(first: Int, second: Double, third: Float)</Declaration><Abstract><Para>Aaa.  f2.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para></Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Aaa.</Para></Discussion></Parameter><Parameter><Name>third</Name><Direction isExplicit="0">in</Direction><Discussion><Para> Bbb.</Para></Discussion></Parameter></Parameters></Function>] CommentXMLValid
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2(_:second:third:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f2FS0_FTSi6secondSd5thirdSf_T_</USR><Declaration>func f2(first: Int, second: Double, third: Float)</Declaration><Abstract><Para>Aaa.  f2.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para></Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Aaa.</Para></Discussion></Parameter><Parameter><Name>third</Name><Direction isExplicit="0">in</Direction><Discussion><Para> Bbb.</Para></Discussion></Parameter></Parameters></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
@@ -264,7 +264,7 @@ func f0() {}
 /// - PARAMETERS:
 ///   - z: A number
 func f0(x: Int, y: Int, z: Int) {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:z:)</Name><USR>s:FC14swift_ide_test16ParameterOutline2f0FS0_FTSi1ySi1zSi_T_</USR><Declaration>func f0(x: Int, y: Int, z: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>y</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>z</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters></Function>] CommentXMLValid
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:z:)</Name><USR>s:FC14swift_ide_test16ParameterOutline2f0FS0_FTSi1ySi1zSi_T_</USR><Declaration>func f0(x: Int, y: Int, z: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>y</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>z</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
@@ -306,7 +306,7 @@ func f0(x: Int, y: Int, z: Int) {}
 // CHECK: {{.*}}DocCommentAsXML=none
   /// - Parameter x: A number
   func f0(x: Int, y: Int) {}
-// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:)</Name><USR>s:FC14swift_ide_test18SeparateParameters2f0FS0_FTSi1ySi_T_</USR><Declaration>func f0(x: Int, y: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters></Function>] CommentXMLValid
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:)</Name><USR>s:FC14swift_ide_test18SeparateParameters2f0FS0_FTSi1ySi_T_</USR><Declaration>func f0(x: Int, y: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
 }
