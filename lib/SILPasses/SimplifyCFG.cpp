@@ -745,22 +745,22 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
       LoopHeaders.count(DestBB))
     return false;
 
-  // Okay, it looks like we want to do this and we can.  Duplicate the
+    // Okay, it looks like we want to do this and we can.  Duplicate the
   // destination block into this one, rewriting uses of the BBArgs to use the
   // branch arguments as we go.
-  EdgeThreadingCloner Cloner(BI);
+  ThreadingCloner Cloner(BI);
 
   for (auto &I : *DestBB)
     Cloner.process(&I);
 
   // Once all the instructions are copied, we can nuke BI itself.  We also add
-  // the threaded and edge block to the worklist now that they (likely) can be
+  // this block back to the worklist now that the terminator (likely) can be
   // simplified.
-  addToWorklist(SrcBB);
-  addToWorklist(Cloner.getEdgeBB());
+  addToWorklist(BI->getParent());
+  BI->eraseFromParent();
 
   if (NeedToUpdateSSA)
-    updateSSAAfterCloning(Cloner, Cloner.getEdgeBB(), DestBB);
+    updateSSAAfterCloning(Cloner, SrcBB, DestBB);
 
   // We may be able to simplify DestBB now that it has one fewer predecessor.
   simplifyAfterDroppingPredecessor(DestBB);
@@ -1768,13 +1768,14 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
     // Okay, it looks like we want to do this and we can.  Duplicate the
     // destination block into this one, rewriting uses of the BBArgs to use the
     // branch arguments as we go.
-    EdgeThreadingCloner Cloner(Branch);
+    ThreadingCloner Cloner(Branch);
 
     for (auto &I : *DestBB)
       Cloner.process(&I);
 
-    updateSSAAfterCloning(Cloner, Cloner.getEdgeBB(), DestBB);
-    addToWorklist(Cloner.getEdgeBB());
+    Branch->eraseFromParent();
+
+    updateSSAAfterCloning(Cloner, BB, DestBB);
   }
 
   return Changed;
