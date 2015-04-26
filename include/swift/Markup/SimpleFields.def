@@ -1,6 +1,26 @@
-// MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind)
+//===--- SimpleFields.def - Swift Markup ------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines simple top-level field extensions for doc comments.
+// These definitions automatically generate the classes and XML printing
+// facilities.
+//
 // There must be a correspnding definition of these nodes
 // in include/swift/Markup/ASTNodes.def.
+//
+//===----------------------------------------------------------------------===//
+
+// MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind)
+
 MARKUP_SIMPLE_FIELD(AttentionField, attention, Attention)
 MARKUP_SIMPLE_FIELD(AuthorField, author, Author)
 MARKUP_SIMPLE_FIELD(AuthorsField, authors, Authors)
