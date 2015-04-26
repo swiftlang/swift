@@ -799,23 +799,23 @@ bb0(%0 : $@callee_owned () -> Builtin.Int8):
   return %4 : $Builtin.Int8
 }
 
+// We remove everything here now.
 // CHECK-LABEL: sil @testouter_transparent
 sil @testouter_transparent : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
 // CHECK: bb0
+// CHECK-NEXT: return
 bb0(%0 : $Builtin.Int8):
-  // CHECK-NOT: = apply
   %2 = function_ref @outer_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
   %3 = function_ref @identity_closure : $@convention(thin) (Builtin.Int8) -> Builtin.Int8
   %4 = partial_apply %3(%0) : $@convention(thin) (Builtin.Int8) -> Builtin.Int8
   %5 = apply %2(%4) : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
-  // CHECK: return %0
   return %5 : $Builtin.Int8
 }
 
-// CHECK-LABEL: sil shared [transparent] @identity_closure
+// We delete this now.
+//
+// CHECK-NOT: sil shared [transparent] @identity_closure
 sil shared [transparent] @identity_closure : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
-// CHECK: bb0
 bb0(%0 : $Builtin.Int8):
-  // CHECK: return
   return %0 : $Builtin.Int8
 }
