@@ -368,5 +368,11 @@ func test_defer(a : Int) {
   defer { return }  // expected-error {{'return' cannot transfer control out of a defer statement}}
 }
 
-
+class SomeTestClass {
+  var x = 42
+  
+  func method() {
+    defer { x = 97 }  // self. not required here!
+  }
+}
 

@@ -384,6 +384,10 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     /// qualification of member references.
     static bool isClosureRequiringSelfQualification(
                   const AbstractClosureExpr *CE) {
+      if (auto *CCE = dyn_cast<ClosureExpr>(CE))
+        if (CCE->isDeferBody())
+          return false;
+      
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
       return !AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
