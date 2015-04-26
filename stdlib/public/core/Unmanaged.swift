@@ -17,7 +17,7 @@
 public struct Unmanaged<T : AnyObject> {
   unowned(unsafe) var _value: T
 
-  @transparent 
+  @transparent
   init(_private: T) { _value = _private }
 
   /// Unsafely turn an opaque C pointer into an unmanaged
@@ -25,9 +25,7 @@ public struct Unmanaged<T : AnyObject> {
   ///
   /// This operation does not change reference counts.
   ///
-  /// ::
-  ///
-  ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
+  ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @transparent public
   static func fromOpaque(value: COpaquePointer) -> Unmanaged {
     // Null pointer check is a debug check, because it guards only against one
@@ -44,9 +42,7 @@ public struct Unmanaged<T : AnyObject> {
   ///
   /// This operation does not change reference counts.
   ///
-  /// ::
-  ///
-  ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
+  ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @transparent public
   func toOpaque() -> COpaquePointer {
     return unsafeBitCast(_value, COpaquePointer.self)
@@ -70,10 +66,8 @@ public struct Unmanaged<T : AnyObject> {
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +0.
   ///
-  /// ::
-  ///
-  ///   CFArraySetValueAtIndex(.passUnretained(array), i,
-  ///                          .passUnretained(object))
+  ///     CFArraySetValueAtIndex(.passUnretained(array), i,
+  ///                            .passUnretained(object))
   @transparent public
   static func passUnretained(value: T) -> Unmanaged {
     return Unmanaged(_private: value)

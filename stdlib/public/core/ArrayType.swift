@@ -15,7 +15,7 @@ public protocol __ArrayType : CollectionType {
 
   typealias _Buffer : _ArrayBufferType
   var _buffer: _Buffer {get}
-  
+
   func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Generator.Element>
 }
 
@@ -40,13 +40,13 @@ protocol _ArrayType
 
   /// Construct an array of count elements, each initialized to repeatedValue
   init(count: Int, repeatedValue: Self.Generator.Element)
-  
+
   /// How many elements the Array stores
   var count: Int {get}
-  
+
   /// How many elements the Array can store without reallocation
   var capacity: Int {get}
-  
+
   /// true if and only if the Array is empty
   var isEmpty: Bool {get}
 
@@ -58,17 +58,17 @@ protocol _ArrayType
   var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {get}
 
   subscript(index: Int) -> Self.Generator.Element {get set}
-  
+
   //===--- basic mutations ------------------------------------------------===//
 
   /// Reserve enough space to store minimumCapacity elements.
   ///
-  /// PostCondition: `capacity >= minimumCapacity` and the array has
+  /// - postcondition: `capacity >= minimumCapacity` and the array has
   /// mutable contiguous storage.
   ///
-  /// Complexity: O(`count`)
+  /// - complexity: O(`count`)
   mutating func reserveCapacity(minimumCapacity: Int)
-  
+
   /// Append newElement to the Array in O(1) (amortized)
   mutating func append(newElement: Self.Generator.Element)
 
@@ -82,28 +82,28 @@ protocol _ArrayType
   func += <
     S: SequenceType where S.Generator.Element == Self.Generator.Element
   >(inout lhs: Self, rhs: S)
-  
+
   /// Remove an element from the end of the Array in O(1).  Returns:
   /// the removed element. Requires: count > 0
   mutating func removeLast() -> Self.Generator.Element
-  
+
   /// Insert `newElement` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   ///
   /// Requires: `atIndex` <= `count`
   mutating func insert(newElement: Self.Generator.Element, atIndex i: Int)
 
   /// Remove and return the element at the given index.  Returns: the removed
-  /// element.  Worst case complexity: O(N).  Requires: count > index
+  /// element.  Worst case - complexity: O(N).  Requires: count > index
   mutating func removeAtIndex(index: Int) -> Self.Generator.Element
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
   /// will not change
   mutating func removeAll(#keepCapacity: Bool)
-  
+
   //===--- algorithms -----------------------------------------------------===//
 
   func join<
@@ -114,15 +114,14 @@ protocol _ArrayType
     @noescape combine: (U, Self.Generator.Element) -> U) -> U
 
   /// Sort `self` in-place according to `isOrderedBefore`.  Requires:
-  /// `isOrderedBefore` induces a `strict weak ordering
-  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`_
+  /// `isOrderedBefore` induces a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements.
   mutating func sort(
     isOrderedBefore: (
       Self.Generator.Element, Self.Generator.Element
     ) -> Bool
   )
-  
+
   //===--- implementation detail  -----------------------------------------===//
 
   typealias _Buffer : _ArrayBufferType
@@ -131,9 +130,9 @@ protocol _ArrayType
 
 internal struct _ArrayTypeMirror<T : _ArrayType> : MirrorType {
   let _value : T
-  
+
   init(_ v : T) { _value = v }
-  
+
   var value: Any { return (_value as Any) }
 
   var valueType: Any.Type { return (_value as Any).dynamicType }

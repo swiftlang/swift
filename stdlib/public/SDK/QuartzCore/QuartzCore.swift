@@ -37,7 +37,7 @@ extension CIFilter {
             dict[key] = value
         }
     self.init(name: name, withInputParameters: dict as [NSObject: AnyObject])
-  } 
+  }
 }
 
 // sdk overlays:

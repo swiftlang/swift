@@ -185,7 +185,7 @@ public struct Character :
 
     /// Return a *generator* over the elements of this *sequence*.
     ///
-    /// Complexity: O(1)
+    /// - complexity: O(1)
     func generate() -> IndexingGenerator<_SmallUTF8> {
       return IndexingGenerator(self)
     }
@@ -247,7 +247,7 @@ public struct Character :
 
     /// Return a *generator* over the elements of this *sequence*.
     ///
-    /// Complexity: O(1)
+    /// - complexity: O(1)
     func generate() -> IndexingGenerator<_SmallUTF16> {
       return IndexingGenerator(self)
     }
@@ -260,7 +260,7 @@ public struct Character :
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// **Note:** the hash value is not guaranteed to be stable across
+  /// - note: the hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {

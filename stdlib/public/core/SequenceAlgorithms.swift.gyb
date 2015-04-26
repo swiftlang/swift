@@ -24,15 +24,15 @@ GElement = "Generator.Element"
 
 extension SequenceType {
   /// Return a lazy `SequenceType` containing pairs (*n*, *x*), where
-  /// *n*\ s are consecutive `Int`\ s starting at zero, and *x*\ s are
-  /// the elements of `base`::
+  /// *n*s are consecutive `Int`s starting at zero, and *x*s are
+  /// the elements of `base`:
   ///
-  ///   > for (n, c) in enumerate("Swift") { println("\(n): '\(c)'" ) }
-  ///   0: 'S'
-  ///   1: 'w'
-  ///   2: 'i'
-  ///   3: 'f'
-  ///   4: 't'
+  ///     > for (n, c) in enumerate("Swift") { println("\(n): '\(c)'" ) }
+  ///     0: 'S'
+  ///     1: 'w'
+  ///     2: 'i'
+  ///     3: 'f'
+  ///     4: 't'
   final public func _prext_enumerate() -> EnumerateSequence<Self> {
     return EnumerateSequence(self)
   }
@@ -49,8 +49,7 @@ extension SequenceType {
 %{
 if preds:
   orderingRequirement = """
-  /// Requires: `isOrderedBefore` is a `strict weak ordering
-  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+  /// Requires: `isOrderedBefore` is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings).
   /// over `self`."""
 else:
   orderingRequirement = ""
@@ -60,7 +59,7 @@ extension SequenceType ${"" if preds else "where Self.Generator.Element : Compar
 
   /// Returns the minimum element in `self`.
   ///
-  /// Complexity: O(count(elements))
+  /// - complexity: O(count(elements))
   /// ${orderingRequirement}
   final public func _prext_minElement(
 %   if preds:
@@ -81,7 +80,7 @@ extension SequenceType ${"" if preds else "where Self.Generator.Element : Compar
 
   /// Returns the maximum element in `self`.
   ///
-  /// Complexity: O(count(elements))
+  /// - complexity: O(count(elements))
   /// ${orderingRequirement}
   final public func _prext_maxElement(
 %   if preds:
@@ -119,8 +118,7 @@ if preds:
   /// Return true iff `self` begins with elements equivalent to those of
   /// `other`, using `isEquivalent` as the equivalence test.
   ///
-  /// Requires: `isEquivalent` is an `equivalence relation
-  /// <http://en.wikipedia.org/wiki/Equivalence_relation>`_"""
+  /// Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)"""
 else:
   comment = """
   /// Return true iff the the initial elements of `s` are equal to `prefix`."""
@@ -167,8 +165,7 @@ if preds:
   /// Return true iff `self` and `other` contain equivalent elements, using
   /// `isEquivalent` as the equivalence test.
   ///
-  /// Requires: `isEquivalent` is an `equivalence relation
-  /// <http://en.wikipedia.org/wiki/Equivalence_relation>`_"""
+  /// Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)"""
 else:
   comment = """
   /// Return `true` iff `self` and `other` contain the same elements in the
@@ -224,8 +221,7 @@ if preds:
   /// Return true iff `self` precedes `other` in a lexicographical ("dictionary")
   /// ordering, using `isOrderedBefore` as the comparison between elements.
   ///
-  /// Requires: isOrderedBefore` is a `strict weak ordering
-  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+  /// Requires: `isOrderedBefore` is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements of `self` and `other`."""
 else:
   comment = """
@@ -435,7 +431,7 @@ extension SequenceType {
 
 extension SequenceType {
   /// Returns a sequence of pairs built out of two underlying sequences,
-  /// where the elements of the `i`\ th pair are the `i`\ th elements
+  /// where the elements of the `i`th pair are the `i`th elements
   /// of each underlying sequence.
   final public func _prext_zip<OtherSequence : SequenceType>(
     other: OtherSequence

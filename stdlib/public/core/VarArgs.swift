@@ -20,19 +20,19 @@
 ///
 /// This protocol is useful in presenting C "varargs" APIs natively in
 /// Swift.  It only works for APIs that have a `va_list` variant, so
-/// for example, it isn't much use if all you have is::
+/// for example, it isn't much use if all you have is:
 ///
-///   int f(int n, ...)
+///     int f(int n, ...)
 ///
-/// Given a version like this, though, ::
+/// Given a version like this, though,
 ///
-///   int f(int, va_list arguments)
+///     int f(int, va_list arguments)
 ///
-/// you can write::
+/// you can write:
 ///
-///   func swiftF(x: Int, arguments: CVarArgType...) -> Int {
-///     return withVaList(arguments) { f(x, $0) }
-///   }
+///     func swiftF(x: Int, arguments: CVarArgType...) -> Int {
+///       return withVaList(arguments) { f(x, $0) }
+///     }
 public protocol CVarArgType {
   // Note: the protocol is public, but its requirement is stdlib-private.
   // That's because there are APIs operating on CVarArgType instances, but
@@ -77,10 +77,10 @@ public func withVaList<R>(builder: VaListBuilder,
 /// Returns a `CVaListPointer` built from `args` that's backed by
 /// autoreleased storage.
 ///
-/// .. Warning:: This function is best avoided in favor of
-///    `withVaList`, but occasionally (i.e. in a `class` initializer) you
-///    may find that the language rules don't allow you to use
-///    `withVaList` as intended.
+/// - warning: This function is best avoided in favor of
+/// `withVaList`, but occasionally (i.e. in a `class` initializer) you
+/// may find that the language rules don't allow you to use
+/// `withVaList` as intended.
 public func getVaList(args: [CVarArgType]) -> CVaListPointer {
   var builder = VaListBuilder()
   for a in args {
@@ -251,13 +251,13 @@ extension Double : _CVarArgPassedAsDouble {
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`
 final public class VaListBuilder {
-  
+
   func append(arg: CVarArgType) {
     for x in arg._cVarArgEncoding {
       storage.append(x)
     }
   }
-  
+
   func va_list() -> CVaListPointer {
     return CVaListPointer(
       _fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
@@ -279,7 +279,7 @@ final public class VaListBuilder {
     var overflow_arg_area: UnsafeMutablePointer<Word> = nil
     var reg_save_area: UnsafeMutablePointer<Word> = nil
   }
-  
+
   init() {
     // prepare the register save area
     storage = Array(count: _x86_64RegisterSaveWords, repeatedValue: 0)

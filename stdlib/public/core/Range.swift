@@ -38,14 +38,14 @@ public struct RangeGenerator<
   public typealias Generator = RangeGenerator<T>
 
   /// `RangeGenerator` is also a `SequenceType`, so it
-  /// `generate`\ 's a copy of itself
+  /// `generate`'s a copy of itself
   public func generate() -> Generator {
     return self
   }
 
   /// The lower bound of the remaining range.
   public var startIndex: T
-  
+
   /// The upper bound of the remaining range; not included in the
   /// generated sequence.
   public var endIndex: T
@@ -53,7 +53,7 @@ public struct RangeGenerator<
 
 /// A collection of consecutive discrete index values.
 ///
-/// :param: `T` is both the element type and the index type of the
+/// - parameter T: is both the element type and the index type of the
 ///   collection.
 ///
 /// Like other collections, a range containing one element has an
@@ -68,17 +68,17 @@ public struct RangeGenerator<
 /// It also follows from the axiom above that `(-99..<100)[0] == 0`.
 /// To prevent confusion (because some expect the result to be `-99`),
 /// in a context where `T` is known to be an integer type,
-/// subscripting with `T` is a compile-time error::
+/// subscripting with `T` is a compile-time error:
 ///
-///   // error: could not find an overload for 'subscript'...
-///   println( Range<Int>(start:-99, end:100)[0] )
+///     // error: could not find an overload for 'subscript'...
+///     println( Range<Int>(start:-99, end:100)[0] )
 ///
-/// However, subscripting that range still works in a generic context::
+/// However, subscripting that range still works in a generic context:
 ///
-///   func brackets<T :ForwardIndexType>(x: Range<T>, i: T) -> T {
-///     return x[i] // Just forward to subscript
-///   }
-///   println(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
+///     func brackets<T :ForwardIndexType>(x: Range<T>, i: T) -> T {
+///       return x[i] // Just forward to subscript
+///     }
+///     println(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
 public struct Range<
   T : ForwardIndexType
 > : Equatable, CollectionType,
@@ -106,11 +106,11 @@ public struct Range<
   }
 
   /// A type that represents a valid position in the collection.
-  /// 
+  ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = T
-  
+
   /// Access the element at `position`.
   ///
   /// Requires: `position` is a valid position in `self` and
@@ -131,16 +131,16 @@ public struct Range<
   public subscript(_: T._DisabledRangeIndex) -> T {
     _sanityCheckFailure("It shouldn't be possible to call this function'")
   }
-  
+
   //===--------------------------------------------------------------------===//
-  
+
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
   public typealias Generator = RangeGenerator<T>
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> RangeGenerator<T> {
     return Generator(self)
   }
@@ -175,13 +175,13 @@ public struct Range<
   public var description: String {
     return "\(startIndex)..<\(endIndex)"
   }
-  
+
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "Range(\(String(reflecting: startIndex))..<\(String(reflecting: endIndex)))"
   }
-  
-  
+
+
   var _startIndex: T
   var _endIndex: T
 }

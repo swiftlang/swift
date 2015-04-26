@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-swift-ide-test -dump-api -source-filename %s > %t.swift
-// RUN: diff -du %S/Inputs/dumped_api.swift %t.swift 
+// RUN: diff -du %S/Inputs/dumped_api.swift %t.swift
 
 //===--- Definitions needed only while experimental -----------------------===//
 internal typealias _ContiguousArrayStorageBase = AnyObject
@@ -38,17 +38,17 @@ public class _AnyGeneratorBase {}
 
 /// An abstract `GeneratorType` base class over `T` elements.
 ///
-/// Use this as a `Sequence`\ 's associated `Generator` type when you
+/// Use this as a `Sequence`'s associated `Generator` type when you
 /// don't want to expose details of the concrete generator, a subclass.
 ///
 /// It is an error to create instances of `AnyGenerator` that are not
 /// also instances of an `AnyGenerator` subclass.
 ///
-/// See also::
+/// See also:
 ///
-///   struct AnySequence<S: SequenceType>
-///   func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
-///   func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
+///     struct AnySequence<S: SequenceType>
+///     func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
+///     func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
 public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
@@ -59,7 +59,7 @@ public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
       "AnyGenerator<T> instances can not be created; create a subclass instance instead."
     )
   }
-  
+
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -77,17 +77,17 @@ extension AnyGenerator : SequenceType {
 /// Return a `GeneratorType` instance that wraps `base` but whose type
 /// depends only on the type of `G.Element`.
 ///
-/// Example::
+/// Example:
 ///
-///   func countStrings() -> AnyGenerator<String> {
-///     let lazyStrings = lazy(0..<10).map { String($0) }
+///     func countStrings() -> AnyGenerator<String> {
+///       let lazyStrings = lazy(0..<10).map { String($0) }
 ///
-///     // This is a really complicated type of no interest to our
-///     // clients.
-///     let g: MapSequenceGenerator<RangeGenerator<Int>, String>
-///       = lazyStrings.generate()
-///     return anyGenerator(g)
-///   }
+///       // This is a really complicated type of no interest to our
+///       // clients.
+///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
+///         = lazyStrings.generate()
+///       return anyGenerator(g)
+///     }
 public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
   return _GeneratorBox(base)
 }
@@ -103,11 +103,11 @@ internal class _FunctionGenerator<T> : AnyGenerator<T> {
 /// Return a `GeneratorType` instance whose `next` method invokes
 /// `nextImplementation` and returns the result.
 ///
-/// Example::
+/// Example:
 ///
-///   var x = 7
-///   let g = anyGenerator { x < 15 ? x++ : nil }
-///   let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
+///     var x = 7
+///     let g = anyGenerator { x < 15 ? x++ : nil }
+///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
 public func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T> {
   return _FunctionGenerator(nextImplementation)
 }
@@ -152,7 +152,7 @@ internal class _AnyCollectionBoxBase : _AnySequenceBox {
 internal class _SequenceBox<S: SequenceType>
   : _AnySequenceBox {
   typealias Element = S.Generator.Element
-  
+
   override func generate() -> _AnyGeneratorBase {
     return _GeneratorBox(_base.generate())
   }
@@ -174,7 +174,7 @@ internal class _SequenceBox<S: SequenceType>
 internal class _CollectionBox<S: CollectionType>
   : _AnyCollectionBox<S.Generator.Element> {
   typealias Element = S.Generator.Element
-  
+
   override func generate() -> _AnyGeneratorBase {
     fatalError("")
   }
@@ -208,7 +208,7 @@ internal class _CollectionBox<S: CollectionType>
 }
 
 /// A type-erased sequence.
-/// 
+///
 /// Forwards operations to an arbitrary underlying sequence having the
 /// same `Element` type, hiding the specifics of the underlying
 /// `SequenceType`.
@@ -221,14 +221,14 @@ public struct AnySequence<T> : SequenceType {
   public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
     _box = _SequenceBox(base)
   }
-  
+
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
   public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
-  
+
   internal let _box: _AnySequenceBox
 }
 
@@ -307,15 +307,15 @@ internal class _ForwardIndexBox<
   required init(_ base: BaseIndex) {
     self.base = base
   }
-  
+
   func successor() -> _ForwardIndexBoxType {
     return self.dynamicType(self.base.successor())
   }
-  
+
   func unsafeUnbox(other: _ForwardIndexBoxType) -> BaseIndex {
     return (unsafeDowncast(other) as _ForwardIndexBox).base
   }
-  
+
   func equals(other: _ForwardIndexBoxType) -> Bool {
     return base == unsafeUnbox(other)
   }
@@ -323,11 +323,11 @@ internal class _ForwardIndexBox<
   func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance {
     return numericCast(distance(base, unsafeUnbox(other)))
   }
-  
+
   func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxType {
     return self.dynamicType(advance(base, numericCast(n)))
   }
-  
+
   func _advancedBy(
     n: AnyForwardIndex.Distance,
     _ limit: _ForwardIndexBoxType
@@ -340,13 +340,13 @@ internal class _ForwardIndexBox<
       _sanityCheck(BaseIndex.self is T.Type)
       // This bit cast is really nothing as we have proven they are
       // the same type.
-      return unsafeBitCast(base, T.self) 
+      return unsafeBitCast(base, T.self)
     }
     return nil
   }
 
   var typeID: ObjectIdentifier { return _typeID(self) }
-  
+
   internal // private
   let base: BaseIndex
 }
@@ -364,11 +364,11 @@ internal class _BidirectionalIndexBox<
   required init(_ base: BaseIndex) {
     super.init(base)
   }
-  
+
   override func successor() -> _ForwardIndexBoxType {
     return self.dynamicType(self.base.successor())
   }
-  
+
   func predecessor() -> _BidirectionalIndexBoxType {
     return self.dynamicType(self.base.predecessor())
   }
@@ -402,7 +402,7 @@ public struct AnyForwardIndex : ForwardIndexType {
   public init<BaseIndex: ForwardIndexType>(_ base: BaseIndex) {
     _box = _ForwardIndexBox(base)
   }
-  
+
   /// Return the next consecutive value in a discrete sequence of
   /// `AnyForwardIndex` values.
   ///
@@ -410,19 +410,19 @@ public struct AnyForwardIndex : ForwardIndexType {
   public func successor() -> AnyForwardIndex {
     return AnyForwardIndex(_box.successor())
   }
-  
-  
-  
+
+
+
   //===--- private --------------------------------------------------------===//
-  
+
   internal var _typeID: ObjectIdentifier {
     return _box.typeID
   }
-  
+
   internal init(_ box: _ForwardIndexBoxType) {
     self._box = box
   }
-  
+
   internal let _box: _ForwardIndexBoxType
 }
 
@@ -451,7 +451,7 @@ public func ~> (
 }
 
 /// Return true iff `lhs` and `rhs` wrap equal underlying
-/// `AnyForwardIndex`\ s.
+/// `AnyForwardIndex`s.
 ///
 /// Requires: the types of indices wrapped by `lhs` and `rhs` are
 /// identical.
@@ -471,7 +471,7 @@ public struct AnyBidirectionalIndex : BidirectionalIndexType {
   public init<BaseIndex: BidirectionalIndexType>(_ base: BaseIndex) {
     _box = _BidirectionalIndexBox(base)
   }
-  
+
   /// Return the next consecutive value in a discrete sequence of
   /// `AnyBidirectionalIndex` values.
   ///
@@ -479,7 +479,7 @@ public struct AnyBidirectionalIndex : BidirectionalIndexType {
   public func successor() -> AnyBidirectionalIndex {
     return AnyBidirectionalIndex(_box.successor())
   }
-  
+
   /// Return the previous consecutive value in a discrete sequence of
   /// `AnyBidirectionalIndex` values.
   ///
@@ -487,18 +487,18 @@ public struct AnyBidirectionalIndex : BidirectionalIndexType {
   public func predecessor() -> AnyBidirectionalIndex {
     return AnyBidirectionalIndex(_box.predecessor())
   }
-  
-  
+
+
   //===--- private --------------------------------------------------------===//
-  
+
   internal var _typeID: ObjectIdentifier {
     return _box.typeID
   }
-  
+
   internal init(_ box: _ForwardIndexBoxType) {
     self._box = box as! _BidirectionalIndexBoxType
   }
-  
+
   internal let _box: _BidirectionalIndexBoxType
 }
 
@@ -527,7 +527,7 @@ public func ~> (
 }
 
 /// Return true iff `lhs` and `rhs` wrap equal underlying
-/// `AnyBidirectionalIndex`\ s.
+/// `AnyBidirectionalIndex`s.
 ///
 /// Requires: the types of indices wrapped by `lhs` and `rhs` are
 /// identical.
@@ -547,7 +547,7 @@ public struct AnyRandomAccessIndex : RandomAccessIndexType {
   public init<BaseIndex: RandomAccessIndexType>(_ base: BaseIndex) {
     _box = _RandomAccessIndexBox(base)
   }
-  
+
   /// Return the next consecutive value in a discrete sequence of
   /// `AnyRandomAccessIndex` values.
   ///
@@ -555,7 +555,7 @@ public struct AnyRandomAccessIndex : RandomAccessIndexType {
   public func successor() -> AnyRandomAccessIndex {
     return AnyRandomAccessIndex(_box.successor())
   }
-  
+
   /// Return the previous consecutive value in a discrete sequence of
   /// `AnyRandomAccessIndex` values.
   ///
@@ -563,7 +563,7 @@ public struct AnyRandomAccessIndex : RandomAccessIndexType {
   public func predecessor() -> AnyRandomAccessIndex {
     return AnyRandomAccessIndex(_box.predecessor())
   }
-  
+
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
@@ -571,26 +571,26 @@ public struct AnyRandomAccessIndex : RandomAccessIndexType {
   public func distanceTo(other: AnyRandomAccessIndex) -> Distance {
     return _box._distanceTo(other._box)
   }
-  
+
   /// Return `self` offset by `n` steps.
   ///
-  /// :returns: If `n > 0`, the result of applying `successor` to
+  /// - returns: If `n > 0`, the result of applying `successor` to
   /// `self` `n` times.  If `n < 0`, the result of applying
   /// `predecessor` to `self` `n` times. Otherwise, `self`.
   public func advancedBy(amount: Distance) -> AnyRandomAccessIndex {
     return AnyRandomAccessIndex(_box._advancedBy(amount))
   }
-  
+
   //===--- private --------------------------------------------------------===//
-  
+
   internal var _typeID: ObjectIdentifier {
     return _box.typeID
   }
-  
+
   internal init(_ box: _ForwardIndexBoxType) {
     self._box = box as! _RandomAccessIndexBoxType
   }
-  
+
   internal let _box: _RandomAccessIndexBoxType
 }
 
@@ -619,7 +619,7 @@ public func ~> (
 }
 
 /// Return true iff `lhs` and `rhs` wrap equal underlying
-/// `AnyRandomAccessIndex`\ s.
+/// `AnyRandomAccessIndex`s.
 ///
 /// Requires: the types of indices wrapped by `lhs` and `rhs` are
 /// identical.
@@ -673,7 +673,7 @@ public func !== <
 
 /// A type-erased wrapper over any collection with at least
 /// forward indices.
-/// 
+///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
 /// `CollectionType`.
@@ -752,21 +752,21 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
     self._box = other._box
   }
 
-  
+
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
   public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
-  
+
   /// The position of the first element in a non-empty collection.
   ///
   /// Identical to `endIndex` in an empty collection.
   public var startIndex: AnyForwardIndex {
     return AnyForwardIndex(_box.startIndex)
   }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -775,7 +775,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   public var endIndex: AnyForwardIndex {
     return AnyForwardIndex(_box.endIndex)
   }
-  
+
   /// Access the element indicated by `position`.
   ///
   /// Requires: `position` indicates a valid position in `self` and
@@ -788,12 +788,12 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   public var underlyingCollectionID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
-  
+
   internal let _box: Box
 }
 /// A type-erased wrapper over any collection with at least
 /// bidirectional indices.
-/// 
+///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
 /// `CollectionType`.
@@ -862,21 +862,21 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
     _sanityCheck(other._box.endIndex is _BidirectionalIndexBoxType)
     self._box = other._box
   }
-  
+
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
   public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
-  
+
   /// The position of the first element in a non-empty collection.
   ///
   /// Identical to `endIndex` in an empty collection.
   public var startIndex: AnyBidirectionalIndex {
     return AnyBidirectionalIndex(_box.startIndex)
   }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -885,7 +885,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   public var endIndex: AnyBidirectionalIndex {
     return AnyBidirectionalIndex(_box.endIndex)
   }
-  
+
   /// Access the element indicated by `position`.
   ///
   /// Requires: `position` indicates a valid position in `self` and
@@ -898,12 +898,12 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   public var underlyingCollectionID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
-  
+
   internal let _box: Box
 }
 /// A type-erased wrapper over any collection with at least
 /// randomaccess indices.
-/// 
+///
 /// Forwards operations to an arbitrary underlying collection having the
 /// same `Element` type, hiding the specifics of the underlying
 /// `CollectionType`.
@@ -962,21 +962,21 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
     _sanityCheck(other._box.endIndex is _RandomAccessIndexBoxType)
     self._box = other._box
   }
-  
+
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
   public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
-  
+
   /// The position of the first element in a non-empty collection.
   ///
   /// Identical to `endIndex` in an empty collection.
   public var startIndex: AnyRandomAccessIndex {
     return AnyRandomAccessIndex(_box.startIndex)
   }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -985,7 +985,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   public var endIndex: AnyRandomAccessIndex {
     return AnyRandomAccessIndex(_box.endIndex)
   }
-  
+
   /// Access the element indicated by `position`.
   ///
   /// Requires: `position` indicates a valid position in `self` and
@@ -998,7 +998,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   public var underlyingCollectionID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
-  
+
   internal let _box: Box
 }
 

@@ -75,7 +75,7 @@ public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
   /// Represent this number using Swift's widest native signed integer
   /// type.
   func toIntMax() -> IntMax
-  
+
   /// Convert from Swift's widest signed integer type, trapping on
   /// overflow.
   init(IntMax)
@@ -96,7 +96,7 @@ public protocol _UnsignedIntegerType : _IntegerType {
   // operators defined for Strideable types (unsigned types are
   // Strideable).
   typealias _DisallowMixedSignArithmetic : SignedIntegerType = Int
-  
+
   /// Represent this number using Swift's widest native unsigned
   /// integer type.
   func toUIntMax() -> UIntMax
@@ -114,10 +114,10 @@ public protocol UnsignedIntegerType : _UnsignedIntegerType, IntegerType {
 /// builds.
 ///
 /// Typically used to do conversion to any contextually-deduced
-/// integer type::
+/// integer type:
 ///
-///   func f(x: Int32) {}
-///   func g(x: Int64) { f(numericCast(x)) }
+///     func f(x: Int32) {}
+///     func g(x: Int64) { f(numericCast(x)) }
 public func numericCast<
   T : _SignedIntegerType, U : _SignedIntegerType
 >(x: T) -> U {
@@ -128,10 +128,10 @@ public func numericCast<
 /// builds.
 ///
 /// Typically used to do conversion to any contextually-deduced
-/// integer type::
+/// integer type:
 ///
-///   func f(x: UInt32) {}
-///   func g(x: UInt64) { f(numericCast(x)) }
+///     func f(x: UInt32) {}
+///     func g(x: UInt64) { f(numericCast(x)) }
 public func numericCast<
   T : _UnsignedIntegerType, U : _UnsignedIntegerType
 >(x: T) -> U {
@@ -142,10 +142,10 @@ public func numericCast<
 /// builds.
 ///
 /// Typically used to do conversion to any contextually-deduced
-/// integer type::
+/// integer type:
 ///
-///   func f(x: UInt32) {}
-///   func g(x: Int64) { f(numericCast(x)) }
+///     func f(x: UInt32) {}
+///     func g(x: Int64) { f(numericCast(x)) }
 public func numericCast<
   T : _SignedIntegerType, U : _UnsignedIntegerType
 >(x: T) -> U {
@@ -156,10 +156,10 @@ public func numericCast<
 /// builds.
 ///
 /// Typically used to do conversion to any contextually-deduced
-/// integer type::
+/// integer type:
 ///
-///   func f(x: Int32) {}
-///   func g(x: UInt64) { f(numericCast(x)) }
+///     func f(x: Int32) {}
+///     func g(x: UInt64) { f(numericCast(x)) }
 public func numericCast<
 T : _UnsignedIntegerType, U : _SignedIntegerType
 >(x: T) -> U {
@@ -185,7 +185,7 @@ public struct ${Self}
   // FIXME: this declaration should be inferred.
   // <rdar://problem/18379938> Type checker refuses to use the default for
   // Int.Distance associated type
-  
+
   /// A type that can represent the number of steps between pairs of
   /// values.
   public typealias Distance = Int
@@ -306,7 +306,7 @@ extension ${Self} : Hashable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// **Note:** the hash value is not guaranteed to be stable across
+  /// - note: the hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
@@ -352,7 +352,7 @@ extension ${Self} : RandomAccessIndexType {
   // outside of a generic context.  See the implementation of Range
   // for details of how this works.
   typealias _DisabledRangeIndex = ${Self}
-  
+
   /// Returns the next consecutive value after `self`.
   ///
   /// Requires: the next value is representable.
@@ -367,23 +367,23 @@ extension ${Self} : RandomAccessIndexType {
   func predecessor() -> ${Self} {
     return self &- 1
   }
-  
+
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
-  /// Complexity: O(1).
+  /// - complexity: O(1).
   @transparent public
   func distanceTo(other: ${Self}) -> ${Self}.Distance {
     return numericCast((numericCast(other) as IntMax) &- numericCast(self))
   }
-  
+
   /// Return `self` offset by `n` steps.
   ///
-  /// :returns: If `n > 0`, the result of applying `successor` to
-  /// `self` `n` times.  If `n < 0`, the result of applying
-  /// `predecessor` to `self` `-n` times. Otherwise, `self`.
+  /// - returns: If `n > 0`, the result of applying `successor` to
+  ///   `self` `n` times.  If `n < 0`, the result of applying
+  ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   @transparent public
   func advancedBy(amount: ${Self}.Distance) -> ${Self} {
     return numericCast((numericCast(self) as IntMax) &+ numericCast(amount))
@@ -403,7 +403,7 @@ extension ${Self} {
     return (${Self}(tmp.0), Bool(tmp.1))
   }
 % end
-  
+
 % for Method,op in [('divide', 'div'), ('remainder', 'rem')]:
   /// Divide `lhs` and `rhs`, returning
   /// ${'a result' if op == 'div' else 'the remainder'} and a `Bool`

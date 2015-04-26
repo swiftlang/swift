@@ -142,8 +142,7 @@ public protocol _BuiltinUnicodeScalarLiteralConvertible {
 }
 
 /// Conforming types can be initialized with string literals
-/// containing a single `Unicode scalar value
-/// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
+/// containing a single [Unicode scalar value](http://www.unicode.org/glossary/#unicode_scalar_value).
 public protocol UnicodeScalarLiteralConvertible {
   typealias UnicodeScalarLiteralType : _BuiltinUnicodeScalarLiteralConvertible
   /// Create an instance initialized to `value`.
@@ -160,8 +159,7 @@ public protocol _BuiltinExtendedGraphemeClusterLiteralConvertible
 }
 
 /// Conforming types can be initialized with string literals
-/// containing a single `Unicode extended grapheme cluster
-/// <http://www.unicode.org/glossary/#extended_grapheme_cluster>`_.
+/// containing a single [Unicode extended grapheme cluster](http://www.unicode.org/glossary/#extended_grapheme_cluster).
 public protocol ExtendedGraphemeClusterLiteralConvertible
   : UnicodeScalarLiteralConvertible {
 
@@ -173,7 +171,7 @@ public protocol ExtendedGraphemeClusterLiteralConvertible
 
 public protocol _BuiltinStringLiteralConvertible
   : _BuiltinExtendedGraphemeClusterLiteralConvertible {
-  
+
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
@@ -182,7 +180,7 @@ public protocol _BuiltinStringLiteralConvertible
 
 public protocol _BuiltinUTF16StringLiteralConvertible
   : _BuiltinStringLiteralConvertible {
-  
+
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     numberOfCodeUnits: Builtin.Word)
@@ -215,11 +213,11 @@ public protocol DictionaryLiteralConvertible {
 }
 
 /// Conforming types can be initialized with string interpolations
-/// containing `\(`\ ...\ `)` clauses.
+/// containing `\(`...`)` clauses.
 public protocol StringInterpolationConvertible {
   /// Create an instance by concatenating the elements of `strings`
   init(stringInterpolation strings: Self...)
-  /// Create an instance containing `expr`\ 's `print` representation
+  /// Create an instance containing `expr`'s `print` representation
   init<T>(stringInterpolationSegment expr: T)
 }
 

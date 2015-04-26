@@ -29,13 +29,13 @@ public struct MapSequenceGenerator<
     }
     return nil
   }
-  
+
   /// `MapSequenceGenerator` is also a `SequenceType`, so it
-  /// `generate`\ 's a copy of itself
+  /// `generate`'s a copy of itself
   public func generate() -> MapSequenceGenerator {
     return self
   }
-  
+
   var _base: Base
   var _transform: (Base.Element)->T
 }
@@ -49,7 +49,7 @@ public struct MapSequenceGenerator<
 public struct MapSequenceView<Base : SequenceType, T> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> MapSequenceGenerator<Base.Generator,T> {
     return MapSequenceGenerator(
       _base: _base.generate(), _transform: _transform)
@@ -94,7 +94,7 @@ public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
   public var startIndex: Base.Index {
     return _base.startIndex
   }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -114,7 +114,7 @@ public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> MapSequenceView<Base, T>.Generator {
     return MapSequenceGenerator(_base: _base.generate(), _transform: _transform)
   }
@@ -148,7 +148,7 @@ public func flatMap<C : CollectionType, T>(
 //===--- Support for lazy(s) ----------------------------------------------===//
 
 % traversals = ('Forward', 'Bidirectional', 'RandomAccess')
-% for View, Self in [('MapSequenceView', 'LazySequence')] + [ 
+% for View, Self in [('MapSequenceView', 'LazySequence')] + [
 %   ('MapCollectionView', 'Lazy%sCollection' % t) for t in traversals
 % ]:
 

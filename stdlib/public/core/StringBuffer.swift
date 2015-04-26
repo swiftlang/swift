@@ -168,26 +168,26 @@ public struct _StringBuffer {
   // substring.  This is what we need to do so that users can call
   // reserveCapacity on String and subsequently use that capacity, in
   // two separate phases.  Operations with one-phase growth should use
-  // "grow()," below.  
+  // "grow()," below.
   func hasCapacity(
     cap: Int, forSubRange r: Range<UnsafePointer<RawByte>>
   ) -> Bool {
     // The substring to be grown could be pointing in the middle of this
-    // _StringBuffer.  
+    // _StringBuffer.
     let offset = (r.startIndex - UnsafePointer(start)) >> elementShift
     return cap + offset <= capacity
   }
 
-  
+
   /// Attempt to claim unused capacity in the buffer.
   ///
   /// Operation succeeds if there is sufficient capacity, and either:
   /// - the buffer is uniquely-refereced, or
   /// - `oldUsedEnd` points to the end of the currently used capacity.
   ///
-  /// :param: subRange range of the substring that the caller tries
+  /// - parameter subRange: range of the substring that the caller tries
   ///   to extend.
-  /// :param: newUsedCount the desired size of the substring.
+  /// - parameter newUsedCount: the desired size of the substring.
   mutating func grow(
     subRange: Range<UnsafePointer<RawByte>>, var newUsedCount: Int
   ) -> Bool {

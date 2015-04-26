@@ -21,16 +21,16 @@ func _swift_bufferAllocate(
 /// containing storage for an array of Element whose size is
 /// determined at create time.
 ///
-/// The analogous C++-ish class template would be::
+/// The analogous C++-ish class template would be:
 ///
-///   template <class Value, class Element>
-///   struct _HeapBuffer {
-///     Value value;
-///     Element baseAddress[];        // length determined at creation time
+///     template <class Value, class Element>
+///     struct _HeapBuffer {
+///       Value value;
+///       Element baseAddress[];        // length determined at creation time
 ///
-///     _HeapBuffer() = delete
-///     static shared_ptr<_HeapBuffer> create(Value init, int capacity);
-///   }
+///       _HeapBuffer() = delete
+///       static shared_ptr<_HeapBuffer> create(Value init, int capacity);
+///     }
 ///
 /// Note that the Element array is RAW MEMORY.  You are expected to
 /// construct and---if necessary---destroy Elements there yourself,
@@ -53,9 +53,9 @@ class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
 
 // Return true if x is non-nil, and the only (strong) reference to the
 // given object.
-// 
+//
 // This is an inout function for two reasons:
-// 
+//
 // 1. You should only call it when about to mutate the object.
 //    Doing so otherwise implies a race condition if the buffer is
 //    shared across threads.
@@ -76,7 +76,7 @@ internal func _isUniquelyReferenced_native(
 internal struct _HeapBuffer<Value, Element> : Equatable {
   /// A default type to use as a backing store
   typealias Storage = _HeapBufferStorage<Value, Element>
-  
+
   let _storage: Builtin.NativeObject?
   var storage: AnyObject? {
     return _storage.map { Builtin.castFromNativeObject($0) }
@@ -139,7 +139,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   init(_ storage: _HeapBufferStorage<Value,Element>) {
     self._storage = Builtin.castToNativeObject(storage)
   }
-  
+
   init(_ storage: AnyObject) {
     _sanityCheck(
       _usesNativeSwiftReferenceCounting(storage.dynamicType),
@@ -147,15 +147,15 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     )
     self._storage = Builtin.castToNativeObject(storage)
   }
-  
+
   init<T : AnyObject>(_ storage: T?) {
     self = storage.map { _HeapBuffer($0) } ?? _HeapBuffer()
   }
-  
+
   init(nativeStorage: Builtin.NativeObject?) {
     self._storage = nativeStorage
   }
-  
+
   /// Create a `_HeapBuffer` with `self.value = initializer` and
   /// `self._capacity() >= capacity`.
   init(
@@ -187,7 +187,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     }
   }
 
-  /// True if storage is non-\ `nil`
+  /// True if storage is non-`nil`
   var hasStorage: Bool {
     return _storage != nil
   }

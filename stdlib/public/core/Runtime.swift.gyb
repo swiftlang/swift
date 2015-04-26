@@ -29,7 +29,7 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
 /// Atomic compare and exchange of `UnsafeMutablePointer<T>` with sequentially
 /// consistent memory ordering.  Precise semantics are defined in C++11 or C11.
 ///
-/// Warning: this operation is extremely tricky to use correctly because of
+/// - warning: this operation is extremely tricky to use correctly because of
 /// writeback semantics.
 ///
 /// It is best to use it directly on an
@@ -38,9 +38,7 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
 ///
 /// In a call like this:
 ///
-/// ::
-///
-///   _stdlib_atomicCompareExchangeStrongPtr(&foo.property1.property2, ...)
+///     _stdlib_atomicCompareExchangeStrongPtr(&foo.property1.property2, ...)
 ///
 /// you need to manually make sure that:
 ///

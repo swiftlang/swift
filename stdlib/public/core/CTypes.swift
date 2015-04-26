@@ -123,18 +123,18 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   var _isNull : Bool {
     return self == nil
   }
-  
+
   /// The hash value.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// **Note:** the hash value is not guaranteed to be stable across
+  /// - note: the hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
   }
-  
+
   /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
@@ -168,8 +168,8 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
 
   /// Reinterpret the bits of `value` as `CFunctionPointer<T>`.
   ///
-  /// .. Warning:: This is a fundamentally unsafe operation, equivalent to
-  ///      `unsafeBitCast(value, CFunctionPointer<T>.self)`
+  /// - warning: This is a fundamentally unsafe operation, equivalent to
+  /// `unsafeBitCast(value, CFunctionPointer<T>.self)`
   public init(_ value: COpaquePointer) {
     self.value = value
   }
@@ -178,7 +178,7 @@ public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// **Note:** the hash value is not guaranteed to be stable across
+  /// - note: the hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
@@ -208,8 +208,8 @@ public func ==<T>(lhs: CFunctionPointer<T>, rhs: CFunctionPointer<T>) -> Bool {
 extension COpaquePointer {
   /// Reinterpret the bits of `value` as `COpaquePointer`.
   ///
-  /// .. Warning:: This is a fundamentally unsafe operation, equivalent to
-  ///      `unsafeBitCast(value, COpaquePointer.self)`
+  /// - warning:: This is a fundamentally unsafe operation, equivalent to
+  ///   `unsafeBitCast(value, COpaquePointer.self)`
   @availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
   public init<T>(_ value: CFunctionPointer<T>) {
     self = value.value

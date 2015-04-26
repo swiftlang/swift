@@ -20,13 +20,13 @@
 /// An simple string designed to represent text that is "knowable at
 /// compile-time".
 ///
-/// Logically speaking, each instance looks something like this::
+/// Logically speaking, each instance looks something like this:
 ///
-///    enum StaticString {
-///       case ASCII(start: UnsafePointer<UInt8>, length: Int)
-///       case UTF8(start: UnsafePointer<UInt8>, length: Int)
-///       case Scalar(UnicodeScalar)
-///    }
+///      enum StaticString {
+///         case ASCII(start: UnsafePointer<UInt8>, length: Int)
+///         case UTF8(start: UnsafePointer<UInt8>, length: Int)
+///         case Scalar(UnicodeScalar)
+///      }
 public struct StaticString
   : _BuiltinUnicodeScalarLiteralConvertible,
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
@@ -187,8 +187,8 @@ public struct StaticString
     isASCII: Builtin.Int1
   ) {
     self = StaticString(
-      _builtinStringLiteral: start, 
-      byteSize: byteSize, 
+      _builtinStringLiteral: start,
+      byteSize: byteSize,
       isASCII: isASCII
     )
   }
@@ -204,7 +204,7 @@ public struct StaticString
   @transparent
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
-    byteSize: Builtin.Word, 
+    byteSize: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
     self = StaticString(start: start, byteSize: byteSize, isASCII: isASCII)
@@ -226,7 +226,7 @@ public struct StaticString
   public var debugDescription: String {
     return self.stringValue.debugDescription
   }
-  
+
   public func getMirror() -> MirrorType {
     return reflect(self.stringValue)
   }

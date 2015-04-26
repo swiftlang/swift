@@ -33,7 +33,7 @@ public func maxElement<
 /// Returns the first index where `value` appears in `domain` or `nil` if
 /// `value` is not found.
 ///
-/// Complexity: O(\ `count(domain)`\ )
+/// - complexity: O(`count(domain)`)
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, _ value: C.Generator.Element) -> C.Index? {
@@ -96,14 +96,14 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 /// Return the result of slicing `elements` into sub-sequences that
 /// don't contain elements satisfying the predicate `isSeparator`.
 ///
-/// :param: maxSplit the maximum number of slices to return, minus 1.
+/// - parameter maxSplit: the maximum number of slices to return, minus 1.
 /// If `maxSplit + 1` slices would otherwise be returned, the
 /// algorithm stops splitting and returns a suffix of `elements`
 ///
-/// :param: allowEmptySlices if true, an empty slice is produced in
-/// the result for each pair of consecutive 
+/// - parameter allowEmptySlices: if true, an empty slice is produced in
+/// the result for each pair of consecutive
 public func split<S: Sliceable, R:BooleanType>(
-  elements: S, 
+  elements: S,
   maxSplit: Int = Int.max,
   allowEmptySlices: Bool = false,
   @noescape isSeparator: (S.Generator.Element) -> R
@@ -162,8 +162,7 @@ public func startsWith<
 /// Return true iff `s` begins with elements equivalent to those of
 /// `prefix`, using `isEquivalent` as the equivalence test.
 ///
-/// Requires: `isEquivalent` is an `equivalence relation
-/// <http://en.wikipedia.org/wiki/Equivalence_relation>`_
+/// Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
   where
@@ -179,14 +178,14 @@ public func startsWith<
 /// The `GeneratorType` for `EnumerateSequence`.  `EnumerateGenerator`
 /// wraps a `Base` `GeneratorType` and yields successive `Int` values,
 /// starting at zero, along with the elements of the underlying
-/// `Base`::
+/// `Base`:
 ///
-///   var g = EnumerateGenerator(["foo", "bar"].generate())
-///   g.next() // (0, "foo")
-///   g.next() // (1, "bar")
-///   g.next() // nil
+///     var g = EnumerateGenerator(["foo", "bar"].generate())
+///     g.next() // (0, "foo")
+///     g.next() // (1, "bar")
+///     g.next() // nil
 ///
-/// Note:: idiomatic usage is to call `enumerate` instead of
+/// - note: idiomatic usage is to call `enumerate` instead of
 /// constructing an `EnumerateGenerator` directly.
 public struct EnumerateGenerator<
   Base: GeneratorType
@@ -215,23 +214,23 @@ public struct EnumerateGenerator<
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
   public typealias Generator = EnumerateGenerator<Base>
-  
+
   /// `EnumerateGenerator` is also a `SequenceType`, so it
-  /// `generate`\ s a copy of itself
+  /// `generate`s a copy of itself
   public func generate() -> Generator {
     return self
   }
 }
 
 /// The `SequenceType` returned by `enumerate()`.  `EnumerateSequence`
-/// is a sequence of pairs (*n*, *x*), where *n*\ s are consecutive
-/// `Int`\ s starting at zero, and *x*\ s are the elements of a `Base`
-/// `SequenceType`::
+/// is a sequence of pairs (*n*, *x*), where *n*s are consecutive
+/// `Int`s starting at zero, and *x*s are the elements of a `Base`
+/// `SequenceType`:
 ///
-///   var s = EnumerateSequence(["foo", "bar"])
-///   Array(s) // [(0, "foo"), (1, "bar")]
+///     var s = EnumerateSequence(["foo", "bar"])
+///     Array(s) // [(0, "foo"), (1, "bar")]
 ///
-/// Note:: idiomatic usage is to call `enumerate` instead of
+/// - note: idiomatic usage is to call `enumerate` instead of
 /// constructing an `EnumerateSequence` directly.
 public struct EnumerateSequence<Base : SequenceType> : SequenceType {
   var base: Base
@@ -243,22 +242,22 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> EnumerateGenerator<Base.Generator> {
     return EnumerateGenerator(base.generate())
   }
 }
 
 /// Return a lazy `SequenceType` containing pairs (*n*, *x*), where
-/// *n*\ s are consecutive `Int`\ s starting at zero, and *x*\ s are
-/// the elements of `base`::
+/// *n*s are consecutive `Int`s starting at zero, and *x*s are
+/// the elements of `base`:
 ///
-///   > for (n, c) in enumerate("Swift") { println("\(n): '\(c)'" )}
-///   0: 'S'
-///   1: 'w'
-///   2: 'i'
-///   3: 'f'
-///   4: 't'
+///     > for (n, c) in enumerate("Swift") { println("\(n): '\(c)'" )}
+///     0: 'S'
+///     1: 'w'
+///     2: 'i'
+///     3: 'f'
+///     4: 't'
 public func enumerate<Seq : SequenceType>(
   base: Seq
 ) -> EnumerateSequence<Seq> {
@@ -280,8 +279,7 @@ public func equal<
 
 /// Return true iff `a1` and `a2` contain equivalent elements, using
 /// `isEquivalent` as the equivalence test.  Requires: `isEquivalent`
-/// is an `equivalence relation
-/// <http://en.wikipedia.org/wiki/Equivalence_relation>`_
+/// is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
@@ -297,7 +295,7 @@ public func equal<
 /// ordering, using "<" as the comparison between elements.
 public func lexicographicalCompare<
     S1 : SequenceType, S2 : SequenceType
-  where 
+  where
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Comparable>(
   a1: S1, _ a2: S2) -> Bool {
@@ -308,12 +306,12 @@ public func lexicographicalCompare<
 /// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
 /// ordering, using `isOrderedBefore` as the comparison between elements.
 ///
-/// Requires: isOrderedBefore` is a `strict weak ordering
-/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// Requires: `isOrderedBefore` is a
+/// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
 /// over the elements of `a1` and `a2`.
 public func lexicographicalCompare<
     S1 : SequenceType, S2 : SequenceType
-  where 
+  where
     S1.Generator.Element == S2.Generator.Element
 >(
   a1: S1, _ a2: S2,

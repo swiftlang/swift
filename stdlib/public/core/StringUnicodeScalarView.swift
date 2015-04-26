@@ -25,8 +25,7 @@ public func <(
 }
 
 extension String {
-  /// A collection of `Unicode scalar values
-  /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_ that
+  /// A collection of [Unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value) that
   /// encode a `String` .
   public struct UnicodeScalarView : Sliceable, SequenceType, Reflectable,
     CustomStringConvertible, CustomDebugStringConvertible, CollectionType {
@@ -129,7 +128,7 @@ extension String {
     /// Access the elements delimited by the given half-open range of
     /// indices.
     ///
-    /// Complexity: O(1) unless bridging from Objective-C requires an
+    /// - complexity: O(1) unless bridging from Objective-C requires an
     /// O(N) conversion.
     public subscript(r: Range<Index>) -> UnicodeScalarView {
       return UnicodeScalarView(
@@ -198,10 +197,10 @@ extension String {
       var _generator: IndexingGenerator<_StringCore>!
     }
 
-    /// Return a *generator* over the `UnicodeScalar`\ s that comprise
+    /// Return a *generator* over the `UnicodeScalar`s that comprise
     /// this *sequence*.
     ///
-    /// Complexity: O(1)
+    /// - complexity: O(1)
     public func generate() -> Generator {
       return Generator(_core)
     }
@@ -228,14 +227,13 @@ extension String {
     self.init(unicodeScalars._core)
   }
 
-  /// The index type for subscripting a `String`\ 's `.unicodeScalars`
+  /// The index type for subscripting a `String`'s `.unicodeScalars`
   /// view.
   public typealias UnicodeScalarIndex = UnicodeScalarView.Index
 }
 
 extension String {
-  /// The value of `self` as a collection of `Unicode scalar values
-  /// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
+  /// The value of `self` as a collection of [Unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value).
   public var unicodeScalars : UnicodeScalarView {
     get {
       return UnicodeScalarView(_core)
@@ -253,19 +251,19 @@ extension String.UnicodeScalarView : ExtensibleCollectionType {
   }
   /// Reserve enough space to store `n` ASCII characters.
   ///
-  /// Complexity: O(`n`)
+  /// - complexity: O(`n`)
   public mutating func reserveCapacity(n: Int) {
     _core.reserveCapacity(n)
   }
   /// Append `x` to `self`.
   ///
-  /// Complexity: amortized O(1).
+  /// - complexity: amortized O(1).
   public mutating func append(x: UnicodeScalar) {
     _core.append(x)
   }
   /// Append the elements of `newElements` to `self`.
   ///
-  /// Complexity: O(*length of result*) 
+  /// - complexity: O(*length of result*)
   public mutating func extend<
     S : SequenceType where S.Generator.Element == UnicodeScalar
   >(newElements: S) {
@@ -281,8 +279,8 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
+  /// - complexity: O(`count(subRange)`) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UnicodeScalar
   >(
@@ -300,16 +298,16 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   public mutating func insert(newElement: UnicodeScalar, atIndex i: Index) {
     Swift.insert(&self, newElement, atIndex: i)
   }
-  
+
   /// Insert `newElements` at index `i`
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self) + count(newElements)`\ ).
+  /// - complexity: O(`count(self) + count(newElements)`).
   public mutating func splice<
     S : CollectionType where S.Generator.Element == UnicodeScalar
   >(newElements: S, atIndex i: Index) {
@@ -320,16 +318,16 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   public mutating func removeAtIndex(i: Index) -> UnicodeScalar {
     return Swift.removeAtIndex(&self, i)
   }
-  
+
   /// Remove the indicated `subRange` of elements
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   public mutating func removeRange(subRange: Range<Index>) {
     Swift.removeRange(&self, subRange)
   }
@@ -338,7 +336,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// :param: `keepCapacity`, if `true`, prevents the release of
+  /// - parameter keepCapacity: if `true`, prevents the release of
   ///   allocated storage, which can be a useful optimization
   ///   when `self` is going to be grown again.
   public mutating func removeAll(#keepCapacity: Bool = false) {
@@ -358,14 +356,14 @@ extension String.UnicodeScalarIndex {
     within unicodeScalars: String.UnicodeScalarView
   ) {
     let utf16 = String.UTF16View(unicodeScalars._core)
-    
+
     if utf16Index != utf16.startIndex
     && utf16Index != utf16.endIndex {
       _precondition(
         utf16Index >= utf16.startIndex
         && utf16Index <= utf16.endIndex,
         "Invalid String.UTF16Index for this UnicodeScalar view")
-      
+
       // Detect positions that have no corresponding index.  Note that
       // we have to check before and after, because an unpaired
       // surrogate will be decoded as a single replacement character,
@@ -377,7 +375,7 @@ extension String.UnicodeScalarIndex {
     }
     self.init(utf16Index._offset, unicodeScalars._core)
   }
-  
+
   /// Construct the position in `unicodeScalars` that corresponds exactly to
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
@@ -388,7 +386,7 @@ extension String.UnicodeScalarIndex {
     within unicodeScalars: String.UnicodeScalarView
   ) {
     let core = unicodeScalars._core
-    
+
     _precondition(
       utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
       "Invalid String.UTF8Index for this UnicodeScalar view")
@@ -399,7 +397,7 @@ extension String.UnicodeScalarIndex {
     }
     self.init(utf8Index._coreIndex, core)
   }
-  
+
   /// Construct the position in `unicodeScalars` that corresponds
   /// exactly to `characterIndex`.
   ///
@@ -419,7 +417,7 @@ extension String.UnicodeScalarIndex {
   public func samePositionIn(utf8: String.UTF8View) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
-  
+
   /// Return the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
@@ -429,7 +427,7 @@ extension String.UnicodeScalarIndex {
   ) -> String.UTF16View.Index {
     return String.UTF16View.Index(self, within: utf16)
   }
-  
+
   /// Return the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
@@ -444,18 +442,18 @@ extension String.UnicodeScalarIndex {
       return true
     }
     let precedingScalar = scalars[self.predecessor()]
-    
+
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-    
+
     let gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
       precedingScalar.value)
-    
+
     if segmenter.isBoundaryAfter(gcb0) {
       return true
     }
-    
+
     let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
       scalars[self].value)
 

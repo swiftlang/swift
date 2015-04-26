@@ -30,8 +30,8 @@ public struct FilterGenerator<
       }
     }
   }
-  
-  /// `FilterGenerator` is also a `SequenceType`, so it `generate`\ 's
+
+  /// `FilterGenerator` is also a `SequenceType`, so it `generate`'s
   /// a copy of itself
   public func generate() -> FilterGenerator {
     return self
@@ -46,7 +46,7 @@ public struct FilterGenerator<
 public struct FilterSequenceView<Base : SequenceType> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> FilterGenerator<Base.Generator> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }
@@ -102,7 +102,7 @@ public func == <Base: CollectionType>(
 public struct FilterCollectionView<Base : CollectionType> : CollectionType {
 
   /// A type that represents a valid position in the collection.
-  /// 
+  ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = FilterCollectionViewIndex<Base>
@@ -121,7 +121,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
   ///
   /// In an empty collection, `startIndex == endIndex`.
   ///
-  /// Complexity: O(N), where N is the ratio between unfiltered and
+  /// - complexity: O(N), where N is the ratio between unfiltered and
   /// filtered collection counts.
   public var startIndex: Index {
     var first = _base.startIndex
@@ -134,14 +134,14 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
     return FilterCollectionViewIndex(
       _pos: first, _end: _base.endIndex, _base: _base, _include: _include)
   }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public var endIndex: Index {
     return FilterCollectionViewIndex(
       _pos: _base.endIndex, _end: _base.endIndex,
@@ -158,7 +158,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> FilterGenerator<Base.Generator> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }

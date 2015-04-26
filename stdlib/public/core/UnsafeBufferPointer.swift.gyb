@@ -20,16 +20,16 @@ public struct UnsafeBufferPointerGenerator<T>: GeneratorType, SequenceType {
   }
 
   /// `UnsafeBufferPointerGenerator` is also a `SequenceType`, so it
-  /// `generate`\ 's a copy of itself
+  /// `generate`'s a copy of itself
   public func generate() -> UnsafeBufferPointerGenerator {
     return self
   }
-  
+
   var position, end: UnsafePointer<T>
 }
 
 %for Mutable in ('Mutable', ''):
-/// A non-owning pointer to buffer of ${Mutable.lower()} `T`\ s stored
+/// A non-owning pointer to buffer of ${Mutable.lower()} `T`s stored
 /// contiguously in memory, presenting a `Collection` interface to the
 /// underlying elements.
 public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
@@ -49,7 +49,7 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
     return _end - _position
   }
 
-  /// Access the `i`\ th element in the buffer.
+  /// Access the `i`th element in the buffer.
   public subscript(i: Int) -> T {
     get {
       _debugPrecondition(i >= 0)
@@ -62,7 +62,7 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
       _debugPrecondition(i < endIndex)
       _position[i] = newValue
     }
-%end    
+%end
   }
 
   /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous
@@ -76,7 +76,7 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> UnsafeBufferPointerGenerator<T> {
     return UnsafeBufferPointerGenerator(position: _position, end: _end)
   }
@@ -90,7 +90,7 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
   public var count: Int {
     return _end - _position
   }
-  
+
   var _position, _end: Unsafe${Mutable}Pointer<T>
 }
 

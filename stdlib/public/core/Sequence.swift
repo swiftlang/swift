@@ -13,10 +13,10 @@
 /// Encapsulates iteration state and interface for iteration over a
 /// *sequence*.
 ///
-/// **Note:** While it is safe to copy a *generator*, advancing one
+/// - note: While it is safe to copy a *generator*, advancing one
 /// copy may invalidate the others.
 ///
-/// Any code that uses multiple generators (or `for`\ ...\ `in` loops)
+/// Any code that uses multiple generators (or `for`...`in` loops)
 /// over a single *sequence* should have static knowledge that the
 /// specific *sequence* is multi-pass, either because its concrete
 /// type is known or because it is constrained to `CollectionType`.
@@ -38,15 +38,15 @@ public protocol GeneratorType {
 }
 
 public protocol _SequenceDefaultsType {
-  /// A type that provides the *sequence*\ 's iteration interface and
+  /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   typealias Generator : GeneratorType
 
   /// Return a *generator* over the elements of this *sequence*.  The
-  /// *generator*\ 's next element is the first element of the
+  /// *generator*'s next element is the first element of the
   /// sequence.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   func generate() -> Generator
 }
 
@@ -54,7 +54,7 @@ extension _SequenceDefaultsType {
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// Complexity: O(N)
+  /// - complexity: O(N)
   final public func _prext_underestimateCount() -> Int {
     return 0
   }
@@ -79,16 +79,16 @@ public protocol _Sequence_Type
   typealias Generator : GeneratorType
 
   /// Return a *generator* over the elements of this *sequence*.  The
-  /// *generator*\ 's next element is the first element of the
+  /// *generator*'s next element is the first element of the
   /// sequence.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   func generate() -> Generator
 
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// Complexity: O(N)
+  /// - complexity: O(N)
   func _prext_underestimateCount() -> Int
 
   func _customContainsEquatableElement(
@@ -96,20 +96,20 @@ public protocol _Sequence_Type
   ) -> Bool?
 }
 
-/// A type that can be iterated with a `for`\ ...\ `in` loop.
+/// A type that can be iterated with a `for`...`in` loop.
 ///
 /// `SequenceType` makes no requirement on conforming types regarding
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
 /// `CollectionType`.
 public protocol SequenceType : _Sequence_Type {
-  /// A type that provides the *sequence*\ 's iteration interface and
+  /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   typealias Generator : GeneratorType
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   func generate() -> Generator
 
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke the function
@@ -176,10 +176,10 @@ internal func _preprocessingPass<Args>(args: Args)
 // pass a GeneratorType through GeneratorSequence to give it "SequenceType-ness"
 /// A sequence built around a generator of type `G`.
 ///
-/// Useful mostly to recover the ability to use `for`\ ...\ `in`,
-/// given just a generator `g`::
+/// Useful mostly to recover the ability to use `for`...`in`,
+/// given just a generator `g`:
 ///
-///   for x in GeneratorSequence(g) { ... }
+///     for x in GeneratorSequence(g) { ... }
 public struct GeneratorSequence<
   G: GeneratorType
 > : GeneratorType, SequenceType {
@@ -201,7 +201,7 @@ public struct GeneratorSequence<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> GeneratorSequence {
     return self
   }

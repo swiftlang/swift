@@ -24,13 +24,13 @@ public protocol _ObjectiveCBridgeable {
   /// instance of `Self._ObjectiveCType` may, or may not, convert
   /// successfully to `Self`; for example, an `NSArray` will only
   /// convert successfully to `[String]` if it contains only
-  /// `NSString`\ s.
+  /// `NSString`s.
   static func _isBridgedToObjectiveC() -> Bool
-  
+
   // _getObjectiveCType is a workaround: right now protocol witness
   // tables don't include associated types, so we can not find
   // '_ObjectiveCType.self' from them.
-  
+
   /// Must return `_ObjectiveCType.self`.
   static func _getObjectiveCType() -> Any.Type
 
@@ -45,8 +45,8 @@ public protocol _ObjectiveCBridgeable {
   /// example, when bridging from NSArray to Array<T>, we can defer
   /// the checking for the individual elements of the array.
   ///
-  /// :param: result The location where the result is written. The optional
-  /// will always contain a value.
+  /// - parameter result The location where the result is written. The optional
+  ///   will always contain a value.
   static func _forceBridgeFromObjectiveC(
     source: _ObjectiveCType,
     inout result: Self?
@@ -60,9 +60,9 @@ public protocol _ObjectiveCBridgeable {
   /// complete conversion to the value type; it cannot defer checking
   /// to a later time.
   ///
-  /// :param: result The location where the result is written.
+  /// - parameter result The location where the result is written.
   ///
-  /// :returns: true if bridging succeeded, false otherwise. This redundant
+  /// - returns: true if bridging succeeded, false otherwise. This redundant
   /// information is provided for the convenience of the runtime's dynamic_cast
   /// implementation, so that it need not look into the optional representation
   /// to determine success.
@@ -87,7 +87,7 @@ public protocol _ObjectiveCBridgeable {
 ///   + if `T._isBridgedToObjectiveC()` returns `false`, then the
 ///     result is empty;
 ///   + otherwise, returns the result of `x._bridgeToObjectiveC()`;
-///  
+///
 /// - otherwise, the result is empty.
 public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
@@ -114,7 +114,7 @@ func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
     _preconditionFailure(
       "Dictionary key failed to bridge from Swift type to a Objective-C type")
   }
-  
+
   _autorelease(bridged)
   return bridged
 }
@@ -167,7 +167,7 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(x: T.
 ///     `T._conditionallyBridgeFromObjectiveC(x)`;
 /// - otherwise, the result is empty.
 public func _conditionallyBridgeFromObjectiveC<T>(
-  x: AnyObject, 
+  x: AnyObject,
   _: T.Type
 ) -> T? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
@@ -194,7 +194,7 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
 
 @asmname("swift_bridgeNonVerbatimFromObjectiveC")
 func _bridgeNonVerbatimFromObjectiveC<T>(
-  x: AnyObject, 
+  x: AnyObject,
   _ nativeType: T.Type,
   inout _ result: T?
 )
@@ -202,13 +202,13 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
 /// Runtime optional to conditionall perform a bridge from an object to a value
 /// type.
 ///
-/// :param: result Will be set to the resulting value if bridging succeeds, and
+/// - parameter result: Will be set to the resulting value if bridging succeeds, and
 /// unchanged otherwise.
 ///
-/// :returns: true to indicate success, false to indicate failure
+/// - returns: true to indicate success, false to indicate failure
 @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(
-  x: AnyObject, 
+  x: AnyObject,
   _ nativeType: T.Type,
   inout _ result: T?
 ) -> Bool
@@ -289,7 +289,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   var _isNull : Bool {
     return UnsafeMutablePointer<T>(self)._isNull
   }
-  
+
   /// Access the underlying raw memory, getting and
   /// setting values.
   public var memory : T {
@@ -320,7 +320,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
     }
   }
 
-  /// Access the `i`\ th element of the raw array pointed to by
+  /// Access the `i`th element of the raw array pointed to by
   /// `self`.
   ///
   /// Requires: `self != nil`
@@ -332,7 +332,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
       return (UnsafePointer<T>(self) + i).memory
     }
   }
-  
+
   /// Create an instance initialized with `nil`.
   @transparent public
   init(nilLiteral: ()) {
@@ -344,7 +344,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   init() {
     self._rawValue = _nilRawPointer
   }
-  
+
   /// Explicit construction from an UnsafeMutablePointer.
   ///
   /// This is inherently unsafe; UnsafeMutablePointer assumes the
@@ -374,7 +374,7 @@ extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
 
 @transparent
 public func == <T> (
-  lhs: AutoreleasingUnsafeMutablePointer<T>, 
+  lhs: AutoreleasingUnsafeMutablePointer<T>,
   rhs: AutoreleasingUnsafeMutablePointer<T>
 ) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))

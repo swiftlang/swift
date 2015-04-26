@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A collection whose elements are all identical `T`\ s.
+/// A collection whose elements are all identical `T`s.
 public struct Repeat<T> : CollectionType {
   
   /// A type that represents a valid position in the collection.
@@ -40,7 +40,7 @@ public struct Repeat<T> : CollectionType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> IndexingGenerator<Repeat> {
     return IndexingGenerator(self)
   }

@@ -81,35 +81,33 @@ public typealias Any = protocol<>
 /// and properties respectively, on each instance of `AnyObject`.  For
 /// example:
 ///
-/// .. parsed-literal:
-///
-///   class C {
-///     @objc func getCValue() -> Int { return 42 }
-///   }
-///
-///   // If x has a method @objc getValue()->Int, call it and
-///   // return the result.  Otherwise, return nil.
-///   func getCValue1(x: AnyObject) -> Int? {
-///     if let f: ()->Int = **x.getCValue** {
-///       return f()
+///     class C {
+///       @objc func getCValue() -> Int { return 42 }
 ///     }
-///     return nil
-///   }
 ///
-///   // A more idiomatic implementation using "optional chaining"
-///   func getCValue2(x: AnyObject) -> Int? {
-///     return **x.getCValue?()**
-///   }
+///     // If x has a method @objc getValue()->Int, call it and
+///     // return the result.  Otherwise, return nil.
+///     func getCValue1(x: AnyObject) -> Int? {
+///       if let f: ()->Int = **x.getCValue** {
+///         return f()
+///       }
+///       return nil
+///     }
 ///
-///   // An implementation that assumes the required method is present
-///   func getCValue3(x: AnyObject) -> **Int** {
-///     return **x.getCValue()** // x.getCValue is implicitly unwrapped.
-///   }
+///     // A more idiomatic implementation using "optional chaining"
+///     func getCValue2(x: AnyObject) -> Int? {
+///       return **x.getCValue?()**
+///     }
+///
+///     // An implementation that assumes the required method is present
+///     func getCValue3(x: AnyObject) -> **Int** {
+///       return **x.getCValue()** // x.getCValue is implicitly unwrapped.
+///     }
 ///
 /// This protocol *must* not have any method or property requirements.
 /// (Final extension methods are OK though.)
 ///
-/// See also: `AnyClass`
+/// - seealso: `AnyClass`
 #if _runtime(_ObjC)
 @objc public protocol AnyObject: class {}
 #else
@@ -129,19 +127,17 @@ public protocol AnyObject: class {}
 /// and properties respectively, on each instance of `AnyClass`. For
 /// example:
 ///
-/// .. parsed-literal:
+///     class C {
+///       @objc class var cValue: Int { return 42 }
+///     }
 ///
-///   class C {
-///     @objc class var cValue: Int { return 42 }
-///   }
+///     // If x has an @objc cValue: Int, return its value.
+///     // Otherwise, return nil.
+///     func getCValue(x: AnyClass) -> Int? {
+///       return **x.cValue**
+///     }
 ///
-///   // If x has an @objc cValue: Int, return its value.  
-///   // Otherwise, return nil.
-///   func getCValue(x: AnyClass) -> Int? {
-///     return **x.cValue**
-///   }
-///
-/// See also: `AnyObject`
+/// - seealso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
@@ -183,7 +179,7 @@ public protocol Equatable {
   /// non-value aspects of `Equatable` types is discouraged, and any
   /// that *are* exposed should be explicitly pointed out in
   /// documentation.
-  /// 
+  ///
   /// **Equality is an equivalence relation**
   ///
   /// - `x == x` is `true`
@@ -209,8 +205,7 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 /// Its requirements are inherited by `Comparable` and thus must
 /// be satisfied by types conforming to that protocol.
 public protocol _Comparable {
-  /// A `strict total order
-  /// <http://en.wikipedia.org/wiki/Total_order#Strict_total_order>`_
+  /// A [strict total order](http://en.wikipedia.org/wiki/Total_order#Strict_total_order)
   /// over instances of `Self`
   func <(lhs: Self, rhs: Self) -> Bool
 }
@@ -226,16 +221,15 @@ public func >= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
 }
 
 /// Instances of conforming types can be compared using relational
-/// operators, which define a `strict total order
-/// <http://en.wikipedia.org/wiki/Total_order#Strict_total_order>`_.
+/// operators, which define a [strict total order](http://en.wikipedia.org/wiki/Total_order#Strict_total_order).
 ///
 /// A type conforming to `Comparable` need only supply the `<` and
 /// `==` operators; default implementations of `<=`, `>`, `>=`, and
-/// `!=` are supplied by the standard library::
+/// `!=` are supplied by the standard library:
 ///
-///   struct Singular : Comparable {}
-///   func ==(x: Singular, y: Singular) -> Bool { return true }
-///   func <(x: Singular, y: Singular) -> Bool { return false }
+///     struct Singular : Comparable {}
+///     func ==(x: Singular, y: Singular) -> Bool { return true }
+///     func <(x: Singular, y: Singular) -> Bool { return false }
 ///
 /// **Axioms**, in addition to those of `Equatable`:
 ///
@@ -254,40 +248,38 @@ public protocol Comparable : _Comparable, Equatable {
 ///
 /// Each instance is a subset of `~Self.allZeros`
 ///
-/// Axioms, where `x` is an instance of `Self`::
+/// **Axioms**, where `x` is an instance of `Self`:
 ///
-///   x | Self.allZeros == x
-///   x ^ Self.allZeros == x
-///   x & Self.allZeros == .allZeros
-///   x & ~Self.allZeros == x
-///   ~x == x ^ ~Self.allZeros
+/// -  `x | Self.allZeros == x`
+/// -  `x ^ Self.allZeros == x`
+/// -  `x & Self.allZeros == .allZeros`
+/// -  `x & ~Self.allZeros == x`
+/// -  `~x == x ^ ~Self.allZeros`
 public protocol BitwiseOperationsType {
   /// Returns the intersection of bits set in `lhs` and `rhs`.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   func & (lhs: Self, rhs: Self) -> Self
-  
+
   /// Returns the union of bits set in `lhs` and `rhs`
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   func |(lhs: Self, rhs: Self) -> Self
 
   /// Returns the bits that are set in exactly one of `lhs` and `rhs`
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   func ^(lhs: Self, rhs: Self) -> Self
 
   /// Returns `x ^ ~Self.allZeros`
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   prefix func ~(x: Self) -> Self
 
   /// The empty bitset.
   ///
-  /// Also the `identity element
-  /// <http://en.wikipedia.org/wiki/Identity_element>`_ for `|` and
-  /// `^`, and the `fixed point
-  /// <http://en.wikipedia.org/wiki/Fixed_point_(mathematics)>`_ for
+  /// Also the [identity element](http://en.wikipedia.org/wiki/Identity_element) for `|` and
+  /// `^`, and the [fixed point](http://en.wikipedia.org/wiki/Fixed_point_(mathematics)) for
   /// `&`.
   static var allZeros: Self { get }
 }
@@ -311,7 +303,7 @@ public protocol Hashable : Equatable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// **Note:** the hash value is not guaranteed to be stable across
+  /// - note: the hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   var hashValue: Int { get }
@@ -322,13 +314,13 @@ public protocol Hashable : Equatable {
 ///
 /// Useful mainly when the optimizer's ability to specialize generics
 /// outstrips its ability to specialize ordinary closures.  For
-/// example, you may find that instead of::
+/// example, you may find that instead of:
 ///
-///   func f(g: (X)->Void) { ... g(a) ...}
+///     func f(g: (X)->Void) { ... g(a) ...}
 ///
-/// the following generates better code::
+/// the following generates better code:
 ///
-///   func f<T : SinkType where T.Element == X>(g: T) { ... g.put(a) ...}
+///     func f<T : SinkType where T.Element == X>(g: T) { ... g.put(a) ...}
 public protocol SinkType {
   /// The type of element to be written to this sink.
   typealias Element

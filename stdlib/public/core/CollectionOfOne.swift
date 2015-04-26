@@ -18,12 +18,12 @@ public struct GeneratorOfOne<T> : GeneratorType, SequenceType {
     self.elements = element
   }
 
-  /// `GeneratorOfOne` is also a `SequenceType`, so it `generate`\ s a
+  /// `GeneratorOfOne` is also a `SequenceType`, so it `generate`s a
   /// copy of itself
   public func generate() -> GeneratorOfOne {
     return self
   }
-  
+
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -41,14 +41,14 @@ public struct GeneratorOfOne<T> : GeneratorType, SequenceType {
 /// A collection containing a single element of type `T`.
 public struct CollectionOfOne<T> : CollectionType {
   /// A type that represents a valid position in the collection.
-  /// 
+  ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Bit
 
   /// Construct an instance containing just `element`.
-  public init(_ element: T) { 
-    self.element = element 
+  public init(_ element: T) {
+    self.element = element
   }
 
   /// The position of the first element.
@@ -59,14 +59,14 @@ public struct CollectionOfOne<T> : CollectionType {
   /// The "past the end" position; always identical to
   /// `startIndex.successor()`.
   ///
-  /// Note: `endIndex` is not a valid argument to `subscript`.
+  /// - note: `endIndex` is not a valid argument to `subscript`.
   public var endIndex: Index {
     return .One
   }
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> GeneratorOfOne<T> {
     return GeneratorOfOne(element)
   }

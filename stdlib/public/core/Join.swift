@@ -44,19 +44,19 @@ public protocol _ExtensibleCollectionType : CollectionType {
   /// Applying `successor()` to the index of the new element yields
   /// `self.endIndex`.
   ///
-  /// Complexity: amortized O(1).
+  /// - complexity: amortized O(1).
   mutating func append(x: Self.Generator.Element)
 
   /// Append the elements of `newElements` to `self`.
   ///
-  /// Complexity: O(*length of result*) 
-  /// 
-  /// A possible implementation::
+  /// - complexity: O(*length of result*)
   ///
-  ///   reserveCapacity(count(self) + underestimateCount(newElements))
-  ///   for x in newElements {
-  ///     self.append(x)
-  ///   }
+  /// A possible implementation:
+  ///
+  ///     reserveCapacity(count(self) + underestimateCount(newElements))
+  ///     for x in newElements {
+  ///       self.append(x)
+  ///     }
   mutating func extend<
       S : SequenceType
       where S.Generator.Element == Self.Generator.Element
@@ -144,11 +144,11 @@ public func +<
 /// `elements`.
 ///
 /// For example, this code excerpt writes "``here be dragons``" to the standard
-/// output::
+/// output:
 ///
-///   println(join(" ", [ "here", "be", "dragons" ]))
+///     println(join(" ", [ "here", "be", "dragons" ]))
 public func join<
-  C : ExtensibleCollectionType, S : SequenceType 
+  C : ExtensibleCollectionType, S : SequenceType
   where S.Generator.Element == C
 >(
   separator: C, _ elements: S

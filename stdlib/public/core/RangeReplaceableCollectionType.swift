@@ -22,7 +22,7 @@ public protocol _RangeReplaceableCollectionDefaultsType
   /// Applying `successor()` to the index of the new element yields
   /// `self.endIndex`.
   ///
-  /// Complexity: amortized O(1).
+  /// - complexity: amortized O(1).
   mutating func append(x: Self.Generator.Element)
 }
 
@@ -54,9 +54,9 @@ public protocol RangeReplaceableCollectionType
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(subRange)`\ ) if
+  /// - complexity: O(`count(subRange)`) if
   /// `subRange.endIndex == self.endIndex` and `isEmpty(newElements)`,
-  /// O(\ `count(self)` + `count(newElements)`\ ) otherwise.
+  /// O(`count(self)` + `count(newElements)`) otherwise.
   mutating func replaceRange<
     C : CollectionType where C.Generator.Element == Self.Generator.Element
   >(
@@ -68,22 +68,22 @@ public protocol RangeReplaceableCollectionType
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   ///
-  /// Can be implemented as::
+  /// Can be implemented as:
   ///
-  ///   Swift.insert(&self, newElement, atIndex: i)
+  ///     Swift.insert(&self, newElement, atIndex: i)
   mutating func insert(newElement: Generator.Element, atIndex i: Index)
 
   /// Insert `newElements` at index `i`
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self) + count(newElements)`\ ).
+  /// - complexity: O(`count(self) + count(newElements)`).
   ///
-  /// Can be implemented as::
+  /// Can be implemented as:
   ///
-  ///   Swift.splice(&self, newElements, atIndex: i)
+  ///     Swift.splice(&self, newElements, atIndex: i)
   mutating func splice<
     S : CollectionType where S.Generator.Element == Generator.Element
   >(newElements: S, atIndex i: Index)
@@ -92,37 +92,37 @@ public protocol RangeReplaceableCollectionType
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   ///
-  /// Can be implemented as::
+  /// Can be implemented as:
   ///
-  ///   Swift.removeAtIndex(&self, i)
+  ///     Swift.removeAtIndex(&self, i)
   mutating func removeAtIndex(i: Index) -> Generator.Element
-  
+
   /// Remove the indicated `subRange` of elements
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   ///
-  /// Can be implemented as::
+  /// Can be implemented as:
   ///
-  ///   Swift.removeRange(&self, subRange)
+  ///     Swift.removeRange(&self, subRange)
   mutating func removeRange(subRange: Range<Index>)
 
   /// Remove all elements
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// :param: `keepCapacity`, if `true`, is a non-binding request to
+  /// - parameter keepCapacity: if `true`, is a non-binding request to
   ///    avoid releasing storage, which can be a useful optimization
   ///    when `self` is going to be grown again.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   ///
-  /// Can be implemented as::
+  /// Can be implemented as:
   ///
-  ///   Swift.removeAll(&self, keepCapacity: keepCapacity)
+  ///     Swift.removeAll(&self, keepCapacity: keepCapacity)
   mutating func removeAll(#keepCapacity: Bool /*= false*/)
 
   /// Return a collection of the same type, containing the elements
@@ -136,7 +136,7 @@ public protocol RangeReplaceableCollectionType
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// Complexity: O(\ `count(x)`\ ).
+/// - complexity: O(`count(x)`).
 public func insert<
   C: RangeReplaceableCollectionType
 >(inout x: C, _ newElement: C.Generator.Element, atIndex i: C.Index) {
@@ -147,7 +147,7 @@ public func insert<
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// Complexity: O(\ `count(x) + count(newElements)`\ ).
+/// - complexity: O(`count(x) + count(newElements)`).
 public func splice<
   C: RangeReplaceableCollectionType,
   S : CollectionType where S.Generator.Element == C.Generator.Element
@@ -167,11 +167,11 @@ internal func _replaceRange<
   x.replaceRange(subRange, with: newElements)
 }
 
-/// Remove from `x` and return the element at index `i` 
+/// Remove from `x` and return the element at index `i`
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// Complexity: O(\ `count(x)`\ ).
+/// - complexity: O(`count(x)`).
 public func removeAtIndex<
   C: RangeReplaceableCollectionType
 >(inout x: C, _ index: C.Index) -> C.Generator.Element {
@@ -185,7 +185,7 @@ public func removeAtIndex<
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// Complexity: O(\ `count(x)`\ ).
+/// - complexity: O(`count(x)`).
 public func removeRange<
   C: RangeReplaceableCollectionType
 >(inout x: C, _ subRange: Range<C.Index>) {
@@ -196,11 +196,11 @@ public func removeRange<
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// :param: `keepCapacity`, if `true`, is a non-binding request to
+/// - parameter keepCapacity: if `true`, is a non-binding request to
 ///    avoid releasing storage, which can be a useful optimization
 ///    when `x` is going to be grown again.
 ///
-/// Complexity: O(\ `count(x)`\ ).
+/// - complexity: O(`count(x)`).
 public func removeAll<
   C: RangeReplaceableCollectionType
 >(inout x: C, keepCapacity: Bool = false) {
@@ -212,7 +212,7 @@ public func removeAll<
   }
 }
 
-/// Append elements from `newElements` to `x`.  Complexity:
+/// Append elements from `newElements` to `x`.  - complexity:
 /// O(N)
 public func extend<
   C: RangeReplaceableCollectionType,
@@ -231,4 +231,4 @@ public func removeLast<
   _precondition(!isEmpty(x), "can't removeLast from an empty collection")
   return removeAtIndex(&x, x.endIndex.predecessor())
 }
-  
+

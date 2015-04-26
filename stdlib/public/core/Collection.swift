@@ -54,14 +54,14 @@ extension _CollectionDefaultsType {
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// Complexity: O(N)
+  /// - complexity: O(N)
   final public func _prext_underestimateCount() -> Int {
     return numericCast(_prext_count())
   }
 
   /// Return the number of elements.
   ///
-  /// Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// - complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   /// O(N) otherwise.
   final public func _prext_count() -> Index.Distance {
     return distance(startIndex, endIndex)
@@ -76,7 +76,7 @@ extension _CollectionDefaultsType {
   /// `Optional(nil)` if the element was not found, or
   /// `Optional(Optional(index))` if an element was found.
   ///
-  /// Complexity: O(N)
+  /// - complexity: O(N)
   final public func _customFindEquatableElement(
     element: Generator.Element
   ) -> Index?? {
@@ -118,11 +118,11 @@ extension _CollectionDefaultsType {
 ///
 /// The sequence view of the elements is identical to the collection
 /// view.  In other words, the following code binds the same series of
-/// values to `x` as does `for x in self {}`::
+/// values to `x` as does `for x in self {}`:
 ///
-///   for i in startIndex..<endIndex {
-///     let x = self[i]
-///   }
+///     for i in startIndex..<endIndex {
+///       let x = self[i]
+///     }
 public protocol CollectionType
   : SequenceType, _CollectionDefaultsType,
   _CollectionGeneratorDefaultsType {
@@ -139,7 +139,7 @@ public protocol CollectionType
 
   /// Return the number of elements.
   ///
-  /// Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// - complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   /// O(N) otherwise.
   func _prext_count() -> Index.Distance
 
@@ -152,7 +152,7 @@ public protocol CollectionType
   /// `Optional(nil)` if the element was not found, or
   /// `Optional(Optional(index))` if an element was found.
   ///
-  /// Complexity: O(N)
+  /// - complexity: O(N)
   func _customFindEquatableElement(element: Generator.Element) -> Index??
 }
 
@@ -204,15 +204,15 @@ public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
 /// A *collection* that supports subscript assignment.
 ///
 /// For any instance `a` of a type conforming to
-/// `MutableCollectionType`, ::
+/// `MutableCollectionType`, :
 ///
-///   a[i] = x
-///   let y = a[i]
+///     a[i] = x
+///     let y = a[i]
 ///
-/// is equivalent to ::
+/// is equivalent to:
 ///
-///   a[i] = x
-///   let y = x
+///     a[i] = x
+///     let y = x
 ///
 public protocol MutableCollectionType : CollectionType {
   /// Access the element at `position`.
@@ -224,18 +224,16 @@ public protocol MutableCollectionType : CollectionType {
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`
 /// conforms to the other requirements of *CollectionType*,
-/// `IndexingGenerator<C>` can be used as the result of `C`\ 's
+/// `IndexingGenerator<C>` can be used as the result of `C`'s
 /// `generate()` method.  For example:
 ///
-/// .. parsed-literal::
-///
-///    struct MyCollection : CollectionType {
-///      struct Index : ForwardIndexType { *implementation hidden* }
-///      subscript(i: Index) -> MyElement { *implementation hidden* }
-///      func generate() -> **IndexingGenerator<MyCollection>** {
-///        return IndexingGenerator(self)
+///      struct MyCollection : CollectionType {
+///        struct Index : ForwardIndexType { *implementation hidden* }
+///        subscript(i: Index) -> MyElement { *implementation hidden* }
+///        func generate() -> **IndexingGenerator<MyCollection>** {
+///          return IndexingGenerator(self)
+///        }
 ///      }
-///    }
 public struct IndexingGenerator<
   C: _CollectionGeneratorDefaultsType
 > : GeneratorType, SequenceType {
@@ -250,7 +248,7 @@ public struct IndexingGenerator<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> IndexingGenerator {
     return self
   }
@@ -263,12 +261,12 @@ public struct IndexingGenerator<
     return _position == _elements.endIndex
     ? .None : .Some(_elements[_position++])
   }
-  
+
   let _elements: C
   var _position: C.Index
 }
 
-/// Return the range of `x` 's valid index values.
+/// Return the range of `x`'s valid index values.
 ///
 /// The result's `endIndex` is the same as that of `x`.  Because
 /// `Range` is half-open, iterating the values of the result produces
@@ -307,7 +305,7 @@ public struct PermutationGenerator<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> Generator {
     return self
   }
@@ -336,18 +334,18 @@ public protocol Sliceable : _Sliceable {
   // that constraint (<rdar://problem/14375973> Include associated
   // type information in protocol witness tables) Instead we constrain
   // to _Sliceable; at least error messages will be more informative.
-  
+
   /// The *collection* type that represents a sub-range of elements.
   ///
   /// Though it can't currently be enforced by the type system, the
   /// `SubSlice` type in a concrete implementation of `Sliceable`
   /// should also be `Sliceable`.
   typealias SubSlice : _Sliceable
-  
+
   /// Access the elements delimited by the given half-open range of
   /// indices.
   ///
-  /// Complexity: O(1) unless bridging from Objective-C requires an
+  /// - complexity: O(1) unless bridging from Objective-C requires an
   /// O(N) conversion.
   subscript(bounds: Range<Index>) -> SubSlice {get}
 }
@@ -356,10 +354,8 @@ public protocol Sliceable : _Sliceable {
 ///
 /// For example,
 ///
-/// .. parsed-literal:
-///
-///      x[i..<j] = *someExpression*
-///      x[i..<j].\ *mutatingMethod*\ ()
+///      x[i..<j] = someExpression
+///      x[i..<j].mutatingMethod()
 public protocol MutableSliceable : Sliceable, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSlice {get set}
 }
@@ -375,7 +371,7 @@ public func dropFirst<Seq : Sliceable>(s: Seq) -> Seq.SubSlice {
 ///
 /// Requires: `s` is non-empty.
 public func dropLast<
-  S: Sliceable 
+  S: Sliceable
   where S.Index: BidirectionalIndexType
 >(s: S) -> S.SubSlice {
   return s[s.startIndex..<s.endIndex.predecessor()]
@@ -386,8 +382,8 @@ public func dropLast<
 ///
 /// If `maxLength` exceeds `count(s)`, the result contains all
 /// the elements of `s`.
-/// 
-/// Complexity: O(1)+K when `S.Index` conforms to
+///
+/// - complexity: O(1)+K when `S.Index` conforms to
 /// `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
 /// of slicing `s`.
 public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
@@ -402,8 +398,8 @@ public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
 ///
 /// If `maxLength` exceeds `count(s)`, the result contains all
 /// the elements of `s`.
-/// 
-/// Complexity: O(1)+K when `S.Index` conforms to
+///
+/// - complexity: O(1)+K when `S.Index` conforms to
 /// `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
 /// of slicing `s`.
 public func suffix<

@@ -63,7 +63,7 @@ extension NSObject : Equatable, Hashable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// **Note:** the hash value is not guaranteed to be stable across
+  /// - note: the hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
@@ -153,7 +153,7 @@ extension String : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public static func _getObjectiveCType() -> Any.Type {
     return NSString.self
   }
@@ -172,7 +172,7 @@ extension String : _ObjectiveCBridgeable {
   ) {
     result = String(x)
   }
-  
+
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSString,
     inout result: String?
@@ -194,7 +194,7 @@ extension Int : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public init(_ number: NSNumber) {
     value = number.integerValue.value
   }
@@ -214,7 +214,7 @@ extension Int : _ObjectiveCBridgeable {
   ) {
     result = x.integerValue
   }
-  
+
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
     inout result: Int?
@@ -228,7 +228,7 @@ extension UInt : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public init(_ number: NSNumber) {
     value = number.unsignedIntegerValue.value
   }
@@ -263,7 +263,7 @@ extension Float : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public init(_ number: NSNumber) {
     self = number.floatValue
   }
@@ -283,7 +283,7 @@ extension Float : _ObjectiveCBridgeable {
   ) {
     result = x.floatValue
   }
-  
+
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
     inout result: Float?
@@ -297,7 +297,7 @@ extension Double : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public init(_ number: NSNumber) {
     self = number.doubleValue
   }
@@ -317,7 +317,7 @@ extension Double : _ObjectiveCBridgeable {
   ) {
     result = x.doubleValue
   }
-  
+
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,
     inout result: Double?
@@ -331,7 +331,7 @@ extension Bool: _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public init(_ number: NSNumber) {
     if number.boolValue { self = true }
     else { self = false }
@@ -367,7 +367,7 @@ extension CGFloat : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true
   }
-  
+
   public init(_ number: NSNumber) {
     self.native = CGFloat.NativeType(number)
   }
@@ -436,9 +436,9 @@ extension NSArray : ArrayLiteralConvertible {
 }
 
 /// The entry point for converting `NSArray` to `Array` in bridge
-/// thunks.  Used, for example, to expose ::
+/// thunks.  Used, for example, to expose :
 ///
-///   func f([NSView]) {}
+///     func f([NSView]) {}
 ///
 /// to Objective-C code as a method that accepts an `NSArray`.  This operation
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
@@ -451,9 +451,9 @@ public func _convertNSArrayToArray<T>(source: NSArray?) -> [T] {
 }
 
 /// The entry point for converting `Array` to `NSArray` in bridge
-/// thunks.  Used, for example, to expose ::
+/// thunks.  Used, for example, to expose :
 ///
-///   func f() -> [NSView] { return [] }
+///     func f() -> [NSView] { return [] }
 ///
 /// to Objective-C code as a method that returns an `NSArray`.
 public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
@@ -500,7 +500,7 @@ extension Array : _ObjectiveCBridgeable {
       result = native
       return
     }
-    
+
     if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
       // Forced down-cast (possible deferred type-checking)
       result = Array(_fromNSArray: source)
@@ -516,7 +516,7 @@ extension Array : _ObjectiveCBridgeable {
   ) -> Bool {
     // Construct the result array by conditionally bridging each element.
     var anyObjectArr = [AnyObject](_fromNSArray: source)
-    
+
     result = _arrayConditionalCast(anyObjectArr)
     return result != nil
   }
@@ -552,9 +552,9 @@ extension Dictionary {
 }
 
 /// The entry point for bridging `NSDictionary` to `Dictionary` in bridge
-/// thunks.  Used, for example, to expose ::
+/// thunks.  Used, for example, to expose:
 ///
-///   func f([String : String]) {}
+///     func f([String : String]) {}
 ///
 /// to Objective-C code as a method that accepts an `NSDictionary`.
 ///
@@ -578,9 +578,9 @@ public func _convertNSDictionaryToDictionary<
 // FIXME: right now the following is O(n), not O(1).
 
 /// The entry point for bridging `Dictionary` to `NSDictionary` in bridge
-/// thunks.  Used, for example, to expose ::
+/// thunks.  Used, for example, to expose:
 ///
-///   func f() -> [String : String] {}
+///     func f() -> [String : String] {}
 ///
 /// to Objective-C code as a method that returns an `NSDictionary`.
 ///
@@ -591,7 +591,7 @@ public func _convertNSDictionaryToDictionary<
 public func _convertDictionaryToNSDictionary<Key, Value>(
     d: [Key : Value]
 ) -> NSDictionary {
-  
+
   // Note: there should be *a good justification* for doing something else
   // than just dispatching to `_bridgeToObjectiveC`.
   return d._bridgeToObjectiveC()
@@ -732,10 +732,10 @@ final public class NSFastGenerator : GeneratorType {
 
 extension NSArray : SequenceType {
   final public
-  
+
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -748,7 +748,7 @@ extension NSArray : Swift.CollectionType {
   var startIndex: Int {
     return 0
   }
-  
+
   final
   var endIndex: Int {
     return count
@@ -775,7 +775,7 @@ extension Set {
 extension NSSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -784,7 +784,7 @@ extension NSSet : SequenceType {
 extension NSOrderedSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -822,7 +822,7 @@ public struct NSIndexSetGenerator : GeneratorType {
 extension NSIndexSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> NSIndexSetGenerator {
     return NSIndexSetGenerator(set: self)
   }
@@ -831,9 +831,9 @@ extension NSIndexSet : SequenceType {
 // FIXME: right now the following is O(n), not O(1).
 
 /// The entry point for bridging `Set` to `NSSet` in bridge
-/// thunks.  Used, for example, to expose ::
+/// thunks.  Used, for example, to expose:
 ///
-///   func f() -> Set<String> {}
+///     func f() -> Set<String> {}
 ///
 /// to Objective-C code as a method that returns an `NSSet`.
 ///
@@ -846,9 +846,9 @@ public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
 }
 
 /// The entry point for bridging `NSSet` to `Set` in bridge
-/// thunks.  Used, for example, to expose ::
+/// thunks.  Used, for example, to expose:
 ///
-///   func f(Set<String>) {}
+///     func f(Set<String>) {}
 ///
 /// to Objective-C code as a method that accepts an `NSSet`.
 ///
@@ -940,7 +940,7 @@ extension NSDictionary : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> Generator {
     return Generator(self)
   }
@@ -949,7 +949,7 @@ extension NSDictionary : SequenceType {
 extension NSEnumerator : SequenceType {
   /// Return a *generator* over the *enumerator*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -976,7 +976,7 @@ extension NSRange {
 //===----------------------------------------------------------------------===//
 
 /// Returns a localized string, using the main bundle if one is not specified.
-public 
+public
 func NSLocalizedString(key: String,
                        tableName: String? = nil,
                        bundle: NSBundle = NSBundle.mainBundle(),
@@ -1063,7 +1063,7 @@ extension NSString {
     let va_args = getVaList(args)
     self.init(format: format as String, arguments: va_args)
   }
-  
+
   public
   convenience init(
     format: NSString, locale: NSLocale?, _ args: CVarArgType...
@@ -1169,10 +1169,10 @@ extension NSArray {
   /// Initializes a newly allocated array by placing in it the objects
   /// contained in a given array.
   ///
-  /// :returns: An array initialized to contain the objects in
+  /// - returns: An array initialized to contain the objects in
   ///    `anArray``. The returned object might be different than the
   ///    original receiver.
-  /// 
+  ///
   /// Discussion: After an immutable array has been initialized in
   /// this way, it cannot be modified.
   @objc(_swiftInitWithArray_NSArray:)
@@ -1185,7 +1185,7 @@ extension NSString {
   /// Returns an `NSString` object initialized by copying the characters
   /// from another given string.
   ///
-  /// :returns: An `NSString` object initialized by copying the
+  /// - returns: An `NSString` object initialized by copying the
   ///   characters from `aString`. The returned object may be different
   ///   from the original receiver.
   @objc(_swiftInitWithString_NSString:)
@@ -1198,7 +1198,7 @@ extension NSSet {
   /// Initializes a newly allocated set and adds to it objects from
   /// another given set.
   ///
-  /// :returns: An initialized objects set containing the objects from
+  /// - returns: An initialized objects set containing the objects from
   /// `set`. The returned set might be different than the original
   /// receiver.
   @objc(_swiftInitWithSet_NSSet:)
@@ -1211,7 +1211,7 @@ extension NSDictionary {
   /// Initializes a newly allocated dictionary and adds to it objects from
   /// another given dictionary.
   ///
-  /// :returns: An initialized dictionary—which might be different
+  /// - returns: An initialized dictionary—which might be different
   ///   than the original receiver—containing the keys and values
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)

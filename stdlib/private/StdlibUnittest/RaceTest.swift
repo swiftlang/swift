@@ -162,7 +162,7 @@ public func == (lhs: Observation1UWord, rhs: Observation1UWord) -> Bool {
   return lhs.uw1 == rhs.uw1
 }
 
-/// An observation result that consists of four `UWord`\ s.
+/// An observation result that consists of four `UWord`s.
 public struct Observation4UWord : Equatable, CustomStringConvertible {
   public var uw1: UWord
   public var uw2: UWord
@@ -189,7 +189,7 @@ public func == (lhs: Observation4UWord, rhs: Observation4UWord) -> Bool {
     lhs.uw4 == rhs.uw4
 }
 
-/// An observation result that consists of three `Word`\ s.
+/// An observation result that consists of three `Word`s.
 public struct Observation3Word : Equatable, CustomStringConvertible {
   public var w1: Word
   public var w2: Word
@@ -213,7 +213,7 @@ public func == (lhs: Observation3Word, rhs: Observation3Word) -> Bool {
     lhs.w3 == rhs.w3
 }
 
-/// An observation result that consists of four `Word`\ s.
+/// An observation result that consists of four `Word`s.
 public struct Observation4Word : Equatable, CustomStringConvertible {
   public var w1: Word
   public var w2: Word
@@ -240,7 +240,7 @@ public func == (lhs: Observation4Word, rhs: Observation4Word) -> Bool {
     lhs.w4 == rhs.w4
 }
 
-/// An observation result that consists of five `Word`\ s.
+/// An observation result that consists of five `Word`s.
 public struct Observation5Word : Equatable, CustomStringConvertible {
   public var w1: Word
   public var w2: Word
@@ -270,7 +270,7 @@ public func == (lhs: Observation5Word, rhs: Observation5Word) -> Bool {
     lhs.w5 == rhs.w5
 }
 
-/// An observation result that consists of nine `Word`\ s.
+/// An observation result that consists of nine `Word`s.
 public struct Observation9Word : Equatable, CustomStringConvertible {
   public var w1: Word
   public var w2: Word

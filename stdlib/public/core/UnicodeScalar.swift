@@ -12,8 +12,7 @@
 // UnicodeScalar Type
 //===----------------------------------------------------------------------===//
 
-/// A `Unicode scalar value
-/// <http://www.unicode.org/glossary/#unicode_scalar_value>`_.
+/// A [Unicode scalar value](http://www.unicode.org/glossary/#unicode_scalar_value).
 public struct UnicodeScalar :
   _BuiltinUnicodeScalarLiteralConvertible,
   UnicodeScalarLiteralConvertible {
@@ -89,7 +88,7 @@ public struct UnicodeScalar :
 
   /// Return a String representation of `self` .
   ///
-  /// :param: `asASCII`, if `true`, forces most values into a numeric
+  /// - parameter asASCII: if `true`, forces most values into a numeric
   /// representation.
   public func escape(#asASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
@@ -134,7 +133,7 @@ public struct UnicodeScalar :
       result += "}"
       return result
     } else {
-      // FIXME: Type checker performance prohibits this from being a 
+      // FIXME: Type checker performance prohibits this from being a
       // single chained "+".
       var result = "\\u{"
       result += lowNibbleAsHex(UInt32(self) >> 28)
@@ -224,7 +223,7 @@ extension UnicodeScalar : Hashable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// **Note:** the hash value is not guaranteed to be stable across
+  /// - note: the hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
@@ -294,7 +293,7 @@ extension UnicodeScalar.UTF16View : CollectionType {
   var startIndex: Int {
     return 0
   }
-  
+
   /// The "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -303,7 +302,7 @@ extension UnicodeScalar.UTF16View : CollectionType {
   var endIndex: Int {
     return 0 + UTF16.width(value)
   }
-  
+
   /// Access the code unit at `position`.
   ///
   /// Requires: `position` is a valid position in `self` and
@@ -313,11 +312,11 @@ extension UnicodeScalar.UTF16View : CollectionType {
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
     ) : UTF16.trailSurrogate(value)
   }
-  
+
   /// Return a *generator* over the code points that comprise this
   /// *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   func generate() -> IndexingGenerator<UnicodeScalar.UTF16View> {
     return IndexingGenerator(self)
   }

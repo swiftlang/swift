@@ -14,7 +14,7 @@
 /// can store both ASCII and UTF-16, and can wrap native Swift
 /// _StringBuffer or NSString instances.
 ///
-/// Usage note: when elements are 8 bits wide, this code may
+/// Usage - note: when elements are 8 bits wide, this code may
 /// dereference one past the end of the byte array that it owns, so
 /// make sure that storage is allocated!  You want a null terminator
 /// anyway, so it shouldn't be a burden.
@@ -49,7 +49,7 @@ public struct _StringCore {
     // in non-checked builds.
 #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(count >= 0)
-    
+
     if _baseAddress == nil {
 #if _runtime(_ObjC)
       _sanityCheck(hasCocoaBuffer,
@@ -78,7 +78,7 @@ public struct _StringCore {
   var _countMask: UWord {
     return UWord.max >> 2
   }
-  
+
   /// Bitmask for the flags part of _countAndFlags
   var _flagMask: UWord {
     return ~_countMask
@@ -133,7 +133,7 @@ public struct _StringCore {
       }
     }
   }
-  
+
   //===--------------------------------------------------------------------===//
   // Initialization
   public init(
@@ -145,12 +145,12 @@ public struct _StringCore {
   ) {
     _sanityCheck(elementShift == 0 || elementShift == 1)
     self._baseAddress = baseAddress
-   
+
     self._countAndFlags
       = (UWord(elementShift) << (UWord._sizeInBits - 1))
       | ((hasCocoaBuffer ? 1 : 0) << (UWord._sizeInBits - 2))
       | UWord(count)
-    
+
     self._owner = owner
     _sanityCheck(UWord(count) & _flagMask == 0, "String too long to represent")
     _invariantCheck()
@@ -166,7 +166,7 @@ public struct _StringCore {
       owner: buffer._anyObject
     )
   }
-  
+
   /// Create the implementation of an empty string.
   /// NOTE: there is no null terminator in an empty string!
   public init() {
@@ -178,9 +178,9 @@ public struct _StringCore {
 
   //===--------------------------------------------------------------------===//
   // Properties
-  
+
   /// The number of elements stored
-  /// Complexity: O(1).
+  /// - complexity: O(1).
   public var count: Int {
     get {
       return Int(_countAndFlags & _countMask)
@@ -196,7 +196,7 @@ public struct _StringCore {
   var elementShift: Int {
     return Int(_countAndFlags >> (UWord._sizeInBits - 1))
   }
-  
+
   /// the number of bytes per element
   /// If the string does not have an ASCII buffer available (including the case
   /// when we don't have a utf16 buffer) then it equals 2.
@@ -255,10 +255,10 @@ public struct _StringCore {
     return nil
   }
 #endif
-  
+
   //===--------------------------------------------------------------------===//
   // slicing
-  
+
   /// Return the given sub-_StringCore
   public subscript(subRange: Range<Int>) -> _StringCore {
     _precondition(
@@ -358,13 +358,13 @@ public struct _StringCore {
   /// Attempt to claim unused capacity in the String's existing
   /// native buffer, if any.  Return zero and a pointer to the claimed
   /// storage if successful. Otherwise, returns a suggested new
-  /// capacity and a null pointer.  
+  /// capacity and a null pointer.
   ///
-  /// Note: If successful, effectively appends garbage to the String
+  /// - note: If successful, effectively appends garbage to the String
   /// until it has newSize UTF-16 code units; you must immediately copy
   /// valid UTF-16 into that storage.
   ///
-  /// Note: if unsuccessful because of insufficient space in an
+  /// - note: if unsuccessful because of insufficient space in an
   /// existing buffer, the suggested new capacity will at least double
   /// the existing buffer's storage
   mutating func _claimCapacity(
@@ -409,14 +409,14 @@ public struct _StringCore {
     if _fastPath(existingStorage != nil) {
       return existingStorage
     }
-    
+
     let oldCount = count
-    
+
     _copyInPlace(
       newSize: newSize,
       newCapacity: newCapacity,
       minElementWidth: minElementWidth)
-    
+
     return _pointerToNth(oldCount)
   }
 
@@ -429,7 +429,7 @@ public struct _StringCore {
   ) {
     _sanityCheck(newCapacity >= newSize)
     var oldCount = count
-    
+
     // Allocate storage.
     let newElementWidth =
       minElementWidth >= elementWidth
@@ -442,7 +442,7 @@ public struct _StringCore {
     if hasContiguousStorage {
       _StringCore._copyElements(
         _baseAddress, srcElementWidth: elementWidth,
-        dstStart: COpaquePointer(newStorage.start), 
+        dstStart: COpaquePointer(newStorage.start),
         dstElementWidth: newElementWidth, count: oldCount)
     }
     else {
@@ -457,13 +457,13 @@ public struct _StringCore {
       _sanityCheckFailure("_copyInPlace: non-native string without objc runtime")
 #endif
     }
-    
+
     self = _StringCore(newStorage)
   }
 
   /// Append `c` to `self`.
   ///
-  /// Complexity: O(1) when amortized over repeated appends of equal
+  /// - complexity: O(1) when amortized over repeated appends of equal
   /// character values
   mutating func append(c: UnicodeScalar) {
     let width = UTF16.width(c)
@@ -475,22 +475,22 @@ public struct _StringCore {
 
   /// Append `u` to `self`.
   ///
-  /// Complexity: amortized O(1).
+  /// - complexity: amortized O(1).
   public mutating func append(u: UTF16.CodeUnit) {
     append(u, nil)
   }
-  
+
   mutating func append(u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit?) {
     _invariantCheck()
     let minBytesPerCodeUnit = u0 <= 0x7f ? 1 : 2
     let utf16Width = u1 == nil ? 1 : 2
-    
+
     let destination = _growBuffer(
       count + utf16Width, minElementWidth: minBytesPerCodeUnit)
 
     if _fastPath(elementWidth == 1) {
       _sanityCheck(
-        _pointerToNth(count) 
+        _pointerToNth(count)
         == COpaquePointer(UnsafeMutablePointer<RawByte>(destination) + 1))
 
       UnsafeMutablePointer<UTF8.CodeUnit>(destination)[0] = UTF8.CodeUnit(u0)
@@ -519,7 +519,7 @@ public struct _StringCore {
 
     if _fastPath(rhs.hasContiguousStorage) {
       _StringCore._copyElements(
-        rhs._baseAddress, srcElementWidth: rhs.elementWidth, 
+        rhs._baseAddress, srcElementWidth: rhs.elementWidth,
         dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
     }
     else {
@@ -569,11 +569,11 @@ extension _StringCore : CollectionType {
 extension _StringCore : Sliceable {}
 
 extension _StringCore : ExtensibleCollectionType {
-  
+
   public mutating func reserveCapacity(n: Int) {
     if _fastPath(!hasCocoaBuffer) {
       if _fastPath(isUniquelyReferencedNonObjC(&_owner)) {
-        
+
         let subRange: Range<UnsafePointer<RawByte>>
           = UnsafePointer(_pointerToNth(0))..<UnsafePointer(_pointerToNth(count))
 
@@ -597,7 +597,7 @@ extension _StringCore : ExtensibleCollectionType {
         width = hasNonAscii ? 2 : 1
       }
     }
-    
+
     let growth = s._prext_underestimateCount()
     var g = s.generate()
 
@@ -636,8 +636,8 @@ var _emptyStringBase: COpaquePointer {
 extension _StringCore : RangeReplaceableCollectionType {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
-  /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
+  /// - complexity: O(`count(subRange)`) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UTF16.CodeUnit
   >(
@@ -646,11 +646,11 @@ extension _StringCore : RangeReplaceableCollectionType {
     _precondition(
       subRange.startIndex >= 0,
       "replaceRange: subRange start precedes String start")
-    
+
     _precondition(
       subRange.endIndex <= count,
       "replaceRange: subRange extends past String end")
-    
+
     let width = elementWidth == 2 || contains(newElements) { $0 > 0x7f } ? 2 : 1
     let replacementCount = numericCast(Swift.count(newElements)) as Int
     let replacedCount = Swift.count(subRange)
@@ -673,12 +673,12 @@ extension _StringCore : RangeReplaceableCollectionType {
       let rangeStart = UnsafeMutablePointer<UInt8>(
         _pointerToNth(subRange.startIndex))
       let tailStart = rangeStart + (replacedCount << elementShift)
-      
+
       if growth > 0 {
         (tailStart + (growth << elementShift)).assignBackwardFrom(
           tailStart, count: tailCount << elementShift)
       }
-      
+
       if _fastPath(elementWidth == 1) {
         var dst = rangeStart
         for u in newElements {
@@ -691,7 +691,7 @@ extension _StringCore : RangeReplaceableCollectionType {
           dst++.memory = u
         }
       }
-      
+
       if growth < 0 {
         (tailStart + (growth << elementShift)).assignFrom(
           tailStart, count: tailCount << elementShift)
@@ -717,7 +717,7 @@ extension _StringCore : RangeReplaceableCollectionType {
   public mutating func insert(newElement: UTF16.CodeUnit, atIndex i: Int) {
     Swift.insert(&self, newElement, atIndex: i)
   }
-  
+
   public mutating func splice<
     S : CollectionType where S.Generator.Element == UTF16.CodeUnit
   >(newElements: S, atIndex i: Int) {
@@ -727,7 +727,7 @@ extension _StringCore : RangeReplaceableCollectionType {
   public mutating func removeAtIndex(i: Int) -> UTF16.CodeUnit {
     return Swift.removeAtIndex(&self, i)
   }
-  
+
   public mutating func removeRange(subRange: Range<Int>) {
     Swift.removeRange(&self, subRange)
   }

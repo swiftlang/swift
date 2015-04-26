@@ -30,7 +30,7 @@ func _toNSArray<T, U : AnyObject>(a: [T], @noescape f: (T) -> U) -> NSArray {
 
 func _toNSRange(r: Range<String.Index>) -> NSRange {
   return NSRange(
-    location: r.startIndex._utf16Index, 
+    location: r.startIndex._utf16Index,
     length: r.endIndex._utf16Index - r.startIndex._utf16Index)
 }
 
@@ -65,7 +65,7 @@ extension String {
 
   //===--- Bridging Helpers -----------------------------------------------===//
   //===--------------------------------------------------------------------===//
-  
+
   /// The corresponding `NSString` - a convenience for bridging code.
   var _ns: NSString {
     return self as NSString
@@ -106,7 +106,7 @@ extension String {
     index._setIfNonNil { self._index(utf16Index) }
     return result
   }
-  
+
   /// Invoke `body` on an `NSRange` buffer.  If `range` was converted
   /// from non-`nil`, convert the buffer to a `Range<Index>` and write
   /// it into the memory referred to by `range`
@@ -187,7 +187,7 @@ extension String {
   //
   // + (instancetype)stringWithFormat:(NSString *)format, ...
   //===--------------------------------------------------------------------===//
-  
+
   // + (instancetype)
   //     stringWithContentsOfFile:(NSString *)path
   //     encoding:(NSStringEncoding)enc
@@ -238,8 +238,8 @@ extension String {
   /// interpreted using a given encoding.  Errors are written into the
   /// inout `error` argument.
   public init?(
-    contentsOfURL url: NSURL, 
-    encoding enc: NSStringEncoding, 
+    contentsOfURL url: NSURL,
+    encoding enc: NSStringEncoding,
     error: NSErrorPointer = nil
   ) {
     if let ns? = NSString(contentsOfURL: url, encoding: enc, error: error) {
@@ -282,7 +282,7 @@ extension String {
     if let ns? = NSString(CString: CString, encoding: enc) {
       self = ns as String
     } else {
-      return nil 
+      return nil
     }
   }
 
@@ -290,7 +290,7 @@ extension String {
   //===--- Adds nothing for String beyond what String(s) does -------------===//
   // + (instancetype)stringWithString:(NSString *)aString
   //===--------------------------------------------------------------------===//
-  
+
   // + (instancetype)stringWithUTF8String:(const char *)bytes
 
   /// Produces a string created by copying the data from a given
@@ -308,7 +308,7 @@ extension String {
 
   //===--- Omitted by agreement during API review 5/20/2014 ---------------===//
   // @property BOOL boolValue;
-  
+
   // - (BOOL)canBeConvertedToEncoding:(NSStringEncoding)encoding
 
   /// Returns a Boolean value that indicates whether the
@@ -348,7 +348,7 @@ extension String {
   //
   // We have a different meaning for "Character" in Swift, and we are
   // trying not to expose error-prone UTF-16 integer indexes
-  
+
   // - (NSString *)
   //     commonPrefixWithString:(NSString *)aString
   //     options:(NSStringCompareOptions)mask
@@ -368,11 +368,11 @@ extension String {
   //     compare:(NSString *)aString options:(NSStringCompareOptions)mask
   //
   // - (NSComparisonResult)
-  //     compare:(NSString *)aString options:(NSStringCompareOptions)mask 
+  //     compare:(NSString *)aString options:(NSStringCompareOptions)mask
   //     range:(NSRange)range
   //
   // - (NSComparisonResult)
-  //     compare:(NSString *)aString options:(NSStringCompareOptions)mask 
+  //     compare:(NSString *)aString options:(NSStringCompareOptions)mask
   //     range:(NSRange)range locale:(id)locale
 
   /// Compares the string using the specified options and
@@ -389,12 +389,12 @@ extension String {
     return locale != nil ? _ns.compare(
       aString, options: mask,
       range: _toNSRange(range != nil ? range! : indices(self)), locale: locale)
-    
+
     : range != nil ? _ns.compare(
       aString, options: mask, range: _toNSRange(range != nil ? range! : indices(self)))
-      
+
     : mask != nil ? _ns.compare(aString, options: mask)
-      
+
     : _ns.compare(aString)
   }
 
@@ -433,7 +433,7 @@ extension String {
       // bridge thunk semantics for the NSArray conversion
       matchesIntoArray._setIfNonNil { _convertNSArrayToArray(matches) }
     }
-    
+
     if let n? = nsOutputName {
       outputName._setIfNonNil { n as String }
     }
@@ -515,7 +515,7 @@ extension String {
   //
   //   @property NSString* description
 
-  
+
   //===--- Omitted for consistency with API review results 5/20/2014 -----===//
   // @property double doubleValue;
 
@@ -542,7 +542,7 @@ extension String {
   //     orthography:(NSOrthography *)orthography
   //     usingBlock:(
   //       void (^)(
-  //         NSString *tag, NSRange tokenRange, 
+  //         NSString *tag, NSRange tokenRange,
   //         NSRange sentenceRange, BOOL *stop)
   //       )block
 
@@ -550,8 +550,8 @@ extension String {
   /// enumerating the specific range of the string, providing the
   /// Block with the located tags.
   public func enumerateLinguisticTagsInRange(
-    range: Range<Index>, 
-    scheme tagScheme: String, 
+    range: Range<Index>,
+    scheme tagScheme: String,
     options opts: NSLinguisticTaggerOptions,
     orthography: NSOrthography?,
     _ body:
@@ -594,12 +594,12 @@ extension String {
   ) {
     _ns.enumerateSubstringsInRange(_toNSRange(range), options: opts) {
       var stop_ = false
-      
+
       body(substring: $0,
         substringRange: self._range($1),
         enclosingRange: self._range($2),
         &stop_)
-      
+
       if stop_ {
         UnsafeMutablePointer($3).memory = true
       }
@@ -634,7 +634,7 @@ extension String {
   //     remainingRange:(NSRangePointer)leftover
 
   /// Gets a given range of characters as bytes in a specified encoding.
-  /// Note: will get a maximum of `min(buffer.count, maxLength)` bytes.
+  /// - note: will get a maximum of `min(buffer.count, maxLength)` bytes.
   public func getBytes(
     inout buffer: [UInt8],
     maxLength: Int,
@@ -662,12 +662,12 @@ extension String {
   //     encoding:(NSStringEncoding)encoding
 
   /// Converts the `String`’s content to a given encoding and
-  /// stores them in a buffer. Note: will store a maximum of
-  /// `min(buffer.count, maxLength)` bytes.
+  /// stores them in a buffer.
+  /// - note: will store a maximum of `min(buffer.count, maxLength)` bytes.
   public func getCString(
     inout buffer: [CChar], maxLength: Int, encoding: NSStringEncoding
   ) -> Bool {
-    return _ns.getCString(&buffer, maxLength: min(buffer.count, maxLength), 
+    return _ns.getCString(&buffer, maxLength: min(buffer.count, maxLength),
                           encoding: encoding)
   }
 
@@ -677,8 +677,8 @@ extension String {
 
   /// Interprets the `String` as a system-independent path and
   /// fills a buffer with a C-string in a format and encoding suitable
-  /// for use with file-system calls. Note: will store a maximum of
-  /// `min(buffer.count, maxLength)` bytes.
+  /// for use with file-system calls.
+  /// - note: will store a maximum of `min(buffer.count, maxLength)` bytes.
   public func getFileSystemRepresentation(
     inout buffer: [CChar], maxLength: Int) -> Bool {
     return _ns.getFileSystemRepresentation(
@@ -798,7 +798,7 @@ extension String {
   // - (instancetype)
   //     initWithCharacters:(const unichar *)characters
   //     length:(NSUInteger)length
-  
+
   /// Returns an initialized `String` object that contains a
   /// given number of characters from a given array of Unicode
   /// characters.
@@ -818,7 +818,7 @@ extension String {
   /// number of characters from a given array of UTF-16 Code Units
   public init(
     utf16CodeUnitsNoCopy: UnsafePointer<unichar>,
-    count: Int, 
+    count: Int,
     freeWhenDone flag: Bool
   ) {
     self = NSString(
@@ -842,7 +842,7 @@ extension String {
   //     initWithContentsOfURL:(NSURL *)url
   //     encoding:(NSStringEncoding)enc
   //     error:(NSError**)error
-  //  
+  //
   // - (instancetype)
   //     initWithContentsOfURL:(NSURL *)url
   //     usedEncoding:(NSStringEncoding *)enc
@@ -856,10 +856,10 @@ extension String {
   //     initWithData:(NSData *)data
   //     encoding:(NSStringEncoding)encoding
   //===--------------------------------------------------------------------===//
-  
+
   // FIXME: optional locale can't be handled with default
   // arguments due to <rdar://problem/16983329>
-  
+
   // - (instancetype)initWithFormat:(NSString *)format, ...
 
   /// Returns a `String` object initialized by using a given
@@ -879,7 +879,7 @@ extension String {
   public init(format: String, arguments: [CVarArgType]) {
     self = String(format: format, locale: nil, arguments: arguments)
   }
-  
+
   // - (instancetype)initWithFormat:(NSString *)format locale:(id)locale, ...
 
   /// Returns a `String` object initialized by using a given
@@ -909,7 +909,7 @@ extension String {
 
   //===--- Already provided by core Swift ---------------------------------===//
   // - (instancetype)initWithString:(NSString *)aString
-  
+
   //===--- Initializers that can fail dropped for factory functions -------===//
   // - (instancetype)initWithUTF8String:(const char *)bytes
 
@@ -966,10 +966,10 @@ extension String {
   /// Returns an array of linguistic tags for the specified
   /// range and requested tags within the receiving string.
   public func linguisticTagsInRange(
-    range: Range<Index>, 
-    scheme tagScheme: String, 
+    range: Range<Index>,
+    scheme tagScheme: String,
     options opts: NSLinguisticTaggerOptions = nil,
-    orthography: NSOrthography? = nil, 
+    orthography: NSOrthography? = nil,
     tokenRanges: UnsafeMutablePointer<[Range<Index>]> = nil // FIXME:Can this be nil?
   ) -> [String] {
     var nsTokenRanges: NSArray? = nil
@@ -978,7 +978,7 @@ extension String {
         _toNSRange(range), scheme: tagScheme, options: opts,
         orthography: orthography != nil ? orthography! : nil, tokenRanges: $0) as NSArray
     }
-    
+
     if nsTokenRanges != nil {
       tokenRanges._setIfNonNil {
         (nsTokenRanges! as [AnyObject]).map {
@@ -986,7 +986,7 @@ extension String {
         }
       }
     }
-    
+
     return _convertNSArrayToArray(result)
   }
 
@@ -1101,7 +1101,7 @@ extension String {
   //     rangeOfCharacterFromSet:(NSCharacterSet *)aSet
   //     options:(NSStringCompareOptions)mask
   //     range:(NSRange)aRange
-  
+
   /// Finds and returns the range in the `String` of the first
   /// character from a given character set found in a given range with
   /// given options.

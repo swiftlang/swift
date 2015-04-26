@@ -39,34 +39,34 @@ public struct ${Index}<I : ${IndexProtocol}> : ${IndexProtocol} {
   public func successor() -> ${Index} {
     return ${Index}(_base.predecessor())
   }
-  
+
   /// Returns the previous consecutive value before `self`.
   ///
   /// Requires: the previous value is representable.
   public func predecessor() -> ${Index} {
     return ${Index}(_base.successor())
   }
-  
+
   /// A type that can represent the number of steps between pairs of
   /// `${Self}` values where one value is reachable from the other.
   typealias Distance = I.Distance
-  
+
 %   if traversal == 'RandomAccess':
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
-  /// Complexity: O(1).
+  /// - complexity: O(1).
   public func distanceTo(other: ${Index}) -> Distance {
     return other._base.distanceTo(_base)
   }
-  
+
   /// Return `self` offset by `n` steps.
   ///
-  /// :returns: If `n > 0`, the result of applying `successor` to
-  /// `self` `n` times.  If `n < 0`, the result of applying
-  /// `predecessor` to `self` `-n` times. Otherwise, `self`.
+  /// - returns: If `n > 0`, the result of applying `successor` to
+  ///   `self` `n` times.  If `n < 0`, the result of applying
+  ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func advancedBy(amount: Distance) -> ${Index} {
     return ${Index}(_base.advancedBy(-amount))
   }
@@ -83,33 +83,33 @@ public struct ${View}<
   T : CollectionType where T.Index : ${IndexProtocol}
 > : CollectionType {
   /// A type that represents a valid position in the collection.
-  /// 
+  ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ${Index}<T.Index>
-  
+
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
   public typealias Generator = IndexingGenerator<${View}>
 
   init(_ _base: T) {
-    self._base = _base 
+    self._base = _base
   }
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> IndexingGenerator<${View}> {
     return IndexingGenerator(self)
   }
-  
+
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
   public var startIndex: Index {
     return ${Index}(_base.endIndex)
   }
-  
+
   /// The collection's "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -126,7 +126,7 @@ public struct ${View}<
   public subscript(position: Index) -> T.Generator.Element {
     return _base[position._base.predecessor()]
   }
-  
+
   var _base: T
 }
 

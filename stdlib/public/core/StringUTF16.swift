@@ -18,16 +18,16 @@ extension String {
       // random access
       public // SPI(Foundation)
       init(_offset: Int) { self._offset = _offset }
-      
+
       public let _offset: Int
     }
-    
+
     /// The position of the first code unit if the `String` is
     /// non-empty; identical to `endIndex` otherwise.
     public var startIndex: Index {
       return Index(_offset: 0)
     }
-    
+
     /// The "past the end" position.
     ///
     /// `endIndex` is not a valid argument to `subscript`, and is always
@@ -98,11 +98,11 @@ extension String {
       return self[Index(_offset: subRange.startIndex)..<Index(_offset: subRange.endIndex)]
     }
 #endif
-    
+
     /// Access the elements delimited by the given half-open range of
     /// indices.
     ///
-    /// Complexity: O(1) unless bridging from Objective-C requires an
+    /// - complexity: O(1) unless bridging from Objective-C requires an
     /// O(N) conversion.
     public subscript(subRange: Range<Index>) -> UTF16View {
       return UTF16View(
@@ -121,7 +121,7 @@ extension String {
       self._length = length
       self._core = _core
     }
-    
+
     /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _UTF16ViewMirror(self)
@@ -152,7 +152,7 @@ extension String {
   /// result is `nil`.
   public init?(_ utf16: UTF16View) {
     let wholeString = String(utf16._core)
-    
+
     if let start? = UTF16Index(
       _offset: utf16._offset
     ).samePositionIn(wholeString) {
@@ -165,8 +165,8 @@ extension String {
     }
     return nil
   }
-  
-  /// The index type for subscripting a `String`\ 's `utf16` view.
+
+  /// The index type for subscripting a `String`'s `utf16` view.
   public typealias UTF16Index = UTF16View.Index
 }
 
@@ -243,7 +243,7 @@ extension String.UTF16View.Index {
     _ utf8Index: String.UTF8Index, within utf16: String.UTF16View
   ) {
     let core = utf16._core
-    
+
     _precondition(
       utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
       "Invalid String.UTF8Index for this UTF-16 view")
@@ -254,7 +254,7 @@ extension String.UTF16View.Index {
     }
     _offset = utf8Index._coreIndex
   }
-  
+
   /// Construct the position in `utf16` that corresponds exactly to
   /// `unicodeScalarIndex`.
   ///
@@ -265,7 +265,7 @@ extension String.UTF16View.Index {
     within utf16: String.UTF16View) {
     _offset = unicodeScalarIndex._position
   }
-  
+
   /// Construct the position in `utf16` that corresponds exactly to
   /// `characterIndex`.
   ///
@@ -296,7 +296,7 @@ extension String.UTF16View.Index {
   ) -> String.UnicodeScalarIndex? {
     return String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
-  
+
   /// Return the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///

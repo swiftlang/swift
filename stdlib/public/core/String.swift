@@ -22,13 +22,11 @@ import SwiftShims
 /// not surprise end-users, regardless of where you venture in the
 /// Unicode character space.  For example,
 ///
-/// * The `==` operator checks for `Unicode canonical equivalence
-///   <http://www.unicode.org/glossary/#deterministic_comparison>`_,
+/// * The `==` operator checks for [Unicode canonical equivalence](http://www.unicode.org/glossary/#deterministic_comparison),
 ///   so two different representations of the same string will always
 ///   compare equal.
 ///
-/// * String elements are `Characters` (`extended grapheme clusters
-///   <http://www.unicode.org/glossary/#extended_grapheme_cluster>`_),
+/// * String elements are `Characters` ([extended grapheme clusters](http://www.unicode.org/glossary/#extended_grapheme_cluster)),
 ///   a unit of text that is meaningful to most humans.
 ///
 /// Locale-Insensitive
@@ -38,9 +36,8 @@ import SwiftShims
 /// locale settings.  That's because, for example, the validity of a
 /// `Dictionary<String, T>` in a running program depends on a given
 /// string comparison having a single, stable result.  Therefore,
-/// Swift always uses the default, un-\ `tailored
-/// <http://www.unicode.org/glossary/#tailorable>`_ Unicode algorithms
-/// for basic string operations.
+/// Swift always uses the default, un-[tailored](http://www.unicode.org/glossary/#tailorable)
+/// Unicode algorithms for basic string operations.
 ///
 /// Importing `Foundation` endows swift strings with the full power of
 /// the `NSString` API, which allows you to choose more complex
@@ -51,12 +48,12 @@ import SwiftShims
 ///
 /// Each string variable, `let` binding, or stored property has an
 /// independent value, so mutations to the string are not observable
-/// through its copies::
+/// through its copies:
 ///
-///   var a = "foo"
-///   var b = a
-///   b[b.endIndex.predecessor()] = "x"
-///   println("a=\(a), b=\(b)")     // a=foo, b=fox
+///     var a = "foo"
+///     var b = a
+///     b[b.endIndex.predecessor()] = "x"
+///     println("a=\(a), b=\(b)")     // a=foo, b=fox
 ///
 /// Strings use Copy-on-Write so that their data is only copied
 /// lazily, upon mutation, when more than one string instance is using
@@ -180,7 +177,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
   @_semantics("string.makeUTF16")
   public
   init(
-    _builtinUTF16StringLiteral start: Builtin.RawPointer, 
+    _builtinUTF16StringLiteral start: Builtin.RawPointer,
     numberOfCodeUnits: Builtin.Word
   )  {
     self = String(
@@ -279,7 +276,7 @@ extension String {
 ///
 /// The behavior is equivalent to `NSString.compare()` with default options.
 ///
-/// :returns:
+/// - returns:
 ///   * an unspecified value less than zero if `lhs < rhs`,
 ///   * zero if `lhs == rhs`,
 ///   * an unspecified value greater than zero  if `lhs > rhs`.
@@ -317,7 +314,7 @@ extension String {
   /// 0025  ; [*038C.0020.0002] # PERCENT SIGN
   /// 0026  ; [*0389.0020.0002] # AMPERSAND
   /// 0027  ; [*02F8.0020.0002] # APOSTROPHE
-  /// precondition: both self and rhs are ASCII strings
+  /// - precondition: both self and rhs are ASCII strings
   public // @testable
   func _compareASCII(rhs: String) -> Int {
     var compare = Int(memcmp(
@@ -397,7 +394,7 @@ extension String {
 
   /// Append `x` to `self`.
   ///
-  /// Complexity: amortized O(1).
+  /// - complexity: amortized O(1).
   public mutating func append(x: UnicodeScalar) {
     _core.append(x)
   }
@@ -425,7 +422,7 @@ extension String : Hashable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// **Note:** the hash value is not guaranteed to be stable across
+  /// - note: the hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
@@ -628,7 +625,7 @@ extension String : CollectionType {
 
       return endIndexUTF16 - graphemeClusterStartUTF16
     }
-    
+
     /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _IndexMirror(self)
@@ -641,7 +638,7 @@ extension String : CollectionType {
     return Index(_base: unicodeScalars.startIndex)
   }
 
-  /// The `String`\ 's "past the end" position.
+  /// The `String`'s "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
@@ -661,20 +658,20 @@ extension String : CollectionType {
   @availability(*, unavailable, message="cannot subscript String with an Int")
   public subscript(i: Int) -> Character {
     _fatalErrorMessage(
-      "fatal error", 
+      "fatal error",
       "cannot subscript String with an Int",
-      __FILE__, 
+      __FILE__,
       __LINE__
     )
   }
 
   /// Return a *generator* over the `Characters` in this `String`.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> IndexingGenerator<String> {
     return IndexingGenerator(self)
   }
-  
+
   internal struct _IndexMirror : MirrorType {
     var _value: Index
 
@@ -689,7 +686,7 @@ extension String : CollectionType {
     var objectIdentifier: ObjectIdentifier? { return .None }
 
     var disposition: MirrorDisposition { return .Aggregate }
-    
+
     var count: Int { return 0 }
 
     subscript(i: Int) -> (String, MirrorType) {
@@ -713,7 +710,7 @@ public func < (lhs: String.Index, rhs: String.Index) -> Bool {
 extension String : Sliceable {
   /// Access the characters in the given `subRange`
   ///
-  /// Complexity: O(1) unless bridging from Objective-C requires an
+  /// - complexity: O(1) unless bridging from Objective-C requires an
   /// O(N) conversion.
   public subscript(subRange: Range<Index>) -> String {
     return String(
@@ -729,14 +726,14 @@ extension String : Sliceable {
 extension String : ExtensibleCollectionType {
   /// Reserve enough space to store `n` ASCII characters.
   ///
-  /// Complexity: O(`n`)
+  /// - complexity: O(`n`)
   public mutating func reserveCapacity(n: Int) {
     _core.reserveCapacity(n)
   }
 
   /// Append `c` to `self`.
   ///
-  /// Complexity: amortized O(1).
+  /// - complexity: amortized O(1).
   public mutating func append(c: Character) {
     switch c._representation {
     case .Small(let _63bits):
@@ -746,7 +743,7 @@ extension String : ExtensibleCollectionType {
       _core.append(String(c)._core)
     }
   }
-  
+
   /// Append the elements of `newElements` to `self`.
   public mutating func extend<
       S : SequenceType
@@ -771,9 +768,9 @@ extension String : ExtensibleCollectionType {
 // Algorithms
 extension String {
   /// Interpose `self` between every pair of consecutive `elements`,
-  /// then concatenate the result.  For example::
+  /// then concatenate the result.  For example:
   ///
-  ///   "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
+  ///     "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
   public func join<
       S : SequenceType where S.Generator.Element == String
   >(elements: S) -> String{
@@ -786,8 +783,8 @@ extension String : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
+  /// - complexity: O(`count(subRange)`) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
   >(
@@ -805,16 +802,16 @@ extension String : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   public mutating func insert(newElement: Character, atIndex i: Index) {
     Swift.insert(&self, newElement, atIndex: i)
   }
-  
+
   /// Insert `newElements` at index `i`
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self) + count(newElements)`\ ).
+  /// - complexity: O(`count(self) + count(newElements)`).
   public mutating func splice<
     S : CollectionType where S.Generator.Element == Character
   >(newElements: S, atIndex i: Index) {
@@ -825,16 +822,16 @@ extension String : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   public mutating func removeAtIndex(i: Index) -> Character {
     return Swift.removeAtIndex(&self, i)
   }
-  
+
   /// Remove the indicated `subRange` of characters
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// - complexity: O(`count(self)`).
   public mutating func removeRange(subRange: Range<Index>) {
     Swift.removeRange(&self, subRange)
   }
@@ -843,7 +840,7 @@ extension String : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// :param: `keepCapacity`, if `true`, prevents the release of
+  /// - parameter keepCapacity: if `true`, prevents the release of
   ///   allocated storage, which can be a useful optimization
   ///   when `self` is going to be grown again.
   public mutating func removeAll(#keepCapacity: Bool = false) {
@@ -1028,7 +1025,7 @@ extension String.Index {
       return nil
     }
   }
-  
+
   /// Construct the position in `characters` that corresponds exactly to
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
@@ -1057,7 +1054,7 @@ extension String.Index {
   ) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
-  
+
   /// Return the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
@@ -1067,7 +1064,7 @@ extension String.Index {
   ) -> String.UTF16View.Index {
     return String.UTF16View.Index(self, within: utf16)
   }
-  
+
   /// Return the position in `unicodeScalars` that corresponds exactly
   /// to `self`.
   ///

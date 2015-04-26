@@ -89,9 +89,9 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 
 /// Returns the the bits of `x`, interpreted as having type `U`.
 ///
-/// .. Caution:: Breaks the guarantees of Swift's type system; use
-///    with extreme care.  There's almost always a better way to do
-///    anything.
+/// Caution: Breaks the guarantees of Swift's type system; use
+/// with extreme care.  There's almost always a better way to do
+/// anything.
 ///
 @transparent
 public func unsafeBitCast<T, U>(var x: T, _: U.Type) -> U {
@@ -181,11 +181,11 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
 /// Requires: `x is T`.  In particular, in -O builds, no test is
 /// performed to ensure that `x` actually has dynamic type `T`.
 ///
-/// .. Danger:: trades safety for performance.  Use `unsafeDowncast`
-///   only when `x as T` has proven to be a performance problem and you
-///   are confident that, always, `x is T`.  It is better than an
-///   `unsafeBitCast` because it's more restrictive, and because
-///   checking is still performed in debug builds.
+/// Danger: trades safety for performance.  Use `unsafeDowncast`
+/// only when `x as T` has proven to be a performance problem and you
+/// are confident that, always, `x is T`.  It is better than an
+/// `unsafeBitCast` because it's more restrictive, and because
+/// checking is still performed in debug builds.
 @transparent
 public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
@@ -197,11 +197,11 @@ public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
 /// Requires: `nonEmpty != nil`.  In particular, in -O builds, no test
 /// is performed to ensure that `nonEmpty` actually is non-nil.
 ///
-/// .. Danger:: trades safety for performance.  Use `unsafeUnwrap`
-///   only when `nonEmpty!` has proven to be a performance problem and
-///   you are confident that, always, `nonEmpty != nil`.  It is better
-///   than an `unsafeBitCast` because it's more restrictive, and
-///   because checking is still performed in debug builds.
+/// Danger: trades safety for performance.  Use `unsafeUnwrap`
+/// only when `nonEmpty!` has proven to be a performance problem and
+/// you are confident that, always, `nonEmpty != nil`.  It is better
+/// than an `unsafeBitCast` because it's more restrictive, and
+/// because checking is still performed in debug builds.
 @inline(__always)
 public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
   if let x? = nonEmpty {
@@ -377,12 +377,12 @@ internal func _makeObjCBridgeObject(
 }
 
 /// Create a `BridgeObject` around the given `object` with the
-/// given spare bits.  
+/// given spare bits.
 ///
 /// Requires:
 ///
 /// 1. `bits & _objectPointerSpareBits == bits`
-/// 2. if `object` is a tagged pointer, `bits == 0`.  Otherwise, 
+/// 2. if `object` is a tagged pointer, `bits == 0`.  Otherwise,
 ///    `object` is either a native object, or `bits ==
 ///    _objectPointerIsObjCBit`.
 @inline(__always)
@@ -398,11 +398,11 @@ internal func _makeBridgeObject(
     || bits == _objectPointerIsObjCBit,
     "All spare bits must be set in non-native, non-tagged bridge objects"
   )
-  
+
   _sanityCheck(
     bits & _objectPointerSpareBits == bits,
     "Can't store non-spare bits into Builtin.BridgeObject")
-  
+
   return Builtin.castToBridgeObject(
     object, bits._builtinWordValue
   )

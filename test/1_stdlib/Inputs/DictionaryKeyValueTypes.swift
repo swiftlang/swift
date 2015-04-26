@@ -516,10 +516,10 @@ func == (lhs: TestBridgedEquatableValueTy, rhs: TestBridgedEquatableValueTy) -> 
 
 /// Expect some number of autoreleased key and value objects.
 ///
-/// :param: opt applies to platforms that have the return-autoreleased
+/// - parameter opt: applies to platforms that have the return-autoreleased
 ///   optimization.
 ///
-/// :param: unopt applies to platforms that don't.
+/// - parameter unopt: applies to platforms that don't.
 ///
 /// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
 func expectAutoreleasedKeysAndValues(
@@ -538,10 +538,10 @@ func expectAutoreleasedKeysAndValues(
 
 /// Expect some number of autoreleased value objects.
 ///
-/// :param: opt applies to platforms that have the return-autoreleased
+/// - parameter opt: applies to platforms that have the return-autoreleased
 ///   optimization.
 ///
-/// :param: unopt applies to platforms that don't.
+/// - parameter unopt: applies to platforms that don't.
 ///
 /// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
 func expectAutoreleasedValues(

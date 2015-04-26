@@ -27,13 +27,13 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
   public init(_ nextElement: ()->T?) {
     self._next = nextElement
   }
-  
+
   /// Deprecated; use `anyGenerator(base)`` instead
   @availability(*, deprecated, renamed="anyGenerator")
   public init<G: GeneratorType where G.Element == T>(var _ base: G) {
     self._next = { base.next() }
   }
-  
+
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -44,7 +44,7 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
     return _next()
   }
 
-  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`\ s
+  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`s
   /// a copy of itself
   public func generate() -> GeneratorOf {
     return self
@@ -62,7 +62,7 @@ public struct SequenceOf<T> : SequenceType {
   ) {
     _generate = { GeneratorOf(makeUnderlyingGenerator()) }
   }
-  
+
   /// Construct an instance whose `generate()` method forwards to
   /// that of `base`.
   public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
@@ -71,11 +71,11 @@ public struct SequenceOf<T> : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> GeneratorOf<T> {
     return _generate()
   }
-  
+
   let _generate: ()->GeneratorOf<T>
 }
 
@@ -91,7 +91,7 @@ internal struct _CollectionOf<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   func generate() -> AnyGenerator<T> {
     var index = startIndex
     return anyGenerator {
@@ -128,12 +128,12 @@ public struct SinkOf<T> : SinkType {
   public init<S: SinkType where S.Element == T>(var _ base: S) {
     _put = { base.put($0) }
   }
-  
+
   /// Write `x` to this sink.
   public func put(x: T) {
     _put(x)
   }
-  
+
   let _put: (T)->()
 }
 

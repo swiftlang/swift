@@ -27,15 +27,13 @@ def cmp(a,b,p):
 %{
 if p:
   orderingRequirement = """\
-/// Requires: `isOrderedBefore` is a `strict weak ordering
-/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// Requires: `isOrderedBefore` is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
 /// over `elements`."""
   according = " according to `isOrderedBefore`"
 else:
   orderingRequirement = """\
 /// Requires: The less-than operator (`func <`) defined in the `Comparable`
-/// conformance is a `strict weak ordering
-/// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+/// conformance is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
 /// over `elements`."""
   according = ""
 }%
@@ -86,12 +84,12 @@ func _insertionSort<
 }
 
 /// Re-order the given `range` of `elements` and return a pivot index
-/// *p*.  
+/// *p*.
 ///
-/// Postcondition: for all *i* in `range.startIndex..<`\ *p*, and *j*
-/// in *p*\ `..<range.endIndex`, `less(elements[`\ *i*\ `],
-/// elements[`\ *j*\ `]) && !less(elements[`\ *j*\ `], 
-/// elements[`\ *p*\ `])`.  Only returns `range.endIndex` when 
+/// - postcondition: for all *i* in `range.startIndex..<`*p*, and *j*
+/// in *p*`..<range.endIndex`, `less(elements[`*i*`],
+/// elements[`*j*`]) && !less(elements[`*j*`],
+/// elements[`*p*`])`.  Only returns `range.endIndex` when
 /// `elements` is empty.
 ${orderingRequirement}
 public func partition<

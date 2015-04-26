@@ -65,17 +65,17 @@ if True:
 /// `ArraySlice` always uses contiguous storage and does not bridge to
 /// Objective-C.
 ///
-/// .. Warning:: Long-term storage of `ArraySlice` instances is discouraged
+/// - warning: Long-term storage of `ArraySlice` instances is discouraged
 ///
-///    Because a `ArraySlice` presents a *view* onto the storage of some
-///    larger array even after the original array's lifetime ends,
-///    storing the slice may prolong the lifetime of elements that are
-///    no longer accessible, which can manifest as apparent memory and
-///    object leakage.  To prevent this effect, use `ArraySlice` only for
-///    transient computation."""
+/// Because a `ArraySlice` presents a *view* onto the storage of some
+/// larger array even after the original array's lifetime ends,
+/// storing the slice may prolong the lifetime of elements that are
+/// no longer accessible, which can manifest as apparent memory and
+/// object leakage.  To prevent this effect, use `ArraySlice` only for
+/// transient computation."""
     elif Self == 'Array':
       SelfDocComment = '''\
-/// Conceptually_, `Array` is an efficient, tail-growable random-access
+/// `Array` is an efficient, tail-growable random-access
 /// collection of arbitrary elements.
 ///
 /// Common Properties of Array Types
@@ -92,12 +92,12 @@ if True:
 /// Each array variable, `let` binding, or stored property has an
 /// independent value that includes the values of all of its elements.
 /// Therefore, mutations to the array are not observable through its
-/// copies::
+/// copies:
 ///
-///   var a = [1, 2, 3]
-///   var b = a
-///   b[0] = 4
-///   println("a=\(a), b=\(b)")     // a=[1, 2, 3], b=[4, 2, 3]
+///     var a = [1, 2, 3]
+///     var b = a
+///     b[0] = 4
+///     println("a=\(a), b=\(b)")     // a=[1, 2, 3], b=[4, 2, 3]
 ///
 /// (Of course, if the array stores `class` references, the objects
 /// are shared; only the values of the references are independent)
@@ -121,8 +121,6 @@ if True:
 /// know how many elements you'll store, you can call
 /// `reserveCapacity` to pre-emptively reallocate and prevent
 /// intermediate reallocations.
-///
-/// .. _Conceptually:
 ///
 /// Objective-C Bridge
 /// ==================
@@ -149,7 +147,7 @@ if True:
 ///
 /// Any bridged `Array` can be implicitly converted to an `NSArray`.
 /// When `T` is a `class` or `@objc` protocol, bridging takes O(1)
-/// time and O(1) space.  Other `Array`\ s must be bridged
+/// time and O(1) space.  Other `Array`s must be bridged
 /// element-by-element, allocating a new object for each element, at a
 /// cost of at least O(`count`) time and space.
 ///
@@ -159,7 +157,7 @@ if True:
 /// An `NSArray` can be implicitly or explicitly converted to any
 /// bridged `Array<T>`.  This conversion calls `copyWithZone` on the
 /// `NSArray`, to ensure it won't be modified, and stores the result
-/// in the `Array`.  Type-checking, to ensure the `NSArray`\ 's
+/// in the `Array`.  Type-checking, to ensure the `NSArray`'s
 /// elements match or can be bridged to `T`, is deferred until the
 /// first element access.'''
 # FIXME: Write about Array up/down-casting.
@@ -195,7 +193,7 @@ public struct ${Self}<T>
   // as described in the comment below.
   // rdar://problem/19553956
 
-  /// Access the `index`\ th element. Reading is O(1).  Writing is
+  /// Access the `index`th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
 %if Self == 'Array':
@@ -239,7 +237,7 @@ public struct ${Self}<T>
     }
   }
 #else
-  /// Access the `index`\ th element. Reading is O(1).  Writing is
+  /// Access the `index`th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
     addressWithNativeOwner {
@@ -260,12 +258,12 @@ public struct ${Self}<T>
 
   /// Return a *generator* over the elements.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func generate() -> IndexingGenerator<${Self}> {
     return IndexingGenerator(self)
   }
 
-  /// A type that can represent a sub-range of ${a_Self} 
+  /// A type that can represent a sub-range of ${a_Self}
   public typealias SubSlice = ArraySlice<T>
 
   /// Access the elements indicated by the given half-open
@@ -475,7 +473,7 @@ extension ${Self} : _ArrayType {
     }
     _buffer.count = count
   }
-  
+
   /// Entry point for `Array` literal construction; builds and returns
   /// a ${Self} of `count` uninitialized elements
   internal static func _allocateUninitialized(
@@ -484,7 +482,7 @@ extension ${Self} : _ArrayType {
     var result = ${Self}(_uninitializedCount: count)
     return (result, result._buffer.baseAddress)
   }
-  
+
   /// How many elements the ${Self} stores
   public var count: Int {
     return _getCount()
@@ -500,13 +498,13 @@ extension ${Self} : _ArrayType {
     // FIXME(prext): remove this function when protocol extensions land.
     return self._prext_isEmpty
   }
-  
+
   /// The first element, or `nil` if the array is empty
   public var first: Element? {
     // FIXME(prext): remove this function when protocol extensions land.
     return self._prext_first
   }
-  
+
   /// The last element, or `nil` if the array is empty
   public var last: Element? {
     // FIXME(prext): remove this function when protocol extensions land.
@@ -516,13 +514,13 @@ extension ${Self} : _ArrayType {
     // return self._prext_last
     return Swift.last(self)
   }
-  
+
   /// An object that guarantees the lifetime of this array's elements
   public
   var _owner: AnyObject? {
     return _buffer.owner
   }
-  
+
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   public var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {
@@ -539,26 +537,26 @@ extension ${Self} : _ArrayType {
 
   /// Reserve enough space to store minimumCapacity elements.
   ///
-  /// PostCondition: `capacity >= minimumCapacity` and the array has
+  /// - postcondition: `capacity >= minimumCapacity` and the array has
   /// mutable contiguous storage.
   ///
-  /// Complexity: O(`count`)
+  /// - complexity: O(`count`)
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
 
       var newBuffer = _ContiguousArrayBuffer<T>(
         count: count, minimumCapacity: minimumCapacity)
-      
+
       _buffer._uninitializedCopy(0..<count, target: newBuffer.baseAddress)
       _buffer = _Buffer(newBuffer)
     }
     _sanityCheck(capacity >= minimumCapacity)
   }
-  
+
   /// Append newElement to the ${Self}
   ///
-  /// Complexity: amortized ${O1}
+  /// - complexity: amortized ${O1}
   @_semantics("array.mutate_unknown")
   public mutating func append(newElement: T) {
     // Checking for the isNative fast-path in the outermost if-statement helps
@@ -591,8 +589,8 @@ extension ${Self} : _ArrayType {
 
   /// Append the elements of `newElements` to `self`.
   ///
-  /// Complexity: O(*length of result*) 
-  /// 
+  /// - complexity: O(*length of result*)
+  ///
   public mutating func extend<
       S : SequenceType
       where S.Generator.Element == T
@@ -616,12 +614,12 @@ extension ${Self} : _ArrayType {
     self.replaceRange((c &- 1)..<c, with: EmptyCollection())
     return result
   }
-  
+
   /// Insert `newElement` at index `i`.
   ///
   /// Requires: `i <= count`
   ///
-  /// Complexity: O(\ `count`\ ).
+  /// - complexity: O(`count`).
   public mutating func insert(newElement: T, atIndex i: Int) {
     _checkIndex(i)
     self.replaceRange(i..<i, with: CollectionOfOne(newElement))
@@ -631,7 +629,7 @@ extension ${Self} : _ArrayType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count`\ ).
+  /// - complexity: O(`count`).
   public mutating func removeAtIndex(index: Int) -> T {
     let result = self[index]
     self.replaceRange(index..<(index + 1), with: EmptyCollection())
@@ -640,9 +638,9 @@ extension ${Self} : _ArrayType {
 
   /// Remove all elements.
   ///
-  /// Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
+  /// - postcondition: `capacity == 0` iff `keepCapacity` is `false`.
   ///
-  /// Complexity: O(\ `count(self)`\ ).
+  /// Complexity: O(`count(self)`).
   public mutating func removeAll(#keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
@@ -651,7 +649,7 @@ extension ${Self} : _ArrayType {
       self.replaceRange(indices(self), with: EmptyCollection())
     }
   }
-  
+
   //===--- algorithms -----------------------------------------------------===//
 
   /// Interpose `self` between each consecutive pair of `elements`,
@@ -675,8 +673,7 @@ extension ${Self} : _ArrayType {
   }
 
   /// Sort `self` in-place according to `isOrderedBefore`.  Requires:
-  /// `isOrderedBefore` induces a `strict weak ordering
-  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+  /// `isOrderedBefore` induces a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements.
   public mutating func sort(isOrderedBefore: (T, T) -> Bool) {
     return withUnsafeMutableBufferPointer {
@@ -687,8 +684,7 @@ extension ${Self} : _ArrayType {
 
   /// Return a copy of `self` that has been sorted according to
   /// `isOrderedBefore`.  Requires: `isOrderedBefore` induces a
-  /// `strict weak ordering
-  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
+  /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements.
   public func sorted(isOrderedBefore: (T, T) -> Bool) -> ${Self} {
     var result = self
@@ -791,16 +787,16 @@ extension ${Self} {
     let n = _extractOrCopyToNativeArrayBuffer(self._buffer)
     return (n.owner, n.baseAddress._rawValue)
   }
-  
+
 }
 
 extension ${Self} {
-  /// Call `body(p)`, where `p` is a pointer to the `${Self}`\ 's
+  /// Call `body(p)`, where `p` is a pointer to the `${Self}`'s
   /// contiguous storage.${contiguousCaveat}
   ///
   /// Often, the optimizer can eliminate bounds checks within an
   /// array algorithm, but when that fails, invoking the
-  /// same algorithm on `body`\ 's argument lets you trade safety for
+  /// same algorithm on `body`'s argument lets you trade safety for
   /// speed.
   public func withUnsafeBufferPointer<R>(
     @noescape body: (UnsafeBufferPointer<T>) -> R
@@ -808,12 +804,12 @@ extension ${Self} {
     return _buffer.withUnsafeBufferPointer(body)
   }
 
-  /// Call `body(p)`, where `p` is a pointer to the `${Self}`\ 's
+  /// Call `body(p)`, where `p` is a pointer to the `${Self}`'s
   /// mutable contiguous storage.${contiguousCaveat}
   ///
   /// Often, the optimizer can eliminate bounds- and uniqueness-checks
   /// within an array algorithm, but when that fails, invoking the
-  /// same algorithm on `body`\ 's argument lets you trade safety for
+  /// same algorithm on `body`'s argument lets you trade safety for
   /// speed.
   public mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (inout UnsafeMutableBufferPointer<T>) -> R
@@ -829,7 +825,7 @@ extension ${Self} {
     // Create an UnsafeBufferPointer over work that we can pass to body
     var a = UnsafeMutableBufferPointer(
       start: work._buffer.baseAddress, count: work.count)
-    
+
     // Invoke the body
     let ret = body(&a)
 
@@ -870,7 +866,7 @@ func _arrayOutOfPlaceReplace<
   let newCount = source.count + growth
   var newBuffer = Optional(
     _forceCreateUniqueMutableBuffer(&source, newCount, newCount))
-  
+
   _arrayOutOfPlaceUpdate(
     &source, &newBuffer,
     subRange.startIndex, insertCount,
@@ -899,10 +895,10 @@ func _arrayNonSliceInPlaceReplace<
 
   let growth = insertCount - eraseCount
   target.count = oldCount + growth
-  
+
   let elements = target.baseAddress
   _sanityCheck(elements != nil)
-  
+
   let oldTailIndex = subRange.endIndex
   let oldTailStart = elements + oldTailIndex
   let newTailIndex = oldTailIndex + growth
@@ -939,14 +935,14 @@ func _arrayNonSliceInPlaceReplace<
       return
     }
 
-    // Move the tail backward to cover the shrinkage.  
+    // Move the tail backward to cover the shrinkage.
     let shrinkage = -growth
     if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
 
       // Assign over the rest of the replaced range with the first
       // part of the tail.
       newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
-      
+
       //  slide the rest of the tail back
       oldTailStart.moveInitializeFrom(
         oldTailStart + shrinkage, count: tailCount - shrinkage)
@@ -969,8 +965,8 @@ func _growArrayCapacity(capacity: Int) -> Int {
 extension ${Self} {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
-  /// Complexity: O(\ `count(subRange)`\ ) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`\ , O(N) otherwise.
+  /// - complexity: O(`count(subRange)`) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   @_semantics("array.mutate_unknown")
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == _Buffer.Element
@@ -994,12 +990,12 @@ extension ${Self} {
       _arrayOutOfPlaceReplace(&self._buffer, subRange, newElements, insertCount)
     }
   }
-  
+
   /// Insert `newElements` at index `i`
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// Complexity: O(\ `count + count(newElements)`\ ).
+  /// - complexity: O(`count + count(newElements)`).
   public mutating func splice<
     S: CollectionType where S.Generator.Element == T
   >(newElements: S, atIndex i: Int) {
@@ -1008,7 +1004,7 @@ extension ${Self} {
 
   /// Remove the indicated `subRange` of elements
   ///
-  /// Complexity: O(\ `count`\ ).
+  /// - complexity: O(`count`).
   public mutating func removeRange(subRange: Range<Int>) {
     Swift.removeRange(&self, subRange)
   }
@@ -1038,18 +1034,18 @@ func += <
 where C.Generator.Element == T
 >(inout lhs: ${Self}<T>, rhs: C) {
   let rhsCount = numericCast(count(rhs)) as Int
-  
+
   let oldCount = lhs.count
   let capacity = lhs.capacity
   let newCount = oldCount + rhsCount
-  
+
   // Ensure uniqueness, mutability, and sufficient storage.  Note that
   // for consistency, we need unique lhs even if rhs is empty.
   lhs.reserveCapacity(
     newCount > capacity ?
     max(newCount, _growArrayCapacity(capacity))
     : newCount)
-  
+
   (lhs._buffer.baseAddress + oldCount).initializeFrom(rhs)
   lhs._buffer.count = newCount
 }
@@ -1063,7 +1059,7 @@ func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   _sanityCheck(newCount >= 0)
   _sanityCheck(requiredCapacity >= newCount)
-  
+
   let minimumCapacity = max(
     requiredCapacity,
     newCount > source.capacity
@@ -1089,7 +1085,7 @@ func _arrayOutOfPlaceUpdate<
   _Buffer: _ArrayBufferType, Initializer: _PointerFunctionType
     where Initializer.Element == _Buffer.Element
 >(
-  inout source: _Buffer, 
+  inout source: _Buffer,
   inout _ dest: _ContiguousArrayBuffer<_Buffer.Element>?,
   _ headCount: Int, // Count of initial source elements to copy/move
   _ newCount: Int,  // Count of new elements to insert
@@ -1097,22 +1093,22 @@ func _arrayOutOfPlaceUpdate<
 ) {
   _sanityCheck(headCount >= 0)
   _sanityCheck(newCount >= 0)
-  
+
   // Count of trailing source elements to copy/move
   let tailCount = dest!.count - headCount - newCount
   _sanityCheck(headCount + tailCount <= source.count)
-  
+
   let sourceCount = source.count
   let oldCount = sourceCount - headCount - tailCount
   let destStart = dest!.baseAddress
   let newStart = destStart + headCount
   let newEnd = newStart + newCount
-  
+
   // Check to see if we have storage we can move from
   if let backing? = source.requestUniqueMutableBackingBuffer(sourceCount) {
     let sourceStart = source.baseAddress
     let oldStart = sourceStart + headCount
-    
+
     // Destroy any items that may be lurking in a _SliceBuffer before
     // its real first element
     let backingStart = backing.baseAddress
@@ -1129,7 +1125,7 @@ func _arrayOutOfPlaceUpdate<
 
     // Move the tail items
     newEnd.moveInitializeFrom(oldStart + oldCount, count: tailCount)
-    
+
     // Destroy any items that may be lurking in a _SliceBuffer after
     // its real last element
     let backingEnd = backingStart + backing.count
@@ -1140,7 +1136,7 @@ func _arrayOutOfPlaceUpdate<
   else {
     let newStart = source._uninitializedCopy(0..<headCount, target: destStart)
     initializeNewElements.call(newStart, count: newCount)
-    source._uninitializedCopy(headCount + oldCount..<sourceCount, 
+    source._uninitializedCopy(headCount + oldCount..<sourceCount,
                               target: newEnd)
   }
   source = _Buffer(dest!)
@@ -1172,12 +1168,12 @@ func _arrayReserve<_Buffer: _ArrayBufferType>(
 ) {
   let count = buffer.count
   let requiredCapacity = max(count, minimumCapacity)
-  
+
   if _fastPath(
       buffer.requestUniqueMutableBackingBuffer(requiredCapacity) != nil) {
     return
   }
- 
+
   var newBuffer = Optional(_forceCreateUniqueMutableBuffer(&buffer, count,
                                                            requiredCapacity))
   _arrayOutOfPlaceUpdate(&buffer, &newBuffer, count, 0, _IgnorePointer())
@@ -1187,8 +1183,8 @@ public func _extractOrCopyToNativeArrayBuffer<
   Buffer : _ArrayBufferType
   where
   Buffer.Generator.Element == Buffer.Element
->(source: Buffer) 
-  -> _ContiguousArrayBuffer<Buffer.Generator.Element> 
+>(source: Buffer)
+  -> _ContiguousArrayBuffer<Buffer.Generator.Element>
 {
   if let n? = source.requestNativeBuffer() {
     return n
@@ -1216,7 +1212,7 @@ func _arrayAppendSequence<
   while true {
     let capacity = buffer.capacity
     let base = buffer.baseAddress
-    
+
     while (nextItem != nil) && count < capacity {
       (base + count++).initialize(nextItem!)
       nextItem = stream.next()
@@ -1240,15 +1236,15 @@ public func ==<T : Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   if lhsCount != rhs.count {
     return false
   }
-  
+
   // Test referential equality.
   if lhsCount == 0 || lhs._buffer.identity == rhs._buffer.identity {
     return true
   }
-  
+
   var streamLHS = lhs.generate()
   var streamRHS = rhs.generate()
-  
+
   var nextLHS = streamLHS.next()
   while nextLHS != nil {
     let nextRHS = streamRHS.next()
@@ -1282,7 +1278,7 @@ public func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
 extension Array {
   /// Try to downcast the source `NSArray` as our native buffer type.
   /// If it succeeds, create a new `Array` around it and return that.
-  /// Return `nil` otherwise. 
+  /// Return `nil` otherwise.
   // Note: this function exists here so that Foundation doesn't have
   // to know Array's implementation details.
   public static func _bridgeFromObjectiveCAdoptingNativeStorage(

@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-/// Returns `Character`\ s read from standard input through the end of the
+/// Returns `Character`s read from standard input through the end of the
 /// current line or until EOF is reached, or `nil` if EOF has already been
 /// reached.
 ///
@@ -20,8 +20,7 @@ import SwiftShims
 /// combinations will be stripped from the result.  This is the default.
 ///
 /// Standard input is interpreted as `UTF-8`.  Invalid bytes
-/// will be replaced by Unicode `replacement characters
-/// <http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character>`_
+/// will be replaced by Unicode [replacement characters](http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character).
 public func readLine(#stripNewline: Bool = true) -> String? {
   var linePtr: UnsafeMutablePointer<CChar> = nil
   var readBytes = swift_stdlib_readLine_stdin(&linePtr)

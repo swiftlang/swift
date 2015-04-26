@@ -117,11 +117,11 @@ public func _stdlib_demangleName(mangledName: String) -> String {
 ///
 /// The function is only defined for positive values of `x`.
 ///
-/// Examples::
+/// Examples:
 ///
-///    floorLog2(1) == 0
-///    floorLog2(2) == floorLog2(3) == 1
-///    floorLog2(9) == floorLog2(15) == 3
+///      floorLog2(1) == 0
+///      floorLog2(2) == floorLog2(3) == 1
+///      floorLog2(9) == floorLog2(15) == 3
 ///
 /// TODO: Implement version working on Int instead of Int64.
 @transparent

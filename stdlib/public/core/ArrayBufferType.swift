@@ -21,7 +21,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
 
   /// Adopt the storage of x
   init(_ buffer: _ContiguousArrayBuffer<Element>)
-  
+
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
@@ -35,10 +35,12 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// If this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
-  /// Otherwise, returns nil.  Note: the result's baseAddress may
-  /// not match ours, if we are a _SliceBuffer.
+  /// Otherwise, returns nil.
   ///
-  /// Note: this function must remain mutating; otherwise the buffer
+  /// - note: the result's baseAddress may not match ours, if we are a
+  ///   _SliceBuffer.
+  ///
+  /// - note: this function must remain mutating; otherwise the buffer
   /// may acquire spurious extra references, which will cause
   /// unnecessary reallocation.
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
@@ -47,7 +49,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// Returns true iff this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer.
   ///
-  /// Note: this function must remain mutating; otherwise the buffer
+  /// - note: this function must remain mutating; otherwise the buffer
   /// may acquire spurious extra references, which will cause
   /// unnecessary reallocation.
   mutating func isMutableAndUniquelyReferenced() -> Bool
@@ -56,7 +58,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>?
-  
+
   /// Replace the given subRange with the first newCount elements of
   /// the given collection.
   ///
@@ -65,7 +67,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   mutating func replace<C: CollectionType where C.Generator.Element == Element>(
     #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   )
-  
+
   /// Return a _SliceBuffer containing the given subRange of values
   /// from this buffer.
   subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {get}
@@ -76,14 +78,14 @@ public protocol _ArrayBufferType : MutableCollectionType {
   func withUnsafeBufferPointer<R>(
     @noescape body: (UnsafeBufferPointer<Element>) -> R
   ) -> R
-  
+
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.  Requires: such
   /// contiguous storage exists or the buffer is empty
   mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (UnsafeMutableBufferPointer<Element>) -> R
   ) -> R
-  
+
   /// How many elements the buffer stores
   var count: Int {get set}
 
@@ -92,7 +94,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
 
   /// An object that keeps the elements stored in this buffer alive
   var owner: AnyObject {get}
-  
+
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   var baseAddress: UnsafeMutablePointer<Element> {get}

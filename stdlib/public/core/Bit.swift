@@ -38,18 +38,18 @@ public enum Bit : Int, Comparable, RandomAccessIndexType, Reflectable {
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
-  /// Complexity: O(1).
+  /// - complexity: O(1).
   public func distanceTo(other: Bit) -> Int {
     return rawValue.distanceTo(other.rawValue)
   }
 
   /// Return `self` offset by `n` steps.
   ///
-  /// :returns: If `n > 0`, the result of applying `successor` to
+  /// - returns: If `n > 0`, the result of applying `successor` to
   /// `self` `n` times.  If `n < 0`, the result of applying
   /// `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
-  /// Complexity: O(1)
+  /// - complexity: O(1)
   public func advancedBy(distance: Int) -> Bit {
     return rawValue.advancedBy(distance) > 0 ? One : Zero
   }
@@ -62,11 +62,11 @@ public enum Bit : Int, Comparable, RandomAccessIndexType, Reflectable {
 
 internal struct _BitMirror : MirrorType {
   let _value: Bit
-  
+
   init(_ v: Bit) {
     self._value = v
   }
-  
+
   var value: Any { return _value }
 
   var valueType: Any.Type { return (_value as Any).dynamicType }
@@ -79,7 +79,7 @@ internal struct _BitMirror : MirrorType {
     _preconditionFailure("MirrorType access out of bounds")
   }
 
-  var summary: String { 
+  var summary: String {
     switch _value {
       case .Zero: return ".Zero"
       case .One:  return ".One"
@@ -107,7 +107,7 @@ extension Bit : IntegerArithmeticType {
       return (Bit(rawValue: v.0 % 2)!, true)
     }
   }
-  
+
   /// Add `lhs` and `rhs`, returning a result and a `Bool` that is
   /// true iff the operation caused an arithmetic overflow.
   public static func addWithOverflow(

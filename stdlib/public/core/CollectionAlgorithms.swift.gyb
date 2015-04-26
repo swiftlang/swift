@@ -59,7 +59,7 @@ extension CollectionType where Self.${GElement} : Equatable {
   /// Returns the first index where `value` appears in `self` or `nil` if
   /// `value` is not found.
   ///
-  /// Complexity: O(\ `self.count()`\ )
+  /// - complexity: O(`self.count()`)
   final public func _prext_find(element: ${GElement}) -> Index? {
     if let result? = _customFindEquatableElement(element) {
       return result
@@ -78,7 +78,7 @@ extension CollectionType {
   /// Returns the first index where `predicate` returns `true` for the
   /// corresponding value, or `nil` if such value is not found.
   ///
-  /// Complexity: O(\ `self.count()`\ )
+  /// - complexity: O(`self.count()`)
   final public func _prext_find(
     @noescape predicate: (${GElement}) -> Bool
   ) -> Index? {

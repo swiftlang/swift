@@ -16,7 +16,7 @@ public protocol Reflectable {
   // The runtime has inappropriate knowledge of this protocol and how its
   // witness tables are laid out. Changing this protocol requires a
   // corresponding change to Reflection.cpp.
-    
+
   /// Returns a mirror that reflects `self`.
   func getMirror() -> MirrorType
 }
@@ -41,7 +41,7 @@ public struct ObjectIdentifier : Hashable, Comparable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// **Note:** the hash value is not guaranteed to be stable across
+  /// - note: the hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {
@@ -108,38 +108,38 @@ public enum QuickLookObject {
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A bezier path.
   case BezierPath(Any)
-  
+
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// An attributed string.
   case AttributedString(Any)
-  
+
   /// A rectangle
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
   case Rectangle(Float64,Float64,Float64,Float64)
-  
+
   /// A point
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
   case Point(Float64,Float64)
-  
+
   /// A size
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
   case Size(Float64,Float64)
-  
+
   /// A logical value
   case Logical(Bool)
-  
+
   /// A range
   /// Uses explicit values to avoid coupling a particular Cocoa type.
   case Range(UInt64, UInt64)
-  
+
   /// A GUI view
   /// Uses an Any to avoid coupling a particular Cocoa type.
   case View(Any)
-  
+
   /// A graphical sprite
   /// Uses an Any to avoid coupling a particular Cocoa type.
   case Sprite(Any)
-  
+
   /// A Uniform Resource Locator
   case URL(String)
 
@@ -186,10 +186,10 @@ public protocol MirrorType {
   /// otherwise.
   var objectIdentifier: ObjectIdentifier? { get }
 
-  /// The count of `value`\ 's logical children 
+  /// The count of `value`'s logical children
   var count: Int { get }
 
-  /// Get a name and mirror for the `i`\ th logical child.
+  /// Get a name and mirror for the `i`th logical child.
   subscript(i: Int) -> (String, MirrorType) { get }
 
   /// A string description of `value`.
@@ -325,8 +325,8 @@ internal struct _LeafMirror<T>: MirrorType {
   var valueType: Any.Type { return value.dynamicType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int { return 0 }
-  subscript(i: Int) -> (String, MirrorType) { 
-    _preconditionFailure("no children") 
+  subscript(i: Int) -> (String, MirrorType) {
+    _preconditionFailure("no children")
   }
   var summary: String { return summaryFunction(_value) }
   var quickLookObject: QuickLookObject? { return quickLookFunction(_value) }
@@ -378,7 +378,7 @@ struct _OpaqueMirror : MirrorType {
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int { return 0 }
-  subscript(i: Int) -> (String, MirrorType) { 
+  subscript(i: Int) -> (String, MirrorType) {
     _preconditionFailure("no children")
   }
   var summary: String { return data.summary }
@@ -435,7 +435,7 @@ func _getClassQuickLookObject(data: _MagicMirrorData) -> QuickLookObject?
 
 struct _ClassMirror : MirrorType {
   let data: _MagicMirrorData
-  
+
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? {
@@ -462,10 +462,10 @@ struct _ClassMirror : MirrorType {
 
 struct _ClassSuperMirror : MirrorType {
   let data: _MagicMirrorData
-  
+
   var value: Any { return data.value }
   var valueType: Any.Type { return data.valueType }
-  
+
   // Suppress the value identifier for super mirrors.
   var objectIdentifier: ObjectIdentifier? {
     return nil

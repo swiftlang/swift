@@ -12,7 +12,7 @@
 
 /// An interval over a `Comparable` type.
 public protocol IntervalType {
-  /// The type of the `Interval`\ 's endpoints
+  /// The type of the `Interval`'s endpoints
   typealias Bound : Comparable
 
   /// Returns `true` iff the interval contains `value`
@@ -21,14 +21,14 @@ public protocol IntervalType {
   /// Return `rhs` clamped to `self`.  The bounds of the result, even
   /// if it is empty, are always within the bounds of `self`
   func clamp(intervalToClamp: Self) -> Self
-  
+
   /// True iff `self` is empty
   var isEmpty: Bool {get}
-  
-  
-  /// The `Interval`\ 's lower bound. Invariant: `start` <= `end`
+
+
+  /// The `Interval`'s lower bound. Invariant: `start` <= `end`
   var start: Bound {get}
-  /// The `Interval`\ 's upper bound. Invariant: `start` <= `end`
+  /// The `Interval`'s upper bound. Invariant: `start` <= `end`
   var end: Bound {get}
 }
 
@@ -50,16 +50,16 @@ ${selfDocComment}
 public struct ${Self}<T : Comparable>
   : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, Reflectable {
 
-  /// The type of the `Interval`\ 's endpoints
+  /// The type of the `Interval`'s endpoints
   public typealias Bound = T
-  
+
   /// Construct a copy of `x`
   public init(_ x: ${Self}) {
     // This initializer exists only so that we can have a descriptive
     // debugDescription that actually constructs the right type.
     self = x
   }
-  
+
   /// Construct an interval with the given bounds.  Requires: `start`
   /// <= `end`.
   public init(_ start: T, _ end: T) {
@@ -68,12 +68,12 @@ public struct ${Self}<T : Comparable>
     _end = end
   }
 
-  /// The `Interval`\ 's lower bound. Invariant: `start` <= `end`
+  /// The `Interval`'s lower bound. Invariant: `start` <= `end`
   public var start: T {
     return _start
   }
-  
-  /// The `Interval`\ 's upper bound. Invariant: `start` <= `end`
+
+  /// The `Interval`'s upper bound. Invariant: `start` <= `end`
   public var end: T {
     return _end
   }
@@ -82,12 +82,12 @@ public struct ${Self}<T : Comparable>
   public var description: String {
     return "\(start)${rangeOperator}\(end)"
   }
-  
+
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "${Self}(\(String(reflecting: start))${rangeOperator}\(String(reflecting: end)))"
   }
-  
+
   /// Returns `true` iff the `Interval` contains `x`
   public func contains(x: Bound) -> Bool {
     return x >= start && x ${upperBoundCompare} end
@@ -97,7 +97,7 @@ public struct ${Self}<T : Comparable>
   /// result, even if it is empty, are always limited to the bounds of
   /// `self`
   public func clamp(intervalToClamp: ${Self}) -> ${Self} {
-    
+
     return ${Self}(
       self.start > intervalToClamp.start ? self.start
         : self.end < intervalToClamp.start ? self.end
@@ -108,8 +108,8 @@ public struct ${Self}<T : Comparable>
         : intervalToClamp.end
     )
   }
-  
-  
+
+
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _IntervalMirror(self)
@@ -119,7 +119,7 @@ public struct ${Self}<T : Comparable>
   var _end: T
 }
 
-/// Two `${Self}`\ s are equal if their `start` and `end` are
+/// Two `${Self}`s are equal if their `start` and `end` are
 /// equal
 public func == <T : Comparable> (
   lhs: ${Self}<T>, rhs: ${Self}<T>
@@ -132,7 +132,7 @@ extension HalfOpenInterval {
   /// `true` iff the `Interval` is empty.
   public var isEmpty: Bool {
     return end <= start
-  }  
+  }
 }
 
 extension ClosedInterval {
