@@ -67,48 +67,48 @@ func testConvertOverflow() {
   var convert_minus_two = Int8(int_minus_two)
   var convert_plus_two  = Int8(int_plus_two)
 
-  var uint8_minus_two  : UInt8 = (-2) // expected-error {{integer literal overflows when stored into 'UInt8'}}
+  var uint8_minus_two  : UInt8 = (-2) // expected-error {{integer literal '-2' overflows when stored into 'UInt8'}}
   var uint8_plus_two   : UInt8 = (2)
-  var uint16_minus_two : UInt16 = (-2) // expected-error {{integer literal overflows when stored into 'UInt16'}}
+  var uint16_minus_two : UInt16 = (-2) // expected-error {{integer literal '-2' overflows when stored into 'UInt16'}}
   var uint16_plus_two  : UInt16 = (2)
-  var uint32_minus_two : UInt32 = (-2) // expected-error {{integer literal overflows when stored into 'UInt32'}}
+  var uint32_minus_two : UInt32 = (-2) // expected-error {{integer literal '-2' overflows when stored into 'UInt32'}}
   var uint32_plus_two  : UInt32 = (2)
-  var uint64_minus_two : UInt64 = (-2) // expected-error {{integer literal overflows when stored into 'UInt64'}}
+  var uint64_minus_two : UInt64 = (-2) // expected-error {{integer literal '-2' overflows when stored into 'UInt64'}}
   var uint64_plus_two  : UInt64 = (2)
   var convert_s_to_u_minus_two = UInt8(int_minus_two)  // expected-error {{integer overflows when converted from 'Int' to 'UInt8'}}
   var convert_s_to_u_plus_two  = UInt8(int_plus_two)
   var convert_u_to_s_plus_two  = Int8(uint32_plus_two)
 
   var int8_min     : Int8 = (-128)
-  var int8_min_m1  : Int8 = (-129) // expected-error {{integer literal overflows when stored into 'Int8'}}
+  var int8_min_m1  : Int8 = (-129) // expected-error {{integer literal '-129' overflows when stored into 'Int8'}}
   var int16_min    : Int16 = (-32768)
-  var int16_min_m1 : Int16 = (-32769) // expected-error {{integer literal overflows when stored into 'Int16'}}
+  var int16_min_m1 : Int16 = (-32769) // expected-error {{integer literal '-32769' overflows when stored into 'Int16'}}
   var int32_min    : Int32 = (-2147483648)
-  var int32_min_m1 : Int32 = (-2147483649) // expected-error {{integer literal overflows when stored into 'Int32'}}
+  var int32_min_m1 : Int32 = (-2147483649) // expected-error {{integer literal '-2147483649' overflows when stored into 'Int32'}}
   var int64_min    : Int64 = (-9223372036854775808)
-  var int64_min_m1 : Int64 = (-9223372036854775809) // expected-error {{integer literal overflows when stored into 'Int64'}}
+  var int64_min_m1 : Int64 = (-9223372036854775809) // expected-error {{integer literal '-9223372036854775809' overflows when stored into 'Int64'}}
   var int_minus_128 = -128
   var int8_min_conv     = Int8(int_minus_128)
   var int_minus_129 = -129
   var int8_min_m1_conv  = Int8(int_minus_129) // expected-error {{integer overflows when converted from 'Int' to 'Int8'}}
 
   var int8_max     : Int8 = (127)
-  var int8_max_p1  : Int8 = (128) // expected-error {{integer literal overflows when stored into 'Int8'}}
+  var int8_max_p1  : Int8 = (128) // expected-error {{integer literal '128' overflows when stored into 'Int8'}}
   var int16_max    : Int16 = (32767)
-  var int16_max_p1 : Int16 = (32768) // expected-error {{integer literal overflows when stored into 'Int16'}}
+  var int16_max_p1 : Int16 = (32768) // expected-error {{integer literal '32768' overflows when stored into 'Int16'}}
   var int32_max    : Int32 = (2147483647)
-  var int32_max_p1 : Int32 = (2147483648) // expected-error {{integer literal overflows when stored into 'Int32'}}
+  var int32_max_p1 : Int32 = (2147483648) // expected-error {{integer literal '2147483648' overflows when stored into 'Int32'}}
   var int64_max    : Int64 = (9223372036854775807)
-  var int64_max_p1 : Int64 = (9223372036854775808) // expected-error {{integer literal overflows when stored into 'Int64'}}
+  var int64_max_p1 : Int64 = (9223372036854775808) // expected-error {{integer literal '9223372036854775808' overflows when stored into 'Int64'}}
   var int16_max_conv    = Int16(UInt64(int16_max))
   var uint64_plus_32768 : UInt64 = 32768
   var int16_max_p1_conv = Int16(uint64_plus_32768) // expected-error {{integer overflows when converted from 'UInt64' to 'Int16'}}
   
-  var int8_max_pa      : Int8   = -13333; //expected-error{{integer literal overflows when stored into 'Int8}}
-  var int32_max_p_hex  : Int32  = 0xFFFF_FFFF; //expected-error{{integer literal overflows when stored into 'Int32'}}
+  var int8_max_pa      : Int8   = -13333; //expected-error{{integer literal '-13333' overflows when stored into 'Int8}}
+  var int32_max_p_hex  : Int32  = 0xFFFF_FFFF; //expected-error{{integer literal '4294967295' overflows when stored into 'Int32'}}
   var uint32_max_hex   : UInt32 = 0xFFFF_FFFF;
-  var uint32_max_p_hex : UInt32 = 0xFFFF_FFFF_F; //expected-error{{integer literal overflows when stored into 'UInt32'}}
-  var uint0_typealias  : MyInt = 256; //expected-error{{integer literal overflows when stored into 'MyInt'}}
+  var uint32_max_p_hex : UInt32 = 0xFFFF_FFFF_F; //expected-error{{integer literal '68719476735' overflows when stored into 'UInt32'}}
+  var uint0_typealias  : MyInt = 256; //expected-error{{integer literal '256' overflows when stored into 'MyInt'}}
 
   var uint8_min  : UInt8 = (0)
   var uint16_min : UInt16 = (0)
@@ -123,13 +123,13 @@ func testConvertOverflow() {
   var int8_min_conv_to_s = Int8(uint16_min)
 
   var uint8_max     : UInt8 = (255)
-  var uint8_max_p1  : UInt8 = (256) // expected-error {{integer literal overflows when stored into 'UInt8'}}
+  var uint8_max_p1  : UInt8 = (256) // expected-error {{integer literal '256' overflows when stored into 'UInt8'}}
   var uint16_max    : UInt16 = (65535)
-  var uint16_max_p1 : UInt16 = (65536) // expected-error {{integer literal overflows when stored into 'UInt16'}}
+  var uint16_max_p1 : UInt16 = (65536) // expected-error {{integer literal '65536' overflows when stored into 'UInt16'}}
   var uint32_max    : UInt32 = (4294967295)
-  var uint32_max_p1 : UInt32 = (4294967296) // expected-error {{integer literal overflows when stored into 'UInt32'}}
+  var uint32_max_p1 : UInt32 = (4294967296) // expected-error {{integer literal '4294967296' overflows when stored into 'UInt32'}}
   var uint64_max    : UInt64 = (18446744073709551615)
-  var uint64_max_p1 : UInt64 = (18446744073709551616) // expected-error {{integer literal overflows when stored into 'UInt64'}}
+  var uint64_max_p1 : UInt64 = (18446744073709551616) // expected-error {{integer literal '18446744073709551616' overflows when stored into 'UInt64'}}
   var uint16_255 : UInt16 = 255
   var uint8_max_conv    = UInt8(uint16_255)
   var uint16_256 : UInt16 = 256
@@ -165,10 +165,10 @@ func testConvertOverflow() {
   // 2^128 * (2^25-1)/2^25 - 1
   var float32_max_not_yet_overflow    : Float32 = (340282356779733661637539395458142568447)
   // 2^128 * (2^25-1)/2^25
-  var float32_max_first_overflow      : Float32 = (340282356779733661637539395458142568448) // expected-error {{integer literal overflows when stored into 'Float32'}}
+  var float32_max_first_overflow      : Float32 = (340282356779733661637539395458142568448) // expected-error {{integer literal '340282356779733661637539395458142568448' overflows when stored into 'Float32'}}
 
   // 2^128
-  var float32_max_definitely_overflow : Float32 = (340282366920938463463374607431768211456) // expected-error {{integer literal overflows when stored into 'Float32'}}
+  var float32_max_definitely_overflow : Float32 = (340282366920938463463374607431768211456) // expected-error {{integer literal '340282366920938463463374607431768211456' overflows when stored into 'Float32'}}
 
   // IEEE binary32 min value = -1 * 2^128 * (2^23-1)/2^23
   var float32_min                     : Float32 = (-340282326356119256160033759537265639424)
@@ -177,10 +177,10 @@ func testConvertOverflow() {
   // -1 * 2^128 * (2^25-1)/2^25 - 1
   var float32_min_not_yet_overflow    : Float32 = (-340282356779733661637539395458142568447)
   // -1 * 2^128 * (2^25-1)/2^25
-  var float32_min_first_overflow      : Float32 = (-340282356779733661637539395458142568448) // expected-error {{integer literal overflows when stored into 'Float32'}}
+  var float32_min_first_overflow      : Float32 = (-340282356779733661637539395458142568448) // expected-error {{integer literal '-340282356779733661637539395458142568448' overflows when stored into 'Float32'}}
 
   // -1 * 2^128
-  var float32_min_definitely_overflow : Float32 = (-340282366920938463463374607431768211456) // expected-error {{integer literal overflows when stored into 'Float32'}}
+  var float32_min_definitely_overflow : Float32 = (-340282366920938463463374607431768211456) // expected-error {{integer literal '-340282366920938463463374607431768211456' overflows when stored into 'Float32'}}
 
   // IEEE binary64 max value = 2^1024 * (2^52-1)/2^52
   var float64_max                     : Float64 = (179769313486231550856124328384506240234343437157459335924404872448581845754556114388470639943126220321960804027157371570809852884964511743044087662767600909594331927728237078876188760579532563768698654064825262115771015791463983014857704008123419459386245141723703148097529108423358883457665451722744025579520)
@@ -189,10 +189,10 @@ func testConvertOverflow() {
   // 2^1024 * (2^54-1)/2^54 - 1
   var float64_max_not_yet_overflow    : Float64 = (179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497791)
   // 2^1024 * (2^54-1)/2^54
-  var float64_max_first_overflow      : Float64 = (179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792) // expected-error {{integer literal overflows when stored into 'Double'}}
+  var float64_max_first_overflow      : Float64 = (179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792) // expected-error {{integer literal '179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792' overflows when stored into 'Double'}}
 
   // 2^1024
-  var float64_max_definitely_overflow : Float64 = (179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216) // expected-error {{integer literal overflows when stored into 'Double'}}
+  var float64_max_definitely_overflow : Float64 = (179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216) // expected-error {{integer literal '179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216' overflows when stored into 'Double'}}
 
   // IEEE binary64 min value = -1 * 2^1024 * (2^52-1)/2^52
   var float64_min                     : Float64 = (-179769313486231550856124328384506240234343437157459335924404872448581845754556114388470639943126220321960804027157371570809852884964511743044087662767600909594331927728237078876188760579532563768698654064825262115771015791463983014857704008123419459386245141723703148097529108423358883457665451722744025579520)
@@ -201,10 +201,10 @@ func testConvertOverflow() {
   // -1 * 2^1024 * (2^54-1)/2^54 - 1
   var float64_min_not_yet_overflow    : Float64 = (-179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497791)
   // -1 * 2^1024 * (2^54-1)/2^54
-  var float64_min_first_overflow      : Float64 = (-179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792) // expected-error {{integer literal overflows when stored into 'Double'}}
+  var float64_min_first_overflow      : Float64 = (-179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792) // expected-error {{integer literal '-179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792' overflows when stored into 'Double'}}
 
   // -1 * 2^1024
-  var float64_min_definitely_overflow : Float64 = (-179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216) // expected-error {{integer literal overflows when stored into 'Double'}}
+  var float64_min_definitely_overflow : Float64 = (-179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216) // expected-error {{integer literal '-179769313486231590772930519078902473361797697894230657273430081157732675805500963132708477322407536021120113879871393357658789768814416622492847430639474124377767893424865485276302219601246094119453082952085005768838150682342462881473913110540827237163350510684586298239947245938479716304835356329624224137216' overflows when stored into 'Double'}}
 }
 
 @transparent 
@@ -213,11 +213,11 @@ func intConversionWrapperForUSCheckedConversion(x: UInt8, _ unused: UInt8) -> In
 }
 @transparent 
 func intConversionWrapperForLiteral() -> Int8 {
-  return 255 // expected-error {{integer literal overflows when stored into 'Int8'}}
+  return 255 // expected-error {{integer literal '255' overflows when stored into 'Int8'}}
 }
 func testFallBackDiagnosticMessages() {
   intConversionWrapperForUSCheckedConversion(255, 30) // expected-error {{integer overflows when converted from unsigned 'Builtin.Int8' to signed 'Builtin.Int8'}}
-  intConversionWrapperForLiteral() // expected-error {{integer literal overflows when stored into signed 'Builtin.Int8'}}
+  intConversionWrapperForLiteral() // expected-error {{integer literal '255' overflows when stored into signed 'Builtin.Int8'}}
 }
 
 // XXX FIXME -- blocked by: 15735295 Need [su]{div,rem}_with_overflow IR

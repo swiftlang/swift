@@ -221,11 +221,11 @@ ERROR(integer_conversion_sign_error,sil_analysis,none,
       "negative integer cannot be converted to unsigned type %0",
       (Type))
 ERROR(integer_literal_overflow,sil_analysis,none,
-      "integer literal overflows when stored into %0",
-      (Type))
+      "integer literal '%1' overflows when stored into %0",
+      (Type, StringRef))
 ERROR(integer_literal_overflow_builtin_types,sil_analysis,none,
-      "integer literal overflows when stored into %select{unsigned|signed}0 %1",
-      (bool, Type))
+      "integer literal '%2' overflows when stored into "
+      "%select{unsigned|signed}0 %1", (bool, Type, StringRef))
 WARNING(integer_literal_overflow_warn,sil_analysis,none,
       "integer literal overflows when stored into %0",
       (Type))

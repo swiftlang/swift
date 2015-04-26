@@ -51,21 +51,21 @@ void DerivedConformance::_insertOperatorDecl(NominalTypeDecl *scope,
 static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
   LiteralExpr *clone;
   if (auto intLit = dyn_cast<IntegerLiteralExpr>(expr)) {
-    clone = new (C) IntegerLiteralExpr(intLit->getDigitsText(), SourceLoc(),
+    clone = new (C) IntegerLiteralExpr(intLit->getDigitsText(), expr->getLoc(),
                                        /*implicit*/ true);
     if (intLit->isNegative())
-      cast<IntegerLiteralExpr>(clone)->setNegative(SourceLoc());
+      cast<IntegerLiteralExpr>(clone)->setNegative(expr->getLoc());
   } else if (isa<NilLiteralExpr>(expr)) {
-    clone = new (C) NilLiteralExpr(SourceLoc());
+    clone = new (C) NilLiteralExpr(expr->getLoc());
   } else if (auto charLit = dyn_cast<CharacterLiteralExpr>(expr)) {
-    clone = new (C) CharacterLiteralExpr(charLit->getValue(), SourceLoc());
+    clone = new (C) CharacterLiteralExpr(charLit->getValue(), expr->getLoc());
   } else if (auto stringLit = dyn_cast<StringLiteralExpr>(expr)) {
-    clone = new (C) StringLiteralExpr(stringLit->getValue(), SourceLoc());
+    clone = new (C) StringLiteralExpr(stringLit->getValue(), expr->getLoc());
   } else if (auto floatLit = dyn_cast<FloatLiteralExpr>(expr)) {
-    clone = new (C) FloatLiteralExpr(floatLit->getDigitsText(), SourceLoc(),
+    clone = new (C) FloatLiteralExpr(floatLit->getDigitsText(), expr->getLoc(),
                                      /*implicit*/ true);
     if (floatLit->isNegative())
-      cast<FloatLiteralExpr>(clone)->setNegative(SourceLoc());
+      cast<FloatLiteralExpr>(clone)->setNegative(expr->getLoc());
   } else {
     llvm_unreachable("invalid raw literal expr");
   }
