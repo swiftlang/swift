@@ -88,8 +88,8 @@ public protocol _NSDictionaryCoreType :
     forKeys: UnsafePointer<Void>, count: Int)
 
   var count: Int { get }
-  func objectForKey(aKey: AnyObject?) -> AnyObject?
-  func keyEnumerator() -> _NSEnumeratorType?
+  func objectForKey(aKey: AnyObject) -> AnyObject?
+  func keyEnumerator() -> _NSEnumeratorType
 
   // We also override the following methods for efficiency.
 
@@ -136,7 +136,7 @@ public protocol _NSSetCoreType :
 
   var count: Int { get }
   func member(member: AnyObject?) -> AnyObject?
-  func objectEnumerator() -> _NSEnumeratorType?
+  func objectEnumerator() -> _NSEnumeratorType
 
   // We also override the following methods for efficiency.
 

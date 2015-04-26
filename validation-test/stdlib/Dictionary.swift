@@ -1242,7 +1242,7 @@ class ParallelArrayDictionary : NSDictionary {
     return 0
   }
 
-  override func objectForKey(aKey: AnyObject?) -> AnyObject? {
+  override func objectForKey(aKey: AnyObject) -> AnyObject? {
     return value
   }
 
