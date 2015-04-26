@@ -1,0 +1,26 @@
+// MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind)
+// There must be a correspnding definition of these nodes
+// in include/swift/Markup/ASTNodes.def.
+MARKUP_SIMPLE_FIELD(AttentionField, attention, Attention)
+MARKUP_SIMPLE_FIELD(AuthorField, author, Author)
+MARKUP_SIMPLE_FIELD(AuthorsField, authors, Authors)
+MARKUP_SIMPLE_FIELD(BugField, bug, Bug)
+MARKUP_SIMPLE_FIELD(Complexity, complexity, Complexity)
+MARKUP_SIMPLE_FIELD(CopyrightField, copyright, Copyright)
+MARKUP_SIMPLE_FIELD(DateField, date, Date)
+MARKUP_SIMPLE_FIELD(ExperimentField, experiment, Experiment)
+MARKUP_SIMPLE_FIELD(ImportantField, important, Important)
+MARKUP_SIMPLE_FIELD(InvariantField, invariant, Invariant)
+MARKUP_SIMPLE_FIELD(NoteField, note, Note)
+MARKUP_SIMPLE_FIELD(PostconditionField, postcondition, Postcondition)
+MARKUP_SIMPLE_FIELD(PreconditionField, precondition, Precondition)
+MARKUP_SIMPLE_FIELD(RemarkField, remark, Remark)
+MARKUP_SIMPLE_FIELD(RemarksField, remarks, Remarks)
+MARKUP_SIMPLE_FIELD(ReturnsField, returns, Returns)
+MARKUP_SIMPLE_FIELD(SeeField, seealso, See)
+MARKUP_SIMPLE_FIELD(SinceField, since, Since)
+MARKUP_SIMPLE_FIELD(TODOField, todo, TODO)
+MARKUP_SIMPLE_FIELD(VersionField, version, Version)
+MARKUP_SIMPLE_FIELD(WarningField, warning, Warning)
+
+#undef MARKUP_SIMPLE_FIELD

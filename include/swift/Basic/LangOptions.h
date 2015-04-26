@@ -32,9 +32,6 @@ namespace swift {
   class LangOptions {
   public:
 
-    /// \brief Temporary hacks to correct ReST rendering as XML.
-    bool ReSTTemporaryHacks = true;
-
     /// \brief Enable legacy character literals.
     bool EnableCharacterLiterals = false;
     

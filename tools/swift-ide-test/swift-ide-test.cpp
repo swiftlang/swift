@@ -15,6 +15,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Mangle.h"
@@ -36,7 +37,7 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
-#include "swift/ReST/Parser.h"
+#include "swift/Markup/Markup.h"
 #include "clang/APINotes/APINotesReader.h"
 #include "clang/APINotes/APINotesWriter.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
@@ -66,6 +67,7 @@ enum class ActionType {
   REPLCodeCompletion,
   SyntaxColoring,
   DumpAPI,
+  DumpComments,
   Structure,
   Annotation,
   TestInputCompleteness,
@@ -78,7 +80,6 @@ enum class ActionType {
   PrintModuleImports,
   PrintUSRs,
   PrintLocalTypes,
-  ParseReST,
   TestCreateCompilerInvocation,
   CompilerInvocationFromModule,
   GenerateModuleAPIDescription,
@@ -138,6 +139,8 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "syntax-coloring", "Perform syntax coloring"),
            clEnumValN(ActionType::DumpAPI,
                       "dump-api", "Dump the public API"),
+           clEnumValN(ActionType::DumpComments,
+                     "dump-comments", "Dump documentation comments attached to decls"),
            clEnumValN(ActionType::Structure,
                       "structure", "Perform document structure annotation"),
            clEnumValN(ActionType::Annotation,
@@ -162,8 +165,6 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "print-usrs", "Print USRs for all decls"),
            clEnumValN(ActionType::PrintLocalTypes,
                       "print-local-types", "Print local types and remanglings in a module"),
-           clEnumValN(ActionType::ParseReST,
-                      "parse-rest", "Parse a ReST file"),
            clEnumValN(ActionType::TestCreateCompilerInvocation,
                       "test-createCompilerInvocation",
                       "Test swift::driver::createCompilerInvocation using the "
@@ -399,11 +400,6 @@ static llvm::cl::opt<bool>
 PrintRegularComments("print-regular-comments",
              llvm::cl::desc("Print regular comments from clang module headers"),
              llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-ReSTTemporaryHacks("rest-temporary-hacks",
-                  llvm::cl::desc("Temporary hacks to correct ReST rendering as XML."),
-                  llvm::cl::init(false));
 
 static llvm::cl::opt<std::string>
 CommentsXMLSchema("comments-xml-schema",
@@ -1758,6 +1754,26 @@ static int doPrintTypes(const CompilerInvocation &InitInvok,
 }
 
 namespace {
+class ASTDocCommentDumper : public ASTWalker {
+  raw_ostream &OS;
+public:
+  ASTDocCommentDumper() : OS(llvm::outs()) {}
+
+  bool walkToDeclPre(Decl *D) override {
+    if (D->isImplicit())
+      return true;
+
+    llvm::markup::MarkupContext MC;
+    auto DC = getDocComment(MC, D);
+    if(DC.hasValue())
+      llvm::markup::dump(DC.getValue()->getDocument(), OS);
+
+    return true;
+  }
+};
+} // end namespace
+
+namespace {
 class ASTCommentPrinter : public ASTWalker {
   raw_ostream &OS;
   SourceManager &SM;
@@ -1854,13 +1870,13 @@ public:
     OS << "]";
   }
 
-  void printFullComment(const Decl *D) {
+  void printDocComment(const Decl *D) {
     std::string XML;
     {
       llvm::raw_string_ostream OS(XML);
       getDocumentationCommentAsXML(D, OS);
     }
-    OS << "FullCommentAsXML=";
+    OS << "DocCommentAsXML=";
     if (XML.empty()) {
       OS << "none";
       return;
@@ -1921,7 +1937,7 @@ public:
       OS << " ";
       printBriefComment(D->getBriefComment());
       OS << " ";
-      printFullComment(D);
+      printDocComment(D);
       OS << "\n";
     }
     return true;
@@ -1929,14 +1945,33 @@ public:
 };
 } // unnamed namespace
 
-static int doPrintComments(const CompilerInvocation &InitInvok,
-                           StringRef SourceFilename,
-                           StringRef CommentsXMLSchema,
-                           bool ReSTTemporaryHacks) {
+static int doDumpComments(const CompilerInvocation &InitInvok,
+                          StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
-  Invocation.getLangOptions().ReSTTemporaryHacks = ReSTTemporaryHacks;
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+
+  ASTDocCommentDumper Dumper;
+  CI.getMainModule()->walk(Dumper);
+
+  llvm::outs() << "\n";
+
+  return 0;
+}
+
+static int doPrintComments(const CompilerInvocation &InitInvok,
+                           StringRef SourceFilename,
+                           StringRef CommentsXMLSchema) {
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(SourceFilename);
+  Invocation.getLangOptions().AttachCommentsToDecls = true;
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -2120,37 +2155,6 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   unsigned BufID = CI.getInputBufferIDs().back();
   USRPrinter Printer(CI.getSourceMgr(), BufID, llvm::outs());
   Printer.walk(*CI.getMainModule());
-  return 0;
-}
-
-static int doParseReST(StringRef SourceFilename) {
-  llvm::rest::ReSTContext Context;
-  llvm::rest::SourceManager<unsigned> SM;
-  llvm::SmallString<64> DocutilsXML;
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFileOrSTDIN(SourceFilename);
-  if (!FileBufOrErr) {
-    llvm::errs() << "error opening input file: "
-                 << FileBufOrErr.getError().message() << '\n';
-    return 1;
-  }
-
-  llvm::rest::LineList LL({});
-  {
-    SmallVector<StringRef, 16> Lines;
-    splitIntoLines(FileBufOrErr.get()->getBuffer(), Lines);
-    llvm::rest::LineListBuilder Builder(Context);
-    for (auto S : Lines) {
-      Builder.addLine(S, SM.registerLine(S, 0));
-    }
-    LL = Builder.takeLineList();
-  }
-  auto *TheDocument = parseDocument(Context, LL);
-  {
-    llvm::raw_svector_ostream OS(DocutilsXML);
-    convertToDocutilsXML(TheDocument, OS);
-  }
-  llvm::outs() << DocutilsXML.str();
   return 0;
 }
 
@@ -2406,8 +2410,11 @@ int main(int argc, char *argv[]) {
 
   case ActionType::PrintComments:
     ExitCode = doPrintComments(InitInvok, options::SourceFilename,
-                               options::CommentsXMLSchema,
-                               options::ReSTTemporaryHacks);
+                               options::CommentsXMLSchema);
+    break;
+
+  case ActionType::DumpComments:
+    ExitCode = doDumpComments(InitInvok, options::SourceFilename);
     break;
 
   case ActionType::PrintModuleComments:
@@ -2421,10 +2428,6 @@ int main(int argc, char *argv[]) {
 
   case ActionType::PrintUSRs:
     ExitCode = doPrintUSRs(InitInvok, options::SourceFilename);
-    break;
-
-  case ActionType::ParseReST:
-    ExitCode = doParseReST(options::SourceFilename);
     break;
   }
 

@@ -166,6 +166,19 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   set(${product}_PATH_TO_CLANG_BUILD "${${product}_PATH_TO_LLVM_BUILD}" CACHE PATH
     "Path to the directory where Clang was built or installed.")
 
+  set(${product}_PATH_TO_CMARK_SOURCE "${${product}_PATH_TO_CMARK_SOURCE}"
+      CACHE PATH "Path to CMark source code.")
+  set(${product}_PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
+    CACHE PATH "Path to the directory where CMark was built.")
+  set(${product}_CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}" CACHE PATH
+    "Path to the directory where CMark was installed.")
+  get_filename_component(PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
+    ABSOLUTE)
+  get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
+    ABSOLUTE)
+  get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
+    ABSOLUTE)
+
   if( NOT EXISTS "${${product}_PATH_TO_CLANG_SOURCE}/include/clang/AST/Decl.h" )
     message(FATAL_ERROR "Please set ${product}_PATH_TO_CLANG_SOURCE to the root directory of Clang's source code.")
   else()
@@ -211,7 +224,7 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   set(LLVM_MAIN_INCLUDE_DIR "${LLVM_MAIN_SRC_DIR}/include")
   set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
   set(LLVM_BINARY_DIR ${CMAKE_BINARY_DIR})
-  set(CMARK_MAIN_INCLUDE_DIR "${${product}_PATH_TO_CMARK_SOURCE}/src")
+  set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
 
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
   include_directories("${PATH_TO_LLVM_BUILD}/include"
@@ -219,7 +232,8 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
                       "${CLANG_BUILD_INCLUDE_DIR}"
                       "${CLANG_MAIN_INCLUDE_DIR}"
                       "${CMARK_MAIN_INCLUDE_DIR}"
-                      "${${product}_PATH_TO_CMARK_BUILD}/src")
+                      "${PATH_TO_CMARK_BUILD}/src")
+
   link_directories(
       "${LLVM_LIBRARY_DIR}"
       # FIXME: if we want to support separate Clang builds and mix different

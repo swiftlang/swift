@@ -13,66 +13,69 @@
 #ifndef SWIFT_AST_COMMENT_H
 #define SWIFT_AST_COMMENT_H
 
-#include "swift/ReST/Parser.h"
+#include "swift/Markup/Markup.h"
 #include "llvm/ADT/Optional.h"
 
 namespace swift {
 class Decl;
-class FullComment;
+class DocComment;
 struct RawComment;
 
-namespace comments {
-class ParamField;
-}
-
-class CommentContext final {
-  SmallVector<FullComment *, 4> FullComments;
-
+class DocComment {
 public:
-  llvm::rest::ReSTContext TheReSTContext;
+  struct CommentParts {
+    Optional<const llvm::markup::Paragraph *>Brief;
+    SmallVector<const llvm::markup::MarkupASTNode *, 4> BodyNodes;
+    SmallVector<const llvm::markup::ParamField *, 8> ParamFields;
+    Optional<const llvm::markup::ReturnsField *>ReturnsField;
 
-  CommentContext();
-
-  ~CommentContext();
-};
-
-class FullComment {
-public:
-  class CommentParts {
-  public:
-    SmallVector<const comments::ParamField *, 8> Params;
-    SmallVector<const llvm::rest::Field *, 4> Returns;
-    const llvm::rest::Paragraph *Brief = nullptr;
-    SmallVector<const llvm::rest::ReSTASTNode *, 4> MiscTopLevelNodes;
+    bool isEmpty() const {
+      return !Brief.hasValue() && !ReturnsField.hasValue() && BodyNodes.empty() && ParamFields.empty();
+    }
   };
 
 private:
   const Decl *D;
-  llvm::rest::Document *Doc;
-  llvm::Optional<CommentParts> Parts;
+  const llvm::markup::Document *Doc = nullptr;
+  const CommentParts Parts;
 
 public:
-  FullComment(const Decl *D, llvm::rest::Document *Doc)
-      : D(D), Doc(Doc) {}
+  DocComment(const Decl *D, llvm::markup::Document *Doc,
+             CommentParts Parts)
+      : D(D), Doc(Doc), Parts(Parts) {}
 
   const Decl *getDecl() const { return D; }
 
-  const llvm::rest::Document *getDocument() const { return Doc; }
+  const llvm::markup::Document *getDocument() const { return Doc; }
 
-  llvm::rest::Document *getMutableDocument() const { return Doc; }
-
-  const CommentParts &getParts(CommentContext &Context) const;
-
-  CommentParts &getMutableParts() {
-    if (!Parts.hasValue())
-      Parts = CommentParts();
-    return Parts.getValue();
+  CommentParts getParts() const {
+    return Parts;
   }
 
-  // Only allow allocation using the allocator in ReSTContext or by placement
-  // new.
-  void *operator new(size_t Bytes, llvm::rest::ReSTContext &C,
-                     unsigned Alignment = alignof(FullComment));
+  Optional<const llvm::markup::Paragraph *>getBrief() const {
+    return Parts.Brief;
+  }
+
+  Optional<const llvm::markup::ReturnsField *>getReturnsField() const {
+    return Parts.ReturnsField;
+  }
+
+  ArrayRef<const llvm::markup::ParamField *> getParamFields() const {
+    return Parts.ParamFields;
+  }
+
+  ArrayRef<const llvm::markup::MarkupASTNode *> getBodyNodes() const {
+    return Parts.BodyNodes;
+  }
+
+  bool isEmpty() const {
+    return Parts.isEmpty();
+  }
+
+  // Only allow allocation using the allocator in MarkupContext or by
+  // placement new.
+  void *operator new(size_t Bytes, llvm::markup::MarkupContext &MC,
+                     unsigned Alignment = alignof(DocComment));
   void *operator new(size_t Bytes, void *Mem) {
     assert(Mem);
     return Mem;
@@ -83,7 +86,8 @@ public:
   void operator delete(void *Data) = delete;
 };
 
-FullComment *getFullComment(CommentContext &Context, const Decl *D);
+Optional<DocComment *>getDocComment(llvm::markup::MarkupContext &Context,
+                                    const Decl *D);
 
 } // namespace swift
 

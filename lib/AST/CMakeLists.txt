@@ -15,6 +15,7 @@ add_swift_library(swiftAST
   DeclContext.cpp
   DiagnosticList.cpp
   DiagnosticEngine.cpp
+  DocComment.cpp
   Expr.cpp
   Identifier.cpp
   LookupVisibleDecls.cpp
@@ -36,7 +37,7 @@ add_swift_library(swiftAST
   USRGeneration.cpp
   Verifier.cpp
   LINK_LIBRARIES
-    swiftReST
+    swiftMarkup
     swiftBasic
 
     # Clang dependencies.

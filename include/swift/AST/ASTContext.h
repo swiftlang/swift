@@ -76,6 +76,7 @@ namespace swift {
   class DiagnosticEngine;
   class Substitution;
   class TypeCheckerDebugConsumer;
+  class DocComment;
 
   enum class KnownProtocolKind : uint8_t;
 

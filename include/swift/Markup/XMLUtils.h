@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_REST_XML_UTILS_H
-#define LLVM_REST_XML_UTILS_H
+#ifndef LLVM_MARKUP_XML_UTILS_H
+#define LLVM_MARKUP_XML_UTILS_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace llvm {
-namespace rest {
+namespace markup {
 
 // FIXME: copied from Clang's
 // CommentASTToXMLConverter::appendToResultWithXMLEscaping
@@ -70,8 +70,8 @@ static inline void appendWithCDATAEscaping(raw_ostream &OS, StringRef S) {
   OS << "]]>";
 }
 
-} // namespace rest
+} // namespace markup
 } // namespace llvm
 
-#endif // LLVM_REST_XML_UTILS_H
+#endif // LLVM_MARKUP_XML_UTILS_H
 

@@ -17,14 +17,13 @@
 
 #include "swift/AST/RawComment.h"
 #include "swift/AST/Comment.h"
-#include "swift/AST/CommentAST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/ReST/Parser.h"
+#include "swift/Markup/Markup.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -147,6 +146,7 @@ RawComment Decl::getRawComment() const {
   if (auto *Unit =
           dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
     if (Optional<BriefAndRawComment> C = Unit->getCommentForDecl(this)) {
+      llvm::markup::MarkupContext MC;
       Context.setBriefComment(this, C->Brief);
       Context.setRawComment(this, C->Raw);
       return C->Raw;
@@ -157,98 +157,30 @@ RawComment Decl::getRawComment() const {
   return RawComment();
 }
 
-static unsigned measureASCIIArt(StringRef S, unsigned NumLeadingSpaces) {
-  StringRef Spaces = S.substr(0, NumLeadingSpaces);
-  if (Spaces.size() != NumLeadingSpaces)
-    return 0;
-  if (Spaces.find_first_not_of(' ') != StringRef::npos)
-    return 0;
-
-  S = S.drop_front(NumLeadingSpaces);
-
-  if (S.startswith(" * "))
-   return NumLeadingSpaces + 3;
-  if (S.startswith(" *\n") || S.startswith(" *\n\r"))
-    return NumLeadingSpaces + 2;
-  return 0;
-}
-
-static llvm::rest::LineList
-toLineList(llvm::rest::ReSTContext &TheReSTContext,
-           llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
-  llvm::rest::LineListBuilder Result(TheReSTContext);
-  for (const auto &C : RC.Comments) {
-    if (C.isLine()) {
-      // Skip comment marker.
-      unsigned CommentMarkerBytes = 2 + (C.isOrdinary() ? 0 : 1);
-      StringRef Cleaned = C.RawText.drop_front(CommentMarkerBytes);
-
-      // Drop trailing newline.
-      Cleaned = Cleaned.rtrim("\n\r");
-      SourceLoc CleanedStartLoc =
-          C.Range.getStart().getAdvancedLocOrInvalid(CommentMarkerBytes);
-      Result.addLine(Cleaned, RSM.registerLine(Cleaned, CleanedStartLoc));
-    } else {
-      // Skip comment markers at the beginning and at the end.
-      unsigned CommentMarkerBytes = 2 + (C.isOrdinary() ? 0 : 1);
-      StringRef Cleaned = C.RawText.drop_front(CommentMarkerBytes).drop_back(2);
-      SourceLoc CleanedStartLoc =
-          C.Range.getStart().getAdvancedLocOrInvalid(CommentMarkerBytes);
-
-      // Determine if we have leading decorations in this block comment.
-      bool HasASCIIArt = false;
-      if (startsWithNewline(Cleaned)) {
-        Result.addLine(Cleaned.substr(0, 0),
-                       RSM.registerLine(Cleaned.substr(0, 0), CleanedStartLoc));
-        unsigned NewlineBytes = measureNewline(Cleaned);
-        Cleaned = Cleaned.drop_front(NewlineBytes);
-        CleanedStartLoc = CleanedStartLoc.getAdvancedLocOrInvalid(NewlineBytes);
-        HasASCIIArt = measureASCIIArt(Cleaned, C.StartColumn - 1) != 0;
-      }
-
-      while (!Cleaned.empty()) {
-        size_t Pos = Cleaned.find_first_of("\n\r");
-        if (Pos == StringRef::npos)
-          Pos = Cleaned.size();
-
-        // Skip over ASCII art, if present.
-        if (HasASCIIArt)
-          if (unsigned ASCIIArtBytes =
-                  measureASCIIArt(Cleaned, C.StartColumn - 1)) {
-            Cleaned = Cleaned.drop_front(ASCIIArtBytes);
-            CleanedStartLoc =
-                CleanedStartLoc.getAdvancedLocOrInvalid(ASCIIArtBytes);
-            Pos -= ASCIIArtBytes;
-          }
-
-        StringRef Line = Cleaned.substr(0, Pos);
-        Result.addLine(Line, RSM.registerLine(Line, CleanedStartLoc));
-
-        Cleaned = Cleaned.drop_front(Pos);
-        unsigned NewlineBytes = measureNewline(Cleaned);
-        Cleaned = Cleaned.drop_front(NewlineBytes);
-        Pos += NewlineBytes;
-        CleanedStartLoc = CleanedStartLoc.getAdvancedLocOrInvalid(Pos);
-      }
-    }
-  }
-  return Result.takeLineList();
-}
-
 static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
                                      const Decl *D) {
   PrettyStackTraceDecl StackTrace("extracting brief comment for", D);
 
-  llvm::rest::ReSTContext TheReSTContext;
-  llvm::rest::SourceManager<SourceLoc> RSM;
-  llvm::rest::LineList LL = toLineList(TheReSTContext, RSM, RC);
-  llvm::SmallString<256> Result;
-  llvm::rest::extractBrief(LL, Result);
-
-  if (Result.empty())
+  if (!canHaveComment(D))
     return StringRef();
-  ArrayRef<char> Copy = Context.AllocateCopy(Result);
-  return StringRef(Copy.data(), Copy.size());
+
+  llvm::markup::MarkupContext MC;
+  auto DC = getDocComment(MC, D);
+  if (!DC.hasValue())
+    return StringRef();
+
+  auto Brief = DC.getValue()->getBrief();
+  if (!Brief.hasValue())
+    return StringRef();
+
+  SmallString<256> BriefStr("");
+  llvm::raw_svector_ostream OS(BriefStr);
+  llvm::markup::printInlinesUnder(Brief.getValue(), OS);
+  OS.flush();
+  if (OS.str().empty())
+    return StringRef();
+
+  return Context.AllocateCopy(OS.str());
 }
 
 StringRef Decl::getBriefComment() const {
@@ -267,117 +199,3 @@ StringRef Decl::getBriefComment() const {
   Context.setBriefComment(this, Result);
   return Result;
 }
-
-CommentContext::CommentContext() {
-  TheReSTContext.LangOpts.IgnoreUniformIndentation = true;
-}
-
-CommentContext::~CommentContext() {
-  for (auto *FC : FullComments) {
-    FC->~FullComment();
-  }
-}
-
-static bool isFieldNamed(const llvm::rest::Field *F, StringRef Name) {
-  const llvm::rest::TextAndInline *ActualName = F->getName();
-  // FIXME: not correct.  We should concatenate text from all children without
-  // markup.
-  if (ActualName->getChildren().size() != 1)
-    return false;
-  if (auto *TextChild =
-          dyn_cast<llvm::rest::PlainText>(ActualName->getChildren().front())) {
-    return TextChild->getLinePart().Text == Name;
-  }
-  return false;
-}
-
-namespace {
-class CommentSema {
-  CommentContext &Context;
-  FullComment::CommentParts &Parts;
-
-public:
-  CommentSema(CommentContext &Context, FullComment *FC)
-      : Context(Context), Parts(FC->getMutableParts()) {}
-
-  void visitDocument(llvm::rest::Document *D);
-
-  comments::ParamField *actOnParam(llvm::rest::Field *F);
-};
-} // unnamed namespace
-
-void CommentSema::visitDocument(llvm::rest::Document *D) {
-  bool IsFirstChild = true;
-  for (auto *N : D->getChildren()) {
-    // If the first document child is a paragraph, consider it a brief
-    // description.
-    if (IsFirstChild) {
-      IsFirstChild = false;
-      if (const auto *P = dyn_cast<llvm::rest::Paragraph>(N)) {
-        Parts.Brief = P;
-        continue;
-      }
-    }
-    if (auto *FL = dyn_cast<llvm::rest::FieldList>(N)) {
-      for (auto *F : FL->getChildren()) {
-        if (isFieldNamed(F, "param"))
-          Parts.Params.push_back(actOnParam(F));
-        else if (isFieldNamed(F, "returns"))
-          Parts.Returns.push_back(F);
-        else
-          Parts.MiscTopLevelNodes.push_back(F);
-      }
-    } else {
-      Parts.MiscTopLevelNodes.push_back(N);
-    }
-  }
-}
-
-comments::ParamField *CommentSema::actOnParam(llvm::rest::Field *F) {
-  assert(isFieldNamed(F, "param"));
-  llvm::rest::LinePart ParamName;
-  auto BodyChildren = F->getBodyChildren();
-  if (!BodyChildren.empty()) {
-    if (auto *P = dyn_cast<llvm::rest::Paragraph>(BodyChildren[0])) {
-      if (auto *TAI = dyn_cast<llvm::rest::TextAndInline>(P->getMutableContent())) {
-        auto MaybeParamName = extractWord(TAI);
-        if (MaybeParamName)
-          ParamName = MaybeParamName.getValue();
-      }
-    }
-  }
-  return new (Context.TheReSTContext)
-      comments::ParamField(F->getName(), ParamName, BodyChildren);
-}
-
-static void performCommentSema(CommentContext &Context, FullComment *FC) {
-  CommentSema(Context, FC).visitDocument(FC->getMutableDocument());
-}
-
-const FullComment::CommentParts &
-FullComment::getParts(CommentContext &Context) const {
-  if (Parts.hasValue())
-    return Parts.getValue();
-
-  performCommentSema(Context, const_cast<FullComment *>(this));
-  return Parts.getValue();
-}
-
-void *FullComment::operator new(size_t Bytes, llvm::rest::ReSTContext &C,
-                                unsigned Alignment) {
-  return C.Allocator.Allocate(Bytes, Alignment);
-}
-
-FullComment *swift::getFullComment(CommentContext &Context, const Decl *D) {
-  auto RC = D->getRawComment();
-  if (RC.isEmpty())
-    return nullptr;
-
-  PrettyStackTraceDecl StackTrace("parsing comment for", D);
-
-  llvm::rest::SourceManager<SourceLoc> RSM;
-  llvm::rest::LineList LL = toLineList(Context.TheReSTContext, RSM, RC);
-  auto *Doc = llvm::rest::parseDocument(Context.TheReSTContext, LL);
-  return new (Context.TheReSTContext) FullComment(D, Doc);
-}
-

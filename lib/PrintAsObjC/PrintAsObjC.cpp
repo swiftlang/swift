@@ -139,9 +139,10 @@ private:
   }
 
   void printDocumentationComment(Decl *D) {
-    CommentContext TheCommentContext;
-    if (auto *FC = getFullComment(TheCommentContext, D))
-      ide::getDocumentationCommentAsDoxygen(TheCommentContext, FC, os);
+    llvm::markup::MarkupContext MC;
+    auto DC = getDocComment(MC, D);
+    if (DC.hasValue())
+      ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
   }
 
   // Ignore other declarations.

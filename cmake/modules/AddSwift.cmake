@@ -916,6 +916,9 @@ function(_add_swift_library_single target name)
     if("${dep}" MATCHES "^clang")
       set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
     endif()
+    if("${dep}" STREQUAL "cmark")
+      set(dep "${CMARK_LIBRARY_DIR}/lib${dep}.a")
+    endif()
     list(APPEND prefixed_link_libraries "${dep}")
   endforeach()
   set(SWIFTLIB_SINGLE_LINK_LIBRARIES "${prefixed_link_libraries}")
@@ -1017,12 +1020,11 @@ function(_add_swift_library_single target name)
   string(REPLACE ";" " " c_compile_flags "${c_compile_flags}")
   string(REPLACE ";" " " link_flags "${link_flags}")
 
-
   # Set compilation and link flags.
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
       COMPILE_FLAGS " ${c_compile_flags}")
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      LINK_FLAGS " ${link_flags} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+    LINK_FLAGS " ${link_flags} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR} -L${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
   target_link_libraries("${target}" PRIVATE
       ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   if(${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES})
@@ -1037,7 +1039,7 @@ function(_add_swift_library_single target name)
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
         COMPILE_FLAGS " ${c_compile_flags}")
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
-        LINK_FLAGS " ${link_flags} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR} -L${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
+      LINK_FLAGS " ${link_flags} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR} -L${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR} -L${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
@@ -1692,7 +1694,7 @@ function(add_swift_llvm_loadable_module name)
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
       c_compile_flags)
-  
+
   set(link_flags)
   _add_variant_link_flags(
       "${sdk}"

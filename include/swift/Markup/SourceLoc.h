@@ -21,7 +21,7 @@
 #include <vector>
 
 namespace llvm {
-namespace rest {
+namespace markup {
 
 class SourceLoc {
   friend class SourceManagerBase;
@@ -146,7 +146,7 @@ SourceManager<ExternalSourceLocTy>::toExternalSourceLoc(SourceLoc Loc) const {
   return { ExternalLoc, Loc.Value - InternalRange.Start.Value };
 }
 
-} // namespace rest
+} // namespace markup
 } // namespace llvm
 
 #endif // LLVM_REST_SOURCELOC_H

@@ -13,19 +13,18 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
-#include "swift/AST/CommentAST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/ReST/AST.h"
-#include "swift/ReST/XMLUtils.h"
+#include "swift/Markup/Markup.h"
+#include "swift/Markup/XMLUtils.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/Index/CommentToXML.h"
 
-using namespace llvm::rest;
+using namespace llvm::markup;
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -34,11 +33,9 @@ using namespace swift;
 
 namespace {
 struct CommentToXMLConverter {
-  CommentContext &TheCommentContext;
   raw_ostream &OS;
 
-  CommentToXMLConverter(CommentContext &TheCommentContext, raw_ostream &OS)
-      : TheCommentContext(TheCommentContext), OS(OS) {}
+  CommentToXMLConverter(raw_ostream &OS) : OS(OS) {}
 
   void printRawHTML(StringRef Tag) {
     OS << "<rawHTML>";
@@ -46,284 +43,178 @@ struct CommentToXMLConverter {
     OS << "</rawHTML>";
   }
 
-  void printASTNode(const ReSTASTNode *N) {
+  void printASTNode(const MarkupASTNode *N) {
     switch (N->getKind()) {
-    case ASTNodeKind::Document:
-      llvm_unreachable("should never happen");
+#define MARKUP_AST_NODE(Id, Parent) \
+    case ASTNodeKind::Id: \
+      print##Id(cast<Id>(N)); \
       break;
-
-    case ASTNodeKind::Section:
-    case ASTNodeKind::Topic:
-    case ASTNodeKind::Sidebar:
-    case ASTNodeKind::Title:
-    case ASTNodeKind::Subtitle:
-    case ASTNodeKind::Transition:
-      llvm_unreachable("implement");
-
-    case ASTNodeKind::Paragraph:
-      printParagraph(cast<Paragraph>(N));
-      break;
-    case ASTNodeKind::BulletList:
-      printBulletList(cast<BulletList>(N));
-      break;
-    case ASTNodeKind::EnumeratedList:
-      printEnumeratedList(cast<EnumeratedList>(N));
-      break;
-    case ASTNodeKind::DefinitionListItem:
-      printDefinitionListItem(cast<DefinitionListItem>(N));
-      break;
-    case ASTNodeKind::DefinitionList:
-      printDefinitionList(cast<DefinitionList>(N));
-      break;
-    case ASTNodeKind::Field:
-      printField(cast<Field>(N));
-      break;
-    case ASTNodeKind::FieldList:
-      printFieldList(cast<FieldList>(N));
-      break;
-    case ASTNodeKind::BlockQuote:
-      printBlockQuote(cast<BlockQuote>(N));
-      break;
-    case ASTNodeKind::TextAndInline:
-      printTextAndInline(cast<TextAndInline>(N));
-      break;
-    case ASTNodeKind::PlainText:
-      printPlainText(cast<PlainText>(N));
-      break;
-    case ASTNodeKind::Emphasis:
-      printEmphasis(cast<Emphasis>(N));
-      break;
-    case ASTNodeKind::StrongEmphasis:
-      printStrongEmphasis(cast<StrongEmphasis>(N));
-      break;
-    case ASTNodeKind::InterpretedText:
-      printInterpretedText(cast<InterpretedText>(N));
-      break;
-    case ASTNodeKind::InlineLiteral:
-      printInlineLiteral(cast<InlineLiteral>(N));
-      break;
-    case ASTNodeKind::HyperlinkReference:
-      printHyperlinkReference(cast<HyperlinkReference>(N));
-      break;
-    case ASTNodeKind::InlineHyperlinkTarget:
-      printInlineHyperlinkTarget(cast<InlineHyperlinkTarget>(N));
-      break;
-    case ASTNodeKind::FootnoteReference:
-      printFootnoteReference(cast<FootnoteReference>(N));
-      break;
-    case ASTNodeKind::CitationReference:
-      printCitationReference(cast<CitationReference>(N));
-      break;
-    case ASTNodeKind::SubstitutionReference:
-      printSubstitutionReference(cast<SubstitutionReference>(N));
-      break;
-
-    case ASTNodeKind::PrivateExtension:
-      llvm_unreachable("implement");
+#define ABSTRACT_MARKUP_AST_NODE(Id, Parent)
+#define MARKUP_AST_NODE_RANGE(Id, FirstId, LastId)
+#include "swift/Markup/ASTNodes.def"
     }
   }
 
-  void printParagraph(const Paragraph *P) {
-    printTextAndInline(P->getContent());
-  }
+#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
+  void print##Id(const Id *Field) { \
+    OS << "<" #XMLKind << ">"; \
+    for (auto Child : Field->getChildren()) \
+      printASTNode(Child); \
+\
+    OS << "</" #XMLKind << ">"; \
+}
+#include "swift/Markup/SimpleFields.def"
 
-  void printBulletList(const BulletList *BL) {
-    printRawHTML("<ul>");
-    for (unsigned i = 0, e = BL->getNumItems(); i != e; ++i) {
-      printRawHTML("<li>");
-      for (const auto *N : BL->getItemChildren(i)) {
-        printASTNode(N);
-      }
-      printRawHTML("</li>");
-    }
-    printRawHTML("</ul>");
-  }
-
-  void printEnumeratedList(const EnumeratedList *EL) {
-    printRawHTML("<ol>");
-    for (unsigned i = 0, e = EL->getNumItems(); i != e; ++i) {
-      printRawHTML("<li>");
-      for (const auto *N : EL->getItemChildren(i)) {
-        printASTNode(N);
-      }
-      printRawHTML("</li>");
-    }
-    printRawHTML("</ol>");
-  }
-
-  void printDefinitionListItem(const DefinitionListItem *DLI) {
-    printRawHTML("<dt>");
-    printASTNode(DLI->getTerm());
-    printRawHTML("</dt>");
-    for (const auto *N : DLI->getClassifiers()) {
-      printASTNode(N);
-    }
-
-    printRawHTML("<dd>");
-    for (const auto *N : DLI->getDefinitionChildren()) {
-      printASTNode(N);
-    }
-    printRawHTML("</dd>");
-  }
-
-  void printDefinitionList(const DefinitionList *DL) {
-    printRawHTML("<dl>");
-    for (const auto *N : DL->getChildren()) {
-      printASTNode(N);
-    }
-    printRawHTML("</dl>");
-  }
-
-  void printField(const Field *F) {
-    printRawHTML("<dt>");
-    printASTNode(F->getName());
-    printRawHTML("</dt>");
-
-    printRawHTML("<dd>");
-    for (const auto *N : F->getBodyChildren()) {
-      printASTNode(N);
-    }
-    printRawHTML("</dd>");
-  }
-
-  void printFieldList(const FieldList *FL) {
-    printRawHTML("<dl>");
-    for (const auto *F : FL->getChildren()) {
-      printASTNode(F);
-    }
-    printRawHTML("</dl>");
+  void printDocument(const Document *D) {
+    llvm_unreachable("Can't print an llvm::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
-    bool HacksEnabled =
-        TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks;
-
-    if (HacksEnabled)
-      OS << "<Verbatim kind=\"code\" xml:space=\"preserve\">";
-    else
-      printRawHTML("<blockquote>");
-
-    for (const auto *N : BQ->getChildren()) {
+    for (const auto *N : BQ->getChildren())
       printASTNode(N);
-    }
-
-    if (HacksEnabled)
-      OS << "</Verbatim>";
-    else
-      printRawHTML("</blockquote>");
   }
 
-  void printTextAndInline(const TextAndInline *T) {
-    for (const auto *IC : T->getChildren()) {
-      printASTNode(IC);
-    }
+  void printList(const List *L) {
+    OS << (L->isOrdered() ? "<List-Number>" : "<List-Bullet>");
+    for (const auto *N : L->getChildren())
+      printASTNode(N);
+
+    OS << (L->isOrdered() ? "</List-Number>" : "</List-Bullet>");
   }
 
-  void printPlainText(const PlainText *PT) {
-    bool HacksEnabled =
-        TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks;
+  void printItem(const Item *I) {
+    OS << "<Item>";
+    for (const auto *N : I->getChildren())
+      printASTNode(N);
 
-    if (HacksEnabled) {
-      for (auto Parts = std::make_pair(StringRef(), PT->getLinePart().Text);
-           !Parts.first.empty() || !Parts.second.empty();
-           Parts = Parts.second.split("\\ ")) {
-        appendWithXMLEscaping(OS, Parts.first);
-      }
-    } else {
-      appendWithXMLEscaping(OS, PT->getLinePart().Text);
+    OS << "</Item>";
+  }
+
+  void printCode(const Code *C) {
+    OS << "<codeVoice>";
+    appendWithXMLEscaping(OS, C->getLiteralContent());
+    OS << "</codeVoice>";
+  }
+
+  void printCodeBlock(const CodeBlock *CB) {
+    OS << "<CodeListing>";
+    SmallVector<StringRef, 16> CodeLines;
+    CB->getLiteralContent().split(CodeLines, "\n");
+    for (auto Line : CodeLines) {
+      OS << "<zCodeLineNumbered>";
+      appendWithCDATAEscaping(OS, Line);
+      OS << "</zCodeLineNumbered>";
     }
+    OS << "</CodeListing>";
+  }
+
+  void printParagraph(const Paragraph *P) {
+    OS << "<Para>";
+    for (const auto *N : P->getChildren())
+      printASTNode(N);
+
+    OS << "</Para>";
+  }
+
+  void printHeader(const Header *H) {
+    llvm::SmallString<4> Tag;
+    llvm::raw_svector_ostream S(Tag);
+    S << "<h" << H->getLevel() << ">";
+    printRawHTML(S.str());
+    for (auto Child : H->getChildren())
+      printASTNode(Child);
+
+    Tag.clear();
+    S << "</h" << H->getLevel() << ">";
+    printRawHTML(S.str());
+  }
+
+  void printHRule(const HRule *HR) {
+    printRawHTML("<hr/>");
+  }
+
+  void printText(const Text *T) {
+    appendWithXMLEscaping(OS, T->getLiteralContent());
+  }
+
+  void printHTML(const HTML *H) {
+    printRawHTML(H->getLiteralContent());
+  }
+
+  void printInlineHTML(const InlineHTML *IH) {
+    printRawHTML(IH->getLiteralContent());
   }
 
   void printEmphasis(const Emphasis *E) {
-    printRawHTML("<em>");
-    for (const auto *IC : E->getChildren()) {
+    OS << "<emphasis>";
+    for (const auto *IC : E->getChildren())
       printASTNode(IC);
-    }
-    printRawHTML("</em>");
+
+    OS << "</emphasis>";
   }
 
-  void printStrongEmphasis(const StrongEmphasis *SE) {
-    printRawHTML("<strong>");
-    for (const auto *IC : SE->getChildren()) {
-      printASTNode(IC);
-    }
-    printRawHTML("</strong>");
-  }
-
-  void printInterpretedText(const InterpretedText *IT) {
-    // FIXME: check role.
-    printRawHTML("<code>");
-    for (const auto *IC : IT->getChildren()) {
-      printASTNode(IC);
-    }
-    printRawHTML("</code>");
-  }
-
-  void printInlineLiteral(const InlineLiteral *IL) {
-    printRawHTML("<code>");
-    for (const auto *IC : IL->getChildren()) {
-      printASTNode(IC);
-    }
-    printRawHTML("</code>");
-  }
-
-  void printHyperlinkReference(const HyperlinkReference *HR) {
-    // FIXME: print as a hyperlink.
-    for (const auto *IC : HR->getChildren()) {
-      printASTNode(IC);
-    }
-  }
-
-  void printInlineHyperlinkTarget(const InlineHyperlinkTarget *IHT) {
-    // FIXME: print link anchor.
-    for (const auto *IC : IHT->getChildren()) {
-      printASTNode(IC);
-    }
-  }
-
-  void printFootnoteReference(const FootnoteReference *FR) {
-    // FIXME: XML format does not support footnotes.  Skip them for now.
-  }
-
-  void printCitationReference(const CitationReference *CR) {
-    // FIXME: XML format does not support citations.  Skip them for now.
-  }
-
-  void printSubstitutionReference(const SubstitutionReference *SR) {
-    // FIXME: we don't resolve substitutions yet.
-  }
-
-  void printOrphanField(const Field *F) {
-    printRawHTML("<dl>");
-    printField(F);
-    printRawHTML("</dl>");
-  }
-
-  void printAsParameter(const comments::ParamField *PF) {
-    OS << "<Parameter><Name>";
-    OS << PF->getParamName().Text;
-    OS << "</Name><Direction isExplicit=\"0\">in</Direction><Discussion>";
-    for (const auto *N : PF->getBodyChildren()) {
-      OS << "<Para>";
+  void printStrong(const Strong *S) {
+    OS << "<bold>";
+    for (const auto *N : S->getChildren())
       printASTNode(N);
-      OS << "</Para>";
-    }
+
+    OS << "</bold>";
+  }
+
+  void printLink(const Link *L) {
+    SmallString<32> Tag;
+    llvm::raw_svector_ostream S(Tag);
+    S << "<Link href=\"" << L->getDestination() << "\">";
+    OS << S.str();
+
+    for (const auto N : L->getChildren())
+      printASTNode(N);
+
+    OS << "</Link>";
+  }
+
+  void printSoftBreak(const SoftBreak *SB) {
+    OS << " ";
+  }
+
+  void printLineBreak(const LineBreak *LB) {
+    printRawHTML("<br/>");
+  }
+
+  void printPrivateExtension(const PrivateExtension *PE) {
+    llvm_unreachable("Can't directly print a Swift Markup PrivateExtension");
+  }
+
+  void printImage(const Image *I) {
+    SmallString<64> Tag;
+    llvm::raw_svector_ostream S(Tag);
+    S << "<img src=\"" << I->getDestination() << "\"/>";
+    printRawHTML(S.str());
+  }
+
+  void printParamField(const ParamField *PF) {
+    OS << "<Parameter><Name>";
+    OS << PF->getName();
+    OS << "</Name><Direction isExplicit=\"0\">in</Direction><Discussion>";
+    for (auto Child : PF->getChildren())
+      printASTNode(Child);
+
     OS << "</Discussion></Parameter>";
   }
 
-  void printAsReturns(const Field *F) {
-    for (const auto *N : F->getBodyChildren()) {
-      printASTNode(N);
-    }
+  void printResultDiscussion(const ReturnsField *RF) {
+    OS << "<ResultDiscussion>";
+    for (auto Child : RF->getChildren())
+      printASTNode(Child);
+    OS << "</ResultDiscussion>";
   }
 
-  void visitFullComment(const FullComment *FC);
+  void visitDocComment(const DocComment *DC);
 };
 } // unnamed namespace
 
-void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
-  const Decl *D = FC->getDecl();
-  const auto &Parts = FC->getParts(TheCommentContext);
+void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
+  const Decl *D = DC->getDecl();
 
   StringRef RootEndTag;
   if (isa<AbstractFunctionDecl>(D)) {
@@ -395,51 +286,31 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
     OS << "</Declaration>";
   }
 
-  if (Parts.Brief) {
+  auto Brief = DC->getBrief();
+  if (Brief.hasValue()) {
     OS << "<Abstract>";
-    OS << "<Para>";
-    printASTNode(Parts.Brief);
-    OS << "</Para>";
+    printASTNode(Brief.getValue());
     OS << "</Abstract>";
   }
 
-  if (!Parts.MiscTopLevelNodes.empty()) {
-    OS << "<Discussion>";
-    for (const auto *N : Parts.MiscTopLevelNodes) {
-      bool Verbatim =
-         TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks &&
-         isa<BlockQuote>(N);
-
-      if (!Verbatim)
-        OS << "<Para>";
-
-      if (const auto *F = dyn_cast<Field>(N)) {
-        printOrphanField(F);
-        OS << "</Para>";
-        continue;
-      }
-      printASTNode(N);
-      if (!Verbatim)
-        OS << "</Para>";
-    }
-    OS << "</Discussion>";
-  }
-
-  if (!Parts.Params.empty()) {
+  if (!DC->getParamFields().empty()) {
     OS << "<Parameters>";
-    for (const auto *N : Parts.Params) {
-      printAsParameter(N);
-    }
+    for (const auto *PF : DC->getParamFields())
+      printParamField(PF);
+
     OS << "</Parameters>";
   }
-  if (!Parts.Returns.empty()) {
-    OS << "<ResultDiscussion>";
-    for (const auto *N : Parts.Returns) {
-      OS << "<Para>";
-      printAsReturns(N);
-      OS << "</Para>";
-    }
-    OS << "</ResultDiscussion>";
+
+  auto RF = DC->getReturnsField();
+  if (RF.hasValue())
+    printResultDiscussion(RF.getValue());
+
+  if (!DC->getBodyNodes().empty()) {
+    OS << "<Discussion>";
+    for (const auto *N : DC->getBodyNodes())
+      printASTNode(N);
+
+    OS << "</Discussion>";
   }
 
   OS << RootEndTag;
@@ -471,16 +342,13 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
     return false;
   }
 
-  CommentContext TheCommentContext;
-  TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks =
-      D->getASTContext().LangOpts.ReSTTemporaryHacks;
-
-  auto *FC = getFullComment(TheCommentContext, D);
-  if (!FC)
+  llvm::markup::MarkupContext MC;
+  auto DC = getDocComment(MC, D);
+  if (!DC.hasValue())
     return false;
 
-  CommentToXMLConverter Converter(TheCommentContext, OS);
-  Converter.visitFullComment(FC);
+  CommentToXMLConverter Converter(OS);
+  Converter.visitDocComment(DC.getValue());
 
   OS.flush();
   return true;
@@ -492,12 +360,10 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
 
 namespace {
 struct CommentToDoxygenConverter {
-  CommentContext &TheCommentContext;
   raw_ostream &OS;
   unsigned PendingNewlines = 1;
 
-  CommentToDoxygenConverter(CommentContext &TheCommentContext, raw_ostream &OS)
-      : TheCommentContext(TheCommentContext), OS(OS) {}
+  CommentToDoxygenConverter(raw_ostream &OS) : OS(OS) {}
 
   void print(StringRef Text) {
     for (unsigned i = 0; i != PendingNewlines; ++i) {
@@ -513,309 +379,190 @@ struct CommentToDoxygenConverter {
     PendingNewlines++;
   }
 
-  void printASTNode(const ReSTASTNode *N) {
+  void printASTNode(const MarkupASTNode *N) {
     switch (N->getKind()) {
-    case ASTNodeKind::Document:
-      llvm_unreachable("should never happen");
-      break;
-
-    case ASTNodeKind::Section:
-    case ASTNodeKind::Topic:
-    case ASTNodeKind::Sidebar:
-    case ASTNodeKind::Title:
-    case ASTNodeKind::Subtitle:
-    case ASTNodeKind::Transition:
-      llvm_unreachable("implement");
-
-    case ASTNodeKind::Paragraph:
-      printParagraph(cast<Paragraph>(N));
-      break;
-    case ASTNodeKind::BulletList:
-      printBulletList(cast<BulletList>(N));
-      break;
-    case ASTNodeKind::EnumeratedList:
-      printEnumeratedList(cast<EnumeratedList>(N));
-      break;
-    case ASTNodeKind::DefinitionListItem:
-      printDefinitionListItem(cast<DefinitionListItem>(N));
-      break;
-    case ASTNodeKind::DefinitionList:
-      printDefinitionList(cast<DefinitionList>(N));
-      break;
-    case ASTNodeKind::Field:
-      printField(cast<Field>(N));
-      break;
-    case ASTNodeKind::FieldList:
-      printFieldList(cast<FieldList>(N));
-      break;
-    case ASTNodeKind::BlockQuote:
-      printBlockQuote(cast<BlockQuote>(N));
-      break;
-    case ASTNodeKind::TextAndInline:
-      printTextAndInline(cast<TextAndInline>(N));
-      break;
-    case ASTNodeKind::PlainText:
-      printPlainText(cast<PlainText>(N));
-      break;
-    case ASTNodeKind::Emphasis:
-      printEmphasis(cast<Emphasis>(N));
-      break;
-    case ASTNodeKind::StrongEmphasis:
-      printStrongEmphasis(cast<StrongEmphasis>(N));
-      break;
-    case ASTNodeKind::InterpretedText:
-      printInterpretedText(cast<InterpretedText>(N));
-      break;
-    case ASTNodeKind::InlineLiteral:
-      printInlineLiteral(cast<InlineLiteral>(N));
-      break;
-    case ASTNodeKind::HyperlinkReference:
-      printHyperlinkReference(cast<HyperlinkReference>(N));
-      break;
-    case ASTNodeKind::InlineHyperlinkTarget:
-      printInlineHyperlinkTarget(cast<InlineHyperlinkTarget>(N));
-      break;
-    case ASTNodeKind::FootnoteReference:
-      printFootnoteReference(cast<FootnoteReference>(N));
-      break;
-    case ASTNodeKind::CitationReference:
-      printCitationReference(cast<CitationReference>(N));
-      break;
-    case ASTNodeKind::SubstitutionReference:
-      printSubstitutionReference(cast<SubstitutionReference>(N));
-      break;
-
-    case ASTNodeKind::PrivateExtension:
-      llvm_unreachable("implement");
+#define MARKUP_AST_NODE(Id, Parent) \
+case ASTNodeKind::Id: \
+print##Id(cast<Id>(N)); \
+break;
+#define ABSTRACT_MARKUP_AST_NODE(Id, Parent)
+#define MARKUP_AST_NODE_RANGE(Id, FirstId, LastId)
+#include "swift/Markup/ASTNodes.def"
     }
   }
 
-  void printParagraph(const Paragraph *P) {
-    print("<p>");
-    printTextAndInline(P->getContent());
-    print("</p>");
+#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
+  void print##Id(const Id *Field) { \
+    OS << "\\" << #XMLKind << " "; \
+    for (auto Child : Field->getChildren()) \
+      printASTNode(Child); \
+      printNewline(); \
   }
+#include "swift/Markup/SimpleFields.def"
 
-  void printBulletList(const BulletList *BL) {
-    print("<ul>");
-    for (unsigned i = 0, e = BL->getNumItems(); i != e; ++i) {
-      print("<li>");
-      for (const auto *N : BL->getItemChildren(i)) {
-        printASTNode(N);
-      }
-      print("</li>");
-    }
-    print("</ul>");
-  }
-
-  void printEnumeratedList(const EnumeratedList *EL) {
-    print("<ol>");
-    for (unsigned i = 0, e = EL->getNumItems(); i != e; ++i) {
-      print("<li>");
-      for (const auto *N : EL->getItemChildren(i)) {
-        printASTNode(N);
-      }
-      print("</li>");
-    }
-    print("</ol>");
-  }
-
-  void printDefinitionListItem(const DefinitionListItem *DLI) {
-    print("<dt>");
-    printASTNode(DLI->getTerm());
-    for (const auto *N : DLI->getClassifiers()) {
-      printASTNode(N);
-    }
-    print("</dt>");
-
-    print("<dd>");
-    for (const auto *N : DLI->getDefinitionChildren()) {
-      printASTNode(N);
-    }
-    print("</dd>");
-  }
-
-  void printDefinitionList(const DefinitionList *DL) {
-    print("<dl>");
-    for (const auto *N : DL->getChildren()) {
-      printASTNode(N);
-    }
-    print("</dl>");
-  }
-
-  void printField(const Field *F) {
-    print("<dt>");
-    printASTNode(F->getName());
-    print("</dt>");
-
-    print("<dd>");
-    for (const auto *N : F->getBodyChildren()) {
-      printASTNode(N);
-    }
-    print("</dd>");
-  }
-
-  void printFieldList(const FieldList *FL) {
-    print("<dl>");
-    for (const auto *F : FL->getChildren()) {
-      printASTNode(F);
-    }
-    print("</dl>");
+  void printDocument(const Document *D) {
+    // FIXME: Why keep doing this?
+    llvm_unreachable("Can't print an llvm::markup::Document as XML directly");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
-    bool HacksEnabled =
-        TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks;
-
-    print(HacksEnabled ? "<pre>" : "<blockquote>");
-
-    for (const auto *N : BQ->getChildren()) {
+    print("<blockquote>");
+    for (const auto *N : BQ->getChildren())
       printASTNode(N);
-    }
 
-    print(HacksEnabled ? "</pre>" : "</blockquote>");
+    print("</blockquote>");
   }
 
-  void printTextAndInline(const TextAndInline *T) {
-    for (const auto *IC : T->getChildren()) {
-      printASTNode(IC);
-    }
+  void printList(const List *BL) {
+    print(BL->isOrdered() ? "<ol>" : "<ul>");
+    for (const auto *I : BL->getChildren())
+      printASTNode(I);
+
+    print(BL->isOrdered() ? "</ol>" : "</ul>");
   }
 
-  void printPlainText(const PlainText *PT) {
-    if (PT->getLinePart().Text == "\n")
-      printNewline();
-    else {
-      bool HacksEnabled =
-          TheCommentContext.TheReSTContext.LangOpts.TemporaryHacks;
+  void printItem(const Item *I) {
+    print("<li>");
+    for (const auto *N : I->getChildren())
+      printASTNode(N);
 
-      if (HacksEnabled) {
-        for (auto Parts = std::make_pair(StringRef(), PT->getLinePart().Text);
-             !Parts.first.empty() || !Parts.second.empty();
-             Parts = Parts.second.split("\\ ")) {
-          print(Parts.first);
-        }
-      } else {
-        print(PT->getLinePart().Text);
-      }
-    }
+    print("</li>");
+  }
+
+  void printCodeBlock(const CodeBlock *CB) {
+    print("<code>");
+    print(CB->getLiteralContent().str());
+    printNewline();
+    print("</code>");
+  }
+
+  void printCode(const Code *C) {
+    print("<code>");
+    print(C->getLiteralContent().str());
+    printNewline();
+    print("</code>");
+  }
+
+  void printHTML(const HTML *H) {
+    print(H->getLiteralContent().str());
+  }
+
+  void printInlineHTML(const InlineHTML *IH) {
+    print(IH->getLiteralContent().str());
+  }
+
+  void printSoftBreak(const SoftBreak *SB) {
+    printNewline();
+  }
+
+  void printLineBreak(const LineBreak *LB) {
+    print("<br/>");
+    printNewline();
+  }
+
+  void printLink(const Link *L) {
+    SmallString<32> Tag;
+    llvm::raw_svector_ostream S(Tag);
+    S << "<a href=\"" << L->getDestination() << "\">";
+    print(S.str());
+
+    for (const auto N : L->getChildren())
+      printASTNode(N);
+
+    print("</a>");
+  }
+
+  void printImage(const Image *I) {
+    SmallString<64> Tag;
+    llvm::raw_svector_ostream S(Tag);
+    S << "<img src=\"" << I->getDestination() << "\"/>";
+    print(S.str());
+  }
+
+  void printParagraph(const Paragraph *P) {
+    for (const auto *N : P->getChildren())
+      printASTNode(N);
   }
 
   void printEmphasis(const Emphasis *E) {
     print("<em>");
-    for (const auto *IC : E->getChildren()) {
-      printASTNode(IC);
-    }
+    for (const auto *N : E->getChildren())
+      printASTNode(N);
+
     print("</em>");
   }
 
-  void printStrongEmphasis(const StrongEmphasis *SE) {
-    print("<strong>");
-    for (const auto *IC : SE->getChildren()) {
-      printASTNode(IC);
-    }
-    print("</strong>");
-  }
-
-  void printInterpretedText(const InterpretedText *IT) {
-    // FIXME: check role.
-    print("<code>");
-    for (const auto *IC : IT->getChildren()) {
-      printASTNode(IC);
-    }
-    print("</code>");
-  }
-
-  void printInlineLiteral(const InlineLiteral *IL) {
-    print("<code>");
-    for (const auto *IC : IL->getChildren()) {
-      printASTNode(IC);
-    }
-    print("</code>");
-  }
-
-  void printHyperlinkReference(const HyperlinkReference *HR) {
-    // FIXME: print as a hyperlink.
-    for (const auto *IC : HR->getChildren()) {
-      printASTNode(IC);
-    }
-  }
-
-  void printInlineHyperlinkTarget(const InlineHyperlinkTarget *IHT) {
-    // FIXME: print link anchor.
-    for (const auto *IC : IHT->getChildren()) {
-      printASTNode(IC);
-    }
-  }
-
-  void printFootnoteReference(const FootnoteReference *FR) {
-    // Doxygen does not support footnotes.
-  }
-
-  void printCitationReference(const CitationReference *CR) {
-    // Doxygen does not support citations.
-  }
-
-  void printSubstitutionReference(const SubstitutionReference *SR) {
-    // FIXME: we don't resolve substitutions yet.
-  }
-
-  void printOrphanField(const Field *F) {
-    print("<dl>");
-    printField(F);
-    print("</dl>");
-  }
-
-  void printBlockCommandContent(ArrayRef<const ReSTASTNode *> Nodes) {
-    if (Nodes.size() == 0)
-      return;
-    print(" ");
-    if (Nodes.size() == 1) {
-      if (const auto *P = dyn_cast<Paragraph>(Nodes[0])) {
-        printTextAndInline(P->getContent());
-        return;
-      }
-    }
-    for (const auto *N : Nodes) {
+  void printStrong(const Strong *E) {
+    print("<em>");
+    for (const auto *N : E->getChildren())
       printASTNode(N);
-    }
+
+    print("</em>");
   }
 
-  void printAsDoxygenParam(const comments::ParamField *PF) {
+  void printHRule(const HRule *HR) {
+    print("<hr/>");
+  }
+
+  void printHeader(const Header *H) {
+    llvm::SmallString<4> Tag;
+    llvm::raw_svector_ostream S(Tag);
+    S << "<h" << H->getLevel() << ">";
+    print(S.str());
+    for (auto Child : H->getChildren())
+      printASTNode(Child);
+
+    Tag.clear();
+    S << "</h" << H->getLevel() << ">";
+    print(S.str());
+  }
+
+  void printText(const Text *T) {
+    print(T->getLiteralContent().str());
+  }
+
+  void printPrivateExtension(const PrivateExtension *PE) {
+    llvm_unreachable("Can't directly print Doxygen for a Swift Markup PrivateExtension");
+  }
+
+  void printParamField(const ParamField *PF) {
     print("\\param ");
-    print(PF->getParamName().Text);
-    printBlockCommandContent(PF->getBodyChildren());
+    print(PF->getName());
+    print(" ");
+    for (auto Child : PF->getChildren())
+      printASTNode(Child);
+
     printNewline();
   }
 
-  void printAsDoxygenReturns(const Field *F) {
-    print("\\returns");
-    printBlockCommandContent(F->getBodyChildren());
+  void printReturnField(const ReturnsField *RF) {
+    print("\\returns ");
+    print(" ");
+    for (auto Child : RF->getChildren())
+      printASTNode(Child);
+
     printNewline();
   }
 };
 } // unnamed namespace
 
-void ide::getDocumentationCommentAsDoxygen(CommentContext &TheCommentContext,
-                                           const FullComment *FC,
+void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
                                            raw_ostream &OS) {
-  CommentToDoxygenConverter Converter(TheCommentContext, OS);
-  const auto &Parts = FC->getParts(TheCommentContext);
+  CommentToDoxygenConverter Converter(OS);
 
-  if (Parts.Brief) {
-    Converter.printTextAndInline(Parts.Brief->getContent());
+  auto Brief = DC->getBrief();
+  if (Brief.hasValue()) {
+    SmallString<256> BriefStr;
+    llvm::raw_svector_ostream OS(BriefStr);
+    llvm::markup::printInlinesUnder(Brief.getValue(), OS);
+    Converter.print(OS.str());
     Converter.printNewline();
     Converter.printNewline();
   }
 
-  for (const auto *N : Parts.MiscTopLevelNodes) {
-    if (const auto *F = dyn_cast<Field>(N)) {
-      Converter.printOrphanField(F);
-      Converter.printNewline();
-      continue;
-    }
+  for (const auto *N : DC->getBodyNodes()) {
     if (const auto *P = dyn_cast<Paragraph>(N)) {
-      Converter.printTextAndInline(P->getContent());
+      Converter.printASTNode(P);
       Converter.printNewline();
       Converter.printNewline();
       continue;
@@ -823,14 +570,18 @@ void ide::getDocumentationCommentAsDoxygen(CommentContext &TheCommentContext,
     Converter.printASTNode(N);
     Converter.printNewline();
   }
-  for (const auto *N : Parts.Params) {
-    Converter.printAsDoxygenParam(N);
+
+  for (const auto PF : DC->getParamFields()) {
+    Converter.printParamField(PF);
     Converter.printNewline();
   }
-  for (const auto *N : Parts.Returns) {
-    Converter.printAsDoxygenReturns(N);
+
+  auto RF = DC->getReturnsField();
+  if (RF.hasValue()) {
+    Converter.printReturnField(RF.getValue());
     Converter.printNewline();
   }
+
   if (Converter.PendingNewlines != 0)
     OS << "\n";
 }

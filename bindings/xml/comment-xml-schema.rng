@@ -363,7 +363,194 @@
   <define name="Discussion">
     <element name="Discussion">
       <zeroOrMore>
-        <ref name="TextBlockContent" />
+        <choice>
+          <ref name="BlockContent" />
+          <ref name="TextInlineContent" />
+        </choice>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="List-Bullet">
+    <element name="List-Bullet">
+      <zeroOrMore>
+        <ref name="Item" />
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="List-Number">
+    <element name="List-Number">
+      <zeroOrMore>
+        <ref name="Item" />
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Attention">
+    <element name="Attention">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Author">
+    <element name="Author">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Authors">
+    <element name="Authors">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Bug">
+    <element name="Bug">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Complexity">
+    <element name="Complexity">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Copyright">
+    <element name="Copyright">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Date">
+    <element name="Date">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Experiment">
+    <element name="Experiment">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Important">
+    <element name="Important">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Invariant">
+    <element name="Invariant">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Note">
+    <element name="Note">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Postcondition">
+    <element name="Postcondition">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Precondition">
+    <element name="Precondition">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Remark">
+    <element name="Remark">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Remarks">
+    <element name="Remarks">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="See">
+    <element name="See">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Since">
+    <element name="Since">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="TODO">
+    <element name="TODO">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Version">
+    <element name="Version">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Warning">
+    <element name="Warning">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="Item">
+    <element name="Item">
+      <zeroOrMore>
+        <ref name="BlockContent" />
       </zeroOrMore>
     </element>
   </define>
@@ -393,7 +580,7 @@
           <!-- In general, template parameters with whitespace discussion
                should not be emitted.  Schema might be more strict here. -->
           <element name="Discussion">
-            <ref name="TextBlockContent" />
+            <ref name="BlockContent" />
           </element>
         </element>
       </oneOrMore>
@@ -435,7 +622,7 @@
                should not be emitted, unless direction is explicitly specified.
                Schema might be more strict here. -->
           <element name="Discussion">
-            <ref name="TextBlockContent" />
+            <ref name="BlockContent" />
           </element>
         </element>
       </oneOrMore>
@@ -445,7 +632,7 @@
   <define name="Exceptions">
     <element name="Exceptions">
       <oneOrMore>
-        <ref name="TextBlockContent" />
+        <ref name="BlockContent" />
       </oneOrMore>
     </element>
   </define>
@@ -506,8 +693,53 @@
   <define name="ResultDiscussion">
     <element name="ResultDiscussion">
       <zeroOrMore>
-        <ref name="TextBlockContent" />
+        <ref name="BlockContent" />
       </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="BlockContent">
+    <choice>
+      <ref name="Attention"/>
+      <ref name="Author"/>
+      <ref name="Authors"/>
+      <ref name="Bug"/>
+      <ref name="Complexity"/>
+      <ref name="Copyright"/>
+      <ref name="Date"/>
+      <ref name="Experiment"/>
+      <ref name="Important"/>
+      <ref name="Invariant"/>
+      <ref name="Note"/>
+      <ref name="Postcondition"/>
+      <ref name="Precondition"/>
+      <ref name="Remark"/>
+      <ref name="Remarks"/>
+      <ref name="See"/>
+      <ref name="Since"/>
+      <ref name="TODO"/>
+      <ref name="Version"/>
+      <ref name="Warning"/>
+      <ref name="TextBlockContent"/>
+      <ref name="List-Bullet"/>
+      <ref name="List-Number"/>
+      <ref name="CodeListing"/>
+    </choice>
+  </define>
+
+  <define name="CodeListing">
+    <element name="CodeListing">
+      <zeroOrMore>
+        <ref name="zCodeLineNumbered"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
+  <define name="zCodeLineNumbered">
+    <element name="zCodeLineNumbered">
+      <optional>
+        <data type="string" />
+      </optional>
     </element>
   </define>
 
@@ -521,8 +753,10 @@
               <value>author</value>
               <value>authors</value>
               <value>bug</value>
+              <value>complexity</value>
               <value>copyright</value>
               <value>date</value>
+              <value>experiment</value>
               <value>invariant</value>
               <value>note</value>
               <value>post</value>
@@ -575,6 +809,23 @@
       </element>
       <element name="emphasized">
         <!-- Non-empty text content. -->
+        <data type="string">
+          <param name="pattern">.*\S.*</param>
+        </data>
+      </element>
+      <element name="emphasis">
+        <!-- Non-empty text content. -->
+        <data type="string">
+          <param name="pattern">.*\S.*</param>
+        </data>
+      </element>
+      <element name="Link">
+        <attribute name="href"/>
+        <data type="string">
+          <param name="pattern">.*\S.*</param>
+        </data>
+      </element>
+      <element name="codeVoice">
         <data type="string">
           <param name="pattern">.*\S.*</param>
         </data>
