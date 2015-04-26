@@ -12,7 +12,7 @@ bb0:
   return %1 : $Int32                               // id: %2
 }
 
-//CHECK-LABLE: caller_func
+//CHECK-LABEL: caller_func
 //CHECK: function_ref
 //CHECK: apply
 //CHECK-NEXT: ret
@@ -31,7 +31,7 @@ bb0:
   return %1 : $Int32                               // id: %2
 }
 
-//CHECK-LABLE: caller_func1
+//CHECK-LABEL: caller_func1
 //CHECK: function_ref
 //CHECK: apply
 //CHECK-NEXT: ret

@@ -8,7 +8,7 @@ import Swift
 // "return (x + y) + (x + y)"
 // make sure we are only calculating x+y once.
 
-//CHECK-LABLE: simply_arith
+//CHECK-LABEL: simply_arith
 //CHECK: builtin
 //CHECK: cond_fail
 //CHECK: builtin

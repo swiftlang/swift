@@ -2,7 +2,7 @@
 
 // Make sure we can swap two values in an array without retaining anything.
 
-//CHECK-LABLE: _TF11swap_refcnt11swapByIndexFT1ARGSaVSs4Int8_1xSi1ySi_T_
+//CHECK-LABEL: _TF11swap_refcnt11swapByIndexFT1ARGSaVSs4Int8_1xSi1ySi_T_
 //CHECK-NOT: strong_retain
 //CHECK-NOT: strong_release
 //CHECK: return
