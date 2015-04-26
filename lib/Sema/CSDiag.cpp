@@ -1817,7 +1817,7 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
   
   return true;
 }
-  
+
 bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
          expr->getKind() == ExprKind::PrefixUnary);
@@ -1890,6 +1890,7 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
           CS->TC.diagnose(argExpr->getLoc(),
                           diag::cannot_apply_lvalue_unop_to_rvalue_vardecl,
                           overloadName, VD->getName(), DiagCase);
+          VD->emitLetToVarNoteIfSimple();
           return true;
         }
       
@@ -2243,19 +2244,18 @@ bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
   
   if (auto DRE = dyn_cast<DeclRefExpr>(addressedExpr)) {
     if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      if (VD->hasAccessorFunctions() && !VD->getSetter()) {
-        CS->TC.diagnose(DRE->getLoc(),
-                        diag::assignment_get_only_property,
-                        VD->getName());
-        return true;
-      }
-      
-      if (VD->isLet()) {
-        CS->TC.diagnose(addressedExpr->getLoc(),
-                        diag::cannot_assign_to_immutable_expr,
-                        getUserFriendlyTypeName(addressedExpr->getType()));
-        return true;
-      }
+      unsigned DiagCase;
+      if (VD->isLet())
+        DiagCase = 0;
+      else if (VD->hasAccessorFunctions() && !VD->getSetter())
+        DiagCase = 1;
+      else
+        DiagCase = 2;
+
+      CS->TC.diagnose(DRE->getLoc(), diag::cannot_pass_rvalue_vardecl_inout,
+                      VD->getName(), DiagCase);
+      VD->emitLetToVarNoteIfSimple();
+      return true;
     }
   } else if (isa<UnresolvedDotExpr>(addressedExpr)) {
     // For now, keep the UDE distinct from the above to allow for potentially

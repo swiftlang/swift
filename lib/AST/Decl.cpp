@@ -2984,6 +2984,26 @@ Identifier VarDecl::getObjCPropertyName() const {
   return getName();
 }
 
+/// If this is a simple 'let' constant, emit a note with a fixit indicating
+/// that it can be rewritten to a 'var'.  This is used in situations where the
+/// compiler detects obvious attempts to mutate a constant.
+void VarDecl::emitLetToVarNoteIfSimple() const {
+  // If it isn't a 'let', don't touch it.
+  if (!isLet()) return;
+  
+  // If it is a multi variable binding, like "let (a,b) = " then don't touch it.
+  auto *PBD = getParentPatternBinding();
+  if (!PBD || PBD->getSingleVar() != this) return;
+  
+  // Don't touch generated code.
+  if (PBD->getLoc().isInvalid() || PBD->isImplicit())
+    return;
+  
+  getASTContext().Diags.diagnose(PBD->getLoc(), diag::convert_let_to_var)
+   .fixItReplace(PBD->getLoc(), "var");
+}
+
+
 /// Determine whether the given Swift type is an integral type, i.e.,
 /// a type that wraps a builtin integer.
 static bool isIntegralType(Type type) {

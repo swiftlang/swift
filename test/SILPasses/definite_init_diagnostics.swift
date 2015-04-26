@@ -692,6 +692,7 @@ class r18199087SubClassA: r18199087BaseClass {
 class rdar18414728Base {
   var prop:String? { return "boo" }
 
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
   let aaaaa:String  // expected-note 3 {{'self.aaaaa' not initialized}}
 
   init() {
@@ -723,6 +724,7 @@ class rdar18414728Base {
 class rdar18414728Derived : rdar18414728Base {
   var prop2:String? { return "boo" }
 
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}}
   let aaaaa2:String
 
   override init() {
@@ -828,10 +830,13 @@ extension Int {
 
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
   let arr : [Int]
   let (u, v) : (Int, Int)
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}}
   let w : (Int, Int)
   let x = 42
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
   let y : Int
   let z : Int?  // expected-note{{'self.z' not initialized}}
 
@@ -919,6 +924,7 @@ struct MyMutabilityImplementation : TestMutabilityProtocol {
 
 // <rdar://problem/16181314> don't require immediate initialization of 'let' values
 func testLocalProperties(b : Int) -> Int {
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
   let x : Int
   let y : Int // never assigned is ok
 
@@ -938,6 +944,7 @@ func testLocalProperties(b : Int) -> Int {
 
 // Should be rejected as multiple assignment.
 func testAddressOnlyProperty<T>(b : T) -> T {
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
   let x : T
   let y : T
   let z : T   // never assigned is ok.
@@ -1068,6 +1075,7 @@ extension SomeProtocol {
 
 // Lvalue check when the archetypes are not the same.
 struct LValueCheck<T> {
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
   let x = 0  // expected-note {{initial value already provided in 'let' declaration}}
 }
 
@@ -1085,3 +1093,11 @@ struct DontLoadFullStruct {
     y = x  // ok!
   }
 }
+
+
+func testReassignment() {
+  let c : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
+  c = 12
+  c = 32  // expected-error {{immutable value 'c' may only be initialized once}}
+}
+

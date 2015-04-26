@@ -79,7 +79,7 @@ func test_global_properties(x: X) {
   a4 = x
   a5 = x
 
-  accept_x_inout(&a1) // expected-error {{cannot assign to a get-only property 'a1'}}
+  accept_x_inout(&a1) // expected-error {{cannot pass get-only property 'a1' as inout argument}}
   accept_x_inout(&a2)
   accept_x_inout(&a3)
   accept_x_inout(&a4)

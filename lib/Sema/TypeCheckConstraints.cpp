@@ -1398,8 +1398,8 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     destTy = objectTv;
   } else {
     // Give a more specific diagnostic depending on what we're assigning to.
-      if (auto *DRE = dyn_cast<DeclRefExpr>(dest))
-        if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(dest))
+      if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
         Diag<Identifier> d;
         if (VD->isImplicit() && VD->getName() == getASTContext().Id_self)
           d = diag::assignment_to_self;
@@ -1410,7 +1410,8 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
         else
           d = diag::assignment_lhs_is_vardecl;
         getTypeChecker().diagnose(equalLoc, d, VD->getName())
-        .highlight(dest->getSourceRange());
+            .highlight(dest->getSourceRange());
+        VD->emitLetToVarNoteIfSimple();
         return Type();
       }
 

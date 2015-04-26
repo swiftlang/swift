@@ -4333,6 +4333,11 @@ public:
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
 
+  /// If this is a simple 'let' constant, emit a note with a fixit indicating
+  /// that it can be rewritten to a 'var'.  This is used in situations where the
+  /// compiler detects obvious attempts to mutate a constant.
+  void emitLetToVarNoteIfSimple() const;
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 

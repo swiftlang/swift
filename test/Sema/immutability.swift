@@ -79,7 +79,8 @@ class FooClass {
 
 
 func let_decls() {
-  let a = 42
+  // <rdar://problem/16927246> provide a fixit to change "let" to "var" if needing to mutate a variable
+  let a = 42  // expected-note {{change 'let' to 'var' to make it mutable}}
   a = 17   // expected-error {{cannot assign}}
 
   let (b,c) = (4, "hello")
@@ -89,6 +90,15 @@ func let_decls() {
   let d = (4, "hello")
   print(d.0); print(d.1)
   d.0 = 17   // expected-error {{cannot assign}}
+
+  
+  let e = 42  // expected-note {{change 'let' to 'var' to make it mutable}}
+  ++e         // expected-error {{cannot pass 'let' value 'e' to mutating unary operator '++'}}
+  
+  // <rdar://problem/16306600> QoI: passing a 'let' value as an inout results in an unfriendly diagnostic
+  let f = 96 // expected-note {{change 'let' to 'var' to make it mutable}}
+  var v = 1
+  swap(&f, &v)  // expected-error {{cannot pass 'let' value 'f' as inout argument}}
 
 }
 
@@ -342,7 +352,7 @@ struct LetStructMembers {
 }
 
 func QoI() {
-  let x = 97
+  let x = 97 // expected-note {{change 'let' to 'var' to make it mutable}}
   x = 17         // expected-error {{cannot assign to 'let' value 'x'}}
 
   var get_only: Int {

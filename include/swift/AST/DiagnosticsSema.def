@@ -49,6 +49,7 @@ NOTE(while_converting_default_tuple_value,sema,none,
      "while converting default tuple value to element type %0", (Type))
 NOTE(while_converting_subscript_index,sema,none,
      "while converting subscript index to expected type %0", (Type))
+
 //------------------------------------------------------------------------------
 // Constraint solver diagnostics
 //------------------------------------------------------------------------------
@@ -94,8 +95,8 @@ ERROR(cannot_apply_lvalue_unop_to_rvalue,sema,none,
       (StringRef, StringRef))
 
 ERROR(cannot_apply_lvalue_unop_to_rvalue_vardecl,sema_tcs,none,
-      "cannot pass %select{'let' value|get-only property|}2 %1 to mutating"
-      " unary operator '%0'",
+      "cannot pass %select{'let' value|get-only property|immutable value}2 %1"
+      " to mutating unary operator '%0'",
       (StringRef, Identifier, unsigned))
 
 ERROR(cannot_subscript_with_index,sema,none,
@@ -112,6 +113,11 @@ ERROR(cannot_assign_invariant_self,sema,none,
 
 ERROR(cannot_assign_to_immutable_expr,sema,none,
       "cannot assign to immutable value of type '%0'", (StringRef))
+
+ERROR(cannot_pass_rvalue_vardecl_inout,sema_tcs,none,
+      "cannot pass %select{'let' value|get-only property|immutable value}1 %0"
+      " as inout argument",
+      (Identifier, unsigned))
 
 ERROR(cannot_assign_to_literal,sema,none,
       "cannot assign to a literal value", ())

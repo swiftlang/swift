@@ -5,7 +5,7 @@ func reset(inout value: Int) { value = 0 }
 func testGlobals() {
   println(privateSetGlobal)
   privateSetGlobal = 42 // expected-error {{cannot assign to 'privateSetGlobal'}}
-  reset(&privateSetGlobal) // expected-error {{type of expression is ambiguous without more context}}
+  reset(&privateSetGlobal) // expected-error {{cannot pass immutable value 'privateSetGlobal' as inout argument}}
 }
 
 func testProperties(var instance: Members) {

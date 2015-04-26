@@ -785,10 +785,13 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       auto *VD = TheMemory.getPathStringToElement(i, PropertyName);
       diagnose(Module, InstInfo.Inst->getLoc(),
                diag::immutable_property_already_initialized, PropertyName);
-      if (auto *Var = dyn_cast<VarDecl>(VD))
+      
+      if (auto *Var = dyn_cast<VarDecl>(VD)) {
         if (Var->getParentInitializer())
           diagnose(Module, SILLocation(VD),
                    diag::initial_value_provided_in_let_decl);
+        Var->emitLetToVarNoteIfSimple();
+      }
       return;
     }
   }

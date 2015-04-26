@@ -80,6 +80,10 @@ ERROR(new_array_syntax,type_parsing,none,
       "array types are now written with the brackets around the element type",
       ())
 
+NOTE(convert_let_to_var,sema,none,
+     "change 'let' to 'var' to make it mutable", ())
+
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

@@ -7,7 +7,7 @@ func modify(inout x: Int) {}
 
 if let x? = foo() {
   use(x)
-  modify(&x) // expected-error{{cannot assign to immutable value of type 'Int'}}
+  modify(&x) // expected-error{{cannot pass 'let' value 'x' as inout argument}}
 }
 
 use(x) // expected-error{{unresolved identifier 'x'}}
