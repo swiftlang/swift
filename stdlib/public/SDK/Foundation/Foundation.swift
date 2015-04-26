@@ -546,7 +546,7 @@ extension Dictionary {
     _sanityCheck(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
-      "Dictionary be backed by NSDictionary storage only when both key and value are bridged verbatim to Objective-C")
+      "Dictionary can be backed by NSDictionary storage only when both key and value are bridged verbatim to Objective-C")
     // FIXME: We would like to call CFDictionaryCreateCopy() to avoid doing an
     // objc_msgSend() for instances of CoreFoundation types.  We can't do that
     // today because CFDictionaryCreateCopy() copies dictionary contents
