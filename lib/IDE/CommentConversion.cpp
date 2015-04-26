@@ -118,15 +118,16 @@ struct CommentToXMLConverter {
 
   void printHeader(const Header *H) {
     llvm::SmallString<4> Tag;
-    llvm::raw_svector_ostream S(Tag);
-    S << "<h" << H->getLevel() << ">";
-    printRawHTML(S.str());
+    llvm::raw_svector_ostream TagStream(Tag);
+    TagStream << "<h" << H->getLevel() << ">";
+    printRawHTML(TagStream.str());
     for (auto Child : H->getChildren())
       printASTNode(Child);
 
-    Tag.clear();
-    S << "</h" << H->getLevel() << ">";
-    printRawHTML(S.str());
+    llvm::SmallString<5> EndTag;
+    llvm::raw_svector_ostream EndTagStream(EndTag);
+    EndTagStream << "</h" << H->getLevel() << ">";
+    printRawHTML(EndTagStream.str());
   }
 
   void printHRule(const HRule *HR) {
@@ -506,15 +507,16 @@ break;
 
   void printHeader(const Header *H) {
     llvm::SmallString<4> Tag;
-    llvm::raw_svector_ostream S(Tag);
-    S << "<h" << H->getLevel() << ">";
-    print(S.str());
+    llvm::raw_svector_ostream TagStream(Tag);
+    TagStream << "<h" << H->getLevel() << ">";
+    print(TagStream.str());
     for (auto Child : H->getChildren())
       printASTNode(Child);
 
-    Tag.clear();
-    S << "</h" << H->getLevel() << ">";
-    print(S.str());
+    llvm::SmallString<5> EndTag;
+    llvm::raw_svector_ostream EndTagStream(EndTag);
+    EndTagStream << "</h" << H->getLevel() << ">";
+    print(EndTagStream.str());
   }
 
   void printText(const Text *T) {

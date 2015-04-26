@@ -1972,6 +1972,7 @@ static int doPrintComments(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
+  Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
   CompilerInstance CI;
   // Display diagnostics to stderr.
