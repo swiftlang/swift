@@ -168,13 +168,13 @@ next(%z : $Builtin.Int8):
 // CHECK-LABEL: define void @dynamic_inject(%O18enum_multi_payload8EitherOr.17* noalias sret, %swift.type* %T)
 sil @dynamic_inject : $@convention(thin) <T> (@out EitherOr<T, Builtin.Int64>) -> () {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
-  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE:%.*]], i32 0) #1
+  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE:%.*]], i32 0)
   inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Left!enumelt.1
-  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 2) #1
+  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 2)
   inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Middle!enumelt
-  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 3) #1
+  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 3)
   inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Center!enumelt
-  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 1) #1
+  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 1)
   inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Right!enumelt.1
 
   return undef : $()
@@ -231,3 +231,37 @@ next(%x : $Builtin.Int8):
   return undef : $()
 }
 
+// CHECK-LABEL: define void @dynamic_value_semantics(%O18enum_multi_payload8EitherOr.17* noalias sret, %O18enum_multi_payload8EitherOr.17*, %swift.type* %T)
+sil @dynamic_value_semantics : $@convention(thin) <T> (@out EitherOr<T, Builtin.Int64>, @in EitherOr<T, Builtin.Int64>) -> () {
+entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
+  // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
+  // CHECK:        switch i32 [[TAG]], label %[[NOOP:[0-9]+]] [
+  // -- only the Left branch of this instance needs cleanup
+  // CHECK-NEXT:     i32 0, label %[[LEFT:[0-9]+]]
+  // CHECK-NEXT:   ]
+  // CHECK:      <label>:[[LEFT]]
+  // CHECK:        call void %destroy(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        br label %[[NOOP]]
+  // CHECK:      <label>:[[NOOP]]
+  destroy_addr %a : $*EitherOr<T, Builtin.Int64>
+
+  // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
+  // CHECK:        switch i32 [[TAG]], label %[[TRIVIAL:[0-9]+]] [
+  // -- only the Left branch of this instance needs nontrivial take
+  // CHECK-NEXT:     i32 0, label %[[LEFT:[0-9]+]]
+  // CHECK-NEXT:   ]
+  // CHECK:      <label>:[[LEFT]]
+  // CHECK:        call %swift.opaque* %initializeWithTake(%swift.opaque* {{%.*}}, %swift.type* %T)
+  // CHECK:        br label %[[DONE:[0-9]+]]
+  // CHECK:      <label>:[[TRIVIAL]]
+  // CHECK:        call void @llvm.memcpy
+  // CHECK:        br label %[[DONE]]
+  // CHECK:      <label>:[[DONE]]
+  copy_addr [take] %a to [initialization] %b : $*EitherOr<T, Builtin.Int64>
+
+  copy_addr [take] %a to                  %b : $*EitherOr<T, Builtin.Int64>
+  copy_addr        %a to [initialization] %b : $*EitherOr<T, Builtin.Int64>
+  copy_addr        %a to                  %b : $*EitherOr<T, Builtin.Int64>
+
+  return undef : $()
+}

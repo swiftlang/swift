@@ -3533,15 +3533,12 @@ namespace {
           return;
         }
 
-        llvm::Value *payload, *extraTagBits;
-        std::tie(payload, extraTagBits)
-          = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
+        llvm::Value *tag = loadPayloadTag(IGF, src, T);
 
         auto *endBB = llvm::BasicBlock::Create(C);
 
         /// Switch out nontrivial payloads.
         auto *trivialBB = llvm::BasicBlock::Create(C);
-        llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
         auto *swi = IGF.Builder.CreateSwitch(tag, trivialBB);
         auto *tagTy = cast<llvm::IntegerType>(tag->getType());
 
@@ -3564,6 +3561,8 @@ namespace {
 
           // Temporarily clear the tag bits from the source so we can use the
           // data.
+          // FIXME: This is totally broken if someone concurrently accesses
+          // a supposedly-immutable value as we're copying it.
           preparePayloadForLoad(IGF, src, tagIndex);
 
           // Do the take/copy of the payload.
@@ -3578,11 +3577,12 @@ namespace {
           } else {
             payloadTI.initializeWithCopy(IGF, destData, srcData, PayloadT);
             // Replant the tag bits, if any, in the source.
-            storePayloadTag(IGF, src, tagIndex);
+            if (PayloadTagBits.count() > 0)
+              storePayloadTag(IGF, src, tagIndex, T);
           }
 
           // Plant spare bit tag bits, if any, into the new value.
-          storePayloadTag(IGF, dest, tagIndex);
+          storePayloadTag(IGF, dest, tagIndex, T);
           IGF.Builder.CreateBr(endBB);
 
           ++tagIndex;
@@ -3591,7 +3591,18 @@ namespace {
         // For trivial payloads (including no-payload cases), we can just
         // primitive-store to the destination.
         IGF.Builder.emitBlock(trivialBB);
-        emitPrimitiveStorePayloadAndExtraTag(IGF, dest, payload, extraTagBits);
+        if (TIK >= Fixed) {
+          // Do a fixed-size primitive load and store if we can.
+          llvm::Value *payload, *extraTagBits;
+          std::tie(payload, extraTagBits)
+            = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
+          emitPrimitiveStorePayloadAndExtraTag(IGF, dest, payload, extraTagBits);
+        } else {
+          // Otherwise, memcpy the dynamic size of the type.
+          IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
+                                   TI->getSize(IGF, T),
+                                   TI->getBestKnownAlignment().getValue());
+        }
         IGF.Builder.CreateBr(endBB);
 
         IGF.Builder.emitBlock(endBB);
@@ -3699,7 +3710,13 @@ namespace {
 
   private:
     void storePayloadTag(IRGenFunction &IGF,
-                         Address enumAddr, unsigned index) const {
+                         Address enumAddr, unsigned index,
+                         SILType T) const {
+      // Use the runtime to initialize dynamic cases.
+      if (TIK < Fixed) {
+        return storeDynamicTag(IGF, enumAddr, index, T);
+      }
+
       // If the tag has spare bits, we need to mask them into the
       // payload area.
       unsigned numSpareBits = PayloadTagBits.count();
@@ -3736,7 +3753,14 @@ namespace {
     }
 
     void storeNoPayloadTag(IRGenFunction &IGF, Address enumAddr,
-                           unsigned index) const {
+                           unsigned index, SILType T) const {
+      // Use the runtime to initialize dynamic cases.
+      if (TIK < Fixed) {
+        // Dynamic case indexes start after the payload cases.
+        return storeDynamicTag(IGF, enumAddr,
+                               index + ElementsWithPayload.size(), T);
+      }
+
       // We can just primitive-store the representation for the empty case.
       llvm::Value *payload, *extraTag;
       std::tie(payload, extraTag) = getNoPayloadCaseValue(IGF.IGM, index);
@@ -3773,11 +3797,8 @@ namespace {
                                [&](const Element &e) { return e.decl == elt; });
       if (payloadI != ElementsWithPayload.end()) {
         unsigned index = payloadI - ElementsWithPayload.begin();
-        // Use the runtime to store a dynamic tag.
-        if (TIK < Fixed)
-          return storeDynamicTag(IGF, enumAddr, index, T);
 
-        return storePayloadTag(IGF, enumAddr, index);
+        return storePayloadTag(IGF, enumAddr, index, T);
       }
 
       auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
@@ -3788,10 +3809,7 @@ namespace {
       
       // Use the runtime to store a dynamic tag. Empty tag values always follow
       // the payloads.
-      if (TIK < Fixed)
-        return storeDynamicTag(IGF, enumAddr,
-                               index + ElementsWithPayload.size(), T);
-      storeNoPayloadTag(IGF, enumAddr, index);
+      storeNoPayloadTag(IGF, enumAddr, index, T);
     }
 
     Address destructiveProjectDataForLoad(IRGenFunction &IGF,
