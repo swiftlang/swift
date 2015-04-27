@@ -2673,11 +2673,12 @@ void ArgEmitter::emitShuffle(Expr *inner,
       // Otherwise, emit the default initializer, then map that as a
       // default argument.
       CanType eltType = outerTuple.getElementType(outerIndex);
+      auto origType = origParamType.getTupleElementType(outerIndex);
       ManagedValue value =
         SGF.emitApplyOfDefaultArgGenerator(outer, defaultArgsOwner,
-                                           outerIndex, eltType);
+                                           outerIndex, eltType, origType);
       emit(ArgumentSource(outer, RValue(SGF, outer, eltType, value)),
-           origParamType.getTupleElementType(outerIndex));
+           origType);
 
      // If this is caller default initialization, generate the
      // appropriate value.

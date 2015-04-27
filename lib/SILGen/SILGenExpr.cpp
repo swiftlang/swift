@@ -1735,6 +1735,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                                                ConcreteDeclRef defaultArgsOwner,
                                                unsigned destIndex,
                                                CanType resultType,
+                                             AbstractionPattern origResultType,
                                                SGFContext C) {
   SILDeclRef generator 
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
@@ -1744,9 +1745,6 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
   auto substFnType = fnType->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
                                          defaultArgsOwner.getSubstitutions());
-  auto origResultType = AbstractionPattern(
-        defaultArgsOwner.getDecl()->getType()->getCanonicalType());
-      
   return emitApply(loc, fnRef, defaultArgsOwner.getSubstitutions(),
                    {}, substFnType,
                    origResultType, resultType,
@@ -1780,19 +1778,8 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
            "ran out of shuffle indexes before running out of fields?!");
     int shuffleIndex = *shuffleIndexIterator++;
     
-    // If the shuffle index is DefaultInitialize, we're supposed to use the
-    // default value.
-    if (shuffleIndex == TupleShuffleExpr::DefaultInitialize) {
-      unsigned destIndex
-        = shuffleIndexIterator - E->getElementMapping().begin() - 1;
-      auto resultType = field.getType()->getCanonicalType();
-      auto apply = SGF.emitApplyOfDefaultArgGenerator(E,
-                                                      E->getDefaultArgsOwner(),
-                                                      destIndex,
-                                                      resultType);      
-      result.addElement(SGF, apply, resultType, E);
-      continue;
-    }
+    assert(shuffleIndex != TupleShuffleExpr::DefaultInitialize &&
+           "General tuples cannot have default initializers");
 
     // If the shuffle index is CallerDefaultInitialize, we're supposed to
     // use the caller-provided default value. This is used only in special
@@ -1947,32 +1934,10 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
       break;
     }
 
-    const auto &element = E->getElement(i);
-
     // A null element indicates that this is the position of the scalar. Add
     // the scalar here.
-    if (element.isNull()) {
-      result.addElement(std::move(scalar));
-      continue;
-    }
-
-    // If this element comes from a default argument generator, emit a call to
-    // that generator.
-    assert(outerFields[i].hasInit() &&
-           "no default initializer in non-scalar field of scalar-to-tuple?!");
-    if (auto defaultArgOwner = element.dyn_cast<ConcreteDeclRef>()) {
-      auto resultType = outerFields[i].getType()->getCanonicalType();
-      auto apply =
-        SGF.emitApplyOfDefaultArgGenerator(E, defaultArgOwner.getDecl(), i,
-                                           resultType, SGFContext());
-
-      result.addElement(SGF, apply, resultType, E);
-      continue;
-    }
-
-    // We have an caller-side default argument. Emit it.
-    Expr *defArg = element.get<Expr *>();
-    result.addElement(visit(defArg));
+    assert(E->getElement(i).isNull() && "Unknown scalar to tuple conversion");
+    result.addElement(std::move(scalar));
   }
 
   return result;

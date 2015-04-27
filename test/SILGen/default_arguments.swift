@@ -20,7 +20,7 @@
 // CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
 // CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]]) : $@convention(thin)
 // CHECK: return [[RESULT]] : $String
-func defarg1(#i: Int = 17, d: Double, s: String = "Hello") { }
+func defarg1(i i: Int = 17, d: Double, s: String = "Hello") { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments15testDefaultArg1FT_T_
 func testDefaultArg1() {
@@ -66,7 +66,7 @@ func testAutocloseFile() {
   autocloseFile()
 }
 
-func testMagicLiterals(#file: String = __FILE__,
+func testMagicLiterals(file file: String = __FILE__,
                        function: String = __FUNCTION__,
                        line: Int = __LINE__,
                        column: Int = __COLUMN__) {}
@@ -201,3 +201,31 @@ func testDSOHandle() {
 extension SuperDefArg {
   static let extensionInitializerWithClosure: Int = { return 22 }()
 }
+
+
+// <rdar://problem/19086357> SILGen crashes reabstracting default argument closure in members
+class ReabstractDefaultArgument<T> {
+  init(a: (T, T) -> Bool = { _, _ in true }) {
+  }
+}
+
+// CHECK-LABEL: sil hidden @_TF17default_arguments32testDefaultArgumentReabstractionFT_T_
+// function_ref default_arguments.ReabstractDefaultArgument.__allocating_init <A>(default_arguments.ReabstractDefaultArgument<A>.Type)(a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>
+// CHECK: [[INITFN:%[0-9]+]] = function_ref @_TFC17default_arguments25ReabstractDefaultArgumentCU__fMGS0_Q__FT1aFTQ_Q__Sb_GS0_Q__
+// %1 = metatype $@thick ReabstractDefaultArgument<Int>.Type
+// function_ref default_arguments.ReabstractDefaultArgument.(init <A>(default_arguments.ReabstractDefaultArgument<A>.Type) -> (a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>).(default argument 0)
+// CHECK: %2 = function_ref @_TIFC17default_arguments25ReabstractDefaultArgumentcU__FMGS0_Q__FT1aFTQ_Q__Sb_GS0_Q__A_ : $@convention(thin) <τ_0_0> () -> @owned @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK-NEXT: %3 = apply %2<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK-NEXT: function_ref reabstraction thunk helper from @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
+// CHECK-NEXT: %4 = function_ref @_TTRXFo_iSiiSi_dSb_XFo_dSidSi_dSb_ : $@convention(thin) (Int, Int, @owned @callee_owned (@in Int, @in Int) -> Bool) -> Bool
+// CHECK-NEXT: %5 = partial_apply %4(%3) : $@convention(thin) (Int, Int, @owned @callee_owned (@in Int, @in Int) -> Bool) -> Bool
+// function_ref reabstraction thunk helper from @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool)
+// CHECK: %6 = function_ref @_TTRXFo_dSidSi_dSb_XFo_iSiiSi_dSb_ : $@convention(thin) (@in Int, @in Int, @owned @callee_owned (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: %7 = partial_apply %6(%5) : $@convention(thin) (@in Int, @in Int, @owned @callee_owned (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: apply [[INITFN]]<Int>(%7, 
+
+func testDefaultArgumentReabstraction() {
+  ReabstractDefaultArgument<Int>()
+}
+
+

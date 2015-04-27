@@ -1068,6 +1068,7 @@ public:
                                               ConcreteDeclRef defaultArgsOwner,
                                               unsigned destIndex,
                                               CanType resultType,
+                                              AbstractionPattern origResultType,
                                               SGFContext C = SGFContext());
 
   /// A convenience method for emitApply that just handles monomorphic
