@@ -50,7 +50,8 @@ extern "C" int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                                const Metadata *payload,
                                                unsigned emptyCases);
 
-/// \brief Store the tag value for the given case.
+/// \brief Store the tag value for the given case into a single-payload enum,
+///        whose associated payload (if any) has already been initialized.
 ///
 /// \param value - pointer to the enum value. If the case being initialized is
 ///                the payload case (-1), then the payload should be
@@ -77,8 +78,8 @@ extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
 extern "C" unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
                                                   const EnumMetadata *enumType);
   
-/// \brief Return an integer value representing which case of a multi-payload
-///        enum is inhabited.
+/// \brief Store the tag value for the given case into a multi-payload enum,
+///        whose associated payload (if any) has already been initialized.
 extern "C" void swift_storeEnumTagMultiPayload(OpaqueValue *value,
                                                const EnumMetadata *enumType,
                                                unsigned whichCase);
