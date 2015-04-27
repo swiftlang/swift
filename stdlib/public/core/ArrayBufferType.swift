@@ -59,13 +59,13 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// Otherwise, return `nil`.
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>?
 
-  /// Replace the given subRange with the first newCount elements of
+  /// Replace the given `subRange` with the first `newCount` elements of
   /// the given collection.
   ///
   /// Requires: this buffer is backed by a uniquely-referenced
   /// _ContiguousArrayBuffer
   mutating func replace<C: CollectionType where C.Generator.Element == Element>(
-    #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
+    subRange subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   )
 
   /// Return a _SliceBuffer containing the given subRange of values

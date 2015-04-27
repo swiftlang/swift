@@ -75,7 +75,9 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   ///
   public
   mutating func replace<C: CollectionType where C.Generator.Element == T>(
-    #subRange: Range<Int>, with insertCount: Int, elementsOf newValues: C
+    subRange subRange: Range<Int>,
+    with insertCount: Int,
+    elementsOf newValues: C
   ) {
     _invariantCheck()
     // FIXME: <rdar://problem/17464946> with

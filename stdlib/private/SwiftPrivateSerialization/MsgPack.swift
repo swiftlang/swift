@@ -215,7 +215,7 @@ public struct MsgPackEncoder {
     _addedElement()
   }
 
-  public mutating func appendExtended(#type: Int8, data: [UInt8]) {
+  public mutating func appendExtended(type type: Int8, data: [UInt8]) {
     switch Int64(data.count) {
     case 1:
       // fixext1
@@ -682,8 +682,10 @@ public struct MsgPackVariantMap : CollectionType {
     return _data.count
   }
 
-  internal mutating func _append(#key: MsgPackVariant, value: MsgPackVariant) {
-    let entry = (key, value)
+  internal mutating func _append(
+    key newKey: MsgPackVariant, value newValue: MsgPackVariant
+  ) {
+    let entry = (newKey, newValue)
     _data.append(entry)
   }
 }

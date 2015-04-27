@@ -235,11 +235,11 @@ extension CVaListPointer : CustomDebugStringConvertible {
 }
 
 func _memcpy(
-  #dest: UnsafeMutablePointer<Void>,
+  dest destination: UnsafeMutablePointer<Void>,
   src: UnsafeMutablePointer<Void>,
   size: UInt
 ) {
-  let dest = dest._rawValue
+  let dest = destination._rawValue
   let src = src._rawValue
   let size = UInt64(size).value
   Builtin.int_memcpy_RawPointer_RawPointer_Int64(dest, src, size,

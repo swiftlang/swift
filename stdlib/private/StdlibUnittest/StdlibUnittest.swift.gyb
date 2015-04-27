@@ -2078,14 +2078,14 @@ public func expectEqualUnicodeScalars(
 }
 
 public func expectPrinted<T>(
-  #expectedOneOf: _UnitTestArray<String>, _ object: T,
+  expectedOneOf patterns: _UnitTestArray<String>, _ object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   let actual = String(object)
-  if !contains(expectedOneOf, actual) {
+  if !contains(patterns, actual) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("expected: any of \(expectedOneOf.debugDescription)")
+    println("expected: any of \(patterns.debugDescription)")
     println("actual: \"\(actual)\"")
     println()
   }
@@ -2099,14 +2099,14 @@ public func expectPrinted<T>(
 }
 
 public func expectDebugPrinted<T>(
-  #expectedOneOf: _UnitTestArray<String>, _ object: T,
+  expectedOneOf patterns: _UnitTestArray<String>, _ object: T,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   let actual = String(reflecting: object)
-  if !contains(expectedOneOf, actual) {
+  if !contains(patterns, actual) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
-    println("expected: any of \(expectedOneOf.debugDescription)")
+    println("expected: any of \(patterns.debugDescription)")
     println("actual: \"\(actual)\"")
     println()
   }
@@ -2553,7 +2553,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
     )
   }
 
-  public mutating func removeAll(#keepCapacity: Bool = false) {
+  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     // Ignore the value of `keepCapacity`.
     elements.removeAll(keepCapacity: false)
   }

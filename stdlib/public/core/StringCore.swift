@@ -425,7 +425,7 @@ public struct _StringCore {
   /// width.  Effectively appends garbage to the String until it has
   /// newSize UTF-16 code units.
   mutating func _copyInPlace(
-    #newSize: Int, newCapacity: Int, minElementWidth: Int
+    newSize newSize: Int, newCapacity: Int, minElementWidth: Int
   ) {
     _sanityCheck(newCapacity >= newSize)
     var oldCount = count
@@ -732,7 +732,7 @@ extension _StringCore : RangeReplaceableCollectionType {
     Swift.removeRange(&self, subRange)
   }
 
-  public mutating func removeAll(#keepCapacity: Bool = false) {
+  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
 }

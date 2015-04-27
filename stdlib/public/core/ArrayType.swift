@@ -102,7 +102,7 @@ protocol _ArrayType
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
   /// will not change
-  mutating func removeAll(#keepCapacity: Bool)
+  mutating func removeAll(keepCapacity keepCapacity: Bool)
 
   //===--- algorithms -----------------------------------------------------===//
 

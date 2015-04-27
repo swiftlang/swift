@@ -18,8 +18,8 @@ public func rand32() -> UInt32 {
 }
 
 @inline(never) @_semantics("stdlib_binary_only") // Hide the libbsd dependency
-public func rand32(#exclusiveUpperBound: UInt32) -> UInt32 {
-  return arc4random_uniform(exclusiveUpperBound)
+public func rand32(exclusiveUpperBound limit: UInt32) -> UInt32 {
+  return arc4random_uniform(limit)
 }
 
 @inline(never) @_semantics("stdlib_binary_only") // Hide the libbsd dependency

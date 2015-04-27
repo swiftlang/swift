@@ -302,7 +302,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   public mutating func replace<
     C: CollectionType where C.Generator.Element == Element
   >(
-    #subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
+    subRange subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   ) {
     _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
   }

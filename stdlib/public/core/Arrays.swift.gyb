@@ -641,7 +641,7 @@ extension ${Self} : _ArrayType {
   /// - postcondition: `capacity == 0` iff `keepCapacity` is `false`.
   ///
   /// Complexity: O(`count(self)`).
-  public mutating func removeAll(#keepCapacity: Bool = false) {
+  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
     }
@@ -747,7 +747,7 @@ extension ${Self} : Reflectable {
 }
 
 extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
-  func _makeDescription(#isDebug: Bool) -> String {
+  func _makeDescription(isDebug isDebug: Bool) -> String {
     var result = "["
     var first = true
     for item in self {

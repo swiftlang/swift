@@ -123,7 +123,7 @@ public protocol RangeReplaceableCollectionType
   /// Can be implemented as:
   ///
   ///     Swift.removeAll(&self, keepCapacity: keepCapacity)
-  mutating func removeAll(#keepCapacity: Bool /*= false*/)
+  mutating func removeAll(keepCapacity keepCapacity: Bool /*= false*/)
 
   /// Return a collection of the same type, containing the elements
   /// of `self`, in order, that satisfy the predicate `includeElement`.

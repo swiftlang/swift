@@ -212,7 +212,7 @@ internal protocol _HashStorageType {
   mutating func updateValue(value: Value, forKey: Key) -> Value?
   mutating func removeAtIndex(index: Index)
   mutating func removeValueForKey(key: Key) -> Value?
-  mutating func removeAll(#keepCapacity: Bool)
+  mutating func removeAll(keepCapacity keepCapacity: Bool)
   var count: Int { get }
 
   static func fromArray(elements: Array<SequenceElement>) -> Self
@@ -388,7 +388,7 @@ public struct Set<T : Hashable> :
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
   /// will not decrease.
-  public mutating func removeAll(#keepCapacity: Bool = false) {
+  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     _variantStorage.removeAll(keepCapacity: keepCapacity)
   }
 
@@ -736,7 +736,7 @@ public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
 }
 
 extension Set: CustomStringConvertible, CustomDebugStringConvertible {
-  private func makeDescription(#isDebug: Bool) -> String {
+  private func makeDescription(isDebug isDebug: Bool) -> String {
     var result = isDebug ? "Set([" : "["
     var first = true
     for member in self {
@@ -1112,7 +1112,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// storage is released.  The default is `false`.
   ///
   /// Complexity: O(`count`).
-  public mutating func removeAll(#keepCapacity: Bool = false) {
+  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     // The 'will not decrease' part in the documentation comment is worded very
     // carefully.  The capacity can increase if we replace Cocoa storage with
     // native storage.
@@ -1275,7 +1275,7 @@ public func != <Key : Equatable, Value : Equatable>(
 }
 
 extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
-  internal func _makeDescription(#isDebug: Bool) -> String {
+  internal func _makeDescription(isDebug isDebug: Bool) -> String {
     if count == 0 {
       return "[:]"
     }
@@ -1788,20 +1788,20 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
 %if Self == 'Set':
 
-  internal mutating func unsafeAddNew(#key: T) {
-    var (i, found) = _find(key, _bucket(key))
+  internal mutating func unsafeAddNew(key newKey: T) {
+    var (i, found) = _find(newKey, _bucket(newKey))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
-    self[i.offset] = Element(key: key)
+    self[i.offset] = Element(key: newKey)
   }
 
 %elif Self == 'Dictionary':
 
-  internal mutating func unsafeAddNew(#key: Key, value: Value) {
-    var (i, found) = _find(key, _bucket(key))
+  internal mutating func unsafeAddNew(key newKey: Key, value: Value) {
+    var (i, found) = _find(newKey, _bucket(newKey))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
-    self[i.offset] = Element(key: key, value: value)
+    self[i.offset] = Element(key: newKey, value: value)
   }
 
 %end
@@ -1896,7 +1896,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       "don't call mutating methods on _Native${Self}Storage")
   }
 
-  internal mutating func removeAll(#keepCapacity: Bool) {
+  internal mutating func removeAll(keepCapacity keepCapacity: Bool) {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
@@ -2660,7 +2660,7 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
     _sanityCheckFailure("can not mutate NS${Self}")
   }
 
-  internal mutating func removeAll(#keepCapacity: Bool) {
+  internal mutating func removeAll(keepCapacity keepCapacity: Bool) {
     _sanityCheckFailure("can not mutate NS${Self}")
   }
 
@@ -3162,7 +3162,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     nativeStorage.count = 0
   }
 
-  internal mutating func removeAll(#keepCapacity: Bool) {
+  internal mutating func removeAll(keepCapacity keepCapacity: Bool) {
     if count == 0 {
       return
     }
@@ -3620,7 +3620,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   internal var _state: ${Self}GeneratorRepresentation<${TypeParameters}>
 
   internal static func _Native(
-    #start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner
+    start start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner
   ) -> ${Self}Generator {
     return ${Self}Generator(
       _state: ._Native(start: start, end: end, owner: owner))
@@ -3817,11 +3817,11 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
   }
 
 %if Self == 'Set':
-  public mutating func add(#member: Key) {
-    _nativeStorage.unsafeAddNew(key: member)
+  public mutating func add(member newKey: Key) {
+    _nativeStorage.unsafeAddNew(key: newKey)
 %elif Self == 'Dictionary':
-  public mutating func add(#key: Key, value: Value) {
-    _nativeStorage.unsafeAddNew(key: key, value: value)
+  public mutating func add(key newKey: Key, value: Value) {
+    _nativeStorage.unsafeAddNew(key: newKey, value: value)
 %end
     _actualCount++
   }

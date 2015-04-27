@@ -22,7 +22,7 @@ import SwiftShims
 
 @asmname("swift_stdlib_atomicCompareExchangeStrongPtr")
 func _stdlib_atomicCompareExchangeStrongPtrImpl(
-  #object: UnsafeMutablePointer<COpaquePointer>,
+  object target: UnsafeMutablePointer<COpaquePointer>,
   expected: UnsafeMutablePointer<COpaquePointer>,
   desired: COpaquePointer) -> Bool
 
@@ -56,11 +56,11 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
 @transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr<T>(
-  #object: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
+  object target: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
   expected: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
   desired: UnsafeMutablePointer<T>) -> Bool {
   return _stdlib_atomicCompareExchangeStrongPtrImpl(
-    object: UnsafeMutablePointer(object),
+    object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
     desired: COpaquePointer(desired))
 }
@@ -68,12 +68,12 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
 @transparent
 public // @testable
 func _stdlib_atomicInitializeARCRef(
-  #object: UnsafeMutablePointer<AnyObject?>,
+  object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
   var expected = COpaquePointer()
   let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
   let wonRace = _stdlib_atomicCompareExchangeStrongPtrImpl(
-    object: UnsafeMutablePointer(object),
+    object: UnsafeMutablePointer(target),
     expected: &expected,
     desired: desiredPtr)
   if !wonRace {
@@ -88,119 +88,119 @@ func _stdlib_atomicInitializeARCRef(
 
 @asmname("swift_stdlib_atomicCompareExchangeStrongUInt${bits}")
 func _stdlib_atomicCompareExchangeStrongUInt${bits}(
-  #object: UnsafeMutablePointer<UInt${bits}>,
+  object target: UnsafeMutablePointer<UInt${bits}>,
   expected: UnsafeMutablePointer<UInt${bits}>,
   desired: UInt${bits}) -> Bool
 
 func _stdlib_atomicCompareExchangeStrongInt${bits}(
-  #object: UnsafeMutablePointer<Int${bits}>,
+  object target: UnsafeMutablePointer<Int${bits}>,
   expected: UnsafeMutablePointer<Int${bits}>,
   desired: Int${bits}) -> Bool {
   return _stdlib_atomicCompareExchangeStrongUInt${bits}(
-    object: UnsafeMutablePointer(object),
+    object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
     desired: UInt${bits}(bitPattern: desired))
 }
 
 @asmname("swift_stdlib_atomicStoreUInt${bits}")
 func _swift_stdlib_atomicStoreUInt${bits}(
-  #object: UnsafeMutablePointer<UInt${bits}>,
+  object target: UnsafeMutablePointer<UInt${bits}>,
   desired: UInt${bits})
 
 func _swift_stdlib_atomicStoreInt${bits}(
-  #object: UnsafeMutablePointer<Int${bits}>,
+  object target: UnsafeMutablePointer<Int${bits}>,
   desired: Int${bits}) {
   return _swift_stdlib_atomicStoreUInt${bits}(
-    object: UnsafeMutablePointer(object),
+    object: UnsafeMutablePointer(target),
     desired: UInt${bits}(bitPattern: desired))
 }
 
 @asmname("swift_stdlib_atomicLoadUInt${bits}")
 func _swift_stdlib_atomicLoadUInt${bits}(
-  #object: UnsafeMutablePointer<UInt${bits}>) -> UInt${bits}
+  object target: UnsafeMutablePointer<UInt${bits}>) -> UInt${bits}
 
 func _swift_stdlib_atomicLoadInt${bits}(
-  #object: UnsafeMutablePointer<Int${bits}>) -> Int${bits} {
+  object target: UnsafeMutablePointer<Int${bits}>) -> Int${bits} {
   return Int${bits}(bitPattern:
     _swift_stdlib_atomicLoadUInt${bits}(
-      object: UnsafeMutablePointer(object)))
+      object: UnsafeMutablePointer(target)))
 }
 
 // Warning: no overflow checking.
 @asmname("swift_stdlib_atomicFetchAddUInt${bits}")
 func _swift_stdlib_atomicFetchAddUInt${bits}(
-  #object: UnsafeMutablePointer<UInt${bits}>,
+  object target: UnsafeMutablePointer<UInt${bits}>,
   operand: UInt${bits}) -> UInt${bits}
 
 // Warning: no overflow checking.
 func _swift_stdlib_atomicFetchAddInt${bits}(
-  #object: UnsafeMutablePointer<Int${bits}>,
+  object target: UnsafeMutablePointer<Int${bits}>,
   operand: Int${bits}) -> Int${bits} {
   return Int${bits}(bitPattern:
     _swift_stdlib_atomicFetchAddUInt${bits}(
-      object: UnsafeMutablePointer(object),
+      object: UnsafeMutablePointer(target),
       operand: UInt${bits}(bitPattern: operand)))
 }
 
 % end
 
 func _stdlib_atomicCompareExchangeStrongInt(
-  #object: UnsafeMutablePointer<Int>,
+  object target: UnsafeMutablePointer<Int>,
   expected: UnsafeMutablePointer<Int>,
   desired: Int) -> Bool {
 #if arch(i386) || arch(arm)
   return _stdlib_atomicCompareExchangeStrongUInt32(
-    object: UnsafeMutablePointer(object),
+    object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
     desired: UInt32(bitPattern: Int32(desired)))
 #elseif arch(x86_64) || arch(arm64)
   return _stdlib_atomicCompareExchangeStrongUInt64(
-    object: UnsafeMutablePointer(object),
+    object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
     desired: UInt64(bitPattern: Int64(desired)))
 #endif
 }
 
 func _swift_stdlib_atomicStoreInt(
-  #object: UnsafeMutablePointer<Int>,
+  object target: UnsafeMutablePointer<Int>,
   desired: Int) {
 #if arch(i386) || arch(arm)
   return _swift_stdlib_atomicStoreUInt32(
-    object: UnsafeMutablePointer(object),
+    object: UnsafeMutablePointer(target),
     desired: UInt32(bitPattern: Int32(desired)))
 #elseif arch(x86_64) || arch(arm64)
   return _swift_stdlib_atomicStoreUInt64(
-    object: UnsafeMutablePointer(object),
+    object: UnsafeMutablePointer(target),
     desired: UInt64(bitPattern: Int64(desired)))
 #endif
 }
 
 @transparent
 public func _swift_stdlib_atomicLoadInt(
-  #object: UnsafeMutablePointer<Int>) -> Int {
+  object target: UnsafeMutablePointer<Int>) -> Int {
 #if arch(i386) || arch(arm)
   return Int(Int32(bitPattern:
     _swift_stdlib_atomicLoadUInt32(
-      object: UnsafeMutablePointer(object))))
+      object: UnsafeMutablePointer(target))))
 #elseif arch(x86_64) || arch(arm64)
   return Int(Int64(bitPattern:
     _swift_stdlib_atomicLoadUInt64(
-      object: UnsafeMutablePointer(object))))
+      object: UnsafeMutablePointer(target))))
 #endif
 }
 
 @asmname("swift_stdlib_atomicLoadPtr")
 func _swift_stdlib_atomicLoadPtrImpl(
-  #object: UnsafeMutablePointer<COpaquePointer>
+  object target: UnsafeMutablePointer<COpaquePointer>
 ) -> COpaquePointer
 
 @transparent
 public // @testable
 func _stdlib_atomicLoadARCRef(
-  #object: UnsafeMutablePointer<AnyObject?>
+  object target: UnsafeMutablePointer<AnyObject?>
 ) -> AnyObject? {
   let result = _swift_stdlib_atomicLoadPtrImpl(
-    object: UnsafeMutablePointer(object))
+    object: UnsafeMutablePointer(target))
   if result != nil {
     return Unmanaged<AnyObject>.fromOpaque(result).takeUnretainedValue()
   }
@@ -209,17 +209,17 @@ func _stdlib_atomicLoadARCRef(
 
 // Warning: no overflow checking.
 public func _swift_stdlib_atomicFetchAddInt(
-  #object: UnsafeMutablePointer<Int>,
+  object target: UnsafeMutablePointer<Int>,
   operand: Int) -> Int {
 #if arch(i386) || arch(arm)
   return Int(Int32(bitPattern:
     _swift_stdlib_atomicFetchAddUInt32(
-      object: UnsafeMutablePointer(object),
+      object: UnsafeMutablePointer(target),
       operand: UInt32(bitPattern: Int32(operand)))))
 #elseif arch(x86_64) || arch(arm64)
   return Int(Int64(bitPattern:
     _swift_stdlib_atomicFetchAddUInt64(
-      object: UnsafeMutablePointer(object),
+      object: UnsafeMutablePointer(target),
       operand: UInt64(bitPattern: Int64(operand)))))
 #endif
 }
@@ -251,7 +251,9 @@ public final class _stdlib_AtomicInt {
     return fetchAndAdd(operand) + operand
   }
 
-  public func compareExchange(inout #expected: Int, desired: Int) -> Bool {
+  public func compareExchange(
+    inout expected expected: Int, desired: Int
+  ) -> Bool {
     var expectedVar = expected
     let result = _stdlib_atomicCompareExchangeStrongInt(
       object: _valuePtr,

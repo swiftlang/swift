@@ -562,8 +562,8 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   runRaceTest(test, trials: trials, threads: threads)
 }
 
-public func consumeCPU(#units: Int) {
-  for i in 0..<units {
+public func consumeCPU(units amountOfWork: Int) {
+  for i in 0..<amountOfWork {
     let scale = 16
     for j in 0..<scale {
       _blackHole(42)
