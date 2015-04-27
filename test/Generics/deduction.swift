@@ -24,7 +24,7 @@ func useIdentity(x: Int, y: Float, i32: Int32) {
   // FIXME: Is this actually the behavior we want? It's strange that these
   // two have different behavior.
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot assign a value of type '(Y)' to a value of type 'X'}}
+  xx = identity(yy) // expected-error{{cannot assign a value of type 'Y' to a value of type 'X'}}
   xx = identity2(yy) // expected-error{{ambiguous use of 'identity2'}}
 }
 

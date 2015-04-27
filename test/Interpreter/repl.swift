@@ -59,8 +59,7 @@ var f1 : Foo = 1
 var f44 : Foo = 44
 f1 +
   f44
-// FIXME: <rdar://problem/16860940> QoI: Strict keyword arguments loses type sugar in calls
-// CHECK: Int = 45{{$}}
+// CHECK: Foo = 45{{$}}
 +(f44)
 // CHECK: Foo = 44{{$}}
 
@@ -94,8 +93,7 @@ var yx = (y:f1, x:f2)
 func sub(#x: Int, #y: Int) -> Int { return x - y }
 
 sub(x:1, y:2) // CHECK: Int = -1
-// FIXME: <rdar://problem/16860940> QoI: Strict keyword arguments loses type sugar in calls
-sub(x:f1, y:f2) // CHECK: Int = -1
+sub(x:f1, y:f2) // CHECK: Foo = -1
 
 var array = [1, 2, 3, 4, 5]
 // CHECK: array : [Int] = [1, 2, 3, 4, 5]

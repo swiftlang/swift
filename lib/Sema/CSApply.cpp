@@ -4217,28 +4217,12 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
              LocatorPathElt::getApplyArgToParam(argIdx, paramIdx));
   };
 
-  // Local function to set the ith argument of the argument.
-  auto setArgElement = [&](unsigned i, Expr *e) {
-    if (argTuple) {
-      argTuple->setElement(i, e);
-      return;
-    }
-
-    assert(i == 0 && "Scalar with more than one argument?");
-
-    if (argParen) {
-      argParen->setSubExpr(e);
-      return;
-    }
-
-    arg = e;
-  };
-
   auto &tc = getConstraintSystem().getTypeChecker();
   bool anythingShuffled = false;
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  argTuple? argTuple->getNumElements() : 1);
+  SmallVector<Expr*, 4> fromTupleExpr(argTuple? argTuple->getNumElements() : 1);
   SmallVector<ScalarToTupleExpr::Element, 4> scalarToTupleElements;
   SmallVector<Expr *, 2> callerDefaultArgs;
   ConcreteDeclRef defaultArgsOwner = nullptr;
@@ -4251,13 +4235,8 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
 
     // Handle variadic parameters.
     if (param.isVararg()) {
-      // FIXME: TupleShuffleExpr cannot handle variadics anywhere other than
-      // at the end.
-      if (paramIdx != numParams-1) {
-        tc.diagnose(arg->getLoc(), diag::tuple_conversion_not_expressible,
-                    arg->getType(), paramType);
-        return nullptr;
-      }
+      assert(paramIdx == numParams-1 &&
+             "variadics must be at the end of the list");
 
       // Find the appropriate injection function.
       if (tc.requireArrayLiteralIntrinsics(arg->getStartLoc()))
@@ -4281,14 +4260,14 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
           fromTupleExprFields[argIdx] = TupleTypeElt(argType,
                                                      getArgLabel(argIdx));
           scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
+          fromTupleExpr[argIdx] = arg;
           continue;
         }
 
         // FIXME: If we're not converting directly from a tuple expression,
         // we can't express this. LAME!
         if (!argTuple && numParams > 1) {
-          tc.diagnose(arg->getLoc(),
-                      diag::tuple_conversion_not_expressible,
+          tc.diagnose(arg->getLoc(), diag::tuple_conversion_not_expressible,
                       arg->getType(), paramType);
           return nullptr;
         }
@@ -4300,7 +4279,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
           return nullptr;
 
         // Add the converted argument.
-        setArgElement(argIdx, convertedArg);
+        fromTupleExpr[argIdx] = convertedArg;
         fromTupleExprFields[argIdx] = TupleTypeElt(convertedArg->getType(),
                                                    getArgLabel(argIdx));
         scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
@@ -4359,29 +4338,66 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     if (argType->isEqual(paramType)) {
       toSugarFields.push_back(TupleTypeElt(argType, param.getName()));
       fromTupleExprFields[argIdx] = TupleTypeElt(paramType, param.getName());
+      fromTupleExpr[argIdx] = arg;
       continue;
     }
 
     // Convert the argument.
-    auto convertedArg = coerceToType(arg, paramType, getArgLocator(argIdx,
-                                                                   paramIdx));
+    auto convertedArg = coerceToType(arg, paramType,
+                                     getArgLocator(argIdx, paramIdx));
     if (!convertedArg)
       return nullptr;
 
     // Add the converted argument.
-    setArgElement(argIdx, convertedArg);
+    fromTupleExpr[argIdx] = convertedArg;
     fromTupleExprFields[argIdx] = TupleTypeElt(convertedArg->getType(),
                                                getArgLabel(argIdx));
     toSugarFields.push_back(TupleTypeElt(argType, param.getName()));
   }
 
-  // Compute the updated 'from' tuple type, since we may have
-  // performed some conversions in place.
-  Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
-  if (argTuple) {
-    argTuple->setType(anythingShuffled? argTupleType : paramType);
+  // Compute a new 'arg', from the bits we have.  We have three cases: the
+  // scalar case, the paren case, and the tuple literal case.
+  if (!argTuple && !argParen) {
+    assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
+    arg = fromTupleExpr[0];
+  } else if (argParen) {
+    // If the element changed, rebuild a new ParenExpr.
+    assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
+    if (fromTupleExpr[0] != argParen->getSubExpr()) {
+      argParen = new (tc.Context) ParenExpr(argParen->getLParenLoc(),
+                                            fromTupleExpr[0],
+                                            argParen->getRParenLoc(),
+                                            argParen->hasTrailingClosure(),
+                                            fromTupleExpr[0]->getType());
+      arg = argParen;
+    } else {
+      // coerceToType may have updated the element type of the ParenExpr in
+      // place.  If so, propagate the type out to the ParenExpr as well.
+      argParen->setType(fromTupleExpr[0]->getType());
+    }
   } else {
-    arg->setType(anythingShuffled? argTupleType : paramType);
+    assert(argTuple);
+
+    bool anyChanged = false;
+    for (unsigned i = 0, e = argTuple->getNumElements(); i != e; ++i)
+      if (fromTupleExpr[i] != argTuple->getElement(i)) {
+        anyChanged = true;
+        break;
+      }
+
+    // If anything about the TupleExpr changed, rebuild a new one.
+    Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
+    if (anyChanged || !argTuple->getType()->isEqual(argTupleType)) {
+      auto EltNames = argTuple->getElementNames();
+      auto EltNameLocs = argTuple->getElementNameLocs();
+      argTuple = TupleExpr::create(tc.Context, argTuple->getLParenLoc(),
+                                   fromTupleExpr, EltNames, EltNameLocs,
+                                   argTuple->getRParenLoc(),
+                                   argTuple->hasTrailingClosure(),
+                                   argTuple->isImplicit(),
+                                   argTupleType);
+      arg = argTuple;
+    }
   }
 
   // If we came from a scalar, create a scalar-to-tuple conversion.
@@ -4392,7 +4408,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   }
 
   // If we don't have to shuffle anything, we're done.
-  if (!anythingShuffled)
+  if (arg->getType()->isEqual(paramType))
     return arg;
 
   // Create the tuple shuffle.

@@ -149,9 +149,16 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
         if (auto *DRE = dyn_cast<DeclRefExpr>(Base))
           checkNoEscapeParameterUse(DRE, Call);
 
+        auto *Arg = Call->getArg();
+
+        // The argument could be shuffled if it includes default arguments,
+        // label differences, or other exciting things like that.
+        if (auto *TSE = dyn_cast<TupleShuffleExpr>(Arg))
+          Arg = TSE->getSubExpr();
+
         // The argument is either a ParenExpr or TupleExpr.
         ArrayRef<Expr*> arguments;
-        if (auto *TE = dyn_cast<TupleExpr>(Call->getArg()))
+        if (auto *TE = dyn_cast<TupleExpr>(Arg))
           arguments = TE->getElements();
         else
           arguments = Call->getArg();

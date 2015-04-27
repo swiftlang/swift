@@ -228,4 +228,15 @@ func testDefaultArgumentReabstraction() {
   ReabstractDefaultArgument<Int>()
 }
 
+// <rdar://problem/20494437> SILGen crash handling default arguments
+// CHECK-LABEL: sil hidden @_TF17default_arguments18r20494437onSuccessFPS_25r20494437ExecutionContext_T_
+// CHECK: function_ref @_TF17default_arguments19r20494437onCompleteFTPS_25r20494437ExecutionContext__T_
+// <rdar://problem/20494437> SILGen crash handling default arguments
+protocol r20494437ExecutionContext {}
+let r20494437Default: r20494437ExecutionContext
+func r20494437onComplete(executionContext: r20494437ExecutionContext = r20494437Default) {}
+func r20494437onSuccess(a: r20494437ExecutionContext) {
+  r20494437onComplete(a)
+}
+
 

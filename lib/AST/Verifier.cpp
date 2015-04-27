@@ -1333,6 +1333,34 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(ScalarToTupleExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying ScalarToTupleExpr", E);
+
+      TupleType *TT = E->getType()->getAs<TupleType>();
+      if (!TT) {
+        Out << "Unexpected types in ScalarToTupleExpr\n";
+        abort();
+      }
+
+      // Verify that the result tuple element that the scalar is placed into
+      // matches the scalar's type.
+      auto SubExprTy = E->getSubExpr()->getType();
+
+      // It has to line up with the type of the resultant tuple element...
+      // unless it is initializing the varargs list, in which case it needs to
+      // match up with the element of the array slice.
+      auto EltTy = TT->getElementType(E->getScalarField());
+      if (TT->getElement(E->getScalarField()).isVararg())
+        SubExprTy = E->getVarargsArrayType();
+
+      if (!SubExprTy->isEqual(EltTy)) {
+        Out << "Type mismatch in ScalarToTupleExpr\n";
+        abort();
+      }
+
+      verifyCheckedBase(E);
+    }
+
     void verifyChecked(TupleShuffleExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying TupleShuffleExpr", E);
 
