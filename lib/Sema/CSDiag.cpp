@@ -2241,45 +2241,51 @@ bool FailureDiagnosis::diagnoseFailureForAssignExpr() {
   
   // If the source type is already an error type, we've likely already posted
   // an error due to a contextual type conversion error.
-  if (isErrorTypeKind(srcType) || isErrorTypeKind(destType)) {
+  if (isErrorTypeKind(srcType) || isErrorTypeKind(destType))
     return true;
-  }
+
   
   auto destTypeName = getUserFriendlyTypeName(destType);
   auto srcTypeName = getUserFriendlyTypeName(srcType);
   
-  if (isa<LiteralExpr>(destExpr)) {
-    CS->TC.diagnose(destExpr->getLoc(),
-                    diag::cannot_assign_to_literal);
-  } else if (!srcTypeName.compare(destTypeName)) {
-    
-    if (destType->is<ArchetypeType>()) {
-      CS->TC.diagnose(srcExpr->getLoc(),
-                      diag::cannot_assign_invariant_self,
-                      srcTypeName);
-    } else {
-      
-      // If the types are the same, this might not be an assignability error -
-      // something else may have gone wrong. In that case, independently
-      // re-typecheck the source expression to see if there's a different
-      // failure.
-      CS->TC.eraseTypeData(srcExpr);
-      CS->TC.typeCheckExpression(srcExpr, CS->DC, Type(), Type(), false);
-      
-      if (srcExpr->getType()->getAs<ErrorType>())
-        return true;
-      
-      CS->TC.diagnose(destExpr->getLoc(),
-                      diag::cannot_assign_to_immutable_expr,
-                      destTypeName);
-    }
-  } else {
-    CS->TC.diagnose(srcExpr->getLoc(),
-                    diag::cannot_assign_values,
-                    srcTypeName,
-                    destTypeName);
+  // Diagnose the error with as specific of an issue as possible.
+  if (isa<LiteralExpr>(destExpr->getSemanticsProvidingExpr())) {
+    CS->TC.diagnose(destExpr->getLoc(), diag::cannot_assign_to_literal);
+    return true;
   }
   
+  // If the result type is a non-lvalue, then we are failing because it is
+  // immutable and that's not a great thing to assign to.
+  if (!destType->isLValueType()) {
+    // Special case it further based on what the actual expression is.
+    auto LeftArg = destExpr->getSemanticsProvidingExpr();
+    if (auto *DRE = dyn_cast<DeclRefExpr>(LeftArg))
+      if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+        unsigned DiagCase;
+        
+        if (VD->isLet())
+          DiagCase = 0;
+        else if (VD->hasAccessorFunctions() && !VD->getSetter())
+          DiagCase = 1;
+        else
+          DiagCase = 2;
+        
+        CS->TC.diagnose(assignExpr->getLoc(),
+                        diag::cannot_assign_to_rvalue_vardecl,
+                        VD->getName(), DiagCase)
+            .highlight(LeftArg->getSourceRange());
+        VD->emitLetToVarNoteIfSimple();
+        return true;
+      }
+    
+    CS->TC.diagnose(assignExpr->getLoc(),
+                    diag::cannot_assign_to_immutable_expr, destTypeName)
+      .highlight(LeftArg->getSourceRange());
+    return true;
+  }
+  
+  CS->TC.diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcTypeName,
+                  destTypeName);
   return true;
 }
 

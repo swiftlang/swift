@@ -146,11 +146,9 @@ func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
   var element = t.getElement()
 
   value = t[index]
-  // FIXME: bogus error
-  t[index] = value // expected-error{{cannot assign a value of invariant archetype type 'T.Value' to another value of the same type}}
+  t[index] = value // expected-error{{cannot assign to immutable value of type 'T.Value'}}
   element = t[17]
-  // FIXME: bogus error
-  t[42] = element // expected-error{{cannot assign a value of invariant archetype type 'T.ElementType' to another value of the same type}}
+  t[42] = element // expected-error{{cannot assign to immutable value of type 'T.ElementType'}}
 
   t[value] = 17 // expected-error{{cannot subscript a value of type 'T' with an index of type 'T.Value'}}
 }
