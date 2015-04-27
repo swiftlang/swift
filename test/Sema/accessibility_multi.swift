@@ -11,11 +11,11 @@ func testGlobals() {
 func testProperties(var instance: Members) {
   println(instance.privateSetProp)
   instance.privateSetProp = 42 // expected-error {{cannot assign to 'privateSetProp' in 'instance'}}
-  reset(&instance.privateSetProp) // expected-error {{cannot assign to immutable value of type 'Int'}}
+  reset(&instance.privateSetProp) // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
 }
 
 func testSubscript(var instance: Members) {
   println(instance[])
   instance[] = 42 // expected-error {{cannot assign to the result of this expression}}
-  reset(&instance[]) // expected-error {{type of expression is ambiguous without more context}}
+  reset(&instance[]) // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
 }

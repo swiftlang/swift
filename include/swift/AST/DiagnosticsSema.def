@@ -123,7 +123,9 @@ ERROR(cannot_assign_to_rvalue_vardecl,sema_tcs,none,
       "cannot assign to %select{'let' value|get-only property|immutable value}1"
       " %0", (Identifier, unsigned))
 
-
+ERROR(cannot_pass_rvalue_inout,sema_tcs,none,
+      "cannot pass immutable value of type '%0' as inout argument",
+      (StringRef))
 
 ERROR(cannot_pass_rvalue_vardecl_inout,sema_tcs,none,
       "cannot pass %select{'let' value|get-only property|immutable value}1 %0"

@@ -335,7 +335,7 @@ class LetClassMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'a' in 'self'}}
     b = 42  // expected-error {{cannot assign to 'b' in 'self'}}
-    updateInt(&a)   // expected-error {{cannot assign to immutable value of type 'Int'}}
+    updateInt(&a)   // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
   }
 }
 struct LetStructMembers {
@@ -351,7 +351,7 @@ struct LetStructMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'a' in 'self'}}
     b = 42  // expected-error {{cannot assign to 'b' in 'self'}}
-    updateInt(&a)   // expected-error {{cannot assign to immutable value of type 'Int'}}
+    updateInt(&a)   // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
   }
 }
 

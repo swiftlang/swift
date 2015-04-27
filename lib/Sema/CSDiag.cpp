@@ -2296,27 +2296,32 @@ bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
   
   auto inoutExpr = cast<InOutExpr>(expr);
   auto addressedExpr = inoutExpr->getSubExpr();
-  
-  if (auto DRE = dyn_cast<DeclRefExpr>(addressedExpr)) {
-    if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      unsigned DiagCase;
-      if (VD->isLet())
-        DiagCase = 0;
-      else if (VD->hasAccessorFunctions() && !VD->getSetter())
-        DiagCase = 1;
-      else
-        DiagCase = 2;
 
-      CS->TC.diagnose(DRE->getLoc(), diag::cannot_pass_rvalue_vardecl_inout,
-                      VD->getName(), DiagCase);
-      VD->emitLetToVarNoteIfSimple();
-      return true;
-    }
-  } else if (isa<UnresolvedDotExpr>(addressedExpr)) {
+  auto subExprType = getTypeOfIndependentSubExpression(addressedExpr);
+
+  
+  // The common cause is that the operand is not an lvalue.
+  if (!subExprType->isLValueType()) {
+    if (auto DRE = dyn_cast<DeclRefExpr>(addressedExpr))
+      if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+        unsigned DiagCase;
+        if (VD->isLet())
+          DiagCase = 0;
+        else if (VD->hasAccessorFunctions() && !VD->getSetter())
+          DiagCase = 1;
+        else
+          DiagCase = 2;
+
+        CS->TC.diagnose(DRE->getLoc(), diag::cannot_pass_rvalue_vardecl_inout,
+                        VD->getName(), DiagCase);
+        VD->emitLetToVarNoteIfSimple();
+        return true;
+      }
+    
     // For now, keep the UDE distinct from the above to allow for potentially
     // better diagnostics.
     CS->TC.diagnose(addressedExpr->getLoc(),
-                    diag::cannot_assign_to_immutable_expr,
+                    diag::cannot_pass_rvalue_inout,
                     getUserFriendlyTypeName(addressedExpr->getType()));
     return true;
   }
