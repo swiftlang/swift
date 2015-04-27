@@ -1467,34 +1467,39 @@ Type ClangImporter::Implementation::importMethodType(
       knownMethod = knownMethodTmp;
   }
 
-  OptionalTypeKind OptionalityOfReturn;
-  if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
-    OptionalityOfReturn = OTK_None;
-  } else if (knownMethod) {
-    OptionalityOfReturn = translateNullability(
-                            knownMethod->getReturnTypeInfo());
-  } else {
-    OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
-  }
-
-  // If we have the getter for a property that itself has
-  // nullability, strip the outer nullability off the result type:
-  // we want the property's nullability here.
+  // Determine if the method is a property getter/setter.
+  const clang::ObjCPropertyDecl *property = nullptr;
+  bool isPropertyGetter = false;
+  bool isPropertySetter = false;
   if (clangDecl->isPropertyAccessor()) {
-    if (auto property = clangDecl->findPropertyDecl()) {
+    property = clangDecl->findPropertyDecl();
+    if (property) {
       if (property->getGetterMethodDecl() == clangDecl) {
-        if (auto propertyNullability
-              = property->getType()->getNullability(getClangASTContext())) {
-          (void)clang::AttributedType::stripOuterNullability(resultType);
-          OptionalityOfReturn = translateNullability(*propertyNullability);
-        }
+        isPropertyGetter = true;
+      } else if (property->getSetterMethodDecl() == clangDecl) {
+        isPropertySetter = true;
       }
     }
   }
 
   // Import the result type.
-  auto swiftResultTy = importType(resultType, resultKind,
-                                  isFromSystemModule, OptionalityOfReturn);
+  Type swiftResultTy;
+  if (isPropertyGetter) {
+    swiftResultTy = importPropertyType(property, isFromSystemModule);
+  } else {
+    OptionalTypeKind OptionalityOfReturn;
+    if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
+      OptionalityOfReturn = OTK_None;
+    } else if (knownMethod) {
+      OptionalityOfReturn = translateNullability(
+                              knownMethod->getReturnTypeInfo());
+    } else {
+      OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
+    }
+
+    swiftResultTy = importType(resultType, resultKind,
+                               isFromSystemModule, OptionalityOfReturn);
+  }
   if (!swiftResultTy)
     return Type();
 
@@ -1559,24 +1564,11 @@ Type ClangImporter::Implementation::importMethodType(
         translateNullability(knownMethod->getParamTypeInfo(paramIndex));
     }
 
-    if (paramIndex == 0 && clangDecl->isPropertyAccessor()) {
-      // If we have the parameter for a setter for a property that has
-      // nullability, strip the outer nullability off the parameter
-      // type: we want the property's nullability here.
-      if (auto property = clangDecl->findPropertyDecl()) {
-        if (property->getSetterMethodDecl() == clangDecl) {
-          if (auto propertyNullability
-                = property->getType()->getNullability(getClangASTContext())) {
-            (void)clang::AttributedType::stripOuterNullability(paramTy);
-            optionalityOfParam = translateNullability(*propertyNullability);
-          }
-        }
-      }
-    }
-
     Type swiftParamTy;
-    if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
-        paramTy->isObjCIdType()) {
+    if (paramIndex == 0 && isPropertySetter) {
+      swiftParamTy = importPropertyType(property, isFromSystemModule);
+    } else if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
+               paramTy->isObjCIdType()) {
       swiftParamTy = getOptionalType(getNSCopyingType(),
                                      ImportTypeKind::Parameter,
                                      optionalityOfParam);
