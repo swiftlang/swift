@@ -589,6 +589,36 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   }
 }
 
+void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
+                                           SILValue Arg, SILParameterInfo PInfo,
+                                           InstModCallbacks Callbacks) {
+  // If we have a trivial type, we do not need to put in any extra releases.
+  if (Arg.getType().isTrivial(Builder.getModule()))
+    return;
+
+  // If we have a non-trivial type and the argument is passed in @inout, we do
+  // not need to destroy it here. This is something that is implicit in the
+  // partial_apply design that will be revisited when partial_apply is
+  // redesigned.
+  if (PInfo.isIndirectInOut())
+    return;
+
+  // Otherwise, we need to destroy the argument. If we have a value, perform a
+  // release_value.
+  if (Arg.getType().isObject()) {
+    if (Arg.getType().hasReferenceSemantics()) {
+      Callbacks.CreatedNewInst(Builder.emitStrongRelease(Loc, Arg));
+      return;
+    }
+
+    Callbacks.CreatedNewInst(Builder.emitReleaseValue(Loc, Arg));
+    return;
+  }
+
+  // Otherwise put in a destroy_addr.
+  Callbacks.CreatedNewInst(Builder.createDestroyAddr(Loc, Arg));
+}
+
 /// For each captured argument of PAI, decrement the ref count of the captured
 /// argument as appropriate at each of the post dominated release locations
 /// found by Tracker.
@@ -596,8 +626,7 @@ static void
 releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
                                       ReleaseTracker &Tracker,
                                       InstModCallbacks &Callbacks) {
-  SILBuilder Builder(PAI);
-  SILModule &M = PAI->getModule();
+  SILBuilderWithScope<16> Builder(PAI);
   SILLocation Loc = PAI->getLoc();
   auto PAITy =
     dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
@@ -615,30 +644,7 @@ releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
       SILValue Arg = Args[AI];
       SILParameterInfo Param = Params[AI + Delta];
 
-      // If we have a trivial type, we do not need to put in any extra releases.
-      if (Arg.getType().isTrivial(M))
-        continue;
-
-      // If we have a non-trivial type and the argument is passed in @inout, we do
-      // not need to destroy it here. This is something that is implicit in the
-      // partial_apply design that will be revisited when partial_apply is
-      // redesigned.
-      if (Param.isIndirectInOut())
-        continue;
-
-      // Otherwise, we need to destroy the argument. If we have a value, perform a
-      // release_value.
-      if (Arg.getType().isObject()) {
-        auto *RVI = Builder.createReleaseValue(Loc, Arg);
-        RVI->setDebugScope(PAI->getDebugScope());
-        Callbacks.CreatedNewInst(RVI);
-        continue;
-      }
-
-      // Otherwise put in a destroy_addr.
-      auto *DAI = Builder.createDestroyAddr(Loc, Arg);
-      DAI->setDebugScope(PAI->getDebugScope());
-      Callbacks.CreatedNewInst(DAI);
+      releasePartialApplyCapturedArg(Builder, Loc, Arg, Param, Callbacks);
     }
   }
 }

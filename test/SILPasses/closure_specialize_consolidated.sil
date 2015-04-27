@@ -195,9 +195,9 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
 // REMOVECLOSURES-NEXT: apply [[SPECFUN3]](
 // REMOVECLOSURES-NEXT: apply [[SPECFUN0]](
 // REMOVECLOSURES-NEXT: apply [[SPECFUN2]](
-// REMOVECLOSURES-NEXT: release_value [[ARG0]] : $Builtin.NativeObject
-// REMOVECLOSURES-NEXT: release_value [[ARG2]] : $Builtin.NativeObject
-// REMOVECLOSURES-NEXT: release_value [[ARG3]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: strong_release [[ARG0]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: strong_release [[ARG2]] : $Builtin.NativeObject
+// REMOVECLOSURES-NEXT: strong_release [[ARG3]] : $Builtin.NativeObject
 
 sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):

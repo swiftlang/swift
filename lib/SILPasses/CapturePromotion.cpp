@@ -883,8 +883,10 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
-  unsigned FirstIndex =
-    PAI->getType().castTo<SILFunctionType>()->getParameters().size();
+  auto CalleePInfo =
+      PAI->getCallee().getType().castTo<SILFunctionType>()->getParameters();
+  auto PInfo = PAI->getType().castTo<SILFunctionType>()->getParameters();
+  unsigned FirstIndex = PInfo.size();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
   SmallVector<SILValue, 16> Args;
   while (OpNo != OpCount) {
@@ -899,8 +901,12 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
              BoxValue.getResultNumber() == 0 &&
              UnderlyingAddrValue.getResultNumber() == 1);
 
-      // Emit a strong release, zapping a retain if we can.
-      B.emitStrongRelease(PAI->getLoc(), BoxValue);
+      SILParameterInfo CPInfo = CalleePInfo[Index];
+      assert(CPInfo.getSILType() == BoxValue.getType() &&
+             "SILType of parameter info does not match type of parameter");
+      // Cleanup the captured argument.
+      releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
+                                     CPInfo);
 
       // Load and copy from the address value, passing the result as an argument
       // to the new closure.

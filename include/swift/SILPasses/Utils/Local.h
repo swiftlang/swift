@@ -140,6 +140,13 @@ bool
 tryDeleteDeadClosure(SILInstruction *Closure,
                      InstModCallbacks Callbacks = InstModCallbacks());
 
+/// Given a SILValue argument to a partial apply \p Arg and the associated
+/// parameter info for that argument, perform the necessary cleanups to Arg when
+/// one is attempting to delete the partial apply.
+void releasePartialApplyCapturedArg(
+    SILBuilder &Builder, SILLocation Loc, SILValue Arg, SILParameterInfo PInfo,
+    InstModCallbacks Callbacks = InstModCallbacks());
+
 /// This helper class represents the lifetime of a single
 /// SILValue. The value itself is held and the lifetime endpoints of
 /// that value are computed.
