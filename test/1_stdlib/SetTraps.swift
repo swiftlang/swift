@@ -87,7 +87,10 @@ SetTraps.test("RemoveInvalidIndex4") {
   s.removeAtIndex(index)
 }
 
-SetTraps.test("RemoveFirstFromEmpty") {
+SetTraps.test("RemoveFirstFromEmpty")
+  .crashOutputMatches(_isDebugAssertConfiguration() ?
+    "can't removeFirst from an empty Set" : "")
+  .code {
   var s = Set<Int>()
   expectCrashLater()
   s.removeFirst()

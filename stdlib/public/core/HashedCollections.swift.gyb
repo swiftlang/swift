@@ -394,7 +394,7 @@ public struct Set<T : Hashable> :
 
   /// Remove a member from the set and return it. Requires: `count > 0`.
   public mutating func removeFirst() -> T {
-    _precondition(count > 0, "cant removeFirst from an empty Set")
+    _precondition(count > 0, "can't removeFirst from an empty Set")
     let member = first!
     remove(member)
     return member
