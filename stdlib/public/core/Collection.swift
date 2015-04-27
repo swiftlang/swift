@@ -53,7 +53,6 @@ public protocol _CollectionDefaultsType
 extension _CollectionDefaultsType {
   /// Returns `true` iff `self` is empty.
   final public var _prext_isEmpty: Bool {
-    // FIXME: dynamic dispatch for Set and Dictionary.
     return startIndex == endIndex
   }
 
