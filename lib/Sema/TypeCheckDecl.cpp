@@ -916,10 +916,9 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
           !Req.getConstraint()->getClassOrBoundGenericClass()) {
         TC.diagnose(genericParams->getWhereLoc(),
                     diag::requires_conformance_nonprotocol,
-                    Req.getSubjectLoc(), Req.getConstraintLoc());
-        Req.getConstraintLoc().setInvalidType(TC.Context);
-        Req.setInvalid();
-        continue;
+                    Req.getSubjectLoc(), Req.getConstraintLoc())
+          .fixItReplace(Req.getColonLoc(), "==");
+        Req.overwriteKind(RequirementKind::SameType);
       }
       
       break;

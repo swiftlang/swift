@@ -286,7 +286,8 @@ func beginsWith3<
 // Bogus requirements
 //===----------------------------------------------------------------------===//
 func nonTypeReq<T where T : Wibble>(_: T) {} // expected-error{{use of undeclared type 'Wibble'}}
-func badProtocolReq<T where T : Int>(_: T) {} // expected-error{{type 'T' constrained to non-protocol type 'Int'}}
+func badProtocolReq<T where T : Int>(_: T) {} // expected-error{{type 'T' constrained to non-protocol type 'Int'; did you mean to use '=='?}}{{31-32===}}
+// expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
 
 func nonTypeSameType<T where T == Wibble>(_: T) {} // expected-error{{use of undeclared type 'Wibble'}}
 func nonTypeSameType2<T where Wibble == T>(_: T) {} // expected-error{{use of undeclared type 'Wibble'}}
