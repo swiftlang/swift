@@ -138,7 +138,14 @@ public protocol CollectionType
   /// `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get}
 
-  typealias _prext_SubSlice
+  /// The *collection* type that represents a sub-range of elements.
+  ///
+  /// Though it can't currently be enforced by the type system, the
+  /// `_prext_SubSlice` type in a concrete implementation of `CollectionType`
+  /// should also be `CollectionType`.
+  typealias _prext_SubSlice : _CollectionDefaultsType
+  // <rdar://problem/20715031> CollectionType.SubSlice should be constrained to CollectionType
+  // <rdar://problem/20715697> CollectionType.SubSlice should constrain its Element type
 
   subscript(_prext_bounds: Range<Index>) -> _prext_SubSlice { get }
 
