@@ -667,15 +667,17 @@ class InductionAnalysis {
   SILBasicBlock *Preheader;
   SILBasicBlock *Header;
   SILBasicBlock *ExitingBlk;
+  SILBasicBlock *ExitBlk;
   IVInfo &IVs;
   InductionInfoMap Map;
   llvm::SpecificBumpPtrAllocator<InductionInfo> Allocator;
 
 public:
   InductionAnalysis(DominanceInfo *D, IVInfo &IVs, SILBasicBlock *Preheader,
-                    SILBasicBlock *Header, SILBasicBlock *ExitingBlk)
+                    SILBasicBlock *Header, SILBasicBlock *ExitingBlk,
+                    SILBasicBlock *ExitBlk)
       : DT(D), Preheader(Preheader), Header(Header), ExitingBlk(ExitingBlk),
-        IVs(IVs) {}
+        ExitBlk(ExitBlk), IVs(IVs) {}
 
   InductionAnalysis(const InductionAnalysis &) = delete;
   InductionAnalysis &operator=(const InductionAnalysis &) = delete;
@@ -729,9 +731,10 @@ private:
     if (!CondBr)
       return nullptr;
 
-    if (Header == CondBr->getTrueBB())
+    if (ExitBlk == CondBr->getFalseBB())
       return nullptr;
-    assert(Header == CondBr->getFalseBB());
+    assert(ExitBlk == CondBr->getTrueBB() &&
+           "The loop's exiting blocks terminator must exit");
 
     auto Cond = CondBr->getCondition();
     SILValue End;
@@ -987,17 +990,18 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   // Find an exiting block.
   SILBasicBlock *ExitingBlk = Loop->getExitingBlock();
+  SILBasicBlock *ExitBlk = Loop->getExitBlock();
   SILBasicBlock *Latch = Loop->getLoopLatch();
-  if (!ExitingBlk || ExitingBlk != Latch) {
+  if (!ExitingBlk || !Latch || !ExitBlk) {
     DEBUG(llvm::dbgs()
-          << "No single exiting block or the latch is not exiting\n");
+          << "No single exiting block or latch found\n");
     return Changed;
   }
 
   DEBUG(Preheader->getParent()->dump());
 
   // Find cannonical induction variables.
-  InductionAnalysis IndVars(DT, IVs, Preheader, Header, ExitingBlk);
+  InductionAnalysis IndVars(DT, IVs, Preheader, Header, ExitingBlk, ExitBlk);
   bool IVarsFound = IndVars.analyse();
   if (!IVarsFound){
     DEBUG(llvm::dbgs() << "No induction variables found\n");
