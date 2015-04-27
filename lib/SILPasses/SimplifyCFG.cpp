@@ -243,22 +243,6 @@ void swift::updateSSAAfterCloning(BaseThreadingCloner &Cloner,
   }
 }
 
-template <class SwitchEnumTy, class SwitchEnumCaseTy>
-static SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
-                                     SmallVectorImpl<SwitchEnumCaseTy> &Cases,
-                                     unsigned EdgeIdx,
-                                     SILBasicBlock *NewDest) {
-    auto *DefaultBB = S->hasDefault() ? S->getDefaultBB() : nullptr;
-    for (unsigned i = 0, e = S->getNumCases(); i != e; ++i)
-      if (EdgeIdx != i)
-        Cases.push_back(S->getCase(i));
-      else
-        Cases.push_back(std::make_pair(S->getCase(i).first, NewDest));
-    if (EdgeIdx == S->getNumCases())
-      DefaultBB = NewDest;
-    return DefaultBB;
-}
-
 /// Perform a dominator-based jump-threading for checked_cast_br [exact]
 /// instructions if they use the same condition (modulo upcasts and downcasts).
 /// This is very beneficial for code that:
