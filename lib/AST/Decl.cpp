@@ -950,6 +950,24 @@ ExtensionDecl::takeConformanceLoaderSlow() {
   return getASTContext().takeConformanceLoader(this);
 }
 
+bool ExtensionDecl::isConstrainedExtension() const {
+  auto nominal = getExtendedType()->getAnyNominal();
+
+  // Error case: erroneous extension.
+  if (!nominal)
+    return false;
+
+  // Non-generic extension.
+  if (!getGenericSignature())
+    return false;
+
+  // If the generic signature differs from that of the nominal type, it's a
+  // constrained extension.
+  return getGenericSignature()->getCanonicalSignature()
+    != nominal->getGenericSignature()->getCanonicalSignature();
+}
+
+
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,

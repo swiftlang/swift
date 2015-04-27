@@ -950,10 +950,11 @@ getActualCtorInitializerKind(uint8_t raw) {
 
 /// Remove values from \p values that don't match the expected type or module.
 ///
-/// Both \p expectedTy and \p expectedModule can be omitted, in which case any
-/// type or module is accepted. Values imported from Clang can also appear in
-/// any module.
-static void filterValues(Type expectedTy, Module *expectedModule, bool isType,
+/// Any of \p expectedTy, \p expectedModule, or \p expectedGenericSig can be
+/// omitted, in which case any type or module is accepted. Values imported
+/// from Clang can also appear in any module.
+static void filterValues(Type expectedTy, Module *expectedModule,
+                         CanGenericSignature expectedGenericSig, bool isType,
                          Optional<swift::CtorInitializerKind> ctorInit,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
@@ -970,6 +971,13 @@ static void filterValues(Type expectedTy, Module *expectedModule, bool isType,
     // module to the original definition in a base module.
     if (expectedModule && !value->hasClangNode() &&
         value->getModuleContext() != expectedModule)
+      return true;
+
+    // If we're expecting a member within a constrained extension with a
+    // particular generic signature, match that signature.
+    if (expectedGenericSig &&
+        value->getDeclContext()->getGenericSignatureOfContext()
+          ->getCanonicalSignature() != expectedGenericSig)
       return true;
 
     // If we're expecting an initializer with a specific kind, and this is not
@@ -1023,7 +1031,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     M->lookupQualified(ModuleType::get(M), name,
                        NL_QualifiedDefault | NL_KnownNoDependency,
                        /*typeResolver=*/nullptr, values);
-    filterValues(getType(TID), nullptr, isType, None, values);
+    filterValues(getType(TID), nullptr, nullptr, isType, None, values);
     break;
   }
 
@@ -1070,6 +1078,9 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
   // Reset module filter.
   M = nullptr;
+
+  /// The generic signature filter.
+  CanGenericSignature genericSig = nullptr;
 
   // For remaining path pieces, filter or drill down into the results we have.
   while (--pathLen) {
@@ -1135,15 +1146,30 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
       auto members = nominal->lookupDirect(memberName);
       values.append(members.begin(), members.end());
-      filterValues(getType(TID), M, isType, ctorInit, values);
+      filterValues(getType(TID), M, genericSig, isType, ctorInit, values);
       break;
     }
 
     case XREF_EXTENSION_PATH_PIECE: {
       ModuleID ownerID;
-      XRefExtensionPathPieceLayout::readRecord(scratch, ownerID);
+      ArrayRef<uint64_t> genericParamIDs;
+      XRefExtensionPathPieceLayout::readRecord(scratch, ownerID,
+                                               genericParamIDs);
       M = getModule(ownerID);
       pathTrace.addExtension(M);
+
+      // Read the generic signature, if we have one.
+      if (!genericParamIDs.empty()) {
+        SmallVector<GenericTypeParamType *, 4> params;
+        SmallVector<Requirement, 5> requirements;
+        for (TypeID paramID : genericParamIDs) {
+          params.push_back(getType(paramID)->castTo<GenericTypeParamType>());
+        }
+        readGenericRequirements(requirements);
+
+        genericSig = GenericSignature::getCanonical(params, requirements);
+      }
+
       continue;
     }
 
@@ -1215,9 +1241,24 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
       ValueDecl *base = values.front();
       GenericParamList *paramList = nullptr;
 
-      if (auto nominal = dyn_cast<NominalTypeDecl>(base))
-        paramList = nominal->getGenericParams();
-      else if (auto fn = dyn_cast<AbstractFunctionDecl>(base))
+      if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
+        if (genericSig) {
+          // Find an extension in the requested module that has the
+          // correct generic signature.
+          for (auto ext : nominal->getExtensions()) {
+            if (ext->getModuleContext() == M &&
+                ext->getGenericSignature()->getCanonicalSignature()
+                  == genericSig) {
+              paramList = ext->getGenericParams();
+              break;
+            }
+          }
+          assert(paramList && "Couldn't find constrained extension");
+        } else {
+          // Simple case: use the nominal type's generic parameters.
+          paramList = nominal->getGenericParams();
+        }
+      } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base))
         paramList = fn->getGenericParams();
 
       if (!paramList || paramIndex >= paramList->size()) {
@@ -1245,6 +1286,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
     // Reset the module filter.
     M = nullptr;
+    genericSig = nullptr;
   }
 
   // Make sure we /used/ the last module filter we got.

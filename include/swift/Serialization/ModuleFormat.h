@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 195; // Last change: include 'as written string' for GenericRequirementLayout
+const uint16_t VERSION_MINOR = 196; // Last change: constrained extension xref
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1158,7 +1158,9 @@ namespace decls_block {
 
   using XRefExtensionPathPieceLayout = BCRecordLayout<
     XREF_EXTENSION_PATH_PIECE,
-    ModuleIDField     // module ID
+    ModuleIDField,       // module ID
+    BCArray<TypeIDField> // for a constrained extension, the type parameters
+    // for a constrained extension, requirements follow
   >;
 
   using XRefOperatorOrAccessorPathPieceLayout = BCRecordLayout<

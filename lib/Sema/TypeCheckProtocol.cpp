@@ -3873,21 +3873,16 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   if (auto metaTy = type->getAs<AnyMetatypeType>())
     type = metaTy->getInstanceType();
 
-  auto genericSig = protocolExtension->getGenericSignature();
-  auto protCanonSig = protocolExtension->getExtendedType()
-                        ->getAs<ProtocolType>()
-                        ->getDecl()
-                        ->getGenericSignature()
-                        ->getCanonicalSignature();
-  // Unconstrained protocol extensions are usable.
-  if (protCanonSig == genericSig->getCanonicalSignature())
+  // Unconstrained protocol extensions are always usable.
+  if (!protocolExtension->isConstrainedExtension())
     return true;
 
   // Set up a constraint system where we open the generic parameters of the
   // protocol extension.
   ConstraintSystem cs(*this, dc, None);
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
-
+  auto genericSig = protocolExtension->getGenericSignature();
+  
   cs.openGeneric(protocolExtension, genericSig->getGenericParams(),
                  genericSig->getRequirements(), false, nullptr,
                  ConstraintLocatorBuilder(nullptr), replacements);

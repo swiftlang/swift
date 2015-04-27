@@ -1781,6 +1781,10 @@ public:
     return IterableDeclContext::isLazy();
   }
 
+  /// Determine whether this is a constrained extension, which adds additional
+  /// requirements beyond those of the nominal type.
+  bool isConstrainedExtension() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Extension;

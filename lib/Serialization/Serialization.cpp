@@ -1288,12 +1288,25 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   }
 
   case DeclContextKind::ExtensionDecl: {
-    Type baseTy = cast<ExtensionDecl>(DC)->getExtendedType();
+    auto ext = cast<ExtensionDecl>(DC);
+    Type baseTy = ext->getExtendedType();
     writeCrossReference(baseTy->getAnyNominal(), pathLen + 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
+    SmallVector<TypeID, 4> genericParams;
+    CanGenericSignature genericSig(nullptr);
+    if (ext->isConstrainedExtension()) {
+      genericSig = ext->getGenericSignature()->getCanonicalSignature();
+      for (auto param : genericSig->getGenericParams())
+        genericParams.push_back(addTypeRef(param));
+    }
     XRefExtensionPathPieceLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addModuleRef(DC->getParentModule()));
+        Out, ScratchRecord, abbrCode, addModuleRef(DC->getParentModule()),
+        genericParams);
+
+    if (genericSig) {
+      writeRequirements(genericSig->getRequirements());
+    }
     break;
   }
 
