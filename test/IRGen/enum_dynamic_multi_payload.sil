@@ -226,6 +226,42 @@ entry:
   return %r : $()
 }
 
+// CHECK-LABEL: define void @dynamic_multi_payload_case_test
+sil @dynamic_multi_payload_case_test : $@convention(thin) <T, U> () -> () {
+entry:
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+
+  %a = alloc_stack $EitherOr<T, U>
+
+  // CHECK: [[LEFT:%.*]] = icmp eq i32 {{%.*}}, 0
+  %x = select_enum_addr %a#1 : $*EitherOr<T, U>,
+    case #EitherOr.Left!enumelt.1: %t,
+    default %f : $Builtin.Int1
+
+  // CHECK: [[RIGHT:%.*]] = icmp eq i32 {{%.*}}, 1
+  %y = select_enum_addr %a#1 : $*EitherOr<T, U>,
+    case #EitherOr.Right!enumelt.1: %t,
+    default %f : $Builtin.Int1
+
+  // CHECK: [[MIDDLE:%.*]] = icmp eq i32 {{%.*}}, 2
+  %z = select_enum_addr %a#1 : $*EitherOr<T, U>,
+    case #EitherOr.Middle!enumelt: %t,
+    default %f : $Builtin.Int1
+
+  // CHECK: [[CENTER:%.*]] = icmp eq i32 {{%.*}}, 3
+  %w = select_enum_addr %a#1 : $*EitherOr<T, U>,
+    case #EitherOr.Center!enumelt: %t,
+    default %f : $Builtin.Int1
+
+  // CHECK: call void @consume_case_test_result(i1 [[LEFT]], i1 [[RIGHT]], i1 [[MIDDLE]], i1 [[CENTER]])
+  %g = function_ref @consume_case_test_result : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
+  %r = apply %g(%x, %y, %z, %w) : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
+
+  dealloc_stack %a#0 : $*@local_storage EitherOr<T, U>
+  return %r : $()
+}
+
 // CHECK-LABEL: define void @dynamic_inject
 // CHECK:         ([[EITHER_OR:%O26enum_dynamic_multi_payload8EitherOr.*]]* noalias sret, %swift.type* %T)
 sil @dynamic_inject : $@convention(thin) <T> (@out EitherOr<T, Builtin.Int64>) -> () {

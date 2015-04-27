@@ -2912,7 +2912,26 @@ namespace {
       }
       
       // Use the runtime to dynamically switch.
-      llvm_unreachable("dynamic switch for multi-payload enum not implemented");
+      auto tag = loadDynamicTag(IGF, enumAddr, T);
+      // Test the tag. Payload cases come first, followed by no-payload cases.
+      // The runtime handles distinguishing empty cases for us.
+      unsigned tagIndex = 0;
+      for (auto &payload : ElementsWithPayload) {
+        if (payload.decl == Case)
+          goto found_case;
+        ++tagIndex;
+      }
+      for (auto &payload : ElementsWithNoPayload) {
+        if (payload.decl == Case)
+          goto found_case;
+        ++tagIndex;
+      }
+      llvm_unreachable("couldn't find case");
+      
+    found_case:
+      llvm::Value *expectedTag
+        = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
+      return IGF.Builder.CreateICmpEQ(tag, expectedTag);
     }
     
     virtual llvm::Value *
