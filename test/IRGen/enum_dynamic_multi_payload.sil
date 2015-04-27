@@ -190,3 +190,44 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
 
   return undef : $()
 }
+
+// CHECK-LABEL: define void @dynamic_switch(%O18enum_multi_payload8EitherOr.17* noalias sret, %swift.type* %T)
+sil @dynamic_switch : $@convention(thin) <T> (@out EitherOr<T, Builtin.Int64>) -> () {
+entry(%e : $*EitherOr<T, Builtin.Int64>):
+  // CHECK: [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
+  // CHECK: switch i32 [[TAG]]
+  // CHECK-NEXT: i32 0, label %[[LEFT:[0-9]+]]
+  // CHECK-NEXT: i32 1, label %[[RIGHT:[0-9]+]]
+  // CHECK-NEXT: i32 2, label %[[MIDDLE:[0-9]+]]
+  // CHECK-NEXT: i32 3, label %[[CENTER:[0-9]+]]
+  switch_enum_addr %e : $*EitherOr<T, Builtin.Int64>,
+    case #EitherOr.Left!enumelt.1: left,
+    case #EitherOr.Middle!enumelt: middle,
+    case #EitherOr.Center!enumelt: center,
+    case #EitherOr.Right!enumelt.1: right
+
+  // CHECK: <label>:[[LEFT]]
+left:
+  %0 = integer_literal $Builtin.Int8, 0
+  br next(%0 : $Builtin.Int8)
+
+  // CHECK: <label>:[[MIDDLE]]
+middle:
+  %1 = integer_literal $Builtin.Int8, 1
+  br next(%1 : $Builtin.Int8)
+
+  // CHECK: <label>:[[CENTER]]
+center:
+  %2 = integer_literal $Builtin.Int8, 2
+  br next(%2 : $Builtin.Int8)
+
+  // CHECK: <label>:[[RIGHT]]
+right:
+  %3 = integer_literal $Builtin.Int8, 3
+  br next(%3 : $Builtin.Int8)
+
+  // CHECK: phi i8 [ 3, %[[RIGHT]] ], [ 2, %[[CENTER]] ], [ 1, %[[MIDDLE]] ], [ 0, %[[LEFT]] ]
+next(%x : $Builtin.Int8):
+  return undef : $()
+}
+

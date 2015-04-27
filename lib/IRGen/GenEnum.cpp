@@ -2840,6 +2840,19 @@ namespace {
     }
     
     llvm::Value *
+    loadDynamicTag(IRGenFunction &IGF, Address addr, SILType T) const {
+      addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy);
+      auto metadata = IGF.emitTypeMetadataRef(T.getSwiftRValueType());
+      auto call = IGF.Builder.CreateCall2(IGF.IGM.getGetEnumCaseMultiPayloadFn(),
+                                          addr.getAddress(), metadata);
+      call->setDoesNotThrow();
+      call->addAttribute(llvm::AttributeSet::FunctionIndex,
+                         llvm::Attribute::ReadOnly);
+      
+      return call;
+    }
+    
+    llvm::Value *
     loadPayloadTag(IRGenFunction &IGF, Address addr, SILType T) const {
       if (TIK >= Fixed) {
         // Load the fixed-size representation and derive the tags.
@@ -2850,7 +2863,7 @@ namespace {
       }
       
       // Otherwise, ask the runtime to extract the dynamically-placed tag.
-      llvm_unreachable("dynamic multi-payload tag load not implemented");
+      return loadDynamicTag(IGF, addr, T);
     }
 
   public:
@@ -3003,7 +3016,73 @@ namespace {
         IGF.Builder.CreateUnreachable();
       }
     }
+    
+  private:
+    void emitDynamicSwitch(IRGenFunction &IGF,
+                           SILType T,
+                           Address addr,
+                           ArrayRef<std::pair<EnumElementDecl*,
+                                              llvm::BasicBlock*>> dests,
+                           llvm::BasicBlock *defaultDest) const {
+      // Ask the runtime to derive the tag index.
+      auto tag = loadDynamicTag(IGF, addr, T);
+      
+      // Switch on the tag value.
+      
+      // Create a map of the destination blocks for quicker lookup.
+      llvm::DenseMap<EnumElementDecl*,llvm::BasicBlock*> destMap(dests.begin(),
+                                                                 dests.end());
 
+      // Create an unreachable branch for unreachable switch defaults.
+      auto &C = IGF.IGM.getLLVMContext();
+      auto *unreachableBB = llvm::BasicBlock::Create(C);
+
+      // If there was no default branch in SIL, use the unreachable branch as
+      // the default.
+      if (!defaultDest)
+        defaultDest = unreachableBB;
+
+      auto blockForCase = [&](EnumElementDecl *theCase) -> llvm::BasicBlock* {
+        auto found = destMap.find(theCase);
+        if (found == destMap.end())
+          return defaultDest;
+        else
+          return found->second;
+      };
+
+      auto *tagSwitch = IGF.Builder.CreateSwitch(tag, unreachableBB,
+                     ElementsWithPayload.size() + ElementsWithNoPayload.size());
+
+      unsigned tagIndex = 0;
+      
+      // Payload tags come first.
+      for (auto &elt : ElementsWithPayload) {
+        auto tagVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
+        tagSwitch->addCase(tagVal, blockForCase(elt.decl));
+        ++tagIndex;
+      }
+      
+      // Next come empty tags.
+      for (auto &elt : ElementsWithNoPayload) {
+        auto tagVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, tagIndex);
+        tagSwitch->addCase(tagVal, blockForCase(elt.decl));
+        ++tagIndex;
+      }
+      
+      assert(tagIndex ==
+               ElementsWithPayload.size()+ElementsWithNoPayload.size());
+      
+      // Delete the unreachable default block if we didn't use it, or emit it
+      // if we did.
+      if (unreachableBB->use_empty()) {
+        delete unreachableBB;
+      } else {
+        IGF.Builder.emitBlock(unreachableBB);
+        IGF.Builder.CreateUnreachable();
+      }
+    }
+  
+  public:
     void emitIndirectSwitch(IRGenFunction &IGF,
                             SILType T,
                             Address addr,
@@ -3018,7 +3097,7 @@ namespace {
       }
 
       // Use the runtime to dynamically switch.
-      llvm_unreachable("dynamic switch for multi-payload enum not implemented");
+      return emitDynamicSwitch(IGF, T, addr, dests, defaultDest);
     }
 
   private:
