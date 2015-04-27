@@ -2617,15 +2617,20 @@ namespace {
       /// The payloads are all POD, so copying is bitwise, and destruction is a
       /// noop.
       POD,
+      /// The payloads are all bitwise-takable, but have no other special
+      /// shared layout.
+      BitwiseTakable,
       /// The payloads are all Swift-reference-counted values, and there is at
       /// most one no-payload case with the tagged-zero representation. Copy
       /// and destroy can just mask out the tag bits and pass the result to
       /// swift_retain/swift_release.
+      /// This implies BitwiseTakable.
       TaggedSwiftRefcounted,
       /// The payloads are all reference-counted values, and there is at
       /// most one no-payload case with the tagged-zero representation. Copy
       /// and destroy can just mask out the tag bits and pass the result to
       /// swift_unknownRetain/swift_unknownRelease.
+      /// This implies BitwiseTakable.
       TaggedUnknownRefcounted,
     };
 
@@ -2652,11 +2657,14 @@ namespace {
       // Check the payloads to see if we can take advantage of common layout to
       // optimize our value semantics.
       bool allPOD = true;
+      bool allBitwiseTakable = true;
       bool allSingleSwiftRefcount = true;
       bool allSingleUnknownRefcount = true;
       for (auto &elt : ElementsWithPayload) {
         if (!elt.ti->isPOD(ResilienceScope::Component))
           allPOD = false;
+        if (!elt.ti->isBitwiseTakable(ResilienceScope::Component))
+          allBitwiseTakable = false;
         if (!elt.ti->isSingleSwiftRetainablePointer(ResilienceScope::Component))
           allSingleSwiftRefcount = false;
         if (!elt.ti->isSingleUnknownRetainablePointer(ResilienceScope::Component))
@@ -2676,6 +2684,8 @@ namespace {
       else if (allSingleUnknownRefcount
                  && ElementsWithNoPayload.size() <= 1) {
         CopyDestroyKind = TaggedUnknownRefcounted;
+      } else if (allBitwiseTakable) {
+        CopyDestroyKind = BitwiseTakable;
       }
     }
 
@@ -2744,6 +2754,7 @@ namespace {
       case TaggedUnknownRefcounted:
         return IGM.UnknownRefCountedPtrTy;
       case POD:
+      case BitwiseTakable:
       case Normal:
         llvm_unreachable("not a refcounted payload");
       }
@@ -2761,6 +2772,7 @@ namespace {
         return;
       }
       case POD:
+      case BitwiseTakable:
       case Normal:
         llvm_unreachable("not a refcounted payload");
       }
@@ -2775,6 +2787,7 @@ namespace {
         return;
       }
       case POD:
+      case BitwiseTakable:
       case Normal:
         llvm_unreachable("not a refcounted payload");
       }
@@ -2792,6 +2805,7 @@ namespace {
         return;
       }
       case POD:
+      case BitwiseTakable:
       case Normal:
         llvm_unreachable("not a refcounted payload");
       }
@@ -3333,6 +3347,7 @@ namespace {
         reexplode(IGF, src, dest);
         return;
 
+      case BitwiseTakable:
       case Normal: {
         auto parts = destructureAndTagLoadableEnum(IGF, src);
         
@@ -3385,6 +3400,7 @@ namespace {
         src.claim(getExplosionSize());
         return;
 
+      case BitwiseTakable:
       case Normal: {
         auto parts = destructureAndTagLoadableEnum(IGF, src);
 
@@ -3425,6 +3441,7 @@ namespace {
         src.claim(getExplosionSize());
         return;
 
+      case BitwiseTakable:
       case Normal: {
         auto parts = destructureAndTagLoadableEnum(IGF, src);
 
@@ -3468,6 +3485,7 @@ namespace {
       case POD:
         return emitPrimitiveCopy(IGF, dest, src, T);
 
+      case BitwiseTakable:
       case TaggedSwiftRefcounted:
       case TaggedUnknownRefcounted:
       case Normal: {
@@ -3518,8 +3536,14 @@ namespace {
       case POD:
         return emitPrimitiveCopy(IGF, dest, src, T);
 
+      case BitwiseTakable:
       case TaggedSwiftRefcounted:
       case TaggedUnknownRefcounted:
+        // Takes can be done by primitive copy in these case.
+        if (isTake)
+          return emitPrimitiveCopy(IGF, dest, src, T);
+        SWIFT_FALLTHROUGH;
+        
       case Normal: {
         // If the enum is loadable, it's better to do this directly using values,
         // so we don't need to RMW tag bits in place.
@@ -3547,8 +3571,10 @@ namespace {
           SILType PayloadT = T.getEnumElementType(payloadCasePair.decl,
                                                   *IGF.IGM.SILMod);
           auto &payloadTI = *payloadCasePair.ti;
-          // Trivial payloads can all share the default path.
-          if (payloadTI.isPOD(ResilienceScope::Local)) {
+          // Trivial and, in the case of a take, bitwise-takable payloads,
+          // can all share the default path.
+          if (payloadTI.isPOD(ResilienceScope::Local)
+              || (isTake && payloadTI.isBitwiseTakable(ResilienceScope::Local))) {
             ++tagIndex;
             continue;
           }
@@ -3589,20 +3615,9 @@ namespace {
         }
 
         // For trivial payloads (including no-payload cases), we can just
-        // primitive-store to the destination.
+        // primitive-copy to the destination.
         IGF.Builder.emitBlock(trivialBB);
-        if (TIK >= Fixed) {
-          // Do a fixed-size primitive load and store if we can.
-          llvm::Value *payload, *extraTagBits;
-          std::tie(payload, extraTagBits)
-            = emitPrimitiveLoadPayloadAndExtraTag(IGF, src);
-          emitPrimitiveStorePayloadAndExtraTag(IGF, dest, payload, extraTagBits);
-        } else {
-          // Otherwise, memcpy the dynamic size of the type.
-          IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
-                                   TI->getSize(IGF, T),
-                                   TI->getBestKnownAlignment().getValue());
-        }
+        emitPrimitiveCopy(IGF, dest, src, T);
         IGF.Builder.CreateBr(endBB);
 
         IGF.Builder.emitBlock(endBB);
@@ -3641,6 +3656,7 @@ namespace {
       case POD:
         return;
 
+      case BitwiseTakable:
       case Normal:
       case TaggedSwiftRefcounted:
       case TaggedUnknownRefcounted: {
