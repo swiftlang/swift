@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -g -module-name test -Xllvm -enable-static-init 
+// RUN: %target-swift-frontend -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -g -module-name test
 // RUN: %target-build-swift %t/main.o %t/mt_module.o -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
@@ -7,7 +7,6 @@
 // Test compilation of a module in multi-threaded compilation.
 // The main purpose of the test is to check that the generated LLVM modules are not corrupt
 // and that linking succeeds.
-// Note that -enable-static-init is specified to test the multi-threaded specific handling of static initializers.
 
 // CHECK: 28
 // CHECK: 125

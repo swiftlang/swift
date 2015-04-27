@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -primary-file %s -parse-as-library -Xllvm -enable-static-init=false -emit-sil -O | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -parse-as-library -emit-sil -O | FileCheck %s
 
-var inputval = 27
+var inputval = nonTrivialInit(false)
 
-var totalsum = 0
+var totalsum = nonTrivialInit(true)
 
 
 // Check if the addressor functions for inputval and totalsum are
@@ -24,3 +24,7 @@ func testit() {
 	}
 }
 
+@inline(never)
+func nonTrivialInit(b: Bool) -> Int {
+	return b ? 0 : 27
+}

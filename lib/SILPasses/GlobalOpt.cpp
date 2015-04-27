@@ -25,9 +25,6 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
-llvm::cl::opt<bool> EnableStaticInitializer("enable-static-init",
-                                            llvm::cl::init(true));
-
 namespace {
 /// Optimize the placement of global initializers.
 ///
@@ -305,8 +302,7 @@ bool SILGlobalOpt::run() {
       bool IsCold = ColdBlocks.isCold(&BB);
       for (auto &I : BB)
         if (BuiltinInst *BI = dyn_cast<BuiltinInst>(&I)) {
-          if (EnableStaticInitializer)
-            collectOnceCall(BI);
+          collectOnceCall(BI);
         } else if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
           if (!IsCold)
             collectGlobalInitCall(AI);
@@ -315,8 +311,7 @@ bool SILGlobalOpt::run() {
   }
   for (auto &InitCalls : GlobalInitCallMap) {
     // Optimize the addressors if possible.
-    if (EnableStaticInitializer)
-      optimizeInitializer(InitCalls.first);
+    optimizeInitializer(InitCalls.first);
     placeInitializers(InitCalls.first, InitCalls.second);
   }
 
