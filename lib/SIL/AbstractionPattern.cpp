@@ -422,6 +422,7 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
 
 void AbstractionPattern::dump() const {
   print(llvm::errs());
+  llvm::errs() << "\n";
 }
 
 void AbstractionPattern::print(raw_ostream &out) const {
