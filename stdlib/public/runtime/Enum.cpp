@@ -377,7 +377,7 @@ swift::swift_storeEnumTagMultiPayload(OpaqueValue *value,
     } else {
       unsigned numPayloadBits = layout.payloadSize * CHAR_BIT;
       whichTag = numPayloads + (whichEmptyCase >> numPayloadBits);
-      whichPayloadValue = whichEmptyCase & ((1 << numPayloads) - 1);
+      whichPayloadValue = whichEmptyCase & ((1U << numPayloads) - 1U);
     }
     storeMultiPayloadTag(value, layout, whichTag);
     storeMultiPayloadValue(value, layout, whichPayloadValue);

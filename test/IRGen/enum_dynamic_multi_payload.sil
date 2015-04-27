@@ -151,6 +151,81 @@ next(%z : $Builtin.Int8):
   return undef : $()
 }
 
+sil hidden_external @consume_case_test_result : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
+
+// CHECK-LABEL: define void @static_multi_payload_case_test
+// CHECK:         call void @consume_case_test_result(i1 true, i1 true, i1 true, i1 true)
+sil @static_multi_payload_case_test : $@convention(thin) () -> () {
+entry:
+  %0 = integer_literal $Builtin.Int64, 0
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+
+  %a = enum $EitherOr<Builtin.Int64, Builtin.Int64>,
+    #EitherOr.Left!enumelt.1, %0 : $Builtin.Int64
+  %x = select_enum %a : $EitherOr<Builtin.Int64, Builtin.Int64>,
+    case #EitherOr.Left!enumelt.1: %t,
+    default %f : $Builtin.Int1
+
+  %b = enum $EitherOr<Builtin.Int64, Builtin.Int64>,
+    #EitherOr.Right!enumelt.1, %0 : $Builtin.Int64
+  %y = select_enum %b : $EitherOr<Builtin.Int64, Builtin.Int64>,
+    case #EitherOr.Right!enumelt.1: %t,
+    default %f : $Builtin.Int1
+
+  %c = enum $EitherOr<Builtin.Int64, Builtin.Int64>,
+    #EitherOr.Middle!enumelt
+  %z = select_enum %c : $EitherOr<Builtin.Int64, Builtin.Int64>,
+    case #EitherOr.Middle!enumelt: %t,
+    default %f : $Builtin.Int1
+
+  %d = enum $EitherOr<Builtin.Int64, Builtin.Int64>,
+    #EitherOr.Center!enumelt
+  %w = select_enum %d : $EitherOr<Builtin.Int64, Builtin.Int64>,
+    case #EitherOr.Center!enumelt: %t,
+    default %f : $Builtin.Int1
+
+  %g = function_ref @consume_case_test_result : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
+  %r = apply %g(%x, %y, %z, %w) : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
+  return %r : $()
+}
+
+// CHECK-LABEL: define void @static_multi_payload_case_test_empty
+// CHECK:         call void @consume_case_test_result(i1 true, i1 true, i1 true, i1 true)
+sil @static_multi_payload_case_test_empty : $@convention(thin) () -> () {
+entry:
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+
+  %a = enum $EitherOr<(), ()>,
+    #EitherOr.Left!enumelt.1, undef : $()
+  %x = select_enum %a : $EitherOr<(), ()>,
+    case #EitherOr.Left!enumelt.1: %t,
+    default %f : $Builtin.Int1
+
+  %b = enum $EitherOr<(), ()>,
+    #EitherOr.Right!enumelt.1, undef : $()
+  %y = select_enum %b : $EitherOr<(), ()>,
+    case #EitherOr.Right!enumelt.1: %t,
+    default %f : $Builtin.Int1
+
+  %c = enum $EitherOr<(), ()>,
+    #EitherOr.Middle!enumelt
+  %z = select_enum %c : $EitherOr<(), ()>,
+    case #EitherOr.Middle!enumelt: %t,
+    default %f : $Builtin.Int1
+
+  %d = enum $EitherOr<(), ()>,
+    #EitherOr.Center!enumelt
+  %w = select_enum %d : $EitherOr<(), ()>,
+    case #EitherOr.Center!enumelt: %t,
+    default %f : $Builtin.Int1
+
+  %g = function_ref @consume_case_test_result : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
+  %r = apply %g(%x, %y, %z, %w) : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
+  return %r : $()
+}
+
 // CHECK-LABEL: define void @dynamic_inject
 // CHECK:         ([[EITHER_OR:%O26enum_dynamic_multi_payload8EitherOr.*]]* noalias sret, %swift.type* %T)
 sil @dynamic_inject : $@convention(thin) <T> (@out EitherOr<T, Builtin.Int64>) -> () {

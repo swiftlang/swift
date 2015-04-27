@@ -2923,31 +2923,53 @@ namespace {
       unsigned numTagBits
         = cast<llvm::IntegerType>(parts.tag->getType())->getBitWidth();
 
-      llvm::Value *caseValue = nullptr;
-      if (Case->hasArgumentType()) {
-        // Cases with payloads are numbered consecutively, scan until we find
-        // the right one.
-        unsigned tagIndex = 0;
-        for (auto &payloadCasePair : ElementsWithPayload) {
-          if (payloadCasePair.decl == Case) {
-            caseValue = llvm::ConstantInt::get(C, APInt(numTagBits,tagIndex));
-            break;
-          }
-          ++tagIndex;
+      // Cases with payloads are numbered consecutively, and only required
+      // testing the tag. Scan until we find the right one.
+      unsigned tagIndex = 0;
+      for (auto &payloadCasePair : ElementsWithPayload) {
+        if (payloadCasePair.decl == Case) {
+          llvm::Value *caseValue
+            = llvm::ConstantInt::get(C, APInt(numTagBits,tagIndex));
+          return IGF.Builder.CreateICmpEQ(parts.tag, caseValue);
         }
-      } else {
-        // Elements without payloads are numbered after the payload elts.
-        unsigned tagIndex = ElementsWithPayload.size();
-        for (auto &elt : ElementsWithNoPayload) {
-          if (elt.decl == Case) {
-            caseValue = llvm::ConstantInt::get(C,APInt(numTagBits, tagIndex));
-            break;
-          }
-          ++tagIndex;
-        }
+        ++tagIndex;
       }
-      assert(caseValue && "Didn't find case decl");
-      return IGF.Builder.CreateICmpEQ(parts.tag, caseValue);
+      // Elements without payloads are numbered after the payload elts.
+      // Multiple empty elements are packed into the payload for each tag
+      // value.
+      unsigned casesPerTag = getNumCasesPerTag();
+
+      auto elti = ElementsWithNoPayload.begin(),
+      eltEnd = ElementsWithNoPayload.end();
+
+      llvm::Value *tagValue = nullptr, *payloadValue = nullptr;
+      for (unsigned i = 0; i < NumEmptyElementTags; ++i) {
+        assert(elti != eltEnd &&
+               "ran out of cases before running out of extra tags?");
+
+        // Look through the cases for this tag.
+        for (unsigned idx = 0; idx < casesPerTag && elti != eltEnd; ++idx) {
+          if (elti->decl == Case) {
+            tagValue = llvm::ConstantInt::get(C, APInt(numTagBits,tagIndex));
+            payloadValue = getEmptyCasePayload(IGF.IGM, tagIndex, idx);
+            goto found_empty_case;
+          }
+          ++elti;
+        }
+        ++tagIndex;
+      }
+
+      llvm_unreachable("Didn't find case decl");
+      
+    found_empty_case:
+      llvm::Value *match = IGF.Builder.CreateICmpEQ(parts.tag, tagValue);
+      assert((parts.payload == nullptr) == (payloadValue == nullptr));
+      if (parts.payload) {
+        auto payloadMatch = IGF.Builder.CreateICmpEQ(parts.payload,
+                                                     payloadValue);
+        match = IGF.Builder.CreateAnd(match, payloadMatch);
+      }
+      return match;
     }
 
     void emitValueSwitch(IRGenFunction &IGF,
@@ -4718,12 +4740,12 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   // Layout has to be done when the value witness table is instantiated,
   // during initializeMetadata. We can at least glean the best available
   // static information from the payloads.
-  Alignment alignment(0x80000000U);
+  Alignment alignment(1);
   IsPOD_t pod = IsPOD;
   IsBitwiseTakable_t bt = IsBitwiseTakable;
   for (auto &element : ElementsWithPayload) {
     auto &payloadTI = *element.ti;
-    alignment = std::min(alignment, payloadTI.getBestKnownAlignment());
+    alignment = std::max(alignment, payloadTI.getBestKnownAlignment());
     pod &= payloadTI.isPOD(ResilienceScope::Component);
     bt &= payloadTI.isBitwiseTakable(ResilienceScope::Component);
   }
