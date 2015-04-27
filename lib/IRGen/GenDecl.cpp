@@ -1182,11 +1182,10 @@ llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
                                                DebugTypeInfo DebugType,
                                                Optional<SILLocation> DebugLoc,
                                                StringRef DebugName) {
-  llvm::GlobalValue *existing = IGM.Module.getNamedGlobal(getName());
+  llvm::GlobalVariable *existing = IGM.Module.getNamedGlobal(getName());
   if (existing) {
-    if (isa<llvm::GlobalVariable>(existing) &&
-        isPointerTo(existing->getType(), storageType))
-      return cast<llvm::GlobalVariable>(existing);
+    if (isPointerTo(existing->getType(), storageType))
+      return existing;
 
     IGM.error(SourceLoc(),
               "program too clever: variable collides with existing symbol "
