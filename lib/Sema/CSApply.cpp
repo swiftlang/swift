@@ -4349,7 +4349,9 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     // If the argument and parameter indices differ, or if the names differ,
     // this is a shuffle.
     sources.push_back(argIdx);
-    if (argIdx != paramIdx || getArgLabel(argIdx) != param.getName()) {
+    if (argIdx != paramIdx || getArgLabel(argIdx) != param.getName() ||
+        param.getDefaultArgKind() != DefaultArgumentKind::None ||
+        param.isVararg()) {
       anythingShuffled = true;
     }
     scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
