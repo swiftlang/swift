@@ -93,6 +93,32 @@ For example::
     @noescape f: (CVaListPointer) -> R
   ) -> R
 
+High-order functions on collections return ``Array``\ s
+-------------------------------------------------------
+
+We can't make ``map()``, ``filter()``, etc. all return ``Self``:
+
+- ``map()`` takes a function ``(T) -> U`` and therefore can't return Self
+  literally.  The required language feature for making ``map()`` return
+  something like ``Self`` in generic code (higher-kinded types) doesn't exist
+  in Swift.  You can't write a method like ``func map(f: (T) -> U) -> Self<U>``
+  today.
+
+- There are lots of sequences that don't have an appropriate form for the
+  result.  What happens when you filter the only element out of a
+  ``SequenceOfOne<T>``, which is defined to have exactly one element?
+
+- A ``map()`` that returns ``Self<U>`` hews most closely to the signature
+  required by Functor (mathematical purity of signature), but if you make map
+  on ``Set`` or ``Dictionary`` return ``Self``, it violates the semantic laws
+  required by Functor, so it's a false purity.  We'd rather preserve the
+  semantics of functional ``map()`` than its signature.
+
+- Even if we throw semantics under the bus, maintaining mathematical purity of
+  signature prevents us from providing useful variants of these algorithms that
+  are the same in spirit, like the ``flatMap()`` that selects the non-nil
+  elements of the result sequence.
+
 Possible future directions
 ==========================
 
