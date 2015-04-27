@@ -179,3 +179,14 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
 
   return undef : $()
 }
+
+// CHECK-LABEL: define void @dynamic_project(%O18enum_multi_payload8EitherOr.17* noalias sret, %swift.type* %T)
+sil @dynamic_project : $@convention(thin) <T> (@out EitherOr<T, Builtin.Int64>) -> () {
+entry(%e : $*EitherOr<T, Builtin.Int64>):
+  // CHECK: bitcast %O18enum_multi_payload8EitherOr.17* %0 to %swift.opaque*
+  %l = unchecked_take_enum_data_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Left!enumelt.1
+  // CHECK: bitcast %O18enum_multi_payload8EitherOr.17* %0 to i64*
+  %r = unchecked_take_enum_data_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Right!enumelt.1
+
+  return undef : $()
+}
