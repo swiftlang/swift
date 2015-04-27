@@ -7,6 +7,7 @@
 sil_stage raw
 
 import Builtin
+import Swift
 
 // -- Singleton enum. The representation is just the singleton payload.
 // CHECK: %O4enum9Singleton = type <{ <{ i64, i64 }> }>
@@ -2313,6 +2314,39 @@ end:
   %v = tuple ()
   return %v : $()
 }
+
+// Should not use spare bits, because T may be a tagged ObjC pointer.
+enum MultiPayloadClassGeneric<T: AnyObject> {
+  case A(C, Builtin.Word)
+  case B(T)
+}
+
+// CHECK-64-LABEL: define { i128, i1 } @multi_payload_class_generic_no_spare_bits(i128, i1, %swift.type* %T)
+// CHECK-32-LABEL: define { i64, i1 } @multi_payload_class_generic_no_spare_bits(i64, i1, %swift.type* %T)
+sil @multi_payload_class_generic_no_spare_bits : $@convention(thin) <T: AnyObject> (@owned MultiPayloadClassGeneric<T>) -> MultiPayloadClassGeneric<T> {
+entry(%e : $MultiPayloadClassGeneric<T>):
+  return %e : $MultiPayloadClassGeneric<T>
+}
+
+// CHECK-64-LABEL: define { i128, i1 } @multi_payload_class_instance_no_spare_bits(i128, i1)
+// CHECK-32-LABEL: define { i64, i1 } @multi_payload_class_instance_no_spare_bits(i64, i1)
+sil @multi_payload_class_instance_no_spare_bits : $@convention(thin) (@owned MultiPayloadClassGeneric<C>) -> MultiPayloadClassGeneric<C> {
+entry(%e : $MultiPayloadClassGeneric<C>):
+  return %e : $MultiPayloadClassGeneric<C>
+}
+
+enum MultiPayloadAddressOnlyFixed {
+  case X(protocol<>)
+  case Y(Builtin.Int32)
+}
+
+// CHECK-LABEL: define void @multi_payload_address_only_destroy(%O4enum28MultiPayloadAddressOnlyFixed*)
+sil @multi_payload_address_only_destroy : $@convention(thin) (@in MultiPayloadAddressOnlyFixed) -> () {
+entry(%m : $*MultiPayloadAddressOnlyFixed):
+  destroy_addr %m : $*MultiPayloadAddressOnlyFixed
+  return undef : $()
+}
+
 
 // Force the storage types to all be generated.
 typealias AllConcreteTestEnums = (
