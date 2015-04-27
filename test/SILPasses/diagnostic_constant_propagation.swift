@@ -67,13 +67,13 @@ func testConvertOverflow() {
   var convert_minus_two = Int8(int_minus_two)
   var convert_plus_two  = Int8(int_plus_two)
 
-  var uint8_minus_two  : UInt8 = (-2) // expected-error {{integer literal '-2' overflows when stored into 'UInt8'}}
+  var uint8_minus_two  : UInt8 = (-2) // expected-error {{negative integer '-2' overflows when stored into unsigned type 'UInt8'}}
   var uint8_plus_two   : UInt8 = (2)
-  var uint16_minus_two : UInt16 = (-2) // expected-error {{integer literal '-2' overflows when stored into 'UInt16'}}
+  var uint16_minus_two : UInt16 = (-2) // expected-error {{negative integer '-2' overflows when stored into unsigned type 'UInt16'}}
   var uint16_plus_two  : UInt16 = (2)
-  var uint32_minus_two : UInt32 = (-2) // expected-error {{integer literal '-2' overflows when stored into 'UInt32'}}
+  var uint32_minus_two : UInt32 = (-2) // expected-error {{negative integer '-2' overflows when stored into unsigned type 'UInt32'}}
   var uint32_plus_two  : UInt32 = (2)
-  var uint64_minus_two : UInt64 = (-2) // expected-error {{integer literal '-2' overflows when stored into 'UInt64'}}
+  var uint64_minus_two : UInt64 = (-2) // expected-error {{negative integer '-2' overflows when stored into unsigned type 'UInt64'}}
   var uint64_plus_two  : UInt64 = (2)
   var convert_s_to_u_minus_two = UInt8(int_minus_two)  // expected-error {{integer overflows when converted from 'Int' to 'UInt8'}}
   var convert_s_to_u_plus_two  = UInt8(int_plus_two)

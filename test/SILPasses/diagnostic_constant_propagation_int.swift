@@ -409,14 +409,10 @@ func testArithmeticOverflow_UInt_64bit() {
     var t3: UInt = 0xffff_ffff_ffff_ffff
 
     var t4: UInt = -1
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}} overflows when stored into 'UInt'{{$}}
-    // FIXME: Bad diagnostic:
-    // <rdar://problem/19623566> Obscure diagnostic for assigning negative numbers to unsigned
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer {{.*}} overflows when stored into unsigned type 'UInt'{{$}}
 
     var t5: UInt = -0xffff_ffff_ffff_ffff
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}} overflows when stored into 'UInt'{{$}}
-    // FIXME: Bad diagnostic:
-    // <rdar://problem/19623566> Obscure diagnostic for assigning negative numbers to unsigned
+    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer {{.*}} overflows when stored into unsigned type 'UInt'{{$}}
   }
 
   if true {

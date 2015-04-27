@@ -509,8 +509,15 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
 
       // Try to print user-visible types if they are available.
       if (!UserDstTy.isNull()) {
+        auto diagID = diag::integer_literal_overflow;
+        
+        // If this is a negative literal in an unsigned type, use a specific
+        // diagnostic.
+        if (SrcTySigned && !DstTySigned && SrcVal.isNegative())
+          diagID = diag::negative_integer_literal_overflow_unsigned;
+        
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                 diag::integer_literal_overflow, UserDstTy, SrcAsString);
+                 diagID, UserDstTy, SrcAsString);
       // Otherwise, print the Builtin Types.
       } else {
         bool SrcTySigned, DstTySigned;

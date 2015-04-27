@@ -220,6 +220,10 @@ WARNING(integer_conversion_overflow_warn,sil_analysis,none,
 ERROR(integer_conversion_sign_error,sil_analysis,none,
       "negative integer cannot be converted to unsigned type %0",
       (Type))
+ERROR(negative_integer_literal_overflow_unsigned,sil_analysis,none,
+      "negative integer '%1' overflows when stored into unsigned type %0",
+      (Type, StringRef))
+
 ERROR(integer_literal_overflow,sil_analysis,none,
       "integer literal '%1' overflows when stored into %0",
       (Type, StringRef))
