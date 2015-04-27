@@ -1,5 +1,5 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-build-swift -Xfrontend -enable-experimental-patterns %s -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -enable-dynamic-value-type-layout -Xfrontend -enable-experimental-patterns %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
 enum Singleton {
@@ -488,3 +488,67 @@ var pl1 = Planet()
 println(pl1.rawValue)
 // CHECK: Venus
 
+enum EitherOr<T, U> {
+  case Left(T)
+  case Middle
+  case Center
+  case Right(U)
+}
+
+@inline(never)
+func presentEitherOr<T, U>(e: EitherOr<T, U>) {
+  switch e {
+  case .Left(let l):
+    println("Left(\(l))")
+  case .Right(let r):
+    println("Right(\(r))")
+  case .Middle:
+    println("Middle")
+  case .Center:
+    println("Center")
+  }
+}
+
+@inline(never)
+func presentEitherOrsOf<T, U>(t t: T, u u: U) {
+  presentEitherOr(EitherOr<T, U>.Left(t))
+  presentEitherOr(EitherOr<T, U>.Middle)
+  presentEitherOr(EitherOr<T, U>.Center)
+  presentEitherOr(EitherOr<T, U>.Right(u))
+}
+
+presentEitherOr(EitherOr<(), ()>.Left())  // CHECK-NEXT: Left(())
+presentEitherOr(EitherOr<(), ()>.Middle)  // CHECK-NEXT: Middle
+presentEitherOr(EitherOr<(), ()>.Center)  // CHECK-NEXT: Center
+presentEitherOr(EitherOr<(), ()>.Right()) // CHECK-NEXT: Right(())
+
+// CHECK-NEXT: Left(())
+// CHECK-NEXT: Middle
+// CHECK-NEXT: Center
+// CHECK-NEXT: Right(())
+presentEitherOrsOf(t: (), u: ())
+
+presentEitherOr(EitherOr<Int, String>.Left(1))      // CHECK-NEXT: Left(1)
+presentEitherOr(EitherOr<Int, String>.Middle)       // CHECK-NEXT: Middle
+presentEitherOr(EitherOr<Int, String>.Center)       // CHECK-NEXT: Center
+presentEitherOr(EitherOr<Int, String>.Right("foo")) // CHECK-NEXT: Right(foo)
+
+// CHECK-NEXT: Left(1)
+// CHECK-NEXT: Middle
+// CHECK-NEXT: Center
+// CHECK-NEXT: Right(foo)
+presentEitherOrsOf(t: 1, u: "foo")
+
+presentEitherOr(EitherOr<(), String>.Left())       // CHECK-NEXT: Left(())
+presentEitherOr(EitherOr<(), String>.Middle)       // CHECK-NEXT: Middle
+presentEitherOr(EitherOr<(), String>.Center)       // CHECK-NEXT: Center
+presentEitherOr(EitherOr<(), String>.Right("foo")) // CHECK-NEXT: Right(foo)
+
+// CHECK-NEXT: Left(())
+// CHECK-NEXT: Middle
+// CHECK-NEXT: Center
+// CHECK-NEXT: Right(foo)
+presentEitherOrsOf(t: (), u: "foo")
+
+// CHECK-NEXT: done
+println("done")

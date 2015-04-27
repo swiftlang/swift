@@ -1532,6 +1532,14 @@ struct EnumMetadata : public Metadata {
     return *asWords;
   }
 
+  size_t &getPayloadSize() {
+    assert(hasPayloadSize());
+    auto offset = Description->Enum.getPayloadSizeOffset();
+    size_t *asWords = reinterpret_cast<size_t *>(this);
+    asWords += offset;
+    return *asWords;
+  }
+
   /// Retrieve the generic arguments of this enum.
   const Metadata * const *getGenericArgs() const {
     const void* const *asWords = reinterpret_cast<const void * const *>(this);

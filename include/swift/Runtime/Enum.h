@@ -22,6 +22,7 @@ namespace swift {
 struct OpaqueValue;
 struct ValueWitnessTable;
 struct Metadata;
+struct EnumMetadata;
   
 /// \brief Initialize the value witness table for a generic, single-payload
 ///        enum instance.
@@ -63,6 +64,24 @@ extern "C" void swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                                  const Metadata *payload,
                                                  int whichCase,
                                                  unsigned emptyCases);
+
+/// \brief Initialize the value witness table for a generic, multi-payload
+///        enum instance.
+extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
+                                         EnumMetadata *enumType,
+                                         unsigned numPayloads,
+                                         const Metadata * const *payloadTypes);
+
+/// \brief Return an integer value representing which case of a multi-payload
+///        enum is inhabited.
+extern "C" unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
+                                                  const EnumMetadata *enumType);
+  
+/// \brief Return an integer value representing which case of a multi-payload
+///        enum is inhabited.
+extern "C" void swift_storeEnumTagMultiPayload(OpaqueValue *value,
+                                               const EnumMetadata *enumType,
+                                               unsigned whichCase);
 
 }
 
