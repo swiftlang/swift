@@ -2536,7 +2536,10 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   // the case if BB is unreachable. Therefore we still have to check it.
   if (!DT->dominates(V.getDef()->getParentBB(), BB))
     return;
-  A->replaceAllUsesWith(V.getDef());
+
+  // An argument has one result value. We need to replace this with the *value*
+  // of the incoming block(s).
+  SILValue(A, 0).replaceAllUsesWith(V);
 }
 
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
