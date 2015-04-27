@@ -1,5 +1,5 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-build-swift -Xfrontend -enable-dynamic-value-type-layout -Xfrontend -enable-experimental-patterns %s -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -enable-experimental-patterns %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
 enum Singleton {

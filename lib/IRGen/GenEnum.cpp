@@ -4743,12 +4743,6 @@ MultiPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   if (TIK >= Fixed)
     return completeFixedLayout(TC, Type, theEnum, enumTy);
   
-  if (!TC.IGM.Opts.EnableDynamicValueTypeLayout) {
-    TC.IGM.unimplemented(theEnum->getLoc(),
-                         "non-fixed multi-payload enum layout");
-    return new UnimplementedTypeInfo(TC.IGM, enumTy);
-  }
-  
   return completeDynamicLayout(TC, Type, theEnum, enumTy);
 }
 
