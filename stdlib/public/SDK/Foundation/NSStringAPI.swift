@@ -1415,7 +1415,7 @@ extension String {
   /// Returns an array of strings made by separately appending
   /// to the `String` each string in in a given array.
   public func stringsByAppendingPaths(paths: [String]) -> [String] {
-    return _ns.stringsByAppendingPaths(paths) as! [String]
+    return _ns.stringsByAppendingPaths(paths)
   }
 
   // - (NSString *)substringFromIndex:(NSUInteger)anIndex
