@@ -569,7 +569,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   case AddressorKind::Owning:
   case AddressorKind::NativeOwning:
     // Emit the release immediately.
-    SGF.B.emitStrongRelease(loc, addressorResult.second.forward(SGF));
+    SGF.B.emitStrongReleaseAndFold(loc, addressorResult.second.forward(SGF));
     break;
   case AddressorKind::NativePinning:
     // Emit the unpin immediately.

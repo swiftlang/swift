@@ -163,11 +163,12 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
 /// to fold it locally into nearby retain instructions or emitting an explicit
 /// strong release if necessary.  If this inserts a new instruction, it
 /// returns it, otherwise it returns null.
-StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
-                                                 SILValue Operand) {
+PointerUnion<StrongRetainInst *, StrongReleaseInst *>
+SILBuilder::emitStrongRelease(SILLocation Loc, SILValue Operand) {
   // Release on a functionref is a noop.
-  if (isa<FunctionRefInst>(Operand))
-    return nullptr;
+  if (isa<FunctionRefInst>(Operand)) {
+    return static_cast<StrongReleaseInst *>(nullptr);
+  }
 
   // Check to see if the instruction immediately before the insertion point is a
   // strong_retain of the specified operand.  If so, we can zap the pair.
@@ -175,11 +176,9 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
   while (I != BBStart) {
     auto *Inst = &*--I;
 
-    if (auto SRA = dyn_cast<StrongRetainInst>(Inst)) {
-      if (SRA->getOperand() == Operand) {
-        DeleteInst(SRA);
-        return nullptr;
-      }
+    if (auto *SRA = dyn_cast<StrongRetainInst>(Inst)) {
+      if (SRA->getOperand() == Operand)
+        return SRA;
       // Skip past unrelated retains.
       continue;
     }
@@ -196,7 +195,7 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
 /// Emit a release_value instruction at the current location, attempting to
 /// fold it locally into another nearby retain_value instruction.  This
 /// returns the new instruction if it inserts one, otherwise it returns null.
-ReleaseValueInst *
+PointerUnion<RetainValueInst *, ReleaseValueInst *>
 SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
   // Check to see if the instruction immediately before the insertion point is a
   // retain_value of the specified operand.  If so, we can zap the pair.
@@ -204,11 +203,9 @@ SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
   while (I != BBStart) {
     auto *Inst = &*--I;
 
-    if (auto SRA = dyn_cast<RetainValueInst>(Inst)) {
-      if (SRA->getOperand() == Operand) {
-        DeleteInst(SRA);
-        return nullptr;
-      }
+    if (auto *SRA = dyn_cast<RetainValueInst>(Inst)) {
+      if (SRA->getOperand() == Operand)
+        return SRA;
       // Skip past unrelated retains.
       continue;
     }

@@ -49,7 +49,7 @@ static void fixupReferenceCounts(SILBasicBlock::iterator I, SILLocation Loc,
   // Either release the callee (which the apply would have done) or remove a
   // retain that happens to be the immediately preceding instruction.
   SILBuilderWithScope<16> B(I);
-  auto *NewRelease = B.emitStrongRelease(Loc, CalleeValue);
+  auto *NewRelease = B.emitStrongReleaseAndFold(Loc, CalleeValue);
 
   // Important: we move the insertion point before this new release, just in
   // case this inserted release would have caused the deallocation of the
@@ -116,8 +116,8 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     // source of the store and erase it.
     if (SRI) {
       if (CalleeValue.isValid())
-        SILBuilderWithScope<1>(SRI).
-          emitStrongRelease(SRI->getLoc(), CalleeValue);
+        SILBuilderWithScope<1>(SRI)
+            .emitStrongReleaseAndFold(SRI->getLoc(), CalleeValue);
       SRI->eraseFromParent();
     }
 

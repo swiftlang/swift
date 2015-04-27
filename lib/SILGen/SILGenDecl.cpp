@@ -136,7 +136,7 @@ namespace {
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.emitStrongRelease(l, closure);
+      gen.B.emitStrongReleaseAndFold(l, closure);
     }
   };
 }
@@ -1183,7 +1183,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   if (loc.box) {
-    B.emitStrongRelease(silLoc, loc.box);
+    B.emitStrongReleaseAndFold(silLoc, loc.box);
     return;
   }
 

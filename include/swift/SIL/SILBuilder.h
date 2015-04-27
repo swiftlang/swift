@@ -17,6 +17,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
 
@@ -31,9 +32,6 @@ class SILBuilder {
   /// InsertedInstrs - If this pointer is non-null, then any inserted
   /// instruction is recorded in this list.
   SmallVectorImpl<SILInstruction*> *InsertedInstrs = nullptr;
-
-  std::function<void(SILInstruction *)> DeleteInst =
-      [](SILInstruction *I) { I->eraseFromParent(); };
 
 public:
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
@@ -120,17 +118,6 @@ public:
 
   SmallVectorImpl<SILInstruction *> *getTrackingList() {
     return InsertedInstrs;
-  }
-
-  //===--------------------------------------------------------------------===//
-  // Instruction Deleter.
-  //===--------------------------------------------------------------------===//
-
-  /// A pass can set this behavior to override the behavior when we delete
-  /// instructions when emitting instructions. This lets the pass update its
-  /// state.
-  void setDeleteCallback(std::function<void(SILInstruction *)> Callback) {
-    DeleteInst = Callback;
   }
 
   //===--------------------------------------------------------------------===//
@@ -1159,7 +1146,16 @@ public:
   /// to fold it locally into nearby retain instructions or emitting an explicit
   /// strong release if necessary.  If this inserts a new instruction, it
   /// returns it, otherwise it returns null.
-  StrongReleaseInst *emitStrongRelease(SILLocation Loc, SILValue Operand);
+  StrongReleaseInst *emitStrongReleaseAndFold(SILLocation Loc,
+                                              SILValue Operand) {
+    auto U = emitStrongRelease(Loc, Operand);
+    if (U.isNull())
+      return nullptr;
+    if (auto *SRI = U.dyn_cast<StrongReleaseInst *>())
+      return SRI;
+    U.get<StrongRetainInst *>()->eraseFromParent();
+    return nullptr;
+  }
 
   /// Emit a release_value instruction at the current location, attempting to
   /// fold it locally into another nearby retain_value instruction.  This
@@ -1168,8 +1164,34 @@ public:
   /// This instruction doesn't handle strength reduction of release_value into
   /// a noop / strong_release / unowned_release.  For that, use the
   /// emitReleaseValueOperation method below or use the TypeLowering API.
-  ReleaseValueInst *emitReleaseValue(SILLocation Loc, SILValue Operand);
+  ReleaseValueInst *emitReleaseValueAndFold(SILLocation Loc, SILValue Operand) {
+    auto U = emitReleaseValue(Loc, Operand);
+    if (U.isNull())
+      return nullptr;
+    if (auto *RVI = U.dyn_cast<ReleaseValueInst *>())
+      return RVI;
+    U.get<RetainValueInst *>()->eraseFromParent();
+    return nullptr;
+  }
 
+  /// Emit a release_value instruction at the current location, attempting to
+  /// fold it locally into another nearby retain_value instruction. Returns a
+  /// pointer union initialized with a release value inst if it inserts one,
+  /// otherwise returns the retain. It is expected that the caller will remove
+  /// the retain_value. This allows for the caller to update any state before
+  /// the retain_value is destroyed.
+  PointerUnion<RetainValueInst *, ReleaseValueInst *>
+  emitReleaseValue(SILLocation Loc, SILValue Operand);
+
+  /// Emit a strong_release instruction at the current location, attempting to
+  /// fold it locally into another nearby strong_retain instruction. Returns a
+  /// pointer union initialized with a strong_release inst if it inserts one,
+  /// otherwise returns the pointer union initialized with the strong_retain. It
+  /// is expected that the caller will remove the returned strong_retain. This
+  /// allows for the caller to update any state before the release value is
+  /// destroyed.
+  PointerUnion<StrongRetainInst *, StrongReleaseInst *>
+  emitStrongRelease(SILLocation Loc, SILValue Operand);
 
   /// Convenience function for calling emitRetain on the type lowering
   /// for the non-address value.

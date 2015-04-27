@@ -603,28 +603,36 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
   if (PInfo.isIndirectInOut())
     return;
 
-  // Otherwise, we need to destroy the argument. *NOTE* The routines we use may
-  // either eliminate the destroy by pairing it with an increment. Given that we
-  // need to check for nullptr and only if the returned value is non-null call
-  // CreatedNewInst.
-  SILInstruction *NewInst = nullptr;
-
+  // Otherwise, we need to destroy the argument.
   if (Arg.getType().isObject()) {
     if (Arg.getType().hasReferenceSemantics()) {
-      NewInst = Builder.emitStrongRelease(Loc, Arg);
-    } else {
-      NewInst = Builder.emitReleaseValue(Loc, Arg);
+      auto U = Builder.emitStrongRelease(Loc, Arg);
+      if (U.isNull())
+        return;
+
+      if (auto *SRI = U.dyn_cast<StrongRetainInst *>()) {
+        Callbacks.DeleteInst(SRI);
+        return;
+      }
+
+      Callbacks.CreatedNewInst(U.get<StrongReleaseInst *>());
+      return;
     }
-  } else {
-    NewInst = Builder.emitDestroyAddr(Loc, Arg);
+
+    auto U = Builder.emitReleaseValue(Loc, Arg);
+    if (U.isNull())
+      return;
+
+    if (auto *RVI = U.dyn_cast<RetainValueInst *>()) {
+      Callbacks.DeleteInst(RVI);
+      return;
+    }
+
+    Callbacks.CreatedNewInst(U.get<ReleaseValueInst *>());
+    return;
   }
 
-  // We managed to eliminate the decrement in the Builder. Return early.
-  if (!NewInst)
-    return;
-
-  // Otherwise, notify via the callback any of our users which need to update
-  // state given the new instruction.
+  SILInstruction *NewInst = Builder.emitDestroyAddr(Loc, Arg);
   Callbacks.CreatedNewInst(NewInst);
 }
 
@@ -635,10 +643,9 @@ static void releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
                                                   ReleaseTracker &Tracker,
                                                   InstModCallbacks Callbacks) {
   SILBuilderWithScope<16> Builder(PAI);
-  Builder.setDeleteCallback(Callbacks.DeleteInst);
   SILLocation Loc = PAI->getLoc();
-  auto PAITy =
-    dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
+  CanSILFunctionType PAITy =
+      dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
 
   // Emit a destroy value for each captured closure argument.
   ArrayRef<SILParameterInfo> Params = PAITy->getParameters();

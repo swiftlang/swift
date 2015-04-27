@@ -237,7 +237,6 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   // instructions.
   SILBuilder B(F);
   B.setTrackingList(&TrackingList);
-  B.setDeleteCallback([this](SILInstruction *I) { eraseInstFromFunction(*I); });
   Builder = &B;
 
   bool Changed = false;

@@ -619,7 +619,7 @@ DeadParamCloner::visitStrongRetainInst(StrongRetainInst *Inst) {
 
 static void emitStrongReleaseAfter(SILValue V, SILInstruction *I) {
   SILBuilderWithScope<2> Builder(std::next(SILBasicBlock::iterator(I)));
-  Builder.emitStrongRelease(I->getLoc(), V);
+  Builder.emitStrongReleaseAndFold(I->getLoc(), V);
 }
 
 /// Specialize a partial_apply by removing the parameters indicated by
