@@ -2488,6 +2488,9 @@ namespace {
         Impl.markUnavailable(result, knownVarInfo->UnavailableMsg);
       }
 
+      if (!decl->hasExternalStorage())
+        Impl.registerExternalDecl(result);
+
       return result;
     }
 

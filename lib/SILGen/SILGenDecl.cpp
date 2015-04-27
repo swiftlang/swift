@@ -1112,11 +1112,11 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     // Nothing to do in SILGen for other external types.
     break;
 
-  case DeclKind::IfConfig:
-    // Any active decls have been added to their parent, so there's nothing
-    // else to emit.
+  case DeclKind::Var:
+    // Imported static vars are handled solely in IRGen.
     break;
 
+  case DeclKind::IfConfig:
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
@@ -1125,7 +1125,6 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::TypeAlias:
   case DeclKind::AssociatedType:
   case DeclKind::GenericTypeParam:
-  case DeclKind::Var:
   case DeclKind::Param:
   case DeclKind::Import:
   case DeclKind::Subscript:

@@ -1300,7 +1300,6 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
-  case DeclKind::Var:
   case DeclKind::Import:
   case DeclKind::Subscript:
   case DeclKind::Destructor:
@@ -1310,6 +1309,10 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::IfConfig:
   case DeclKind::Param:
     llvm_unreachable("Not a valid external definition for IRgen");
+
+  case DeclKind::Var:
+    assert(D->getClangDecl() && "Not a valid external var for IRGen");
+    return emitClangDecl(const_cast<clang::Decl *>(D->getClangDecl()));
 
   case DeclKind::Func:
     if (auto *clangDecl = D->getClangDecl())

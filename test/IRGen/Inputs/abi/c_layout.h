@@ -76,3 +76,11 @@ unsigned short eatMyUnsignedShorts(unsigned short a);
 
 int ints(int a);
 unsigned unsigneds(unsigned a);
+
+// Test static globals
+
+static float glowingArable = 17.0;
+
+static inline void doubleTrouble(void) {
+  glowingArable *= 2.0;
+}

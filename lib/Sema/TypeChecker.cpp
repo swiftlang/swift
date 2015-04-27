@@ -458,6 +458,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
         TC.handleExternalDecl(decl);
         continue;
       }
+      if (isa<VarDecl>(decl))
+        continue;
       llvm_unreachable("Unhandled external definition kind");
     }
 
