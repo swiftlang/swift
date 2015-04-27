@@ -1772,23 +1772,14 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
   auto outerFields = E->getType()->castTo<TupleType>()->getElements();
   auto shuffleIndexIterator = E->getElementMapping().begin();
   auto shuffleIndexEnd = E->getElementMapping().end();
-  unsigned callerDefaultArgIndex = 0;
   for (auto &field : outerFields) {
     assert(shuffleIndexIterator != shuffleIndexEnd &&
            "ran out of shuffle indexes before running out of fields?!");
     int shuffleIndex = *shuffleIndexIterator++;
     
     assert(shuffleIndex != TupleShuffleExpr::DefaultInitialize &&
-           "General tuples cannot have default initializers");
-
-    // If the shuffle index is CallerDefaultInitialize, we're supposed to
-    // use the caller-provided default value. This is used only in special
-    // cases, e.g., __FILE__, __LINE__, and __COLUMN__.
-    if (shuffleIndex == TupleShuffleExpr::CallerDefaultInitialize) {
-      auto arg = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
-      result.addElement(visit(arg));
-      continue;
-    }
+           shuffleIndex != TupleShuffleExpr::CallerDefaultInitialize &&
+           "Only argument tuples can have default initializers & varargs");
 
     // If the shuffle index is FirstVariadic, it is the beginning of the list of
     // varargs inputs.  Save this case for last.
@@ -1918,6 +1909,8 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
   for (unsigned i = 0, e = outerFields.size(); i != e; ++i) {
     // Handle the variadic argument. If we didn't emit the scalar field yet,
     // it goes into the variadic array; otherwise, the variadic array is empty.
+    assert(!outerFields[i].isVararg() &&
+           "Only argument tuples can have default initializers & varargs");
     if (outerFields[i].isVararg()) {
       assert(i == e - 1 && "vararg isn't last?!");
       ManagedValue varargs;

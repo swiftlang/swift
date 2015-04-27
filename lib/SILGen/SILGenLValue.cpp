@@ -1721,6 +1721,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
                        getBaseAccessKind(decl, accessKind, strategy));
 
   Expr *indexExpr = e->getIndex();
+  // FIXME: This admits varargs tuples, which should only be handled as part of
+  // argument emission.
   RValue index = gen.emitRValue(indexExpr);
 
   if (strategy == AccessStrategy::DirectToAccessor ||
