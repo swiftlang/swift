@@ -184,6 +184,16 @@ SILValue SILValue::stripIndexingInsts() {
   }
 }
 
+SILValue SILValue::stripExpectIntrinsic() {
+  SILValue V = *this;
+  auto *BI = dyn_cast<BuiltinInst>(V);
+  if (!BI)
+    return V;
+  if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::expect)
+    return V;
+  return BI->getArguments()[0];
+}
+
 SILBasicBlock *ValueBase::getParentBB() {
   if (auto Inst = dyn_cast<SILInstruction>(this))
     return Inst->getParent();

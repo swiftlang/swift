@@ -249,7 +249,11 @@ public:
   //
   // An indexing inst is either index_addr or index_raw_pointer.
   SILValue stripIndexingInsts();
-  
+
+  // Returns the underlying value after stripping off a builtin expect
+  // intrinsic call.
+  SILValue stripExpectIntrinsic();
+
   void replaceAllUsesWith(SILValue V);
 
   void dump() const;
