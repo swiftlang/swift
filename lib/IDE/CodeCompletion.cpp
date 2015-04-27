@@ -121,6 +121,13 @@ CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   NumChunks = Chunks.size();
 }
 
+CodeCompletionString *CodeCompletionString::create(llvm::BumpPtrAllocator &Allocator, ArrayRef<Chunk> Chunks) {
+  void *CCSMem = Allocator.Allocate(sizeof(CodeCompletionString) +
+                                    Chunks.size() * sizeof(CodeCompletionString::Chunk),
+                                    llvm::alignOf<CodeCompletionString>());
+  return new (CCSMem) CodeCompletionString(Chunks);
+}
+
 void CodeCompletionString::print(raw_ostream &OS) const {
   unsigned PrevNestingLevel = 0;
   for (auto C : getChunks()) {
@@ -467,11 +474,7 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
-  void *CCSMem = Sink.Allocator
-      ->Allocate(sizeof(CodeCompletionString) +
-                     Chunks.size() * sizeof(CodeCompletionString::Chunk),
-                 llvm::alignOf<CodeCompletionString>());
-  auto *CCS = new (CCSMem) CodeCompletionString(Chunks);
+  auto *CCS = CodeCompletionString::create(*Sink.Allocator, Chunks);
 
   switch (Kind) {
   case CodeCompletionResult::ResultKind::Declaration: {

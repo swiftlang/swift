@@ -261,6 +261,13 @@ private:
   CodeCompletionString(ArrayRef<Chunk> Chunks);
 
 public:
+  /// Creates a \c CodeCompletionString from a list of \c Chunks.
+  ///
+  /// \note The caller must ensure any text inside \c Chunks will outlive this
+  /// object, typically by storing them inside a \c CodeCompletionResultSink.
+  static CodeCompletionString *create(llvm::BumpPtrAllocator &Allocator,
+                                      ArrayRef<Chunk> Chunks);
+
   ArrayRef<Chunk> getChunks() const {
     return llvm::makeArrayRef(reinterpret_cast<const Chunk *>(this + 1),
                               NumChunks);
@@ -403,6 +410,10 @@ private:
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
 
+public:
+  /// Constructs a \c Pattern or \c Keyword result.
+  ///
+  /// \note The caller must ensure \c CodeCompletionString outlives this result.
   CodeCompletionResult(ResultKind Kind,
                        SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
@@ -414,6 +425,11 @@ private:
     assert(CompletionString);
   }
 
+  /// Constructs a \c Declaration result.
+  ///
+  /// \note The caller must ensure \c CodeCompletionString and any StringRef
+  /// arguments outlive this result, typically by storing them in the same
+  /// \c CodeCompletionResultSink as the result itself.
   CodeCompletionResult(SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
@@ -430,7 +446,6 @@ private:
     assert(CompletionString);
   }
 
-public:
   ResultKind getKind() const { return static_cast<ResultKind>(Kind); }
 
   CodeCompletionDeclKind getAssociatedDeclKind() const {
