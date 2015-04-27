@@ -71,35 +71,35 @@ func fref() -> Reftype {}
 
 // non-settable var is non-settable:
 // - assignment
-non_settable_x = x // expected-error{{}}
+non_settable_x = x // expected-error{{cannot assign to a get-only property 'non_settable_x'}}
 // - inout (mono)
-f2(&non_settable_x) // expected-error{{}}
+f2(&non_settable_x) // expected-error{{cannot pass get-only property 'non_settable_x' as inout argument}}
 // - inout (generic)
-f1(&non_settable_x) // expected-error{{}}
+f1(&non_settable_x) // expected-error{{cannot pass get-only property 'non_settable_x' as inout argument}}
 // - inout assignment
-non_settable_x += x // expected-error{{}}
-++non_settable_x // expected-error{{}}
+non_settable_x += x // expected-error{{cannot pass get-only property 'non_settable_x' to mutating binary operator '+='}}
+++non_settable_x // expected-error{{cannot pass get-only property 'non_settable_x' to mutating unary operator '++'}}
 
 // non-settable property is non-settable:
-z.non_settable_x = x // expected-error{{}}
-f2(&z.non_settable_x) // expected-error{{}}
-f1(&z.non_settable_x) // expected-error{{}}
-z.non_settable_x += x // expected-error{{}}
-++z.non_settable_x // expected-error{{}}
+z.non_settable_x = x // expected-error{{cannot assign to 'non_settable_x' in 'z'}}
+f2(&z.non_settable_x) // expected-error{{cannot assign to immutable value of type 'X'}}
+f1(&z.non_settable_x) // expected-error{{cannot assign to immutable value of type 'X'}}
+z.non_settable_x += x // expected-error{{cannot pass immutable value of type 'X' to mutating binary operator '+='}}
+++z.non_settable_x // expected-error{{cannot pass immutable value of type 'X' to mutating unary operator '++'}}
 
 // non-settable subscript is non-settable:
-z[0] = 0.0 // expected-error{{}}
-f2(&z[0]) // expected-error{{}}
-f1(&z[0]) // expected-error{{}}
-z[0] += 0.0 // expected-error{{}} expected-note{{overloads for '+=' exist with these partially matching parameter lists:}}
-++z[0] // expected-error{{}}
+z[0] = 0.0 // expected-error{{cannot assign to immutable value of type 'Double'}}
+f2(&z[0]) // expected-error{{could not find an overload for 'subscript' that accepts the supplied arguments}}
+f1(&z[0]) // expected-error{{could not find an overload for 'subscript' that accepts the supplied arguments}}
+z[0] += 0.0 // expected-error{{cannot pass immutable value of type 'Double' to mutating binary operator '+='}}
+++z[0] // expected-error{{cannot pass immutable value of type 'Double' to mutating unary operator '++'}}
 
 // settable property of an rvalue value type is non-settable:
-fz().settable_x = x // expected-error{{}}
-f2(&fz().settable_x) // expected-error{{}}
-f1(&fz().settable_x) // expected-error{{}}
-fz().settable_x += x // expected-error{{}}
-++fz().settable_x // expected-error{{}}
+fz().settable_x = x // expected-error{{cannot assign to the result of this expression}}
+f2(&fz().settable_x) // expected-error{{cannot assign to immutable value of type 'X'}}
+f1(&fz().settable_x) // expected-error{{cannot assign to immutable value of type 'X'}}
+fz().settable_x += x // expected-error{{cannot pass immutable value of type 'X' to mutating binary operator '+='}}
+++fz().settable_x // expected-error{{cannot pass immutable value of type 'X' to mutating unary operator '++'}}
 
 // settable property of an rvalue reference type IS SETTABLE:
 fref().property = 0.0
@@ -109,11 +109,11 @@ fref().property += 0.0
 ++fref().property
 
 // settable property of a non-settable value type is non-settable:
-z.non_settable_x.property = 1.0 // expected-error{{}}
-f2(&z.non_settable_x.property) // expected-error{{}}
-f1(&z.non_settable_x.property) // expected-error{{}}
-z.non_settable_x.property += 1.0 // expected-error{{}} expected-note{{overloads for '+=' exist with these partially matching parameter lists:}}
-++z.non_settable_x.property // expected-error{{}}
+z.non_settable_x.property = 1.0 // expected-error{{cannot assign to the result of this expression}}
+f2(&z.non_settable_x.property) // expected-error{{cannot assign to immutable value of type 'Double'}}
+f1(&z.non_settable_x.property) // expected-error{{cannot assign to immutable value of type 'Double'}}
+z.non_settable_x.property += 1.0 // expected-error{{cannot pass immutable value of type 'Double' to mutating binary operator '+='}}
+++z.non_settable_x.property // expected-error{{cannot pass immutable value of type 'Double' to mutating unary operator '++'}}
 
 // settable property of a non-settable reference type IS SETTABLE:
 z.non_settable_reftype.property = 1.0

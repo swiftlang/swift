@@ -100,6 +100,10 @@ func let_decls() {
   var v = 1
   swap(&f, &v)  // expected-error {{cannot pass 'let' value 'f' as inout argument}}
 
+  
+  // <rdar://problem/19711233> QoI: poor diagnostic for operator-assignment involving immutable operand
+  let g = 14 // expected-note {{change 'let' to 'var' to make it mutable}}
+  g /= 2  // expected-error {{cannot pass 'let' value 'g' to mutating binary operator '/='}}
 }
 
 struct SomeStruct {

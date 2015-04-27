@@ -1755,44 +1755,92 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
   
   auto binop = cast<BinaryExpr>(expr);
   
-  auto argExpr = dyn_cast<TupleExpr>(binop->getArg());
+  auto argExpr = cast<TupleExpr>(binop->getArg());
   auto argTuple = getTypeOfIndependentSubExpression(argExpr)->
-  getAs<TupleType>();
+        getAs<TupleType>();
   
   // If the argument type is not a tuple, we've posted the diagnostic
   // recursively.
   if (!argTuple)
     return true;
   
-  std::string overloadName;
-  
-  SmallVector<Type, 16> paramLists;
-  SmallVector<Type, 2> argTypes;
-  
-  if (auto DRE = dyn_cast<DeclRefExpr>(binop->getFn())) {
-    overloadName = DRE->getDecl()->getNameStr();
-  } else if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(binop->getFn())) {
-    overloadName = ODRE->getDecls()[0]->getNameStr();
-    
-    for (auto DRE : ODRE->getDecls()) {
-      if (auto fnType = DRE->getType()->getAs<AnyFunctionType>()) {
-        paramLists.push_back(fnType->getInput());
-      }
-    }
+  ValueDecl *CandidatePtr = nullptr; // temporary for the ArrayRef to reference.
+  ArrayRef<ValueDecl *> Candidates;
+  if (auto declRefExpr = dyn_cast<DeclRefExpr>(binop->getFn())) {
+    CandidatePtr = declRefExpr->getDecl();
+    Candidates = CandidatePtr;
+  } else if (auto overloadedDRE =
+                 dyn_cast<OverloadedDeclRefExpr>(binop->getFn())) {
+    Candidates = overloadedDRE->getDecls();
   } else if (overloadConstraint) {
-    overloadName = overloadConstraint->getOverloadChoice().
-    getDecl()->getName().str();
+    CandidatePtr = overloadConstraint->getOverloadChoice().getDecl();
+    Candidates = CandidatePtr;
   } else {
-    llvm_unreachable("unrecognized binop function kind");
+    llvm_unreachable("unrecognized unop function kind");
   }
-  
+  std::string overloadName = Candidates[0]->getNameStr();
   assert(!overloadName.empty());
   
+  SmallVector<Type, 2> argTypes;
   argTypes.push_back(argTuple->getElementType(0));
   argTypes.push_back(argTuple->getElementType(1));
   
   auto argTyName1 = getUserFriendlyTypeName(argTypes[0]);
   auto argTyName2 = getUserFriendlyTypeName(argTypes[1]);
+  expr->setType(ErrorType::get(CS->getASTContext()));
+
+  
+  // A common error is to apply an operator that only has an inout LHS (e.g. +=)
+  // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
+  // case.
+  if (!argTypes[0]->isLValueType()) {
+    bool allAreLValues = true;
+    for (auto decl : Candidates) {
+      auto fnType = decl->getType()->getAs<AnyFunctionType>();
+      if (!fnType) continue;
+      
+      auto tupleType = fnType->getInput()->getAs<TupleType>();
+      if (!tupleType || tupleType->getNumElements() < 1) continue;
+      
+      if (!tupleType->getElement(0).getType()->is<InOutType>()) {
+        allAreLValues = false;
+        break;
+      }
+    }
+    
+    if (allAreLValues) {
+      // Ok, that's the problem.  Special case it further based on what the
+      // actual expression is.
+      auto LeftArg = argExpr->getElement(0)->getSemanticsProvidingExpr();
+      if (auto *DRE = dyn_cast<DeclRefExpr>(LeftArg))
+        if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+          unsigned DiagCase;
+          
+          if (VD->isLet())
+            DiagCase = 0;
+          else if (VD->hasAccessorFunctions() && !VD->getSetter())
+            DiagCase = 1;
+          else
+            DiagCase = 2;
+          
+          CS->TC.diagnose(binop->getLoc(),
+                          diag::cannot_apply_lvalue_binop_to_rvalue_vardecl,
+                          overloadName, VD->getName(), DiagCase)
+            .highlight(LeftArg->getSourceRange());
+          VD->emitLetToVarNoteIfSimple();
+          return true;
+        }
+      
+      CS->TC.diagnose(binop->getLoc(),
+                      diag::cannot_apply_lvalue_binop_to_rvalue,
+                      overloadName, argTyName1)
+        .highlight(LeftArg->getSourceRange());
+      return true;
+    }
+  }
+
+  
+  
   
   if (argTyName1.compare(argTyName2)) {
     CS->TC.diagnose(argExpr->getElement(0)->getLoc(),
@@ -1807,14 +1855,15 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
                     argTyName1);
   }
   
-  if (paramLists.size())
-    suggestPotentialOverloads(overloadName,
-                              argExpr->getElement(0)->getLoc(),
-                              paramLists,
-                              argTypes);
-  
-  expr->setType(ErrorType::get(CS->getASTContext()));
-  
+  if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(binop->getFn())) {
+    SmallVector<Type, 16> paramLists;
+    for (auto DRE : ODRE->getDecls())
+      if (auto fnType = DRE->getType()->getAs<AnyFunctionType>())
+        paramLists.push_back(fnType->getInput());
+    
+    suggestPotentialOverloads(overloadName, argExpr->getElement(0)->getLoc(),
+                              paramLists, argTypes);
+  }
   return true;
 }
 
