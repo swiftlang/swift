@@ -566,25 +566,28 @@ public:
     if (!TrueBB->getSinglePredecessor()) TrueBB = nullptr;
     if (!FalseBB->getSinglePredecessor()) FalseBB = nullptr;
 
-    SILValue Left = CMP->getOperand(0);
-    SILValue Right = CMP->getOperand(1);
-
     // The relationship expressed in the builtin.
     ValueRelation Rel;
     bool Swap = false;
 
     switch (CMP->getBuiltinInfo().ID) {
       default: return;
-      case BuiltinValueKind::ICMP_NE:
+      case BuiltinValueKind::ICMP_NE: {
+        SILValue Left = CMP->getOperand(0);
+        SILValue Right = CMP->getOperand(1);
         if (FalseBB)
           Constraints.push_back(Constraint(FalseBB, Left, Right,
                                      ValueRelation::EQ));
         return;
-      case BuiltinValueKind::ICMP_EQ:
+      }
+      case BuiltinValueKind::ICMP_EQ: {
+        SILValue Left = CMP->getOperand(0);
+        SILValue Right = CMP->getOperand(1);
         if (TrueBB)
           Constraints.push_back(Constraint(TrueBB, Left, Right,
                                      ValueRelation::EQ));
         return;
+      }
       case BuiltinValueKind::ICMP_SLE:
         Rel = ValueRelation::SLE;
         break;
@@ -614,6 +617,9 @@ public:
         Swap = true;
         break;
     }
+
+    SILValue Left = CMP->getOperand(0);
+    SILValue Right = CMP->getOperand(1);
 
     if (Swap)
       std::swap(Left, Right);

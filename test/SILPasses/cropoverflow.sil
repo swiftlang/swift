@@ -703,3 +703,22 @@ bb0(%0 : $Int8):
   %10 = tuple ()
   return %10 : $()
 }
+
+// CHECK-LABEL: @crash_unary_comparator
+// CHECK: return
+sil hidden @crash_unary_comparator : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = builtin "trunc_Int32_Int1"(%0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %1, bb1, bb2                            // id: %4
+
+bb1:                                              // Preds: bb0
+  br bb3                                          // id: %10
+
+bb2:                                              // Preds: bb0
+  br bb3                                          // id: %15
+
+bb3:                                              // Preds: bb1 bb2
+  %3 = tuple ()                                  // user: %17
+  return %3 : $()                                // id: %17
+}
+
