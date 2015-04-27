@@ -539,6 +539,26 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
 
 SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
                                                       bool NegateResult) {
+  // Canonicalize boolean comparisions.
+  if (auto OpTy = BI->getArguments()[0].getType().getAs<BuiltinIntegerType>())
+    if (OpTy->isFixedWidth(1))
+      // cmp_eq %X, -1 -> xor (cmp_eq %X, 0), -1
+      if (!NegateResult) {
+        if (auto *ILOp = dyn_cast<IntegerLiteralInst>(BI->getArguments()[1]))
+          if (ILOp->getValue().isAllOnesValue()) {
+            auto X = BI->getArguments()[0];
+            SILValue One(ILOp);
+            SILValue Zero(
+                Builder->createIntegerLiteral(BI->getLoc(), BI->getType(), 0));
+            SILValue Inverted(Builder->createBuiltin(
+                BI->getLoc(), BI->getName(), BI->getType(), {}, {X, Zero}));
+            auto *Xor = Builder->createBuiltinBinaryFunction(
+                BI->getLoc(), "xor", BI->getType(), BI->getType(),
+                {Inverted, One});
+            replaceInstUsesWith(*BI, Xor);
+            return eraseInstFromFunction(*BI);
+          }
+      }
   IsZeroKind LHS = isZeroValue(BI->getArguments()[0]);
   IsZeroKind RHS = isZeroValue(BI->getArguments()[1]);
 
