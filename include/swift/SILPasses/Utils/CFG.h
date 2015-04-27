@@ -74,6 +74,14 @@ SILBasicBlock *splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
                                  DominanceInfo *DT = nullptr,
                                  SILLoopInfo *LI = nullptr);
 
+/// \brief Splits the edge from terminator.
+///
+/// Updates dominance information and loop information if not null.
+/// Returns the newly created basic block.
+SILBasicBlock *splitEdge(TermInst *T, unsigned EdgeIdx,
+                         DominanceInfo *DT = nullptr,
+                         SILLoopInfo *LI = nullptr);
+
 /// \brief Splits the edges between two basic blocks.
 ///
 /// Updates dominance information and loop information if not null.

@@ -558,7 +558,7 @@ SILBasicBlock *swift::splitBasicBlockAndBranch(SILInstruction *SplitBeforeInst,
   return NewBB;
 }
 
-static SILBasicBlock *splitEdge(TermInst *T, unsigned EdgeIdx,
+SILBasicBlock *swift::splitEdge(TermInst *T, unsigned EdgeIdx,
                                 DominanceInfo *DT, SILLoopInfo *LI) {
   auto *SrcBB = T->getParent();
   auto *Fn = SrcBB->getParent();
