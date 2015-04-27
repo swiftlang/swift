@@ -794,7 +794,7 @@ void IRGenModuleDispatcher::emitLazyDefinitions() {
     while (!LazyFieldTypeAccessors.empty()) {
       auto accessor = LazyFieldTypeAccessors.pop_back_val();
       emitFieldTypeAccessor(*accessor.IGM, accessor.type, accessor.fn,
-                            accessor.storedProperties);
+                            accessor.fieldTypes);
     }
 
     // Emit any lazy function definitions we require.

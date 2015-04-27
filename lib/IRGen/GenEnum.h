@@ -455,6 +455,8 @@ public:
                                   Explosion &dest,
                                   unsigned offset) const = 0;
   
+  virtual bool needsPayloadSizeInMetadata() const = 0;
+  
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;
   EnumImplStrategy &operator=(const EnumImplStrategy &) = delete;

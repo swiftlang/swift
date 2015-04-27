@@ -52,9 +52,16 @@ public:
     // emitParentMetadataRef.
 
     // Instantiation-specific.
-    if (auto generics = Target->getGenericParamsOfContext()) {
+    
+    // Reserve a word to cache the payload size if the type has dynamic layout.
+    auto &strategy = getEnumImplStrategy(IGM,
+           Target->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
+    if (strategy.needsPayloadSizeInMetadata())
+      asImpl().addPayloadSize();
+    
+    // Add fields for generic cases.
+    if (auto generics = Target->getGenericParamsOfContext())
       asImpl().addGenericFields(*generics);
-    }
   }
 };
 
@@ -80,6 +87,7 @@ public:
                               ProtocolDecl *protocol) {
     addPointer();
   }
+  void addPayloadSize() { addPointer(); }
 
 private:
   void addPointer() {

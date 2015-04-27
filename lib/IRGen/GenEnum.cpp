@@ -84,6 +84,8 @@ namespace {
                          0, {}, {}, {})
     {}
 
+    bool needsPayloadSizeInMetadata() const override { return false; }
+
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
                                      SILType Type,
                                      EnumDecl *theEnum,
@@ -287,6 +289,8 @@ namespace {
 
   /// Implementation strategy for singleton enums, with zero or one cases.
   class SingletonEnumImplStrategy final : public EnumImplStrategy {
+    bool needsPayloadSizeInMetadata() const override { return false; }
+    
     const TypeInfo *getSingleton() const {
       return ElementsWithPayload.empty() ? nullptr : ElementsWithPayload[0].ti;
     }
@@ -708,6 +712,8 @@ namespace {
       assert(!ElementsWithNoPayload.empty());
     }
 
+    bool needsPayloadSizeInMetadata() const override { return false; }
+    
     llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
                                    Explosion &value,
                                    EnumElementDecl *Case) const override {
@@ -1242,6 +1248,12 @@ namespace {
   class SinglePayloadEnumImplStrategy final
     : public PayloadEnumImplStrategyBase
   {
+    // The payload size is readily available from the payload metadata; no
+    // need to cache it in the enum metadata.
+    bool needsPayloadSizeInMetadata() const override {
+      return false;
+    }
+    
     EnumElementDecl *getPayloadElement() const {
       return ElementsWithPayload[0].decl;
     }
@@ -2689,7 +2701,14 @@ namespace {
       }
     }
 
-  public:
+    bool needsPayloadSizeInMetadata() const override {
+      // For dynamic multi-payload enums, it would be expensive to recalculate
+      // the payload area size from all of the cases, so cache it in the
+      // metadata. For fixed-layout cases this isn't necessary (except for
+      // reflection, but it's OK if reflection is a little slow).
+      return TIK < Fixed;
+    }
+
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
                                       SILType Type,
                                       EnumDecl *theEnum,

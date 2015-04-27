@@ -192,10 +192,12 @@ public:
   }
   
   void addLazyFieldTypeAccessor(NominalTypeDecl *type,
-                                NominalTypeDecl::StoredPropertyRange storedProperties,
+                                ArrayRef<CanType> fieldTypes,
                                 llvm::Function *fn,
                                 IRGenModule *IGM) {
-    LazyFieldTypeAccessors.push_back({type, storedProperties, fn, IGM});
+    LazyFieldTypeAccessors.push_back({type,
+                                      {fieldTypes.begin(), fieldTypes.end()},
+                                      fn, IGM});
   }
   
   unsigned getFunctionOrder(SILFunction *F) {
@@ -229,7 +231,7 @@ private:
 
   struct LazyFieldTypeAccessor {
     NominalTypeDecl *type;
-    NominalTypeDecl::StoredPropertyRange storedProperties;
+    std::vector<CanType> fieldTypes;
     llvm::Function *fn;
     IRGenModule *IGM;
   };
@@ -457,8 +459,8 @@ public:
   void addProtocolConformanceRecord(llvm::Constant *record);
 
   void addLazyFieldTypeAccessor(NominalTypeDecl *type,
-                          NominalTypeDecl::StoredPropertyRange storedProperties,
-                          llvm::Function *fn);
+                                ArrayRef<CanType> fieldTypes,
+                                llvm::Function *fn);
 
 private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;

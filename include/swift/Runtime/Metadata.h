@@ -1038,10 +1038,6 @@ struct NominalTypeDescriptor {
       /// metadata area.
       uint32_t FieldOffsetVectorOffset;
       
-      /// True if metadata records for this type have a field offset vector for
-      /// its stored properties.
-      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
-      
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
       const char *FieldNames;
@@ -1050,6 +1046,10 @@ struct NominalTypeDescriptor {
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
       const Metadata * const *(*GetFieldTypes)(const Metadata *Self);
+
+      /// True if metadata records for this type have a field offset vector for
+      /// its stored properties.
+      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }      
     } Class;
     
     /// Information about struct types.
@@ -1062,10 +1062,6 @@ struct NominalTypeDescriptor {
       /// vector.
       uint32_t FieldOffsetVectorOffset;
       
-      /// True if metadata records for this type have a field offset vector for
-      /// its stored properties.
-      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
-      
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
       const char *FieldNames;
@@ -1074,12 +1070,18 @@ struct NominalTypeDescriptor {
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
       const Metadata * const *(*GetFieldTypes)(const Metadata *Self);
+
+      /// True if metadata records for this type have a field offset vector for
+      /// its stored properties.
+      bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
     } Struct;
     
     /// Information about enum types.
     struct {
-      /// The number of non-empty cases in the enum.
-      uint32_t NumNonEmptyCases;
+      /// The number of non-empty cases in the enum are in the low 24 bits;
+      /// the offset of the payload size in the metadata record in words,
+      /// if any, is stored in the high 8 bits.
+      uint32_t NumPayloadCasesAndPayloadSizeOffset;
       /// The number of empty cases in the enum.
       uint32_t NumEmptyCases;
       /// The names of the cases. A doubly-null-terminated list of strings,
@@ -1088,8 +1090,25 @@ struct NominalTypeDescriptor {
       const char *CaseNames;
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
-      /// CaseNames.
+      /// CaseNames. Only types for payload cases are provided.
       const Metadata * const *(*GetCaseTypes)(const Metadata *Self);
+
+      uint32_t getNumPayloadCases() const {
+        return NumPayloadCasesAndPayloadSizeOffset & 0x00FFFFFFU;
+      }
+      uint32_t getNumEmptyCases() const {
+        return NumEmptyCases;
+      }
+      uint32_t getNumCases() const {
+        return getNumPayloadCases() + NumEmptyCases;
+      }
+      size_t getPayloadSizeOffset() const {
+        return ((NumPayloadCasesAndPayloadSizeOffset & 0xFF000000U) >> 24);
+      }
+      
+      bool hasPayloadSizeOffset() const {
+        return getPayloadSizeOffset() != 0;
+      }
     } Enum;
   };
   
@@ -1475,6 +1494,46 @@ struct StructMetadata : public Metadata {
 
   /// Retrieve the generic arguments of this struct.
   const Metadata * const *getGenericArgs() const {
+    if (Description->GenericParams.NumParams == 0)
+      return nullptr;
+
+    const void* const *asWords = reinterpret_cast<const void * const *>(this);
+    asWords += Description->GenericParams.Offset;
+    return reinterpret_cast<const Metadata * const *>(asWords);
+  }
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::Struct;
+  }
+};
+
+/// The structure of type metadata for enums.
+struct EnumMetadata : public Metadata {
+  /// An out-of-line description of the type.
+  const NominalTypeDescriptor *Description;
+  
+  /// The parent type of this member type, or null if this is not a
+  /// member type.
+  const Metadata *Parent;
+
+  /// True if the metadata records the size of the payload area.
+  bool hasPayloadSize() const {
+    return Description->Enum.hasPayloadSizeOffset();
+  }
+
+  /// Retrieve the size of the payload area.
+  ///
+  /// `hasPayloadSize` must be true for this to be valid.
+  size_t getPayloadSize() const {
+    assert(hasPayloadSize());
+    auto offset = Description->Enum.getPayloadSizeOffset();
+    const size_t *asWords = reinterpret_cast<const size_t *>(this);
+    asWords += offset;
+    return *asWords;
+  }
+
+  /// Retrieve the generic arguments of this enum.
+  const Metadata * const *getGenericArgs() const {
     const void* const *asWords = reinterpret_cast<const void * const *>(this);
     if (Description->GenericParams.NumParams == 0)
       return nullptr;
@@ -1484,7 +1543,7 @@ struct StructMetadata : public Metadata {
   }
 
   static bool classof(const Metadata *metadata) {
-    return metadata->getKind() == MetadataKind::Struct;
+    return metadata->getKind() == MetadataKind::Enum;
   }
 };
 

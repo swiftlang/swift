@@ -1735,13 +1735,47 @@ namespace {
     }
   }
   
+  // FIXME: rdar://19537198
+  // If the FieldNames string (including the final terminator)
+  // is exactly 4 or 8 or 16 bytes long then on arm64 it gets emitted
+  // into section __TEXT,__literal4/8/16 and miscompiled somehow.
+  // Workaround: add an extra byte to avoid those sizes.
+  void workAroundBrokenARM64Assembler(llvm::SmallVectorImpl<char> &out) {
+    if (out.size() == 3 ||
+        out.size() == 7 ||
+        out.size() == 15) {
+      out.push_back('\0');
+    }
+  }
+  
+  /// Build a doubly-null-terminated list of field names.
+  template<typename ValueDeclRange>
+  unsigned getFieldNameString(const ValueDeclRange &fields,
+                              llvm::SmallVectorImpl<char> &out) {
+    unsigned numFields = 0;
+
+    {
+      llvm::raw_svector_ostream os(out);
+      
+      for (ValueDecl *prop : fields) {
+        os << prop->getName().str() << '\0';
+        ++numFields;
+      }
+      // The final null terminator is provided by getAddrOfGlobalString.
+      
+      os.flush();
+    }
+    workAroundBrokenARM64Assembler(out);
+    return numFields;
+  }
+  
   /// Build the field type vector accessor for a nominal type. This is a
   /// function that lazily instantiates the type metadata for all of the
   /// types of the stored properties of an instance of a nominal type.
   static llvm::Function *
   getFieldTypeAccessorFn(IRGenModule &IGM,
                          NominalTypeDecl *type,
-                         NominalTypeDecl::StoredPropertyRange storedProperties){
+                         ArrayRef<CanType> fieldTypes) {
     // The accessor function has the following signature:
     // const Metadata * const *getFieldTypes(const Metadata *T);
     auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
@@ -1757,11 +1791,36 @@ namespace {
     // the type metadata for the fields, which could lead to infinite recursion
     // in recursive types if we build the field type accessor during metadata
     // generation.
-    IGM.addLazyFieldTypeAccessor(type, storedProperties, fn);
+    IGM.addLazyFieldTypeAccessor(type, fieldTypes, fn);
     
     return fn;
   }
-
+  
+  /// Build a field type accessor for stored properties.
+  static llvm::Function *
+  getFieldTypeAccessorFn(IRGenModule &IGM,
+                         NominalTypeDecl *type,
+                         NominalTypeDecl::StoredPropertyRange storedProperties){
+    SmallVector<CanType, 4> types;
+    for (VarDecl *prop : storedProperties) {
+      types.push_back(prop->getType()->getCanonicalType());
+    }
+    return getFieldTypeAccessorFn(IGM, type, types);
+  }
+  
+  /// Build a field type accessor for enum payloads.
+  static llvm::Function *
+  getFieldTypeAccessorFn(IRGenModule &IGM,
+                         NominalTypeDecl *type,
+                         ArrayRef<EnumImplStrategy::Element> enumElements){
+    SmallVector<CanType, 4> types;
+    for (auto &elt : enumElements) {
+      assert(elt.decl->hasArgumentType() && "enum case doesn't have arg?!");
+      types.push_back(elt.decl->getArgumentType()->getCanonicalType());
+    }
+    return getFieldTypeAccessorFn(IGM, type, types);
+  }
+  
   class StructNominalTypeDescriptorBuilder
     : public NominalTypeDescriptorBuilderBase<StructNominalTypeDescriptorBuilder>
   {
@@ -1823,25 +1882,8 @@ namespace {
     void addKindDependentFields() {
       // Build the field name list.
       llvm::SmallString<64> fieldNames;
-      unsigned numFields = 0;
-      
-      for (auto prop : Target->getStoredProperties()) {
-        fieldNames.append(prop->getName().str());
-        fieldNames.push_back('\0');
-        ++numFields;
-      }
-      // The final null terminator is provided by getAddrOfGlobalString.
-      
-      // FIXME: rdar://19537198
-      // If the FieldNames string (including the final terminator) 
-      // is exactly 4 or 8 or 16 bytes long then on arm64 it gets emitted 
-      // into section __TEXT,__literal4/8/16 and miscompiled somehow.
-      // Workaround: add an extra byte to avoid those sizes.
-      if (fieldNames.size() == 3 || 
-          fieldNames.size() == 7 || 
-          fieldNames.size() == 15) {
-        fieldNames.push_back('\0');
-      }
+      unsigned numFields = getFieldNameString(Target->getStoredProperties(),
+                                              fieldNames);
       
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
@@ -1924,25 +1966,8 @@ namespace {
     void addKindDependentFields() {
       // Build the field name list.
       llvm::SmallString<64> fieldNames;
-      unsigned numFields = 0;
-      
-      for (auto prop : Target->getStoredProperties()) {
-        fieldNames.append(prop->getName().str());
-        fieldNames.push_back('\0');
-        ++numFields;
-      }
-      // The final null terminator is provided by getAddrOfGlobalString.
-      
-      // FIXME: rdar://19537198
-      // If the FieldNames string (including the final terminator) 
-      // is exactly 4 or 8 or 16 bytes long then on arm64 it gets emitted 
-      // into section __TEXT,__literal4/8/16 and miscompiled somehow.
-      // Workaround: add an extra byte to avoid those sizes.
-      if (fieldNames.size() == 3 || 
-          fieldNames.size() == 7 || 
-          fieldNames.size() == 15) {
-        fieldNames.push_back('\0');
-      }
+      unsigned numFields = getFieldNameString(Target->getStoredProperties(),
+                                              fieldNames);
       
       addConstantInt32(numFields);
       addConstantInt32InWords(FieldVectorOffset);
@@ -1965,6 +1990,7 @@ namespace {
     
     // Offsets of key fields in the metadata records.
     Size GenericParamsOffset;
+    Size PayloadSizeOffset;
     
     EnumDecl *Target;
     
@@ -1982,10 +2008,16 @@ namespace {
         
         Size AddressPoint = Size::invalid();
         Size GenericParamsOffset = Size::invalid();
+        Size PayloadSizeOffset = Size::invalid();
         
         void noteAddressPoint() { AddressPoint = NextOffset; }
+        void addPayloadSize() {
+          PayloadSizeOffset = NextOffset;
+          EnumMetadataScanner::addPayloadSize();
+        }
         void addGenericFields(const GenericParamList &g) {
           GenericParamsOffset = NextOffset;
+          EnumMetadataScanner::addGenericFields(g);
         }
       };
       
@@ -1997,6 +2029,8 @@ namespace {
              && "found generic param vector after address point?!");
       GenericParamsOffset = scanner.GenericParamsOffset.isInvalid()
         ? Size(0) : scanner.GenericParamsOffset - scanner.AddressPoint;
+      PayloadSizeOffset = scanner.PayloadSizeOffset.isInvalid()
+        ? Size(0) : scanner.PayloadSizeOffset - scanner.AddressPoint;
     }
     
     EnumDecl *getTarget() { return Target; }
@@ -2010,27 +2044,59 @@ namespace {
     }
     
     void addKindDependentFields() {
-      // FIXME: Populate.
-      addConstantInt32(0);
-      addConstantInt32(0);
-      addConstantWord(0);
-      addConstantWord(0);
+      auto &strategy = getEnumImplStrategy(IGM,
+                        Target->getDeclaredTypeInContext()->getCanonicalType());
+      
+      
+      // # payload cases in the low 24 bits, payload size offset in the high 8.
+      unsigned numPayloads = strategy.getElementsWithPayload().size();
+      assert(numPayloads < (1<<24) && "too many payload elements for runtime");
+      assert(PayloadSizeOffset % IGM.getPointerAlignment() == Size(0)
+             && "payload size not word-aligned");
+      unsigned PayloadSizeOffsetInWords
+        = PayloadSizeOffset / IGM.getPointerSize();
+      assert(PayloadSizeOffsetInWords < 0x100 &&
+             "payload size offset too far from address point for runtime");
+      addConstantInt32(numPayloads | (PayloadSizeOffsetInWords << 24));
+      // # empty cases
+      addConstantInt32(strategy.getElementsWithNoPayload().size());
+
+      // Build the list of case names, payload followed by no-payload.
+      llvm::SmallString<64> fieldNames;
+      for (auto &payloadCase : strategy.getElementsWithPayload()) {
+        fieldNames.append(payloadCase.decl->getName().str());
+        fieldNames.push_back('\0');
+      }
+      for (auto &noPayloadCase : strategy.getElementsWithNoPayload()) {
+        fieldNames.append(noPayloadCase.decl->getName().str());
+        fieldNames.push_back('\0');
+      }
+      workAroundBrokenARM64Assembler(fieldNames);
+      // The final null terminator is provided by getAddrOfGlobalString.
+      addWord(IGM.getAddrOfGlobalString(fieldNames));
+      
+      // Build the case type accessor.
+      llvm::Function *caseTypeVectorAccessor
+        = getFieldTypeAccessorFn(IGM, Target,
+                                 strategy.getElementsWithPayload());
+      
+      addWord(caseTypeVectorAccessor);
     }
   };
 }
 
 void
 IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
-                          NominalTypeDecl::StoredPropertyRange storedProperties,
-                          llvm::Function *fn) {
-  dispatcher.addLazyFieldTypeAccessor(type, storedProperties, fn, this);
+                                      ArrayRef<CanType> fieldTypes,
+                                      llvm::Function *fn) {
+  dispatcher.addLazyFieldTypeAccessor(type, fieldTypes, fn, this);
 }
 
 void
 irgen::emitFieldTypeAccessor(IRGenModule &IGM,
                          NominalTypeDecl *type,
                          llvm::Function *fn,
-                         NominalTypeDecl::StoredPropertyRange storedProperties)
+                         ArrayRef<CanType> fieldTypes)
 {
   IRGenFunction IGF(IGM, fn);
   auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
@@ -2087,9 +2153,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   emitPolymorphicParametersForGenericValueWitness(IGF, type, metadata);
   
   // Allocate storage for the field vector.
-  SmallVector<VarDecl*, 4> fields(storedProperties.begin(),
-                                  storedProperties.end());
-  unsigned allocSize = fields.size() * IGM.getPointerSize().getValue();
+  unsigned allocSize = fieldTypes.size() * IGM.getPointerSize().getValue();
   auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
   auto allocAlignMaskVal =
     IGM.getSize(IGM.getPointerAlignment().asSize() - Size(1));
@@ -2100,11 +2164,10 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     = IGF.Builder.CreateBitCast(builtVectorAlloc, metadataArrayPtrTy);
   
   // Emit type metadata for the fields into the vector.
-  for (unsigned i : indices(fields)) {
-    auto field = fields[i];
+  for (unsigned i : indices(fieldTypes)) {
+    auto fieldTy = fieldTypes[i];
     auto slot = IGF.Builder.CreateInBoundsGEP(builtVector,
                       llvm::ConstantInt::get(IGM.Int32Ty, i));
-    auto fieldTy = field->getType()->getCanonicalType();
     
     // Strip reference storage qualifiers like unowned and weak.
     // FIXME: Some clients probably care about them.
@@ -4016,6 +4079,10 @@ public:
     auto type = Target->getDeclaredType()->getCanonicalType();
     addWord(emitValueWitnessTable(IGM, type));
   }
+  
+  void addPayloadSize() {
+    llvm_unreachable("nongeneric enums shouldn't need payload size in metadata");
+  }
 };
   
 class GenericEnumMetadataBuilder
@@ -4046,6 +4113,12 @@ public:
                                           pattern);
     for (auto witness: pattern)
       addWord(witness);
+  }
+  
+  void addPayloadSize() {
+    // In all cases where a payload size is demanded in the metadata, it's
+    // runtime-dependent, so fill in a zero here.
+    addConstantWord(0);
   }
   
   void emitInitializeMetadata(IRGenFunction &IGF,
@@ -4264,6 +4337,10 @@ namespace {
     void addValueWitnessTable() {
       auto type = this->Target->getDeclaredType()->getCanonicalType();
       addWord(emitValueWitnessTable(IGM, type));
+    }
+    
+    void addPayloadSize() const {
+      llvm_unreachable("nongeneric enums shouldn't need payload size in metadata");
     }
   };
 }

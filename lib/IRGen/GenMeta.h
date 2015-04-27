@@ -221,9 +221,9 @@ namespace irgen {
   /// lazily generates the metadata for the types of all of the nominal type's
   /// fields for reflection purposes.
   void emitFieldTypeAccessor(IRGenModule &IGM,
-                         NominalTypeDecl *type,
-                         llvm::Function *fn,
-                         NominalTypeDecl::StoredPropertyRange storedProperties);
+                             NominalTypeDecl *type,
+                             llvm::Function *fn,
+                             ArrayRef<CanType> fieldTypes);
   
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.
