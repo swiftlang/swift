@@ -3668,6 +3668,19 @@ namespace {
         IGF.Builder.CreateStore(extraTag, projectExtraTagBits(IGF, enumAddr));
       }
     }
+    
+    void storeDynamicTag(IRGenFunction &IGF, Address enumAddr, unsigned index,
+                         SILType T) const {
+      // Invoke the runtime to store the tag.
+      enumAddr = IGF.Builder.CreateBitCast(enumAddr, IGF.IGM.OpaquePtrTy);
+      auto indexVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, index);
+      auto metadata = IGF.emitTypeMetadataRef(T.getSwiftRValueType());
+      
+      auto call = IGF.Builder.CreateCall3(
+                                     IGF.IGM.getStoreEnumTagMultiPayloadFn(),
+                                     enumAddr.getAddress(), metadata, indexVal);
+      call->setDoesNotThrow();
+    }
 
   public:
 
@@ -3679,16 +3692,27 @@ namespace {
       auto payloadI = std::find_if(ElementsWithPayload.begin(),
                                    ElementsWithPayload.end(),
                                [&](const Element &e) { return e.decl == elt; });
-      if (payloadI != ElementsWithPayload.end())
-        return storePayloadTag(IGF,
-                               enumAddr,
-                               payloadI - ElementsWithPayload.begin());
+      if (payloadI != ElementsWithPayload.end()) {
+        unsigned index = payloadI - ElementsWithPayload.begin();
+        // Use the runtime to store a dynamic tag.
+        if (TIK < Fixed)
+          return storeDynamicTag(IGF, enumAddr, index, T);
+
+        return storePayloadTag(IGF, enumAddr, index);
+      }
 
       auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
                                  ElementsWithNoPayload.end(),
                                [&](const Element &e) { return e.decl == elt; });
       assert(emptyI != ElementsWithNoPayload.end() && "case not in enum");
-      storeNoPayloadTag(IGF, enumAddr, emptyI - ElementsWithNoPayload.begin());
+      unsigned index = emptyI - ElementsWithNoPayload.begin();
+      
+      // Use the runtime to store a dynamic tag. Empty tag values always follow
+      // the payloads.
+      if (TIK < Fixed)
+        return storeDynamicTag(IGF, enumAddr,
+                               index + ElementsWithPayload.size(), T);
+      storeNoPayloadTag(IGF, enumAddr, index);
     }
 
     Address destructiveProjectDataForLoad(IRGenFunction &IGF,

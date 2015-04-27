@@ -497,6 +497,14 @@ FUNCTION(GetEnumCaseSinglePayload,
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
+// int swift_getEnumCaseMultiPayload(opaque_t *obj, Metadata *enumTy);
+FUNCTION(GetEnumCaseMultiPayload,
+         swift_getEnumCaseMultiPayload,
+         RuntimeCC,
+         RETURNS(Int32Ty),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 // void swift_storeEnumTagSinglePayload(opaque_t *obj, Metadata *payload,
 //                                      int case_index,
 //                                      unsigned num_empty_cases);
@@ -505,6 +513,15 @@ FUNCTION(StoreEnumTagSinglePayload,
          RuntimeCC,
          RETURNS(VoidTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_storeEnumTagMultiPayload(opaque_t *obj, Metadata *enumTy,
+//                                     int case_index);
+FUNCTION(StoreEnumTagMultiPayload,
+         swift_storeEnumTagMultiPayload,
+         RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
 // Class object_getClass(id object);

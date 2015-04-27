@@ -164,3 +164,18 @@ next(%z : $Builtin.Int8):
   dealloc_stack %s#0 : $*@local_storage EitherOr<(), ()> 
   return undef : $()
 }
+
+// CHECK-LABEL: define void @dynamic_inject(%O18enum_multi_payload8EitherOr.17* noalias sret, %swift.type* %T)
+sil @dynamic_inject : $@convention(thin) <T> (@out EitherOr<T, Builtin.Int64>) -> () {
+entry(%e : $*EitherOr<T, Builtin.Int64>):
+  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE:%.*]], i32 0) #1
+  inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Left!enumelt.1
+  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 2) #1
+  inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Middle!enumelt
+  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 3) #1
+  inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Center!enumelt
+  // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE]], i32 1) #1
+  inject_enum_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Right!enumelt.1
+
+  return undef : $()
+}
