@@ -2679,6 +2679,12 @@ namespace {
       }
     }
 
+  public:
+    TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
+                                      SILType Type,
+                                      EnumDecl *theEnum,
+                                      llvm::StructType *enumTy) override;
+
   private:
     TypeInfo *completeFixedLayout(TypeConverter &TC,
                                   SILType Type,
@@ -2689,13 +2695,6 @@ namespace {
                                     EnumDecl *theEnum,
                                     llvm::StructType *enumTy);
 
-  public:
-    TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                      SILType Type,
-                                      EnumDecl *theEnum,
-                                      llvm::StructType *enumTy) override;
-
-  private:
     unsigned getNumCaseBits() const {
       return CommonSpareBits.size() - CommonSpareBits.count();
     }
@@ -2800,6 +2799,10 @@ namespace {
 
     llvm::ConstantInt *getEmptyCasePayload(IRGenModule &IGM,
                                        unsigned tagIndex, unsigned idx) const {
+      // The payload may be empty.
+      if (CommonSpareBits.size() == 0)
+        return nullptr;
+      
       APInt v = interleaveSpareBits(IGM, PayloadTagBits,
                                     PayloadTagBits.size(),
                                     tagIndex, 0);
@@ -2808,6 +2811,48 @@ namespace {
                                0, idx);
       return llvm::ConstantInt::get(IGM.getLLVMContext(), v);
     }
+    
+    struct DestructuredLoadableEnum {
+      llvm::Value *payload, *extraTagBits;
+    };
+    DestructuredLoadableEnum
+    destructureLoadableEnum(IRGenFunction &IGF, Explosion &src) const {
+      llvm::Value *payload
+        = CommonSpareBits.size() > 0 ? src.claimNext() : nullptr;
+      
+      llvm::Value *extraTagBits
+        = ExtraTagBitCount > 0 ? src.claimNext() : nullptr;
+      
+      return {payload, extraTagBits};
+    }
+    
+    struct DestructuredAndTaggedLoadableEnum {
+      llvm::Value *payload, *extraTagBits, *tag;
+    };
+    DestructuredAndTaggedLoadableEnum
+    destructureAndTagLoadableEnum(IRGenFunction &IGF, Explosion &src) const {
+      auto destructured = destructureLoadableEnum(IGF, src);
+      
+      llvm::Value *tag = extractPayloadTag(IGF, destructured.payload,
+                                           destructured.extraTagBits);
+
+      return {destructured.payload, destructured.extraTagBits, tag};
+    }
+    
+    llvm::Value *
+    loadPayloadTag(IRGenFunction &IGF, Address addr, SILType T) const {
+      if (TIK >= Fixed) {
+        // Load the fixed-size representation and derive the tags.
+        llvm::Value *payload, *extraTagBits;
+        std::tie(payload, extraTagBits)
+          = emitPrimitiveLoadPayloadAndExtraTag(IGF, addr);
+        return extractPayloadTag(IGF, payload, extraTagBits);
+      }
+      
+      // Otherwise, ask the runtime to extract the dynamically-placed tag.
+      llvm_unreachable("dynamic multi-payload tag load not implemented");
+    }
+
   public:
     
     virtual llvm::Value *
@@ -2829,15 +2874,9 @@ namespace {
     emitValueCaseTest(IRGenFunction &IGF, Explosion &value,
                       EnumElementDecl *Case) const override {
       auto &C = IGF.IGM.getLLVMContext();
-      llvm::Value *payload = value.claimNext();
-      llvm::Value *extraTagBits = nullptr;
-      if (ExtraTagBitCount > 0)
-        extraTagBits = value.claimNext();
-      
-      // Extract the tag bits so we can compare them.
-      llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
+      auto parts = destructureAndTagLoadableEnum(IGF, value);
       unsigned numTagBits
-        = cast<llvm::IntegerType>(tag->getType())->getBitWidth();
+        = cast<llvm::IntegerType>(parts.tag->getType())->getBitWidth();
 
       llvm::Value *caseValue = nullptr;
       if (Case->hasArgumentType()) {
@@ -2863,9 +2902,8 @@ namespace {
         }
       }
       assert(caseValue && "Didn't find case decl");
-      return IGF.Builder.CreateICmpEQ(tag, caseValue);
+      return IGF.Builder.CreateICmpEQ(parts.tag, caseValue);
     }
-    
 
     void emitValueSwitch(IRGenFunction &IGF,
                          Explosion &value,
@@ -2894,17 +2932,13 @@ namespace {
           return found->second;
       };
 
-      llvm::Value *payload = value.claimNext();
-      llvm::Value *extraTagBits = nullptr;
-      if (ExtraTagBitCount > 0)
-        extraTagBits = value.claimNext();
+      auto parts = destructureAndTagLoadableEnum(IGF, value);
 
       // Extract and switch on the tag bits.
-      llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
       unsigned numTagBits
-        = cast<llvm::IntegerType>(tag->getType())->getBitWidth();
+        = cast<llvm::IntegerType>(parts.tag->getType())->getBitWidth();
 
-      auto *tagSwitch = IGF.Builder.CreateSwitch(tag, unreachableBB,
+      auto *tagSwitch = IGF.Builder.CreateSwitch(parts.tag, unreachableBB,
                              ElementsWithPayload.size() + NumEmptyElementTags);
 
       // Switch over the tag bits for payload cases.
@@ -2925,13 +2959,25 @@ namespace {
       for (unsigned i = 0; i < NumEmptyElementTags; ++i) {
         assert(elti != eltEnd &&
                "ran out of cases before running out of extra tags?");
+        
+        auto tagVal = llvm::ConstantInt::get(C, APInt(numTagBits, tagIndex));
+        
+        // If the payload is empty, there's only one case per tag.
+        if (!parts.payload) {
+          tagSwitch->addCase(tagVal, blockForCase(elti->decl));
+        
+          ++elti;
+          ++tagIndex;
+          continue;
+        }
+        
         auto *tagBB = llvm::BasicBlock::Create(C);
-        tagSwitch->addCase(llvm::ConstantInt::get(C,APInt(numTagBits,tagIndex)),
-                           tagBB);
+        tagSwitch->addCase(tagVal, tagBB);
 
         // Switch over the cases for this tag.
         IGF.Builder.emitBlock(tagBB);
-        auto *caseSwitch = IGF.Builder.CreateSwitch(payload, unreachableBB);
+        auto *caseSwitch = IGF.Builder.CreateSwitch(parts.payload,
+                                                    unreachableBB);
         for (unsigned idx = 0; idx < casesPerTag && elti != eltEnd; ++idx) {
           APInt v = interleaveSpareBits(IGF.IGM, PayloadTagBits,
                                         PayloadTagBits.size(),
@@ -2981,6 +3027,10 @@ namespace {
                         unsigned payloadTag,
                         const LoadableTypeInfo &payloadTI,
                         Explosion &out) const {
+      // If the payload is empty, so is the explosion.
+      if (CommonSpareBits.size() == 0)
+        return;
+      
       // If we have spare bits, we have to mask out any set tag bits packed
       // there.
       if (PayloadTagBits.any()) {
@@ -3014,13 +3064,10 @@ namespace {
         return;
       }
 
-      llvm::Value *payload = inValue.claimNext();
-      // We don't need the tag bits.
-      if (ExtraTagBitCount > 0)
-        inValue.claimNext();
+      auto parts = destructureLoadableEnum(IGF, inValue);
 
       // Unpack the payload.
-      projectPayloadValue(IGF, payload,
+      projectPayloadValue(IGF, parts.payload,
                           foundPayload - ElementsWithPayload.begin(),
                      cast<LoadableTypeInfo>(*foundPayload->ti), out);
     }
@@ -3029,25 +3076,25 @@ namespace {
                                   unsigned bitWidth,
                                   unsigned offset) const override {
       PackEnumPayload pack(IGF, bitWidth);
-      // Pack the payload.
-      pack.addAtOffset(src.claimNext(), offset);
+      // Pack the payload, if any.
+      if (CommonSpareBits.size() > 0)
+        pack.addAtOffset(src.claimNext(), offset);
       // Pack the extra bits, if any.
-      if (ExtraTagBitCount > 0) {
+      if (ExtraTagBitCount > 0)
         pack.addAtOffset(src.claimNext(), CommonSpareBits.size() + offset);
-      }
       return pack.get();
     }
 
     void unpackEnumPayload(IRGenFunction &IGF, llvm::Value *outerPayload,
                             Explosion &dest, unsigned offset) const override {
       UnpackEnumPayload unpack(IGF, outerPayload);
-      // Unpack the payload.
-      dest.add(unpack.claimAtOffset(payloadTy, offset));
+      // Unpack the payload, if any.
+      if (CommonSpareBits.size() > 0)
+        dest.add(unpack.claimAtOffset(payloadTy, offset));
       // Unpack the extra bits, if any.
-      if (ExtraTagBitCount > 0) {
+      if (ExtraTagBitCount > 0)
         dest.add(unpack.claimAtOffset(extraTagTy,
                                       CommonSpareBits.size() + offset));
-      }
     }
 
   private:
@@ -3057,7 +3104,9 @@ namespace {
                               unsigned tag) const {
       // Pack the payload.
       auto &loadablePayloadTI = cast<LoadableTypeInfo>(payloadTI); // FIXME
-      llvm::Value *payload = loadablePayloadTI.packEnumPayload(IGF, params,
+      llvm::Value *payload = nullptr;
+      if (CommonSpareBits.size() > 0)
+        payload = loadablePayloadTI.packEnumPayload(IGF, params,
                                                     CommonSpareBits.size(), 0);
 
       // If we have spare bits, pack tag bits into them.
@@ -3072,7 +3121,8 @@ namespace {
         payload = IGF.Builder.CreateOr(payload, tagMask);
       }
 
-      out.add(payload);
+      if (payload)
+        out.add(payload);
 
       // If we have extra tag bits, pack the remaining tag bits into them.
       if (ExtraTagBitCount > 0) {
@@ -3096,13 +3146,13 @@ namespace {
         tagIndex = index & ((1 << numCaseBits) - 1);
       }
 
-      llvm::ConstantInt *payload;
+      llvm::ConstantInt *payload = nullptr;
       llvm::ConstantInt *extraTag = nullptr;
       unsigned numSpareBits = CommonSpareBits.count();
       if (numSpareBits > 0) {
         // If we have spare bits, pack tag bits into them.
         payload = getEmptyCasePayload(IGM, tag, tagIndex);
-      } else {
+      } else if (CommonSpareBits.size() > 0) {
         // Otherwise the payload is just the index.
         payload = llvm::ConstantInt::get(IGM.getLLVMContext(),
                                      APInt(CommonSpareBits.size(), tagIndex));
@@ -3121,20 +3171,21 @@ namespace {
                                 unsigned index) const {
       llvm::Value *payload, *extraTag;
       std::tie(payload, extraTag) = getNoPayloadCaseValue(IGF.IGM, index);
-      out.add(payload);
+      if (CommonSpareBits.size() > 0) {
+        assert(payload);
+        out.add(payload);
+      }
       if (ExtraTagBitCount > 0) {
         assert(extraTag);
         out.add(extraTag);
       }
     }
 
-    void forNontrivialPayloads(IRGenFunction &IGF,
-               llvm::Value *payload, llvm::Value *extraTagBits,
+    void forNontrivialPayloads(IRGenFunction &IGF, llvm::Value *tag,
                std::function<void (unsigned, EnumImplStrategy::Element)> f)
     const {
       auto *endBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
 
-      llvm::Value *tag = extractPayloadTag(IGF, payload, extraTagBits);
       auto *swi = IGF.Builder.CreateSwitch(tag, endBB);
       auto *tagTy = cast<llvm::IntegerType>(tag->getType());
 
@@ -3172,7 +3223,7 @@ namespace {
       auto maskVal = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), mask);
       return IGF.Builder.CreateAnd(payload, maskVal);
     }
-
+    
   public:
     void emitValueInjection(IRGenFunction &IGF,
                             EnumElementDecl *elt,
@@ -3204,45 +3255,43 @@ namespace {
         return;
 
       case Normal: {
-        llvm::Value *payload = src.claimNext();
-        llvm::Value *extraTagBits = ExtraTagBitCount > 0
-          ? src.claimNext() : nullptr;
-
-        forNontrivialPayloads(IGF, payload, extraTagBits,
+        auto parts = destructureAndTagLoadableEnum(IGF, src);
+        
+        forNontrivialPayloads(IGF, parts.tag,
           [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
             auto &lti = cast<LoadableTypeInfo>(*elt.ti);
             Explosion value;
-            projectPayloadValue(IGF, payload, tagIndex, lti, value);
+            projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
             Explosion tmp;
             lti.copy(IGF, value, tmp);
             tmp.claimAll(); // FIXME: repack if not bit-identical
           });
 
-        dest.add(payload);
-        if (extraTagBits)
-          dest.add(extraTagBits);
+        if (parts.payload)
+          dest.add(parts.payload);
+        if (parts.extraTagBits)
+          dest.add(parts.extraTagBits);
         return;
       }
 
       case TaggedSwiftRefcounted:
       case TaggedUnknownRefcounted: {
-        llvm::Value *payload = src.claimNext();
-        llvm::Value *extraTagBits = ExtraTagBitCount > 0
-          ? src.claimNext() : nullptr;
-
+        auto parts = destructureLoadableEnum(IGF, src);
+        assert(parts.payload && "no payload for single refcounted enum?!");
+        
         // Mask the tag bits out of the payload, if any.
         llvm::Value *ptrVal
-          = maskTagBitsFromPayload(IGF, payload);
+          = maskTagBitsFromPayload(IGF, parts.payload);
 
         // Retain the pointer.
         auto ptr = IGF.Builder.CreateIntToPtr(ptrVal,
                                               getRefcountedPtrType(IGF.IGM));
         retainRefcountedPayload(IGF, ptr);
 
-        dest.add(payload);
-        if (extraTagBits)
-          dest.add(extraTagBits);
+        dest.add(parts.payload);
+        if (parts.extraTagBits)
+          dest.add(parts.extraTagBits);
         return;
       }
       }
@@ -3258,15 +3307,13 @@ namespace {
         return;
 
       case Normal: {
-        llvm::Value *payload = src.claimNext();
-        llvm::Value *extraTagBits = ExtraTagBitCount > 0
-          ? src.claimNext() : nullptr;
+        auto parts = destructureAndTagLoadableEnum(IGF, src);
 
-        forNontrivialPayloads(IGF, payload, extraTagBits,
+        forNontrivialPayloads(IGF, parts.tag,
           [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
             auto &lti = cast<LoadableTypeInfo>(*elt.ti);
             Explosion value;
-            projectPayloadValue(IGF, payload, tagIndex, lti, value);
+            projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
             lti.consume(IGF, value);
           });
@@ -3275,13 +3322,12 @@ namespace {
 
       case TaggedSwiftRefcounted:
       case TaggedUnknownRefcounted: {
-        llvm::Value *payload = src.claimNext();
-        if (ExtraTagBitCount > 0)
-          src.claimNext();
-
+        auto parts = destructureLoadableEnum(IGF, src);
+        assert(parts.payload && "no payload for single refcounted enum?!");
+        
         // Mask the tag bits out of the payload, if any.
         llvm::Value *ptrVal
-          = maskTagBitsFromPayload(IGF, payload);
+          = maskTagBitsFromPayload(IGF, parts.payload);
 
         // Release the pointer.
         auto ptr = IGF.Builder.CreateIntToPtr(ptrVal,
@@ -3301,15 +3347,13 @@ namespace {
         return;
 
       case Normal: {
-        llvm::Value *payload = src.claimNext();
-        llvm::Value *extraTagBits = ExtraTagBitCount > 0
-          ? src.claimNext() : nullptr;
+        auto parts = destructureAndTagLoadableEnum(IGF, src);
 
-        forNontrivialPayloads(IGF, payload, extraTagBits,
+        forNontrivialPayloads(IGF, parts.tag,
           [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
             auto &lti = cast<LoadableTypeInfo>(*elt.ti);
             Explosion value;
-            projectPayloadValue(IGF, payload, tagIndex, lti, value);
+            projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
             lti.fixLifetime(IGF, value);
           });
@@ -3318,13 +3362,12 @@ namespace {
 
       case TaggedSwiftRefcounted:
       case TaggedUnknownRefcounted: {
-        llvm::Value *payload = src.claimNext();
-        if (ExtraTagBitCount > 0)
-          src.claimNext();
+        auto parts = destructureLoadableEnum(IGF, src);
+        assert(parts.payload && "no payload for single refcounted enum?!");
 
         // Mask the tag bits out of the payload, if any.
         llvm::Value *ptrVal
-          = maskTagBitsFromPayload(IGF, payload);
+          = maskTagBitsFromPayload(IGF, parts.payload);
 
         // Release the pointer.
         auto ptr = IGF.Builder.CreateIntToPtr(ptrVal,
@@ -3349,8 +3392,8 @@ namespace {
       case TaggedSwiftRefcounted:
       case TaggedUnknownRefcounted:
       case Normal: {
-        // If the enum is loadable, it's better to do this directly using values,
-        // so we don't need to RMW tag bits in place.
+        // If the enum is loadable, it's better to do this directly using
+        // values, so we don't need to RMW tag bits in place.
         if (TI->isLoadable()) {
           Explosion tmpSrc, tmpOld;
           if (isTake)
@@ -3366,7 +3409,7 @@ namespace {
 
         auto *endBB = llvm::BasicBlock::Create(C);
 
-        // Sanity-check whether the source and destination alias.
+        // Check whether the source and destination alias.
         llvm::Value *alias = IGF.Builder.CreateICmpEQ(dest.getAddress(),
                                                       src.getAddress());
         auto *noAliasBB = llvm::BasicBlock::Create(C);
@@ -3502,6 +3545,41 @@ namespace {
       emitIndirectInitialize(IGF, dest, src, T, IsTake);
     }
 
+    void destroy(IRGenFunction &IGF, Address addr, SILType T)
+    const override {
+      switch (CopyDestroyKind) {
+      case POD:
+        return;
+
+      case Normal:
+      case TaggedSwiftRefcounted:
+      case TaggedUnknownRefcounted: {
+        // If loadable, it's better to do this directly to the value than
+        // in place, so we don't need to RMW out the tag bits in memory.
+        if (TI->isLoadable()) {
+          Explosion tmp;
+          loadAsTake(IGF, addr, tmp);
+          consume(IGF, tmp);
+          return;
+        }
+
+        auto tag = loadPayloadTag(IGF, addr, T);
+
+        forNontrivialPayloads(IGF, tag,
+          [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+            // Clear tag bits out of the payload area, if any.
+            preparePayloadForLoad(IGF, addr, tagIndex);
+            // Destroy the data.
+            Address dataAddr = IGF.Builder.CreateBitCast(addr,
+                                      elt.ti->getStorageType()->getPointerTo());
+            SILType payloadT = T.getEnumElementType(elt.decl, *IGF.IGM.SILMod);
+            elt.ti->destroy(IGF, dataAddr, payloadT);
+          });
+        return;
+      }
+      }
+    }
+
   private:
     /// Clear any tag bits stored in the payload area of the given address.
     void preparePayloadForLoad(IRGenFunction &IGF, Address enumAddr,
@@ -3522,43 +3600,6 @@ namespace {
           payloadBits = IGF.Builder.CreateAnd(payloadBits, spareBitMask);
           IGF.Builder.CreateStore(payloadBits, payloadAddr);
         }
-      }
-    }
-
-    void destroy(IRGenFunction &IGF, Address addr, SILType T)
-    const override {
-      switch (CopyDestroyKind) {
-      case POD:
-        return;
-
-      case Normal:
-      case TaggedSwiftRefcounted:
-      case TaggedUnknownRefcounted: {
-        // If loadable, it's better to do this directly to the value than
-        // in place, so we don't need to RMW out the tag bits in memory.
-        if (TI->isLoadable()) {
-          Explosion tmp;
-          loadAsTake(IGF, addr, tmp);
-          consume(IGF, tmp);
-          return;
-        }
-
-        llvm::Value *payload, *extraTagBits;
-        std::tie(payload, extraTagBits)
-          = emitPrimitiveLoadPayloadAndExtraTag(IGF, addr);
-
-        forNontrivialPayloads(IGF, payload, extraTagBits,
-          [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
-            // Clear tag bits out of the payload area, if any.
-            preparePayloadForLoad(IGF, addr, tagIndex);
-            // Destroy the data.
-            Address dataAddr = IGF.Builder.CreateBitCast(addr,
-                                      elt.ti->getStorageType()->getPointerTo());
-            SILType payloadT = T.getEnumElementType(elt.decl, *IGF.IGM.SILMod);
-            elt.ti->destroy(IGF, dataAddr, payloadT);
-          });
-        return;
-      }
       }
     }
 
@@ -3715,6 +3756,8 @@ namespace {
     ClusteredBitVector
     getBitPatternForNoPayloadElement(IRGenModule &IGM,
                                      EnumElementDecl *theCase) const override {
+      assert(TIK >= Fixed);
+
       llvm::ConstantInt *payloadPart, *extraPart;
 
       auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
@@ -3725,7 +3768,10 @@ namespace {
       unsigned index = emptyI - ElementsWithNoPayload.begin();
 
       std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(IGM, index);
-      ClusteredBitVector bits = getBitVectorFromAPInt(payloadPart->getValue());
+      ClusteredBitVector bits;
+      
+      if (payloadPart)
+        bits = getBitVectorFromAPInt(payloadPart->getValue());
 
       unsigned totalSize
         = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
@@ -3743,6 +3789,8 @@ namespace {
 
     ClusteredBitVector
     getBitMaskForNoPayloadElements(IRGenModule &IGM) const override {
+      assert(TIK >= Fixed);
+
       // All bits are significant.
       // TODO: They don't have to be.
       return ClusteredBitVector::getConstant(
@@ -3751,6 +3799,8 @@ namespace {
     }
 
     ClusteredBitVector getTagBitsForPayloads(IRGenModule &IGM) const override {
+      assert(TIK >= Fixed);
+      
       ClusteredBitVector result = PayloadTagBits;
 
       unsigned totalSize

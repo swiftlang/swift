@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend %s -gnone -emit-ir -enable-source-import -I %S/Inputs -enable-dynamic-value-type-layout | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
+import Builtin
 import enum_multi_payload
+
+sil_stage canonical
 
 /* TODO: Banished to Inputs/enum_multi_payload.swift so that IRGen doesn't try
    to emit metadata for multi-payload enums until it's fully able to.
@@ -10,13 +13,26 @@ enum Either<T, U> {
   case Right(U)
 }
 
+enum EitherOr<T, U> {
+  case Left(T)
+  case Middle
+  case Center
+  case Right(U)
+}
+
 class C {}
 
  */
 
-// Force validation of the Either decl.
+// Force validation of the decls in the enum_multi_payload file.
 func either(x: C) -> Either<C, C> {
   return .Left(x)
+  return .Right(x)
+}
+func either_or(x: C) -> EitherOr<C, C> {
+  return .Left(x)
+  return .Middle
+  return .Center
   return .Right(x)
 }
 
@@ -27,4 +43,124 @@ func either(x: C) -> Either<C, C> {
 sil @fixed_instances_dont_use_spare_bits : $@convention(thin) (@owned Either<C, C>) -> @owned Either<C, C> {
 entry(%e : $Either<C, C>):
   return %e : $Either<C, C>
+}
+
+// -- Handle case where all of the payloads become empty.
+// CHECK-LABEL: define void @empty_instance(i1) {
+sil @empty_instance : $@convention(thin) (Either<(), ()>) -> () {
+// CHECK-NEXT: entry:
+entry(%e : $Either<(), ()>):
+
+  retain_value %e : $Either<(), ()>
+  release_value %e : $Either<(), ()>
+  fix_lifetime %e : $Either<(), ()>
+
+  // CHECK-NEXT: alloca
+  %s = alloc_stack $Either<(), ()>
+
+  %l = enum $Either<(), ()>, #Either.Left!enumelt.1, undef : $()
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: store i1 false
+  store %l to %s#1 : $*Either<(), ()>
+  %r = enum $Either<(), ()>, #Either.Right!enumelt.1, undef : $()
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: store i1 true
+  store %r to %s#1 : $*Either<(), ()>
+
+  %a = unchecked_enum_data %l : $Either<(), ()>, #Either.Left!enumelt.1
+  %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt.1
+
+  // CHECK-NEXT: switch 
+  // CHECK-NEXT:   i1 false, label %5
+  // CHECK-NEXT:   i1 true, label %6
+  // CHECK:      <label>:5
+  // CHECK:        br label %7
+  // CHECK:      <label>:6
+  // CHECK:        br label %8
+  switch_enum %e : $Either<(), ()>,
+    case #Either.Left!enumelt.1: left,
+    case #Either.Right!enumelt.1: right
+
+left(%x : $()):
+  %0 = integer_literal $Builtin.Int8, 0
+  br next(%0 : $Builtin.Int8)
+
+right(%y : $()):
+  %1 = integer_literal $Builtin.Int8, 1
+  br next(%1 : $Builtin.Int8)
+
+  // CHECK:        phi i8 [ 1, %8 ], [ 0, %7 ]
+next(%z : $Builtin.Int8):
+  dealloc_stack %s#0 : $*@local_storage Either<(), ()>
+  return undef : $()
+}
+
+// CHECK-LABEL: define void @empty_instance2(i2) {
+sil @empty_instance2 : $@convention(thin) (EitherOr<(), ()>) -> () {
+// CHECK-NEXT: entry:
+entry(%e : $EitherOr<(), ()>):
+
+  retain_value %e : $EitherOr<(), ()>
+  release_value %e : $EitherOr<(), ()>
+  fix_lifetime %e : $EitherOr<(), ()>
+
+  // CHECK-NEXT: alloca
+  %s = alloc_stack $EitherOr<(), ()>
+
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: store i2 0
+  %l = enum $EitherOr<(), ()>, #EitherOr.Left!enumelt.1, undef : $()
+  store %l to %s#1 : $*EitherOr<(), ()>
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: store i2 1
+  %r = enum $EitherOr<(), ()>, #EitherOr.Right!enumelt.1, undef : $()
+  store %r to %s#1 : $*EitherOr<(), ()>
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: store i2 -2
+  %m = enum $EitherOr<(), ()>, #EitherOr.Middle!enumelt
+  store %m to %s#1 : $*EitherOr<(), ()>
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: store i2 -1
+  %k = enum $EitherOr<(), ()>, #EitherOr.Center!enumelt
+  store %k to %s#1 : $*EitherOr<(), ()>
+
+  %a = unchecked_enum_data %l : $EitherOr<(), ()>, #EitherOr.Left!enumelt.1
+  %b = unchecked_enum_data %r : $EitherOr<(), ()>, #EitherOr.Right!enumelt.1
+
+  // CHECK-NEXT: switch
+  // CHECK-NEXT:   i2  0, label %[[LEFT_PRE:[0-9]+]]
+  // CHECK-NEXT:   i2  1, label %[[RIGHT_PRE:[0-9]+]]
+  // CHECK-NEXT:   i2 -2, label [[MIDDLE:%[0-9]+]]
+  // CHECK-NEXT:   i2 -1, label [[CENTER:%[0-9]+]]
+  switch_enum %e : $EitherOr<(), ()>,
+    case #EitherOr.Left!enumelt.1: left,
+    case #EitherOr.Middle!enumelt: middle,
+    case #EitherOr.Center!enumelt: center,
+    case #EitherOr.Right!enumelt.1: right
+
+  // CHECK:      <label>:[[LEFT_PRE]]
+  // CHECK:        br label [[LEFT:%[0-9]+]]
+  // CHECK:      <label>:[[RIGHT_PRE]]
+  // CHECK:        br label [[RIGHT:%[0-9]+]]
+
+left(%x : $()):
+  %0 = integer_literal $Builtin.Int8, 0
+  br next(%0 : $Builtin.Int8)
+
+middle:
+  %1 = integer_literal $Builtin.Int8, 1
+  br next(%1 : $Builtin.Int8)
+
+center:
+  %2 = integer_literal $Builtin.Int8, 2
+  br next(%2 : $Builtin.Int8)
+
+right(%y : $()):
+  %3 = integer_literal $Builtin.Int8, 3
+  br next(%3 : $Builtin.Int8)
+
+next(%z : $Builtin.Int8):
+  // CHECK:      phi i8 [ 3, [[RIGHT]] ], [ 2, [[CENTER]] ], [ 1, [[MIDDLE]] ], [ 0, [[LEFT]] ]
+  dealloc_stack %s#0 : $*@local_storage EitherOr<(), ()> 
+  return undef : $()
 }
