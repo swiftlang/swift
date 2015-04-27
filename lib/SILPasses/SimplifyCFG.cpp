@@ -377,8 +377,15 @@ static bool propagateCondBrCondition(CondBranchInst *CBR, DominanceInfo *DT) {
     if (!LiteralInsts[Literal]) {
       // Create a 0- or 1- literal in the cond_br's block.
       SILInstruction *User = CUI.Use->getUser();
+
+      // Can't use a return location on an integer_literal.
+      auto Loc = User->getLoc();
+      if (User->getLoc().is<ImplicitReturnLocation>() ||
+          User->getLoc().is<ReturnLocation>())
+        Loc = CBR->getLoc();
+
       LiteralInsts[Literal] = SILBuilderWithScope<1>(CBR).
-        createIntegerLiteral(User->getLoc(), Cond.getType(), Literal);
+        createIntegerLiteral(Loc, Cond.getType(), Literal);
     }
     // Replace the use of the cond_br condition with a literal.
     CUI.Use->set(LiteralInsts[Literal]);
