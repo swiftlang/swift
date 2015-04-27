@@ -1179,7 +1179,12 @@ public:
 
   SourceLoc getLoc() const { return NameRange.Start; }
   SourceLoc getStartLoc() const {
-    return (Base->isImplicit() ? NameRange.Start : Base->getStartLoc());
+    SourceLoc BaseStartLoc = Base->getStartLoc();
+    if (BaseStartLoc.isInvalid() || NameRange.End.isInvalid()) {
+      return NameRange.Start;
+    } else {
+      return BaseStartLoc;
+    }
   }
   SourceLoc getEndLoc() const {
     return NameRange.End;
@@ -1251,7 +1256,12 @@ public:
   SourceLoc getLoc() const { return NameLoc; }
 
   SourceLoc getStartLoc() const {
-    return (Base->isImplicit() ? NameLoc : Base->getStartLoc());
+    SourceLoc BaseStartLoc = Base->getStartLoc();
+    if (BaseStartLoc.isInvalid() || NameLoc.isInvalid()) {
+      return NameLoc;
+    } else {
+      return BaseStartLoc;
+    }
   }
   SourceLoc getEndLoc() const { return NameLoc; }
 

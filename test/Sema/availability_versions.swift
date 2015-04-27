@@ -1132,6 +1132,32 @@ enum EnumForFixit {
       // expected-note@-3 {{add @availability attribute to enclosing enum}} {{1-1=@availability(OSX, introduced=10.10)\n}}
 }
 
+@objc
+class Y {
+ var z = 0
+}
+
+@objc
+class X {
+  var y = Y()
+}
+
+func testForFixitWithNestedMemberRefExpr() {
+  var x = X()
+
+  x.y.z = globalFuncAvailableOn10_11()
+      // expected-error@-1 {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
+      // expected-note@-2 {{guard with version check}} {{3-39=if #available(OSX >= 10.11, *) {\n      x.y.z = globalFuncAvailableOn10_11()\n  } else {\n      // Fallback on earlier versions\n  }}}
+      // expected-note@-3 {{add @availability attribute to enclosing global function}} {{1-1=@availability(OSX, introduced=10.11)\n}}
+
+  // Access via dynamic member reference
+  var anyX: AnyObject = x
+  anyX.y?.z = globalFuncAvailableOn10_11()
+      // expected-error@-1 {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
+      // expected-note@-2 {{guard with version check}} {{3-43=if #available(OSX >= 10.11, *) {\n      anyX.y?.z = globalFuncAvailableOn10_11()\n  } else {\n      // Fallback on earlier versions\n  }}}
+      // expected-note@-3 {{add @availability attribute to enclosing global function}} {{1-1=@availability(OSX, introduced=10.11)\n}}
+}
+
 // Protocol Conformances
 
 protocol HasMethodF {
