@@ -2469,8 +2469,7 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
-                            SILType T) const override
-    {
+                            SILType T) const override {
       // Fixed-size enums don't need dynamic witness table initialization.
       if (TIK >= Fixed) return;
 
@@ -3865,12 +3864,47 @@ namespace {
       return IGF.Builder.CreateBitCast(enumAddr,
                                payloadI->ti->getStorageType()->getPointerTo());
     }
+    
+    llvm::Value *emitPayloadMetadataArrayForLayout(IRGenFunction &IGF,
+                                                   SILType T) const {
+      auto numPayloads = ElementsWithPayload.size();
+      auto metadataBufferTy = llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
+                                                   numPayloads);
+      auto metadataBuffer = IGF.createAlloca(metadataBufferTy,
+                                             IGF.IGM.getPointerAlignment(),
+                                             "payload_types");
+      llvm::Value *firstAddr;
+      for (unsigned i = 0; i < numPayloads; ++i) {
+        auto &elt = ElementsWithPayload[i];
+        Address eltAddr = IGF.Builder.CreateStructGEP(metadataBuffer, i,
+                                                  IGF.IGM.getPointerSize() * i);
+        if (i == 0) firstAddr = eltAddr.getAddress();
+        
+        auto payloadTy = T.getEnumElementType(elt.decl, *IGF.IGM.SILMod);
+        
+        auto metadata = IGF.emitTypeMetadataRefForLayout(payloadTy);
+        
+        IGF.Builder.CreateStore(metadata, eltAddr);
+      }
+      
+      return firstAddr;
+    }
 
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             llvm::Value *vwtable,
                             SILType T) const override {
-      // FIXME
+      // Fixed-size enums don't need dynamic metadata initialization.
+      if (TIK >= Fixed) return;
+      
+      // Ask the runtime to set up the metadata record for a dynamic enum.
+      auto payloadMetadataArray = emitPayloadMetadataArrayForLayout(IGF, T);
+      auto numPayloadsVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                                   ElementsWithPayload.size());
+
+      IGF.Builder.CreateCall4(IGF.IGM.getInitEnumMetadataMultiPayloadFn(),
+                              vwtable, metadata, numPayloadsVal,
+                              payloadMetadataArray);
     }
 
     /// \group Extra inhabitants

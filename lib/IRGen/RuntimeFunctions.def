@@ -488,6 +488,18 @@ FUNCTION(InitEnumValueWitnessTableSinglePayload,
          ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
+// void swift_initEnumMetadataMultiPayload(value_witness_table_t *vwt,
+//                                         Metadata *enumType,
+//                                         size_t numPayloads,
+//                                         Metadata * const *payloadTypes);
+FUNCTION(InitEnumMetadataMultiPayload,
+         swift_initEnumMetadataMultiPayload,
+         RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, SizeTy,
+              TypeMetadataPtrTy->getPointerTo(0)),
+         ATTRS(NoUnwind))
+
 // int swift_getEnumCaseSinglePayload(opaque_t *obj, Metadata *payload,
 //                                    unsigned num_empty_cases);
 FUNCTION(GetEnumCaseSinglePayload,

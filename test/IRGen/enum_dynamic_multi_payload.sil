@@ -1,12 +1,8 @@
-// RUN: %target-swift-frontend %s -gnone -emit-ir -enable-source-import -I %S/Inputs -enable-dynamic-value-type-layout | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -gnone -emit-ir -I %S/Inputs -enable-dynamic-value-type-layout | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import Builtin
-import enum_multi_payload
 
 sil_stage canonical
-
-/* TODO: Banished to Inputs/enum_multi_payload.swift so that IRGen doesn't try
-   to emit metadata for multi-payload enums until it's fully able to.
 
 enum Either<T, U> {
   case Left(T)
@@ -22,19 +18,9 @@ enum EitherOr<T, U> {
 
 class C {}
 
- */
+sil_vtable C {}
 
-// Force validation of the decls in the enum_multi_payload file.
-func either(x: C) -> Either<C, C> {
-  return .Left(x)
-  return .Right(x)
-}
-func either_or(x: C) -> EitherOr<C, C> {
-  return .Left(x)
-  return .Middle
-  return .Center
-  return .Right(x)
-}
+// CHECK: @_TMPdO26enum_dynamic_multi_payload8EitherOr = {{.*}} %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_GENERIC_METADATA:@[A-Za-z0-9_]+]]
 
 // -- The runtime doesn't track spare bits, so fixed instances of the dynamic
 //    type can't use them.
@@ -166,7 +152,7 @@ next(%z : $Builtin.Int8):
 }
 
 // CHECK-LABEL: define void @dynamic_inject
-// CHECK:         ([[EITHER_OR:%O18enum_multi_payload8EitherOr.*]]* noalias sret, %swift.type* %T)
+// CHECK:         ([[EITHER_OR:%O26enum_dynamic_multi_payload8EitherOr.*]]* noalias sret, %swift.type* %T)
 sil @dynamic_inject : $@convention(thin) <T> (@out EitherOr<T, Builtin.Int64>) -> () {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
   // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE:%.*]], i32 0)
@@ -271,7 +257,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
 }
 
 // CHECK-LABEL: define void @dynamic_value_semantics2
-// CHECK:         ([[EITHER_OR:%O18enum_multi_payload8EitherOr.*]]* noalias sret, [[EITHER_OR]]*, %swift.type* %T)
+// CHECK:         ([[EITHER_OR:%O26enum_dynamic_multi_payload8EitherOr.*]]* noalias sret, [[EITHER_OR]]*, %swift.type* %T)
 sil @dynamic_value_semantics2 : $@convention(thin) <T> (@out EitherOr<T, C>, @in EitherOr<T, C>) -> () {
 entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
@@ -321,3 +307,12 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 
   return undef : $()
 }
+
+// CHECK: define private %swift.type* [[CREATE_GENERIC_METADATA]](%swift.type_pattern*, i8**) {
+// CHECK:   [[BUF:%.*]] = alloca [2 x %swift.type*]
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
+// CHECK:   [[BUF0:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 0
+// CHECK:   store %swift.type* %T, {{.*}} [[BUF0]]
+// CHECK:   [[BUF1:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 1
+// CHECK:   store %swift.type* %U, {{.*}} [[BUF1]]
+// CHECK:   call void @swift_initEnumMetadataMultiPayload(i8** {{%.*}}, %swift.type* [[METADATA]], {{i(32|64)}} 2, %swift.type** [[BUF0]])
