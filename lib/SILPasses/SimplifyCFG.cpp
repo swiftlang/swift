@@ -970,6 +970,25 @@ static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
   Builder.createCondFail(Orig->getLoc(), Cond);
 }
 
+/// Inverts the expected value of 'PotentialExpect' (if it is an expect
+/// intrinsic) and returns this expected value apply to 'V'.
+static SILValue invertExpectAndApplyTo(SILBuilder &Builder,
+                                       SILValue PotentialExpect, SILValue V) {
+  auto *BI = dyn_cast<BuiltinInst>(PotentialExpect);
+  if (!BI)
+    return V;
+  if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::expect)
+    return V;
+  auto Args = BI->getArguments();
+  IntegerLiteralInst *IL = dyn_cast<IntegerLiteralInst>(Args[1]);
+  if (!IL)
+    return V;
+  SILValue NegatedExpectedValue = Builder.createIntegerLiteral(
+      IL->getLoc(), Args[1].getType(), IL->getValue() == 0 ? -1 : 0);
+  return Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(), {},
+                               {V, NegatedExpectedValue});
+}
+
 /// simplifyCondBrBlock - Simplify a basic block that ends with a conditional
 /// branch.
 bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
@@ -999,6 +1018,30 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     addToWorklist(LiveBlock);
     ++NumConstantFolded;
     return true;
+  }
+
+  // Canonicalize "cond_br (not %cond), BB1, BB2" to "cond_br %cond, BB2, BB1".
+  // This looks through expect intrinsic calls and applies the ultimate expect
+  // call inverted to the condition.
+  if (auto *Xor =
+          dyn_cast<BuiltinInst>(BI->getCondition().stripExpectIntrinsic())) {
+    if (Xor->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
+      // Check if it's a boolean invertion of the condition.
+      OperandValueArrayRef Args = Xor->getArguments();
+      if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
+        if (IL->getValue().isAllOnesValue()) {
+          auto Cond = Args[0];
+          SILBuilderWithScope<2> Builder(BI);
+          Builder.createCondBranch(
+              BI->getLoc(),
+              invertExpectAndApplyTo(Builder, BI->getCondition(), Cond),
+              FalseSide, FalseArgs, TrueSide, TrueArgs);
+          BI->eraseFromParent();
+          addToWorklist(ThisBB);
+          return true;
+        }
+      }
+    }
   }
 
   // If the destination block is a simple trampoline (jump to another block)
