@@ -306,7 +306,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
     case ValueKind::ApplyInst:
     case ValueKind::TryApplyInst:
-    case ValueKind::BuiltinInst:
     case ValueKind::AllocBoxInst:
     case ValueKind::AllocExistentialBoxInst:
     case ValueKind::AllocRefInst:
@@ -382,6 +381,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::SelectEnumAddrInst:
     case ValueKind::SelectEnumInst:
     case ValueKind::SelectValueInst:
+      return InlineCost::Expensive;
+
+    case ValueKind::BuiltinInst:
+      // Expect intrinsics are 'free' instructions.
+      if (cast<BuiltinInst>(I).getIntrinsicInfo().ID == llvm::Intrinsic::expect)
+        return InlineCost::Free;
       return InlineCost::Expensive;
 
     case ValueKind::SILArgument:
