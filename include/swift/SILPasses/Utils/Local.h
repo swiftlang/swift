@@ -17,6 +17,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/Allocator.h"
 #include <functional>
 #include <utility>
 
@@ -422,6 +423,88 @@ public:
   }
 };
 
+/// This iterator 'looks through' one level of builtin expect users exposing all
+/// users of the looked through builtin expect instruction i.e it presents a
+/// view that shows all users as if there were no builtin expect instructions
+/// interposed.
+class IgnoreExpectUseIterator
+    : public std::iterator<std::forward_iterator_tag, Operand *, ptrdiff_t> {
+  ValueBaseUseIterator OrigUseChain;
+  ValueBaseUseIterator CurrentIter;
+
+  static bool isExpect(Operand *Use) {
+    if (auto *BI = dyn_cast<BuiltinInst>(Use->getUser()))
+      if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
+        return true;
+    return false;
+  }
+
+  // Advance through expect users to their users until we encounter a user that
+  // is not an expect.
+  void advanceThroughExpects() {
+    while (CurrentIter == OrigUseChain &&
+           CurrentIter != ValueBaseUseIterator(nullptr) &&
+           isExpect(*CurrentIter)) {
+      auto *Expect = CurrentIter->getUser();
+      CurrentIter = Expect->use_begin();
+      // Expect with no users advance to next item in original use chain.
+      if (CurrentIter == Expect->use_end())
+        CurrentIter = ++OrigUseChain;
+    }
+  }
+
+public:
+  IgnoreExpectUseIterator(ValueBase *V)
+      : OrigUseChain(V->use_begin()), CurrentIter(V->use_begin()) {
+    advanceThroughExpects();
+  }
+
+  IgnoreExpectUseIterator() = default;
+
+  Operand *operator*() const { return *CurrentIter; }
+  Operand *operator->() const { return *CurrentIter; }
+  SILInstruction *getUser() const { return this->getUser(); }
+
+  IgnoreExpectUseIterator &operator++() {
+    assert(**this && "increment past end()!");
+    if (OrigUseChain == CurrentIter) {
+      // Use chain of the original value.
+      ++OrigUseChain;
+      ++CurrentIter;
+      // Ignore expects.
+      advanceThroughExpects();
+      } else {
+      // Use chain of an expect.
+      ++CurrentIter;
+      if (CurrentIter == ValueBaseUseIterator(nullptr)) {
+        // At the end of the use chain of an expect.
+        CurrentIter = ++OrigUseChain;
+        advanceThroughExpects();
+      }
+    }
+    return *this;
+  }
+
+  IgnoreExpectUseIterator operator++(int unused) {
+    IgnoreExpectUseIterator Copy = *this;
+    ++*this;
+    return Copy;
+  }
+  friend bool operator==(IgnoreExpectUseIterator lhs,
+                         IgnoreExpectUseIterator rhs) {
+    return lhs.CurrentIter == rhs.CurrentIter;
+  }
+  friend bool operator!=(IgnoreExpectUseIterator lhs,
+                         IgnoreExpectUseIterator rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+inline Range<IgnoreExpectUseIterator>
+ignore_expect_uses(ValueBase *V) {
+  return Range<IgnoreExpectUseIterator>(IgnoreExpectUseIterator(V),
+                                        IgnoreExpectUseIterator());
+}
 } // end namespace swift
 
 #endif
