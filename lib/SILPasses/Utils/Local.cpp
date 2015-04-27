@@ -603,30 +603,39 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
   if (PInfo.isIndirectInOut())
     return;
 
-  // Otherwise, we need to destroy the argument. If we have a value, perform a
-  // release_value.
+  // Otherwise, we need to destroy the argument. *NOTE* The routines we use may
+  // either eliminate the destroy by pairing it with an increment. Given that we
+  // need to check for nullptr and only if the returned value is non-null call
+  // CreatedNewInst.
+  SILInstruction *NewInst = nullptr;
+
   if (Arg.getType().isObject()) {
     if (Arg.getType().hasReferenceSemantics()) {
-      Callbacks.CreatedNewInst(Builder.emitStrongRelease(Loc, Arg));
-      return;
+      NewInst = Builder.emitStrongRelease(Loc, Arg);
+    } else {
+      NewInst = Builder.emitReleaseValue(Loc, Arg);
     }
-
-    Callbacks.CreatedNewInst(Builder.emitReleaseValue(Loc, Arg));
-    return;
+  } else {
+    NewInst = Builder.emitDestroyAddr(Loc, Arg);
   }
 
-  // Otherwise put in a destroy_addr.
-  Callbacks.CreatedNewInst(Builder.createDestroyAddr(Loc, Arg));
+  // We managed to eliminate the decrement in the Builder. Return early.
+  if (!NewInst)
+    return;
+
+  // Otherwise, notify via the callback any of our users which need to update
+  // state given the new instruction.
+  Callbacks.CreatedNewInst(NewInst);
 }
 
 /// For each captured argument of PAI, decrement the ref count of the captured
 /// argument as appropriate at each of the post dominated release locations
 /// found by Tracker.
-static void
-releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
-                                      ReleaseTracker &Tracker,
-                                      InstModCallbacks &Callbacks) {
+static void releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
+                                                  ReleaseTracker &Tracker,
+                                                  InstModCallbacks Callbacks) {
   SILBuilderWithScope<16> Builder(PAI);
+  Builder.setDeleteCallback(Callbacks.DeleteInst);
   SILLocation Loc = PAI->getLoc();
   auto PAITy =
     dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());

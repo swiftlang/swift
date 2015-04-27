@@ -33,6 +33,8 @@ enum AddressOnlyEnum {
 
 sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 
+sil @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -2448,4 +2450,17 @@ bb2(%9 : $Builtin.Int1):
 bb3:
   %14 = integer_literal $Builtin.Int1, 0
   br bb2(%14 : $Builtin.Int1)
+}
+
+// Make sure we do not crash on this and remove everything.
+// CHECK-LABEL: sil @partial_apply_retain_removal : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0
+// CHECK-NEXT: return
+sil @partial_apply_retain_removal : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()  
+  %2 = partial_apply %1(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  strong_release %2 : $@callee_owned @convention(thick) () -> ()
+  return %0 : $Builtin.NativeObject
 }

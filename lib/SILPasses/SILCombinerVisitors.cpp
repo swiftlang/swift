@@ -448,15 +448,12 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
                                                           PAI->getType());
 
   // Try to delete dead closures.
-  tryDeleteDeadClosure(PAI,
-                       InstModCallbacks({
-                         [this](SILInstruction *DeadInst) {
-                           eraseInstFromFunction(*DeadInst);
-                         },
-                         [this](SILInstruction *NewInst) {
-                           Worklist.add(NewInst);
-                         }
-                       }));
+  tryDeleteDeadClosure(
+      PAI, InstModCallbacks(
+               [this](SILInstruction *DeadInst) {
+                 eraseInstFromFunction(*DeadInst);
+               },
+               [this](SILInstruction *NewInst) { Worklist.add(NewInst); }));
   return nullptr;
 }
 

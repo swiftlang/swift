@@ -177,7 +177,7 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
 
     if (auto SRA = dyn_cast<StrongRetainInst>(Inst)) {
       if (SRA->getOperand() == Operand) {
-        SRA->eraseFromParent();
+        DeleteInst(SRA);
         return nullptr;
       }
       // Skip past unrelated retains.
@@ -206,7 +206,7 @@ SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
 
     if (auto SRA = dyn_cast<RetainValueInst>(Inst)) {
       if (SRA->getOperand() == Operand) {
-        SRA->eraseFromParent();
+        DeleteInst(SRA);
         return nullptr;
       }
       // Skip past unrelated retains.

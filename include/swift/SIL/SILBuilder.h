@@ -31,6 +31,10 @@ class SILBuilder {
   /// InsertedInstrs - If this pointer is non-null, then any inserted
   /// instruction is recorded in this list.
   SmallVectorImpl<SILInstruction*> *InsertedInstrs = nullptr;
+
+  std::function<void(SILInstruction *)> DeleteInst =
+      [](SILInstruction *I) { I->eraseFromParent(); };
+
 public:
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
@@ -114,8 +118,19 @@ public:
     InsertedInstrs = II;
   }
 
-  SmallVectorImpl<SILInstruction*> *getTrackingList() {
+  SmallVectorImpl<SILInstruction *> *getTrackingList() {
     return InsertedInstrs;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Instruction Deleter.
+  //===--------------------------------------------------------------------===//
+
+  /// A pass can set this behavior to override the behavior when we delete
+  /// instructions when emitting instructions. This lets the pass update its
+  /// state.
+  void setDeleteCallback(std::function<void(SILInstruction *)> Callback) {
+    DeleteInst = Callback;
   }
 
   //===--------------------------------------------------------------------===//

@@ -405,6 +405,9 @@ public:
 
   void checkSILInstruction(SILInstruction *I) {
     const SILBasicBlock *BB = I->getParent();
+    require(BB, "Instruction with null parent");
+    require(I->getFunction(), "Instruction not in function");
+
     // Check that non-terminators look ok.
     if (!isa<TermInst>(I)) {
       require(!BB->empty(), "Can't be in a parent block if it is empty");

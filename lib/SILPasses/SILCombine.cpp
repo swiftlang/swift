@@ -232,9 +232,12 @@ void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
 bool SILCombiner::runOnFunction(SILFunction &F) {
   clear();
 
-  // Create a SILBuilder for F and initialize the tracking list.
+  // Create a SILBuilder for F, initialize the tracking list, and add the
+  // callback so we can update the worklist if the SILBuilder deletes
+  // instructions.
   SILBuilder B(F);
   B.setTrackingList(&TrackingList);
+  B.setDeleteCallback([this](SILInstruction *I) { eraseInstFromFunction(*I); });
   Builder = &B;
 
   bool Changed = false;
