@@ -178,7 +178,12 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addDCE();
   PM.addCSE();
   PM.addSILCombine();
-  AddSimplifyCFGSILCombine(PM);
+  PM.addJumpThreadSimplifyCFG();
+  // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
+  // cond_br).
+  PM.addSILCombine();
+  // Which can expose opportunity for simplifcfg.
+  PM.addSimplifyCFG();
 
   // Perform retain/release code motion and run the first ARC optimizer.
   PM.addGlobalLoadStoreOpts();
@@ -305,7 +310,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addMem2Reg();
   PM.addCSE();
   PM.addSILCombine();
-  PM.addSimplifyCFG();
+  PM.addJumpThreadSimplifyCFG();
   PM.addGlobalLoadStoreOpts();
   PM.addLateCodeMotion();
   PM.addGlobalARCOpts();

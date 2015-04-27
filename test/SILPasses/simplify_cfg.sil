@@ -285,11 +285,13 @@ bb2:
 }
 
 // CHECK-LABEL: @elim_trampoline
-// CHECK: cond_br %0, bb2(%1 : $Int64), bb1
-// CHECK: bb1
-// CHECK-NEXT: br bb2
-// CHECK: bb2
-// CHECK-NEXT: return
+// CHECK:  cond_br %0, bb1, bb2
+// CHECK:bb1:
+// CHECK:  br bb3(%1
+// CHECK:bb2:
+// CHECK:  br bb3(%2
+// CHECK:bb3({{.*}}):
+// CHECK:  return
 sil @elim_trampoline : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
   cond_br %0, bb1(%1 : $Int64), bb2(%2 : $Int64)
@@ -322,11 +324,13 @@ bb3(%4 : $Int64):
 }
 
 // CHECK-LABEL: @elim_trampoline3
-// CHECK: cond_br %0, bb2(%1 : $Int64), bb1
-// CHECK: bb1
-// CHECK-NEXT: br bb2
-// CHECK: bb2
-// CHECK-NEXT: return
+// CHECK:  cond_br %0, bb1, bb2
+// CHECK:bb1:
+// CHECK:  br bb3(%1
+// CHECK:bb2:
+// CHECK:  br bb3(%2
+// CHECK:bb3({{.*}}):
+// CHECK:  return
 sil @elim_trampoline3 : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
   cond_br %0, bb1(%1 : $Int64), bb2(%2 : $Int64)
@@ -384,12 +388,14 @@ bb5(%6 : $Int64):
 // gets eliminated by branching to a target of this trampoline.
 // CHECK-LABEL: @elim_trampoline5
 // CHECK: cond_br
+// CHECK: bb3:
 // CHECK: cond_br
-// CHECK: bb4
+// CHECK: bb4{{.*}}:
 // Last cond_br should branch directly to the target of a trampoline
 // instead of the original bb3
-// CHECK: cond_br {{.*}}, bb3, bb4({{.*}})
-// CHECK-NOT: bb5
+// CHECK: cond_br {{.*}}, bb3, bb5
+// CHECK: bb5:
+// CHECK-NEXT: br bb4
 // CHECK: }
 sil @elim_trampoline5 : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
@@ -1556,11 +1562,13 @@ bb3(%a3 : $Builtin.Int1):
 // CHECK:      bb1:
 // CHECK-NEXT:   apply
 // CHECK-NEXT:   integer_literal
-// CHECK-NEXT:   br bb3
+// CHECK-NEXT:   br bb4
 // CHECK:      bb2:
 // CHECK-NEXT:   apply
 // CHECK-NEXT:   cond_br
-// CHECK:      bb3({{.*}}):
+// CHECK:      bb3:
+// CHECK:        br bb4
+// CHECK:      bb4({{.*}}):
 // CHECK-NEXT:   apply
 // CHECK-NEXT:   cond_fail
 sil @dont_move_cond_fail_no_postdom : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
@@ -1799,4 +1807,132 @@ bb10:
 
 bb11(%100 : $Builtin.Int32):
   return %100 : $Builtin.Int32
+}
+
+sil @a : $@convention(thin) ()->()
+sil @b : $@convention(thin) ()->()
+sil @c : $@convention(thin) ()->()
+sil @d : $@convention(thin) ()->()
+
+// CHECK-LABEL: sil @jump_thread_diamond
+// CHECK: bb1:
+// CHECK:   [[A:%.*]] = function_ref @a
+// CHECK:   apply [[A]]
+// CHECK:   [[C:%.*]] = function_ref @c
+// CHECK:   apply [[C]]
+// CHECK:   br bb3
+// CHECK: bb2:
+// CHECK:   [[B:%.*]] = function_ref @b
+// CHECK:   apply [[B]]
+// CHECK:   [[D:%.*]] = function_ref @d
+// CHECK:   apply [[D]]
+// CHECK:   br bb3
+
+// CHECK: return
+sil @jump_thread_diamond : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
+  %8 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
+  %9 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %8, bb1, bb2
+
+bb1:
+  %10 = function_ref @a : $@convention(thin) () -> ()
+  %11 = apply %10() : $@convention(thin) () -> ()
+  br bb3
+
+bb2:
+  %13 = function_ref @b : $@convention(thin) () -> ()
+  %14 = apply %13() : $@convention(thin) () -> ()
+  br bb3
+
+bb3:
+  %19 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
+  %20 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
+  %21 = builtin "int_expect_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %21, bb4, bb5
+
+bb4:
+  %23 = function_ref @c : $@convention(thin) () -> ()
+  %24 = apply %23() : $@convention(thin) () -> ()
+  br bb6
+
+bb5:
+  %26 = function_ref @d : $@convention(thin) () -> ()
+  %27 = apply %26() : $@convention(thin) () -> ()
+  br bb6
+
+bb6:
+  %29 = tuple ()
+  return %29 : $()
+}
+
+enum AnEnum {
+  case B(Builtin.Int32), C(Builtin.Int16)
+}
+
+sil @f : $@convention(thin) (Builtin.Int32) -> ()
+sil @f2 : $@convention(thin) (Builtin.Int16) -> ()
+
+// CHECK-LABEL: sil @jump_thread_switch_enum
+// CHECK: bb0([[ARG:%.*]] : $AnEnum):
+// CHECK:  [[F:%.*]] = function_ref @f : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:  [[F2:%.*]] = function_ref @f2 : $@convention(thin) (Builtin.Int16) -> ()
+// CHECK:  switch_enum [[ARG]] : $AnEnum, case #AnEnum.B!enumelt.1: bb1, case #AnEnum.C!enumelt.1: bb2
+
+// CHECK: bb1([[ARG2:%.*]] : $Builtin.Int32):
+// CHECK:  apply [[F]]([[ARG2]])
+// CHECK:  [[UED:%.*]] = unchecked_enum_data [[ARG]] : $AnEnum, #AnEnum.B!enumelt.1
+// CHECK:  apply [[F]]([[UED]])
+// CHECK:  br bb3
+
+// CHECK: bb2([[ARG3:%.*]] : $Builtin.Int16):
+// CHECK:  apply [[F2]]([[ARG3]])
+// CHECK:  [[UED2:%.*]] = unchecked_enum_data [[ARG]] : $AnEnum, #AnEnum.C!enumelt.1
+// CHECK:  apply [[F2]]([[UED2]])
+// CHECK:  br bb3
+
+sil @jump_thread_switch_enum : $@convention(thin) (AnEnum) -> () {
+bb0(%0 : $AnEnum):
+
+  %1 = function_ref @f : $@convention(thin) (Builtin.Int32) -> ()
+
+  %2 = function_ref @f2 : $@convention(thin) (Builtin.Int16) -> ()
+  switch_enum %0 : $AnEnum, case #AnEnum.B!enumelt.1: bb1, case #AnEnum.C!enumelt.1: bb3
+
+bb1(%4 : $Builtin.Int32):
+  br bb2
+
+bb2:
+  %6 = apply %1(%4) : $@convention(thin) (Builtin.Int32) -> ()
+  br bb5
+
+bb3(%8 : $Builtin.Int16):
+  br bb4
+
+bb4:
+  %10 = apply %2(%8) : $@convention(thin) (Builtin.Int16) -> ()
+  br bb5
+
+bb5:
+  switch_enum %0 : $AnEnum, case #AnEnum.C!enumelt.1: bb6, case #AnEnum.B!enumelt.1: bb8
+
+bb6(%13 : $Builtin.Int16):
+  br bb7
+
+bb7:
+  %15 = apply %2(%13) : $@convention(thin) (Builtin.Int16) -> ()
+  br bb10
+
+bb8(%17 : $Builtin.Int32):
+  br bb9
+
+bb9:
+  %19 = apply %1(%17) : $@convention(thin) (Builtin.Int32) -> ()
+  br bb10
+
+bb10:
+  %21 = tuple ()
+  return %21 : $()
 }

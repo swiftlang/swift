@@ -295,11 +295,12 @@ class BasicBlockCloner : public BaseThreadingCloner {
   SILBasicBlock *getDestBB() { return DestBB; }
 };
 
-/// Helper function to perform SSA updates in case of jump threading.
-void updateSSAAfterCloning(BaseThreadingCloner &Cloner,
-                           SILBasicBlock *SrcBB,
-                           SILBasicBlock *DestBB);
-
+/// Helper function to perform SSA updates in case of jump threading. Set
+/// 'NeedToSplitCriticalEdges' to false if all critical edges are split,
+/// otherwise this call will try to split all critical edges.
+void updateSSAAfterCloning(BaseThreadingCloner &Cloner, SILBasicBlock *SrcBB,
+                           SILBasicBlock *DestBB,
+                           bool NeedToSplitCriticalEdges = true);
 
 /// \brief This is a helper class used to optimize casts.
 class CastOptimizer {

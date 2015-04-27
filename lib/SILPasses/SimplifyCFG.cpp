@@ -65,9 +65,12 @@ namespace {
     PostDominanceInfo *PDT;
 
     bool ShouldVerify;
+    bool EnableJumpThread;
   public:
-    SimplifyCFG(SILFunction &Fn, SILPassManager *PM, bool Verify) :
-      Fn(Fn), PM(PM), ShouldVerify(Verify) {}
+    SimplifyCFG(SILFunction &Fn, SILPassManager *PM, bool Verify,
+                bool EnableJumpThread)
+        : Fn(Fn), PM(PM), ShouldVerify(Verify),
+          EnableJumpThread(EnableJumpThread) {}
 
     bool run();
     
@@ -136,6 +139,9 @@ namespace {
 
     bool simplifyBlocks();
     bool canonicalizeSwitchEnums();
+    bool simplifyThreadedTerminators();
+    bool dominatorBasedSimplifications(SILFunction &Fn,
+                                       DominanceInfo *DT);
     bool dominatorBasedSimplify(DominanceAnalysis *DA,
                                 PostDominanceAnalysis *PDA);
 
@@ -183,12 +189,13 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
 
 /// Helper function to perform SSA updates in case of jump threading.
 void swift::updateSSAAfterCloning(BaseThreadingCloner &Cloner,
-                                  SILBasicBlock *SrcBB,
-                                  SILBasicBlock *DestBB) {
+                                  SILBasicBlock *SrcBB, SILBasicBlock *DestBB,
+                                  bool NeedToSplitCriticalEdges) {
   // We are updating SSA form. This means we need to be able to insert phi
   // nodes. To make sure we can do this split all critical edges from
   // instructions that don't support block arguments.
-  splitAllCriticalEdges(*DestBB->getParent(), true, nullptr, nullptr);
+  if (NeedToSplitCriticalEdges)
+    splitAllCriticalEdges(*DestBB->getParent(), true, nullptr, nullptr);
 
   SILSSAUpdater SSAUp;
   for (auto AvailValPair : Cloner.AvailVals) {
@@ -467,18 +474,415 @@ static bool propagateSwitchEnumCondition(SwitchEnumInst *SWI, DominanceInfo *DT)
   return Changed;
 }
 
+static SILValue getTerminatorCondition(TermInst *Term) {
+  if (auto *CondBr = dyn_cast<CondBranchInst>(Term))
+    return CondBr->getCondition().stripExpectIntrinsic();
+
+  if (auto *SEI = dyn_cast<SwitchEnumInst>(Term))
+    return SEI->getOperand();
+
+  return nullptr;
+}
+
+/// Is this basic block jump threadable.
+static bool isThreadableBlock(SILBasicBlock *BB,
+                              SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders) {
+  if (isa<ReturnInst>(BB->getTerminator()))
+    return false;
+
+  // We know how to handle cond_br and switch_enum .
+  if (!isa<CondBranchInst>(BB->getTerminator()) &&
+      !isa<SwitchEnumInst>(BB->getTerminator()))
+    return false;
+
+  if (LoopHeaders.count(BB))
+    return false;
+
+  unsigned Cost = 0;
+  for (auto &Inst : BB->getInstList()) {
+    if (!Inst.isTriviallyDuplicatable())
+      return false;
+
+    // Don't jumpthread function calls.
+    if (isa<ApplyInst>(Inst))
+      return false;
+
+    // Only thread 'small blocks'.
+    if (instructionInlineCost(Inst) != InlineCost::Free)
+      if (++Cost == 4)
+        return false;
+  }
+  return true;
+}
+
+
+/// A description of an edge leading to a conditionally branching (or switching)
+/// block and the successor block to thread to.
+///
+/// Src:
+///   br Dest
+///     \
+///      \  Edge
+///       v
+///      Dest:
+///        ...
+///        switch/cond_br
+///        /  \
+///       ...  v
+///            EnumCase/ThreadedSuccessorIdx
+class ThreadInfo {
+  SILBasicBlock *Src;
+  SILBasicBlock *Dest;
+  EnumElementDecl *EnumCase;
+  unsigned ThreadedSuccessorIdx;
+
+public:
+  ThreadInfo(SILBasicBlock *Src, SILBasicBlock *Dest,
+             unsigned ThreadedBlockSuccessorIdx)
+      : Src(Src), Dest(Dest), EnumCase(nullptr),
+        ThreadedSuccessorIdx(ThreadedBlockSuccessorIdx) {}
+
+  ThreadInfo(SILBasicBlock *Src, SILBasicBlock *Dest, EnumElementDecl *EnumCase)
+      : Src(Src), Dest(Dest), EnumCase(EnumCase), ThreadedSuccessorIdx(0) {}
+
+  ThreadInfo() = default;
+
+  void threadEdge() {
+    auto *SrcTerm = cast<BranchInst>(Src->getTerminator());
+
+    EdgeThreadingCloner Cloner(SrcTerm);
+    for (auto &I : *Dest)
+      Cloner.process(&I);
+
+    // We have copied the threaded block into the edge.
+    Src = Cloner.getEdgeBB();
+
+    if (auto *CondTerm = dyn_cast<CondBranchInst>(Src->getTerminator())) {
+      // We know the direction this conditional branch is going to take thread
+      // it.
+      assert(Src->getSuccessors().size() > ThreadedSuccessorIdx &&
+             "Threaded terminator does not have enough successors");
+
+      auto *ThreadedSuccessorBlock =
+          Src->getSuccessors()[ThreadedSuccessorIdx].getBB();
+      auto Args = ThreadedSuccessorIdx == 0 ? CondTerm->getTrueArgs()
+                                            : CondTerm->getFalseArgs();
+
+      SILBuilderWithScope<1>(CondTerm)
+        .createBranch(CondTerm->getLoc(), ThreadedSuccessorBlock, Args);
+
+      CondTerm->eraseFromParent();
+    } else {
+      // Get the enum element and the destination block of the block we jump
+      // thread.
+      auto *SEI = cast<SwitchEnumInst>(Src->getTerminator());
+      auto *ThreadedSuccessorBlock = SEI->getCaseDestination(EnumCase);
+
+      // Instantiate the payload if necessary.
+      SILBuilderWithScope<1> Builder(SEI);
+      if (!ThreadedSuccessorBlock->bbarg_empty()) {
+        auto EnumVal = SEI->getOperand();
+        auto EnumTy = EnumVal->getType(0);
+        auto Loc = SEI->getLoc();
+        auto Ty = EnumTy.getEnumElementType(EnumCase, SEI->getModule());
+        SILValue UED(
+            Builder.createUncheckedEnumData(Loc, EnumVal, EnumCase, Ty));
+        assert(UED.getType() ==
+                   (*ThreadedSuccessorBlock->bbarg_begin())->getType() &&
+               "Argument types must match");
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
+      } else
+        Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {});
+      SEI->eraseFromParent();
+
+      // Split the edge from 'Dest' to 'ThreadedSuccessorBlock' it is now
+      // critical. Doing this here safes us from doing it over the whole
+      // function in updateSSAAfterCloning because we have split all other
+      // critical edges earlier.
+      splitEdgesFromTo(Dest, ThreadedSuccessorBlock, nullptr, nullptr);
+    }
+    updateSSAAfterCloning(Cloner, Src, Dest, false);
+  }
+};
+
+/// Give a cond_br or switch_enum instruction and one successor block return
+/// true if we can infer the value of the condition/enum along the edge to this
+/// successor blocks.
+static bool isKnownEdgeValue(TermInst *Term, SILBasicBlock *SuccBB,
+                             EnumElementDecl *&EnumCase) {
+  assert((isa<CondBranchInst>(Term) || isa<SwitchEnumInst>(Term)) &&
+         "Expect a cond_br or switch_enum");
+  if (auto *SEI = dyn_cast<SwitchEnumInst>(Term)) {
+    if (auto Case = SEI->getUniqueCaseForDestination(SuccBB)) {
+      EnumCase = Case.get();
+      return SuccBB->getSinglePredecessor() != nullptr;
+    }
+    return false;
+  }
+
+  return SuccBB->getSinglePredecessor() != nullptr;
+}
+
+/// Create a enum element by extracting the operand of a switch_enum.
+static SILInstruction *createEnumElement(SILBuilder &Builder,
+                                         SwitchEnumInst *SEI,
+                                         EnumElementDecl *EnumElement) {
+  auto EnumVal = SEI->getOperand();
+  // Do we have a payload.
+  auto EnumTy = EnumVal->getType(0);
+  if (EnumElement->hasArgumentType()) {
+    auto Ty = EnumTy.getEnumElementType(EnumElement, SEI->getModule());
+    SILValue UED(Builder.createUncheckedEnumData(SEI->getLoc(), EnumVal,
+                                                 EnumElement, Ty));
+    return Builder.createEnum(SEI->getLoc(), UED, EnumElement, EnumTy);
+  }
+  return Builder.createEnum(SEI->getLoc(), SILValue(), EnumElement, EnumTy);
+}
+
+/// Create a value for the condition of the terminator that flows along the edge
+/// with 'EdgeIdx'. Insert it before the 'UserInst'.
+static SILInstruction *createValueForEdge(SILInstruction *UserInst,
+                                          SILInstruction *DominatingTerminator,
+                                          unsigned EdgeIdx) {
+  SILBuilderWithScope<1> Builder(UserInst);
+
+  if (auto *CBI = dyn_cast<CondBranchInst>(DominatingTerminator))
+    return Builder.createIntegerLiteral(
+        CBI->getLoc(), CBI->getCondition().getType(), EdgeIdx == 0 ? -1 : 0);
+
+  auto *SEI = cast<SwitchEnumInst>(DominatingTerminator);
+  auto *DstBlock = SEI->getSuccessors()[EdgeIdx].getBB();
+  auto Case = SEI->getUniqueCaseForDestination(DstBlock);
+  assert(Case && "No unique case found for destination block");
+  return createEnumElement(Builder, SEI, Case.get());
+}
+
+/// Peform dominator based value simplifications and jump threading on all users
+/// of the operand of 'DominatingBB's terminator.
+static bool tryDominatorBasedSimplifications(
+    SILBasicBlock *DominatingBB, DominanceInfo *DT,
+    SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders,
+    SmallVectorImpl<ThreadInfo> &JumpThreadableEdges,
+    llvm::DenseSet<std::pair<SILBasicBlock *, SILBasicBlock *>>
+        &ThreadedEdgeSet,
+    bool TryJumpThreading,
+    llvm::DenseMap<SILBasicBlock *, bool> &CachedThreadable) {
+  auto *DominatingTerminator = DominatingBB->getTerminator();
+
+  // We handle value propagation from cond_br and switch_enum terminators.
+  bool IsEnumValue = isa<SwitchEnumInst>(DominatingTerminator);
+  if (!isa<CondBranchInst>(DominatingTerminator) && !IsEnumValue)
+    return false;
+
+  auto DominatingCondition = getTerminatorCondition(DominatingTerminator);
+  if (!DominatingCondition)
+    return false;
+
+  bool Changed = false;
+
+  // We will look at all the outgoing edges from the conditional branch to see
+  // whether any other uses of the condition or uses of the condition along an
+  // edge are dominated by said outgoing edges. The outgoing edge carries the
+  // value on which we switch/cond_branch.
+  auto Succs = DominatingBB->getSuccessors();
+  for (unsigned Idx = 0; Idx < Succs.size(); ++Idx) {
+    auto *DominatingSuccBB = Succs[Idx].getBB();
+
+    EnumElementDecl *EnumCase = nullptr;
+    if (!isKnownEdgeValue(DominatingTerminator, DominatingSuccBB, EnumCase))
+      continue;
+
+    // Look for other uses of DominatingCondition that are either:
+    //  * dominated by the DominatingSuccBB
+    //
+    //     cond_br %dominating_cond / switch_enum
+    //       /
+    //      /
+    //     /
+    //   DominatingSuccBB:
+    //     ...
+    //     use %dominating_cond
+    //
+    //  * are a conditional branch that has an incoming edge that is
+    //  dominated by DominatingSuccBB.
+    //
+    //     cond_br %dominating_cond
+    //     /
+    //    /
+    //   /
+    //
+    //  DominatingSuccBB:
+    //   ...
+    //   br DestBB
+    //
+    //    \
+    //     \ E -> %dominating_cond = true
+    //      \
+    //       v
+    //        DestBB
+    //          cond_br %dominating_cond
+    SmallVector<SILInstruction *, 16> UsersToReplace;
+    for (auto *Op : ignore_expect_uses(DominatingCondition.getDef())) {
+      auto *CondUserInst = Op->getUser();
+
+      // Ignore the DominatingTerminator itself.
+      if (CondUserInst->getParent() == DominatingBB)
+        continue;
+
+      // For enum values we are only interested in switch_enum and select_enum
+      // users.
+      if (IsEnumValue && !isa<SwitchEnumInst>(CondUserInst) &&
+          !isa<SelectEnumInst>(CondUserInst))
+        continue;
+
+      // If the use is dominated we can replace this use by the value
+      // flowing to DominatingSuccBB.
+      if (DT->dominates(DominatingSuccBB, CondUserInst->getParent())) {
+        UsersToReplace.push_back(CondUserInst);
+        continue;
+      }
+
+      // Jump threading is expensive so we don't always do it.
+      if (!TryJumpThreading)
+        continue;
+
+      auto *DestBB = CondUserInst->getParent();
+
+      // Check whether we have seen this destination block already.
+      auto CacheEntryIt = CachedThreadable.find(DestBB);
+      bool IsThreadable = CacheEntryIt != CachedThreadable.end()
+                              ? CacheEntryIt->second
+                              : (CachedThreadable[DestBB] =
+                                     isThreadableBlock(DestBB, LoopHeaders));
+
+      // If the use is a conditional branch/switch then look for an incoming
+      // edge that is dominated by DominatingSuccBB.
+      if (IsThreadable) {
+        auto Preds = DestBB->getPreds();
+
+        for (SILBasicBlock *PredBB : Preds) {
+          if (!isa<BranchInst>(PredBB->getTerminator()))
+            continue;
+          if (!DT->dominates(DominatingSuccBB, PredBB))
+            continue;
+
+          // Don't jumpthread the same edge twice.
+          if (!ThreadedEdgeSet.insert(std::make_pair(PredBB, DestBB)).second)
+            continue;
+
+          if (isa<CondBranchInst>(DestBB->getTerminator()))
+            JumpThreadableEdges.push_back(ThreadInfo(PredBB, DestBB, Idx));
+          else
+            JumpThreadableEdges.push_back(ThreadInfo(PredBB, DestBB, EnumCase));
+          break;
+        }
+      }
+    }
+
+    // Replace dominated user instructions.
+    for (auto *UserInst : UsersToReplace) {
+      SILInstruction *EdgeValue = nullptr;
+      for (auto &Op : UserInst->getAllOperands()) {
+        if (Op.get().stripExpectIntrinsic() == DominatingCondition) {
+          if (!EdgeValue)
+            EdgeValue = createValueForEdge(UserInst, DominatingTerminator, Idx);
+          Op.set(EdgeValue);
+          Changed = true;
+        }
+      }
+    }
+  }
+  return Changed;
+}
+
+/// Propagate values of branched upon values along the outgoing edges down the
+/// dominator tree.
+bool SimplifyCFG::dominatorBasedSimplifications(SILFunction &Fn,
+                                                DominanceInfo *DT) {
+  bool Changed = false;
+  // Collect jump threadable edges and propagate outgoing edge values of
+  // conditional branches/switches.
+  SmallVector<ThreadInfo, 8> JumpThreadableEdges;
+  llvm::DenseMap<SILBasicBlock *, bool> CachedThreadable;
+  llvm::DenseSet<std::pair<SILBasicBlock *, SILBasicBlock *>> ThreadedEdgeSet;
+  for (auto &BB : Fn)
+    if (DT->getNode(&BB)) // Only handle reachable blocks.
+      Changed |= tryDominatorBasedSimplifications(
+          &BB, DT, LoopHeaders, JumpThreadableEdges, ThreadedEdgeSet,
+          EnableJumpThread, CachedThreadable);
+
+  // Nothing to jump thread?
+  if (JumpThreadableEdges.empty())
+    return Changed;
+
+  for (auto &ThreadInfo : JumpThreadableEdges) {
+    ThreadInfo.threadEdge();
+    Changed = true;
+  }
+
+  return Changed;
+}
+
+/// Simplify terminators that could have been simplified by threading.
+bool SimplifyCFG::simplifyThreadedTerminators() {
+  bool HaveChangedCFG = false;
+  for (auto &BB : Fn) {
+    auto *Term = BB.getTerminator();
+    // Simplify a switch_enum.
+    if (auto *SEI = dyn_cast<SwitchEnumInst>(Term)) {
+      if (auto *EI = dyn_cast<EnumInst>(SEI->getOperand())) {
+        auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
+        auto *ThisBB = SEI->getParent();
+        if (EI->hasOperand() && !LiveBlock->bbarg_empty())
+          SILBuilderWithScope<1>(SEI)
+              .createBranch(SEI->getLoc(), LiveBlock, EI->getOperand());
+        else
+          SILBuilderWithScope<1>(SEI).createBranch(SEI->getLoc(), LiveBlock);
+        SEI->eraseFromParent();
+        if (EI->use_empty())
+          EI->eraseFromParent();
+        HaveChangedCFG = true;
+      }
+      continue;
+    } else if (auto *CondBr = dyn_cast<CondBranchInst>(Term)) {
+      // If the condition is an integer literal, we can constant fold the
+      // branch.
+      if (auto *IL = dyn_cast<IntegerLiteralInst>(CondBr->getCondition())) {
+        SILBasicBlock *TrueSide = CondBr->getTrueBB();
+        SILBasicBlock *FalseSide = CondBr->getFalseBB();
+        auto TrueArgs = CondBr->getTrueArgs();
+        auto FalseArgs = CondBr->getFalseArgs();
+        bool isFalse = !IL->getValue();
+        auto LiveArgs = isFalse ? FalseArgs : TrueArgs;
+        auto *LiveBlock = isFalse ? FalseSide : TrueSide;
+        SILBuilderWithScope<1>(CondBr)
+            .createBranch(CondBr->getLoc(), LiveBlock, LiveArgs);
+        CondBr->eraseFromParent();
+        if (IL->use_empty())
+          IL->eraseFromParent();
+        HaveChangedCFG = true;
+      }
+    }
+  }
+  return HaveChangedCFG;
+}
+
 // Simplifications that walk the dominator tree to prove redundancy in
 // conditional branching.
 bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA,
                                          PostDominanceAnalysis *PDA) {
-  bool Changed = false;
-
   // Get the dominator tree.
   DT = DA->get(&Fn);
 
-  unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
-  bool HasChangedInCurrentIter = false;
+  // Split all critical edges such that we can move code onto edges. This is
+  // also required for SSA construction in dominatorBasedSimplifications' jump
+  // threading. It only splits new critical edges it creates by jump threading.
+  bool Changed =
+      EnableJumpThread ? splitAllCriticalEdges(Fn, false, DT, nullptr) : false;
 
+  unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
+
+  bool HasChangedInCurrentIter;
   do {
     HasChangedInCurrentIter = false;
 
@@ -517,32 +921,6 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA,
     if (ShouldVerify)
       DT->verify();
 
-    // Simplify terminators. This changes the CFG and therefore invalidates the
-    // dom tree.
-    DominanceInfo *InvalidDT = DT;
-    DT = nullptr;
-
-    // Simplify terminators.
-    bool HaveChangedCFG = false;
-    for (auto &BB : Fn) {
-      auto *Term = BB.getTerminator();
-      if (auto *SEI = dyn_cast<SwitchEnumInst>(Term))
-        HaveChangedCFG |= simplifySwitchEnumBlock(SEI);
-      else if (auto *CondBr = dyn_cast<CondBranchInst>(Term))
-        HaveChangedCFG |= simplifyCondBrBlock(CondBr);
-    }
-    HasChangedInCurrentIter |= HaveChangedCFG;
-
-    // Remove unreachable blocks.
-    if (HaveChangedCFG)
-      HasChangedInCurrentIter |= RemoveUnreachable(Fn).run();
-
-    // Recompute the dominator tree if we have changed the CFG so we can used it
-    // in simplifyArgs and the following iteration.
-    DT = InvalidDT;
-    if (HaveChangedCFG)
-      DT->recalculate(Fn);
-
     // Simplify the block argument list. This is extremely subtle: simplifyArgs
     // will not change the CFG iff the PDT is null. Really we should move that
     // one optimization out of simplifyArgs ... I am squinting at you
@@ -554,6 +932,18 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA,
 
     if (ShouldVerify)
       DT->verify();
+
+    // Jump thread.
+    if (dominatorBasedSimplifications(Fn, DT)) {
+      DominanceInfo *InvalidDT = DT;
+      DT = nullptr;
+      HasChangedInCurrentIter = true;
+      // Simplify terminators.
+      simplifyThreadedTerminators();
+      DT = InvalidDT;
+      DT->recalculate(Fn);
+    }
+
     Changed |= HasChangedInCurrentIter;
   } while (HasChangedInCurrentIter && --MaxIter);
 
@@ -1853,7 +2243,6 @@ bool SimplifyCFG::run() {
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
   PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
 
-
   if (Changed) {
     // Force dominator recomputation since we modifed the cfg.
     DA->invalidate(&Fn, SILAnalysis::PreserveKind::Nothing);
@@ -1861,9 +2250,9 @@ bool SimplifyCFG::run() {
   }
 
   Changed |= dominatorBasedSimplify(DA, PDA);
+
   DT = nullptr;
   PDT = nullptr;
-
   // Now attempt to simplify the remaining blocks.
   if (simplifyBlocks()) {
     // Simplifying other blocks might have resulted in unreachable
@@ -2637,10 +3026,17 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
 
 namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
+  bool EnableJumpThread;
+
+public:
+  SimplifyCFGPass(bool EnableJumpThread)
+      : EnableJumpThread(EnableJumpThread) {}
 
   /// The entry point to the transformation.
   void run() override {
-    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll).run())
+    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
+                    EnableJumpThread)
+            .run())
       invalidateAnalysis(SILAnalysis::PreserveKind::Nothing);
   }
 
@@ -2650,7 +3046,11 @@ class SimplifyCFGPass : public SILFunctionTransform {
 
 
 SILTransform *swift::createSimplifyCFG() {
-  return new SimplifyCFGPass();
+  return new SimplifyCFGPass(false);
+}
+
+SILTransform *swift::createJumpThreadSimplifyCFG() {
+  return new SimplifyCFGPass(true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2688,7 +3088,7 @@ public:
   
   /// The entry point to the transformation.
   void run() override {
-    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll)
+    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll, false)
             .simplifyBlockArgs())
       invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
   }

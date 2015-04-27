@@ -374,15 +374,18 @@ bb3:
 // HOIST: [[L2:%[0-9]+]] = load %1
 // HOIST: retain_value [[L2]]
 // HOIST: apply [[CB1]]([[SUB3]], {{.*}}[[L2]])
-// HOIST: br bb2
+// HOIST: br bb3
 
-// HOIST: bb2
+// HOIST: bb3
 // HOIST-NOT: cond_fail
 // HOIST-NOT: @checkbounds
 // HOIST: builtin
 // HOIST: builtin
 // HOIST-NOT: builtin
-// HOIST: cond_br {{.*}}, {{.*}}, bb2
+// HOIST: cond_br {{.*}}, {{.*}}, bb4
+// HOIST: bb4
+// HOIST:  br bb3
+
 // HOIST: return
 
 sil @hoist : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
@@ -428,17 +431,22 @@ bb3:
 // HOIST:  retain_value
 // HOIST:  [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:  apply [[CB]]
-// HOIST:  br bb2
+// HOIST:  br bb3
 
 // Loop.
-// HOIST:  bb2{{.*}}:
+// HOIST:  bb3{{.*}}:
 // HOIST-NOT: cond_fail
 // HOIST-NOT: @checkbounds
 // HOIST: builtin
 // HOIST: builtin
 // HOIST-NOT: builtin
-// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb2{{.*}}
-// HOIST: return
+// HOIST:  cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST: bb4:
+// HOIST:   br bb3
+// HOIST: bb5:
+// HOIST:   br bb6
+// HOIST: bb6{{.*}}:
+// HOIST:   return
 
 sil @hoistinvariant : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
@@ -475,16 +483,22 @@ bb3:
 
 // HOIST-LABEL: sil @hoist_rangechecked
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb1
+// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
 // HOIST: bb1:
+// HOIST: br bb6
+// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
-// HOIST:   br bb2{{.*}}
-// HOIST: bb2{{.*}}:
+// HOIST:   br bb3{{.*}}
+// HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb3{{.*}}, bb2{{.*}}
-// HOIST: bb3{{.*}}:
+// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST: bb4
+// HOIST:   br bb3
+// HOIST: bb5
+// HOIST:   br bb6
+// HOIST: bb6{{.*}}:
 // HOIST:  return
 
 sil @hoist_rangechecked : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
@@ -531,16 +545,22 @@ bb3:
 
 // HOIST-LABEL: sil @hoist_rangechecked_addr_proj_store
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb1
+// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
 // HOIST: bb1:
+// HOIST:  br bb6
+// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
-// HOIST:   br bb2{{.*}}
-// HOIST: bb2{{.*}}:
+// HOIST:   br bb3{{.*}}
+// HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb3{{.*}}, bb2{{.*}}
-// HOIST: bb3{{.*}}:
+// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST: bb4
+// HOIST:   br bb3
+// HOIST: bb5
+// HOIST:   br bb6
+// HOIST: bb6{{.*}}:
 // HOIST:  return
 
 sil @hoist_rangechecked_addr_proj_store : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
@@ -586,18 +606,25 @@ bb3:
   %23 = struct $Int32 (%4 : $Builtin.Int32)
   return %23 : $Int32
 }
+
 // HOIST-LABEL: hoist_inclusive_rangechecked
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb1
+// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
 // HOIST: bb1:
+// HOIST:  br bb6
+// HOIST: bb2:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:    apply [[CB]]
-// HOIST:   br bb2{{.*}}
-// HOIST: bb2{{.*}}:
+// HOIST:   br bb3{{.*}}
+// HOIST: bb3{{.*}}:
 // HOIST-NOT: function_ref @checkbounds
 // HOIST-NOT:    apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb3{{.*}}, bb2{{.*}}
-// HOIST: bb3{{.*}}:
+// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST: bb4:
+// HOIST:  br bb3
+// HOIST: bb5:
+// HOIST:  br bb6
+// HOIST: bb6{{.*}}:
 // HOIST: return
 sil @hoist_inclusive_rangechecked : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
@@ -644,15 +671,21 @@ bb3:
 /// Don't hoist arrays that are variant.
 // HOIST-LABEL: dont_hoist_variant_array
 // HOIST: bb0
-// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb1
+// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
 // HOIST: bb1:
+// HOIST:  br bb6
+// HOIST: bb2:
 // HOIST-NOT:   function_ref @checkbounds
-// HOIST:   br bb2{{.*}}
-// HOIST: bb2{{.*}}:
+// HOIST:   br bb3{{.*}}
+// HOIST: bb3{{.*}}:
 // HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:  apply [[CB]]
-// HOIST:  cond_br {{.*}}, bb3{{.*}}, bb2{{.*}}
-// HOIST: bb3{{.*}}:
+// HOIST:  cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST: bb4:
+// HOIST:  br bb3
+// HOIST: bb5:
+// HOIST:  br bb6
+// HOIST: bb6{{.*}}:
 // HOIST: return
 
 sil @dont_hoist_variant_array: $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
@@ -693,11 +726,12 @@ bb3:
 }
 
 // HOIST-LABEL: sil @dont_hoist_due_to_unknown_release
-// HOIST: bb2
+// HOIST: bb3
 // HOIST:   [[CB:%.*]] = function_ref @checkbounds
 // HOIST:   apply [[CB]]
-// HOIST:   cond_br {{.*}}, bb3({{.*}}), bb2
-
+// HOIST:   cond_br {{.*}}, bb5, bb4
+// HOIST: bb4:
+// HOIST:  br bb3
 sil @dont_hoist_due_to_unknown_release : $@convention(thin) (Int32, @inout ArrayInt, Builtin.NativeObject) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt, %100: $Builtin.NativeObject):
   %105 = integer_literal $Builtin.Int1, -1
