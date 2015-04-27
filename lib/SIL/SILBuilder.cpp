@@ -92,7 +92,8 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
 /// emitDestroyAddr - Try to fold a destroy_addr operation into the previous
 /// instructions, or generate an explicit one if that fails.  If this inserts a
 /// new instruction, it returns it, otherwise it returns null.
-DestroyAddrInst *SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand){
+DestroyAddrInst *SILBuilder::emitDestroyAddrAndFold(SILLocation Loc,
+                                                    SILValue Operand) {
   // Check to see if the instruction immediately before the insertion point is a
   // copy_addr from the specified operand.  If so, we can fold this into the
   // copy_addr as a take.

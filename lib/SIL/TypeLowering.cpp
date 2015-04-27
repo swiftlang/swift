@@ -887,12 +887,12 @@ namespace {
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
-      B.emitDestroyAddr(loc, addr);
+      B.emitDestroyAddrAndFold(loc, addr);
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      B.emitDestroyAddr(loc, value);
+      B.emitDestroyAddrAndFold(loc, value);
     }
 
     void emitRetainValue(SILBuilder &B, SILLocation loc,

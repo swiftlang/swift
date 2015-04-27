@@ -632,7 +632,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
     return;
   }
 
-  SILInstruction *NewInst = Builder.emitDestroyAddr(Loc, Arg);
+  SILInstruction *NewInst = Builder.emitDestroyAddrAndFold(Loc, Arg);
   Callbacks.CreatedNewInst(NewInst);
 }
 

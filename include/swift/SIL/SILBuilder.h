@@ -1140,7 +1140,7 @@ public:
   /// Try to fold a destroy_addr operation into the previous instructions, or
   /// generate an explicit one if that fails.  If this inserts a new
   /// instruction, it returns it, otherwise it returns null.
-  DestroyAddrInst *emitDestroyAddr(SILLocation Loc, SILValue Operand);
+  DestroyAddrInst *emitDestroyAddrAndFold(SILLocation Loc, SILValue Operand);
 
   /// Perform a strong_release instruction at the current location, attempting
   /// to fold it locally into nearby retain instructions or emitting an explicit

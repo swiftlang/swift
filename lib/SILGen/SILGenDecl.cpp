@@ -218,7 +218,7 @@ public:
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     if (v.getType().isAddress())
-      gen.B.emitDestroyAddr(l, v);
+      gen.B.emitDestroyAddrAndFold(l, v);
     else
       gen.B.emitReleaseValueOperation(l, v);
   }
@@ -1193,7 +1193,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   if (!Val.getType().isAddress())
     B.emitReleaseValueOperation(silLoc, Val);
   else
-    B.emitDestroyAddr(silLoc, Val);
+    B.emitDestroyAddrAndFold(silLoc, Val);
 }
 
 void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,

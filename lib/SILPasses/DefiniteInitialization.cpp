@@ -1581,7 +1581,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       // Emit a destroy_addr in the taken block.
       B.setInsertionPoint(TrueBB->begin());
       SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
-      if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
+      if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
         Releases.push_back(DA);
     }
     
@@ -1654,7 +1654,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         // destroy its value at releases position.
         B.setInsertionPoint(Release);
         SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
-        if (auto *DA = B.emitDestroyAddr(Release->getLoc(), EltPtr))
+        if (auto *DA = B.emitDestroyAddrAndFold(Release->getLoc(), EltPtr))
           Releases.push_back(DA);
         continue;
       }
@@ -1701,7 +1701,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       // Set up the conditional destroy block.
       B.setInsertionPoint(CondDestroyBlock->begin());
       SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
-      if (auto *DA = B.emitDestroyAddr(Loc, EltPtr))
+      if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
         Releases.push_back(DA);
     }
     

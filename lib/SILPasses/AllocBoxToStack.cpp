@@ -433,7 +433,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
         continue;
 
       SILBuilderWithScope<1> BuildDestroy(LastRelease);
-      BuildDestroy.emitDestroyAddr(Loc, PointerResult);
+      BuildDestroy.emitDestroyAddrAndFold(Loc, PointerResult);
     }
   }
 

@@ -134,7 +134,7 @@ void SILGenFunction::emitClassMemberDestruction(SILValue selfValue,
     if (!ti.isTrivial()) {
       SILValue addr = B.createRefElementAddr(cleanupLoc, selfValue, vd,
                                          ti.getLoweredType().getAddressType());
-      B.emitDestroyAddr(cleanupLoc, addr);
+      B.emitDestroyAddrAndFold(cleanupLoc, addr);
     }
   }
 }
