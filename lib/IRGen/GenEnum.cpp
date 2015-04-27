@@ -2631,17 +2631,21 @@ namespace {
 
     CopyDestroyStrategy CopyDestroyKind;
 
+    bool ConstrainedByRuntimeLayout : 1;
+
   public:
     MultiPayloadEnumImplStrategy(IRGenModule &IGM,
                                  TypeInfoKind tik, unsigned NumElements,
-                                  std::vector<Element> &&WithPayload,
-                                  std::vector<Element> &&WithRecursivePayload,
-                                  std::vector<Element> &&WithNoPayload)
+                                 std::vector<Element> &&WithPayload,
+                                 std::vector<Element> &&WithRecursivePayload,
+                                 std::vector<Element> &&WithNoPayload,
+                                 bool constrainedByRuntimeLayout)
       : PayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                      std::move(WithPayload),
                                      std::move(WithRecursivePayload),
                                      std::move(WithNoPayload)),
-        CopyDestroyKind(Normal)
+        CopyDestroyKind(Normal),
+        ConstrainedByRuntimeLayout(constrainedByRuntimeLayout)
     {
       assert(ElementsWithPayload.size() > 1);
 
@@ -2675,6 +2679,17 @@ namespace {
       }
     }
 
+  private:
+    TypeInfo *completeFixedLayout(TypeConverter &TC,
+                                  SILType Type,
+                                  EnumDecl *theEnum,
+                                  llvm::StructType *enumTy);
+    TypeInfo *completeDynamicLayout(TypeConverter &TC,
+                                    SILType Type,
+                                    EnumDecl *theEnum,
+                                    llvm::StructType *enumTy);
+
+  public:
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
                                       SILType Type,
                                       EnumDecl *theEnum,
@@ -3762,27 +3777,37 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   std::vector<Element> elementsWithRecursivePayload;
   std::vector<Element> elementsWithNoPayload;
 
+  bool constrainedByRuntimeLayout = false;
+
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
 
     // Compute whether this gives us an apparent payload or dynamic layout.
     // Note that we do *not* apply substitutions from a bound generic instance
     // yet. We want all instances of a generic enum to share an implementation
-    // strategy.
-    Type argType = elt->getArgumentType();
-    if (argType.isNull()) {
+    // strategy. If the abstract layout of the enum is dependent on generic
+    // parameters, then we additionally need to constrain any layout
+    // optimizations we perform to things that are reproducible by the runtime.
+    Type origArgType = elt->getArgumentType();
+    if (origArgType.isNull()) {
       elementsWithNoPayload.push_back({elt, nullptr});
       continue;
     }
-    auto argLoweredTy = TC.IGM.SILMod->Types.getLoweredType(argType);
-    auto *argTI = TC.tryGetCompleteTypeInfo(argLoweredTy.getSwiftRValueType());
-    if (!argTI) {
+    auto origArgLoweredTy = TC.IGM.SILMod->Types.getLoweredType(origArgType);
+    auto *origArgTI
+      = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getSwiftRValueType());
+    if (!origArgTI) {
       elementsWithRecursivePayload.push_back({elt, nullptr});
       continue;
     }
+    
+    // If the unsubstituted argument is dependent, then we need to constrain
+    // our layout optimizations to what the runtime can reproduce.
+    if (!isa<FixedTypeInfo>(origArgTI))
+      constrainedByRuntimeLayout = true;
 
-    auto loadableArgTI = dyn_cast<LoadableTypeInfo>(argTI);
-    if (loadableArgTI && loadableArgTI->getExplosionSize() == 0) {
+    auto loadableOrigArgTI = dyn_cast<LoadableTypeInfo>(origArgTI);
+    if (loadableOrigArgTI && loadableOrigArgTI->isKnownEmpty()) {
       elementsWithNoPayload.push_back({elt, nullptr});
     } else {
       // *Now* apply the substitutions and get the type info for the instance's
@@ -3827,7 +3852,8 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
     return new MultiPayloadEnumImplStrategy(TC.IGM, tik, numElements,
                                     std::move(elementsWithPayload),
                                     std::move(elementsWithRecursivePayload),
-                                    std::move(elementsWithNoPayload));
+                                    std::move(elementsWithNoPayload),
+                                    constrainedByRuntimeLayout);
   if (elementsWithPayload.size() == 1)
     return new SinglePayloadEnumImplStrategy(TC.IGM, tik, numElements,
                                     std::move(elementsWithPayload),
@@ -4065,370 +4091,425 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
   return mutableTI;
 }
 
-namespace {
-  TypeInfo *
-  SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                   SILType Type,
-                                                   EnumDecl *theEnum,
-                                                   llvm::StructType *enumTy) {
-    if (ElementsWithPayload.empty()) {
+TypeInfo *
+SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
+                                                 SILType Type,
+                                                 EnumDecl *theEnum,
+                                                 llvm::StructType *enumTy) {
+  if (ElementsWithPayload.empty()) {
+    enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
+    Alignment alignment(1);
+    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+                          alignment);
+    return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
+                                                         Size(0), {},
+                                                         alignment,
+                                                         IsPOD));
+  } else {
+    const TypeInfo &eltTI = *getSingleton();
+
+    // Use the singleton element's storage type if fixed-size.
+    if (eltTI.isFixedSize()) {
+      llvm::Type *body[] = { eltTI.StorageType };
+      enumTy->setBody(body, /*isPacked*/ true);
+    } else {
       enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
-      Alignment alignment(1);
+    }
+
+    if (TIK <= Opaque) {
+      auto alignment = eltTI.getBestKnownAlignment();
+      applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
+                            alignment);
+      return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
+                             alignment,
+                             eltTI.isPOD(ResilienceScope::Local),
+                             eltTI.isBitwiseTakable(ResilienceScope::Local)));
+    } else {
+      auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
+      auto alignment = fixedEltTI.getFixedAlignment();
       applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
                             alignment);
-      return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
-                                                           Size(0), {},
-                                                           alignment,
-                                                           IsPOD));
-    } else {
-      const TypeInfo &eltTI = *getSingleton();
-
-      // Use the singleton element's storage type if fixed-size.
-      if (eltTI.isFixedSize()) {
-        llvm::Type *body[] = { eltTI.StorageType };
-        enumTy->setBody(body, /*isPacked*/ true);
-      } else {
-        enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
-      }
-
-      if (TIK <= Opaque) {
-        auto alignment = eltTI.getBestKnownAlignment();
-        applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
-                              alignment);
-        return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
-                               alignment,
-                               eltTI.isPOD(ResilienceScope::Local),
-                               eltTI.isBitwiseTakable(ResilienceScope::Local)));
-      } else {
-        auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
-        auto alignment = fixedEltTI.getFixedAlignment();
-        applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
-                              alignment);
-        return getFixedEnumTypeInfo(enumTy,
-                          fixedEltTI.getFixedSize(),
-                          fixedEltTI.getSpareBits(),
-                          alignment,
-                          fixedEltTI.isPOD(ResilienceScope::Local),
-                          fixedEltTI.isBitwiseTakable(ResilienceScope::Local));
-      }
+      return getFixedEnumTypeInfo(enumTy,
+                        fixedEltTI.getFixedSize(),
+                        fixedEltTI.getSpareBits(),
+                        alignment,
+                        fixedEltTI.isPOD(ResilienceScope::Local),
+                        fixedEltTI.isBitwiseTakable(ResilienceScope::Local));
     }
   }
+}
 
-  TypeInfo *
-  NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
+TypeInfo *
+NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
+                                                  SILType Type,
+                                                  EnumDecl *theEnum,
+                                                  llvm::StructType *enumTy) {
+  // Since there are no payloads, we need just enough bits to hold a
+  // discriminator.
+  unsigned tagBits = llvm::Log2_32(ElementsWithNoPayload.size() - 1) + 1;
+  auto tagTy = llvm::IntegerType::get(TC.IGM.getLLVMContext(), tagBits);
+  // Round the physical size up to the next power of two.
+  unsigned tagBytes = (tagBits + 7U)/8U;
+  if (!llvm::isPowerOf2_32(tagBytes))
+    tagBytes = llvm::NextPowerOf2(tagBytes);
+  Size tagSize(tagBytes);
+
+  llvm::Type *body[] = { tagTy };
+  enumTy->setBody(body, /*isPacked*/true);
+
+  // Unused tag bits in the physical size can be used as spare bits.
+  // TODO: We can use all values greater than the largest discriminator as
+  // extra inhabitants, not just those made available by spare bits.
+  SpareBitVector spareBits;
+  spareBits.appendClearBits(tagBits);
+  spareBits.extendWithSetBits(tagSize.getValueInBits());
+
+  Alignment alignment(tagBytes);
+  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+                        alignment);
+
+  return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
+                                   enumTy, tagSize, std::move(spareBits),
+                                   alignment, IsPOD));
+}
+
+TypeInfo *
+CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                     SILType Type,
                                                     EnumDecl *theEnum,
-                                                    llvm::StructType *enumTy) {
-    // Since there are no payloads, we need just enough bits to hold a
-    // discriminator.
-    unsigned tagBits = llvm::Log2_32(ElementsWithNoPayload.size() - 1) + 1;
-    auto tagTy = llvm::IntegerType::get(TC.IGM.getLLVMContext(), tagBits);
-    // Round the physical size up to the next power of two.
-    unsigned tagBytes = (tagBits + 7U)/8U;
-    if (!llvm::isPowerOf2_32(tagBytes))
-      tagBytes = llvm::NextPowerOf2(tagBytes);
-    Size tagSize(tagBytes);
+                                                    llvm::StructType *enumTy){
+  // The type should have come from Clang or be @objc,
+  // and should have a raw type.
+  assert((theEnum->hasClangNode() || theEnum->isObjC())
+         && "c-compatible enum didn't come from clang!");
+  assert(theEnum->hasRawType()
+         && "c-compatible enum doesn't have raw type!");
+  assert(!theEnum->getDeclaredTypeInContext()->is<BoundGenericType>()
+         && "c-compatible enum is generic!");
 
-    llvm::Type *body[] = { tagTy };
-    enumTy->setBody(body, /*isPacked*/true);
+  // The raw type should be a C integer type, which should have a single
+  // scalar representation as a Swift struct. We'll use that same
+  // representation type for the enum so that it's ABI-compatible.
+  auto &rawTI = TC.getCompleteTypeInfo(
+                                   theEnum->getRawType()->getCanonicalType());
+  auto &rawFixedTI = cast<FixedTypeInfo>(rawTI);
+  assert(rawFixedTI.isPOD(ResilienceScope::Component)
+         && "c-compatible raw type isn't POD?!");
+  ExplosionSchema rawSchema = rawTI.getSchema();
+  assert(rawSchema.size() == 1
+         && "c-compatible raw type has non-single-scalar representation?!");
+  assert(rawSchema.begin()[0].isScalar()
+         && "c-compatible raw type has non-single-scalar representation?!");
+  llvm::Type *tagTy = rawSchema.begin()[0].getScalarType();
 
-    // Unused tag bits in the physical size can be used as spare bits.
-    // TODO: We can use all values greater than the largest discriminator as
-    // extra inhabitants, not just those made available by spare bits.
-    SpareBitVector spareBits;
-    spareBits.appendClearBits(tagBits);
-    spareBits.extendWithSetBits(tagSize.getValueInBits());
+  llvm::Type *body[] = { tagTy };
+  enumTy->setBody(body, /*isPacked*/ false);
 
-    Alignment alignment(tagBytes);
-    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
-                          alignment);
+  auto alignment = rawFixedTI.getFixedAlignment();
+  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+                        alignment);
 
-    return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
-                                     enumTy, tagSize, std::move(spareBits),
-                                     alignment, IsPOD));
+  return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
+                                               rawFixedTI.getFixedSize(),
+                                               rawFixedTI.getSpareBits(),
+                                               alignment,
+                                               IsPOD));
+}
+
+TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
+                                    TypeConverter &TC,
+                                    SILType Type,
+                                    EnumDecl *theEnum,
+                                    llvm::StructType *enumTy) {
+  // See whether the payload case's type has extra inhabitants.
+  unsigned fixedExtraInhabitants = 0;
+  unsigned numTags = ElementsWithNoPayload.size();
+
+  auto &payloadTI = getFixedPayloadTypeInfo(); // FIXME non-fixed payload
+  fixedExtraInhabitants = payloadTI.getFixedExtraInhabitantCount(TC.IGM);
+
+  // Determine how many tag bits we need. Given N extra inhabitants, we
+  // represent the first N tags using those inhabitants. For additional tags,
+  // we use discriminator bit(s) to inhabit the full bit size of the payload.
+  NumExtraInhabitantTagValues = std::min(numTags, fixedExtraInhabitants);
+
+  unsigned tagsWithoutInhabitants = numTags - NumExtraInhabitantTagValues;
+  if (tagsWithoutInhabitants == 0) {
+    ExtraTagBitCount = 0;
+    NumExtraTagValues = 0;
+  // If the payload size is greater than 32 bits, the calculation would
+  // overflow, but one tag bit should suffice. if you have more than 2^32
+  // enum discriminators you have other problems.
+  } else if (payloadTI.getFixedSize().getValue() >= 4) {
+    ExtraTagBitCount = 1;
+    NumExtraTagValues = 2;
+  } else {
+    unsigned tagsPerTagBitValue =
+      1 << payloadTI.getFixedSize().getValueInBits();
+    NumExtraTagValues
+      = (tagsWithoutInhabitants+(tagsPerTagBitValue-1))/tagsPerTagBitValue+1;
+    ExtraTagBitCount = llvm::Log2_32(NumExtraTagValues-1) + 1;
   }
 
-  TypeInfo *
-  CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                      SILType Type,
-                                                      EnumDecl *theEnum,
-                                                      llvm::StructType *enumTy){
-    // The type should have come from Clang or be @objc,
-    // and should have a raw type.
-    assert((theEnum->hasClangNode() || theEnum->isObjC())
-           && "c-compatible enum didn't come from clang!");
-    assert(theEnum->hasRawType()
-           && "c-compatible enum doesn't have raw type!");
-    assert(!theEnum->getDeclaredTypeInContext()->is<BoundGenericType>()
-           && "c-compatible enum is generic!");
+  // Create the body type.
+  setTaggedEnumBody(TC.IGM, enumTy,
+                     payloadTI.getFixedSize().getValueInBits(),
+                     ExtraTagBitCount);
 
-    // The raw type should be a C integer type, which should have a single
-    // scalar representation as a Swift struct. We'll use that same
-    // representation type for the enum so that it's ABI-compatible.
-    auto &rawTI = TC.getCompleteTypeInfo(
-                                     theEnum->getRawType()->getCanonicalType());
-    auto &rawFixedTI = cast<FixedTypeInfo>(rawTI);
-    assert(rawFixedTI.isPOD(ResilienceScope::Component)
-           && "c-compatible raw type isn't POD?!");
-    ExplosionSchema rawSchema = rawTI.getSchema();
-    assert(rawSchema.size() == 1
-           && "c-compatible raw type has non-single-scalar representation?!");
-    assert(rawSchema.begin()[0].isScalar()
-           && "c-compatible raw type has non-single-scalar representation?!");
-    llvm::Type *tagTy = rawSchema.begin()[0].getScalarType();
+  // The enum has the alignment of the payload. The size includes the added
+  // tag bits.
+  auto sizeWithTag = payloadTI.getFixedSize().getValue();
+  unsigned extraTagByteCount = (ExtraTagBitCount+7U)/8U;
+  sizeWithTag += extraTagByteCount;
 
-    llvm::Type *body[] = { tagTy };
-    enumTy->setBody(body, /*isPacked*/ false);
-
-    auto alignment = rawFixedTI.getFixedAlignment();
-    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
-                          alignment);
-
-    return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
-                                                 rawFixedTI.getFixedSize(),
-                                                 rawFixedTI.getSpareBits(),
-                                                 alignment,
-                                                 IsPOD));
+  // FIXME: We don't have enough semantic understanding of extra inhabitant
+  // sets to be able to reason about how many spare bits from the payload type
+  // we can forward. If we spilled tag bits, however, we can offer the unused
+  // bits we have in that byte.
+  SpareBitVector spareBits;
+  spareBits.appendClearBits(payloadTI.getFixedSize().getValueInBits());
+  if (ExtraTagBitCount > 0) {
+    spareBits.appendClearBits(ExtraTagBitCount);
+    spareBits.appendSetBits(extraTagByteCount * 8 - ExtraTagBitCount);
   }
+  
+  auto alignment = payloadTI.getFixedAlignment();
+  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+                        alignment);
+  
+  return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
+                      alignment,
+                      payloadTI.isPOD(ResilienceScope::Component),
+                      payloadTI.isBitwiseTakable(ResilienceScope::Component));
+}
 
-  TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
-                                      TypeConverter &TC,
-                                      SILType Type,
-                                      EnumDecl *theEnum,
-                                      llvm::StructType *enumTy) {
-    // See whether the payload case's type has extra inhabitants.
-    unsigned fixedExtraInhabitants = 0;
-    unsigned numTags = ElementsWithNoPayload.size();
+TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
+                                                TypeConverter &TC,
+                                                SILType Type,
+                                                EnumDecl *theEnum,
+                                                llvm::StructType *enumTy) {
+  // The body is runtime-dependent, so we can't put anything useful here
+  // statically.
+  enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/true);
 
-    auto &payloadTI = getFixedPayloadTypeInfo(); // FIXME non-fixed payload
-    fixedExtraInhabitants = payloadTI.getFixedExtraInhabitantCount(TC.IGM);
+  // Layout has to be done when the value witness table is instantiated,
+  // during initializeMetadata.
+  auto &payloadTI = getPayloadTypeInfo();
+  auto alignment = payloadTI.getBestKnownAlignment();
+  
+  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
+                        alignment);
+  
+  return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
+         alignment,
+         payloadTI.isPOD(ResilienceScope::Component),
+         payloadTI.isBitwiseTakable(ResilienceScope::Component)));
+}
 
-    // Determine how many tag bits we need. Given N extra inhabitants, we
-    // represent the first N tags using those inhabitants. For additional tags,
-    // we use discriminator bit(s) to inhabit the full bit size of the payload.
-    NumExtraInhabitantTagValues = std::min(numTags, fixedExtraInhabitants);
+TypeInfo *
+SinglePayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
+                                                SILType type,
+                                                EnumDecl *theEnum,
+                                                llvm::StructType *enumTy) {
+  if (TIK >= Fixed)
+    return completeFixedLayout(TC, type, theEnum, enumTy);
+  return completeDynamicLayout(TC, type, theEnum, enumTy);
+}
 
-    unsigned tagsWithoutInhabitants = numTags - NumExtraInhabitantTagValues;
-    if (tagsWithoutInhabitants == 0) {
-      ExtraTagBitCount = 0;
-      NumExtraTagValues = 0;
-    // If the payload size is greater than 32 bits, the calculation would
-    // overflow, but one tag bit should suffice. if you have more than 2^32
-    // enum discriminators you have other problems.
-    } else if (payloadTI.getFixedSize().getValue() >= 4) {
-      ExtraTagBitCount = 1;
-      NumExtraTagValues = 2;
-    } else {
-      unsigned tagsPerTagBitValue =
-        1 << payloadTI.getFixedSize().getValueInBits();
-      NumExtraTagValues
-        = (tagsWithoutInhabitants+(tagsPerTagBitValue-1))/tagsPerTagBitValue+1;
-      ExtraTagBitCount = llvm::Log2_32(NumExtraTagValues-1) + 1;
-    }
-
-    // Create the body type.
-    setTaggedEnumBody(TC.IGM, enumTy,
-                       payloadTI.getFixedSize().getValueInBits(),
-                       ExtraTagBitCount);
-
-    // The enum has the alignment of the payload. The size includes the added
-    // tag bits.
-    auto sizeWithTag = payloadTI.getFixedSize().getValue();
-    unsigned extraTagByteCount = (ExtraTagBitCount+7U)/8U;
-    sizeWithTag += extraTagByteCount;
-
-    // FIXME: We don't have enough semantic understanding of extra inhabitant
-    // sets to be able to reason about how many spare bits from the payload type
-    // we can forward. If we spilled tag bits, however, we can offer the unused
-    // bits we have in that byte.
-    SpareBitVector spareBits;
-    spareBits.appendClearBits(payloadTI.getFixedSize().getValueInBits());
-    if (ExtraTagBitCount > 0) {
-      spareBits.appendClearBits(ExtraTagBitCount);
-      spareBits.appendSetBits(extraTagByteCount * 8 - ExtraTagBitCount);
-    }
-    
-    auto alignment = payloadTI.getFixedAlignment();
-    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
-                          alignment);
-    
-    return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
-                        alignment,
-                        payloadTI.isPOD(ResilienceScope::Component),
-                        payloadTI.isBitwiseTakable(ResilienceScope::Component));
-  }
-
-  TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
-                                                  TypeConverter &TC,
+TypeInfo *
+MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
                                                   SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
-    // The body is runtime-dependent, so we can't put anything useful here
-    // statically.
-    enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/true);
+  // We need tags for each of the payload types, which we may be able to form
+  // using spare bits, plus a minimal number of tags with which we can
+  // represent the empty cases.
+  unsigned numPayloadTags = ElementsWithPayload.size();
+  unsigned numEmptyElements = ElementsWithNoPayload.size();
 
-    // Layout has to be done when the value witness table is instantiated,
-    // during initializeMetadata.
-    auto &payloadTI = getPayloadTypeInfo();
-    auto alignment = payloadTI.getBestKnownAlignment();
+  // See if the payload types have any spare bits in common.
+  // At the end of the loop CommonSpareBits.size() will be the size (in bits)
+  // of the largest payload.
+  CommonSpareBits = {};
+  Alignment worstAlignment(1);
+  IsPOD_t isPOD = IsPOD;
+  IsBitwiseTakable_t isBT = IsBitwiseTakable;
+  for (auto &elt : ElementsWithPayload) {
+    auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti); // FIXME
+    if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
+      worstAlignment = fixedPayloadTI.getFixedAlignment();
+    if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
+      isPOD = IsNotPOD;
+    if (!fixedPayloadTI.isBitwiseTakable(ResilienceScope::Component))
+      isBT = IsNotBitwiseTakable;
+
+    unsigned payloadBits = fixedPayloadTI.getFixedSize().getValueInBits();
     
-    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
-                          alignment);
-    
-    return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
-           alignment,
-           payloadTI.isPOD(ResilienceScope::Component),
-           payloadTI.isBitwiseTakable(ResilienceScope::Component)));
+    // See what spare bits from the payload we can use for layout optimization.
+
+    // The runtime currently does not track spare bits, so we can't use them
+    // if the type is layout-dependent. (Even when the runtime does, it will
+    // likely only track a subset of the spare bits.)
+    if (ConstrainedByRuntimeLayout) {
+      if (CommonSpareBits.size() < payloadBits)
+        CommonSpareBits.extendWithClearBits(payloadBits);
+      continue;
+    }
+
+    // As a hack, if the payload type is generic, don't use any spare bits
+    // from it, even if our concrete instance has them. We don't want varying
+    // spare bits between ObjC and Swift class references to introduce dynamic
+    // layout; that's a lot of overhead in generic code for little gain.
+    // There's a corresponding hack in TypeConverter::convertArchetypeType to
+    // give class archetypes no spare bits.
+    if (elt.decl->getInterfaceType()->isDependentType()) {
+      FixedTypeInfo::applyFixedSpareBitsMask(CommonSpareBits,
+                               SpareBitVector::getConstant(payloadBits, false));
+      continue;
+    }
+
+    // Otherwise, we have no constraints on what spare bits we can use.
+    fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
   }
 
-  TypeInfo *
-  SinglePayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                  SILType type,
-                                                  EnumDecl *theEnum,
-                                                  llvm::StructType *enumTy) {
-    if (TIK >= Fixed)
-      return completeFixedLayout(TC, type, theEnum, enumTy);
-    return completeDynamicLayout(TC, type, theEnum, enumTy);
+  unsigned commonSpareBitCount = CommonSpareBits.count();
+  unsigned usedBitCount = CommonSpareBits.size() - commonSpareBitCount;
+
+  // Determine how many tags we need to accommodate the empty cases, if any.
+  if (ElementsWithNoPayload.empty()) {
+    NumEmptyElementTags = 0;
+  } else {
+    // We can store tags for the empty elements using the inhabited bits with
+    // their own tag(s).
+    if (usedBitCount >= 32) {
+      NumEmptyElementTags = 1;
+    } else {
+      unsigned emptyElementsPerTag = 1 << usedBitCount;
+      NumEmptyElementTags
+        = (numEmptyElements + (emptyElementsPerTag-1))/emptyElementsPerTag;
+    }
   }
 
-  TypeInfo *
-  MultiPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
-                                                  SILType Type,
-                                                  EnumDecl *theEnum,
-                                                  llvm::StructType *enumTy) {
-    // TODO Dynamic layout for multi-payload enums.
-    if (!TC.IGM.Opts.EnableDynamicValueTypeLayout && TIK < Fixed) {
-      TC.IGM.unimplemented(theEnum->getLoc(),
-                           "non-fixed multi-payload enum layout");
-      return new UnimplementedTypeInfo(TC.IGM, enumTy);
-    }
+  unsigned numTags = numPayloadTags + NumEmptyElementTags;
+  unsigned numTagBits = llvm::Log2_32(numTags-1) + 1;
+  ExtraTagBitCount = numTagBits <= commonSpareBitCount
+    ? 0 : numTagBits - commonSpareBitCount;
+  NumExtraTagValues = numTags >> commonSpareBitCount;
 
-    // We need tags for each of the payload types, which we may be able to form
-    // using spare bits, plus a minimal number of tags with which we can
-    // represent the empty cases.
-    unsigned numPayloadTags = ElementsWithPayload.size();
-    unsigned numEmptyElements = ElementsWithNoPayload.size();
+  // Create the type. We need enough bits to store the largest payload plus
+  // extra tag bits we need.
+  setTaggedEnumBody(TC.IGM, enumTy,
+                     CommonSpareBits.size(),
+                     ExtraTagBitCount);
 
-    // See if the payload types have any spare bits in common.
-    // At the end of the loop CommonSpareBits.size() will be the size (in bits)
-    // of the largest payload.
-    CommonSpareBits = {};
-    Alignment worstAlignment(1);
-    IsPOD_t isPOD = IsPOD;
-    IsBitwiseTakable_t isBT = IsBitwiseTakable;
-    for (auto &elt : ElementsWithPayload) {
-      auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti); // FIXME
-      if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
-        worstAlignment = fixedPayloadTI.getFixedAlignment();
-      if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
-        isPOD = IsNotPOD;
-      if (!fixedPayloadTI.isBitwiseTakable(ResilienceScope::Component))
-        isBT = IsNotBitwiseTakable;
+  // The enum has the worst alignment of its payloads. The size includes the
+  // added tag bits.
+  auto sizeWithTag = (CommonSpareBits.size() + 7U)/8U;
+  unsigned extraTagByteCount = (ExtraTagBitCount+7U)/8U;
+  sizeWithTag += extraTagByteCount;
 
-      // As a hack, if the payload type is generic, don't use any spare bits
-      // from it, even if our concrete instance has them. We can't support
-      // runtime-dependent spare bits yet. There's a corresponding hack in
-      // TypeConverter::convertArchetypeType to give class archetypes no
-      // spare bits.
-      if (elt.decl->getInterfaceType()->isDependentType())
-        CommonSpareBits = SpareBitVector::getConstant(
-                     fixedPayloadTI.getFixedSize().getValueInBits(), false);
-      else
-        fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
-    }
+  SpareBitVector spareBits;
 
-    unsigned commonSpareBitCount = CommonSpareBits.count();
-    unsigned usedBitCount = CommonSpareBits.size() - commonSpareBitCount;
+  // Determine the bits we're going to use for the tag.
+  assert(PayloadTagBits.empty());
 
-    // Determine how many tags we need to accommodate the empty cases, if any.
-    if (ElementsWithNoPayload.empty()) {
-      NumEmptyElementTags = 0;
-    } else {
-      // We can store tags for the empty elements using the inhabited bits with
-      // their own tag(s).
-      if (usedBitCount >= 32) {
-        NumEmptyElementTags = 1;
-      } else {
-        unsigned emptyElementsPerTag = 1 << usedBitCount;
-        NumEmptyElementTags
-          = (numEmptyElements + (emptyElementsPerTag-1))/emptyElementsPerTag;
-      }
-    }
+  // The easiest case is if we're going to use all of the available
+  // payload tag bits (plus potentially some extra bits), because we
+  // can just straight-up use CommonSpareBits as that bitset.
+  if (numTagBits >= commonSpareBitCount) {
+    PayloadTagBits = CommonSpareBits;
 
-    unsigned numTags = numPayloadTags + NumEmptyElementTags;
-    unsigned numTagBits = llvm::Log2_32(numTags-1) + 1;
-    ExtraTagBitCount = numTagBits <= commonSpareBitCount
-      ? 0 : numTagBits - commonSpareBitCount;
-    NumExtraTagValues = numTags >> commonSpareBitCount;
+    // We're using all of the common spare bits as tag bits, so none
+    // of them are spare; nor are the extra tag bits.
+    spareBits.appendClearBits(CommonSpareBits.size() + ExtraTagBitCount);
 
-    // Create the type. We need enough bits to store the largest payload plus
-    // extra tag bits we need.
-    setTaggedEnumBody(TC.IGM, enumTy,
-                       CommonSpareBits.size(),
-                       ExtraTagBitCount);
+    // The remaining bits in the extra tag bytes are spare.
+    spareBits.appendSetBits(extraTagByteCount * 8 - ExtraTagBitCount);
 
-    // The enum has the worst alignment of its payloads. The size includes the
-    // added tag bits.
-    auto sizeWithTag = (CommonSpareBits.size() + 7U)/8U;
-    unsigned extraTagByteCount = (ExtraTagBitCount+7U)/8U;
-    sizeWithTag += extraTagByteCount;
+  // Otherwise, we need to construct a new bitset that doesn't
+  // include the bits we aren't using.
+  } else {
+    assert(ExtraTagBitCount == 0
+           && "spilled extra tag bits with spare bits available?!");
+    PayloadTagBits =
+      ClusteredBitVector::getConstant(CommonSpareBits.size(), false);
 
-    SpareBitVector spareBits;
+    // Start the spare bit set using all the common spare bits.
+    spareBits = CommonSpareBits;
 
-    // Determine the bits we're going to use for the tag.
-    assert(PayloadTagBits.empty());
-
-    // The easiest case is if we're going to use all of the available
-    // payload tag bits (plus potentially some extra bits), because we
-    // can just straight-up use CommonSpareBits as that bitset.
-    if (numTagBits >= commonSpareBitCount) {
-      PayloadTagBits = CommonSpareBits;
-
-      // We're using all of the common spare bits as tag bits, so none
-      // of them are spare; nor are the extra tag bits.
-      spareBits.appendClearBits(CommonSpareBits.size() + ExtraTagBitCount);
-
-      // The remaining bits in the extra tag bytes are spare.
-      spareBits.appendSetBits(extraTagByteCount * 8 - ExtraTagBitCount);
-
-    // Otherwise, we need to construct a new bitset that doesn't
-    // include the bits we aren't using.
-    } else {
-      assert(ExtraTagBitCount == 0
-             && "spilled extra tag bits with spare bits available?!");
-      PayloadTagBits =
-        ClusteredBitVector::getConstant(CommonSpareBits.size(), false);
-
-      // Start the spare bit set using all the common spare bits.
-      spareBits = CommonSpareBits;
-
-      // Mark the bits we'll use as occupied in both bitsets.
-      // We take bits starting from the most significant.
-      unsigned remainingTagBits = numTagBits;
-      for (unsigned bit = CommonSpareBits.size() - 1; true; --bit) {
-        if (!CommonSpareBits[bit]) {
-          assert(bit > 0 && "ran out of spare bits?!");
-          continue;
-        }
-
-        // Use this bit as a payload tag bit.
-        PayloadTagBits.setBit(bit);
-
-        // A bit used as a payload tag bit is not a spare bit.
-        spareBits.clearBit(bit);
-
-        if (--remainingTagBits == 0) break;
+    // Mark the bits we'll use as occupied in both bitsets.
+    // We take bits starting from the most significant.
+    unsigned remainingTagBits = numTagBits;
+    for (unsigned bit = CommonSpareBits.size() - 1; true; --bit) {
+      if (!CommonSpareBits[bit]) {
         assert(bit > 0 && "ran out of spare bits?!");
+        continue;
       }
-      assert(PayloadTagBits.count() == numTagBits);
-    }
-    
-    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/ true,
-                          worstAlignment);
 
-    return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
-                                worstAlignment, isPOD, isBT);
+      // Use this bit as a payload tag bit.
+      PayloadTagBits.setBit(bit);
+
+      // A bit used as a payload tag bit is not a spare bit.
+      spareBits.clearBit(bit);
+
+      if (--remainingTagBits == 0) break;
+      assert(bit > 0 && "ran out of spare bits?!");
+    }
+    assert(PayloadTagBits.count() == numTagBits);
   }
+  
+  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/ true,
+                        worstAlignment);
+
+  return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
+                              worstAlignment, isPOD, isBT);
+}
+
+
+TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
+                                                TypeConverter &TC,
+                                                SILType Type,
+                                                EnumDecl *theEnum,
+                                                llvm::StructType *enumTy) {
+  // The body is runtime-dependent, so we can't put anything useful here
+  // statically.
+  enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/true);
+
+  // Layout has to be done when the value witness table is instantiated,
+  // during initializeMetadata. We can at least glean the best available
+  // static information from the payloads.
+  Alignment alignment(0x80000000U);
+  IsPOD_t pod = IsPOD;
+  IsBitwiseTakable_t bt = IsBitwiseTakable;
+  for (auto &element : ElementsWithPayload) {
+    auto &payloadTI = *element.ti;
+    alignment = std::min(alignment, payloadTI.getBestKnownAlignment());
+    pod &= payloadTI.isPOD(ResilienceScope::Component);
+    bt &= payloadTI.isBitwiseTakable(ResilienceScope::Component);
+  }
+  
+  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
+                        alignment);
+  
+  return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
+                                                       alignment, pod, bt));
+}
+
+TypeInfo *
+MultiPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
+                                                SILType Type,
+                                                EnumDecl *theEnum,
+                                                llvm::StructType *enumTy) {
+  if (TIK >= Fixed)
+    return completeFixedLayout(TC, Type, theEnum, enumTy);
+  
+  if (!TC.IGM.Opts.EnableDynamicValueTypeLayout) {
+    TC.IGM.unimplemented(theEnum->getLoc(),
+                         "non-fixed multi-payload enum layout");
+    return new UnimplementedTypeInfo(TC.IGM, enumTy);
+  }
+  
+  return completeDynamicLayout(TC, Type, theEnum, enumTy);
 }
 
 const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,

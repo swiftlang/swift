@@ -221,7 +221,16 @@ public:
   ///       .applyFixedSpareBitsMask(spareBits, 0);
   ///
   /// and end up with a spare bits mask for the entire enum.
-  void applyFixedSpareBitsMask(SpareBitVector &bits) const;
+  void applyFixedSpareBitsMask(SpareBitVector &mask) const;
+  
+  /// Applies a fixed spare bits mask to the given BitVector,
+  /// clearing any bits used by valid representations of the type.
+  ///
+  /// If the bitvector is empty or smaller than this type, it is grown and
+  /// filled with bits direct from the spare bits mask. If the bitvector is
+  /// larger than this type, the trailing bits are untouched.
+  static void applyFixedSpareBitsMask(SpareBitVector &mask,
+                                      const SpareBitVector &spareBits);
   
   /// Fixed-size types never need dynamic value witness table instantiation.
   void initializeMetadata(IRGenFunction &IGF,

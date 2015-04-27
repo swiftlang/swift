@@ -433,21 +433,26 @@ unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
   return ((1U << spareBitCount) - 1U) << inhabitedBitCount;
 }
 
-void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
+void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask,
+                                            const SpareBitVector &spareBits) {
   // If the mask is no longer than the stored spare bits, we can just
   // apply the stored spare bits.
-  if (mask.size() <= SpareBits.size()) {
+  if (mask.size() <= spareBits.size()) {
     // Grow the mask out if necessary; the tail padding is all spare bits.
-    mask.extendWithSetBits(SpareBits.size());
-    mask &= SpareBits;
+    mask.extendWithSetBits(spareBits.size());
+    mask &= spareBits;
 
   // Otherwise, we have to grow out the stored spare bits before we
   // can intersect.
   } else {
-    auto paddedSpareBits = SpareBits;
+    auto paddedSpareBits = spareBits;
     paddedSpareBits.extendWithSetBits(mask.size());
     mask &= paddedSpareBits;
   }
+}
+
+void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
+  return applyFixedSpareBitsMask(mask, SpareBits);
 }
 
 llvm::ConstantInt *

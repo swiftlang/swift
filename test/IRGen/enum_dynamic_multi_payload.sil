@@ -1,0 +1,30 @@
+// RUN: %target-swift-frontend %s -gnone -emit-ir -enable-source-import -I %S/Inputs -enable-dynamic-value-type-layout | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+import enum_multi_payload
+
+/* TODO: Banished to Inputs/enum_multi_payload.swift so that IRGen doesn't try
+   to emit metadata for multi-payload enums until it's fully able to.
+
+enum Either<T, U> {
+  case Left(T)
+  case Right(U)
+}
+
+class C {}
+
+ */
+
+// Force validation of the Either decl.
+func either(x: C) -> Either<C, C> {
+  return .Left(x)
+  return .Right(x)
+}
+
+// -- The runtime doesn't track spare bits, so fixed instances of the dynamic
+//    type can't use them.
+// CHECK-64-LABEL: define { i64, i1 } @fixed_instances_dont_use_spare_bits(i64, i1)
+// CHECK-32-LABEL: define { i32, i1 } @fixed_instances_dont_use_spare_bits(i32, i1)
+sil @fixed_instances_dont_use_spare_bits : $@convention(thin) (@owned Either<C, C>) -> @owned Either<C, C> {
+entry(%e : $Either<C, C>):
+  return %e : $Either<C, C>
+}
