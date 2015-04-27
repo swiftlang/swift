@@ -151,12 +151,12 @@ func testArithmeticOverflow_UInt_32bit() {
     var t3: UInt = 0xffff_ffff
 
     var t4: UInt = -1
-    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}}overflows when stored into 'UInt'{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer {{.*}}overflows when stored into unsigned type 'UInt'{{$}}
     // FIXME: Bad diagnostic:
     // <rdar://problem/19623566> Obscure diagnostic for assigning negative numbers to unsigned
 
     var t5: UInt = -0xffff_ffff
-    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: integer literal {{.*}}overflows when stored into 'UInt'{{$}}
+    // CHECK-32-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative {{.*}}overflows when stored into unsigned type 'UInt'{{$}}
     // FIXME: Bad diagnostic:
     // <rdar://problem/19623566> Obscure diagnostic for assigning negative numbers to unsigned
   }
