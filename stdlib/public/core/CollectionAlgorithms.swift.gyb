@@ -114,15 +114,15 @@ partitionDocComment = """\
   /// Only returns `range.endIndex` when `self` is empty."""
 
 orderingRequirementForPredicate = """\
-  /// Requires: `isOrderedBefore` is a `strict weak ordering
-  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
-  /// over `self`."""
+  /// Requires: `isOrderedBefore` is a
+  /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
+  /// over the elements in `self`."""
 
 orderingRequirementForComparable = """\
   /// Requires: The less-than operator (`func <`) defined in the `Comparable`
-  /// conformance is a `strict weak ordering
-  /// <http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings>`__
-  /// over `self`."""
+  /// conformance is a
+  /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
+  /// over the elements in `self`."""
 
 }%
 
@@ -147,6 +147,111 @@ ${orderingRequirementForPredicate}
     var isOrderedBefore: (${GElement}, ${GElement}) -> Bool
   ) -> Index {
     return _partition(&self, range, &isOrderedBefore)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// sort()
+//===----------------------------------------------------------------------===//
+
+%{
+
+sortDocCommentForPredicate = """\
+  /// Return an `Array` containing the sorted elements of `source`
+  /// according to `isOrderedBefore`."""
+
+sortDocCommentForComparable = """\
+  /// Return an `Array` containing the sorted elements of `source`."""
+
+sortInPlaceDocCommentForPredicate = """\
+  /// Sort `self` in-place according to `isOrderedBefore`."""
+
+sortInPlaceDocCommentForComparable = """\
+  /// Sort `self` in-place."""
+
+sortIsUnstableForPredicate = """\
+  /// The sorting algorithm is not stable (can change the relative order of
+  /// elements for which `isOrderedBefore` does not establish an order)."""
+
+sortIsUnstableForComparable = """\
+  /// The sorting algorithm is not stable (can change the relative order of
+  /// elements that compare equal)."""
+
+}%
+
+extension SequenceType where Self.Generator.Element : Comparable {
+${sortDocCommentForComparable}
+  ///
+${sortIsUnstableForComparable}
+  ///
+${orderingRequirementForComparable}
+  final public func _prext_sort() -> [Generator.Element] {
+    var result = ContiguousArray(self)
+    result._prext_sortInPlace()
+    return Array(result)
+  }
+}
+
+extension SequenceType {
+${sortDocCommentForPredicate}
+  ///
+${sortIsUnstableForPredicate}
+  ///
+${orderingRequirementForPredicate}
+  final public func _prext_sort(
+    @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
+  ) -> [Generator.Element] {
+    var result = ContiguousArray(self)
+    result._prext_sortInPlace(isOrderedBefore)
+    return Array(result)
+  }
+}
+
+extension MutableCollectionType
+  where
+  Self.Index : RandomAccessIndexType,
+  Self.Generator.Element : Comparable {
+
+${sortInPlaceDocCommentForComparable}
+  ///
+${sortIsUnstableForComparable}
+  ///
+${orderingRequirementForComparable}
+  final public mutating func _prext_sortInPlace() {
+    let didSortUnsafeBuffer: Void? =
+      _withUnsafeMutableBufferPointerIfSupported {
+      (bufferPointer) -> () in
+      bufferPointer._prext_sortInPlace()
+      return ()
+    }
+    if didSortUnsafeBuffer == nil {
+      _introSort(&self, self._prext_indices)
+    }
+  }
+}
+
+extension MutableCollectionType where Self.Index : RandomAccessIndexType {
+${sortInPlaceDocCommentForPredicate}
+  ///
+${sortIsUnstableForPredicate}
+  ///
+${orderingRequirementForPredicate}
+  final public mutating func _prext_sortInPlace(
+    @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
+  ) {
+    let didSortUnsafeBuffer: Void? =
+      _withUnsafeMutableBufferPointerIfSupported {
+      (bufferPointer) -> () in
+      bufferPointer._prext_sortInPlace(isOrderedBefore)
+      return ()
+    }
+    if didSortUnsafeBuffer == nil {
+      typealias IsOrderedBefore =
+        (Generator.Element, Generator.Element) -> Bool
+      let escapableIsOrderedBefore =
+        unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
+      _introSort(&self, self._prext_indices, escapableIsOrderedBefore)
+    }
   }
 }
 
