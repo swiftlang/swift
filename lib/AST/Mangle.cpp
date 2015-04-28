@@ -719,21 +719,18 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     assert(DWARFMangling && "sugared types are only legal for the debugger");
     auto NameAliasTy = cast<NameAliasType>(tybase);
     TypeAliasDecl *decl = NameAliasTy->getDecl();
-    Buffer << "a";
-    if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
+    if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule)
       // It's not possible to mangle the context of the builtin module.
-      Buffer << decl->getName().str();
-    } else {
-      // For the DWARF output we want to mangle the type alias + context,
-      // unless the type alias references a builtin type.
-      assert(decl->getModuleContext() !=
-             decl->getASTContext().TheBuiltinModule);
-      ContextStack context(*this);
-      while (DeclCtx && !DeclCtx->isInnermostContextGeneric())
-        DeclCtx = DeclCtx->getParent();
-      mangleContextOf(decl, BindGenerics::None);
-      mangleIdentifier(decl->getName());
-    }
+      return mangleType(decl->getUnderlyingType(), explosion, uncurryLevel);
+    
+    Buffer << "a";
+    // For the DWARF output we want to mangle the type alias + context,
+    // unless the type alias references a builtin type.
+    ContextStack context(*this);
+    while (DeclCtx && !DeclCtx->isInnermostContextGeneric())
+      DeclCtx = DeclCtx->getParent();
+    mangleContextOf(decl, BindGenerics::None);
+    mangleIdentifier(decl->getName());
     return;
   }
 
