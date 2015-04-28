@@ -91,8 +91,10 @@ SWIFT_CLASS("_TtC8comments9CodeBlock")
 
 /// This is how you use this code.
 ///
-/// <code> f0() // WOW!
-
+/// <code>f0() // WOW!
+/// f0() // WOW!
+/// f0() // WOW!
+/// 
 /// </code>
 - (void)f0;
 - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
@@ -147,6 +149,40 @@ SWIFT_CLASS("_TtC8comments16ImplicitNameLink")
 @end
 
 
+SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
+@interface IndentedBlockComment
+
+/// Brief.
+///
+/// First paragraph line.
+/// Second paragraph line.
+///
+/// Now for a code sample:
+///
+/// <code>var x = 1
+/// // var y = 2
+/// var z = 3
+/// 
+/// </code>
+- (void)f1;
+
+/// Hugely indented brief.
+///
+/// First paragraph line.
+/// Second paragraph line.
+///
+/// Now for a code sample:
+///
+/// <code>var x = 1
+/// // var y = 2
+/// var z = 3
+/// 
+/// </code>
+- (void)f2;
+- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
 SWIFT_CLASS("_TtC8comments10InlineCode")
 @interface InlineCode
 
@@ -160,6 +196,17 @@ SWIFT_CLASS("_TtC8comments10InlineLink")
 @interface InlineLink
 
 /// Aaa bbb ccc.
+- (void)f0;
+- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments14MultiLineBrief")
+@interface MultiLineBrief
+
+/// Brief first line. Brief after softbreak.
+///
+/// Some paragraph text.
 - (void)f0;
 - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end

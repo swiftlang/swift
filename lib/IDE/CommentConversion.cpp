@@ -432,15 +432,23 @@ break;
 
   void printCodeBlock(const CodeBlock *CB) {
     print("<code>");
-    print(CB->getLiteralContent().str());
-    printNewline();
+    SmallVector<StringRef, 8> Lines;
+    CB->getLiteralContent().split(Lines, "\n");
+    for (auto Line : Lines) {
+      print(Line);
+      printNewline();
+    }
     print("</code>");
   }
 
   void printCode(const Code *C) {
     print("<code>");
-    print(C->getLiteralContent().str());
-    printNewline();
+    SmallVector<StringRef, 8> Lines;
+    C->getLiteralContent().split(Lines, "\n");
+    for (auto Line : Lines) {
+      print(Line);
+      printNewline();
+    }
     print("</code>");
   }
 

@@ -21,11 +21,41 @@ using namespace markup;
 std::string LineList::str() const {
   std::string Result;
   raw_string_ostream Stream(Result);
-  for (const auto Line : Lines) {
-    Stream << Line.Text << "\n";
+  if (Lines.empty())
+    return "";
+
+  auto FirstLine = Lines.begin();
+  while (FirstLine->Text.empty() && FirstLine != Lines.end())
+    ++FirstLine;
+
+  if (FirstLine == Lines.end())
+    return "";
+
+  auto InitialIndentation = measureIndentation(FirstLine->Text);
+
+  for (auto Line = FirstLine; Line != Lines.end(); ++Line) {
+    auto Drop = std::min(InitialIndentation, Line->FirstNonspaceOffset);
+    Stream << Line->Text.drop_front(Drop) << "\n";
   }
+
   Stream.flush();
   return Result;
+}
+
+size_t llvm::markup::measureIndentation(StringRef Text) {
+  size_t Col = 0;
+  for (size_t i = 0, e = Text.size(); i != e; ++i) {
+    if (Text[i] == ' ' || Text[i] == '\v' || Text[i] == '\f') {
+      Col++;
+      continue;
+    }
+
+    if (Text[i] == '\t') {
+      Col += ((i + 8) / 8) * 8;
+    }
+    return i;
+  }
+  return Text.size();
 }
 
 void LineListBuilder::addLine(llvm::StringRef Text, swift::SourceRange Range) {

@@ -112,8 +112,10 @@ enum A012_AttachToEntities {
   /// This is how you use this code.
   ///
   ///     f0() // WOW!
+  ///     f0() // WOW!
+  ///     f0() // WOW!
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test9CodeBlock2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>This is how you use this code.</Para></Abstract><Discussion><CodeListing><zCodeLineNumbered><![CDATA[ f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test9CodeBlock2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>This is how you use this code.</Para></Abstract><Discussion><CodeListing><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
 }
 
 @objc class EmptyComments {
@@ -348,5 +350,48 @@ func f0(x: Int, y: Int, z: Int) {}
   ///   - Fff.
   func f0() {}
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test13UnorderedList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><List-Bullet><Item><Para>Aaa.</Para></Item><Item><Para>Bbb. Ccc.</Para></Item></List-Bullet><List-Bullet><Item><Para>Ddd.</Para></Item><Item><Para>Eee.</Para><List-Bullet><Item><Para>Fff.</Para></Item></List-Bullet></Item></List-Bullet></Discussion></Function>]
+}
+
+@objc class IndentedBlockComment {
+// CHECK: {{.*}}DocCommentAsXML=none
+  /**
+      Brief.
+
+      First paragraph line.
+      Second paragraph line.
+
+      Now for a code sample:
+
+          var x = 1
+          // var y = 2
+          var z = 3
+  */
+  func f1() {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f1FS0_FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+  /**
+                        Hugely indented brief.
+
+                        First paragraph line.
+                        Second paragraph line.
+
+                        Now for a code sample:
+
+                            var x = 1
+                            // var y = 2
+                            var z = 3
+  */
+  func f2() {}
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f2FS0_FT_T_</USR><Declaration>func f2()</Declaration><Abstract><Para>Hugely indented brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+}
+
+@objc class MultiLineBrief {
+// CHECK: {{.*}}DocCommentAsXML=none
+
+  /// Brief first line.
+  /// Brief after softbreak.
+  ///
+  /// Some paragraph text.
+  func f0() {}
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test14MultiLineBrief2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Brief first line. Brief after softbreak.</Para></Abstract><Discussion><Para>Some paragraph text.</Para></Discussion></Function>]
 }
 
