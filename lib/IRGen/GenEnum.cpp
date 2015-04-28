@@ -73,6 +73,13 @@ void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
   TI->initializeWithTake(IGF, dest, src, T);
 }
 
+llvm::Value *irgen::EnumImplStrategy::
+loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc, Address addr) const {
+  IGF.IGM.error(loc, "Can only load from an address of an optional "
+                "reference.");
+  llvm::report_fatal_error("loadRefcountedPtr: Invalid SIL in IRGen");
+}
+
 namespace {
   /// Implementation strategy for unimplemented enums.
   /// Does nothing but produce stub 'undef' values for enum operations.
@@ -2204,6 +2211,13 @@ namespace {
       }
     }
 
+    llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
+                                   Address addr) const override {
+      // There is no need to bitcast from the enum address. Loading from the
+      // reference type emits a bitcast to the proper reference type first.
+      return cast<LoadableTypeInfo>(getPayloadTypeInfo()).loadRefcountedPtr(
+        IGF, loc, addr).getValue();
+    }
   private:
     llvm::ConstantInt *getZeroExtraTagConstant(IRGenModule &IGM) const {
       assert(TIK >= Fixed && "not fixed layout");
@@ -4306,6 +4320,10 @@ namespace {
                                           llvm::Value *payload)
     const override {
       return Strategy.maskFixedExtraInhabitant(IGF, payload);
+    }
+    LoadedRef loadRefcountedPtr(IRGenFunction &IGF,
+                                SourceLoc loc, Address addr) const override {
+      return LoadedRef(Strategy.loadRefcountedPtr(IGF, loc, addr), false);
     }
   };
 

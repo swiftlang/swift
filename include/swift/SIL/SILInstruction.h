@@ -2873,6 +2873,25 @@ public:
     : UnaryInstructionBase(loc, operand, operand.getType()) {}
 };
 
+/// Given an object reference, return true iff it is non-nil and refers
+/// to a native swift object with strong reference count of 1.
+class IsUniqueInst : public UnaryInstructionBase<ValueKind::IsUniqueInst>
+{
+public:
+  IsUniqueInst(SILLocation Loc, SILValue Operand, SILType BoolTy)
+    : UnaryInstructionBase(Loc, Operand, BoolTy) {}
+};
+
+/// Given an object reference, return true iff it is non-nil and either refers
+/// to a native swift object with strong reference count of 1 or refers to a
+/// pinned object (for simultaneous access to multiple subobjects).
+class IsUniqueOrPinnedInst :
+    public UnaryInstructionBase<ValueKind::IsUniqueOrPinnedInst> {
+public:
+  IsUniqueOrPinnedInst(SILLocation Loc, SILValue Operand, SILType BoolTy)
+    : UnaryInstructionBase(Loc, Operand, BoolTy) {}
+};
+
 //===----------------------------------------------------------------------===//
 // DeallocationInsts
 //===----------------------------------------------------------------------===//

@@ -855,6 +855,104 @@ emitBuiltinMakeMaterializeForSetCallback(SILGenFunction &gen,
   return ManagedValue::forUnmanaged(result);
 }
 
+static bool requireRefCountedType(SILGenFunction &gen,
+                                  SILLocation loc,
+                                  Type type) {
+  auto valueType = type->getOptionalObjectType();
+  auto objType = valueType ? valueType : type;
+  if (objType->mayHaveSuperclass()
+      || objType->isClassExistentialType()
+      || objType->is<BuiltinNativeObjectType>()
+      || objType->is<BuiltinBridgeObjectType>()
+      || objType->is<BuiltinUnknownObjectType>()) {
+    return true;
+  }
+  gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                   "isUnique operand type must be a refcounted object");
+  return false;
+}
+
+static ManagedValue emitBuiltinIsUnique(SILGenFunction &gen,
+                                        SILLocation loc,
+                                        ArrayRef<Substitution> subs,
+                                        ArrayRef<ManagedValue> args,
+                                        CanFunctionType formalApplyType,
+                                        SGFContext C) {
+
+  assert(subs.size() == 1 && "isUnique should have a single substitution");
+
+  if (!requireRefCountedType(gen, loc, subs[0].getReplacement())) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, gen.getASTContext());
+    return ManagedValue::forUnmanaged(SILUndef::get(Int1Ty, gen.SGM.M));
+  }
+  assert(args.size() == 1 && "isUnique should have a single argument");
+  assert((args[0].getType().isAddress() && !args[0].hasCleanup()) &&
+         "Builtin.isUnique takes an address.");
+
+  return ManagedValue::forUnmanaged(
+    gen.B.createIsUnique(loc, args[0].getValue()));
+}
+
+static ManagedValue
+emitBuiltinIsUniqueOrPinned(SILGenFunction &gen,
+                               SILLocation loc,
+                               ArrayRef<Substitution> subs,
+                               ArrayRef<ManagedValue> args,
+                               CanFunctionType formalApplyType,
+                               SGFContext C) {
+  assert(subs.size() == 1 && "isUnique should have a single substitution");
+
+  if (!requireRefCountedType(gen, loc, subs[0].getReplacement())) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, gen.getASTContext());
+    return ManagedValue::forUnmanaged(SILUndef::get(Int1Ty, gen.SGM.M));
+  }
+  assert(args.size() == 1 && "isUnique should have a single argument");
+  assert((args[0].getType().isAddress() && !args[0].hasCleanup()) &&
+         "Builtin.isUnique takes an address.");
+
+  return ManagedValue::forUnmanaged(
+    gen.B.createIsUniqueOrPinned(loc, args[0].getValue()));
+}
+
+// This force-casts the incoming address to NativeObject assuming the caller has
+// performed all necessary checks. For example, this may directly cast a
+// single-payload enum to a NativeObject reference.
+static ManagedValue
+emitBuiltinIsUnique_native(SILGenFunction &gen,
+                           SILLocation loc,
+                           ArrayRef<Substitution> subs,
+                           ArrayRef<ManagedValue> args,
+                           CanFunctionType formalApplyType,
+                           SGFContext C) {
+
+  assert(subs.size() == 1 && "isUnique_native should have one sub.");
+  assert(args.size() == 1 && "isUnique_native should have one arg.");
+
+  auto ToType =
+    SILType::getNativeObjectType(gen.getASTContext()).getAddressType();
+  auto toAddr = gen.B.createUncheckedAddrCast(loc, args[0].getValue(), ToType);
+  SILValue result = gen.B.createIsUnique(loc, toAddr);
+  return ManagedValue::forUnmanaged(result);
+}
+
+static ManagedValue
+emitBuiltinIsUniqueOrPinned_native(SILGenFunction &gen,
+                                   SILLocation loc,
+                                   ArrayRef<Substitution> subs,
+                                   ArrayRef<ManagedValue> args,
+                                   CanFunctionType formalApplyType,
+                                   SGFContext C) {
+
+  assert(subs.size() == 1 && "isUniqueOrPinned_native should have one sub.");
+  assert(args.size() == 1 && "isUniqueOrPinned_native should have one arg.");
+
+  auto ToType =
+    SILType::getNativeObjectType(gen.getASTContext()).getAddressType();
+  auto toAddr = gen.B.createUncheckedAddrCast(loc, args[0].getValue(), ToType);
+  SILValue result = gen.B.createIsUniqueOrPinned(loc, toAddr);
+  return ManagedValue::forUnmanaged(result);
+}
+
 /// Specialized emitter for type traits.
 template<TypeTraitResult (TypeBase::*Trait)(),
          BuiltinValueKind Kind>

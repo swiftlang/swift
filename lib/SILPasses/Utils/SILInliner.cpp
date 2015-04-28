@@ -376,6 +376,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::UnmanagedToRefInst:
     case ValueKind::UnownedReleaseInst:
     case ValueKind::UnownedRetainInst:
+    case ValueKind::IsUniqueInst:
+    case ValueKind::IsUniqueOrPinnedInst:
     case ValueKind::UnownedToRefInst:
     case ValueKind::InitBlockStorageHeaderInst:
     case ValueKind::SelectEnumAddrInst:

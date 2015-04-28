@@ -648,6 +648,8 @@ public:
   void visitStrongRetainUnownedInst(StrongRetainUnownedInst *i);
   void visitUnownedRetainInst(UnownedRetainInst *i);
   void visitUnownedReleaseInst(UnownedReleaseInst *i);
+  void visitIsUniqueInst(IsUniqueInst *i);
+  void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
@@ -1507,7 +1509,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
           }
         }
       }
-
     }
     visit(&I);
   }
@@ -3044,6 +3045,33 @@ void IRGenSILFunction::visitUnownedReleaseInst(swift::UnownedReleaseInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = getReferentTypeInfo(*this, i->getOperand().getType());
   ti.unownedRelease(*this, lowered);
+}
+
+static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
+                                 SourceLoc loc, bool checkPinned) {
+  auto &operTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(operand.getType()));
+  LoadedRef ref =
+    operTI.loadRefcountedPtr(IGF, loc, IGF.getLoweredAddress(operand));
+
+  return
+    IGF.emitIsUniqueCall(ref.getValue(), loc, ref.isNonNull(), checkPinned);
+}
+
+void IRGenSILFunction::visitIsUniqueInst(swift::IsUniqueInst *i) {
+  llvm::Value *result = emitIsUnique(*this, i->getOperand(),
+                                     i->getLoc().getSourceLoc(), false);
+  Explosion out;
+  out.add(result);
+  setLoweredExplosion(SILValue(i, 0), out);
+}
+
+void IRGenSILFunction::
+visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
+  llvm::Value *result = emitIsUnique(*this, i->getOperand(),
+                                     i->getLoc().getSourceLoc(), true);
+  Explosion out;
+  out.add(result);
+  setLoweredExplosion(SILValue(i, 0), out);
 }
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {

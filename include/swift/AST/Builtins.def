@@ -283,6 +283,54 @@ BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
 /// Fixes the lifetime of any heap references in a value.
 BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 
+/// isUnique : <T> (inout T[?]) -> Int1
+///
+/// This builtin takes an inout object reference and returns a boolean. Passing
+/// the reference inout forces the optimizer to preserve a retain distinct from
+/// what’s required to maintain lifetime for any of the reference's source-level
+/// copies, because the called function is allowed to replace the reference,
+/// thereby releasing the referent.
+///
+/// The kind of reference count checking that Builtin.isUnique performs depends
+/// on the argument type:
+///
+/// - Native object types are directly checked by reading the
+///   strong reference count:
+///   (Builtin.NativeObject, known native class reference)
+///
+/// - Objective-C object types require an additional check that the
+///   dynamic object type uses native swift reference counting:
+///   (Builtin.UnknownObject, unknown class reference, class existential)
+///
+/// - Bridged object types allow the dymanic object type check to be
+///   passed based on their pointer encoding:
+///   (Builtin.BridgeObject)
+///
+/// Any of the above types may also be wrapped in an optional.
+/// If the static argument type is optional, then a null check is also
+/// performed.
+///
+/// Thus, isUnique only returns true for non-null, native swift object
+/// references with a strong reference count of one.
+BUILTIN_SIL_OPERATION(IsUnique, "isUnique", Special)
+
+/// isUniqueOrPinned : <T> (inout T[?]) -> Int1
+///
+/// This builtin has the same semantics as isUnique except that it also returns
+/// true if the object is marked pinned regardless of the reference count. This
+/// allows for simultaneous non-structural modification of multiple subobjects.
+BUILTIN_SIL_OPERATION(IsUniqueOrPinned, "isUniqueOrPinned", Special)
+
+/// IsUnique_native : <T> (inout T[?]) -> Int1
+///
+/// These variants of isUnique implicitly cast to a non-null NativeObject before
+/// checking uniqueness. This allows an object reference statically typed as
+/// BridgeObject or UnknownObject to be treated as a native object by the
+/// runtime.
+BUILTIN_SIL_OPERATION(IsUnique_native, "isUnique_native", Special)
+BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
+                      Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.

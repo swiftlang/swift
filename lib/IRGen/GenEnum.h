@@ -457,6 +457,9 @@ public:
   
   virtual bool needsPayloadSizeInMetadata() const = 0;
   
+  virtual llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
+                                         Address addr) const;
+
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;
   EnumImplStrategy &operator=(const EnumImplStrategy &) = delete;

@@ -1425,6 +1425,20 @@ SILCloner<ImplClass>::visitUnownedReleaseInst(UnownedReleaseInst *Inst) {
     getBuilder().createUnownedRelease(getOpLocation(Inst->getLoc()),
                                       getOpValue(Inst->getOperand())));
 }
+template<typename ImplClass>
+void SILCloner<ImplClass>::visitIsUniqueInst(IsUniqueInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createIsUnique(getOpLocation(Inst->getLoc()),
+                                getOpValue(Inst->getOperand())));
+}
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createIsUniqueOrPinned(getOpLocation(Inst->getLoc()),
+                                        getOpValue(Inst->getOperand())));
+}
 
 template<typename ImplClass>
 void

@@ -369,6 +369,14 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
   initialize(IGF, copy, destAddr);
 }
 
+LoadedRef LoadableTypeInfo::loadRefcountedPtr(IRGenFunction &IGF,
+                                              SourceLoc loc,
+                                              Address addr) const {
+  IGF.IGM.error(loc, "Can only load from an address that holds a reference to "
+                "a refcounted type or an address of an optional reference.");
+  llvm::report_fatal_error("loadRefcountedPtr: Invalid SIL in IRGen");
+}
+
 static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
   return llvm::ConstantInt::get(IGM.SizeTy, size.getValue());
 }

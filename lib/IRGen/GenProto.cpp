@@ -1257,6 +1257,11 @@ namespace {
       IGF.emitFixLifetime(value);
     }
 
+    LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
+                                Address addr) const override {
+      return LoadedRef(IGF.emitLoadUnknownRefcountedPtr(addr), true);
+    }
+
     const UnownedTypeInfo *
     createUnownedStorageType(TypeConverter &TC) const override {
       // We can just re-use the storage type for the @unowned(safe) type.

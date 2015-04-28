@@ -1899,6 +1899,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   UNARY_INSTRUCTION(StrongRetainUnowned)
   UNARY_INSTRUCTION(UnownedRetain)
   UNARY_INSTRUCTION(UnownedRelease)
+  UNARY_INSTRUCTION(IsUnique)
+  UNARY_INSTRUCTION(IsUniqueOrPinned)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(AutoreleaseValue)
   UNARY_INSTRUCTION(ReleaseValue)

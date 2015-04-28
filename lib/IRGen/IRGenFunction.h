@@ -253,6 +253,11 @@ public:
   void emitUnknownWeakAssign(llvm::Value *value, Address dest);
   llvm::Value *emitUnknownWeakLoadStrong(Address src, llvm::Type *type);
   llvm::Value *emitUnknownWeakTakeStrong(Address src, llvm::Type *type);
+  llvm::Value *emitLoadNativeRefcountedPtr(Address addr);
+  llvm::Value *emitLoadUnknownRefcountedPtr(Address addr);
+  llvm::Value *emitLoadBridgeRefcountedPtr(Address addr);
+  llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
+                                bool isNonNull, bool checkPinned);
 
 //--- Expression emission ------------------------------------------------------
 public:

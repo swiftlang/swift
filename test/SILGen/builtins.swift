@@ -564,3 +564,152 @@ func projectValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawP
 func deallocValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> () {
   Builtin.deallocValueBuffer(&buffer, Int.self)
 }
+
+// ----------------------------------------------------------------------------
+// isUnique variants
+// ----------------------------------------------------------------------------
+
+// NativeObject
+// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRGSqBo_Sb : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> Bool
+// CHECK-NEXT: bb0(%0 : $*Optional<Builtin.NativeObject>):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.NativeObject>
+// CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]]#1 : $*Optional<Builtin.NativeObject>
+// CHECK: [[BUILTIN:%.*]] = is_unique [[BOX]]#1 : $*Optional<Builtin.NativeObject>
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Optional<Builtin.NativeObject>
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUnique(inout ref: Builtin.NativeObject?) -> Bool {
+  return _getBool(Builtin.isUnique(&ref))
+}
+
+// NativeObject nonNull
+// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRBoSb : $@convention(thin) (@inout Builtin.NativeObject) -> Bool
+// CHECK-NEXT: bb0(%0 : $*Builtin.NativeObject):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.NativeObject
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.NativeObject
+// CHECK: [[BUILTIN:%.*]] = is_unique [[BOX]]#1 : $*Builtin.NativeObject
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Builtin.NativeObject
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUnique(inout ref: Builtin.NativeObject) -> Bool {
+  return _getBool(Builtin.isUnique(&ref))
+}
+
+// NativeObject pinned
+// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinnedFRGSqBo_Sb : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> Bool
+// CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.NativeObject>
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Optional<Builtin.NativeObject>
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[BOX]]#1 : $*Optional<Builtin.NativeObject>
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Optional<Builtin.NativeObject>
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUniqueOrPinned(inout ref: Builtin.NativeObject?) -> Bool {
+  return _getBool(Builtin.isUniqueOrPinned(&ref))
+}
+
+// NativeObject pinned nonNull
+// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinnedFRBoSb : $@convention(thin) (@inout Builtin.NativeObject) -> Bool
+// CHECK: bb0(%0 : $*Builtin.NativeObject):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.NativeObject
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.NativeObject
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[BOX]]#1 : $*Builtin.NativeObject
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Builtin.NativeObject
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUniqueOrPinned(inout ref: Builtin.NativeObject) -> Bool {
+  return _getBool(Builtin.isUniqueOrPinned(&ref))
+}
+
+// UnknownObject (ObjC)
+// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRGSqBO_Sb : $@convention(thin) (@inout Optional<Builtin.UnknownObject>) -> Bool
+// CHECK: bb0(%0 : $*Optional<Builtin.UnknownObject>):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.UnknownObject>
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Optional<Builtin.UnknownObject>
+// CHECK: [[BUILTIN:%.*]] = is_unique [[BOX]]#1 : $*Optional<Builtin.UnknownObject>
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Optional<Builtin.UnknownObject>
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUnique(inout ref: Builtin.UnknownObject?) -> Bool {
+  return _getBool(Builtin.isUnique(&ref))
+}
+
+// UnknownObject (ObjC) nonNull
+// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRBOSb : $@convention(thin) (@inout Builtin.UnknownObject) -> Bool
+// CHECK: bb0(%0 : $*Builtin.UnknownObject):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.UnknownObject
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.UnknownObject
+// CHECK: [[BUILTIN:%.*]] = is_unique [[BOX]]#1 : $*Builtin.UnknownObject
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Builtin.UnknownObject
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUnique(inout ref: Builtin.UnknownObject) -> Bool {
+  return _getBool(Builtin.isUnique(&ref))
+}
+
+// UnknownObject (ObjC) pinned nonNull
+// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinnedFRBOSb : $@convention(thin) (@inout Builtin.UnknownObject) -> Bool
+// CHECK: bb0(%0 : $*Builtin.UnknownObject):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.UnknownObject
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.UnknownObject
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[BOX]]#1 : $*Builtin.UnknownObject
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Builtin.UnknownObject
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUniqueOrPinned(inout ref: Builtin.UnknownObject) -> Bool {
+  return _getBool(Builtin.isUniqueOrPinned(&ref))
+}
+
+// BridgeObject nonNull
+// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRBbSb : $@convention(thin) (@inout Builtin.BridgeObject) -> Bool
+// CHECK: bb0(%0 : $*Builtin.BridgeObject):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.BridgeObject
+// CHECK: [[BUILTIN:%.*]] = is_unique [[BOX]]#1 : $*Builtin.BridgeObject
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Builtin.BridgeObject
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUnique(inout ref: Builtin.BridgeObject) -> Bool {
+  return _getBool(Builtin.isUnique(&ref))
+}
+
+// BridgeObject pinned nonNull
+// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinnedFRBbSb : $@convention(thin) (@inout Builtin.BridgeObject) -> Bool
+// CHECK: bb0(%0 : $*Builtin.BridgeObject):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.BridgeObject
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[BOX]]#1 : $*Builtin.BridgeObject
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Builtin.BridgeObject
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUniqueOrPinned(inout ref: Builtin.BridgeObject) -> Bool {
+  return _getBool(Builtin.isUniqueOrPinned(&ref))
+}
+
+// BridgeObject nonNull native
+// CHECK-LABEL: sil hidden @_TF8builtins15isUnique_nativeFRBbSb : $@convention(thin) (@inout Builtin.BridgeObject) -> Bool
+// CHECK: bb0(%0 : $*Builtin.BridgeObject):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.BridgeObject
+// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[BOX]]#1 : $*Builtin.BridgeObject to $*Builtin.NativeObject
+// CHECK: [[BUILTIN:%.*]] = is_unique [[CAST]] : $*Builtin.NativeObject
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Builtin.BridgeObject
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUnique_native(inout ref: Builtin.BridgeObject) -> Bool {
+  return _getBool(Builtin.isUnique_native(&ref))
+}
+
+// BridgeObject pinned nonNull native
+// CHECK-LABEL: sil hidden @_TF8builtins23isUniqueOrPinned_nativeFRBbSb : $@convention(thin) (@inout Builtin.BridgeObject) -> Bool
+// CHECK: bb0(%0 : $*Builtin.BridgeObject):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
+// CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.BridgeObject
+// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[BOX]]#1 : $*Builtin.BridgeObject to $*Builtin.NativeObject
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[CAST]] : $*Builtin.NativeObject
+// CHECK: copy_addr [[BOX]]#1 to %0 : $*Builtin.BridgeObject
+// CHECK-NEXT: strong_release [[BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return
+func isUniqueOrPinned_native(inout ref: Builtin.BridgeObject) -> Bool {
+  return _getBool(Builtin.isUniqueOrPinned_native(&ref))
+}

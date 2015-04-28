@@ -1201,6 +1201,12 @@ public:
   void visitUnownedReleaseInst(UnownedReleaseInst *RI) {
     OS << "unowned_release " << getIDAndType(RI->getOperand());
   }
+  void visitIsUniqueInst(IsUniqueInst *CUI) {
+    OS << "is_unique " << getIDAndType(CUI->getOperand());
+  }
+  void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
+    OS << "is_unique_or_pinned " << getIDAndType(CUI->getOperand());
+  }
   void visitDeallocStackInst(DeallocStackInst *DI) {
     OS << "dealloc_stack " << getIDAndType(DI->getOperand());
   }

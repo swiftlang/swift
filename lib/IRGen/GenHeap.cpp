@@ -914,6 +914,74 @@ void IRGenFunction::emitUnpin(llvm::Value *value) {
   call->setDoesNotThrow();
 }
 
+llvm::Value *IRGenFunction::emitLoadNativeRefcountedPtr(Address addr) {
+  llvm::Value *src =
+    Builder.CreateBitCast(addr.getAddress(),
+                          IGM.RefCountedPtrTy->getPointerTo());
+  return Builder.CreateLoad(src);
+}
+
+llvm::Value *IRGenFunction::emitLoadUnknownRefcountedPtr(Address addr) {
+  llvm::Value *src =
+    Builder.CreateBitCast(addr.getAddress(),
+                          IGM.UnknownRefCountedPtrTy->getPointerTo());
+  return Builder.CreateLoad(src);
+}
+
+llvm::Value *IRGenFunction::emitLoadBridgeRefcountedPtr(Address addr) {
+  llvm::Value *src =
+    Builder.CreateBitCast(addr.getAddress(),
+                          IGM.BridgeObjectPtrTy->getPointerTo());
+  return Builder.CreateLoad(src);
+}
+
+llvm::Value *IRGenFunction::
+emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull,
+                 bool checkPinned) {
+  llvm::Constant *fn;
+  if (value->getType() == IGM.RefCountedPtrTy) {
+    if (checkPinned) {
+      if (isNonNull)
+        fn = IGM.getIsUniquelyReferencedOrPinned_nonNull_nativeFn();
+      else
+        fn = IGM.getIsUniquelyReferencedOrPinned_nativeFn();
+    }
+    else {
+      if (isNonNull)
+        fn = IGM.getIsUniquelyReferenced_nonNull_nativeFn();
+      else
+        fn = IGM.getIsUniquelyReferenced_nativeFn();
+    }
+  } else if (value->getType() == IGM.UnknownRefCountedPtrTy) {
+    if (checkPinned) {
+      if (!isNonNull)
+        unimplemented(loc, "optional objc ref");
+
+      fn = IGM.getIsUniquelyReferencedOrPinnedNonObjC_nonNullFn();
+    }
+    else {
+      if (isNonNull)
+        fn = IGM.getIsUniquelyReferencedNonObjC_nonNullFn();
+      else
+        fn = IGM.getIsUniquelyReferencedNonObjCFn();
+    }
+  } else if (value->getType() == IGM.BridgeObjectPtrTy) {
+    if (!isNonNull)
+      unimplemented(loc, "optional bridge ref");
+
+    if (checkPinned)
+      fn = IGM.getIsUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObjectFn();
+    else
+      fn = IGM.getIsUniquelyReferencedNonObjC_nonNull_bridgeObjectFn();
+  } else {
+    llvm_unreachable("Unexpected LLVM type for a refcounted pointer.");
+  }
+  llvm::CallInst *call = Builder.CreateCall(fn, value);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setDoesNotThrow();
+  return call;
+}
+
 #define DEFINE_VALUE_OP(ID)                                           \
 void IRGenFunction::emit##ID(llvm::Value *value) {                    \
   if (doesNotRequireRefCounting(value)) return;                       \

@@ -659,6 +659,16 @@ static ValueDecl *getTransferArrayOperation(ASTContext &Context, Identifier Id){
   return builder.build(Id);
 }
 
+static ValueDecl *getIsUniqueOperation(ASTContext &Context, Identifier Id) {
+  // <T> (@inout T) -> Int1
+  Type Int1Ty = BuiltinIntegerType::get(1, Context);
+
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeInOut(makeGenericParam()));
+  builder.setResult(makeConcrete(Int1Ty));
+  return builder.build(Id);
+}
+
 static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
                                             Identifier Id) {
   GenericSignatureBuilder builder(Context);
@@ -1445,7 +1455,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TakeArrayBackToFront:
     if (!Types.empty()) return nullptr;
     return getTransferArrayOperation(Context, Id);
-      
+
+  case BuiltinValueKind::IsUnique:
+  case BuiltinValueKind::IsUniqueOrPinned:
+  case BuiltinValueKind::IsUnique_native:
+  case BuiltinValueKind::IsUniqueOrPinned_native:
+    if (!Types.empty()) return nullptr;
+    return getIsUniqueOperation(Context, Id);
+
   case BuiltinValueKind::Sizeof:
   case BuiltinValueKind::Strideof:
   case BuiltinValueKind::Alignof:

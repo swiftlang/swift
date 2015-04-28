@@ -1181,6 +1181,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(StrongRetainUnowned)
   UNARY_INSTRUCTION(UnownedRetain)
   UNARY_INSTRUCTION(UnownedRelease)
+  UNARY_INSTRUCTION(IsUnique)
+  UNARY_INSTRUCTION(IsUniqueOrPinned)
   UNARY_INSTRUCTION(DebugValue)
   UNARY_INSTRUCTION(DebugValueAddr)
 #undef UNARY_INSTRUCTION

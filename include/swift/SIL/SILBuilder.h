@@ -935,6 +935,15 @@ public:
                                            SILValue base) {
     return insert(new (F.getModule()) MarkDependenceInst(loc, value, base));
   }
+  IsUniqueInst *createIsUnique(SILLocation loc, SILValue operand) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    return insert(new (F.getModule()) IsUniqueInst(loc, operand, Int1Ty));
+  }
+  IsUniqueOrPinnedInst *createIsUniqueOrPinned(SILLocation loc,
+                                               SILValue value) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    return insert(new (F.getModule()) IsUniqueOrPinnedInst(loc, value, Int1Ty));
+  }
   
   DeallocStackInst *createDeallocStack(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) DeallocStackInst(loc, operand));

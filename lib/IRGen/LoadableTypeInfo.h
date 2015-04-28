@@ -24,6 +24,15 @@
 namespace swift {
 namespace irgen {
 
+struct LoadedRef {
+  llvm::PointerIntPair<llvm::Value*, 1> ValAndNonNull;
+public:
+  LoadedRef(llvm::Value *V, bool nonNull): ValAndNonNull(V, nonNull) {}
+
+  llvm::Value *getValue() const { return ValAndNonNull.getPointer(); }
+  bool isNonNull() const { return ValAndNonNull.getInt(); }
+};
+
 /// LoadableTypeInfo - A refinement of FixedTypeInfo designed for use
 /// when implementing a type that can be loaded into an explosion.
 /// Types that are not loadable are called address-only; this is the
@@ -116,6 +125,11 @@ public:
                                   llvm::Value *payload,
                                   Explosion &targetExplosion,
                                   unsigned offset) const = 0;
+
+  /// Load a a reference counted pointer from an address.
+  /// Return the loaded pointer value.
+  virtual LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
+                                      Address addr) const;
 
   static bool classof(const LoadableTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isLoadable(); }

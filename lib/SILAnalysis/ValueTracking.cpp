@@ -88,6 +88,8 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::StrongUnpinInst:
   case ValueKind::UnownedReleaseInst:
   case ValueKind::UnownedRetainInst:
+  case ValueKind::IsUniqueInst:
+  case ValueKind::IsUniqueOrPinnedInst:
   case ValueKind::InjectEnumAddrInst:
   case ValueKind::DeinitExistentialAddrInst:
   case ValueKind::UnreachableInst:
