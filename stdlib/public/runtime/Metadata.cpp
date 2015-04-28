@@ -27,6 +27,7 @@
 #include <cctype>
 #include <sys/mman.h>
 #include <pthread.h>
+#include <unistd.h>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "ErrorObject.h"
@@ -39,7 +40,7 @@ using namespace swift;
 using namespace metadataimpl;
 
 void *MetadataAllocator::alloc(size_t size) {
-  static const uintptr_t pagesizeMask = getpagesize() - 1;
+  static const uintptr_t pagesizeMask = sysconf(_SC_PAGESIZE) - 1;
   
   char *end = next + size;
   
