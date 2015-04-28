@@ -117,6 +117,11 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(CopyBlockInst, SILInstruction, MayHaveSideEffects)
   INST(StrongPinInst, SILInstruction, MayHaveSideEffects)
   INST(StrongUnpinInst, SILInstruction, MayHaveSideEffects)
+
+  // IsUnique does not actually write to memory but should be modeled
+  // as such. Its operand is a pointer to an object reference. The
+  // optimizer should not assume that the same object is pointed to after
+  // the isUnique instruction. It appears to write a new object reference.
   INST(IsUniqueInst, SILInstruction, MayHaveSideEffects)
   INST(IsUniqueOrPinnedInst, SILInstruction, MayHaveSideEffects)
 

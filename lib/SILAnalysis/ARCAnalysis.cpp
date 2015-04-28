@@ -117,6 +117,8 @@ static bool canDecrementRefCountsByValueKind(SILInstruction *User) {
   case ValueKind::CopyBlockInst:
   case ValueKind::CondFailInst:
   case ValueKind::StrongPinInst:
+  case ValueKind::IsUniqueInst:
+  case ValueKind::IsUniqueOrPinnedInst:
     return false;
 
   case ValueKind::CopyAddrInst:
@@ -165,6 +167,8 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
 }
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
+  if (isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User))
+    return true;
   if (auto *AI = dyn_cast<ApplyInst>(User))
     if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
         return FRI->getReferencedFunction()->getName().startswith(

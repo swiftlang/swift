@@ -41,6 +41,8 @@ using namespace swift;
 /// Reading the pinned prevents us from moving the pin instructions accross it.
 static bool mayReadPinFlag(SILInstruction *I) {
   auto Kind = I->getKind();
+  if (Kind == ValueKind::IsUniqueOrPinnedInst)
+    return true;
   if (Kind != ValueKind::ApplyInst)
     return false;
   if (!I->mayReadFromMemory())
