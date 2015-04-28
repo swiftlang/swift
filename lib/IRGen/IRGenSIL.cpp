@@ -1622,7 +1622,7 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfClassExistential(*this, existential, i->getType(),
                                    opType, result);
-  } else if (opType.isExistentialMetatypeType()) {
+  } else if (opType.is<ExistentialMetatypeType>()) {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfMetatype(*this, existential, opType, result);
   } else {
