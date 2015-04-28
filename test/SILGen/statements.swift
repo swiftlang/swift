@@ -490,5 +490,13 @@ func defer_test2(cond : Bool) {
 
 
 
+protocol StaticFooProtocol { static func foo() }
+
+func testDeferOpenExistential(b: Bool, type: StaticFooProtocol.Type) {
+  defer { type.foo() }
+  if b { return }
+  return
+}
+
 
 

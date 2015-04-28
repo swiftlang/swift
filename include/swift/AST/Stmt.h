@@ -188,7 +188,10 @@ public:
 ///    tmpClosure()   // This is emitted on each path that needs to run this.
 ///
 /// As such, the body of the 'defer' is actually type checked within the
-/// closure's DeclContext.
+/// closure's DeclContext.  We do this because of unfortunateness in SILGen,
+/// not every expression (e.g. OpenExistentialExpr can be multiply emitted in a
+/// composable way).  When this gets fixed, patches r27767 and r27768 can be
+/// reverted to go back to the simpler and more obvious representation.
 ///
 class DeferStmt : public Stmt {
   SourceLoc DeferLoc;
