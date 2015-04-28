@@ -89,6 +89,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
 
 void ConstraintLocator::dump(SourceManager *sm) {
   dump(sm, llvm::errs());
+  llvm::errs() << "\n";
 }
 
 void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
