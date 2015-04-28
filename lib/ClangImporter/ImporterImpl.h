@@ -289,6 +289,9 @@ public:
   /// Mapping from Objective-C selectors to method names.
   llvm::DenseMap<std::pair<ObjCSelector, char>, DeclName> SelectorMappings;
 
+  /// Is the given identifier a reserved name in Swift?
+  static bool isSwiftReservedName(StringRef name);
+
   /// Translation API nullability from an API note into an optional kind.
   static OptionalTypeKind translateNullability(clang::NullabilityKind kind);
 

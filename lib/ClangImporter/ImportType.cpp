@@ -1414,14 +1414,27 @@ considerErrorImport(ClangImporter::Implementation &importer,
     if (methodKind == SpecialMethodKind::Constructor && index == 0)
       return errorInfo;
 
+    // If the error is an unlabeled first parameter, try to slice
+    // "AndReturnError" off the end of the base method name, unless that
+    // creates a reserved identifier.
+    static const char errorSuffix[] = "AndReturnError";
+    Identifier newBaseName = methodName.getBaseName();
+    if (index == 0 && paramNames[0].empty()) {
+      StringRef baseNameStr = newBaseName.str();
+      if (baseNameStr.endswith(errorSuffix)) {
+        baseNameStr = baseNameStr.drop_back(sizeof(errorSuffix) - 1);
+        if (!importer.isSwiftReservedName(baseNameStr)) {
+          newBaseName = importer.SwiftContext.getIdentifier(baseNameStr);
+        }
+      }
+    }
+
     SmallVector<Identifier, 8> newParamNames;
     newParamNames.append(paramNames.begin(),
                          paramNames.begin() + index);
     newParamNames.append(paramNames.begin() + index + 1,
                          paramNames.end());
-    methodName = DeclName(importer.SwiftContext,
-                          methodName.getBaseName(),
-                          newParamNames);
+    methodName = DeclName(importer.SwiftContext, newBaseName, newParamNames);
 
     return errorInfo;
   }

@@ -127,3 +127,11 @@ let fn = ErrorProne.fail
 // CHECK:      [[T0:%.*]] = load [[TEMP]]#1
 // CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
 // CHECK:      throw [[T1]]
+
+// This just needs to type-check.
+// rdar://20722195
+func testAndReturnError() throws {
+  try ErrorProne.fail()
+  try ErrorProne.go()
+  try ErrorProne.tryAndReturnError() // collides with 'try' keyword
+}

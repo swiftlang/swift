@@ -988,7 +988,7 @@ ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
 #pragma mark Importing names
 
 /// \brief Determine whether the given name is reserved for Swift.
-static bool isSwiftReservedName(StringRef name) {
+bool ClangImporter::Implementation::isSwiftReservedName(StringRef name) {
   tok kind = Lexer::kindOfIdentifier(name, /*InSILMode=*/false);
   return (kind != tok::identifier);
 }
@@ -1084,7 +1084,8 @@ static Identifier importArgName(ASTContext &ctx, StringRef name, bool dropWith){
 
       argName = name.substr(iter.getPosition());
       // Don't drop "with" if the resulting arg is a reserved name.
-      if (isSwiftReservedName(camel_case::toLowercaseWord(argName, scratch))) {
+      if (ClangImporter::Implementation::isSwiftReservedName(
+                              camel_case::toLowercaseWord(argName, scratch))) {
         argName = name;
       }
     } else {
