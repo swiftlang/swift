@@ -11,3 +11,15 @@ class C {
 }
 
 typealias t = t // expected-error {{type alias 't' circularly references itself}}
+
+
+
+
+// <rdar://problem/17564699> QoI: Structs should get convenience initializers
+struct MyStruct {
+  init(k: Int) {
+  }
+  convenience init() {  // expected-error {{delegating initializers in structs are not not marked with 'convenience'}} {{3-14=}}
+    self.init(k: 1)
+  }
+}

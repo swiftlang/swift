@@ -1376,6 +1376,9 @@ ERROR(designated_init_in_extension,sema_tcd,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
       (Type))
+ERROR(enumstruct_convenience_init,sema_tce,none,
+      "delegating initializers in %0 are not not marked with 'convenience'",
+      (StringRef))
 ERROR(nonclass_convenience_init,sema_tce,none,
       "convenience initializer not allowed in non-class type %0",
       (Type))

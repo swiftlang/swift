@@ -5500,10 +5500,19 @@ public:
       if (auto extType = CD->getExtensionType()) {
         if (!extType->getClassOrBoundGenericClass() &&
             !extType->is<ErrorType>()) {
-          // FIXME: Add a Fix-It here, which requires source-location
-          // information within the AST for "convenience".
-          TC.diagnose(CD->getLoc(), diag::nonclass_convenience_init,
-                      extType);
+          auto ConvenienceLoc =
+            CD->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
+
+          // Produce a tailored diagnostic for structs and enums.
+          bool isStruct = extType->getStructOrBoundGenericStruct() != nullptr;
+          if (isStruct || extType->getEnumOrBoundGenericEnum()) {
+            TC.diagnose(CD->getLoc(), diag::enumstruct_convenience_init,
+                        isStruct ? "structs" : "enums")
+              .fixItRemove(ConvenienceLoc);
+          } else {
+            TC.diagnose(CD->getLoc(), diag::nonclass_convenience_init, extType)
+              .fixItRemove(ConvenienceLoc);
+          }
           CD->setInitKind(CtorInitializerKind::Designated);
         }
       }

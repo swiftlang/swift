@@ -40,7 +40,7 @@ class DerivesA : A {
 }
 
 struct S {
-  convenience init(int i: Int) { // expected-error{{convenience initializer not allowed in non-class type 'S'}}
+  convenience init(int i: Int) { // expected-error{{delegating initializers in structs are not not marked with 'convenience'}}
     self.init(double: Double(i))
   }  
 
