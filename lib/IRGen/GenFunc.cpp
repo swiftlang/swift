@@ -2049,21 +2049,12 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   // We are currently emiting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
+    auto TruncTy = IGF.IGM.Int32Ty;
     auto ToTy =
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
     llvm::Value *Arg = args.claimNext();
-    auto *Int128Type = llvm::Type::getIntNTy(IGF.IGM.getLLVMContext(), 128);
-    unsigned bitSize = Arg->getType()->getScalarSizeInBits();
-    if (bitSize > 128) {
-      // TODO: the integer literal bit size is 2048, but we only have a 128-bit
-      // conversion function available.
-      Arg = IGF.Builder.CreateTrunc(Arg, Int128Type);
-    } else if (bitSize < 128) {
-      // Just for completeness. IntToFPWithOverflow is currently only used to
-      // convert 2048 bit integer literals.
-      Arg = IGF.Builder.CreateSExt(Arg, Int128Type);
-    }
-    llvm::Value *V = IGF.Builder.CreateSIToFP(Arg, ToTy);
+    llvm::Value *Truncated = IGF.Builder.CreateTrunc(Arg, TruncTy);
+    llvm::Value *V = IGF.Builder.CreateSIToFP(Truncated, ToTy);
     return out.add(V);
   }
 
