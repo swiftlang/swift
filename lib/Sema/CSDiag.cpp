@@ -450,6 +450,11 @@ ResolvedLocator constraints::resolveLocatorToDecl(
       continue;
     }
 
+    if (auto identity = dyn_cast<IdentityExpr>(anchor)) {
+      anchor = identity->getSubExpr();
+      continue;
+    }
+
     if (auto constructor = dyn_cast<ConstructorRefCallExpr>(anchor)) {
       anchor = constructor->getFn();
       continue;

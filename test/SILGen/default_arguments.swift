@@ -239,4 +239,17 @@ func r20494437onSuccess(a: r20494437ExecutionContext) {
   r20494437onComplete(a)
 }
 
+// <rdar://problem/18400194> Parenthesized function expression crashes the compiler
+func r18400194(a: Int, x: Int = 97) {}
+
+// CHECK-LABEL: sil hidden @_TIF17default_arguments9r18400194FTSi1xSi_T_A0_
+// CHECK: integer_literal $Builtin.Int2048, 97
+
+// CHECK-LABEL: sil hidden @_TF17default_arguments14test_r18400194FT_T_
+// CHECK: function_ref @_TF17default_arguments9r18400194FTSi1xSi_T_ : $@convention(thin) (Int, Int) -> () // user: %7
+// CHECK: integer_literal $Builtin.Int2048, 1
+// CHECK:  function_ref @_TIF17default_arguments9r18400194FTSi1xSi_T_A0_ : $@convention(thin) () -> Int
+func test_r18400194() {
+  (r18400194)(1)
+}
 
