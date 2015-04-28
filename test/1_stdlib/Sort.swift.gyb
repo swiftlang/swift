@@ -1,17 +1,13 @@
 // RUN: rm -f %t.swift %t.out
 
 // RUN: %S/../../utils/gyb %s -o %t.swift
-// RUN: %S/../../utils/line-directive %t.swift -- %target-build-swift -Xfrontend -disable-access-control %t.swift -o %t.out
+// RUN: %S/../../utils/line-directive %t.swift -- %target-build-swift %t.swift -o %t.out
 // RUN: %S/../../utils/line-directive %t.swift -- %target-run %t.out
 
-// XFAIL: linux
-
 import StdlibUnittest
+import SwiftPrivate
 
 var Algorithm = TestSuite("Algorithm")
-
-@asmname("random") func random() -> UInt32
-
 
 // Check if one array is a correctly sorted version of another array.
 // We can't simply sort both arrays and compare them, because it is needed to
@@ -89,22 +85,15 @@ class OffsetCollection : MutableCollectionType {
 % withArrayTypeNames = ["Array", "ContiguousArray"]
 % withPredicateValues = [True, False]
 % for t in withArrayTypeNames:
-
-func random${t}(count: Int) -> ${t}<Int> {
-  var a: ${t}<Int> = []
-  a.reserveCapacity(Int(count))
-  for i in 0..<count {
-    a.append(Int(random()))
-  }
-  return a
-}
+// workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %   for p in withPredicateValues:
+// workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %     comparePredicate = ", <" if p else ""
 %     name = "lessPredicate" if p else "noPredicate"
 
-Algorithm.test("sorted/${name}") {
+Algorithm.test("${t}/sorted/${name}") {
   let count = 1000
-  var ary = random${t}(count)
+  var ary = ${t}(randArray(count))
   var sortedAry1 = [Int]()
   var sortedAry2 = ${t}<Int>()
 
@@ -127,7 +116,7 @@ Algorithm.test("sorted/${name}") {
 
 Algorithm.test("sort/CollectionsWithUnusualIndices") {
   let count = 1000
-  var ary = randomArray(count)
+  var ary = randArray(count)
 
   // Check if sorting routines work well on collections with startIndex != 0.
   var offsetAry = OffsetCollection(ary, offset: 500, forward: false)

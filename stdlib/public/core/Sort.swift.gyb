@@ -150,6 +150,7 @@ Loop: while true {
   return lo
 }
 
+public // @testable
 func _introSort<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
