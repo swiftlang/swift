@@ -72,7 +72,7 @@ extension _CollectionDefaultsType {
     return distance(startIndex, endIndex)
   }
 
-  /// Customization point for `SequenceType._prext_find()`.
+  /// Customization point for `SequenceType._prext_indexOf()`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.
@@ -82,7 +82,7 @@ extension _CollectionDefaultsType {
   /// `Optional(Optional(index))` if an element was found.
   ///
   /// - complexity: O(N)
-  final public func _customFindEquatableElement(
+  final public func _customIndexOfEquatableElement(
     element: Generator.Element
   ) -> Index?? {
     return nil
@@ -158,7 +158,7 @@ public protocol CollectionType
   /// O(N) otherwise.
   func _prext_count() -> Index.Distance
 
-  /// Customization point for `SequenceType._prext_find()`.
+  /// Customization point for `SequenceType._prext_indexOf()`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.
@@ -168,7 +168,7 @@ public protocol CollectionType
   /// `Optional(Optional(index))` if an element was found.
   ///
   /// - complexity: O(N)
-  func _customFindEquatableElement(element: Generator.Element) -> Index??
+  func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
 }
 
 // A fast implementation for when you are backed by a contiguous array.

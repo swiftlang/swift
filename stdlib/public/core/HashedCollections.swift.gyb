@@ -641,7 +641,7 @@ public struct Set<T : Hashable> :
     return contains(member)
   }
 
-  public func _customFindEquatableElement(member: T) -> Index?? {
+  public func _customIndexOfEquatableElement(member: T) -> Index?? {
     return Optional(indexOf(member))
   }
 

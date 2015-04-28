@@ -38,7 +38,7 @@ public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, _ value: C.Generator.Element) -> C.Index? {
   // FIXME(prext): remove this function when protocol extensions land.
-  return domain._prext_find(value)
+  return domain._prext_indexOf(value)
 }
 
 /// Return the lesser of `x` and `y`

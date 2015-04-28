@@ -3476,12 +3476,12 @@ SetTestSuite.test("indexOf") {
   expectEmpty(s1.indexOf(999))
 }
 
-SetTestSuite.test("_customFindEquatableElement") {
+SetTestSuite.test("_customIndexOfEquatableElement") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let foundIndex1 = s1._customFindEquatableElement(1010)!!
+  let foundIndex1 = s1._customIndexOfEquatableElement(1010)!!
   expectEqual(1010, s1[foundIndex1])
 
-  expectEmpty(s1._customFindEquatableElement(999)!)
+  expectEmpty(s1._customIndexOfEquatableElement(999)!)
 }
 
 SetTestSuite.test("commutative") {

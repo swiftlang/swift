@@ -2739,13 +2739,13 @@ func callStaticFind(
   collection: MinimalForwardCollection<MinimalEquatableValue>,
   _ element: MinimalEquatableValue
 ) -> MinimalForwardCollection<MinimalEquatableValue>.Index? {
-  return collection._prext_find(element)
+  return collection._prext_indexOf(element)
 }
 
 func callGenericFind<
   C : CollectionType where C.Generator.Element : Equatable
 >(collection: C, _ element: C.Generator.Element) -> C.Index? {
-  return collection._prext_find(element)
+  return collection._prext_indexOf(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -2796,7 +2796,7 @@ struct CollectionWithCustomFindMethod : CollectionType {
     return MinimalEquatableValue(_elements[i.position])
   }
 
-  func _customFindEquatableElement(
+  func _customIndexOfEquatableElement(
     element: MinimalEquatableValue
   ) -> MinimalForwardIndex?? {
     ++CollectionWithCustomFindMethod.timesFindWasCalled
@@ -2816,7 +2816,7 @@ func callStaticFind(
   sequence: CollectionWithCustomFindMethod,
   _ element: MinimalEquatableValue
 ) -> CollectionWithCustomFindMethod.Index? {
-  return sequence._prext_find(element)
+  return sequence._prext_indexOf(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -2842,14 +2842,14 @@ SequenceTypeAlgorithms.test("find/WhereElementIsEquatable/CustomImplementation/$
 func callGenericFind_<
   C : CollectionType where C.Generator.Element : Equatable
 >(collection: C, _ element: C.Generator.Element) -> C.Index? {
-  return collection._prext_find(element)
+  return collection._prext_indexOf(element)
 }
 
 func callStaticFind_(
   set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Set<MinimalHashableValue>.Index? {
-  return set._prext_find(element)
+  return set._prext_indexOf(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -2896,7 +2896,7 @@ SequenceTypeAlgorithms.test("find/Predicate") {
       test.sequence.map { MinimalEquatableValue($0) })
     expectEqual(
       test.expected,
-      s._prext_find { $0.value == test.element }
+      s._prext_indexOf { $0.value == test.element }
         .map { $0.position },
       stackTrace: test.loc.withCurrentLoc())
   }
