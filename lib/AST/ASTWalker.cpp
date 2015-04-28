@@ -146,11 +146,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitCollectionExpr(CollectionExpr *E) {
-    if (Expr *Sub = doIt(E->getSubExpr())) {
-      E->setSubExpr(Sub);
-      return E;
-    }
-    return nullptr;
+    for (auto &elt : E->getElements())
+      if (Expr *Sub = doIt(elt))
+        elt = Sub;
+      else
+        return nullptr;
+    return E;
   }
 
   Expr *visitDeclRefExpr(DeclRefExpr *E) {

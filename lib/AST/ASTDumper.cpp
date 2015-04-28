@@ -1562,13 +1562,19 @@ public:
   }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
-    OS << '\n';
-    printRec(E->getSubExpr());
+    for (auto elt : E->getElements()) {
+      OS << '\n';
+      printRec(elt);
+    }
+    OS << ')';
   }
   void visitDictionaryExpr(DictionaryExpr *E) {
     printCommon(E, "dictionary_expr");
-    OS << '\n';
-    printRec(E->getSubExpr());
+    for (auto elt : E->getElements()) {
+      OS << '\n';
+      printRec(elt);
+    }
+    OS << ')';
   }
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");

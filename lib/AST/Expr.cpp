@@ -618,17 +618,21 @@ TupleExpr *TupleExpr::createImplicit(ASTContext &ctx, ArrayRef<Expr *> SubExprs,
                 /*HasTrailingClosure=*/false, /*Implicit=*/true, Type());
 }
 
-ArrayRef<Expr *> CollectionExpr::getElements() const {
-  if (auto paren = dyn_cast<ParenExpr>(SubExpr)) {
-    // FIXME: Hack. When this goes away, remove IdentityExpr's friendship of
-    // CollectionExpr.
-    return llvm::makeArrayRef(&paren->SubExpr, 1);
-  }
 
-  if (auto tuple = dyn_cast<TupleExpr>(SubExpr))
-    return tuple->getElements();
+ArrayExpr *ArrayExpr::create(ASTContext &C, SourceLoc LBracketLoc,
+                             ArrayRef<Expr*> Elements, SourceLoc RBracketLoc,
+                             Type Ty) {
+  // Copy the element list into the ASTContext.
+  auto NewElements = C.AllocateCopy(Elements);
+  return new (C) ArrayExpr(LBracketLoc, NewElements, RBracketLoc, Ty);
+}
 
-  return llvm::makeArrayRef(&SubExpr, 1);
+DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
+                             ArrayRef<Expr*> Elements, SourceLoc RBracketLoc,
+                             Type Ty) {
+  // Copy the element list into the ASTContext.
+  auto NewElements = C.AllocateCopy(Elements);
+  return new (C) DictionaryExpr(LBracketLoc, NewElements, RBracketLoc, Ty);
 }
 
 static ValueDecl *getCalledValue(Expr *E) {

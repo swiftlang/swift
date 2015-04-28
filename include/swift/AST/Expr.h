@@ -1363,9 +1363,6 @@ public:
 class IdentityExpr : public Expr {
   Expr *SubExpr;
   
-  // FIXME: Hack for CollectionExpr::getElements()
-  friend class CollectionExpr;
-
 public:
   IdentityExpr(ExprKind kind,
                Expr *subExpr, Type ty = Type(),
@@ -1609,25 +1606,29 @@ public:
 class CollectionExpr : public Expr {
   SourceLoc LBracketLoc;
   SourceLoc RBracketLoc;
-  Expr *SubExpr;
-  Expr *SemanticExpr;
+
+  /// ASTContext allocated element lists.  Each entry is one entry of the
+  /// collection.  If this is a DictionaryLiteral, each entry is a Tuple with
+  /// the key and value pair.
+  MutableArrayRef<Expr*> Elements;
+
+  Expr *SemanticExpr = nullptr;
 
 protected:
-  CollectionExpr(ExprKind Kind, SourceLoc LBracketLoc, Expr *SubExpr, 
+  CollectionExpr(ExprKind Kind, SourceLoc LBracketLoc,
+                 MutableArrayRef<Expr*> Elements,
                  SourceLoc RBracketLoc, Type Ty)
     : Expr(Kind, /*Implicit=*/false, Ty),
       LBracketLoc(LBracketLoc), RBracketLoc(RBracketLoc),
-      SubExpr(SubExpr), SemanticExpr(nullptr) { }
+      Elements(Elements) { }
 
 public:
-  /// Get the ParenExpr or TupleExpr representing the literal contents
-  /// of the container.
-  Expr *getSubExpr() const { return SubExpr; }
-  void setSubExpr(Expr *e) { SubExpr = e; }
 
   /// Retrieve the elements stored in the collection.
-  ArrayRef<Expr *> getElements() const;
-  Expr *getElement(unsigned i) const { return getElements()[i]; }
+  ArrayRef<Expr *> getElements() const { return Elements; }
+  MutableArrayRef<Expr *> getElements() { return Elements; }
+  Expr *getElement(unsigned i) const { return Elements[i]; }
+  void setElement(unsigned i, Expr *E) { Elements[i] = E; }
 
   SourceLoc getLBracketLoc() const { return LBracketLoc; }
   SourceLoc getRBracketLoc() const { return RBracketLoc; }
@@ -1647,11 +1648,14 @@ public:
  
 /// \brief An array literal expression [a, b, c].
 class ArrayExpr : public CollectionExpr {
+  ArrayExpr(SourceLoc LBracketLoc, MutableArrayRef<Expr*> Elements,
+            SourceLoc RBracketLoc, Type Ty)
+  : CollectionExpr(ExprKind::Array, LBracketLoc, Elements, RBracketLoc, Ty) {}
 public:
-  ArrayExpr(SourceLoc LBracketLoc, Expr *SubExpr, SourceLoc RBracketLoc,
-            Type Ty = Type())
-    : CollectionExpr(ExprKind::Array, LBracketLoc, SubExpr, RBracketLoc, Ty) { }
-    
+  static ArrayExpr *create(ASTContext &C, SourceLoc LBracketLoc,
+                           ArrayRef<Expr*> Elements, SourceLoc RBracketLoc,
+                           Type Ty = Type());
+
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Array;
   }
@@ -1659,12 +1663,17 @@ public:
 
 /// \brief A dictionary literal expression [a : x, b : y, c : z].
 class DictionaryExpr : public CollectionExpr {
-public:
-  DictionaryExpr(SourceLoc LBracketLoc, Expr *SubExpr, SourceLoc RBracketLoc,
-                 Type Ty = Type())
-    : CollectionExpr(ExprKind::Dictionary, LBracketLoc, SubExpr, RBracketLoc, 
+  DictionaryExpr(SourceLoc LBracketLoc, MutableArrayRef<Expr*> Elements,
+                 SourceLoc RBracketLoc, Type Ty)
+    : CollectionExpr(ExprKind::Dictionary, LBracketLoc, Elements, RBracketLoc,
                      Ty) { }
-    
+public:
+
+  static DictionaryExpr *create(ASTContext &C, SourceLoc LBracketLoc,
+                                ArrayRef<Expr*> Elements, SourceLoc RBracketLoc,
+                                Type Ty = Type());
+
+
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Dictionary;
   }

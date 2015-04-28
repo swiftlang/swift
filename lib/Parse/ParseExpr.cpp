@@ -2181,21 +2181,17 @@ ParserResult<Expr> Parser::parseExprCollection() {
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
-    SourceLoc RSquareLoc = consumeToken();
-    auto EmptyTuple = TupleExpr::createEmpty(Context, LSquareLoc, 
-                                             RSquareLoc, /*Implicit=*/false);
+    SourceLoc RSquareLoc = consumeToken(tok::r_square);
     return makeParserResult(
-                new (Context) ArrayExpr(LSquareLoc, EmptyTuple, RSquareLoc));
+                    ArrayExpr::create(Context, LSquareLoc, {}, RSquareLoc));
   }
 
   // [:] is always an empty dictionary.
   if (Tok.is(tok::colon) && peekToken().is(tok::r_square)) {
     consumeToken(tok::colon);
-    SourceLoc RSquareLoc = consumeToken();
-    auto EmptyTuple = TupleExpr::createEmpty(Context, LSquareLoc, 
-                                             RSquareLoc, /*Implicit=*/false);
+    SourceLoc RSquareLoc = consumeToken(tok::r_square);
     return makeParserResult(
-              new (Context) DictionaryExpr(LSquareLoc, EmptyTuple, RSquareLoc));
+                  DictionaryExpr::create(Context, LSquareLoc, {}, RSquareLoc));
   }
 
   // Parse the first expression.
@@ -2257,20 +2253,8 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
     return makeParserCodeCompletionResult<Expr>();
 
   assert(SubExprs.size() >= 1);
-
-  Expr *SubExpr;
-  if (SubExprs.size() == 1) {
-    SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0],
-                                      RSquareLoc,
-                                      /*hasTrailingClosure=*/false);
-  } else {
-    SubExpr = TupleExpr::create(Context, LSquareLoc, SubExprs, { }, { },
-                                RSquareLoc, /*hasTrailingClosure=*/false,
-                                /*Implicit=*/false);
-  }
-
-  return makeParserResult(
-      Status, new (Context) ArrayExpr(LSquareLoc, SubExpr, RSquareLoc));
+  return makeParserResult(Status,
+          ArrayExpr::create(Context, LSquareLoc, SubExprs, RSquareLoc));
 }
 
 /// parseExprDictionary - Parse a dictionary literal expression.
@@ -2338,18 +2322,8 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
     return makeParserCodeCompletionResult<Expr>();
 
   assert(SubExprs.size() >= 1);
-
-  Expr *SubExpr;
-  if (SubExprs.size() == 1)
-    SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0], RSquareLoc,
-                                      /*hasTrailingClosure=*/false);
-  else
-    SubExpr = TupleExpr::create(Context, LSquareLoc, SubExprs, { }, { },
-                                RSquareLoc, /*hasTrailingClosure=*/false, 
-                                /*Implicit=*/false);
-
-  return makeParserResult(new (Context)
-                          DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc));
+  return makeParserResult(DictionaryExpr::create(Context, LSquareLoc, SubExprs,
+                                                 RSquareLoc));
 }
 
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {

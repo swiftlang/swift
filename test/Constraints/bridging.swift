@@ -82,13 +82,13 @@ func arrayToNSArray() {
   nsa = [BridgedClass]()
   nsa = [OtherClass]()
   nsa = [BridgedStruct]()
-  nsa = [NotBridgedStruct]() // expected-error{{cannot assign a value of type '[(NotBridgedStruct)]' to a value of type 'NSArray'}}
+  nsa = [NotBridgedStruct]() // expected-error{{cannot assign a value of type '[NotBridgedStruct]' to a value of type 'NSArray'}}
 
   nsa = [AnyObject]() as NSArray
   nsa = [BridgedClass]() as NSArray
   nsa = [OtherClass]() as NSArray
   nsa = [BridgedStruct]() as NSArray
-  nsa = [NotBridgedStruct]() as NSArray // expected-error{{'[(NotBridgedStruct)]' is not convertible to 'NSArray'}}
+  nsa = [NotBridgedStruct]() as NSArray // expected-error{{'[NotBridgedStruct]' is not convertible to 'NSArray'}}
 }
 
 // NSArray -> Array

@@ -188,7 +188,7 @@ public var (c, d): (PrivateStruct?, PrivateStruct?) // expected-error {{variable
 var internalVar: PrivateStruct? // expected-error {{variable must be declared private because its type uses a private type}}
 
 let internalConstant = PrivateStruct() // expected-error {{constant must be declared private because its type 'PrivateStruct' uses a private type}}
-public let publicConstant = [InternalStruct]() // expected-error {{constant cannot be declared public because its type '[(InternalStruct)]' uses an internal type}}
+public let publicConstant = [InternalStruct]() // expected-error {{constant cannot be declared public because its type '[InternalStruct]' uses an internal type}}
 
 public struct Properties {
   public let x: PrivateStruct = PrivateStruct() // expected-error {{property cannot be declared public because its type uses a private type}}
