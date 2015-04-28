@@ -5327,6 +5327,20 @@ void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
   out.add(tablesAndValue.first);
 }
 
+void irgen::emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
+                                           SILType existentialTy,
+                                           Explosion &out) {
+  assert(existentialTy.is<ExistentialMetatypeType>());
+  auto &baseTI = IGF.getTypeInfo(existentialTy).as<ExistentialMetatypeTypeInfo>();
+
+  auto tablesAndValue = baseTI.getWitnessTablesAndValue(value);
+
+  llvm::Value *dynamicType = IGF.Builder.CreateCall(
+                    IGF.IGM.getGetMetatypeMetadataFn(), tablesAndValue.second);
+  out.add(dynamicType);
+  out.add(tablesAndValue.first);
+}
+
 /// Emit a projection from an existential container to its concrete value
 /// buffer with the type metadata for the contained value.
 ///

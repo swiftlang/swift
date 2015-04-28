@@ -329,6 +329,10 @@ public:
   bool isClassExistentialType() const {
     return getSwiftRValueType()->isClassExistentialType();
   }
+  // Returns true if the referenced type is an existential metatype.
+  bool isExistentialMetatypeType() const {
+    return is<ExistentialMetatypeType>();
+  }
   
   /// Returns the representation used by an existential type. If the concrete
   /// type is provided, this may return a specialized representation kind that

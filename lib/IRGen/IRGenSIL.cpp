@@ -1616,15 +1616,18 @@ void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
 void IRGenSILFunction::visitExistentialMetatypeInst(
                                             swift::ExistentialMetatypeInst *i) {
   Explosion result;
-  if (i->getOperand().getType().isClassExistentialType()) {
-    SILValue op = i->getOperand();
+  SILValue op = i->getOperand();
+  SILType opType = op.getType();
+  if (opType.isClassExistentialType()) {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfClassExistential(*this, existential, i->getType(),
-                                   op.getType(), result);
+                                   opType, result);
+  } else if (opType.isExistentialMetatypeType()) {
+    Explosion existential = getLoweredExplosion(op);
+    emitMetatypeOfMetatype(*this, existential, opType, result);
   } else {
     Address existential = getLoweredAddress(i->getOperand());
-    emitMetatypeOfOpaqueExistential(*this, existential,
-                                    i->getOperand().getType(), result);
+    emitMetatypeOfOpaqueExistential(*this, existential, opType, result);
   }
   setLoweredExplosion(SILValue(i, 0), result);
 }
