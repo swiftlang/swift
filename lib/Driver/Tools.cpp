@@ -52,6 +52,17 @@ static void addInputsOfType(ArgStringList &Arguments, const JobList &Jobs,
     auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
     if (!output.empty())
       Arguments.push_back(output.c_str());
+    else if (isa<BackendJobAction>(Cmd->getSource()) &&
+             InputType == types::TY_SwiftModuleFile) {
+      // Since BackendJobAction does not generate Swift module files, we look
+      // through BackendJobAction's inputs (CompileJobAction) to find the Swift
+      // module files.
+      assert(Cmd->getInputs().size() == 1);
+      auto *CompileJob = Cmd->getInputs().front();
+      auto &output = CompileJob->getOutput().getAnyOutputForType(InputType);
+      if (!output.empty())
+        Arguments.push_back(output.c_str());
+    }
   }
 }
 

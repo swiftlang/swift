@@ -21,3 +21,12 @@
 // CHECK-MARKER: -c
 // CHECK-MARKER: -embed-bitcode-marker
 // CHECK-MARKER-NOT: -frontend
+
+// RUN: %target-swiftc_driver -embed-bitcode -c -emit-module %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-MODULE
+// CHECK-MODULE: -frontend
+// CHECK-MODULE: -emit-bc
+// CHECK-MODULE: -emit-module-path
+// CHECK-MODULE: -frontend
+// CHECK-MODULE-NOT: -emit-module-path
+// CHECK-MODULE: -frontend
+// CHECK-MODULE: -emit-module
