@@ -478,3 +478,23 @@ public class NonObjCClass { }
     return ()
   }
 }
+
+// CHECK-LABEL: @interface Throwing1
+// CHECK-NEXT: - (BOOL)method1WithError:(NSError * __nullable * __null_unspecified)error;
+// CHECK-NEXT: - (Throwing1 * __nullable)method2WithError:(NSError * __nullable * __null_unspecified)error;
+// CHECK-NEXT: - (NS_ARRAY(NSString *) __nullable)method3:(NSInteger)x error:(NSError * __nullable * __null_unspecified)error;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)method4WithError:(NSError * __nullable * __null_unspecified)error;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)initWithError:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)initWithString:(NSString * __nonnull)string error:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)initWithError:(NSError * __nullable * __null_unspecified)error fn:(NSInteger (^ __nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+@objc class Throwing1 {
+  func method1() throws { }
+  func method2() throws -> Throwing1 { return self }
+  func method3(x: Int) throws -> [String] { return [] }
+  func method4() throws -> Self { return self }
+
+  init() throws { }
+  init(string: String) throws { }
+  init(fn: Int -> Int) throws { }
+}
