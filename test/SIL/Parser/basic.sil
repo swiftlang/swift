@@ -1339,6 +1339,22 @@ entry(%0 : $@convention(thick) () -> (),
   return undef : $()
 }
 
+// CHECK-LABEL: sil @is_unique : $@convention(thin) (@inout Builtin.NativeObject)
+sil @is_unique : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Int1 {
+bb0(%0 : $*Builtin.NativeObject):
+  // CHECK: %1 = is_unique %0 : $*Builtin.NativeObject
+  %1 = is_unique %0 : $*Builtin.NativeObject
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @is_unique_or_pinned : $@convention(thin) (@inout Builtin.NativeObject)
+sil @is_unique_or_pinned : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Int1 {
+bb0(%0 : $*Builtin.NativeObject):
+  // CHECK: %1 = is_unique_or_pinned %0 : $*Builtin.NativeObject
+  %1 = is_unique_or_pinned %0 : $*Builtin.NativeObject
+  return %1 : $Builtin.Int1
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
 // CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_

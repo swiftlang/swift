@@ -1213,6 +1213,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("inject_enum_addr", ValueKind::InjectEnumAddrInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("is_nonnull", ValueKind::IsNonnullInst)
+    .Case("is_unique", ValueKind::IsUniqueInst)
+    .Case("is_unique_or_pinned", ValueKind::IsUniqueOrPinnedInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
     .Case("load_weak", ValueKind::LoadWeakInst)
