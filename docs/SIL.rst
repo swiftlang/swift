@@ -2245,6 +2245,40 @@ The second operand may have either object or address type.  In the
 latter case, the dependency is on the current value stored in the
 address.
 
+is_unique
+`````````
+
+::
+
+  sil-instruction ::= 'is_unique' sil-operand
+
+  %1 = is_unique %0 : $*T
+  // $T must be a reference-counted type
+  // %1 will be of type Builtin.Int1
+
+Checks whether %0 is the address of a unique reference to a memory
+object. Returns 1 if the strong reference count is 1, and 0 if the
+strong reference count is greater than 1.
+
+A discussion of the semantics can be found here:
+:ref:`arcopts.is_unique`.
+
+is_unique_or_pinned
+```````````````````
+
+::
+
+  sil-instruction ::= 'is_unique_or_pinned' sil-operand
+
+  %1 = is_unique_or_pinned %0 : $*T
+  // $T must be a reference-counted type
+  // %1 will be of type Builtin.Int1
+
+Checks whether %0 is the address of either a unique reference to a
+memory object or a reference to a pinned object. Returns 1 if the
+strong reference count is 1 or the object has been marked pinned by
+strong_pin.
+
 copy_block
 ``````````
 ::
