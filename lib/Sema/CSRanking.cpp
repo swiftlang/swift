@@ -210,7 +210,7 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
     = potentialWitness->getDeclContext()->getDeclaredTypeInContext();
   ProtocolConformance *conformance = nullptr;
   if (!tc.conformsToProtocol(owningType, proto, dc, true, &conformance) ||
-      !conformance->isComplete())
+      !conformance)
     return Comparison::Unordered;
 
   // If the witness and the potential witness are not the same, there's no

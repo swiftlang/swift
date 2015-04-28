@@ -411,6 +411,21 @@ public protocol PConforms4 : PConforms3 {
 struct PConforms4Impl : PConforms4 {}
 let pc4z = PConforms4Impl().z
 
+// rdar://problem/20608438
+protocol PConforms5 {
+  func f() -> Int
+}
+
+protocol PConforms6 : PConforms5 {}
+
+extension PConforms6 {
+  final func f() -> Int { return 42 }
+}
+
+func test<T: PConforms6>(x: T) -> Int { return x.f() }
+
+struct PConforms6Impl : PConforms6 { }
+
 // ----------------------------------------------------------------------------
 // Typealiases in protocol extensions.
 // ----------------------------------------------------------------------------
