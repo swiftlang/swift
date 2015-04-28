@@ -1699,7 +1699,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                                    restriction,
                                                    type1, type2,
                                                    getConstraintLocator(locator));
-          this->addConstraint(constraint);
+          addConstraint(constraint);
           return SolutionKind::Solved;
         };
       
@@ -2262,7 +2262,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
                            getConstraintLocator(
                              locator, 
                              ConstraintLocator::ConstructorMember));
-  
+
   // The first type must be convertible to the constructor's argument type.
   addConstraint(ConstraintKind::ArgumentTupleConversion, argType, tv,
                 applyLocator);
@@ -2825,15 +2825,15 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     }
     
     TypeBase *favoredType = nullptr;
-    
+
     if (auto anchor = constraint.getLocator()->getAnchor()) {
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         auto argExpr = applyExpr->getArg();
-        favoredType = this->getFavoredType(argExpr);
+        favoredType = getFavoredType(argExpr);
         
         if (!favoredType) {
-          this->optimizeConstraints(argExpr);
-          favoredType = this->getFavoredType(argExpr);
+          optimizeConstraints(argExpr);
+          favoredType = getFavoredType(argExpr);
         }        
       }
     }
@@ -3430,7 +3430,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
                                      /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
 
-  // Try to look through ImplicitlyUnwrappedOptional<T>; the result is always an r-value.
+  // Try to look through ImplicitlyUnwrappedOptional<T>: the result is always an
+  // r-value.
   if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(desugar2)) {
     type2 = objTy;
     desugar2 = type2->getDesugaredType();
@@ -3798,7 +3799,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto t1 = obj1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
     
-    auto baseType1 = this->getBaseTypeForArrayType(t1);
+    auto baseType1 = getBaseTypeForArrayType(t1);
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 
     return matchTypes(baseType1, baseType2,
@@ -3886,8 +3887,8 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto t1 = type1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
     
-    Type baseType1 = this->getBaseTypeForArrayType(t1);
-    Type baseType2 = this->getBaseTypeForArrayType(t2);
+    Type baseType1 = getBaseTypeForArrayType(t1);
+    Type baseType2 = getBaseTypeForArrayType(t2);
 
     // Look through type variables in the first element type; we need to know
     // it's structure before we can decide whether this can be an array upcast.

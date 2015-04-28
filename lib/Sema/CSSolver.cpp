@@ -397,7 +397,7 @@ ConstraintSystem::SolverState::SolverState(ConstraintSystem &cs) : CS(cs) {
     langOpts.DebugConstraintSolver = true;
     llvm::raw_ostream &dbgOut = ctx.TypeCheckerDebug->getStream();
     dbgOut << "---Constraint system #" << SolutionAttempt << "---\n";
-    CS.dump(dbgOut);
+    CS.print(dbgOut);
   }
 }
 

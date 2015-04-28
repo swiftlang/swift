@@ -930,7 +930,7 @@ bool TypeChecker::typeCheckExpression(
     log << "---Initial constraints for the given expression---\n";
     expr->print(log);
     log << "\n";
-    cs.dump(log);
+    cs.print(log);
   }
 
   // Attempt to solve the constraint system.
@@ -1056,7 +1056,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
     log << "---Initial constraints for the given expression---\n";
     expr->print(log);
     log << "\n";
-    cs.dump(log);
+    cs.print(log);
   }
 
   // Attempt to solve the constraint system.
@@ -1722,7 +1722,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
     log << "---Initial constraints for the given expression---\n";
     expr->print(log);
     log << "\n";
-    cs.dump(log);
+    cs.print(log);
   }
 
   // Attempt to solve the constraint system.
@@ -1870,14 +1870,15 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
 }
 
 void ConstraintSystem::dump() {
-  dump(llvm::errs());
+  print(llvm::errs());
 }
 
-void ConstraintSystem::dump(raw_ostream &out) {
+void ConstraintSystem::print(raw_ostream &out) {
   out << "Score: " << CurrentScore << "\n";
   out << "Type Variables:\n";
   for (auto tv : TypeVariables) {
     out.indent(2);
+    out << '#' << tv->getID() << " = ";
     tv->getImpl().print(out);
     if (tv->getImpl().canBindToLValue())
       out << " [lvalue allowed]";
