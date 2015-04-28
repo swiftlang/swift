@@ -286,10 +286,13 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
           !req.getConstraint()->getClassOrBoundGenericClass()) {
         tc.diagnose(genericParams->getWhereLoc(),
                     diag::requires_conformance_nonprotocol,
-                    req.getSubjectLoc(), req.getConstraintLoc())
-          .fixItReplace(req.getColonLoc(), "==");
-        req.overwriteKind(RequirementKind::SameType);
+                    req.getSubjectLoc(), req.getConstraintLoc());
+        req.getConstraintLoc().setInvalidType(tc.Context);
+        invalid = true;
+        req.setInvalid();
+        continue;
       }
+
       break;
     }
 

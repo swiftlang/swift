@@ -920,11 +920,6 @@ public:
   /// \brief Determine the kind of requirement
   RequirementKind getKind() const { return Kind; }
 
-  /// Overwrite the requirement kind.
-  void overwriteKind(RequirementKind kind) {
-    Kind = kind;
-  }
-
   /// \brief Determine whether this requirement is invalid.
   bool isInvalid() const { return Invalid; }
 
