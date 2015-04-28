@@ -655,8 +655,12 @@ extension ${Self} : _ArrayType {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     @noescape body: (inout UnsafeMutableBufferPointer<T>) -> R
   ) -> R? {
-    // FIXME: file a bug about this crash.
+    // FIXME: Can't write simple code because of:
+    // <rdar://problem/20735802> Assertion failure while emitting SIL for
+    // _withUnsafeMutableBufferPointerIfSupported
+
     //return withUnsafeMutableBufferPointer { body($0) }
+
     return withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       let r = body(&bufferPointer)
