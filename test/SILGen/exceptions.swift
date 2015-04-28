@@ -35,8 +35,8 @@ func dont_make_a_cat() throws -> Cat {
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: store [[T2]] to [[BOX]]#1
-// CHECK-NEXT: destroy_addr %1 : $*T
 // CHECK-NEXT: builtin "willThrow"
+// CHECK-NEXT: destroy_addr %1 : $*T
 // CHECK-NEXT: throw [[BOX]]#0
 func dont_return<T>(argument: T) throws -> T {
   throw HomeworkError.TooMuch
@@ -161,3 +161,27 @@ class HasThrowingInit {
 // CHECK:    bb2([[ERROR:%.*]] : $_ErrorType):
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[ERROR]]
+
+
+enum ColorError : _ErrorType {
+  case Red, Green, Blue
+}
+
+//CHECK-LABEL: sil hidden @_TF10exceptions6IThrowFzT_Si
+//CHECK: builtin "willThrow"
+//CHECK-NEXT: throw
+//CHECK: return
+func IThrow() throws -> Int32 {
+  throw ColorError.Red
+  return 0
+}
+
+// Make sure that we are not emitting calls to 'willThrow' on rethrow sites.
+//CHECK-LABEL: sil hidden @_TF10exceptions12DoesNotThrowFzT_Si
+//CHECK-NOT: builtin "willThrow"
+//CHECK: return
+func DoesNotThrow() throws -> Int32 {
+  IThrow()
+  return 2
+}
+

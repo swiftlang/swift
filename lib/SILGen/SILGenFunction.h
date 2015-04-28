@@ -759,7 +759,10 @@ public:
                          ArrayRef<CatchStmt*> clauses,
                          JumpDest catchFallthroughDest);
 
-  void emitThrow(SILLocation loc, ManagedValue exn);
+  /// Emit code for the throw expr. If \p emitWillThrow is set then emit a
+  /// call to swift_willThrow, that will allow the debugger to place a
+  /// breakpoint on throw sites.
+  void emitThrow(SILLocation loc, ManagedValue exn, bool emitWillThrow = false);
   
   //===--------------------------------------------------------------------===//
   // Patterns

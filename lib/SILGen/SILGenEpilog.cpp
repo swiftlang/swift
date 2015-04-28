@@ -237,8 +237,7 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
 
   B.setInsertionPoint(rethrowBB);
   Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation());
-  B.createBuiltin(throwLoc, SGM.getASTContext().getIdentifier("willThrow"),
-                  SGM.Types.getEmptyTupleType(), {}, {exn});
+
   B.createThrow(throwLoc, exn);
 
   ThrowDest = JumpDest::invalid();

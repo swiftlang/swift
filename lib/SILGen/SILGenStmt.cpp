@@ -795,7 +795,8 @@ void SILGenFunction::emitTryApplyErrorBranch(SILLocation loc,
   }
 }
 
-void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV) {
+void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
+                               bool emitWillThrow) {
   assert(ThrowDest.isValid() &&
          "calling emitThrow with invalid throw destination!");
 
@@ -804,6 +805,13 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV) {
   // exception's cleanup when emitting each cleanup we branch through.
   // But for now we aren't bothering.
   SILValue exn = exnMV.forward(*this);
+
+  if (emitWillThrow) {
+    // Generate a call to the 'swift_willThrow' runtime function to allow the
+    // debugger to catch the throw event.
+    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
+                    SGM.Types.getEmptyTupleType(), {}, {exn});
+  }
 
   // Branch to the cleanup destination.
   Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn);

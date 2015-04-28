@@ -884,8 +884,9 @@ RValue RValueEmitter::visitThrowExpr(ThrowExpr *E, SGFContext C) {
   // If we have a valid throw destination, emit the exception and jump there.
   if (SGF.ThrowDest.isValid()) {
     ManagedValue exn = SGF.emitRValueAsSingleValue(E->getSubExpr());
-    SGF.emitThrow(E, exn);
 
+    SGF.emitThrow(E, exn, /* emit a call to willThrow */ true);
+    
   // Otherwise, diagnose.
   } else {
     SGF.SGM.diagnose(E, diag::unhandled_throw);
