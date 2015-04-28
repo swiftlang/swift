@@ -84,21 +84,6 @@ ArrayTestSuite.test("Native/isEmpty") {
   expectFalse(a.isEmpty)
 }
 
-% for array_type in all_array_types:
-
-/// Returns an ${array_type} that does not share its buffer with other arrays.
-func getFresh${array_type}<S : SequenceType>(sequence: S)
-  -> ${array_type}<S.Generator.Element> {
-  var result: ${array_type}<S.Generator.Element> = []
-  result.reserveCapacity(sequence._prext_underestimateCount())
-  for element in sequence {
-    result.append(element)
-  }
-  return result
-}
-
-% end
-
 enum EnumWithoutPayloads : Equatable {
   case A, B, C, D
 }
@@ -112,7 +97,6 @@ func == (lhs: EnumWithoutPayloads, rhs: EnumWithoutPayloads) -> Bool {
     return false
   }
 }
-
 
 % for array_type in all_array_types:
 
@@ -138,11 +122,12 @@ ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
 }
 
 ArrayTestSuite.test("${array_type}/emptyAllocation") {
+
   let arr0 = ${array_type}<Int>()
-  let arr1 = ${array_type}<TestValueTy>(count: 0, repeatedValue: TestValueTy(0))
+	let arr1 = ${array_type}<TestValueTy>(count: 0, repeatedValue: TestValueTy(0))
   // Empty arrays all use the same buffer
   expectEqual(arr0._buffer.identity, arr1._buffer.identity)
-
+  
   let hasNilBuffer = arr1.identity == nil
   expectFalse(hasNilBuffer)
 
@@ -212,89 +197,6 @@ ArrayTestSuite.test("${array_type}/flatMap") {
     ${array_type}([1, 2]).flatMap(enumerate))
   expectEqual(${array_type}([1, 1, 1, 2]),
     ${array_type}([1, 2]).flatMap(enumerate).flatMap(enumerate))
-}
-
-% end
-
-//===----------------------------------------------------------------------===//
-// _withUnsafeMutableBufferPointerIfSupported()
-//===----------------------------------------------------------------------===//
-
-struct WithUnsafeMutableBufferPointerIfSupportedTest {
-  let sequence: [Int]
-  let loc: SourceLoc
-
-  init(
-    _ sequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__
-  ) {
-    self.sequence = sequence
-    self.loc = SourceLoc(file, line, comment: "test data")
-  }
-}
-
-let withUnsafeMutableBufferPointerIfSupportedTests = [
-  WithUnsafeMutableBufferPointerIfSupportedTest([]),
-  WithUnsafeMutableBufferPointerIfSupportedTest([ 10 ]),
-  WithUnsafeMutableBufferPointerIfSupportedTest([ 10, 20, 30, 40, 50 ]),
-]
-
-% for array_type in all_array_types:
-
-ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported") {
-  for test in withUnsafeMutableBufferPointerIfSupportedTests {
-    var a = getFresh${array_type}(test.sequence._prext_map { OpaqueValue($0) })
-    if true {
-      // Read.
-      var result = a._withUnsafeMutableBufferPointerIfSupported {
-        (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>) in
-        return OpaqueValue(Array(buffer))
-      }
-      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
-      expectEqualSequence(test.sequence, result!.value._prext_map { $0.value })
-      expectEqualSequence(test.sequence, a._prext_map { $0.value })
-    }
-    if true {
-      // Read and write.
-      var result = a._withUnsafeMutableBufferPointerIfSupported {
-        (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>)
-          -> OpaqueValue<Array<OpaqueValue<Int>>> in
-        let result = OpaqueValue(Array(buffer))
-        for i in buffer._prext_indices {
-          buffer[i] = OpaqueValue(buffer[i].value * 10)
-        }
-        return result
-      }
-      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
-      expectEqualSequence(test.sequence, result!.value._prext_map { $0.value })
-      expectEqualSequence(
-        test.sequence._prext_map { $0 * 10 },
-        a._prext_map { $0.value })
-    }
-  }
-  // FIXME: tests for arrays bridged from Objective-C.
-}
-
-ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1") {
-  var a = getFresh${array_type}([ OpaqueValue(10) ])
-  var result = a._withUnsafeMutableBufferPointerIfSupported {
-    (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>)
-      -> OpaqueValue<Int> in
-    buffer = UnsafeMutableBufferPointer(start: buffer.baseAddress, count: 0)
-    expectCrashLater()
-    return OpaqueValue(42)
-  }
-}
-
-ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2") {
-  var a = getFresh${array_type}([ OpaqueValue(10) ])
-  var result = a._withUnsafeMutableBufferPointerIfSupported {
-    (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>)
-      -> OpaqueValue<Int> in
-    buffer = UnsafeMutableBufferPointer(start: nil, count: 1)
-    expectCrashLater()
-    return OpaqueValue(42)
-  }
 }
 
 //===---
