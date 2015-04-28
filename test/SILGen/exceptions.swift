@@ -167,7 +167,7 @@ enum ColorError : _ErrorType {
   case Red, Green, Blue
 }
 
-//CHECK-LABEL: sil hidden @_TF10exceptions6IThrowFzT_Si
+//CHECK-LABEL: sil hidden @_TF10exceptions6IThrowFzT_VSs5Int32
 //CHECK: builtin "willThrow"
 //CHECK-NEXT: throw
 //CHECK: return
@@ -177,7 +177,7 @@ func IThrow() throws -> Int32 {
 }
 
 // Make sure that we are not emitting calls to 'willThrow' on rethrow sites.
-//CHECK-LABEL: sil hidden @_TF10exceptions12DoesNotThrowFzT_Si
+//CHECK-LABEL: sil hidden @_TF10exceptions12DoesNotThrowFzT_VSs5Int32
 //CHECK-NOT: builtin "willThrow"
 //CHECK: return
 func DoesNotThrow() throws -> Int32 {
