@@ -651,6 +651,10 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
 
     Arguments.push_back("-force_load");
     Arguments.push_back(Args.MakeArgString(ARCLiteLib));
+
+    // Arclite depends on CoreFoundation.
+    Arguments.push_back("-framework");
+    Arguments.push_back("CoreFoundation");
   }
 
   Args.AddAllArgValues(Arguments, options::OPT_Xlinker);

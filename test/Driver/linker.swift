@@ -43,7 +43,7 @@
 // CHECK-DAG: -rpath [[STDLIB_PATH]]
 // CHECK-DAG: -lSystem
 // CHECK-DAG: -arch x86_64
-// CHECK-DAG: -force_load {{[^ ]+/lib/arc/libarclite_macosx.a}}
+// CHECK-DAG: -force_load {{[^ ]+/lib/arc/libarclite_macosx.a}} -framework CoreFoundation
 // CHECK: -o {{[^ ]+}}
 
 
