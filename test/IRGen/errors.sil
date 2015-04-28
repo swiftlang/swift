@@ -19,6 +19,7 @@ sil @throws : $@convention(thin) () -> @error _ErrorType {
   // CHECK-NEXT: call void @swift_willThrow
   // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
   // CHECK-NEXT: ret void
+  builtin "willThrow"(%1 : $_ErrorType) : $()
   throw %1 : $_ErrorType
 }
 
@@ -78,6 +79,7 @@ enum ColorError : _ErrorType {
 // CHECK: ret i64 undef
 sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned _ErrorType) -> (Int64, @error _ErrorType) {
 bb0(%0 : $_ErrorType):
+  builtin "willThrow"(%0 : $_ErrorType) : $()
   throw %0 : $_ErrorType                        // id: %3
 }
 

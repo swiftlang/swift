@@ -519,6 +519,10 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     B.emitBlock(errorBB);
     SILValue error =
       errorBB->createBBArg(initFnType->getErrorResult().getSILType());
+
+    B.createBuiltin(Loc, SGM.getASTContext().getIdentifier("willThrow"),
+                    SGM.Types.getEmptyTupleType(), {}, {error});
+
     B.createThrow(Loc, error);
 
     B.emitBlock(normalBB);

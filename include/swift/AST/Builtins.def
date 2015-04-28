@@ -285,6 +285,18 @@ BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 
 #undef BUILTIN_SIL_OPERATION
 
+// BUILTIN_RUNTIME_CALL - A call into a runtime function.
+// These functions accept a single argument of any type.
+#ifndef BUILTIN_RUNTIME_CALL
+#define BUILTIN_RUNTIME_CALL(Id, Name, Attrs) \
+  BUILTIN(Id, Name, Attrs)
+#endif
+
+/// willThrow: T -> ()
+BUILTIN_RUNTIME_CALL(WillThrow, "willThrow", "n")
+
+#undef BUILTIN_RUNTIME_CALL
+
 // BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
 // These have various types.
 #ifndef BUILTIN_MISC_OPERATION

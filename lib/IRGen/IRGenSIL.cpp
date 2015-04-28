@@ -2140,22 +2140,9 @@ void IRGenSILFunction::visitAutoreleaseReturnInst(AutoreleaseReturnInst *i) {
   emitReturnInst(*this, i->getOperand().getType(), temp);
 }
 
-static void emitWillThrowCall(IRGenFunction &IGF, llvm::Constant *fn,
-                              llvm::Value *value) {
-  llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
-  call->setCallingConv(IGF.IGM.RuntimeCC);
-  call->setDoesNotThrow();
-}
-
 void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   // Store the exception to the error slot.
   llvm::Value *exn = getLoweredSingletonExplosion(i->getOperand());
-
-  // Place a call to swift_willThrow(), to allow the debugger to place a
-  // breakpoint in unoptimized builds.
-  if (!IGM.Opts.Optimize) {
-    emitWillThrowCall(*this, IGM.getWillThrowFn(), exn);
-  }
 
   Builder.CreateStore(exn, getCallerErrorResultSlot());
 

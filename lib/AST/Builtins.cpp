@@ -685,6 +685,10 @@ static ValueDecl *getFenceOperation(ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
 }
 
+static ValueDecl *getWillThrowOperation(ASTContext &Context, Identifier Id) {
+  return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
+}
+
 static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
                                       Type T) {
   TupleTypeElt ArgElts[] = { Context.TheRawPointerType, T, T };
@@ -1032,6 +1036,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
    OverloadedBuiltinKind::overload,
 #define BUILTIN_TYPE_TRAIT_OPERATION(id, name) \
    OverloadedBuiltinKind::Special,
+#define BUILTIN_RUNTIME_CALL(id, attrs, name) \
+  OverloadedBuiltinKind::Special,
 #include "swift/AST/Builtins.def"
 };
 
@@ -1313,7 +1319,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       return nullptr;
     return getCmpXChgOperation(Context, Id, T);
   }
-  
+
   // If this starts with atomicrmw, we have special suffixes to handle.
   if (OperationName.startswith("atomicrmw_")) {
     OperationName = OperationName.drop_front(strlen("atomicrmw_"));
@@ -1514,7 +1520,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::Once:
     return getOnceOperation(Context, Id);
-      
+
+  case BuiltinValueKind::WillThrow:
+    return getWillThrowOperation(Context, Id);
+
   case BuiltinValueKind::ExtractElement:
     if (Types.size() != 2) return nullptr;
     return getExtractElementOperation(Context, Id, Types[0], Types[1]);

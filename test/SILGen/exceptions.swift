@@ -23,6 +23,7 @@ func make_a_cat() throws -> Cat {
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: store [[T2]] to [[BOX]]#1
+// CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[BOX]]#0
 func dont_make_a_cat() throws -> Cat {
   throw HomeworkError.TooHard
@@ -35,6 +36,7 @@ func dont_make_a_cat() throws -> Cat {
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: store [[T2]] to [[BOX]]#1
 // CHECK-NEXT: destroy_addr %1 : $*T
+// CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[BOX]]#0
 func dont_return<T>(argument: T) throws -> T {
   throw HomeworkError.TooMuch
@@ -157,4 +159,5 @@ class HasThrowingInit {
 // CHECK:    bb1([[SELF:%.*]] : $HasThrowingInit):
 // CHECK-NEXT: return [[SELF]]
 // CHECK:    bb2([[ERROR:%.*]] : $_ErrorType):
+// CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[ERROR]]
