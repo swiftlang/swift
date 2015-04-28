@@ -660,6 +660,9 @@ public:
   GenericParamList *maybeReadGenericParams(DeclContext *DC,
                                      llvm::BitstreamCursor &Cursor,
                                      GenericParamList *outerParams = nullptr);
+
+  /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
+  Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
 };
 
 } // end namespace swift

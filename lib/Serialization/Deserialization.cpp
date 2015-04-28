@@ -14,6 +14,7 @@
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/BCReadingExtras.h"
@@ -270,6 +271,7 @@ Pattern *ModuleFile::maybeReadPattern() {
 
   SmallVector<uint64_t, 8> scratch;
 
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
   auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
@@ -288,6 +290,7 @@ Pattern *ModuleFile::maybeReadPattern() {
                                                   SourceLoc(),
                                                   isImplicit);
     result->setType(subPattern->getType());
+    restoreOffset.reset();
     return result;
   }
   case decls_block::TUPLE_PATTERN: {
@@ -332,6 +335,7 @@ Pattern *ModuleFile::maybeReadPattern() {
                                        elements, SourceLoc(), hasVararg,
                                        SourceLoc(), isImplicit);
     result->setType(getType(tupleTypeID));
+    restoreOffset.reset();
     return result;
   }
   case decls_block::NAMED_PATTERN: {
@@ -343,6 +347,7 @@ Pattern *ModuleFile::maybeReadPattern() {
     auto result = new (getContext()) NamedPattern(var, isImplicit);
     if (var->hasType())
       result->setType(var->getType());
+    restoreOffset.reset();
     return result;
   }
   case decls_block::ANY_PATTERN: {
@@ -352,6 +357,7 @@ Pattern *ModuleFile::maybeReadPattern() {
     AnyPatternLayout::readRecord(scratch, typeID, isImplicit);
     auto result = new (getContext()) AnyPattern(SourceLoc(), isImplicit);
     result->setType(getType(typeID));
+    restoreOffset.reset();
     return result;
   }
   case decls_block::TYPED_PATTERN: {
@@ -366,6 +372,7 @@ Pattern *ModuleFile::maybeReadPattern() {
     auto result = new (getContext()) TypedPattern(subPattern, typeInfo,
                                                   isImplicit);
     result->setType(typeInfo.getType());
+    restoreOffset.reset();
     return result;
   }
   case decls_block::VAR_PATTERN: {
@@ -377,6 +384,7 @@ Pattern *ModuleFile::maybeReadPattern() {
     auto result = new (getContext()) VarPattern(SourceLoc(), isLet, subPattern,
                                                 isImplicit);
     result->setType(subPattern->getType());
+    restoreOffset.reset();
     return result;
   }
 
@@ -2237,6 +2245,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                           fn->getExtInfo()));
     }
 
+    if (auto errorConvention = maybeReadForeignErrorConvention())
+      ctor->setForeignErrorConvention(*errorConvention);
+
     if (isImplicit)
       ctor->setImplicit();
     if (hasStubImplementation)
@@ -2458,6 +2469,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     fn->setDeserializedSignature(patterns,
                                  TypeLoc::withoutLoc(signature->getResult()));
 
+    if (auto errorConvention = maybeReadForeignErrorConvention())
+      fn->setForeignErrorConvention(*errorConvention);
+
     if (auto overridden = cast_or_null<FuncDecl>(getDecl(overriddenID))) {
       fn->setOverriddenDecl(overridden);
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
@@ -2468,6 +2482,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       fn->setImplicit();
     fn->setMutating(isMutating);
     fn->setDynamicSelf(hasDynamicSelf);
+
     // If we are an accessor on a var or subscript, make sure it is deserialized
     // too.
     getDecl(accessorStorageDeclID);
@@ -3886,4 +3901,96 @@ TypeLoc
 ModuleFile::loadAssociatedTypeDefault(const swift::AssociatedTypeDecl *ATD,
                                       uint64_t contextData) {
   return TypeLoc::withoutLoc(getType(contextData));
+}
+
+static Optional<ForeignErrorConvention::Kind>
+decodeRawStableForeignErrorConventionKind(uint8_t kind) {
+  switch (kind) {
+  case static_cast<uint8_t>(ForeignErrorConventionKind::ZeroResult):
+    return ForeignErrorConvention::ZeroResult;
+  case static_cast<uint8_t>(ForeignErrorConventionKind::NonZeroResult):
+    return ForeignErrorConvention::NonZeroResult;
+  case static_cast<uint8_t>(ForeignErrorConventionKind::NilResult):
+    return ForeignErrorConvention::NilResult;
+  case static_cast<uint8_t>(ForeignErrorConventionKind::NonNilError):
+    return ForeignErrorConvention::NonNilError;
+  default:
+    return None;
+  }
+}
+
+Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 8> scratch;
+
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+
+  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return None;
+
+  unsigned recKind = DeclTypeCursor.readRecord(next.ID, scratch);
+  switch (recKind) {
+  case FOREIGN_ERROR_CONVENTION:
+    restoreOffset.reset();
+    break;
+
+  default:
+    return None;
+  }
+
+  uint8_t rawKind;
+  bool isOwned;
+  unsigned errorParameterIndex;
+  TypeID errorParameterTypeID;
+  TypeID resultTypeID;
+  ForeignErrorConventionLayout::readRecord(scratch, rawKind, isOwned,
+                                           errorParameterIndex,
+                                           errorParameterTypeID,
+                                           resultTypeID);
+
+  ForeignErrorConvention::Kind kind;
+  if (auto optKind = decodeRawStableForeignErrorConventionKind(rawKind))
+    kind = *optKind;
+  else {
+    error();
+    return None;
+  }
+
+  Type errorParameterType = getType(errorParameterTypeID);
+  CanType canErrorParameterType;
+  if (errorParameterType)
+    canErrorParameterType = errorParameterType->getCanonicalType();
+
+  Type resultType = getType(resultTypeID);
+  CanType canResultType;
+  if (resultType)
+    canResultType = resultType->getCanonicalType();
+
+  auto owned = isOwned ? ForeignErrorConvention::IsOwned
+                       : ForeignErrorConvention::IsNotOwned;
+  switch (kind) {
+  case ForeignErrorConvention::ZeroResult:
+    return ForeignErrorConvention::getZeroResult(errorParameterIndex,
+                                                 owned,
+                                                 canErrorParameterType,
+                                                 canResultType);
+
+  case ForeignErrorConvention::NonZeroResult:
+    return ForeignErrorConvention::getNonZeroResult(errorParameterIndex,
+                                                    owned,
+                                                    canErrorParameterType,
+                                                    canResultType);
+
+  case ForeignErrorConvention::NilResult:
+    return ForeignErrorConvention::getNilResult(errorParameterIndex,
+                                                owned,
+                                                canErrorParameterType);
+
+  case ForeignErrorConvention::NonNilError:
+    return ForeignErrorConvention::getNonNilError(errorParameterIndex,
+                                                  owned,
+                                                  canErrorParameterType);
+  }
 }

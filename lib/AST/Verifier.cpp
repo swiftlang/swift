@@ -2078,6 +2078,12 @@ struct ASTNodeBase {};
         abort();
       }
 
+      if (AFD->getForeignErrorConvention() && !AFD->isObjC()) {
+        Out << "foreign error convention on non-@objc function\n";
+        AFD->dump(Out);
+        abort();
+      }
+
       verifyCheckedBase(AFD);
     }
 
