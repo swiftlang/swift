@@ -22,7 +22,30 @@
 #define SWIFT_DEBUG_RUNTIME 0
 #endif
 
-static void *permanentAlloc(size_t size) { return malloc(size); }
+/// A bump pointer for metadata allocations. Since metadata is (currently)
+/// never released, it does not support deallocation. This allocator by itself
+/// is not thread-safe; in concurrent uses, allocations must be guarded by
+/// a lock, such as the per-metadata-cache lock used to guard metadata
+/// instantiations. All allocations are pointer-aligned.
+class MetadataAllocator {
+  /// Address of the next available space. The allocator grabs a page at a time,
+  /// so the need for a new page can be determined by page alignment.
+  ///
+  /// Initializing to -1 instead of nullptr ensures that the first allocation
+  /// triggers a page allocation since it will always span a "page" boundary.
+  char *next = (char*)(~(uintptr_t)0U);
+  
+public:
+  MetadataAllocator() = default;
+
+  // Don't copy or move, please.
+  MetadataAllocator(const MetadataAllocator &) = delete;
+  MetadataAllocator(MetadataAllocator &&) = delete;
+  MetadataAllocator &operator=(const MetadataAllocator &) = delete;
+  MetadataAllocator &operator=(MetadataAllocator &&) = delete;
+  
+  void *alloc(size_t size);
+};
 
 // A wrapper around a pointer to a metadata cache entry that provides
 // DenseMap semantics that compare values in the key vector for the metadata
@@ -99,11 +122,12 @@ protected:
 
 public:
   template<typename...ImplArgs>
-  static Impl *allocate(const void * const *arguments,
+  static Impl *allocate(MetadataAllocator &allocator,
+                        const void * const *arguments,
                         size_t numArguments, size_t payloadSize) {
-    void *buffer = permanentAlloc(sizeof(Impl)  +
-                                  numArguments * sizeof(void*) +
-                                  payloadSize);
+    void *buffer = allocator.alloc(sizeof(Impl)  +
+                                   numArguments * sizeof(void*) +
+                                   payloadSize);
     void *resultPtr = (char*)buffer + numArguments * sizeof(void*);
     auto result = new (resultPtr) Impl(numArguments);
 
@@ -156,12 +180,15 @@ template <class Entry> class MetadataCache {
 
   /// Synchronization of metadata creation.
   std::mutex *Lock;
-
+  
   /// The head of a linked list connecting all the metadata cache entries.
   /// TODO: Remove this when LLDB is able to understand the final data
   /// structure for the metadata cache.
   const Entry *Head;
 
+  /// Allocator for entries of this cache.
+  MetadataAllocator Allocator;
+  
 public:
   MetadataCache() : Map(new MDMapTy()), Lock(new std::mutex()) {}
   ~MetadataCache() { delete Map; delete Lock; }
@@ -169,6 +196,11 @@ public:
   /// Caches are not copyable.
   MetadataCache(const MetadataCache &other) = delete;
   MetadataCache &operator=(const MetadataCache &other) = delete;
+
+  /// Get the allocator for metadata in this cache.
+  /// The allocator can only be safely used while the cache is locked during
+  /// an addMetadataEntry call.
+  MetadataAllocator &getAllocator() { return Allocator; }
 
   /// Call entryBuilder() and add the generated metadata to the cache.
   /// \p key is the key used by the cache and \p Bucket is the cache

@@ -25,6 +25,7 @@
 #include <condition_variable>
 #include <new>
 #include <cctype>
+#include <sys/mman.h>
 #include <pthread.h>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -36,6 +37,28 @@
 
 using namespace swift;
 using namespace metadataimpl;
+
+void *MetadataAllocator::alloc(size_t size) {
+  static const uintptr_t pagesizeMask = getpagesize() - 1;
+  
+  char *end = next + size;
+  
+  // Allocate a new page if we need one.
+  if (LLVM_UNLIKELY(((uintptr_t)next & ~pagesizeMask)
+                      != (((uintptr_t)end & ~pagesizeMask)))){
+    next = (char*)
+      mmap(nullptr, pagesizeMask+1, PROT_READ|PROT_WRITE,
+           MAP_ANON|MAP_PRIVATE, -1, 0);
+
+    if (next == MAP_FAILED)
+      crash("unable to allocate memory for metadata cache");
+    end = next + size;
+  }
+  
+  char *addr = next;
+  next = end;
+  return addr;
+}
 
 namespace {
   struct GenericCacheEntry;
@@ -87,6 +110,19 @@ static GenericMetadataCache &getCache(GenericMetadata *metadata) {
   return lazyCache->get();
 }
 
+/// Fetch the metadata cache for a generic metadata structure,
+/// in a context where it must have already been initialized.
+static GenericMetadataCache &unsafeGetInitializedCache(GenericMetadata *metadata) {
+  // Keep this assert even if you change the representation above.
+  static_assert(sizeof(LazyGenericMetadataCache) <=
+                sizeof(GenericMetadata::PrivateData),
+                "metadata cache is larger than the allowed space");
+
+  auto lazyCache =
+    reinterpret_cast<LazyGenericMetadataCache*>(metadata->PrivateData);
+  return lazyCache->unsafeGetAlreadyInitialized();
+}
+
 ClassMetadata *
 swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
                                           const void *arguments,
@@ -108,9 +144,11 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
   assert(metadataSize == pattern->MetadataSize + extraPrefixSize);
   assert(prefixSize == pattern->AddressPoint + extraPrefixSize);
 
-  char *bytes = GenericCacheEntry::allocate(argumentsAsArray,
-                                            numGenericArguments,
-                                            metadataSize)->getData<char>();
+  char *bytes = GenericCacheEntry::allocate(
+                              unsafeGetInitializedCache(pattern).getAllocator(),
+                              argumentsAsArray,
+                              numGenericArguments,
+                              metadataSize)->getData<char>();
 
   // Copy any extra prefix bytes in from the superclass.
   if (extraPrefixSize) {
@@ -146,8 +184,10 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
   size_t numGenericArguments = pattern->NumKeyArguments;
 
   char *bytes =
-    GenericCacheEntry::allocate(argumentsAsArray, numGenericArguments,
-                                pattern->MetadataSize)->getData<char>();
+    GenericCacheEntry::allocate(
+                              unsafeGetInitializedCache(pattern).getAllocator(),
+                              argumentsAsArray, numGenericArguments,
+                              pattern->MetadataSize)->getData<char>();
 
   // Copy in the metadata template.
   memcpy(bytes, pattern->getMetadataTemplate(), pattern->MetadataSize);
@@ -249,7 +289,8 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
   auto entry = ObjCClassWrappers.findOrAdd(args, numGenericArgs,
     [&]() -> ObjCClassCacheEntry* {
       // Create a new entry for the cache.
-      auto entry = ObjCClassCacheEntry::allocate(args, numGenericArgs, 0);
+      auto entry = ObjCClassCacheEntry::allocate(ObjCClassWrappers.getAllocator(),
+                                                 args, numGenericArgs, 0);
 
       auto metadata = entry->getData();
       metadata->setKind(MetadataKind::ObjCClassWrapper);
@@ -385,6 +426,7 @@ swift::swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]) {
     [&]() -> FunctionCacheEntry* {
       // Create a new entry for the cache.
       auto entry = FunctionCacheEntry::allocate(
+        FunctionTypes.getAllocator(),
         flagsArgsAndResult,
         numKeyArguments,
         numArguments * sizeof(FunctionTypeMetadata::Argument));
@@ -921,7 +963,8 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
       // Allocate the tuple cache entry, which includes space for both the
       // metadata and a value-witness table.
-      auto entry = TupleCacheEntry::allocate(genericArgs, numElements,
+      auto entry = TupleCacheEntry::allocate(TupleTypes.getAllocator(),
+                                             genericArgs, numElements,
                                              numElements * sizeof(Element));
 
       auto witnesses = &entry->Witnesses;
@@ -1353,10 +1396,10 @@ static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                            const ClassMetadata *super,
-                                            size_t numFields,
-                                      const ClassFieldLayout *fieldLayouts,
-                                            size_t *fieldOffsets) {
+                                          const ClassMetadata *super,
+                                          size_t numFields,
+                                          const ClassFieldLayout *fieldLayouts,
+                                          size_t *fieldOffsets) {
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
 
@@ -1442,6 +1485,10 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   // even if Swift doesn't, because of SwiftObject.)
   rodata->InstanceStart = size;
 
+  auto &allocator = unsafeGetInitializedCache(
+                                 self->getDescription()->GenericMetadataPattern)
+    .getAllocator();
+
   // Always clone the ivar descriptors.
   if (numFields) {
     const ClassIvarList *dependentIvars = rodata->IvarList;
@@ -1450,7 +1497,7 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
     auto ivarListSize = sizeof(ClassIvarList) +
                         numFields * sizeof(ClassIvarEntry);
-    auto ivars = (ClassIvarList*) permanentAlloc(ivarListSize);
+    auto ivars = (ClassIvarList*) allocator.alloc(ivarListSize);
     memcpy(ivars, dependentIvars, ivarListSize);
     rodata->IvarList = ivars;
 
@@ -1575,7 +1622,8 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   auto entry = MetatypeTypes.findOrAdd(args, numGenericArgs,
     [&]() -> MetatypeCacheEntry* {
       // Create a new entry for the cache.
-      auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs, 0);
+      auto entry = MetatypeCacheEntry::allocate(MetatypeTypes.getAllocator(),
+                                                args, numGenericArgs, 0);
 
       auto metadata = entry->getData();
       metadata->setKind(MetadataKind::Metatype);
@@ -1681,7 +1729,9 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
     [&]() -> ExistentialMetatypeCacheEntry* {
       // Create a new entry for the cache.
       auto entry =
-        ExistentialMetatypeCacheEntry::allocate(args, numGenericArgs, 0);
+        ExistentialMetatypeCacheEntry::allocate(
+                                        ExistentialMetatypeTypes.getAllocator(),
+                                        args, numGenericArgs, 0);
 
       ExistentialTypeFlags flags;
       if (instanceMetadata->getKind() == MetadataKind::Existential) {
@@ -2047,7 +2097,8 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
   auto entry = ExistentialTypes.findOrAdd(protocolArgs, numProtocols,
     [&]() -> ExistentialCacheEntry* {
       // Create a new entry for the cache.
-      auto entry = ExistentialCacheEntry::allocate(protocolArgs, numProtocols,
+      auto entry = ExistentialCacheEntry::allocate(ExistentialTypes.getAllocator(),
+                             protocolArgs, numProtocols,
                              sizeof(const ProtocolDescriptor *) * numProtocols);
       auto metadata = entry->getData();
       

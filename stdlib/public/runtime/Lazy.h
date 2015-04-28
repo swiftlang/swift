@@ -39,6 +39,12 @@ public:
 #endif
     return Value;
   }
+  
+  /// Get the value, assuming it must have already been initialized by this
+  /// point.
+  T &unsafeGetAlreadyInitialized() {
+    return Value;
+  }
 
 private:
   static void lazyInitCallback(void *Argument) {
