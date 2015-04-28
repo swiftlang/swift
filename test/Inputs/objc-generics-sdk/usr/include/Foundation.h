@@ -88,8 +88,6 @@ typedef double NSTimeInterval;
 @end
 
 @interface NSError : NSObject
-@property (copy,nonatomic) NSString *domain;
-@property (nonatomic) NSInteger code;
 @end
 
 @interface NSString : NSObject <NSSecureCoding, NSCopying>

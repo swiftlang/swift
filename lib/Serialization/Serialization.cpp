@@ -15,7 +15,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/RawComment.h"
@@ -1794,48 +1793,6 @@ void Serializer::writeLocalDeclContext(const DeclContext *DC) {
   }
 }
 
-static ForeignErrorConventionKind getRawStableForeignErrorConventionKind(
-                                    ForeignErrorConvention::Kind kind) {
-  switch (kind) {
-  case ForeignErrorConvention::ZeroResult:
-    return ForeignErrorConventionKind::ZeroResult;
-  case ForeignErrorConvention::NonZeroResult:
-    return ForeignErrorConventionKind::NonZeroResult;
-  case ForeignErrorConvention::NilResult:
-    return ForeignErrorConventionKind::NilResult;
-  case ForeignErrorConvention::NonNilError:
-    return ForeignErrorConventionKind::NonNilError;
-  }
-}
-
-void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
-  using namespace decls_block;
-
-  auto kind = getRawStableForeignErrorConventionKind(fec.getKind());
-  uint8_t isOwned = fec.isErrorOwned() == ForeignErrorConvention::IsOwned;
-  TypeID errorParameterTypeID = addTypeRef(fec.getErrorParameterType());
-  TypeID resultTypeID;
-  switch (fec.getKind()) {
-  case ForeignErrorConvention::ZeroResult:
-  case ForeignErrorConvention::NonZeroResult:
-    resultTypeID = addTypeRef(fec.getResultType());
-    break;
-
-  case ForeignErrorConvention::NilResult:
-  case ForeignErrorConvention::NonNilError:
-    resultTypeID = 0;
-    break;
-  }
-
-  auto abbrCode = DeclTypeAbbrCodes[ForeignErrorConventionLayout::Code];
-  ForeignErrorConventionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           static_cast<uint8_t>(kind),
-                                           isOwned,
-                                           fec.getErrorParameterIndex(),
-                                           errorParameterTypeID,
-                                           resultTypeID);
-}
-
 void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
@@ -2308,9 +2265,6 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto pattern : fn->getBodyParamPatterns())
       writePattern(pattern);
 
-    if (auto errorConvention = fn->getForeignErrorConvention())
-      writeForeignErrorConvention(*errorConvention);
-
     break;
   }
 
@@ -2422,8 +2376,6 @@ void Serializer::writeDecl(const Decl *D) {
     assert(ctor->getBodyParamPatterns().size() == 2);
     for (auto pattern : ctor->getBodyParamPatterns())
       writePattern(pattern);
-    if (auto errorConvention = ctor->getForeignErrorConvention())
-      writeForeignErrorConvention(*errorConvention);
     break;
   }
 
@@ -3115,7 +3067,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<GenericRequirementLayout>();
   registerDeclTypeAbbr<LastGenericRequirementLayout>();
 
-  registerDeclTypeAbbr<ForeignErrorConventionLayout>();
   registerDeclTypeAbbr<DeclContextLayout>();
   registerDeclTypeAbbr<AbstractClosureExprLayout>();
   registerDeclTypeAbbr<PatternBindingInitializerLayout>();
