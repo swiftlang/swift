@@ -42,6 +42,17 @@ using namespace metadataimpl;
 void *MetadataAllocator::alloc(size_t size) {
   static const uintptr_t pagesizeMask = sysconf(_SC_PAGESIZE) - 1;
   
+  // If the requested size is a page or larger, map page(s) for it
+  // specifically.
+  if (LLVM_UNLIKELY(size > pagesizeMask)) {
+    auto mem = mmap(nullptr, (size + pagesizeMask) & ~pagesizeMask,
+                    PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE,
+                    -1, 0);
+    if (next == MAP_FAILED)
+      crash("unable to allocate memory for metadata cache");
+    return mem;
+  }
+  
   char *end = next + size;
   
   // Allocate a new page if we need one.
