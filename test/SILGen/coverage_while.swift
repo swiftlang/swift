@@ -27,24 +27,30 @@ func foo() -> Int32 {
     if (x > 30) { break }
   }
 
-  // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 10) - 11)
+  // CHECK: [[@LINE+1]]:10 -> [[@LINE+4]]:4 : 10
+  repeat {
+    x--
+    // CHECK: [[@LINE+1]]:11 -> [[@LINE+1]]:16 : 10
+  } while x > 0
+
+  // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 11) - 12)
   while (x < 100) {
-    if (x == 40) { // CHECK: [[@LINE]]:18 -> [[@LINE+2]]:6 : 11
+    if (x == 40) { // CHECK: [[@LINE]]:18 -> [[@LINE+2]]:6 : 12
       return x
     }
     ++x
   }
 
   var y : Int32? = 2
-  // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:15 : ((0 + 12) - 11)
+  // CHECK: [[@LINE+1]]:9 -> [[@LINE+1]]:15 : ((0 + 13) - 12)
   while x > 30, let z = y {
     y = nil
   }
 
-  // TODO: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 13) - 11)
+  // TODO: [[@LINE+1]]:9 -> [[@LINE+1]]:18 : ((0 + 14) - 12)
   while let z = y {
   }
-  // CHECK: [[@LINE-1]]:4 -> [[@LINE+1]]:11 : (0 - 11)
+  // CHECK: [[@LINE-1]]:4 -> [[@LINE+1]]:11 : (0 - 12)
   return x
 }
 

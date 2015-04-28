@@ -445,7 +445,8 @@ public:
 
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       assignCounter(RWS, CounterExpr::Zero());
-      assignCounter(RWS->getBody());
+      CounterExpr &BodyCounter = assignCounter(RWS->getBody());
+      assignCounter(RWS->getCond(), CounterExpr::Ref(BodyCounter));
 
     } else if (auto *FS = dyn_cast<ForStmt>(S)) {
       assignCounter(FS, CounterExpr::Zero());
