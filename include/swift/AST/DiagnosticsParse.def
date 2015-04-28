@@ -681,11 +681,6 @@ WARNING(parameter_extraneous_empty_name,decl_parsing,none,
         (Identifier))
 ERROR(parameter_operator_keyword_argument,decl_parsing,none,
       "operator cannot have keyword arguments", ())
-ERROR(implied_with_parameter,decl_parsing,none,
-        "'with' is implied for the first parameter of "
-        "%select{a method|an initializer}0; did you mean to name this "
-        "parameter '%1'?",
-        (bool, StringRef))
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics

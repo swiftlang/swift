@@ -409,72 +409,13 @@ mapParsedParameters(Parser &parser,
       break;
     }
 
-    // Local function that checks the argument and parameter name to see if they
-    // are permissible, which may result in changes.
-    auto checkArgNames = [&](Identifier argName, Identifier paramName)
-                           -> std::pair<Identifier, Identifier> {
-      // If the first parameter of a function or initializer is a keyword
-      // argument and starts with "with", note that the "with" is implied.
-      if (!argName.empty() && isFirstParameter && isFirstParameterClause &&
-          (paramContext == Parser::ParameterContextKind::Function ||
-           paramContext == Parser::ParameterContextKind::Initializer) &&
-          argName.str().size() > 4 &&
-          camel_case::getFirstWord(argName.str()) == "with") {
-
-        // Compute the name that remains once we drop "with".
-        llvm::SmallString<16> buffer;
-        StringRef remainingName
-          = camel_case::toLowercaseWord(argName.str().substr(4), buffer);
-
-        // Figure out where to emit the diagnostic.
-        bool isInitializer
-          = paramContext == Parser::ParameterContextKind::Initializer;
-        auto diag = parser.diagnose(param.FirstNameLoc,
-                                    diag::implied_with_parameter,
-                                    isInitializer, remainingName);
-
-        // Emit a Fix-It to patch this up.
-        if (param.SecondNameLoc.isInvalid()) {
-          // There was no second name, so changing this involves introducing
-          // a separate keyword argument name without the "with".
-          llvm::SmallString<16> replacementText;
-          replacementText += remainingName;
-          replacementText += " ";
-          diag.fixItInsert(param.FirstNameLoc, replacementText);
-
-          // If there was a back-tick, remove it: we have two names now.
-          if (param.PoundLoc.isValid())
-            diag.fixItRemove(param.PoundLoc);
-        } else if (!param.SecondName.empty() &&
-                   param.SecondName.str() == remainingName) {
-          // Both names were specified and the second one matches what we get
-          // by dropping "with", so just zap the first name from the source.
-          diag.fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
-
-          // If this isn't a keyword argument by default, add a back-tick back.
-          if (!isKeywordArgumentByDefault) {
-            diag.fixItInsert(param.SecondNameLoc, "#");
-          }
-        } else {
-          // There were two names and the second one doesn't match, so just fix
-          // the first name by dropping the "with".
-          diag.fixItReplace(param.FirstNameLoc, remainingName);
-        }
-
-        // Update the argument name.
-        argName = parser.Context.getIdentifier(remainingName);
-      }
-
-      return {argName, paramName};
-    };
-
     // Create the pattern.
     Pattern *pattern;
     Identifier argName;
     Identifier paramName;
     if (param.SecondNameLoc.isValid()) {
-      std::tie(argName, paramName) = checkArgNames(param.FirstName,
-                                                   param.SecondName);
+      argName = param.FirstName;
+      paramName = param.SecondName;
 
       // Both names were provided, so pass them in directly.
       pattern = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
@@ -522,7 +463,7 @@ mapParsedParameters(Parser &parser,
         }
       }
 
-      std::tie(argName, paramName) = checkArgNames(argName, param.FirstName);
+      paramName = param.FirstName;
 
       pattern = createParamPattern(param.LetVarInOutLoc, param.SpecifierKind,
                                    argName, SourceLoc(),

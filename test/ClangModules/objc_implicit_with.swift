@@ -5,11 +5,11 @@
 import AppKit
 
 class X {
-  init(withInt: Int) { } // expected-error{{'with' is implied for the first parameter of an initializer; did you mean to name this parameter 'int'?}}{{8-8=int }}
-  init(withFloat float: Float) { } // expected-error{{'with' is implied for the first parameter of an initializer; did you mean to name this parameter 'float'?}}{{8-18=}}
-  init(withDouble d: Double) { } // expected-error{{'with' is implied for the first parameter of an initializer; did you mean to name this parameter 'double'?}}{{8-18=double}}
+  init(withInt: Int) { }
+  init(withFloat float: Float) { }
+  init(withDouble d: Double) { }
 
-  func doSomething(withDouble d: Double) { } // expected-error{{'with' is implied for the first parameter of a method; did you mean to name this parameter 'double'?}}{{20-30=double}}
+  func doSomething(withDouble d: Double) { }
 
   init(_ withString: String) { } // not corrected
   func doSomething(withString: String) { } // not corrected
