@@ -623,7 +623,6 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
     if (auto *SEI = dyn_cast<SwitchEnumInst>(Term)) {
       if (auto *EI = dyn_cast<EnumInst>(SEI->getOperand())) {
         auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
-        auto *ThisBB = SEI->getParent();
         if (EI->hasOperand() && !LiveBlock->bbarg_empty())
           SILBuilderWithScope<1>(SEI)
               .createBranch(SEI->getLoc(), LiveBlock, EI->getOperand());
