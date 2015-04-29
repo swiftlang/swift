@@ -855,23 +855,10 @@ emitBuiltinMakeMaterializeForSetCallback(SILGenFunction &gen,
   return ManagedValue::forUnmanaged(result);
 }
 
-static bool requireRefCountedType(SILGenFunction &gen,
-                                  SILLocation loc,
-                                  Type type) {
-  auto valueType = type->getOptionalObjectType();
-  auto objType = valueType ? valueType : type;
-  if (objType->mayHaveSuperclass()
-      || objType->isClassExistentialType()
-      || objType->is<BuiltinNativeObjectType>()
-      || objType->is<BuiltinBridgeObjectType>()
-      || objType->is<BuiltinUnknownObjectType>()) {
-    return true;
-  }
-  gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                   "isUnique operand type must be a refcounted object");
-  return false;
-}
-
+// This should only accept as an operand type single-refcounted-pointer types,
+// class existentials, or single-payload enums (optional). Type checking must be
+// deferred until IRGen so Builtin.isUnique can be called from a transparent
+// generic wrapper (we can only type check after specialization).
 static ManagedValue emitBuiltinIsUnique(SILGenFunction &gen,
                                         SILLocation loc,
                                         ArrayRef<Substitution> subs,
@@ -880,11 +867,6 @@ static ManagedValue emitBuiltinIsUnique(SILGenFunction &gen,
                                         SGFContext C) {
 
   assert(subs.size() == 1 && "isUnique should have a single substitution");
-
-  if (!requireRefCountedType(gen, loc, subs[0].getReplacement())) {
-    auto Int1Ty = SILType::getBuiltinIntegerType(1, gen.getASTContext());
-    return ManagedValue::forUnmanaged(SILUndef::get(Int1Ty, gen.SGM.M));
-  }
   assert(args.size() == 1 && "isUnique should have a single argument");
   assert((args[0].getType().isAddress() && !args[0].hasCleanup()) &&
          "Builtin.isUnique takes an address.");
@@ -901,11 +883,6 @@ emitBuiltinIsUniqueOrPinned(SILGenFunction &gen,
                                CanFunctionType formalApplyType,
                                SGFContext C) {
   assert(subs.size() == 1 && "isUnique should have a single substitution");
-
-  if (!requireRefCountedType(gen, loc, subs[0].getReplacement())) {
-    auto Int1Ty = SILType::getBuiltinIntegerType(1, gen.getASTContext());
-    return ManagedValue::forUnmanaged(SILUndef::get(Int1Ty, gen.SGM.M));
-  }
   assert(args.size() == 1 && "isUnique should have a single argument");
   assert((args[0].getType().isAddress() && !args[0].hasCleanup()) &&
          "Builtin.isUnique takes an address.");

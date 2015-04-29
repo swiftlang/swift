@@ -102,6 +102,18 @@ public func unsafeBitCast<T, U>(var x: T, _: U.Type) -> U {
   return UnsafeMutablePointer<U>(Builtin.addressof(&x)).memory
 }
 
+/// `unsafeBitCast` something to `AnyObject` where something may be a
+/// single ref-counted pointer, a bridge object, a single-payload
+/// enum, or a class existential. The size of T's representation may
+/// be larger than AnyObject, as long as the first field is a reference.
+///
+/// Caution: Should only be used when we need to assume a consistent
+/// object layout across all representations mentioned above.
+@transparent
+internal func _reinterpretCastRefToAnyObject<T>(var x: T) -> AnyObject {
+  return UnsafeMutablePointer<AnyObject>(Builtin.addressof(&x)).memory
+}
+
 /// `unsafeBitCast` something to `AnyObject`
 @transparent
 public func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
@@ -424,4 +436,61 @@ func _getSuperclass(t: AnyClass) -> AnyClass? {
 public // @testable
 func _getSuperclass(t: Any.Type) -> AnyClass? {
   return (t as? AnyClass).flatMap { _getSuperclass($0) }
+}
+
+//===--- Builtin.IsUnique -------------------------------------------------===//
+// _isUnique functions must take an inout object because they rely on
+// Builtin.isUnique which requires an inout reference to preserve
+// source-level copies in the presence of ARC optimization.
+//
+// Taking an inout object makes sense for two additional reasons:
+//
+// 1. You should only call it when about to mutate the object.
+//    Doing so otherwise implies a race condition if the buffer is
+//    shared across threads.
+//
+// 2. When it is not an inout function, self is passed by
+//    value... thus bumping the reference count and disturbing the
+//    result we are trying to observe, Dr. Heisenberg!
+//
+// _isUnique and _isUniquePinned cannot be made public or the compiler
+// will attempt to generate generic code for the transparent function
+// and type checking will fail.
+
+/// Return true if `object` is uniquely referenced.
+@transparent
+internal func _isUnique<T>(inout object: T) -> Bool {
+  return Bool(Builtin.isUnique(&object))
+}
+
+/// Return true if `object` is uniquely referenced or pinned.
+@transparent
+internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
+  return Bool(Builtin.isUniqueOrPinned(&object))
+}
+
+/// Return true if `object` is uniquely referenced.
+/// This provides sanity checks on top of the Builtin.
+@transparent
+public // @testable
+func _isUnique_native<T>(inout object: T) -> Bool {
+  // This could be a bridge object, single payload enum, or plain old
+  // reference. Any any case it's non pointer bits must be zero.
+  _sanityCheck((Builtin.reinterpretCast(object) & _objectPointerSpareBits) == 0)
+  _sanityCheck(_usesNativeSwiftReferenceCounting(
+      _reinterpretCastRefToAnyObject(object).dynamicType))
+  return Bool(Builtin.isUnique_native(&object))
+}
+
+/// Return true if `object` is uniquely referenced or pinned.
+/// This provides sanity checks on top of the Builtin.
+@transparent
+public // @testable
+func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
+  // This could be a bridge object, single payload enum, or plain old
+  // reference. Any any case it's non pointer bits must be zero.
+  _sanityCheck((Builtin.reinterpretCast(object) & _objectPointerSpareBits) == 0)
+  _sanityCheck(_usesNativeSwiftReferenceCounting(
+      _reinterpretCastRefToAnyObject(object).dynamicType))
+  return Bool(Builtin.isUniqueOrPinned_native(&object))
 }
