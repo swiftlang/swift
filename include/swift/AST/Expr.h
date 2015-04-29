@@ -2770,6 +2770,8 @@ public:
   ArrayRef<Pattern *> getParamPatterns() { return ParamPattern; }
   ArrayRef<const Pattern *> getParamPatterns() const { return ParamPattern; }
 
+  unsigned getNaturalArgumentCount() const { return 1; }
+
   /// \brief Retrieve the result type of this closure.
   Type getResultType() const;
 

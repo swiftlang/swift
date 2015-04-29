@@ -55,9 +55,27 @@ public:
   };
 
 private:
+  static Kind getKindForFunctionType(Type type, unsigned uncurryLevel) {
+    // If type-checking didn't give us a sensible type, conservatively
+    // say that it throws.
+    if (!type) return Kind::Handled;
+
+    while (true) {
+      FunctionType *fnType = type->getAs<FunctionType>();
+      if (!fnType) return Kind::Handled;
+      if (uncurryLevel == 0) {
+        return fnType->getExtInfo().throws()
+                 ? Kind::Handled : Kind::NonThrowingFunction;
+      }
+
+      uncurryLevel--;
+      type = fnType->getResult();
+    }
+  }
+
   template <class T>
   static Kind getKindForFunctionBody(T *fn) {
-    return (fn->isBodyThrowing() ? Kind::Handled : Kind::NonThrowingFunction);
+    return getKindForFunctionType(fn->getType(), fn->getNaturalArgumentCount());
   }
 
   Kind TheKind;
