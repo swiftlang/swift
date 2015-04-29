@@ -2799,6 +2799,10 @@ public:
 
   template<typename NominalOrExtensionDecl>
   void checkExplicitConformance(NominalOrExtensionDecl *D, Type T) {
+    // For anything with a Clang node, lazily check conformances.
+    if (D->hasClangNode())
+      return;
+
     ReferencedNameTracker *tracker = nullptr;
     if (SourceFile *SF = D->getParentSourceFile())
       tracker = SF->getReferencedNameTracker();

@@ -96,6 +96,12 @@ public func date() {
   d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4]]
 }
 
+// Make sure we build some witness tables for enums.
+func useOptions(var opt: NSURLBookmarkCreationOptions)
+       -> NSURLBookmarkCreationOptions {
+  return opt | opt
+}
+
 // LOC-CHECK: ![[THUNK:.*]] = !DISubprogram({{.*}}linkageName: "_TToFC4main8MyObjectg5MyArrCSo7NSArray"
 // LOC-CHECK-NOT:                           line:
 // LOC-CHECK-SAME:                          isDefinition: true
