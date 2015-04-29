@@ -131,7 +131,7 @@ func dont_return<T>(argument: T) throws -> T {
 // CHECK-NEXT: br [[CATCH]]([[T0]] : $_ErrorType)
 func all_together_now(flag: Bool) -> Cat {
   do {
-    return dont_return(flag ? make_a_cat() : dont_make_a_cat())
+    return try dont_return(flag ? make_a_cat() : dont_make_a_cat())
   } catch HomeworkError.CatAteIt(let cat) {
     return cat
   } catch _ {
@@ -181,7 +181,7 @@ func IThrow() throws -> Int32 {
 //CHECK-NOT: builtin "willThrow"
 //CHECK: return
 func DoesNotThrow() throws -> Int32 {
-  IThrow()
+  try IThrow()
   return 2
 }
 

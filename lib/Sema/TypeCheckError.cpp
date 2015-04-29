@@ -38,6 +38,9 @@ public:
     /// A non-exhaustive catch within a non-throwing function.
     NonExhaustiveCatch,
 
+    /// A default argument expression.
+    DefaultArgument,
+
     /// The initializer for an instance variable.
     IVarInitializer,
 
@@ -64,6 +67,30 @@ private:
 public:
   static Context getHandled() {
     return Context(Kind::Handled);
+  }
+
+  static Context forTopLevelCode(TopLevelCodeDecl *D) {
+    // Top-level code implicitly handles errors.
+    return Context(Kind::Handled);
+  }
+
+  static Context forFunction(AbstractFunctionDecl *D) {
+    return Context(getKindForFunctionBody(D));
+  }
+
+  static Context forInitializer(Initializer *init) {
+    if (isa<DefaultArgumentInitializer>(init)) {
+      return Context(Kind::DefaultArgument);
+    }
+
+    auto binding = cast<PatternBindingInitializer>(init)->getBinding();
+    assert(!binding->getDeclContext()->isLocalContext() &&
+           "setting up error context for local pattern binding?");
+    if (!binding->isStatic() && binding->getDeclContext()->isTypeContext()) {
+      return Context(Kind::IVarInitializer);
+    } else {
+      return Context(Kind::GlobalVarInitializer);
+    }
   }
 
   static Context forClosure(AbstractClosureExpr *E) {
@@ -150,6 +177,10 @@ public:
       diagnoseThrowInIllegalContext(TC, E, "a property initializer");
       return;
 
+    case Kind::DefaultArgument:
+      diagnoseThrowInIllegalContext(TC, E, "a default argument");
+      return;
+
     case Kind::CatchPattern:
       diagnoseThrowInIllegalContext(TC, E, "a catch pattern");
       return;
@@ -180,6 +211,7 @@ public:
 
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
+    case Kind::DefaultArgument:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
       // Diagnosed at the call sites.
@@ -203,6 +235,12 @@ class CheckErrorCoverage : public ASTWalker {
 
   /// Do we have a throw site using 'try' in this context?
   bool HasTryThrowSite = false;
+
+  void flagInvalidCode() {
+    // Suppress warnings about useless try or catch.
+    HasAnyThrowSite = true;
+    HasTryThrowSite = true;
+  }
 
   /// An RAII object for restoring all the interesting state in an
   /// error-coverage.
@@ -256,20 +294,6 @@ public:
   CheckErrorCoverage(TypeChecker &tc, Context initialContext)
     : TC(tc), CurContext(initialContext) {}
 
-  void checkClosureBody(ClosureExpr *E) {
-    ContextScope scope(*this);
-    CurContext = Context::forClosure(E);
-    scope.makeIndependentContext();
-    E->getBody()->walk(*this);
-  }
-
-  void checkAutoClosureBody(AutoClosureExpr *E) {
-    ContextScope scope(*this);
-    CurContext = Context::forClosure(E);
-    E->getBody()->walk(*this);
-    scope.preserveInfoFromAutoclosureBody();
-  }
-
 private:
   bool walkToDeclPre(Decl *D) override {
     // Skip the implementations of all local declarations... except
@@ -278,6 +302,12 @@ private:
   }
 
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    // Remember if we saw an error.
+    if (isa<ErrorExpr>(E)) {
+      flagInvalidCode();
+      return {false, E};
+    }
+
     // Check explicit closures.
     if (auto closure = dyn_cast<ClosureExpr>(E)) {
       checkClosureBody(closure);
@@ -321,6 +351,20 @@ private:
     return {true, S};
   }
 
+  void checkClosureBody(ClosureExpr *E) {
+    ContextScope scope(*this);
+    CurContext = Context::forClosure(E);
+    scope.makeIndependentContext();
+    E->getBody()->walk(*this);
+  }
+
+  void checkAutoClosureBody(AutoClosureExpr *E) {
+    ContextScope scope(*this);
+    CurContext = Context::forClosure(E);
+    E->getBody()->walk(*this);
+    scope.preserveInfoFromAutoclosureBody();
+  }
+
   void checkDoCatch(DoCatchStmt *S) {
     // Handle the 'do' clause.
     {
@@ -341,9 +385,10 @@ private:
 
       S->getBody()->walk(*this);
 
-      // Complain if nothing threw within the body.
+      // Warn if nothing threw within the body.
       if (!HasAnyThrowSite) {
-        TC.diagnose(S->getDoLoc(), diag::no_throw_in_catch);
+        TC.diagnose(S->getCatches().front()->getCatchLoc(),
+                    diag::no_throw_in_do_with_catch);
       }
 
       if (!S->isSyntacticallyExhaustive()) {
@@ -376,8 +421,12 @@ private:
 
   void checkApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
-    auto fnType = E->getFn()->getType()->getAs<FunctionType>();
-    if (!fnType || !fnType->throws()) return;
+    // But if the expression didn't type-check, suppress diagnostics.
+    auto type = E->getFn()->getType();
+    if (!type) return flagInvalidCode();
+    auto fnType = type->getAs<FunctionType>();
+    if (!fnType) return flagInvalidCode();
+    if (!fnType->throws()) return;
 
     // TODO: filter out non-throwing calls to rethrows here.
 
@@ -393,7 +442,7 @@ private:
     HasTryThrowSite |= requiresTry;
 
     bool isErrorHandled = CurContext.isHandled();
-    bool isTryCovered = (requiresTry && IsInTry);
+    bool isTryCovered = (!requiresTry || IsInTry);
     if (!isErrorHandled) {
       CurContext.diagnoseUnhandledThrowSite(TC, E, isTryCovered);
     } else if (!isTryCovered) {
@@ -409,7 +458,7 @@ private:
 
     E->getSubExpr()->walk(*this);
 
-    // Diagnose 'try' expressions that weren't actually needed.
+    // Warn about 'try' expressions that weren't actually needed.
     if (!HasTryThrowSite) {
       TC.diagnose(E->getLoc(), diag::no_throw_in_try);
 
@@ -424,3 +473,21 @@ private:
 };
 
 } // end anonymous namespace 
+
+void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
+  CheckErrorCoverage checker(*this, Context::forTopLevelCode(code));
+  code->getBody()->walk(checker);
+}
+
+void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
+  CheckErrorCoverage checker(*this, Context::forFunction(fn));
+  if (auto body = fn->getBody()) {
+    body->walk(checker);
+  }
+}
+
+void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
+                                                Expr *init) {
+  CheckErrorCoverage checker(*this, Context::forInitializer(initCtx));
+  init->walk(checker);
+}

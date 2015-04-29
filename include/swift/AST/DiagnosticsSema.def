@@ -1808,8 +1808,8 @@ ERROR(throwing_call_without_try,sema,none,
 WARNING(no_throw_in_try,sema,none,
         "no calls to throwing functions occur within 'try' expression", ())
 
-WARNING(no_throw_in_catch,sema,none,
-        "no errors are thrown in the 'do' block", ())
+WARNING(no_throw_in_do_with_catch,sema,none,
+        "'catch' block is unreachable because no errors are thrown in 'do' block", ())
 
 //------------------------------------------------------------------------------
 // Type Check Types

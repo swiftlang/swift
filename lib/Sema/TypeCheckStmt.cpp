@@ -978,6 +978,8 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
         else
           field.getInit()->setExpr(e, true);
 
+        tc.checkInitializerErrorHandling(initContext, e);
+
         // Walk the checked initializer and contextualize any closures
         // we saw there.
         bool hasClosures = tc.contextualizeInitializer(initContext, e);
@@ -1286,4 +1288,5 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(*this, TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
+  checkTopLevelErrorHandling(TLCD);
 }

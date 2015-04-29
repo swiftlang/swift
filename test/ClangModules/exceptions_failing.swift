@@ -6,5 +6,5 @@ import Foundation
 import exceptions
 
 func test0() {
-  try ErrorProne.fail() // expected-error {{call can throw, but error is not handled}}
+  try ErrorProne.fail() // expected-error {{errors thrown from here are not handled}}
 }

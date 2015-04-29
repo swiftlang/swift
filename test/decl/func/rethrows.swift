@@ -7,11 +7,11 @@ let r1 = {() rethrows -> Int in 0} // expected-error {{only function declaration
 let r2 : () rethrows -> Int = { 0 } // expected-error {{only function declarations may be marked 'rethrows'}}
 let r3 : Optional<() rethrows -> ()> = nil // expected-error {{only function declarations may be marked 'rethrows'}}
 
-func f1(f: () throws -> ()) rethrows { f() }
+func f1(f: () throws -> ()) rethrows { try f() }
 func f2(f: () -> ()) rethrows { f() } // expected-error {{'rethrows' function must take a throwing function argument}}
 func f3(f: UndeclaredFunctionType) rethrows { f() } // expected-error {{use of undeclared type 'UndeclaredFunctionType'}}
 
-func cf1(f: () throws -> ())() rethrows { f() }
+func cf1(f: () throws -> ())() rethrows { try f() }
 func cf2(f: () -> ())() rethrows { f() } // expected-error {{'rethrows' function must take a throwing function argument}}
 func cf3(f: UndeclaredFunctionType)() rethrows { f() } // expected-error {{use of undeclared type 'UndeclaredFunctionType'}}
 func cf4(f: () ->())(g: () throws -> ()) rethrows {}

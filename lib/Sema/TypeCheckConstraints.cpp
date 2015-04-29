@@ -1215,6 +1215,11 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
   // If we entered an initializer context, contextualize any
   // auto-closures we might have created.
   if (initContext) {
+    // Check safety of error-handling in the declaration, too.
+    if (!hadError) {
+      checkInitializerErrorHandling(initContext, init);
+    }
+
     bool hasClosures =
       (!hadError && contextualizeInitializer(initContext, init));
 

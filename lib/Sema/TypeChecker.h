@@ -1405,6 +1405,11 @@ public:
     return !Context.LangOpts.DebugForbidTypecheckPrefix.empty();
   }
 
+  /// Check error handling in the given type-checked top-level code.
+  void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
+  void checkFunctionErrorHandling(AbstractFunctionDecl *D);
+  void checkInitializerErrorHandling(Initializer *I, Expr *E);
+
   void addExprForDiagnosis(Expr *E) {
     DiagnosedExprs.insert(E);
   }

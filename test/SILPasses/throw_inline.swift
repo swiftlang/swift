@@ -12,6 +12,6 @@ public func foo() throws -> Int32 {
 // CHECK: %1 = struct $Int32 (%0 : $Builtin.Int32)
 // CHECK: return %1 : $Int32
 func bar() throws  -> Int32 {
-  return foo()
+  return try foo()
 }
 

@@ -544,6 +544,13 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     TC.computeCaptures(FD);
   }
 
+  // Check error-handling correctness for all the functions defined in
+  // this file.  This can depend on all of their interior function
+  // bodies having been type-checked.
+  for (AbstractFunctionDecl *FD : TC.definedFunctions) {
+    TC.checkFunctionErrorHandling(FD);
+  }
+
   // Check all of the local function captures. One can only capture a local
   // function that itself has no captures.
   for (const auto &localFunctionCapture : TC.LocalFunctionCaptures) {

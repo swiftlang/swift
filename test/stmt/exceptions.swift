@@ -16,16 +16,16 @@ func e() {}
 func opaque_error() -> _ErrorType { return MSV.Foo }
 
 func one() {
-  throw MSV.Foo // expected-error {{error is not handled and enclosing function is not marked with 'throws'}}
+  throw MSV.Foo // expected-error {{error is not handled because the enclosing function is not declared 'throws'}}
 }
 
 func two() {
-  throw opaque_error() // expected-error {{error is not handled and enclosing function is not marked with 'throws'}}
+  throw opaque_error() // expected-error {{error is not handled because the enclosing function is not declared 'throws'}}
 }
 
 func three() {
-  do { // expected-error {{'catch' patterns must be exhaustive in function not marked with 'throws'}}
-    throw opaque_error()
+  do {
+    throw opaque_error() // expected-error {{error is not handled because the enclosing catch is not exhaustive}}
   } catch let e as MSV {
   }
 }

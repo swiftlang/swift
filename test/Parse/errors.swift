@@ -16,12 +16,14 @@ func one() {
   }
 
   do {
-  } catch {   // implicitly "catch let error"
+    
+  } catch { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
     let error2 = error
   }
 
   do {
-  } catch where true {   // implicitly "catch let error where true"
+  } catch where true { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
     let error2 = error
+  } catch {
   }
 }

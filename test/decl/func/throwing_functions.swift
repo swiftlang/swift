@@ -47,7 +47,7 @@ var fG: (i: Int) throws -> Int = fooG
 func fred(callback: (UInt8) throws -> ()) throws { }
 
 func rachel() -> Int { return 12 }
-func donna(generator: () throws -> Int) -> Int { return generator() }
+func donna(generator: () throws -> Int) -> Int { return generator() } // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
 
 donna(rachel)
 
@@ -106,10 +106,10 @@ var c1 = {() throws -> Int in 0}
 var c2 : () throws -> Int = c1 // ok
 var c3 : () -> Int = c1 // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c4 : () -> Int = {() throws -> Int in 0} // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
-var c5 : () -> Int = { try 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
-var c6 : () throws -> Int = { do { try 0 } ; return 0 }
-var c7 : () -> Int = { do { try 0 } ; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
-var c8 : () -> Int = { do { try 0  } catch _ { var x = 0 } ; return 0 }
+var c5 : () -> Int = { try c2() } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
+var c6 : () throws -> Int = { do { try c2() } ; return 0 }
+var c7 : () -> Int = { do { try c2() } ; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
+var c8 : () -> Int = { do { try c2()  } catch _ { var x = 0 } ; return 0 }
 
 // Initializers
 struct A {
@@ -117,7 +117,7 @@ struct A {
 }
 
 func fi1() throws {
-    A(doomed: ())
+    A(doomed: ()) // expected-error {{call can throw but is not marked with 'try'}}
 }
 
 struct B {
