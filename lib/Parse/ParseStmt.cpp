@@ -973,7 +973,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       //       LET y? = bar()
       // diagnose this specifically and produce a nice fixit.
       diagnose(Tok, diag::where_end_of_binding_use_letvar, BindingKindStr)
-        .fixItInsert(Tok.getLoc(), BindingKindStr);
+        .fixItInsert(Tok.getLoc(), BindingKindStr.str() + " ");
       VarLoc = Tok.getLoc();
     }
     
