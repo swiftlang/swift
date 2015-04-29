@@ -1735,19 +1735,6 @@ namespace {
     }
   }
   
-  // FIXME: rdar://19537198
-  // If the FieldNames string (including the final terminator)
-  // is exactly 4 or 8 or 16 bytes long then on arm64 it gets emitted
-  // into section __TEXT,__literal4/8/16 and miscompiled somehow.
-  // Workaround: add an extra byte to avoid those sizes.
-  void workAroundBrokenARM64Assembler(llvm::SmallVectorImpl<char> &out) {
-    if (out.size() == 3 ||
-        out.size() == 7 ||
-        out.size() == 15) {
-      out.push_back('\0');
-    }
-  }
-  
   /// Build a doubly-null-terminated list of field names.
   template<typename ValueDeclRange>
   unsigned getFieldNameString(const ValueDeclRange &fields,
@@ -1765,7 +1752,6 @@ namespace {
       
       os.flush();
     }
-    workAroundBrokenARM64Assembler(out);
     return numFields;
   }
   
@@ -2071,7 +2057,6 @@ namespace {
         fieldNames.append(noPayloadCase.decl->getName().str());
         fieldNames.push_back('\0');
       }
-      workAroundBrokenARM64Assembler(fieldNames);
       // The final null terminator is provided by getAddrOfGlobalString.
       addWord(IGM.getAddrOfGlobalString(fieldNames));
       
