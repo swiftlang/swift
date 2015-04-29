@@ -855,7 +855,7 @@ void LSBBForwarder::invalidateReadFromStores(LSContext &Ctx,
   AliasAnalysis *AA = Ctx.getAA();
   llvm::SmallVector<SILValue, 4> InvalidatedStoreList;
   for (auto &P : Stores)
-    if (P.second.aliasingRead(AA, Inst))
+    if (P.second.aliasingRead(AA, Inst) && !isLetPointer(P.first))
       InvalidatedStoreList.push_back(P.first);
 
   for (SILValue SIOp : InvalidatedStoreList) {

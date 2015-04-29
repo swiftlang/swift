@@ -548,6 +548,23 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   return AliasResult::MayAlias;
 }
 
+/// Check if this is the address of a "let" member.
+/// Nobody can write into let members.
+bool swift::isLetPointer(SILValue V) {
+  if (auto *REA = dyn_cast<RefElementAddrInst>(V))
+    return REA->getField()->isLet();
+
+  if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(V)) {
+    auto *GlobalDecl = GAI->getReferencedGlobal()->getDecl();
+    return GlobalDecl && GlobalDecl->isLet();
+  }
+
+  if (auto *SEA = dyn_cast<StructElementAddrInst>(V))
+    return isLetPointer(SEA->getOperand());
+
+  return false;
+}
+
 namespace {
 
 using MemBehavior = SILInstruction::MemoryBehavior;
@@ -578,8 +595,21 @@ public:
 
   MemBehavior visitSILInstruction(SILInstruction *Inst) {
     // If we do not have any more information, just use the general memory
-    // behavior implementation.
-    return Inst->getMemoryBehavior();
+     // behavior implementation.
+     auto Behavior =  Inst->getMemoryBehavior();
+     if (!isLetPointer(V))
+       return Behavior;
+
+     switch (Behavior) {
+     case MemBehavior::MayHaveSideEffects:
+       return MemBehavior::MayRead;
+     case MemBehavior::MayReadWrite:
+       return MemBehavior::MayRead;
+     case MemBehavior::MayWrite:
+       return MemBehavior::None;
+     default:
+       return Behavior;
+     }
   }
 
   MemBehavior visitLoadInst(LoadInst *LI);
@@ -697,6 +727,9 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
 }
 
 MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
+  if (isLetPointer(V))
+    return MemBehavior::None;
+
   // If the store dest cannot alias the pointer in question, then the
   // specified value can not be modified by the store.
   if (AA.isNoAlias(SI->getDest(), V, SI->getDest().getType(),
@@ -744,7 +777,10 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
 }
 
 MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
-    DEBUG(llvm::dbgs() << "  Found apply we don't understand returning "
+  if (isLetPointer(V))
+    return MemBehavior::MayRead;
+
+  DEBUG(llvm::dbgs() << "  Found apply we don't understand returning "
                           "MHSF.\n");
   return MemBehavior::MayHaveSideEffects;
 }

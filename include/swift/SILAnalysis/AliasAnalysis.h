@@ -142,6 +142,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 /// "true" type of the instruction.
 SILType findTypedAccessType(SILValue V);
 
+/// Check if V points to a let-variable.
+bool isLetPointer(SILValue V);
+
 } // end namespace swift
 
 #endif
