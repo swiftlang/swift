@@ -35,4 +35,10 @@ var _fastEnumerationStorageMutationsPtr: UnsafeMutablePointer<CUnsignedLong> {
   return UnsafeMutablePointer(
       Builtin.addressof(&_fastEnumerationStorageMutationsTarget))
 }
+
+internal func _isUniquelyReferenced_native(
+  inout x: Builtin.NativeObject
+) -> Bool {
+  return Bool(Builtin.isUnique(&x))
+}
 #endif

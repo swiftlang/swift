@@ -69,13 +69,13 @@ struct _BridgeStorage<
   @inline(__always)
   public // @testable
   mutating func isUniquelyReferencedNative() -> Bool {
-    return _isUnique(&rawValue)
+    return Bool(Builtin.isUnique(&rawValue))
   }
 
   @inline(__always)
   public // @testable
   mutating func isUniquelyReferencedOrPinnedNative() -> Bool {
-    return _isUniqueOrPinned(&rawValue)
+    return Bool(Builtin.isUniqueOrPinned(&rawValue))
   }
 
   public // @testable
@@ -122,14 +122,16 @@ struct _BridgeStorage<
   public // @testable
   mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)
-    return _isUnique_native(&rawValue)
+    _sanityCheck(_nonPointerBits(rawValue) == 0)
+    return Bool(Builtin.isUnique_native(&rawValue))
   }
 
   @inline(__always)
   public // @testable
   mutating func isUniquelyReferencedOrPinned_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)
-    return _isUniqueOrPinned_native(&rawValue)
+    _sanityCheck(_nonPointerBits(rawValue) == 0)
+    return Bool(Builtin.isUniqueOrPinned_native(&rawValue))
   }
 
   public // @testable
@@ -147,7 +149,7 @@ struct _BridgeStorage<
     }
   }
 
-  // rawValue is passed inout to _isUnique.  Although its value
+  // rawValue is passed inout to Builtin.isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.
   internal var rawValue: Builtin.BridgeObject
 }

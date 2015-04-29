@@ -51,12 +51,30 @@ class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
   }
 }
 
+// Return true if x is non-nil, and the only (strong) reference to the
+// given object.
+//
+// This is an inout function for two reasons:
+//
+// 1. You should only call it when about to mutate the object.
+//    Doing so otherwise implies a race condition if the buffer is
+//    shared across threads.
+//
+// 2. When it is not an inout function, self is passed by
+//    value... thus bumping the reference count and disturbing the
+//    result we are trying to observe, Dr. Heisenberg!
+internal func _isUniquelyReferenced_native(
+  inout x: Builtin.NativeObject?
+) -> Bool {
+  return Bool(Builtin.isUnique(&x))
+}
+
 /// Management API for `_HeapBufferStorage<Value, Element>`
 internal struct _HeapBuffer<Value, Element> : Equatable {
   /// A default type to use as a backing store
   typealias Storage = _HeapBufferStorage<Value, Element>
 
-  // _storage is passed inout to _isUnique.  Although its value
+  // _storage is passed inout to Builtin.isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.
   var _storage: Builtin.NativeObject?
   var storage: AnyObject? {
@@ -191,11 +209,11 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    return _isUnique(&_storage)
+    return Bool(Builtin.isUnique(&_storage))
   }
 
   mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return _isUniqueOrPinned(&_storage)
+    return Bool(Builtin.isUniqueOrPinned(&_storage))
   }
 }
 
