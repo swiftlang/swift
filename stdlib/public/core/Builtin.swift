@@ -128,19 +128,6 @@ func !=(lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 
-/// Return `true` iff `t0` is identical to `t1`; i.e. if they are both
-/// `nil` or they both represent the same type.
-public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
-  return unsafeBitCast(t0, Int.self) == unsafeBitCast(t1, Int.self)
-}
-
-/// Return `false` iff `t0` is identical to `t1`; i.e. if they are both
-/// `nil` or they both represent the same type.
-public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
-  return !(t0 == t1)
-}
-
-
 /// Tell the optimizer that this code is unreachable if condition is
 /// known at compile-time to be true.  If condition is false, or true
 /// but not a compile-time constant, this call has no effect.
