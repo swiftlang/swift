@@ -888,8 +888,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   Condition = StmtCondition();
 
   SmallVector<StmtConditionElement, 4> result;
-  // Parse the leading condition if present.
-  if (Tok.isNot(tok::kw_var, tok::kw_let)) {
+  // Parse the leading boolean condition if present.
+  if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case)) {
     ParserResult<Expr> CondExpr = parseExprBasic(ID);
     Status |= CondExpr;
     result.push_back(CondExpr.getPtrOrNull());
@@ -939,15 +939,32 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
   // For error recovery purposes, keep track of the disposition of the last
   // pattern binding we saw ('let' vs 'var') in multiple PBD cases.
-  bool IsLet = true;
+  enum BK_BindingKind {
+    BK_Let, BK_Var, BK_Case
+  } BindingKind = BK_Let;
+  StringRef BindingKindStr = "let";
  
   // Parse the list of condition-bindings, each of which can have a 'where'.
   do {
     SourceLoc VarLoc;
     
-    if (Tok.isAny(tok::kw_let, tok::kw_var)) {
-      IsLet = Tok.is(tok::kw_let);
+    if (Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_case)) {
+      BindingKind =
+        Tok.is(tok::kw_let) ? BK_Let : Tok.is(tok::kw_var) ? BK_Var : BK_Case;
+      BindingKindStr = Tok.getText();
       VarLoc = consumeToken();
+
+      // If will probably  be a common typo to write "if let case" instead of
+      // "if case let" so detect this and produce a nice fixit.
+      if (BindingKind != BK_Case && Tok.is(tok::kw_case)) {
+        diagnose(VarLoc, diag::wrong_condition_case_location, BindingKindStr)
+          .fixItRemove(VarLoc)
+          .fixItInsertAfter(Tok.getLoc(), " " + BindingKindStr.str());
+
+        BindingKindStr = "case";
+        VarLoc = consumeToken(tok::kw_case);
+      }
+
     } else {
       // We get here with erroneous code like:
       //    if let x? = foo() where cond(), y? = bar()
@@ -955,9 +972,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       //    if let x? = foo() where cond(),
       //       LET y? = bar()
       // diagnose this specifically and produce a nice fixit.
-      diagnose(Tok, diag::where_end_of_binding_use_letvar,
-               IsLet ? "let" : "var")
-        .fixItInsert(Tok.getLoc(), IsLet ? "let " : "var ");
+      diagnose(Tok, diag::where_end_of_binding_use_letvar, BindingKindStr)
+        .fixItInsert(Tok.getLoc(), BindingKindStr);
       VarLoc = Tok.getLoc();
     }
     
@@ -966,7 +982,13 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     // Parse the list of name binding's within a let/var clauses.
     do {
       ParserResult<Pattern> Pattern;
-      
+
+      if (BindingKind == BK_Case) {
+        // In our recursive parse, remember that we're in a var/let pattern.
+        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+          T(InVarOrLetPattern, IVOLP_InMatchingPattern);
+        Pattern = parseMatchingPattern(/*isExprBasic*/ true);
+      }
       // The "if let" construct requires a refutable matching pattern, so parse
       // it now.
       //
@@ -975,10 +997,10 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       // "if let x : AnyObject = foo()" for good QoI and migration.  This is not
       // a valid modern 'if let' sequences: it isn't a valid matching pattern.
       //
-      if (Tok.is(tok::identifier) && peekToken().is(tok::colon))
-        Pattern = parseSwift1IfLetPattern(IsLet, VarLoc);
+      else if (Tok.is(tok::identifier) && peekToken().is(tok::colon))
+        Pattern = parseSwift1IfLetPattern(BindingKind == BK_Let, VarLoc);
       else {
-        Pattern = parseMatchingPatternAsLetOrVar(IsLet, VarLoc,
+        Pattern = parseMatchingPatternAsLetOrVar(BindingKind == BK_Let, VarLoc,
                                                  /*isExprBasic*/ true);
         if (auto *P = Pattern.getPtrOrNull())
           P->setImplicit();  // The let/var pattern is part of the statement.
@@ -1011,7 +1033,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       // Add variable bindings from the pattern to the case scope.
       addPatternVariablesToScope(Pattern.get());
 
-    } while (Tok.is(tok::comma) && peekToken().isNot(tok::kw_let, tok::kw_var)&&
+    } while (Tok.is(tok::comma) &&
+             peekToken().isNot(tok::kw_let, tok::kw_var, tok::kw_case) &&
              consumeIf(tok::comma));
 
     // If there is a where clause on this let/var specification, parse and

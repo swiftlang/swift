@@ -741,6 +741,9 @@ ERROR(expected_expr_conditional_where,stmt_parsing,PointsToFirstBadToken,
       "expected expression in conditional binding 'where' clause", ())
 ERROR(conditional_var_initializer_required,stmt_parsing,none,
       "variable binding in a condition requires an initializer", ())
+ERROR(wrong_condition_case_location,stmt_parsing,none,
+      "pattern matching binding is spelled with 'case %0', not '%0 case'",
+      (StringRef))
 ERROR(where_end_of_binding_use_letvar,stmt_parsing,none,
       "binding ended by previous 'where' clause; "
       "use '%0' to introduce a new one", (StringRef))
