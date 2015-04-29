@@ -274,7 +274,7 @@ public func equal<
     S1.Generator.Element : Equatable
 >(a1: S1, _ a2: S2) -> Bool {
   // FIXME(prext): remove this function when protocol extensions land.
-  return a1._prext_equalElements(a2)
+  return a1._prext_elementsEqual(a2)
 }
 
 /// Return true iff `a1` and `a2` contain equivalent elements, using
@@ -288,7 +288,7 @@ public func equal<
   @noescape _ isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
   -> Bool {
   // FIXME(prext): remove this function when protocol extensions land.
-  return a1._prext_equalElements(a2, isEquivalent: isEquivalent)
+  return a1._prext_elementsEqual(a2, isEquivalent: isEquivalent)
 }
 
 /// Return true iff a1 precedes a2 in a lexicographical ("dictionary")

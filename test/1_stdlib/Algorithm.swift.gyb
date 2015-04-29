@@ -843,7 +843,7 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
 // equal()
 //===----------------------------------------------------------------------===//
 
-struct EqualElementsTest {
+struct ElementsEqualTest {
   let expected: Bool
   let sequence: [Int]
   let other: [Int]
@@ -866,29 +866,29 @@ struct EqualElementsTest {
     self.loc = SourceLoc(file, line, comment: "test data" + comment)
   }
 
-  func flip() -> EqualElementsTest {
-    return EqualElementsTest(
+  func flip() -> ElementsEqualTest {
+    return ElementsEqualTest(
       expected, other, sequence,
       expectedLeftoverOther, expectedLeftoverSequence,
       file: loc.file, line: loc.line, comment: " (flipped)")
   }
 }
 
-let equalElementsTests = [
-  EqualElementsTest(true, [], [], [], []),
+let elementsEqualTests = [
+  ElementsEqualTest(true, [], [], [], []),
 
-  EqualElementsTest(false, [ 1 ], [], [], []),
-  EqualElementsTest(false, [], [ 1 ], [], []),
+  ElementsEqualTest(false, [ 1 ], [], [], []),
+  ElementsEqualTest(false, [], [ 1 ], [], []),
 
-  EqualElementsTest(false, [ 1, 2 ], [], [ 2 ], []),
-  EqualElementsTest(false, [], [ 1, 2 ], [], [ 2 ]),
+  ElementsEqualTest(false, [ 1, 2 ], [], [ 2 ], []),
+  ElementsEqualTest(false, [], [ 1, 2 ], [], [ 2 ]),
 
-  EqualElementsTest(false, [ 1, 2, 3, 4 ], [ 1, 2 ], [ 4 ], []),
-  EqualElementsTest(false, [ 1, 2 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
+  ElementsEqualTest(false, [ 1, 2, 3, 4 ], [ 1, 2 ], [ 4 ], []),
+  ElementsEqualTest(false, [ 1, 2 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
 ].flatMap { [ $0, $0.flip() ] }
 
-SequenceTypeAlgorithms.test("equalElements/WhereElementIsEquatable") {
-  for test in equalElementsTests {
+SequenceTypeAlgorithms.test("elementsEqual/WhereElementIsEquatable") {
+  for test in elementsEqualTests {
     if true {
       let s = MinimalSequence<MinimalEquatableValue>(
         test.sequence.map { MinimalEquatableValue($0) })
@@ -896,7 +896,7 @@ SequenceTypeAlgorithms.test("equalElements/WhereElementIsEquatable") {
         test.other.map { MinimalEquatableValue($0) })
       expectEqual(
         test.expected,
-        s._prext_equalElements(other),
+        s._prext_elementsEqual(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.expectedLeftoverSequence, s._prext_map { $0.value },
@@ -914,7 +914,7 @@ SequenceTypeAlgorithms.test("equalElements/WhereElementIsEquatable") {
         test.other.map { MinimalEquatableValue($0) })
       expectEqual(
         test.expected,
-        s._prext_equalElements(other),
+        s._prext_elementsEqual(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.sequence, s._prext_map { $0.value },
@@ -926,8 +926,8 @@ SequenceTypeAlgorithms.test("equalElements/WhereElementIsEquatable") {
   }
 }
 
-SequenceTypeAlgorithms.test("equalElements/Predicate") {
-  for test in equalElementsTests {
+SequenceTypeAlgorithms.test("elementsEqual/Predicate") {
+  for test in elementsEqualTests {
     if true {
       let s = MinimalSequence<OpaqueValue<Int>>(
         test.sequence.map { OpaqueValue($0) })
@@ -935,7 +935,7 @@ SequenceTypeAlgorithms.test("equalElements/Predicate") {
         test.other.map { OpaqueValue($0) })
       expectEqual(
         test.expected,
-        s._prext_equalElements(other) { $0.value == $1.value },
+        s._prext_elementsEqual(other) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.expectedLeftoverSequence, s._prext_map { $0.value },
@@ -953,7 +953,7 @@ SequenceTypeAlgorithms.test("equalElements/Predicate") {
         test.other.map { OpaqueValue($0) })
       expectEqual(
         test.expected,
-        s._prext_equalElements(other) { $0.value == $1.value },
+        s._prext_elementsEqual(other) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.sequence, s._prext_map { $0.value },

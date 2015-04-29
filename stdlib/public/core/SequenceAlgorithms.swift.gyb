@@ -150,7 +150,7 @@ else:
 % end
 
 //===----------------------------------------------------------------------===//
-// equalElements()
+// elementsEqual()
 //===----------------------------------------------------------------------===//
 
 % # Generate two versions: with explicit predicates and with
@@ -173,7 +173,7 @@ else:
 }%
 
   ${comment}
-  final public func _prext_equalElements<
+  final public func _prext_elementsEqual<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
