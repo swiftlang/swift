@@ -18,8 +18,8 @@ public struct RangeGenerator<
   public typealias Element = T
 
   /// Construct an instance that traverses the elements of `bounds`
-  @transparent public
-  init(_ bounds: Range<T>) {
+  @transparent
+  public init(_ bounds: Range<T>) {
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
   }
@@ -71,11 +71,11 @@ public struct RangeGenerator<
 /// subscripting with `T` is a compile-time error:
 ///
 ///     // error: could not find an overload for 'subscript'...
-///     println( Range<Int>(start:-99, end:100)[0] )
+///     println(Range<Int>(start: -99, end: 100)[0])
 ///
 /// However, subscripting that range still works in a generic context:
 ///
-///     func brackets<T :ForwardIndexType>(x: Range<T>, i: T) -> T {
+///     func brackets<T : ForwardIndexType>(x: Range<T>, i: T) -> T {
 ///       return x[i] // Just forward to subscript
 ///     }
 ///     println(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
@@ -94,8 +94,8 @@ public struct Range<
 
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
-  @transparent public
-  init(start: T, end: T) {
+  @transparent
+  public init(start: T, end: T) {
     _startIndex = start
     _endIndex = end
   }
@@ -181,7 +181,6 @@ public struct Range<
     return "Range(\(String(reflecting: startIndex))..<\(String(reflecting: endIndex)))"
   }
 
-
   var _startIndex: T
   var _endIndex: T
 }
@@ -194,7 +193,8 @@ public func ==<T>(lhs: Range<T>, rhs: Range<T>) -> Bool {
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
 @transparent
-public func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos) -> Range<Pos> {
+public func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos)
+  -> Range<Pos> {
   return Range(start: minimum, end: maximum)
 }
 
@@ -211,7 +211,7 @@ public func ... <Pos : ForwardIndexType> (
 /// Forms a half-open range that contains `start`, but not
 /// `end`.  Requires: `start <= end`
 @transparent
-public func ..< <Pos : ForwardIndexType where Pos: Comparable> (
+public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
   _precondition(start <= end, "Can't form Range with end < start")
@@ -221,7 +221,7 @@ public func ..< <Pos : ForwardIndexType where Pos: Comparable> (
 /// Forms a closed range that contains both `start` and `end`.
 /// Requres: `start <= end`
 @transparent
-public func ... <Pos : ForwardIndexType where Pos: Comparable> (
+public func ... <Pos : ForwardIndexType where Pos : Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
   _precondition(start <= end, "Can't form Range with end < start")
@@ -229,7 +229,7 @@ public func ... <Pos : ForwardIndexType where Pos: Comparable> (
   return Range(start: start, end: end.successor())
 }
 
-public func ~= <I : ForwardIndexType where I: Comparable> (
+public func ~= <I : ForwardIndexType where I : Comparable> (
   pattern: Range<I>, value: I
 ) -> Bool {
   // convert to an interval and check that.
