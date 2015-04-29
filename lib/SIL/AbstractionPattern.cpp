@@ -235,7 +235,10 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
     // If we imported as a tuple type, construct the special
     // method-formal-parameters abstraction pattern.
     if (isa<TupleType>(swiftEltType)) {
-      assert(method->parameters().size() ==
+      // This assertion gets messed up by variadic methods that we've
+      // imported as non-variadic.
+      assert(method->isVariadic() ||
+             method->parameters().size() ==
              cast<TupleType>(swiftEltType)->getNumElements() +
                unsigned(errorInfo.hasErrorParameter()));
       return getObjCMethodFormalParamTuple(swiftEltType, method, errorInfo);
