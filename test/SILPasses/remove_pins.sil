@@ -22,6 +22,8 @@ sil [_semantics "array.make_mutable"] @make_mutable : $@convention(method) (@ino
 
 sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed ArrayInt) -> ()
 
+sil @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@convention(c) (UnsafePointer<HeapObject>) -> Bool
+
 sil @user : $@convention(thin) (Builtin.NativeObject) -> Bool
 
 ///////////
@@ -83,21 +85,22 @@ bb0(%0 : $*ArrayInt):
 }
 
 // CHECK-LABEL: sil @dont_remove_pins_across_pin_read
+// CHECK: [[PINREAD:%.*]] = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native
 // CHECK: strong_pin
-// CHECK: is_unique_or_pinned
+// CHECK: apply [[PINREAD]]
 // CHECK: strong_unpin
 
-sil @dont_remove_pins_across_pin_read : $@convention(thin) (@inout ArrayInt) -> Builtin.Int1 {
+sil @dont_remove_pins_across_pin_read : $@convention(thin) (@inout ArrayInt) -> Bool {
 bb0(%0 : $*ArrayInt):
   %1 = load %0: $*ArrayInt
-  %2 = struct_element_addr %0 : $*ArrayInt, #ArrayInt.buffer
-  %3 = struct_element_addr %2 : $*ArrayIntBuffer, #ArrayIntBuffer.storage
-  %4 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
-  %5 = struct_extract %4 : $ArrayIntBuffer, #ArrayIntBuffer.storage
-  %6 = strong_pin %5 : $Builtin.NativeObject
-  %7 = is_unique_or_pinned %3 : $*Builtin.NativeObject
+  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
+  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@convention(c) (UnsafePointer<HeapObject>) -> Bool
+  %6 = strong_pin %3 : $Builtin.NativeObject
+  %7 = apply %5(%4) : $@convention(c) (UnsafePointer<HeapObject>) -> Bool
   strong_unpin %6 : $Optional<Builtin.NativeObject>
-  return %7 : $Builtin.Int1
+  return %7 : $Bool
 }
 
 // CHECK-LABEL: sil @remove_pins_with_inert_rcidentity_uses : $@convention(thin) (@inout ArrayInt) -> () {
@@ -109,6 +112,7 @@ bb0(%0 : $*ArrayInt):
   %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
   %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@convention(c) (UnsafePointer<HeapObject>) -> Bool
   %6 = strong_pin %3 : $Builtin.NativeObject
   %7 = integer_literal $Builtin.Int1, 0
   %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
@@ -124,17 +128,18 @@ bb0(%0 : $*ArrayInt):
 sil @cant_remove_pins_with_escaping_rcidentity_use : $@convention(thin) (@inout ArrayInt) -> Bool {
 bb0(%0 : $*ArrayInt):
   %1 = load %0: $*ArrayInt
-  %4 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
-  %5 = struct_extract %4 : $ArrayIntBuffer, #ArrayIntBuffer.storage
-  %6 = strong_pin %5 : $Builtin.NativeObject
+  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
+  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@convention(c) (UnsafePointer<HeapObject>) -> Bool
+  %6 = strong_pin %3 : $Builtin.NativeObject
   %7 = integer_literal $Builtin.Int1, 0
   %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
   %9 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 0
   strong_unpin %9 : $Optional<Builtin.NativeObject>
-  %11 = unchecked_enum_data %6 : $Optional<Builtin.NativeObject>, #Optional.Some!enumelt.1
-  %12 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> Bool
-  %13 = apply %12(%11) : $@convention(thin) (Builtin.NativeObject) -> Bool
-  return %13 : $Bool
+  %10 = unchecked_trivial_bit_cast %9 : $Optional<Builtin.NativeObject> to $UnsafePointer<HeapObject>
+  %11 = apply %5(%10) : $@convention(c) (UnsafePointer<HeapObject>) -> Bool
+  return %11 : $Bool
 }
 
 // Make sure we ignore the uses of %10 and %12.
@@ -151,6 +156,7 @@ bb0(%0 : $*ArrayInt):
   %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
   %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@convention(c) (UnsafePointer<HeapObject>) -> Bool
   %6 = strong_pin %3 : $Builtin.NativeObject
   %7 = integer_literal $Builtin.Int1, 0
   %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
@@ -171,6 +177,7 @@ bb0(%0 : $*ArrayInt):
   %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
   %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %5 = function_ref @_swift_isUniquelyReferencedOrPinned_nonNull_native : $@convention(c) (UnsafePointer<HeapObject>) -> Bool
   %6 = strong_pin %3 : $Builtin.NativeObject
   %7 = integer_literal $Builtin.Int1, 0
   %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)

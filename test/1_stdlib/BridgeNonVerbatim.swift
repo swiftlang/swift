@@ -133,7 +133,7 @@ func testScope() {
   // CHECK-NEXT: getObjects yields them at +0: true
   var x = objects[0]
   println("getObjects yields them at +0: "
-    + "\(_isUnique_native(&x))")
+    + "\(_swift_isUniquelyReferenced_native(UnsafePointer(bitPattern:x)))")
 }
 
 autoreleasepool() {

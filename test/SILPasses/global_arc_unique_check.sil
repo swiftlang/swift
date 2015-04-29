@@ -32,13 +32,18 @@ bb2:
   // CHECK-NOT: strong_retain
   // CHECK-NOT: strong_release
   strong_retain %0 : $MD5
+  // function_ref _swift_isUniquelyReferenced_native
+  %172 = function_ref @_swift_isUniquelyReferenced_native : $@convention(thin) (Int32) -> Bool
   %314 = ref_element_addr %0 : $MD5, #MD5.w
   %318 = load %314 : $*Array<UInt32>
   %319 = alloc_stack $Array<UInt32>
   store %318 to %319#1 : $*Array<UInt32>
+  %321 = unchecked_addr_cast %319#1 : $*Array<UInt32> to $*Int32
+  %322 = load %321 : $*Int32
   dealloc_stack %319#0 : $*@local_storage Array<UInt32>
-  %179 = is_unique %314 : $*Array<UInt32>
-  cond_br %179, bb4, bb5 
+  %179 = apply %172(%322) : $@convention(thin) (Int32) -> Bool
+  %180 = struct_extract %179 : $Bool, #Bool.value
+  cond_br %180, bb4, bb5 
 
 // CHECK: bb3
 // CHECK-NEXT: strong_release

@@ -657,13 +657,15 @@ bb3:
 }
 
 sil @arc_user : $@convention(thin) () -> ()
+sil @_swift_isUniquelyReferenced_native : $@convention(thin) (Int32) -> Bool
 
 // The retains here aren't able to be moved to a successor BB.  But we still want to move them as far
 // as possible down the current BB.  The first retain should be moved to above the release_value.
 // The second retain shouldn't move at all
 // The third retain should move below the sadd builtin
 // The fourth retain should move below the arc_user builtin, but above the apply
-// The fifth retain should *NOT* move below is_unique, unless we can prove that the pointers do not
+// The fifth retain should *NOT* move below the apply to
+// _swift_isUniquelyReferenced_native, unless we can prove that the pointers do not
 // alias.
 // And the last retain should remain where it is at the end of the BB.
 //
@@ -677,9 +679,12 @@ sil @arc_user : $@convention(thin) () -> ()
 // CHECK-NEXT: retain_value %3
 // CHECK-NEXT: retain_value %2
 // CHECK-NEXT: apply
-// CHECK-NEXT: integer_literal $Builtin.Word, 1
+// CHECK-NEXT: function_ref _swift_isUniquelyReferenced_native
+// CHECK-NEXT: function_ref @_swift_isUniquelyReferenced_native
+// CHECK-NEXT: integer_literal $Builtin.Int32, 1
+// CHECK-NEXT: struct $Int32 (
 // CHECK-NEXT: retain_value %3
-// CHECK-NEXT: is_unique
+// CHECK-NEXT: apply
 // CHECK-NEXT: retain_value %3
 // CHECK-NEXT: switch_enum
 
@@ -694,8 +699,11 @@ bb0(%0 : $FakeOptional<Builtin.Int32>, %1 : $FakeOptional<Builtin.Int32>, %2 : $
   %1000 = function_ref @arc_user : $@convention(thin) () -> ()
   apply %1000 () : $@convention(thin) () -> ()
   retain_value %3 : $FakeOptional<Builtin.Int32>
-  %500 = integer_literal $Builtin.Word, 1 // Fake pointer bits
-  %501 = is_unique %500 : $Builtin.Word
+  // function_ref _swift_isUniquelyReferenced_native
+  %500 = function_ref @_swift_isUniquelyReferenced_native : $@convention(thin) (Int32) -> Bool
+  %501 = integer_literal $Builtin.Int32, 1
+  %502 = struct $Int32 (%501 : $Builtin.Int32)
+  %503 = apply %500(%502) : $@convention(thin) (Int32) -> Bool
   retain_value %3 : $FakeOptional<Builtin.Int32>
   switch_enum %0 : $FakeOptional<Builtin.Int32>, case #FakeOptional.Some!enumelt.1: bb1, default bb2
 
@@ -1321,17 +1329,22 @@ bb0(%0 : $F):
   return %2 : $()
 }
 
-// Make sure that is_unique stops code motion.
-// CHECK-LABEL: sil @is_unique_stops_codemotion : $@convention(thin) (@inout Builtin.NativeObject) -> () {
-// CHECK: bb0([[IN:%[0-9]+]] : $*Builtin.NativeObject):
-// CHECK: [[LD:%[0-9]+]] = load [[IN]] : $*Builtin.NativeObject
-// CHECK: strong_retain [[LD]] : $Builtin.NativeObject
-// CHECK: is_unique [[IN]] : $*Builtin.NativeObject
-sil @is_unique_stops_codemotion : $@convention(thin) (@inout Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject):
-  %1 = load %0 : $*Builtin.NativeObject
-  strong_retain %1 : $Builtin.NativeObject
-  is_unique %0 : $*Builtin.NativeObject
+// This is not the real signature. We pattern match off the prefix _swift_isUniquelyReferenced
+sil @_swift_isUniquelyReferenced_2 : $@convention(thin) (Builtin.RawPointer) -> ()
+
+// Make sure that isUniquelyReferenced stops code motion.
+// CHECK-LABEL: sil @is_uniquelyreferenced_stops_codemotion : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[IN:%[0-9]+]] : $Builtin.NativeObject):
+// CHECK: [[CAST_RESULT:%[0-9]+]] = unchecked_trivial_bit_cast [[IN]]
+// CHECK: [[FN:%[0-9]+]] = function_ref @_swift_isUniquelyReferenced_2 : $@convention(thin) (Builtin.RawPointer) -> ()
+// CHECK: strong_retain [[IN]] : $Builtin.NativeObject
+// CHECK: apply [[FN]]([[CAST_RESULT]]) : $@convention(thin) (Builtin.RawPointer) -> ()
+sil @is_uniquelyreferenced_stops_codemotion : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = unchecked_trivial_bit_cast %0 : $Builtin.NativeObject to $Builtin.RawPointer
+  %2 = function_ref @_swift_isUniquelyReferenced_2 : $@convention(thin) (Builtin.RawPointer) -> ()
+  apply %2(%1) : $@convention(thin) (Builtin.RawPointer) -> ()
   %9999 = tuple()
   return %9999 : $()
 }

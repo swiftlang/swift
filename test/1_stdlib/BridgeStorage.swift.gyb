@@ -23,7 +23,7 @@
 
 import Swift
 
-//===--- Code mimics stdlib without swizzling ----------------------------===//
+//===--- Code destined for stdlib -----------------------------------------===//
 import SwiftShims
 
 protocol BridgeStorage {
@@ -73,7 +73,8 @@ struct BridgeObject<NativeType : AnyObject, ObjCType : AnyObject>
   }
 
   mutating func isUniquelyReferencedNative() -> Bool {
-    return _getBool(Builtin.isUnique(&object))
+    return _swift_isUniquelyReferencedNonObjC_nonNull(
+      UnsafePointer(rawObject))
   }
 
   var isNative: Bool {
@@ -99,7 +100,8 @@ struct BridgeObject<NativeType : AnyObject, ObjCType : AnyObject>
   mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
     precondition(isNative)
     precondition(spareBits == 0)
-    return _isUnique_native(&object)
+    return _swift_isUniquelyReferenced_nonNull_native(
+      UnsafePointer(rawObject))
   }
 
   var objCInstance: ObjC {
@@ -114,9 +116,8 @@ struct BridgeObject<NativeType : AnyObject, ObjCType : AnyObject>
   var rawObject: Builtin.RawPointer {
     return Builtin.bridgeToRawPointer(object)
   }
-
-  // object declared mutable to be passed to isUnique.
-  var object: AnyObject
+  
+  let object: AnyObject
   let bits: UInt8
 }
 
