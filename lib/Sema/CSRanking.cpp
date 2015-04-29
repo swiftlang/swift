@@ -209,7 +209,8 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
   auto owningType
     = potentialWitness->getDeclContext()->getDeclaredTypeInContext();
   ProtocolConformance *conformance = nullptr;
-  if (!tc.conformsToProtocol(owningType, proto, dc, true, &conformance) ||
+  if (!tc.conformsToProtocol(owningType, proto, dc,
+                             ConformanceCheckFlags::InExpression, &conformance) ||
       !conformance)
     return Comparison::Unordered;
 
@@ -318,7 +319,8 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  if (!tc.conformsToProtocol(modelTy, proto, dc, true))
+  if (!tc.conformsToProtocol(modelTy, proto, dc,
+                             ConformanceCheckFlags::InExpression))
     return SelfTypeRelationship::Unrelated;
 
   return isProtocol1? SelfTypeRelationship::ConformedToBy

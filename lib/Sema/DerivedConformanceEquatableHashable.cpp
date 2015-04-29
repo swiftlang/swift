@@ -364,7 +364,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   if (!tc.conformsToProtocol(intType,
                              C.getProtocol(KnownProtocolKind::Hashable),
                              enumDecl,
-                             /*inExpression=*/false)) {
+                             None)) {
     tc.diagnose(enumDecl->getLoc(), diag::broken_int_hashable_conformance);
     return nullptr;
   }
@@ -372,7 +372,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::IntegerLiteralConvertible);
   if (!tc.conformsToProtocol(intType, intLiteralProto, enumDecl,
-                             /*inExpression=*/false)) {
+                             None)) {
     tc.diagnose(enumDecl->getLoc(),
                 diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;

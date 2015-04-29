@@ -133,11 +133,12 @@ Type Solution::computeSubstitutions(
                && "Archetype out-of-sync");
         ProtocolConformance *conformance = nullptr;
         Type replacement = currentReplacement;
-        bool conforms = tc.conformsToProtocol(replacement,
-                                              protoType->getDecl(),
-                                              getConstraintSystem().DC,
-                                              /*expression=*/true,
-                                              &conformance);
+        bool conforms = tc.conformsToProtocol(
+                          replacement,
+                          protoType->getDecl(),
+                          getConstraintSystem().DC,
+                          ConformanceCheckFlags::InExpression,
+                          &conformance);
         (void)isOpenedAnyObject;
         assert((conforms ||
                 firstArchetype->getIsRecursive() ||
@@ -230,7 +231,9 @@ static DeclTy *findNamedWitnessImpl(TypeChecker &tc, DeclContext *dc, Type type,
 
   // Find the member used to satisfy the named requirement.
   ProtocolConformance *conformance = 0;
-  bool conforms = tc.conformsToProtocol(type, proto, dc, true, &conformance);
+  bool conforms = tc.conformsToProtocol(type, proto, dc,
+                                        ConformanceCheckFlags::InExpression,
+                                        &conformance);
   if (!conforms)
     return nullptr;
 
@@ -1413,7 +1416,8 @@ namespace {
       Type valueType = value->getType()->getRValueType();
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
-                                            true, &conformance);
+                                            ConformanceCheckFlags::InExpression,
+                                            &conformance);
       assert(conforms && "Should already have checked the conformance");
       (void)conforms;
 
@@ -1449,12 +1453,12 @@ namespace {
       // Try to find the conformance of the value type to _BridgedToObjectiveC.
       ProtocolConformance *conformance = nullptr;
 
-      bool conformsToBridgedToObjectiveC = tc.conformsToProtocol(
-                                                  valueType,
-                                                  bridgedProto,
-                                                  cs.DC,
-                                                  true,
-                                                  &conformance);
+      bool conformsToBridgedToObjectiveC
+        = tc.conformsToProtocol(valueType,
+                                bridgedProto,
+                                cs.DC,
+                                ConformanceCheckFlags::InExpression,
+                                &conformance);
 
       FuncDecl *fn = nullptr;
 
@@ -1841,7 +1845,8 @@ namespace {
       ProtocolDecl *protocol = tc.getProtocol(
           expr->getLoc(), KnownProtocolKind::StringLiteralConvertible);
 
-      if (!tc.conformsToProtocol(type, protocol, cs.DC, true)) {
+      if (!tc.conformsToProtocol(type, protocol, cs.DC,
+                                 ConformanceCheckFlags::InExpression)) {
         // If the type does not conform to StringLiteralConvertible, it should
         // be ExtendedGraphemeClusterLiteralConvertible.
         protocol = tc.getProtocol(
@@ -1850,7 +1855,8 @@ namespace {
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
-      if (!tc.conformsToProtocol(type, protocol, cs.DC, true)) {
+      if (!tc.conformsToProtocol(type, protocol, cs.DC,
+                                 ConformanceCheckFlags::InExpression)) {
         // ... or it should be UnicodeScalarLiteralConvertible.
         protocol = tc.getProtocol(
             expr->getLoc(),
@@ -1859,7 +1865,8 @@ namespace {
         isGraphemeClusterLiteral = false;
       }
 
-      assert(tc.conformsToProtocol(type, protocol, cs.DC, true));
+      assert(tc.conformsToProtocol(type, protocol, cs.DC,
+                                   ConformanceCheckFlags::InExpression));
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1900,7 +1907,8 @@ namespace {
             expr->getLoc(),
             KnownProtocolKind::_BuiltinUTF16StringLiteralConvertible);
         if (!forceASCII &&
-            tc.conformsToProtocol(type, builtinProtocol, cs.DC, true)) {
+            tc.conformsToProtocol(type, builtinProtocol, cs.DC,
+                                  ConformanceCheckFlags::InExpression)) {
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_BuiltinUTF16StringLiteral,
@@ -2162,7 +2170,8 @@ namespace {
       auto proto = tc.getLiteralProtocol(expr);
       assert(proto && "Missing object literal protocol?");
       ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(conformingType, proto, cs.DC, true,
+      bool conforms = tc.conformsToProtocol(conformingType, proto, cs.DC,
+                                            ConformanceCheckFlags::InExpression,
                                             &conformance);
       (void)conforms;
       assert(conforms && "object literal type conforms to protocol");
@@ -2697,7 +2706,9 @@ namespace {
 
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(arrayTy, arrayProto,
-                                            cs.DC, true, &conformance);
+                                            cs.DC,
+                                            ConformanceCheckFlags::InExpression,
+                                            &conformance);
       (void)conforms;
       assert(conforms && "Type does not conform to protocol?");
 
@@ -2760,7 +2771,9 @@ namespace {
 
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(dictionaryTy, dictionaryProto,
-                                            cs.DC, true, &conformance);
+                                            cs.DC,
+                                            ConformanceCheckFlags::InExpression,
+                                            &conformance);
       if (!conforms)
         return nullptr;
 
@@ -3982,7 +3995,8 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
   SmallVector<ProtocolConformance *, 4> conformances;
   for (auto proto : protocols) {
     ProtocolConformance *conformance = nullptr;
-    bool conforms = tc.conformsToProtocol(fromType, proto, DC, true,
+    bool conforms = tc.conformsToProtocol(fromType, proto, DC,
+                                          ConformanceCheckFlags::InExpression,
                                           &conformance);
     assert(conforms && "Type does not conform to protocol?");
     (void)conforms;
@@ -5187,7 +5201,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   // Check whether this literal type conforms to the builtin protocol.
   ProtocolConformance *builtinConformance = nullptr;
   if (builtinProtocol &&
-      tc.conformsToProtocol(type, builtinProtocol, cs.DC, true,
+      tc.conformsToProtocol(type, builtinProtocol, cs.DC,
+                            ConformanceCheckFlags::InExpression,
                             &builtinConformance)) {
     // Find the builtin argument type we'll use.
     Type argType;
@@ -5228,7 +5243,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   // This literal type must conform to the (non-builtin) protocol.
   assert(protocol && "requirements should have stopped recursion");
   ProtocolConformance *conformance = nullptr;
-  bool conforms = tc.conformsToProtocol(type, protocol, cs.DC, true,
+  bool conforms = tc.conformsToProtocol(type, protocol, cs.DC,
+                                        ConformanceCheckFlags::InExpression,
                                         &conformance);
   assert(conforms && "must conform to literal protocol");
   (void)conforms;

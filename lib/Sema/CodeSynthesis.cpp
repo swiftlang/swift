@@ -693,7 +693,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // recovery by synthesizing without the copy call.
   auto *CopyingProto = getNSCopyingProtocol(TC, VD->getDeclContext());
   if (!CopyingProto || !TC.conformsToProtocol(UnderlyingType, CopyingProto,
-                                              VD->getDeclContext(), false)) {
+                                              VD->getDeclContext(), None)) {
     TC.diagnose(VD->getLoc(), diag::nscopying_doesnt_conform);
     return Val;
   }

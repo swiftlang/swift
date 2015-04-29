@@ -378,8 +378,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   if (!equatableProto)
     return nullptr;
 
-  if (!tc.conformsToProtocol(rawType, equatableProto, enumDecl,
-                             /*inExpression=*/false)) {
+  if (!tc.conformsToProtocol(rawType, equatableProto, enumDecl, None)) {
     SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
     tc.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
     return nullptr;

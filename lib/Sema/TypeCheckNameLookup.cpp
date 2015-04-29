@@ -98,10 +98,15 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
     // lookup.
     this->forceExternalDeclMembers(nominalLookupType);
 
+    ConformanceCheckOptions conformanceOptions;
+    if (isKnownPrivate)
+      conformanceOptions |= ConformanceCheckFlags::InExpression;
+
     for (auto member : protocolMembers) {
       auto proto = cast<ProtocolDecl>(member->getDeclContext());
       ProtocolConformance *conformance = nullptr;
-      if (conformsToProtocol(type, proto, dc, isKnownPrivate, &conformance) &&
+      if (conformsToProtocol(type, proto, dc, conformanceOptions,
+                             &conformance) &&
           conformance) {
         // FIXME: Just swap in this result, once
         // forceExternalDeclMembers() is dead.
@@ -182,6 +187,10 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
   if (result.Results.empty()) {
     // We couldn't find any normal declarations. Let's try inferring
     // associated types.
+    ConformanceCheckOptions options;
+    if (isKnownPrivate)
+      options |= ConformanceCheckFlags::InExpression;
+
     for (AssociatedTypeDecl *assocType : inferredAssociatedTypes) {
       // If the type does not actually conform to the protocol, skip this
       // member entirely.
@@ -190,8 +199,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
       // particular witness.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
       ProtocolConformance *conformance = nullptr;
-      if (!conformsToProtocol(type, protocol, dc, isKnownPrivate,
-                              &conformance) ||
+      if (!conformsToProtocol(type, protocol, dc, options, &conformance) ||
           !conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;

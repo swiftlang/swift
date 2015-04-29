@@ -260,6 +260,15 @@ enum class ObjCReason {
   MemberOfObjCProtocol
 };
 
+/// Flags that control protocol conformance checking.
+enum class ConformanceCheckFlags {
+  /// Whether we're performing the check from within an expression.
+  InExpression = 0x01,
+};
+
+/// Options that control protocol conformance checking.
+typedef OptionSet<ConformanceCheckFlags> ConformanceCheckOptions;
+
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final : public LazyResolver {
@@ -1071,9 +1080,7 @@ public:
   /// \param DC The context in which to check conformance. This affects, for
   /// example, extension visibility.
   ///
-  /// \param InExpression If true, this conformance is being checked as part of
-  /// type-checking an expression. This results in dependencies being treated
-  /// slightly differently.
+  /// \param options Options that control the conformance check.
   ///
   /// \param Conformance If non-NULL, and the type does conform to the given
   /// protocol, this will be set to the protocol conformance mapping that
@@ -1092,7 +1099,7 @@ public:
   /// declared conformance of \c T to \c Proto. It does not mean that this
   /// conformance is valid. Check \c (*Conformance)->getState() for that.
   bool conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
-                          bool InExpression,
+                          ConformanceCheckOptions options,
                           ProtocolConformance **Conformance = 0,
                           SourceLoc ComplainLoc = SourceLoc());
 

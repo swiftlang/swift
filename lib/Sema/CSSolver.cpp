@@ -888,7 +888,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       for (auto proto : literalProtocols) {
         do {
           // If the type conforms to this protocol, we're covered.
-          if (tc.conformsToProtocol(testType, proto, cs.DC, true)) {
+          if (tc.conformsToProtocol(testType, proto, cs.DC,
+                                    ConformanceCheckFlags::InExpression)) {
             coveredLiteralProtocols.insert(proto);
             break;
           }

@@ -704,7 +704,7 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
            [=](Module &M, Type T, ProtocolDecl *Protocol)
            -> ProtocolConformance* {
              ProtocolConformance *c;
-             if (conformsToProtocol(T, Protocol, &M, /*expression=*/false, &c))
+             if (conformsToProtocol(T, Protocol, &M, None, &c))
                return c;
              return nullptr;
            });
@@ -2570,7 +2570,7 @@ static LiteralExpr *getAutoIncrementedLiteralExpr(TypeChecker &TC,
       TC.getProtocol(forElt->getLoc(),
                      KnownProtocolKind::IntegerLiteralConvertible);
     if (!TC.conformsToProtocol(rawTy, ilcProto, forElt->getDeclContext(),
-                               false)) {
+                               None)) {
       TC.diagnose(forElt->getLoc(),
                   diag::enum_non_integer_convertible_raw_type_no_value);
       return nullptr;
@@ -2638,8 +2638,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
                                           literalProtocolKinds.end(),
                                           [&](KnownProtocolKind protoKind) {
       ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
-      return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(),
-                                   /*inExpression*/false);
+      return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
     });
 
     if (!literalConvertible) {
@@ -6476,7 +6475,8 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     // For literal-convertible types, form the corresponding literal.
 #define CHECK_LITERAL_PROTOCOL(Kind, String) \
     if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) { \
-      if (tc.conformsToProtocol(type, proto, dc, true)) \
+      if (tc.conformsToProtocol(type, proto, dc, \
+                                ConformanceCheckFlags::InExpression)) \
         return std::string(String); \
     }
     CHECK_LITERAL_PROTOCOL(ArrayLiteralConvertible, "[]")

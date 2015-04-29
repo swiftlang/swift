@@ -937,7 +937,7 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
         ProtocolConformance *Conformance = nullptr;
         // FIXME: This should track whether this should result in a private or
         // non-private dependency.
-        if (conformsToProtocol(T, Proto, DC, false, &Conformance, ComplainLoc)){
+        if (conformsToProtocol(T, Proto, DC, None, &Conformance, ComplainLoc)) {
           Conformances.push_back(Conformance);
         } else {
           return true;

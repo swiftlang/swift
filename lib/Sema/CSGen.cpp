@@ -256,7 +256,7 @@ namespace {
           if (CS.TC.conformsToProtocol(otherArgTy,
                                        proto,
                                        CS.DC,
-                                       true)) {
+                                       ConformanceCheckFlags::InExpression)) {
             return otherArgTy->isEqual(paramTy);
           }
         } else if (auto defaultTy = CS.TC.getDefaultType(proto, CS.DC)) {
@@ -295,7 +295,8 @@ namespace {
     
     ProtocolConformance *conformance = nullptr;
     if (!CS.TC.conformsToProtocol(paramTy, equatableProto,
-                                  CS.DC, true, &conformance))
+                                  CS.DC, ConformanceCheckFlags::InExpression,
+                                  &conformance))
       return;
     if (!conformance)
       return;

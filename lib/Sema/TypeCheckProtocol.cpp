@@ -1534,7 +1534,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   bool isError = replacement->is<ErrorType>();
   for (auto proto : archetype->getConformsTo()) {
     ProtocolConformance *conformance = nullptr;
-    bool conforms = tc.conformsToProtocol(replacement, proto, dc, false,
+    bool conforms = tc.conformsToProtocol(replacement, proto, dc, None,
                                           &conformance);
     assert((conforms || isError) &&
            "Conformance should already have been verified");
@@ -2402,7 +2402,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 
   // Check protocol conformances.
   for (auto reqProto : assocType->getConformingProtocols(&tc)) {
-    if (!tc.conformsToProtocol(type, reqProto, dc, false))
+    if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
   }
 
@@ -3710,7 +3710,7 @@ checkConformsToProtocol(TypeChecker &TC,
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getInheritedProtocols(&TC)) {
     ProtocolConformance *InheritedConformance = nullptr;
-    if (TC.conformsToProtocol(T, InheritedProto, DC, false,
+    if (TC.conformsToProtocol(T, InheritedProto, DC, None,
                               &InheritedConformance, ComplainLoc)) {
       if (!conformance->hasInheritedConformance(InheritedProto))
         conformance->setInheritedConformance(InheritedProto,
@@ -3739,9 +3739,12 @@ checkConformsToProtocol(TypeChecker &TC,
 }
 
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                     DeclContext *DC, bool InExpression,
+                                     DeclContext *DC,
+                                     ConformanceCheckOptions options,
                                      ProtocolConformance **Conformance,
                                      SourceLoc ComplainLoc) {
+  bool InExpression = options.contains(ConformanceCheckFlags::InExpression);
+  
   const DeclContext *topLevelContext = DC->getModuleScopeContext();
   auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
     // Record that we depend on the type's conformance.

@@ -1024,7 +1024,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   if (!ApplicationDelegateProto ||
       !TC.conformsToProtocol(CD->getDeclaredType(), ApplicationDelegateProto,
-                             CD, /*inExpression=*/false)) {
+                             CD, None)) {
     TC.diagnose(attr->getLocation(),
                 diag::attr_ApplicationMain_not_ApplicationDelegate,
                 applicationMainKind);

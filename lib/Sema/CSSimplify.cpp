@@ -1817,7 +1817,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       
       // Bridging from an ErrorType to an Objective-C NSError.
       auto errorType = TC.Context.getProtocol(KnownProtocolKind::_ErrorType);
-      if (TC.conformsToProtocol(type1, errorType, DC, /*expr*/ true))
+      if (TC.conformsToProtocol(type1, errorType, DC,
+                                ConformanceCheckFlags::InExpression))
         if (auto NSErrorTy = TC.getNSErrorType(DC))
           if (type2->isEqual(NSErrorTy))
             conversionsOrFixes.push_back(
@@ -2298,7 +2299,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     }
   } else {
     // Check whether this type conforms to the protocol.
-    if (TC.conformsToProtocol(type, protocol, DC, true))
+    if (TC.conformsToProtocol(type, protocol, DC,
+                              ConformanceCheckFlags::InExpression))
       return SolutionKind::Solved;
   }
   
@@ -2637,7 +2639,8 @@ static Type getRawRepresentableValueType(TypeChecker &tc, DeclContext *dc,
     return nullptr;
 
   ProtocolConformance *conformance = nullptr;
-  if (!tc.conformsToProtocol(type, proto, dc, true, &conformance))
+  if (!tc.conformsToProtocol(type, proto, dc,
+                             ConformanceCheckFlags::InExpression, &conformance))
     return nullptr;
 
   return tc.getWitnessType(type, proto, conformance, tc.Context.Id_RawValue,
