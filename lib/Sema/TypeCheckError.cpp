@@ -463,7 +463,7 @@ private:
     bool isTryCovered = (!requiresTry || IsInTry);
     if (!isErrorHandled) {
       CurContext.diagnoseUnhandledThrowSite(TC, E, isTryCovered);
-    } else if (!isTryCovered) {
+    } else if (!isTryCovered && !TC.Context.LangOpts.EnableThrowWithoutTry) {
       TC.diagnose(E->getLoc(), diag::throwing_call_without_try);
     }
   }

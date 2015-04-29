@@ -211,6 +211,9 @@ def enable_objc_implicit_properties :
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
+def enable_throw_without_try : Flag<["-"], "enable-throw-without-try">,
+  HelpText<"Allow throwing function calls without 'try'">;
+
 def import_module : Separate<["-"], "import-module">,
   HelpText<"Implicitly import the specified module">;
 
