@@ -1293,10 +1293,26 @@ public:
     // initializing constructor).
     auto nominal = ctorRef->getDecl()->getDeclContext()
                      ->getDeclaredTypeOfContext()->getAnyNominal();
-    bool useAllocatingCtor = isa<StructDecl>(nominal) ||
-                             isa<EnumDecl>(nominal) ||
-                             isa<ProtocolDecl>(nominal) ||
-                             ctorRef->getDecl()->isFactoryInit();
+    bool useAllocatingCtor;
+    
+    // Value types only have allocating initializers.
+    if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
+      useAllocatingCtor = true;
+    // Protocols only witness allocating initializers, except for @objc
+    // protocols, which only witness initializing initializers.
+    else if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+      useAllocatingCtor = !proto->isObjC();
+    // Factory initializers are effectively "allocating" initializers with no
+    // corresponding initializing entry point.
+    } else if (ctorRef->getDecl()->isFactoryInit()) {
+      useAllocatingCtor = true;
+    } else {
+      // We've established we're in a class initializer, so we've already
+      // allocated an instance, and only want to delegate its initialization.
+      assert(isa<ClassDecl>(nominal)
+             && "some new kind of init context we haven't implemented");
+      useAllocatingCtor = false;
+    }
 
     // Load the 'self' argument.
     Expr *arg = expr->getArg();
@@ -1310,7 +1326,19 @@ public:
       else
         self = ManagedValue::forUnmanaged(SGF.emitMetatypeOfValue(expr, arg));
     } else {
-      self = SGF.emitRValueAsSingleValue(arg);
+      // If we're in a protocol extension initializer, we haven't allocated
+      // "self" yet at this point. Do so. Use alloc_ref_dynamic since we should
+      // only ever get here in ObjC protocol extensions currently.
+      if (SGF.AllocatorMetatype) {
+        assert(ctorRef->getDecl()->isObjC()
+               && "only expect to delegate an initializer from an allocator "
+                  "in objc protocol extensions");
+        
+        self = allocateObjCObject(
+                        ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg);
+      } else {
+        self = SGF.emitRValueAsSingleValue(arg);
+      }
     }
 
     CanType selfFormalType = arg->getType()->getCanonicalType();

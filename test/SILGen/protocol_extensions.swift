@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-silgen %s | FileCheck %s
 
 public protocol P1 {
   func reqP1a()
@@ -272,8 +272,6 @@ protocol ClassInitRequirement: class {
   init(c: C)
 }
 
-class Butt: ClassInitRequirement { required init(c: C) { } }
-
 extension ClassInitRequirement {
   // CHECK-LABEL: sil hidden @_TFP19protocol_extensions20ClassInitRequirementCUS0___fMQPS0_FT1dCS_1D_S1_ : $@convention(thin) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
@@ -282,5 +280,30 @@ extension ClassInitRequirement {
   // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_UP]], [[SELF_TYPE]])
   init(d: D) {
     self.init(c: d)
+  }
+}
+
+@objc class OC {}
+@objc class OD: OC {}
+
+@objc protocol ObjCInitRequirement {
+  init(c: OC, d: OC)
+}
+
+func foo(t: ObjCInitRequirement.Type, c: OC) -> ObjCInitRequirement {
+  return t(c: OC(), d: OC())
+}
+
+extension ObjCInitRequirement {
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions19ObjCInitRequirementCUS0___fMQPS0_FT1dCS_2OD_S1_ : $@convention(thin) <Self where Self : ObjCInitRequirement> (@owned OD, @thick Self.Type) -> @owned Self
+  // CHECK:       bb0([[ARG:%.*]] : $OD, [[SELF_TYPE:%.*]] : $@thick Self.Type):
+  // CHECK:         [[OBJC_SELF_TYPE:%.*]] = thick_to_objc_metatype [[SELF_TYPE]]
+  // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic [objc] [[OBJC_SELF_TYPE]] : $@objc_metatype Self.Type, $Self
+  // CHECK:         [[WITNESS:%.*]] = witness_method [volatile] $Self, #ObjCInitRequirement.init!initializer.1.foreign : $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjCInitRequirement> (OC, OC, @owned τ_0_0) -> @owned τ_0_0
+  // CHECK:         [[UPCAST1:%.*]] = upcast [[ARG]]
+  // CHECK:         [[UPCAST2:%.*]] = upcast [[ARG]]
+  // CHECK:         apply [[WITNESS]]<Self>([[UPCAST1]], [[UPCAST2]], [[SELF]])
+  init(d: OD) {
+    self.init(c: d, d: d)
   }
 }

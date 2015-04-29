@@ -397,6 +397,12 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
   if (vd->isFinal())
     return false;
 
+  // If the decl is an @objc protocol requirement, then the only witness is
+  // objc.
+  if (auto *proto = dyn_cast<ProtocolDecl>(vd->getDeclContext()))
+    if (proto->isObjC())
+      return true;
+
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
     // If a function has an associated Clang node, it's foreign and only has
     // an ObjC entry point.
@@ -414,7 +420,7 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
     // an ObjC entry point.
     if (vd->hasClangNode())
       return true;
-
+    
     return cd->getAttrs().hasAttribute<DynamicAttr>();
   }
   if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
