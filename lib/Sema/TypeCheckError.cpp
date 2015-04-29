@@ -55,20 +55,20 @@ public:
   };
 
 private:
-  static Kind getKindForFunctionType(Type type, unsigned uncurryLevel) {
+  static Kind getKindForFunctionType(Type type, unsigned numBodyArgs) {
     // If type-checking didn't give us a sensible type, conservatively
     // say that it throws.
     if (!type) return Kind::Handled;
 
+    assert(numBodyArgs > 0);
     while (true) {
       FunctionType *fnType = type->getAs<FunctionType>();
       if (!fnType) return Kind::Handled;
-      if (uncurryLevel == 0) {
+      if (--numBodyArgs == 0) {
         return fnType->getExtInfo().throws()
                  ? Kind::Handled : Kind::NonThrowingFunction;
       }
 
-      uncurryLevel--;
       type = fnType->getResult();
     }
   }
