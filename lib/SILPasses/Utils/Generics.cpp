@@ -79,15 +79,6 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     return ApplySite();
   }
 
-  // If there are any incomplete conformances, we cannot specialize.
-  // FIXME: Semantic analysis should ensure that this never happens.
-  for (auto sub : Apply.getSubstitutions()) {
-    for (auto conformance : sub.getConformances()) {
-      if (conformance && conformance->isIncomplete())
-        return ApplySite();
-    }
-  }
-
   llvm::SmallString<64> ClonedName;
   {
     llvm::raw_svector_ostream buffer(ClonedName);
