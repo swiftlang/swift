@@ -264,10 +264,19 @@ enum class ObjCReason {
 enum class ConformanceCheckFlags {
   /// Whether we're performing the check from within an expression.
   InExpression = 0x01,
+  /// Whether we will be using the conformance in the AST.
+  ///
+  /// This implies that the conformance will have to be complete.
+  Used = 0x02
 };
 
 /// Options that control protocol conformance checking.
 typedef OptionSet<ConformanceCheckFlags> ConformanceCheckOptions;
+
+inline ConformanceCheckOptions operator|(ConformanceCheckFlags lhs,
+                                         ConformanceCheckFlags rhs) {
+  return ConformanceCheckOptions(lhs) | rhs;
+}
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
@@ -282,6 +291,10 @@ public:
 
   /// \brief The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
+
+  /// The list of protocol conformances that were "used" and will need to be
+  /// completed before type checking is considered complete.
+  llvm::SetVector<NormalProtocolConformance *> UsedConformances;
 
   /// The list of nominal type declarations that have been validated
   /// during type checking.

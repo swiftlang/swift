@@ -137,7 +137,8 @@ Type Solution::computeSubstitutions(
                           replacement,
                           protoType->getDecl(),
                           getConstraintSystem().DC,
-                          ConformanceCheckFlags::InExpression,
+                          (ConformanceCheckFlags::InExpression|
+                           ConformanceCheckFlags::Used),
                           &conformance);
         (void)isOpenedAnyObject;
         assert((conforms ||
@@ -3996,7 +3997,8 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
   for (auto proto : protocols) {
     ProtocolConformance *conformance = nullptr;
     bool conforms = tc.conformsToProtocol(fromType, proto, DC,
-                                          ConformanceCheckFlags::InExpression,
+                                          (ConformanceCheckFlags::InExpression|
+                                           ConformanceCheckFlags::Used),
                                           &conformance);
     assert(conforms && "Type does not conform to protocol?");
     (void)conforms;

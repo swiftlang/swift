@@ -3744,7 +3744,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      ProtocolConformance **Conformance,
                                      SourceLoc ComplainLoc) {
   bool InExpression = options.contains(ConformanceCheckFlags::InExpression);
-  
+
   const DeclContext *topLevelContext = DC->getModuleScopeContext();
   auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
     // Record that we depend on the type's conformance.
@@ -3777,6 +3777,15 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     if (Conformance)
       *Conformance = lookupResult.getPointer();
     recordDependency(lookupResult.getPointer());
+
+    // If we're using this conformance and it is incomplete, queue it for
+    // completion.
+    if (options.contains(ConformanceCheckFlags::Used) &&
+        lookupResult.getPointer() &&
+        lookupResult.getPointer()->isIncomplete()) {
+      auto normalConf = lookupResult.getPointer()->getRootNormalConformance();
+      UsedConformances.insert(normalConf);
+    }
     return true;
 
   case ConformanceKind::DoesNotConform:

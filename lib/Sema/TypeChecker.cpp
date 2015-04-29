@@ -516,13 +516,22 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       }
     }
 
+    // Complete any conformances that we used.
+    for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
+      auto conformance = TC.UsedConformances[i];
+      if (conformance->isIncomplete())
+        TC.checkConformance(conformance);
+    }
+    TC.UsedConformances.clear();
+
     TC.definedFunctions.insert(TC.definedFunctions.end(),
                                TC.implicitlyDefinedFunctions.begin(),
                                TC.implicitlyDefinedFunctions.end());
     TC.implicitlyDefinedFunctions.clear();
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
-           currentExternalDef < TC.Context.ExternalDefinitions.size());
+           currentExternalDef < TC.Context.ExternalDefinitions.size() ||
+           !TC.UsedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more sane.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
