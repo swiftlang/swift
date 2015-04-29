@@ -300,6 +300,15 @@ namespace {
 
 class LSBBForwarder;
 
+using StoreList = SmallVector<StoreInst *, 8>;
+
+/// The predecessor order in StoreList. We have one StoreInst for each
+/// predecessor in StoreList.
+using PredOrderInStoreList = SmallVector<SILBasicBlock *, 8>;
+
+/// Map an address to a list of StoreInst, one for each predecessor.
+using CoveredStoreMap = llvm::DenseMap<SILValue, StoreList>;
+
 /// This class stores global state that we use when processing and also drives
 /// the computation. We put its interface at the top for use in other parts of
 /// the pass which may want to use this global information.
@@ -332,6 +341,10 @@ public:
   ~LSContext() = default;
 
   bool runIteration();
+
+  /// Remove all LSValues from all LSBBForwarders which contain the load/store
+  /// instruction \p I.
+  void stopTrackingInst(SILInstruction *I, CoveredStoreMap &StoreMap);
 
   AliasAnalysis *getAA() const { return AA; }
   PostDominanceInfo *getPDI() const { return PDI; }
@@ -422,8 +435,15 @@ public:
 
   /// Returns the set of insts represented by this LSValue.
   ArrayRef<SILInstruction *> getInsts() const { return Insts; }
-
-  MutableArrayRef<SILInstruction *> getInsts() { return Insts; }
+ 
+  /// Returns true if the value contains the instruction \p Inst.
+  bool containsInst(SILInstruction *Inst) const {
+    for (SILInstruction *I : Insts) {
+      if (I == Inst)
+        return true;
+    }
+    return false;
+  }
 
 #ifndef NDEBUG
   friend raw_ostream &operator<<(raw_ostream &os, const LSValue &Val) {
@@ -597,15 +617,6 @@ public:
 
 namespace {
 
-using StoreList = SmallVector<StoreInst *, 8>;
-
-/// The predecessor order in StoreList. We have one StoreInst for each
-/// predecessor in StoreList.
-using PredOrderInStoreList = SmallVector<SILBasicBlock *, 8>;
-
-/// Map an address to a list of StoreInst, one for each predecessor.
-using CoveredStoreMap = llvm::DenseMap<SILValue, StoreList>;
-
 /// State of the load store forwarder in one basic block.
 ///
 /// An invariant of this pass is that a SILValue can only be in one of Stores
@@ -639,6 +650,30 @@ public:
 
   SILBasicBlock *getBB() const { return BB; }
 
+  /// Removes an LSStore or LSLoad if it contains instruction \p I.
+  /// Returns true if \p I was found and an LSStore/LSLoad was removed.
+  bool removeIfContainsInst(SILInstruction *I) {
+    if (auto *SI = dyn_cast<StoreInst>(I)) {
+      auto StoreIter = Stores.find(SI->getDest());
+      if (StoreIter != Stores.end() && StoreIter->second.containsInst(I)) {
+        Stores.erase(StoreIter);
+        return true;
+      }
+      return false;
+    }
+    auto LoadIter = Loads.find(cast<LoadInst>(I)->getOperand());
+    if (LoadIter != Loads.end() && LoadIter->second.containsInst(I)) {
+      Loads.erase(LoadIter);
+      return true;
+    }
+    return false;
+  }
+
+  void eraseValue(SILValue Addr) {
+    Stores.erase(Addr);
+    Loads.erase(Addr);
+  }
+  
   /// Merge in the states of all predecessors.
   void mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                              unsigned> &BBToBBIDMap,
@@ -676,16 +711,13 @@ public:
     StoreMap.erase(Addr);
   }
 
-  /// Stop tracking any state on the address operaned on by I.
-  void stopTrackingAddress(SILInstruction *I, CoveredStoreMap &StoreMap) {
-    SILValue Addr = getAddressForLS(I);
-    stopTrackingAddress(Addr, StoreMap);
-  }
+  /// Delete the store that we have mapped to Addr, plus other instructions
+  /// which get dead due to the removed store.
+  void deleteStoreMappedToAddress(SILValue Addr, CoveredStoreMap &StoreMap,
+                                  LSContext &Ctx);
 
-  /// Delete all instructions that we have mapped to Addr.
-  void deleteInstsMappedToAddress(SILValue Addr, CoveredStoreMap &StoreMap);
-
-  void deleteUntrackedInstruction(SILInstruction *I, CoveredStoreMap &StoreMap);
+  void deleteUntrackedInstruction(SILInstruction *I, CoveredStoreMap &StoreMap,
+                                  LSContext &Ctx);
 
   /// Invalidate any loads that we can not prove that Inst does not write to.
   void invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst,
@@ -725,11 +757,6 @@ private:
 
   bool tryToSubstitutePartialAliasLoad(SILValue PrevAddr, SILValue PrevValue,
                                        LoadInst *LI);
-
-  /// Stop tracking all state mapped to Addr and return all instructions
-  /// associated with Addr in V.
-  void stopTrackingAddress(SILValue Addr, CoveredStoreMap &StoreMap,
-                           llvm::SmallVectorImpl<SILInstruction *> &V);
 };
 
 #ifndef NDEBUG
@@ -748,58 +775,41 @@ inline raw_ostream &operator<<(raw_ostream &os,
 
 } // end anonymous namespace
 
-void
-LSBBForwarder::
-stopTrackingAddress(SILValue Addr, CoveredStoreMap &StoreMap,
-                    llvm::SmallVectorImpl<SILInstruction *> &V) {
+void LSBBForwarder::deleteStoreMappedToAddress(SILValue Addr,
+                                               CoveredStoreMap &StoreMap,
+                                               LSContext &Ctx) {
   auto SIIter = Stores.find(Addr);
-  if (SIIter != Stores.end()) {
-    assert((Loads.find(Addr) == Loads.end()) && "An address can never be in "
-           "both the stores and load lists.");
-    for (auto *I : SIIter->second.getInsts())
-      V.push_back(I);
-    Stores.erase(Addr);
-    StoreMap.erase(Addr);
+  if (SIIter == Stores.end())
     return;
-  }
-
-  auto LIIter = Loads.find(Addr);
-  if (LIIter == Loads.end())
-    return;
-
-  for (auto *I : LIIter->second.getInsts())
-    V.push_back(I);
-  Loads.erase(Addr);
-}
-
-void
-LSBBForwarder::
-deleteInstsMappedToAddress(SILValue Addr, CoveredStoreMap &StoreMap) {
+  assert((Loads.find(Addr) == Loads.end()) &&
+         "An address can never be in both the stores and load lists.");
+  
   llvm::SmallVector<SILInstruction *, 8> InstsToDelete;
-  stopTrackingAddress(Addr, StoreMap, InstsToDelete);
 
-  if (InstsToDelete.empty())
-    return;
+  for (auto *SI : SIIter->second.getInsts())
+    InstsToDelete.push_back(SI);
 
   auto UpdateFun = [&](SILInstruction *DeadI) {
-    if (!isa<LoadInst>(DeadI) && !isa<StoreInst>(DeadI))
-      return;
-    stopTrackingAddress(DeadI, StoreMap);
+    Ctx.stopTrackingInst(DeadI, StoreMap);
   };
 
+  // Delete the instructions.
   for (auto *I : InstsToDelete)
     recursivelyDeleteTriviallyDeadInstructions(I, true, UpdateFun);
+
+  assert(Stores.find(Addr) == Stores.end() &&
+         "Addr should be removed during deleting the store instruction");
 }
 
 void
 LSBBForwarder::
-deleteUntrackedInstruction(SILInstruction *I, CoveredStoreMap &StoreMap) {
+deleteUntrackedInstruction(SILInstruction *I,
+                           CoveredStoreMap &StoreMap,
+                           LSContext &Ctx) {
   DEBUG(llvm::dbgs() << "        Deleting all instructions recursively from: "
                      << *I);
   auto UpdateFun = [&](SILInstruction *DeadI) {
-    if (!isa<LoadInst>(DeadI) && !isa<StoreInst>(DeadI))
-      return;
-    stopTrackingAddress(DeadI, StoreMap);
+    Ctx.stopTrackingInst(DeadI, StoreMap);
   };
   recursivelyDeleteTriviallyDeadInstructions(I, true, UpdateFun);
 }
@@ -869,7 +879,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     SILValue LdSrcOp = LdSrc->getOperand();
     auto Iter = Loads.find(LdSrcOp);
     if (Iter != Loads.end() && LdSrcOp == SI->getDest()) {
-      deleteUntrackedInstruction(SI, StoreMap);
+      deleteUntrackedInstruction(SI, StoreMap, Ctx);
       NumDeadStores++;
       return true;
     }
@@ -923,7 +933,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
   }
 
   for (SILValue SIOp : StoresToDelete)
-    deleteInstsMappedToAddress(SIOp, StoreMap);
+    deleteStoreMappedToAddress(SIOp, StoreMap, Ctx);
   for (SILValue SIOp : StoresToStopTracking)
     stopTrackingAddress(SIOp, StoreMap);
 
@@ -1016,7 +1026,7 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
 
     DEBUG(llvm::dbgs() << "        Forwarding store from: " << *Addr);
     SILValue(LI).replaceAllUsesWith(Result);
-    deleteUntrackedInstruction(LI, StoreMap);
+    deleteUntrackedInstruction(LI, StoreMap, Ctx);
     NumForwardedLoads++;
     return true;
   }
@@ -1034,7 +1044,7 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
       DEBUG(llvm::dbgs() << "        Replacing with previous load: "
             << *Result);
       SILValue(LI).replaceAllUsesWith(Result);
-      deleteUntrackedInstruction(LI, StoreMap);
+      deleteUntrackedInstruction(LI, StoreMap, Ctx);
       NumDupLoads++;
       return true;
     }
@@ -1074,7 +1084,7 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
 
     DEBUG(llvm::dbgs() << "        Forwarding from multiple stores: ");
     SILValue(LI).replaceAllUsesWith(Result);
-    deleteUntrackedInstruction(LI, StoreMap);
+    deleteUntrackedInstruction(LI, StoreMap, Ctx);
     NumForwardedLoads++;
     return true;
   }
@@ -1413,6 +1423,44 @@ LSContext::runIteration() {
   }
 
   return Changed;
+}
+
+void LSContext::stopTrackingInst(SILInstruction *I, CoveredStoreMap &StoreMap) {
+  if (auto *SI = dyn_cast<StoreInst>(I)) {
+    StoreMap.erase(SI->getDest());
+  } else if (! isa<LoadInst>(I)) {
+    return;
+  }
+
+  // LSValues may be propagated (= copied) to multiple blocks. Therefore we
+  // have to look into successors as well.
+  SmallVector<SILBasicBlock *, 8> WorkList;
+  SmallPtrSet<SILBasicBlock *, 8> BlocksHandled;
+  
+  // Start with the block of the instruction.
+  WorkList.push_back(I->getParentBB());
+
+  while (!WorkList.empty()) {
+    SILBasicBlock *WorkBB = WorkList.back();
+    WorkList.pop_back();
+    BlocksHandled.insert(WorkBB);
+
+    auto IDIter = BBToBBIDMap.find(WorkBB);
+    if (IDIter == BBToBBIDMap.end())
+      continue;
+    LSBBForwarder &F = BBIDToForwarderMap[IDIter->second];
+
+    // Remove the LSValue if it contains I. If not, we don't have to continue
+    // with the successors.
+    if (!F.removeIfContainsInst(I))
+      continue;
+    
+    // Continue with the successors.
+    for (SILBasicBlock *Succ : WorkBB->getSuccessors()) {
+      if (BlocksHandled.count(Succ) == 0)
+        WorkList.push_back(Succ);
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//

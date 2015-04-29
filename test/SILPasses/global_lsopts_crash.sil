@@ -1,0 +1,51 @@
+// RUN: %target-sil-opt %s -global-load-store-opts -verify | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil_global @test_global : $Int64
+
+// Test that the optimization does not crash when deleting a previous
+// dead store in another block.
+// In this case deleting 'store %32 to %11' when visiting 'store %22 to %11'.
+
+// CHECK-LABEL: sil @testit
+// CHECK: {{^bb1:}}
+// CHECK-NOT: load
+// CHECK: {{^bb2(.*):}}
+// CHECK-NOT: store
+sil @testit : $@convention(thin) () -> () {
+bb0:
+  %11 = global_addr @test_global : $*Int64
+  %12 = integer_literal $Builtin.Int64, 0
+  %13 = struct $Int64 (%12 : $Builtin.Int64)
+  store %13 to %11 : $*Int64
+  %15 = integer_literal $Builtin.Int64, 10
+  %16 = integer_literal $Builtin.Int1, -1
+  %18 = struct_element_addr %11 : $*Int64, #Int64.value
+  br bb2(%12 : $Builtin.Int64)
+
+bb1:
+  %21 = load %18 : $*Builtin.Int64
+  %22 = struct $Int64 (%21 : $Builtin.Int64)
+  store %22 to %11 : $*Int64
+  %r = tuple ()
+  return %r : $()
+
+bb2(%25 : $Builtin.Int64):
+  %28 = load %18 : $*Builtin.Int64
+  %29 = builtin "sadd_with_overflow_Int64"(%28 : $Builtin.Int64, %25 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %30 = tuple_extract %29 : $(Builtin.Int64, Builtin.Int1), 0
+  %32 = struct $Int64 (%30 : $Builtin.Int64)
+  store %32 to %11 : $*Int64
+  %35 = builtin "cmp_eq_Int64"(%30 : $Builtin.Int64, %15 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %35, bb1, bb3
+
+bb3:
+  br bb2(%30 : $Builtin.Int64)
+
+}
+
