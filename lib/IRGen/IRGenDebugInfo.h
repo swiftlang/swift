@@ -90,12 +90,12 @@ class IRGenDebugInfo {
   llvm::SmallString<256> MainFilename;
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;               /// The current working directory.
-  llvm::MDCompileUnit *TheCU = nullptr; /// The current compilation unit.
-  llvm::MDFile *MainFile     = nullptr; /// The main file.
+  llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
+  llvm::DIFile *MainFile = nullptr;     /// The main file.
   llvm::MDModule *MainModule = nullptr; /// The current module.
   llvm::MDNode *EntryPointFn;      /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
-  llvm::MDType *InternalType;      /// Catch-all type for opaque internal types.
+  llvm::DIType *InternalType; /// Catch-all type for opaque internal types.
 
   Location LastDebugLoc;    /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
@@ -172,14 +172,13 @@ public:
   /// \param Fn The IR representation of the function.
   /// \param Rep The calling convention of the function.
   /// \param Ty The signature of the function.
-  llvm::MDSubprogram *emitFunction(SILModule &SILMod, SILDebugScope *DS,
+  llvm::DISubprogram *emitFunction(SILModule &SILMod, SILDebugScope *DS,
                                    llvm::Function *Fn,
                                    SILFunctionTypeRepresentation Rep,
-                                   SILType Ty,
-                                   DeclContext *DeclCtx = nullptr);
+                                   SILType Ty, DeclContext *DeclCtx = nullptr);
 
   /// Emit debug info for a given SIL function.
-  llvm::MDSubprogram *emitFunction(SILFunction &SILFn, llvm::Function *Fn);
+  llvm::DISubprogram *emitFunction(SILFunction &SILFn, llvm::Function *Fn);
 
   /// Convenience function useful for functions without any source
   /// location. Internally calls emitFunction, emits a debug
@@ -220,8 +219,8 @@ public:
 
   /// Emit a dbg.declare or dbg.value intrinsic, depending on Storage.
   void emitDbgIntrinsic(llvm::BasicBlock *BB, llvm::Value *Storage,
-                        llvm::MDLocalVariable *Var, llvm::MDExpression *Expr,
-                        unsigned Line, unsigned Col, llvm::MDLocalScope *Scope,
+                        llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
+                        unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
                         SILDebugScope *DS);
 
   /// Create debug metadata for a global variable.
@@ -251,65 +250,62 @@ private:
   void createImportedModule(StringRef Name, StringRef MangledPrefix,
                             llvm::MDModule *Module, unsigned Line);
 
-  llvm::MDType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
-                           llvm::MDScope *Scope, llvm::MDFile *File);
-  llvm::MDType *getOrCreateType(DebugTypeInfo DbgTy);
-  llvm::MDScope *getOrCreateScope(SILDebugScope *DS);
-  llvm::MDScope *getOrCreateContext(DeclContext *DC);
+  llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
+                           llvm::DIScope *Scope, llvm::DIFile *File);
+  llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy);
+  llvm::DIScope *getOrCreateScope(SILDebugScope *DS);
+  llvm::DIScope *getOrCreateContext(DeclContext *DC);
   llvm::MDNode *createInlinedAt(SILDebugScope *Scope);
 
   StringRef getCurrentDirname();
-  llvm::MDFile *getOrCreateFile(const char *Filename);
-  llvm::MDType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI);
+  llvm::DIFile *getOrCreateFile(const char *Filename);
+  llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI);
   StringRef getName(const FuncDecl &FD);
   StringRef getName(SILLocation L);
   StringRef getMangledName(TypeAliasDecl *Decl);
   StringRef getMangledName(DebugTypeInfo DTI);
-  llvm::MDTypeRefArray createParameterTypes(CanSILFunctionType FnTy,
+  llvm::DITypeRefArray createParameterTypes(CanSILFunctionType FnTy,
                                             DeclContext *DeclCtx);
-  llvm::MDTypeRefArray createParameterTypes(SILType SILTy,
+  llvm::DITypeRefArray createParameterTypes(SILType SILTy,
                                             DeclContext *DeclCtx);
   void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
                            SILType CanTy, DeclContext *DeclCtx);
-  llvm::DebugNodeArray getTupleElements(TupleType *TupleTy,
-                                        llvm::MDScope *Scope,
-                                        llvm::MDFile *File, unsigned Flags,
-                                        DeclContext *DeclContext,
-                                        unsigned &SizeInBits);
-  llvm::MDFile *getFile(llvm::MDScope *Scope);
-  llvm::MDModule *getOrCreateModule(llvm::MDScope *Parent, std::string Name,
-                                    llvm::MDFile *File);
-  llvm::MDScope *getModule(StringRef MangledName);
-  llvm::DebugNodeArray getStructMembers(NominalTypeDecl *D, Type BaseTy,
-                                        llvm::MDScope *Scope,
-                                        llvm::MDFile *File,
-                                        unsigned Flags, unsigned &SizeInBits);
-  llvm::MDCompositeType *
+  llvm::DINodeArray getTupleElements(TupleType *TupleTy, llvm::DIScope *Scope,
+                                     llvm::DIFile *File, unsigned Flags,
+                                     DeclContext *DeclContext,
+                                     unsigned &SizeInBits);
+  llvm::DIFile *getFile(llvm::DIScope *Scope);
+  llvm::MDModule *getOrCreateModule(llvm::DIScope *Parent, std::string Name,
+                                    llvm::DIFile *File);
+  llvm::DIScope *getModule(StringRef MangledName);
+  llvm::DINodeArray getStructMembers(NominalTypeDecl *D, Type BaseTy,
+                                     llvm::DIScope *Scope, llvm::DIFile *File,
+                                     unsigned Flags, unsigned &SizeInBits);
+  llvm::DICompositeType *
   createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
-                   llvm::MDScope *Scope, llvm::MDFile *File, unsigned Line,
+                   llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
                    unsigned SizeInBits, unsigned AlignInBits, unsigned Flags,
-                   llvm::MDType *DerivedFrom, unsigned RuntimeLang,
+                   llvm::DIType *DerivedFrom, unsigned RuntimeLang,
                    StringRef UniqueID);
-  llvm::MDDerivedType *createMemberType(DebugTypeInfo DTI, StringRef Name,
+  llvm::DIDerivedType *createMemberType(DebugTypeInfo DTI, StringRef Name,
                                         unsigned &OffsetInBits,
-                                        llvm::MDScope *Scope,
-                                        llvm::MDFile *File, unsigned Flags);
-  llvm::DebugNodeArray getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
-                                       llvm::MDScope *Scope, llvm::MDFile *File,
-                                       unsigned Flags);
-  llvm::MDCompositeType *createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
+                                        llvm::DIScope *Scope,
+                                        llvm::DIFile *File, unsigned Flags);
+  llvm::DINodeArray getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
+                                    llvm::DIScope *Scope, llvm::DIFile *File,
+                                    unsigned Flags);
+  llvm::DICompositeType *createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
                                         StringRef MangledName,
-                                        llvm::MDScope *Scope,
-                                        llvm::MDFile *File, unsigned Line,
+                                        llvm::DIScope *Scope,
+                                        llvm::DIFile *File, unsigned Line,
                                         unsigned Flags);
-  llvm::MDType *createPointerSizedStruct(llvm::MDScope *Scope,
-                                        StringRef Name, llvm::MDFile *File,
-                                        unsigned Line, unsigned Flags,
-                                        StringRef MangledName);
-  llvm::MDType *createPointerSizedStruct(llvm::MDScope *Scope,
-                                        StringRef Name, llvm::MDType *PointeeTy,
-                                        llvm::MDFile *File, unsigned Line,
-                                        unsigned Flags, StringRef MangledName);
+  llvm::DIType *createPointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
+                                         llvm::DIFile *File, unsigned Line,
+                                         unsigned Flags, StringRef MangledName);
+  llvm::DIType *createPointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
+                                         llvm::DIType *PointeeTy,
+                                         llvm::DIFile *File, unsigned Line,
+                                         unsigned Flags, StringRef MangledName);
   uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy);
   TypeAliasDecl *getMetadataType();
 };

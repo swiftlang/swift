@@ -19,7 +19,7 @@ class MyClass {
     // Test that image is in an alloca, but not an indirect location.
     // CHECK: store {{(i32|i64)}} %0, {{(i32|i64)}}* %[[ALLOCA:.*]],
     // CHECK: call void @llvm.dbg.declare(metadata {{(i32|i64)}}* %[[ALLOCA]], metadata ![[IMAGE:.*]], metadata !{{[0-9]+}})
-    // CHECK: ![[IMAGE]] = !MDLocalVariable(tag: DW_TAG_arg_variable, name: "image"
+    // CHECK: ![[IMAGE]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "image"
     // CHECK-NOT:                           flags:
     // CHECK-SAME:                          line: [[@LINE-7]]
     // CHECK-NOT:                           flags:

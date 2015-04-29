@@ -7,7 +7,7 @@
 // Make sure there is no conflicting dbg.value for this variable.x
 // CHECK-NOT: dbg.value{{.*}}metadata ![[U]]
 class Class <T> {
-// CHECK: ![[U]] = !MDLocalVariable(tag: DW_TAG_arg_variable, name: "y",{{.*}} line: [[@LINE+1]],
+// CHECK: ![[U]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "y",{{.*}} line: [[@LINE+1]],
 	func foo <U> (var x : T, var y : U)
 	{
 		println("hello world")

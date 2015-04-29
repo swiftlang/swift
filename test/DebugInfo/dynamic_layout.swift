@@ -6,7 +6,7 @@ class Class <T> {
 	init(_x : T) {x = _x}
 
   // Verify that the mangling of the decl context of the type U is correct.
-  // CHECK: !MDCompositeType({{.*}}name: "{{[^"]*}}_TtQq_FC14dynamic_layout5Class3foo{{[^"]*}}"
+  // CHECK: !DICompositeType({{.*}}name: "{{[^"]*}}_TtQq_FC14dynamic_layout5Class3foo{{[^"]*}}"
 	func foo <U> (y : U) -> (T,U) {
 		var tuple = (x,y)
 		return tuple

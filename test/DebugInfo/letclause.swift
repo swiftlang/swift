@@ -7,7 +7,7 @@ func peek() -> Symbol? { return Symbol() }
 func foo() {
 // CHECK: define {{.*}}foo
 // CHECK: call void @llvm.dbg.declare(metadata %V9letclause6Symbol undef, metadata ![[S:.*]], metadata !{{[0-9]+}})
-// CHECK: ![[S]] = !MDLocalVariable(tag: DW_TAG_auto_variable, name: "s"
+// CHECK: ![[S]] = !DILocalVariable(tag: DW_TAG_auto_variable, name: "s"
 // CHECK-SAME:                      line: [[@LINE+1]],
   while let s = peek() {
     print(s)

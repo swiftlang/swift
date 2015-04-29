@@ -5,14 +5,14 @@
 // RUN: %target-swift-frontend -c -module-name Foo %s -I %t -g -o - | llvm-dwarfdump - | FileCheck --check-prefix=DWARF %s
 
 // CHECK-DAG: ![[FOOMODULE:[0-9]+]] = !MDModule(name: "Foo"
-// CHECK-DAG: !MDImportedEntity(tag: DW_TAG_imported_module, scope: ![[THISFILE:[0-9]+]], entity: ![[FOOMODULE]]
-// CHECK-DAG: ![[THISFILE]] = !MDFile(filename: "Imports.swift", directory: "{{.*}}test/DebugInfo")
-// CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = !MDFile(filename: "Swift.swiftmodule"
+// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[THISFILE:[0-9]+]], entity: ![[FOOMODULE]]
+// CHECK-DAG: ![[THISFILE]] = !DIFile(filename: "Imports.swift", directory: "{{.*}}test/DebugInfo")
+// CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = !DIFile(filename: "Swift.swiftmodule"
 // CHECK-DAG: ![[SWIFTMODULE:[0-9]+]] = !MDModule(name: "Swift"
-// CHECK-DAG: !MDImportedEntity(tag: DW_TAG_imported_module, scope: ![[SWIFTFILE]], entity: ![[SWIFTMODULE]]
-// CHECK-DAG: ![[BASICFILE:[0-9]+]] = !MDFile(filename: "basic.swiftmodule"
+// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[SWIFTFILE]], entity: ![[SWIFTMODULE]]
+// CHECK-DAG: ![[BASICFILE:[0-9]+]] = !DIFile(filename: "basic.swiftmodule"
 // CHECK-DAG: ![[BASICMODULE:[0-9]+]] = !MDModule(name: "basic"
-// CHECK-DAG: !MDImportedEntity(tag: DW_TAG_imported_module, scope: ![[BASICFILE]], entity: ![[BASICMODULE]]
+// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[BASICFILE]], entity: ![[BASICMODULE]]
 import basic
 import typealias Swift.Optional
 

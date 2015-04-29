@@ -22,10 +22,10 @@
 
 // Sanity check for the regex above.
 // SANITY: {{^ *ret }}
-// SANITY: !MDCompileUnit(
+// SANITY: !DICompileUnit(
 
 // CHECK-HIDDEN: @[[HIDDEN_GV:_TWVVSC.*]] = linkonce_odr hidden
-// CHECK-HIDDEN-NOT: !MDGlobalVariable({{.*}}[[HIDDEN_GV]]
+// CHECK-HIDDEN-NOT: !DIGlobalVariable({{.*}}[[HIDDEN_GV]]
 
 import ObjectiveC
 import Foundation
@@ -40,17 +40,17 @@ class MyObject : NSObject {
 // IMPORT-CHECK: %Si = type <{ i[[PTRSIZE:[0-9]+]] }>
 // IMPORT-CHECK: filename: "test-foundation.swift"
 // IMPORT-CHECK: !MDModule(name: "ObjectiveC"
-// IMPORT-CHECK: !MDCompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[FOUNDATION:[0-9]+]]
+// IMPORT-CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[FOUNDATION:[0-9]+]]
 // IMPORT-CHECK-SAME:             identifier: [[NSARRAY:"[^"]+"]]
 // IMPORT-CHECK: [[FOUNDATION]] = !MDModule(name: "Foundation",{{.*}} file: ![[FOUNDATION_FILE:[0-9]+]]
-// IMPORT-CHECK: ![[FOUNDATION_FILE]] = !MDFile(filename: "Foundation-{{.*}}.pcm"
-// IMPORT-CHECK: !MDDerivedType(tag: DW_TAG_member, name: "MyArr",
+// IMPORT-CHECK: ![[FOUNDATION_FILE]] = !DIFile(filename: "Foundation-{{.*}}.pcm"
+// IMPORT-CHECK: !DIDerivedType(tag: DW_TAG_member, name: "MyArr",
 // IMPORT-CHECK-NOT:            line:
 // IMPORT-CHECK-SAME:           baseType: ![[NSARRAY]]
 // IMPORT-CHECK-SAME:           size: [[PTRSIZE]], align: [[PTRSIZE]]
 // IMPORT-CHECK-NOT:            offset: 0
 // IMPORT-CHECK-SAME:           ){{$}}
-// IMPORT-CHECK: !MDImportedEntity(tag: DW_TAG_imported_module,{{.*}} entity: ![[FOUNDATION]]
+// IMPORT-CHECK: !DIImportedEntity(tag: DW_TAG_imported_module,{{.*}} entity: ![[FOUNDATION]]
 
 
   // Force the use of Int.
@@ -62,15 +62,15 @@ class MyObject : NSObject {
 }
 
 // FIXME (LLVM-branch): The [local] attribute means ObjectiveC-CC.
-// SANITY-DAG: !MDSubprogram(name: "blah",{{.*}} line: [[@LINE+2]],{{.*}} isDefinition: true
+// SANITY-DAG: !DISubprogram(name: "blah",{{.*}} line: [[@LINE+2]],{{.*}} isDefinition: true
 extension MyObject {
   func blah() {
     println("blah blah blah")
   }
 }
 
-// SANITY-DAG: !MDCompositeType(tag: DW_TAG_structure_type, name: "NSObject",{{.*}} identifier: "_TtCSo8NSObject"
-// SANITY-DAG: !MDGlobalVariable(name: "NsObj",{{.*}} line: [[@LINE+1]],{{.*}} type: !"_TtCSo8NSObject",{{.*}} isDefinition: true
+// SANITY-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSObject",{{.*}} identifier: "_TtCSo8NSObject"
+// SANITY-DAG: !DIGlobalVariable(name: "NsObj",{{.*}} line: [[@LINE+1]],{{.*}} type: !"_TtCSo8NSObject",{{.*}} isDefinition: true
 var NsObj: NSObject
 NsObj = MyObject()
 var MyObj: MyObject
@@ -96,10 +96,10 @@ public func date() {
   d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4]]
 }
 
-// LOC-CHECK: ![[THUNK:.*]] = !MDSubprogram({{.*}}linkageName: "_TToFC4main8MyObjectg5MyArrCSo7NSArray"
+// LOC-CHECK: ![[THUNK:.*]] = !DISubprogram({{.*}}linkageName: "_TToFC4main8MyObjectg5MyArrCSo7NSArray"
 // LOC-CHECK-NOT:                           line:
 // LOC-CHECK-SAME:                          isDefinition: true
-// LOC-CHECK: ![[DBG]] = !MDLocation(line: 0, scope: ![[THUNK]])
+// LOC-CHECK: ![[DBG]] = !DILocation(line: 0, scope: ![[THUNK]])
 
 // These debug locations should all be in ordered by increasing line number.
 // LOC-CHECK: ![[L1]] =

@@ -39,7 +39,7 @@ func main(x: Int) -> Void
 // CHECK: call {{.*}} @swift_release {{.*}}
 // CHECK: call {{.*}} @swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
 // CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]
-// CHECK: ![[CLOSURE_END]] = !MDLocation(line: [[@LINE+1]],
+// CHECK: ![[CLOSURE_END]] = !DILocation(line: [[@LINE+1]],
         }
     )
 

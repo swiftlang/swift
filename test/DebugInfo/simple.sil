@@ -17,7 +17,7 @@ bb0(%0 : $Int32):
   cond_fail %8 : $Builtin.Int1                    // id: %9
   %10 = struct $Int32 (%7 : $Builtin.Int32)          // user: %11
   // CHECK: ret i32 %{{.*}}, !dbg ![[LOC:.*]]
-  // CHECK: ![[LOC]] = !MDLocation(line: [[@LINE+1]],
+  // CHECK: ![[LOC]] = !DILocation(line: [[@LINE+1]],
   return %10 : $Int32                               // id: %11
 }
 

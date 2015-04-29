@@ -3,9 +3,9 @@
 // CHECK-LABEL: define{{.*}}2fn
 func fn() {
   println("two")
-// CHECK-DAG: ![[LOC:.*]] = !MDLocation(line: [[@LINE+1]], column: 13,
+// CHECK-DAG: ![[LOC:.*]] = !DILocation(line: [[@LINE+1]], column: 13,
   println(0 - UInt(Process.arguments.count))
-// CHECK-DAG: ![[LOC2:.*]] = !MDLocation(line: [[@LINE+1]], column: 13,
+// CHECK-DAG: ![[LOC2:.*]] = !DILocation(line: [[@LINE+1]], column: 13,
   println(1 - UInt(Process.arguments.count))
   println("three")
 }

@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 class Foo {
-  // CHECK: !MDSubprogram(name: "deinit", linkageName: "_TFC11Destructors3FooD"
+  // CHECK: !DISubprogram(name: "deinit", linkageName: "_TFC11Destructors3FooD"
   // CHECK-SAME:          line: [[@LINE-2]]
   // CHECK-SAME:          isDefinition: true
   var x : Int

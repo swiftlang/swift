@@ -33,9 +33,9 @@ func main() -> Int64 {
 }
 
 // Self should be artificial.
-// CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "self",{{.*}} line: 16
+// CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "self",{{.*}} line: 16
 // CHECK-SAME:             DIFlagArtificial
 
-// CHECK: ![[LOC]] = !MDLocalVariable(tag: DW_TAG_auto_variable, name: "loc2d",{{.*}} line: [[@LINE-10]]
+// CHECK: ![[LOC]] = !DILocalVariable(tag: DW_TAG_auto_variable, name: "loc2d",{{.*}} line: [[@LINE-10]]
 
 main()

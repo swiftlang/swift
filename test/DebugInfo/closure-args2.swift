@@ -10,10 +10,10 @@ func main () -> Void
         { (lhs : String, rhs : String) -> Bool in
 
     // CHECK-NOT: llvm.dbg.{{.*}}%swift.refcounted*
-    // CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "lhs"
-    // CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "rhs"
-    // CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "random_string"
-    // CHECK: !MDLocalVariable(tag: DW_TAG_arg_variable, name: "random_int"
+    // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "lhs"
+    // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "rhs"
+    // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "random_string"
+    // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "random_int"
 
             if rhs == random_string
             || count(rhs.unicodeScalars) == random_int {

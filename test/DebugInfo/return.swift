@@ -19,6 +19,6 @@ public func ifelseexpr() -> Int {
   // CHECK:  @swift_release to void (%C6return1X*)*)(%C6return1X* [[X]])
   // CHECK:  @swift_release to void (%C6return1X*)*)(%C6return1X* [[X]]) {{.*}}, !dbg ![[RET:.*]]
   // CHECK:  ret{{.*}}, !dbg ![[RET]]
-  return x.x; // CHECK: ![[RET]] = !MDLocation(line: [[@LINE]],
+  return x.x; // CHECK: ![[RET]] = !DILocation(line: [[@LINE]],
 }
 

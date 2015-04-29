@@ -22,6 +22,6 @@ func main() {
 // CHECK:  call void {{.*}}elease({{.*}}) {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]
 // CHECK-NEXT:  ret void, !dbg ![[CLEANUPS]]
-// CHECK: ![[CLEANUPS]] = !MDLocation(line: [[@LINE+1]], column: 1,
+// CHECK: ![[CLEANUPS]] = !DILocation(line: [[@LINE+1]], column: 1,
 }
 main()

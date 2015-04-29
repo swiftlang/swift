@@ -17,7 +17,7 @@
 // CHECK-DWARF-NEXT: AT_linkage_name( "_TtC4main3foo" )
 
 // Verify the IR interface:
-// CHECK: !MDCompositeType(tag: DW_TAG_structure_type, name: "foo"
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "foo"
 // CHECK-SAME:             line: [[@LINE+2]]
 // CHECK-SAME:             identifier: "_TtC4main3foo"
 class foo {

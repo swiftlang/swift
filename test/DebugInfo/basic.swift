@@ -22,11 +22,11 @@
 //
 // CHECK: foo
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]
-// CHECK-DAG: ![[FOO:[0-9]+]] = !MDSubprogram(name: "foo",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[FOOTYPE:[0-9]+]]
+// CHECK-DAG: ![[FOO:[0-9]+]] = !DISubprogram(name: "foo",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[FOOTYPE:[0-9]+]]
 public
 func foo(var a: Int64, var _ b: Int64) -> Int64 {
-     // CHECK-DAG: !MDLexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-1]], column: 49)
-     // CHECK-DAG: ![[ASCOPE:.*]] = !MDLocation(line: [[@LINE-2]], column: 14, scope: ![[FOO]])
+     // CHECK-DAG: !DILexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-1]], column: 49)
+     // CHECK-DAG: ![[ASCOPE:.*]] = !DILocation(line: [[@LINE-2]], column: 14, scope: ![[FOO]])
      // Check that a is the first and b is the second argument.
      // CHECK-DAG: store i64 %0, i64* [[AVAL:.*]], align 8
      // CHECK-DAG: store i64 %1, i64* [[BVAL:.*]], align 8
@@ -34,22 +34,22 @@ func foo(var a: Int64, var _ b: Int64) -> Int64 {
      // CHECK-DAG: [[BVAL]] = getelementptr inbounds {{.*}}, [[BMEM:.*]], i32 0, i32 0
      // CHECK-DAG: call void @llvm.dbg.declare(metadata [[AMEM]], metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
      // CHECK-DAG: call void @llvm.dbg.declare(metadata [[BMEM]], metadata ![[BARG:.*]], metadata !{{[0-9]+}})
-     // CHECK-DAG: ![[AARG]] = !MDLocalVariable(tag: DW_TAG_arg_variable, name: "a"
-     // CHECK-DAG: ![[BARG]] = !MDLocalVariable(tag: DW_TAG_arg_variable, name: "b"
+     // CHECK-DAG: ![[AARG]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "a"
+     // CHECK-DAG: ![[BARG]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "b"
      if b != 0 {
-       // CHECK-DAG: !MDLexicalBlock({{.*}} line: [[@LINE-1]]
+       // CHECK-DAG: !DILexicalBlock({{.*}} line: [[@LINE-1]]
        // Transparent inlined multiply:
        // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
-       // CHECK-DAG: [[MUL]] = !MDLocation(line: [[@LINE+4]], column: 16,
+       // CHECK-DAG: [[MUL]] = !DILocation(line: [[@LINE+4]], column: 16,
        // Runtime call to multiply function:
        // CHECK-NOSIL: @_TZFSsoi1mFTVSs5Int64S__S_{{.*}}, !dbg ![[MUL:[0-9]+]]
-       // CHECK-NOSIL: [[MUL]] = !MDLocation(line: [[@LINE+1]], column: 16,
+       // CHECK-NOSIL: [[MUL]] = !DILocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {
-       // CHECK-DAG: [[PARENT:[0-9]+]] = distinct !MDLexicalBlock({{.*}} line: [[@LINE-1]], column: 13)
+       // CHECK-DAG: [[PARENT:[0-9]+]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-1]], column: 13)
        var c: Int64 = 42
        if a == 0 {
-         // CHECK-DAG: !MDLexicalBlock(scope: ![[PARENT]],{{.*}} line: [[@LINE-1]], column: 18)
+         // CHECK-DAG: !DILexicalBlock(scope: ![[PARENT]],{{.*}} line: [[@LINE-1]], column: 18)
          // What about a nested scope?
          return 0
        }
@@ -57,20 +57,20 @@ func foo(var a: Int64, var _ b: Int64) -> Int64 {
      }
 }
 
-// CHECK-DAG: ![[MAINFILE:[0-9]+]] = !MDFile(filename: "basic.swift", directory: "{{.*}}DebugInfo")
-// CHECK-DAG: !MDCompileUnit({{.*}}file: ![[MAINFILE]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}} flags: "{{[^"]*}}-emit-ir
-// CHECK-DAG: !MDSubprogram(name: "main"
+// CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "basic.swift", directory: "{{.*}}DebugInfo")
+// CHECK-DAG: !DICompileUnit({{.*}}file: ![[MAINFILE]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}} flags: "{{[^"]*}}-emit-ir
+// CHECK-DAG: !DISubprogram(name: "main"
 
 // Function type for foo.
-// CHECK-DAG: ![[FOOTYPE]] = !MDSubroutineType(types: ![[PARAMTYPES:[0-9]+]])
+// CHECK-DAG: ![[FOOTYPE]] = !DISubroutineType(types: ![[PARAMTYPES:[0-9]+]])
 // CHECK-DAG: ![[PARAMTYPES]] = !{!"_TtVSs5Int64", !"_TtVSs5Int64", !"_TtVSs5Int64"}
 // Import of the main module.
-// CHECK-DAG: !MDImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], line: 1)
+// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], line: 1)
 // CHECK-DAG: ![[MAINMODULE]] = !MDModule(name: "basic"
 
 // Import of the swift standard library.
-// CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = !MDFile(filename: "{{.*}}Swift.swiftmodule",
-// CHECK-DAG: !MDImportedEntity(tag: DW_TAG_imported_module, scope: ![[SWIFTFILE]], entity: ![[SWIFTMODULE:[0-9]+]])
+// CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = !DIFile(filename: "{{.*}}Swift.swiftmodule",
+// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[SWIFTFILE]], entity: ![[SWIFTMODULE:[0-9]+]])
 // CHECK-DAG: ![[SWIFTMODULE]] = !MDModule(name: "Swift"
 
 // DWARF Version
