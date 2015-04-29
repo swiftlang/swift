@@ -16,12 +16,11 @@ extern "C" NS_RETURNS_RETAINED __nullable id
 SCN_Swift_SCNSceneSource_entryWithIdentifier(
     id NS_RELEASES_ARGUMENT __nonnull self_,
     NSString *NS_RELEASES_ARGUMENT __nonnull uid,
-    Class NS_RELEASES_ARGUMENT __nonnull entryClass) {
+    Class __nonnull entryClass) {
   SCNSceneSource *sceneSource = self_;
   id Result = [[sceneSource entryWithIdentifier:uid withClass:entryClass] retain];
   [self_ release];
   [uid release];
-  [entryClass release];
   return Result;
 }
 

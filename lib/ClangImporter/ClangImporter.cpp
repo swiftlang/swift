@@ -240,6 +240,9 @@ ClangImporter::create(ASTContext &ctx,
 
       // Request new APIs from Foundation.
       "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=3",
+
+      // Request new APIs from SceneKit.
+      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=1",
     };
     invocationArgStrs.insert(invocationArgStrs.end(), extraArgs.begin(),
                              extraArgs.end());
