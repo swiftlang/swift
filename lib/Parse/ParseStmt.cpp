@@ -91,8 +91,16 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   };
 
   ParserResult<Expr> ResultExpr = parseTopLevelExpr(diag::expected_expr);
-  if (ResultExpr.isNonNull())
+  if (ResultExpr.isNonNull()) {
     Result = ResultExpr.get();
+  } else if (!ResultExpr.hasCodeCompletion()) {
+    // If we've consumed any tokens at all, build an error expression
+    // covering the consumed range.
+    SourceLoc startLoc = StructureMarkers.back().Loc;
+    if (startLoc != Tok.getLoc()) {
+      Result = new (Context) ErrorExpr(SourceRange(startLoc, PreviousLoc));
+    }
+  }
 
   if (ResultExpr.hasCodeCompletion() && CodeCompletion) {
     CodeCompletion->completeExpr();

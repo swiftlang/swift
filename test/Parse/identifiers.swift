@@ -24,4 +24,4 @@ func s̈pin̈al_tap̈() {}
 () // expected-error{{invalid character in source file}}
 
 // Placeholders are recognized as identifiers but with error.
-func <#some name#>() {} // expected-error {{editor placeholder in source file}}
+func <#some name#>() {} // expected-error 2 {{editor placeholder in source file}}
