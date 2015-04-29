@@ -26,8 +26,8 @@ namespace llvm {
 }
 
 namespace clang {
-  class Type;
   class ObjCMethodDecl;
+  class Type;
 }
 
 namespace swift {
@@ -59,15 +59,28 @@ class AbstractionPattern {
     ClangFunctionParamTupleType,
     /// A type reference with an Objective-C method.  OrigType is
     /// valid and is a function type.  ObjCMethod is valid.
+    /// OtherData is an encoded foreign error index.
     ObjCMethodType,
     /// A reference to the uncurried parameters of a Clang Objective-C
     /// method type, imported as a tuple type.  OrigType is valid and
     /// is a tuple type with two elements.  ObjCMethod is valid.
+    /// OtherData is an encoded foreign error index.
     ObjCMethodParamTupleType,
     /// A reference to the formal parameters of a Clang Objective-C
     /// method type, imported as a tuple type.  OrigType is valid and
     /// is a tuple type.  ObjCMethod is valid.
+    /// OtherData is an encoded foreign error index.
     ObjCMethodFormalParamTupleType,
+  };
+
+  struct EncodedForeignErrorInfo {
+    unsigned Value;
+
+    bool hasErrorParameter() const { return Value != 0; }
+    unsigned getErrorParameterIndex() const {
+      assert(hasErrorParameter());
+      return Value - 1;
+    }
   };
 
   unsigned TheKind : 4;
@@ -116,6 +129,10 @@ class AbstractionPattern {
             getKind() == Kind::ObjCMethodFormalParamTupleType);
   }
 
+  bool hasStoredForeignErrorInfo() const {
+    return hasStoredObjCMethod();
+  }
+
   void initSwiftType(CanGenericSignature signature, CanType origType) {
     assert(signature || !origType->isDependentType());
     if (isOpaqueType(signature, origType)) {
@@ -136,11 +153,12 @@ class AbstractionPattern {
   }
 
   void initObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                      Kind kind) {
+                      Kind kind, EncodedForeignErrorInfo errorInfo) {
     assert(!isOpaqueType(nullptr, origType));
     TheKind = unsigned(kind);
     OrigType = origType;
     ObjCMethod = method;
+    OtherData = errorInfo.Value;
   }
 
   AbstractionPattern() {}
@@ -176,6 +194,7 @@ public:
     return pattern;
   }
 
+private:
   /// Return an abstraction pattern for a tuple representing all the
   /// parameters to a C or block function.
   static AbstractionPattern getClangFunctionParamTuple(CanType origType,
@@ -186,37 +205,50 @@ public:
     return pattern;
   }
 
+public:
   /// Return an abstraction pattern for the type of an Objective-C method.
   static AbstractionPattern getObjCMethod(CanType origType,
-                                          const clang::ObjCMethodDecl *method) {
+                                          const clang::ObjCMethodDecl *method,
+                         const Optional<ForeignErrorConvention> &foreignError);
+
+private:
+  /// Return an abstraction pattern for the type of an Objective-C method.
+  static AbstractionPattern getObjCMethod(CanType origType,
+                                          const clang::ObjCMethodDecl *method,
+                                          EncodedForeignErrorInfo errorInfo) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initObjCMethod(origType, method, Kind::ObjCMethodType);
+    pattern.initObjCMethod(origType, method, Kind::ObjCMethodType,
+                           errorInfo);
     return pattern;
   }
 
   /// Return an abstraction pattern for a tuple representing the
   /// uncurried parameter clauses of an Objective-C method.
   static AbstractionPattern getObjCMethodParamTuple(CanType origType,
-                                          const clang::ObjCMethodDecl *method) {
+                                          const clang::ObjCMethodDecl *method,
+                                          EncodedForeignErrorInfo errorInfo) {
     assert(isa<TupleType>(origType));
     assert(cast<TupleType>(origType)->getNumElements() == 2);
     AbstractionPattern pattern;
-    pattern.initObjCMethod(origType, method, Kind::ObjCMethodParamTupleType);
+    pattern.initObjCMethod(origType, method, Kind::ObjCMethodParamTupleType,
+                           errorInfo);
     return pattern;
   }
 
   /// Return an abstraction pattern for a tuple representing the
   /// formal parameters to an Objective-C method.
   static AbstractionPattern getObjCMethodFormalParamTuple(CanType origType,
-                                          const clang::ObjCMethodDecl *method) {
+                                          const clang::ObjCMethodDecl *method,
+                                          EncodedForeignErrorInfo errorInfo) {
     assert(isa<TupleType>(origType));
     AbstractionPattern pattern;
     pattern.initObjCMethod(origType, method,
-                           Kind::ObjCMethodFormalParamTupleType);
+                           Kind::ObjCMethodFormalParamTupleType, errorInfo);
     return pattern;
   }
 
+public:
   /// Return an abstraction pattern with an added level of optionality.
   ///
   /// The based abstraction pattern must be either opaque or based on
@@ -315,6 +347,11 @@ public:
   const clang::ObjCMethodDecl *getObjCMethod() const {
     assert(hasStoredObjCMethod());
     return ObjCMethod;
+  }
+
+  EncodedForeignErrorInfo getEncodedForeignErrorInfo() const {
+    assert(hasStoredForeignErrorInfo());
+    return { OtherData };
   }
 
   template<typename TYPE>

@@ -127,3 +127,7 @@ let fn = ErrorProne.fail
 // CHECK:      [[T0:%.*]] = load [[TEMP]]#1
 // CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
 // CHECK:      throw [[T1]]
+
+func testArgs() throws {
+  try ErrorProne.consume(nil)
+}

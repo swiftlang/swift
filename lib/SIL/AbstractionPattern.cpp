@@ -18,6 +18,7 @@
 #define DEBUG_TYPE "libsil"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
@@ -73,6 +74,18 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   assert(decl->hasArgumentType());
   assert(!decl->hasClangNode());
   return AbstractionPattern(decl->getArgumentType());
+}
+
+AbstractionPattern
+AbstractionPattern::getObjCMethod(CanType origType,
+                                  const clang::ObjCMethodDecl *method,
+                         const Optional<ForeignErrorConvention> &foreignError) {
+  if (foreignError.hasValue()) {
+    return getObjCMethod(origType, method,
+                         { foreignError->getErrorParameterIndex() + 1 });
+  } else {
+    return getObjCMethod(origType, method, { 0 });
+  }
 }
 
 AbstractionPattern
@@ -171,9 +184,22 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
     return AbstractionPattern(cast<TupleType>(getType()).getElementType(index),
                           getClangFunctionParameterType(getClangType(), index));
 
-  case Kind::ObjCMethodFormalParamTupleType:
-    return AbstractionPattern(cast<TupleType>(getType()).getElementType(index),
-                  getObjCMethod()->parameters()[index]->getType().getTypePtr());
+  case Kind::ObjCMethodFormalParamTupleType: {
+    auto swiftEltType = cast<TupleType>(getType()).getElementType(index);
+    auto method = getObjCMethod();
+    auto errorInfo = getEncodedForeignErrorInfo();
+
+    // If we're asking for something after the error parameter, slide
+    // the parameter index up by one.
+    auto paramIndex = index;
+    if (errorInfo.hasErrorParameter() &&
+        paramIndex >= errorInfo.getErrorParameterIndex()) {
+      paramIndex++;
+    }
+
+    return AbstractionPattern(swiftEltType,
+                  method->parameters()[paramIndex]->getType().getTypePtr());
+  }
   case Kind::ObjCMethodParamTupleType: {
     auto tupleType = cast<TupleType>(getType());
     assert(tupleType->getNumElements() == 2);
@@ -191,9 +217,13 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
 
     // Otherwise, we're talking about the formal parameter clause.
 
+    auto errorInfo = getEncodedForeignErrorInfo();
+
     // Nullary methods still take a formal () parameter clause.
     // There's no corresponding Clang type for that.
-    if (method->parameters().empty()) {
+    if (method->parameters().empty() ||
+        (method->parameters().size() == 1 &&
+         errorInfo.hasErrorParameter())) {
       // Imported initializers also sometimes get "withFooBar: ()" clauses.
       assert(swiftEltType->isVoid() ||
              (isa<TupleType>(swiftEltType) &&
@@ -202,13 +232,32 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
       return AbstractionPattern(swiftEltType);
     }
 
+    // If we imported as a tuple type, construct the special
+    // method-formal-parameters abstraction pattern.
     if (isa<TupleType>(swiftEltType)) {
-      return getObjCMethodFormalParamTuple(swiftEltType, getObjCMethod());
-    } else {
-      assert(getObjCMethod()->parameters().size() == 1);
-      return AbstractionPattern(swiftEltType,
-                   getObjCMethod()->parameters()[0]->getType().getTypePtr());
+      assert(method->parameters().size() ==
+             cast<TupleType>(swiftEltType)->getNumElements() +
+               unsigned(errorInfo.hasErrorParameter()));
+      return getObjCMethodFormalParamTuple(swiftEltType, method, errorInfo);
     }
+
+    // Otherwise, we must have imported a single parameter.
+    // But we might also have a foreign error.
+
+    // If we don't, we must have a single source parameter.
+    if (!errorInfo.hasErrorParameter()) {
+      assert(method->parameters().size() == 1);
+      return AbstractionPattern(swiftEltType,
+                            method->parameters()[0]->getType().getTypePtr());
+    }
+
+    // Otherwise, we must have two; pick the one that isn't the foreign error.
+    assert(method->parameters().size() == 2);
+    unsigned errorIndex = errorInfo.getErrorParameterIndex();
+    assert(errorIndex < 2);
+    unsigned paramIndex = (errorIndex == 0 ? 1 : 0);
+    return AbstractionPattern(swiftEltType,
+                   method->parameters()[paramIndex]->getType().getTypePtr());
   }
   }
   llvm_unreachable("bad kind");
@@ -224,13 +273,15 @@ AbstractionPattern AbstractionPattern::transformType(
   case Kind::Opaque:
     return getOpaque();
   case Kind::ObjCMethodType:
-    return getObjCMethod(transform(getType()), getObjCMethod());
+    return getObjCMethod(transform(getType()), getObjCMethod(),
+                         getEncodedForeignErrorInfo());
   case Kind::ClangType:
     return AbstractionPattern(transform(getType()), getClangType());
   case Kind::Type:
     return AbstractionPattern(getGenericSignature(), transform(getType()));
   case Kind::ObjCMethodParamTupleType:
-    return getObjCMethodParamTuple(transform(getType()), getObjCMethod());
+    return getObjCMethodParamTuple(transform(getType()), getObjCMethod(),
+                                   getEncodedForeignErrorInfo());
 
   // In both of the following cases, if the transform makes it no
   // longer a tuple type, we need to change kinds.
@@ -247,7 +298,8 @@ AbstractionPattern AbstractionPattern::transformType(
   case Kind::ObjCMethodFormalParamTupleType: {
     auto newType = transform(getType());
     if (isa<TupleType>(newType)) {
-      return getObjCMethodFormalParamTuple(newType, getObjCMethod());
+      return getObjCMethodFormalParamTuple(newType, getObjCMethod(),
+                                           getEncodedForeignErrorInfo());
     } else {
       assert(getNumTupleElements() == 1);
       return AbstractionPattern(newType,
@@ -392,7 +444,8 @@ AbstractionPattern AbstractionPattern::getFunctionInputType() const {
     // Preserve the Clang type in the resulting abstraction pattern.
     auto inputType = cast<AnyFunctionType>(getType()).getInput();
     assert(isa<TupleType>(inputType)); // always at least ((), SelfType)
-    return AbstractionPattern::getObjCMethodParamTuple(inputType, getObjCMethod());
+    return getObjCMethodParamTuple(inputType, getObjCMethod(),
+                                   getEncodedForeignErrorInfo());
   }
   }
   llvm_unreachable("bad kind");

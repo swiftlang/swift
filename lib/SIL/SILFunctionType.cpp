@@ -1029,7 +1029,8 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
                                AnyFunctionType::ExtInfo extInfo,
                          const Optional<ForeignErrorConvention> &foreignError) {
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-    auto origPattern = AbstractionPattern::getObjCMethod(origType, method);
+    auto origPattern =
+      AbstractionPattern::getObjCMethod(origType, method, foreignError);
     return getSILFunctionType(M, origPattern, substType, substInterfaceType,
                               extInfo, ObjCMethodConventions(method),
                               foreignError);
