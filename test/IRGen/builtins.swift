@@ -541,10 +541,13 @@ func zeroInitializerEmpty() {
 // isUnique variants
 // ----------------------------------------------------------------------------
 
+// CHECK: define hidden void @_TF8builtins26acceptsBuiltinNativeObjectFRGSqBo_T_([[BUILTIN_NATIVE_OBJECT_TY:%.*]]*) {
+func acceptsBuiltinNativeObject(inout ref: Builtin.NativeObject?) {}
+
 // native
-// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRGSqBo_Bi1_(%Sq.16*) {
+// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRGSqBo_Bi1_({{%.*}}*) {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast %Sq.16* %0 to %swift.refcounted**
+// CHECK-NEXT: bitcast [[BUILTIN_NATIVE_OBJECT_TY]]* %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
 // CHECK-NEXT: call i1 @_swift_isUniquelyReferenced_native(%swift.refcounted* %2)
 // CHECK-NEXT: ret i1 %3
@@ -563,9 +566,9 @@ func isUnique(inout ref: Builtin.NativeObject) -> Bool {
 }
 
 // native pinned
-// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRGSqBo_Bi1_(%Sq.16*) {
+// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRGSqBo_Bi1_({{%.*}}*) {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast %Sq.16* %0 to %swift.refcounted**
+// CHECK-NEXT: bitcast [[BUILTIN_NATIVE_OBJECT_TY]]* %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
 // CHECK-NEXT: call i1 @_swift_isUniquelyReferencedOrPinned_native(%swift.refcounted* %2)
 // CHECK-NEXT: ret i1 %3
@@ -583,10 +586,13 @@ func isUniqueOrPinned(inout ref: Builtin.NativeObject) -> Bool {
   return Builtin.isUniqueOrPinned(&ref)
 }
 
+// CHECK: define hidden void @_TF8builtins27acceptsBuiltinUnknownObjectFRGSqBO_T_([[BUILTIN_UNKNOWN_OBJECT_TY:%.*]]*) {
+func acceptsBuiltinUnknownObject(inout ref: Builtin.UnknownObject?) {}
+
 // ObjC
-// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRGSqBO_Bi1_(%Sq.17*) {
+// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRGSqBO_Bi1_({{%.*}}*) {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast %Sq.17* %0 to %objc_object**
+// CHECK-NEXT: bitcast [[BUILTIN_UNKNOWN_OBJECT_TY]]* %0 to %objc_object**
 // CHECK-NEXT: load %objc_object*, %objc_object** %1
 // CHECK-NEXT: call i1 @_swift_isUniquelyReferencedNonObjC(%objc_object* %2)
 // CHECK-NEXT: ret i1 %3
