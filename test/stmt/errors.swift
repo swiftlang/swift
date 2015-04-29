@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -verify %s
+// RUN: %target-swift-frontend -parse -verify %s
 
 enum MSV : _ErrorType {
   case Foo, Bar, Baz

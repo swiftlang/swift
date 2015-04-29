@@ -93,8 +93,8 @@ module objc_structs {
   export *
 }
 
-module exceptions {
-  header "exceptions.h"
+module errors {
+  header "errors.h"
   export *
 }
 

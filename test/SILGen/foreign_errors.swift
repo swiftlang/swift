@@ -3,9 +3,9 @@
 // REQUIRES: objc_interop
 
 import Foundation
-import exceptions
+import errors
 
-// CHECK: sil hidden @_TF10exceptions5test0FzT_T_ : $@convention(thin) () -> @error _ErrorType
+// CHECK: sil hidden @_TF14foreign_errors5test0FzT_T_ : $@convention(thin) () -> @error _ErrorType
 func test0() throws {
   // CHECK: [[SELF:%.*]] = metatype $@thick ErrorProne.Type
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $@thick ErrorProne.Type, #ErrorProne.fail!1.foreign : ErrorProne.Type -> () throws -> () , $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> Bool
@@ -53,8 +53,8 @@ extension NSObject {
   @objc func abort() throws {
     throw NSError()
   }
-// CHECK-LABEL: sil hidden @_TToFE10exceptionsCSo8NSObject5abortfS0_FzT_T_ : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
-// CHECK: [[T0:%.*]] = function_ref @_TFE10exceptionsCSo8NSObject5abortfS0_FzT_T_ : $@convention(method) (@guaranteed NSObject) -> @error _ErrorType
+// CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject5abortfS0_FzT_T_ : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
+// CHECK: [[T0:%.*]] = function_ref @_TFE14foreign_errorsCSo8NSObject5abortfS0_FzT_T_ : $@convention(method) (@guaranteed NSObject) -> @error _ErrorType
 // CHECK: try_apply [[T0]](
 // CHECK: bb1(
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int1, -1
@@ -78,8 +78,8 @@ extension NSObject {
   @objc func badDescription() throws -> String {
     throw NSError()
   }
-// CHECK-LABEL: sil hidden @_TToFE10exceptionsCSo8NSObject14badDescriptionfS0_FzT_SS : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> @autoreleased Optional<NSString>
-// CHECK: [[T0:%.*]] = function_ref @_TFE10exceptionsCSo8NSObject14badDescriptionfS0_FzT_SS : $@convention(method) (@guaranteed NSObject) -> (@owned String, @error _ErrorType)
+// CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject14badDescriptionfS0_FzT_SS : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> @autoreleased Optional<NSString>
+// CHECK: [[T0:%.*]] = function_ref @_TFE14foreign_errorsCSo8NSObject14badDescriptionfS0_FzT_SS : $@convention(method) (@guaranteed NSObject) -> (@owned String, @error _ErrorType)
 // CHECK: try_apply [[T0]](
 // CHECK: bb1([[RESULT:%.*]] : $String):
 // CHECK:   [[T0:%.*]] = function_ref @swift_StringToNSString : $@convention(thin) (@owned String) -> @owned NSString
@@ -100,11 +100,11 @@ extension NSObject {
 // CHECK: bb3([[T0:%.*]] : $Optional<NSString>):
 // CHECK:   autorelease_return [[T0]] : $Optional<NSString>
 
-// CHECK-LABEL: sil hidden @_TToFE10exceptionsCSo8NSObject7takeIntfS0_FzSiT_ : $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
+// CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject7takeIntfS0_FzSiT_ : $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
 // CHECK: bb0([[I:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[SELF:%[0-9]+]] : $NSObject)
   @objc func takeInt(i: Int) throws { }
 
-// CHECK-LABEL: sil hidden @_TToFE10exceptionsCSo8NSObject10takeDoublefS0_FzTSd3intSi7closureFSiSi_T_ : $@convention(objc_method) (Double, Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @convention(block) (Int) -> Int, NSObject) -> Bool
+// CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject10takeDoublefS0_FzTSd3intSi7closureFSiSi_T_ : $@convention(objc_method) (Double, Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @convention(block) (Int) -> Int, NSObject) -> Bool
 // CHECK: bb0([[D:%[0-9]+]] : $Double, [[INT:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[CLOSURE:%[0-9]+]] : $@convention(block) (Int) -> Int, [[SELF:%[0-9]+]] : $NSObject):
   @objc func takeDouble(d: Double, int: Int, closure: (Int) -> Int) throws {
     throw NSError()
@@ -127,11 +127,3 @@ let fn = ErrorProne.fail
 // CHECK:      [[T0:%.*]] = load [[TEMP]]#1
 // CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
 // CHECK:      throw [[T1]]
-
-// This just needs to type-check.
-// rdar://20722195
-func testAndReturnError() throws {
-  try ErrorProne.fail()
-  try ErrorProne.go()
-  try ErrorProne.tryAndReturnError() // collides with 'try' keyword
-}

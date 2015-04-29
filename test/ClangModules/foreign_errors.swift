@@ -3,8 +3,16 @@
 // REQUIRES: objc_interop
 
 import Foundation
-import exceptions
+import errors
 
 func test0() {
   try ErrorProne.fail() // expected-error {{errors thrown from here are not handled}}
+}
+
+// Test "AndReturnError" stripping.
+// rdar://20722195
+func testAndReturnError() throws {
+  try ErrorProne.fail()
+  try ErrorProne.go()
+  try ErrorProne.tryAndReturnError() // collides with 'try' keyword
 }
