@@ -11,9 +11,6 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift | FileCheck %s
 
-// REQUIRES: OS=macosx
-// FIXME: This fails with r27206 on armv7. rdar://problem/20521110
-
 let zero: Bit = .Zero
 let one: Bit = .One
 
