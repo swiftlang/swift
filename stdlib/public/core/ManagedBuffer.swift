@@ -272,10 +272,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   ///
   /// See `isUniquelyReferenced` for details.
   public mutating func holdsUniqueReference() -> Bool {
-    let o = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(_nativeBuffer))
-    let result = _swift_isUniquelyReferenced_nonNull_native(o)
-    _fixLifetime(_nativeBuffer)
-    return result
+    return Bool(Builtin.isUnique(&_nativeBuffer))
   }
 
   /// Returns true iff either `self` holds the only strong reference
@@ -283,10 +280,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   ///
   /// See `isUniquelyReferenced` for details.
   public mutating func holdsUniqueOrPinnedReference() -> Bool {
-    let o = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(_nativeBuffer))
-    let result = _swift_isUniquelyReferencedOrPinned_nonNull_native(o)
-    _fixLifetime(_nativeBuffer)
-    return result
+    return Bool(Builtin.isUniqueOrPinned(&_nativeBuffer))
   }
 
   //===--- internal/private API -------------------------------------------===//
@@ -462,23 +456,13 @@ public func == <Value, Element>(
 /// This function is safe to use for `mutating` functions in
 /// multithreaded code because a false positive would imply that there
 /// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T : AnyObject>(inout object: T) -> Bool {
-
-  // Note: the pointer must be extracted in a separate step or an
-  // extra reference will be held during the check below
-  let o = UnsafePointer<Void>(Builtin.bridgeToRawPointer(object))
-  let result = _swift_isUniquelyReferencedNonObjC_nonNull(o)
-  Builtin.fixLifetime(object)
-  return result
+public func isUniquelyReferencedNonObjC<T : AnyObject>(inout object: T) -> Bool
+{
+  return Bool(Builtin.isUnique(&object))
 }
 
 internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T) -> Bool {
-  // Note: the pointer must be extracted in a separate step or an
-  // extra reference will be held during the check below
-  let o = UnsafePointer<Void>(Builtin.bridgeToRawPointer(object))
-  let result = _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(o)
-  Builtin.fixLifetime(object)
-  return result
+  return Bool(Builtin.isUniqueOrPinned(&object))
 }
 
 /// Returns `true` iff `object` is a non-`@objc` class instance with a single
@@ -506,12 +490,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T
 public func isUniquelyReferenced<T : NonObjectiveCBase>(
   inout object: T
 ) -> Bool {
-  // Note: the pointer must be extracted in a separate step or an
-  // extra reference will be held during the check below
-  let o = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(object))
-  let result = _swift_isUniquelyReferenced_nonNull_native(o)
-  Builtin.fixLifetime(object)
-  return result
+  return Bool(Builtin.isUnique(&object))
 }
 
 /// Returns `true` iff `object` is a non-`@objc` class instance with
@@ -540,12 +519,6 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 public func isUniquelyReferencedNonObjC<T : AnyObject>(
   inout object: T?
 ) -> Bool {
-
-  // Note: the pointer must be extracted in a separate step or an
-  // extra reference will be held during the check below
-  let o = Builtin.reinterpretCast(object) as UnsafePointer<Void>
-  let result = _swift_isUniquelyReferencedNonObjC(o)
-  Builtin.fixLifetime(object)
-  return result
+  return Bool(Builtin.isUnique(&object))
 }
 

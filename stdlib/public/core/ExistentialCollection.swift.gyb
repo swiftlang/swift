@@ -375,8 +375,7 @@ public struct ${Self} : ${Traversal}IndexType {
   }
 
   public mutating func _successorInPlace() {
-    let rawBox = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(_box))
-    if _fastPath(_swift_isUniquelyReferenced_nonNull_native(rawBox)) {
+    if _fastPath(Bool(Builtin.isUnique_native(&_box))) {
       _box._successorInPlace()
     }
     else {
@@ -394,8 +393,7 @@ public struct ${Self} : ${Traversal}IndexType {
   }
 
   public mutating func _predecessorInPlace() {
-    let rawBox = UnsafePointer<HeapObject>(Builtin.bridgeToRawPointer(_box))
-    if _fastPath(_swift_isUniquelyReferenced_nonNull_native(rawBox)) {
+    if _fastPath(Bool(Builtin.isUnique_native(&_box))) {
       _box._predecessorInPlace()
     }
     else {
@@ -434,7 +432,9 @@ public struct ${Self} : ${Traversal}IndexType {
       '' if Traversal == 'Forward' else ' as! _%sIndexBoxType' % Traversal}
   }
 
-  internal let _box: _${Traversal}IndexBoxType
+  // _box is passed inout to Builtin.isUnique.  Although its value
+  // is unchanged, it must appear mutable to the optimizer.
+  internal var _box: _${Traversal}IndexBoxType
 }
 
 public func ~> (

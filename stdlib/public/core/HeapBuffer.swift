@@ -66,10 +66,7 @@ class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
 internal func _isUniquelyReferenced_native(
   inout x: Builtin.NativeObject?
 ) -> Bool {
-  let p: UnsafePointer<_HeapObject> = Builtin.reinterpretCast(x)
-  let result = _swift_isUniquelyReferenced_native(p)
-  Builtin.fixLifetime(x)
-  return result
+  return Bool(Builtin.isUnique(&x))
 }
 
 /// Management API for `_HeapBufferStorage<Value, Element>`
@@ -77,7 +74,9 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   /// A default type to use as a backing store
   typealias Storage = _HeapBufferStorage<Value, Element>
 
-  let _storage: Builtin.NativeObject?
+  // _storage is passed inout to Builtin.isUnique.  Although its value
+  // is unchanged, it must appear mutable to the optimizer.
+  var _storage: Builtin.NativeObject?
   var storage: AnyObject? {
     return _storage.map { Builtin.castFromNativeObject($0) }
   }
@@ -210,17 +209,11 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    let o: UnsafePointer<HeapObject> = Builtin.reinterpretCast(_storage)
-    let result = _swift_isUniquelyReferenced_native(o)
-    Builtin.fixLifetime(_storage)
-    return result
+    return Bool(Builtin.isUnique(&_storage))
   }
 
   mutating func isUniquelyReferencedOrPinned() -> Bool {
-    let o: UnsafePointer<HeapObject> = Builtin.reinterpretCast(_storage)
-    let result = _swift_isUniquelyReferencedOrPinned_native(o)
-    Builtin.fixLifetime(_storage)
-    return result
+    return Bool(Builtin.isUniqueOrPinned(&_storage))
   }
 }
 

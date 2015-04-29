@@ -69,17 +69,13 @@ struct _BridgeStorage<
   @inline(__always)
   public // @testable
   mutating func isUniquelyReferencedNative() -> Bool {
-    return _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-      _bitPattern(rawValue)
-    )
+    return Bool(Builtin.isUnique(&rawValue))
   }
 
   @inline(__always)
   public // @testable
   mutating func isUniquelyReferencedOrPinnedNative() -> Bool {
-    return _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
-      _bitPattern(rawValue)
-    )
+    return Bool(Builtin.isUniqueOrPinned(&rawValue))
   }
 
   public // @testable
@@ -127,8 +123,7 @@ struct _BridgeStorage<
   mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)
     _sanityCheck(_nonPointerBits(rawValue) == 0)
-    let p: UnsafePointer<HeapObject> = Builtin.reinterpretCast(rawValue)
-    return _swift_isUniquelyReferenced_nonNull_native(p)
+    return Bool(Builtin.isUnique_native(&rawValue))
   }
 
   @inline(__always)
@@ -136,8 +131,7 @@ struct _BridgeStorage<
   mutating func isUniquelyReferencedOrPinned_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)
     _sanityCheck(_nonPointerBits(rawValue) == 0)
-    let p: UnsafePointer<HeapObject> = Builtin.reinterpretCast(rawValue)
-    return _swift_isUniquelyReferencedOrPinned_nonNull_native(p)
+    return Bool(Builtin.isUniqueOrPinned_native(&rawValue))
   }
 
   public // @testable
@@ -154,6 +148,8 @@ struct _BridgeStorage<
       return (_bitPattern(rawValue) & _objCTaggedPointerBits) != 0
     }
   }
-  
-  internal let rawValue: Builtin.BridgeObject
+
+  // rawValue is passed inout to Builtin.isUnique.  Although its value
+  // is unchanged, it must appear mutable to the optimizer.
+  internal var rawValue: Builtin.BridgeObject
 }

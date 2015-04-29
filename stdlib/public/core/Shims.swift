@@ -39,9 +39,6 @@ var _fastEnumerationStorageMutationsPtr: UnsafeMutablePointer<CUnsignedLong> {
 internal func _isUniquelyReferenced_native(
   inout x: Builtin.NativeObject
 ) -> Bool {
-  let p = UnsafePointer<_HeapObject>(Builtin.bridgeToRawPointer(x))
-  let result = _swift_isUniquelyReferenced_nonNull_native(p)
-  Builtin.fixLifetime(x)
-  return result
+  return Bool(Builtin.isUnique(&x))
 }
 #endif
