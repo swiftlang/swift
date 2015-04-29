@@ -101,7 +101,8 @@ public struct Range<
   }
 
   /// `true` iff the range is empty, i.e. `startIndex == endIndex`
-  public var isEmpty : Bool {
+  public var isEmpty: Bool {
+    // FIXME(prext): remove this function when protocol extensions land.
     return startIndex == endIndex
   }
 
