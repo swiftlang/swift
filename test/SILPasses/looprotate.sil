@@ -293,3 +293,43 @@ bb5:
   return %r3 : $()
 
 }
+
+// CHECK-LABEL: sil @dont_rotate_single_basic_block_loop
+// CHECK: bb0({{.*}}):
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   cond_br {{.*}}, bb1, bb2
+// CHECK: bb2:
+// CHECK:   return
+sil @dont_rotate_single_basic_block_loop : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  br bb1
+bb1:
+  cond_br %0, bb1, bb2
+bb2:
+ %1 = tuple ()
+ return %1 : $()
+}
+
+// CHECK-LABEL: sil @dont_rotate_single_basic_block_loop_split_backedge
+// CHECK: bb0({{.*}}):
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   cond_br {{.*}}, bb2, bb3
+// CHECK: bb2:
+// CHECK:   br bb1
+// CHECK: bb3:
+// CHECK:   return
+sil @dont_rotate_single_basic_block_loop_split_backedge : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  br bb1
+bb1:
+  cond_br %0, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+ %1 = tuple ()
+ return %1 : $()
+}

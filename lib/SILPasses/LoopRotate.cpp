@@ -375,6 +375,30 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *L, DominanceInfo *DT,
   return DidRotate;
 }
 
+/// Check whether this a single basic block loop - ignoring split back edges.
+static bool isSingleBlockLoop(SILLoop *L) {
+  auto Blocks = L->getBlocks();
+  auto NumBlocks = Blocks.size();
+  if (NumBlocks > 2)
+    return false;
+
+  if (NumBlocks == 1)
+    return true;
+
+  auto *Header = L->getHeader();
+  auto *BackEdge = Blocks[1];
+  if (BackEdge == Header)
+    BackEdge = Blocks[0];
+
+  if (!BackEdge->getSingleSuccessor())
+    return false;
+
+  assert(BackEdge->getSingleSuccessor() == Header && "Loop not well formed");
+
+  // Check whether the back-edge block is just a split-edge.
+  return ++BackEdge->begin() == BackEdge->end();
+}
+
 /// We rotated a loop if it has the following properties.
 ///
 /// * It has an exiting header with a conditional branch.
@@ -406,7 +430,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
     return false;
   }
 
-  if (!RotateSingleBlockLoops && Header == UpTo)
+  if (!RotateSingleBlockLoops && (Header == UpTo || isSingleBlockLoop(L)))
     return false;
 
   assert(RotateSingleBlockLoops || L->getBlocks().size() != 1);
