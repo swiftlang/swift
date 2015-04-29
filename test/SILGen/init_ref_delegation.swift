@@ -9,7 +9,6 @@ struct S {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin S.Type):
     // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box $S
     // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*S
-    // CHECK-NEXT:   [[SELF_META:%[0-9]+]] = metatype $@thin S.Type
     
     // CHECK:   [[S_DELEG_INIT:%[0-9]+]] = function_ref @_TFV19init_ref_delegation1SCfMS0_FT1xVS_1X_S0_ : $@convention(thin) (X, @thin S.Type) -> S
     
@@ -34,7 +33,6 @@ enum E {
     // CHECK: bb0([[E_META:%[0-9]+]] : $@thin E.Type):
     // CHECK:   [[E_BOX:%[0-9]+]] = alloc_box $E
     // CHECK:   [[E_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[E_BOX]]#1 : $*E
-    // CHECK:   [[E_META:%[0-9]+]] = metatype $@thin E.Type
 
     // CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_TFO19init_ref_delegation1ECfMS0_FT1xVS_1X_S0_ : $@convention(thin) (X, @thin E.Type) -> E
 
@@ -59,7 +57,6 @@ struct S2 {
     // CHECK: bb0([[S2_META:%[0-9]+]] : $@thin S2.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $S2
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*S2
-    // CHECK:   [[S2_META:%[0-9]+]] = metatype $@thin S2.Type
 
     // CHECK:   [[S2_DELEG_INIT:%[0-9]+]] = function_ref @_TFV19init_ref_delegation2S2CfMS0_U__FT1tQ__S0_ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
 

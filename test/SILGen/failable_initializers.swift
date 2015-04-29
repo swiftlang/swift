@@ -81,7 +81,7 @@ struct LoadableStruct {
     
   // CHECK: = integer_literal $Builtin.Int1, -1
   // CHECK: = integer_literal $Builtin.Int1, 0
-  // CHECK: = select_enum %11 : $Optional<LoadableStruct>, case #Optional.Some!enumelt.1:
+  // CHECK: = select_enum {{%.*}} : $Optional<LoadableStruct>, case #Optional.Some!enumelt.1:
   // CHECK: cond_br {{.*}}, [[DOES_HAVE_VALUE:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
   // -- TODO: failure
   // CHECK:       [[DOES_HAVE_VALUE]]:

@@ -33,9 +33,9 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
                                AC.getIdentifier("$metatype"), SourceLoc(),
                                AC.getIdentifier("$metatype"), metatype,
                                ctor->getDeclContext());
-  return new (gen.F.getModule()) SILArgument(gen.F.begin(),
-                                             gen.getLoweredType(metatype),
-                                             VD);
+  gen.AllocatorMetatype = new (gen.F.getModule()) SILArgument(gen.F.begin(),
+                                              gen.getLoweredType(metatype), VD);
+  return gen.AllocatorMetatype;
 }
 
 static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,

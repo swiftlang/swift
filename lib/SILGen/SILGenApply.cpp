@@ -1133,9 +1133,8 @@ public:
       auto archetype = subs[innerIdx].getArchetype();
       while (archetype->getParent())
         archetype = archetype->getParent();
-      if (!archetype->getSelfProtocol()) {
+      if (!archetype->getSelfProtocol())
         break;
-      }
     }
 
     return subs.slice(innerIdx);
@@ -1296,6 +1295,7 @@ public:
                      ->getDeclaredTypeOfContext()->getAnyNominal();
     bool useAllocatingCtor = isa<StructDecl>(nominal) ||
                              isa<EnumDecl>(nominal) ||
+                             isa<ProtocolDecl>(nominal) ||
                              ctorRef->getDecl()->isFactoryInit();
 
     // Load the 'self' argument.
@@ -1305,7 +1305,10 @@ public:
     // If we're using the allocating constructor, we need to pass along the
     // metatype.
     if (useAllocatingCtor) {
-      self = ManagedValue::forUnmanaged(SGF.emitMetatypeOfValue(expr, arg));
+      if (SGF.AllocatorMetatype)
+        self = ManagedValue::forUnmanaged(SGF.AllocatorMetatype);
+      else
+        self = ManagedValue::forUnmanaged(SGF.emitMetatypeOfValue(expr, arg));
     } else {
       self = SGF.emitRValueAsSingleValue(arg);
     }
@@ -1315,10 +1318,27 @@ public:
                  expr);
 
     // Determine the callee. For structs and enums, this is the allocating
-    // constructor (because there is no initializing constructor). For classes,
+    // constructor (because there is no initializing constructor). For protocol
+    // default implementations, we also use the allocation constructor, because
+    // that's the only thing that's witnessed. For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
-    if (SGF.getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class) {
+    if (isa<ArchetypeType>(
+                 SelfParam.getSubstRValueType().getLValueOrInOutObjectType())) {
+      // Look up the witness for the constructor.
+      auto constant = SILDeclRef(ctorRef->getDecl(),
+                             useAllocatingCtor
+                               ? SILDeclRef::Kind::Allocator
+                               : SILDeclRef::Kind::Initializer,
+                             SILDeclRef::ConstructAtBestResilienceExpansion,
+                             SILDeclRef::ConstructAtNaturalUncurryLevel,
+                             SGF.SGM.requiresObjCDispatch(ctorRef->getDecl()));
+      setCallee(Callee::forArchetype(SGF, SILValue(),
+                     self.getType().getSwiftRValueType(), constant,
+                     cast<AnyFunctionType>(expr->getType()->getCanonicalType()),
+                     expr));
+    } else if (SGF.getMethodDispatch(ctorRef->getDecl())
+                 == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
       setCallee(Callee::forClassMethod(
                   SGF,

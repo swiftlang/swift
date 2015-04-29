@@ -208,6 +208,7 @@ class CanType : public Type {
   static CanType getAnyOptionalObjectTypeImpl(CanType type,
                                               OptionalTypeKind &kind);
   static CanType getReferenceStorageReferentImpl(CanType type);
+  static CanType getLValueOrInOutObjectTypeImpl(CanType type);
   static ClassDecl *getClassBoundImpl(CanType type);
 
 public:
@@ -298,6 +299,10 @@ public:
 
   CanType getReferenceStorageReferent() const {
     return getReferenceStorageReferentImpl(*this);
+  }
+  
+  CanType getLValueOrInOutObjectType() const {
+    return getLValueOrInOutObjectTypeImpl(*this);
   }
   
   // Direct comparison is allowed for CanTypes - they are known canonical.

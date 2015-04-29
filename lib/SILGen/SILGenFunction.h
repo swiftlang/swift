@@ -360,6 +360,9 @@ public:
   };
   SelfInitDelegationStates SelfInitDelegationState = NormalSelf;
   
+  /// The metatype argument to an allocating constructor, if we're emitting one.
+  SILValue AllocatorMetatype;
+  
   /// LocalFunctions - Entries in this map are generated when a local function
   /// declaration that requires local context, such as a func closure, is
   /// emitted. This map is then queried to produce the value for a DeclRefExpr

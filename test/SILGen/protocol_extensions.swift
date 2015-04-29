@@ -253,3 +253,17 @@ func test_open_existential_semantics_class(guaranteed: CP1,
   plusOneCP1().f1()
 }
 
+protocol InitRequirement {
+  init(c: C)
+}
+
+extension InitRequirement {
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions15InitRequirementCUS0___fMQPS0_FT1dCS_1D_S1_ : $@convention(thin) <Self where Self : InitRequirement> (@out Self, @owned D, @thick Self.Type) -> ()
+  // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
+  init(d: D) {
+  // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@out τ_0_0, @owned C, @thick τ_0_0.Type) -> ()
+  // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
+  // CHECK:         apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_UP]], [[SELF_TYPE]])
+    self.init(c: d)
+  }
+}

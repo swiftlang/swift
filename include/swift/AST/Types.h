@@ -4107,6 +4107,14 @@ inline CanType CanType::getReferenceStorageReferentImpl(CanType type) {
   return type;
 }
 
+inline CanType CanType::getLValueOrInOutObjectTypeImpl(CanType type) {
+  if (auto refType = dyn_cast<InOutType>(type))
+    return refType.getObjectType();
+  if (auto refType = dyn_cast<LValueType>(type))
+    return refType.getObjectType();
+  return type;
+}
+
 inline bool TypeBase::mayHaveSuperclass() {
   if (getClassOrBoundGenericClass())
     return true;
