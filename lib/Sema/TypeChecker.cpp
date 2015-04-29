@@ -30,6 +30,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "Swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallSet.h"
@@ -587,91 +588,95 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // checking.
   performNameBinding(SF, StartElem);
 
-  auto &Ctx = SF.getASTContext();
-  TypeChecker TC(Ctx);
-  auto &DefinedFunctions = TC.definedFunctions;
-  if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
-    TC.enableDebugTimeFunctionBodies();
-  
-  // Lookup the swift module.  This ensures that we record all known protocols
-  // in the AST.
-  (void) TC.getStdlibModule(&SF);
-
-  if (!Ctx.LangOpts.DisableAvailabilityChecking ) {
-    // Build the type refinement hierarchy for the primary
-    // file before type checking.
-    TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
-  }
-
-  // Resolve extensions. This has to occur first during type checking,
-  // because the extensions need to be wired into the AST for name lookup
-  // to work.
-  // FIXME: We can have interesting ordering dependencies among the various
-  // extensions, so we'll need to be smarter here.
-  // FIXME: The current source file needs to be handled specially, because of
-  // private extensions.
   bool ImportsFoundationModule = false;
-  auto FoundationModuleName = Ctx.getIdentifier("Foundation");
-  SF.forAllVisibleModules([&](Module::ImportedModule import) {
-    if (import.second->getName() == FoundationModuleName)
-      ImportsFoundationModule = true;
+  auto &Ctx = SF.getASTContext();
+  auto FoundationModuleName = Ctx.getIdentifier(FOUNDATION_MODULE_NAME);
+  {
+    // NOTE: The type checker is scoped to be torn down before AST
+    // verification.
+    TypeChecker TC(Ctx);
+    auto &DefinedFunctions = TC.definedFunctions;
+    if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
+      TC.enableDebugTimeFunctionBodies();
+    
+    // Lookup the swift module.  This ensures that we record all known
+    // protocols in the AST.
+    (void) TC.getStdlibModule(&SF);
 
-    // FIXME: Respect the access path?
-    for (auto file : import.second->getFiles()) {
-      auto SF = dyn_cast<SourceFile>(file);
-      if (!SF)
+    if (!Ctx.LangOpts.DisableAvailabilityChecking ) {
+      // Build the type refinement hierarchy for the primary
+      // file before type checking.
+      TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
+    }
+
+    // Resolve extensions. This has to occur first during type checking,
+    // because the extensions need to be wired into the AST for name lookup
+    // to work.
+    // FIXME: We can have interesting ordering dependencies among the various
+    // extensions, so we'll need to be smarter here.
+    // FIXME: The current source file needs to be handled specially, because of
+    // private extensions.
+    SF.forAllVisibleModules([&](Module::ImportedModule import) {
+      if (import.second->getName() == FoundationModuleName)
+        ImportsFoundationModule = true;
+
+      // FIXME: Respect the access path?
+      for (auto file : import.second->getFiles()) {
+        auto SF = dyn_cast<SourceFile>(file);
+        if (!SF)
+          continue;
+
+        for (auto D : SF->Decls) {
+          if (auto ED = dyn_cast<ExtensionDecl>(D))
+            bindExtensionDecl(ED, TC);
+        }
+      }
+    });
+
+    // FIXME: Check for cycles in class inheritance here?
+    
+    // Type check the top-level elements of the source file.
+    for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
+      if (isa<TopLevelCodeDecl>(D))
         continue;
 
-      for (auto D : SF->Decls) {
-        if (auto ED = dyn_cast<ExtensionDecl>(D))
-          bindExtensionDecl(ED, TC);
+      TC.typeCheckDecl(D, /*isFirstPass*/true);
+    }
+
+    // At this point, we can perform general name lookup into any type.
+
+    // We don't know the types of all the global declarations in the first
+    // pass, which means we can't completely analyze everything. Perform the
+    // second pass now.
+
+    bool hasTopLevelCode = false;
+    for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
+      if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+        hasTopLevelCode = true;
+        // Immediately perform global name-binding etc.
+        TC.typeCheckTopLevelCodeDecl(TLCD);
+      } else {
+        TC.typeCheckDecl(D, /*isFirstPass*/false);
       }
     }
-  });
 
-  // FIXME: Check for cycles in class inheritance here?
-  
-  // Type check the top-level elements of the source file.
-  for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
-    if (isa<TopLevelCodeDecl>(D))
-      continue;
-
-    TC.typeCheckDecl(D, /*isFirstPass*/true);
-  }
-
-  // At this point, we can perform general name lookup into any type.
-
-  // We don't know the types of all the global declarations in the first
-  // pass, which means we can't completely analyze everything. Perform the
-  // second pass now.
-
-  bool hasTopLevelCode = false;
-  for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
-    if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      hasTopLevelCode = true;
-      // Immediately perform global name-binding etc.
-      TC.typeCheckTopLevelCodeDecl(TLCD);
-    } else {
-      TC.typeCheckDecl(D, /*isFirstPass*/false);
+    if (hasTopLevelCode) {
+      TC.contextualizeTopLevelCode(TLC,
+                             llvm::makeArrayRef(SF.Decls).slice(StartElem));
     }
+    
+    DefinedFunctions.insert(DefinedFunctions.end(),
+                            TC.implicitlyDefinedFunctions.begin(),
+                            TC.implicitlyDefinedFunctions.end());
+    TC.implicitlyDefinedFunctions.clear();
+
+    // If we're in REPL mode, inject temporary result variables and other stuff
+    // that the REPL needs to synthesize.
+    if (SF.Kind == SourceFileKind::REPL && !TC.Context.hadError())
+      TC.processREPLTopLevel(SF, TLC, StartElem);
+
+    typeCheckFunctionsAndExternalDecls(TC);
   }
-
-  if (hasTopLevelCode) {
-    TC.contextualizeTopLevelCode(TLC,
-                           llvm::makeArrayRef(SF.Decls).slice(StartElem));
-  }
-  
-  DefinedFunctions.insert(DefinedFunctions.end(),
-                          TC.implicitlyDefinedFunctions.begin(),
-                          TC.implicitlyDefinedFunctions.end());
-  TC.implicitlyDefinedFunctions.clear();
-
-  // If we're in REPL mode, inject temporary result variables and other stuff
-  // that the REPL needs to synthesize.
-  if (SF.Kind == SourceFileKind::REPL && !TC.Context.hadError())
-    TC.processREPLTopLevel(SF, TLC, StartElem);
-
-  typeCheckFunctionsAndExternalDecls(TC);
 
   // Checking that benefits from having the whole module available.
   if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {

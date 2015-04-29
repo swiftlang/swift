@@ -268,7 +268,10 @@ private:
   std::unique_ptr<clang::Parser> Parser;
 
   /// The active type checker, or null if there is no active type checker.
-  LazyResolver *typeResolver = nullptr;
+  ///
+  /// The flag is \c true if there has ever been a type resolver assigned, i.e.
+  /// if type checking has begun.
+  llvm::PointerIntPair<LazyResolver *, 1, bool> typeResolver;
 
 public:
   /// \brief Mapping of already-imported declarations.
@@ -993,11 +996,16 @@ public:
   bool shouldImportGlobalAsLet(clang::QualType type);
 
   LazyResolver *getTypeResolver() const {
-    return typeResolver;
+    return typeResolver.getPointer();
   }
   void setTypeResolver(LazyResolver *newResolver) {
-    assert((!typeResolver || !newResolver) && "already have a type resolver");
-    typeResolver = newResolver;
+    assert((!typeResolver.getPointer() || !newResolver) &&
+           "already have a type resolver");
+    typeResolver.setPointerAndInt(newResolver, true);
+  }
+  bool hasBegunTypeChecking() const { return typeResolver.getInt(); }
+  bool hasFinishedTypeChecking() const {
+    return hasBegunTypeChecking() && !getTypeResolver();
   }
 
   /// Allocate a new delayed conformance ID with the given set of

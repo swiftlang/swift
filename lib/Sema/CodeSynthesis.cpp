@@ -1964,7 +1964,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   // If the struct in which this constructor is being added was imported,
   // add it as an external definition.
   if (decl->hasClangNode()) {
-    tc.Context.ExternalDefinitions.insert(ctor);
+    tc.Context.addedExternalDecl(ctor);
   }
 
   return ctor;

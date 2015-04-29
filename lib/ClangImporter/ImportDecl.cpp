@@ -421,9 +421,10 @@ static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
 ///   let rawValue: Raw
 /// }
 /// \endcode
-static FuncDecl *makeRawValueTrivialGetter(StructDecl *optionSetDecl,
+static FuncDecl *makeRawValueTrivialGetter(ClangImporter::Implementation &Impl,
+                                           StructDecl *optionSetDecl,
                                            ValueDecl *rawDecl) {
-  ASTContext &C = optionSetDecl->getASTContext();
+  ASTContext &C = Impl.SwiftContext;
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto rawType = rawDecl->getType();
 
@@ -446,6 +447,10 @@ static FuncDecl *makeRawValueTrivialGetter(StructDecl *optionSetDecl,
   getterDecl->setType(toRawType);
   getterDecl->setBodyResultType(rawType);
   getterDecl->setAccessibility(Accessibility::Public);
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return getterDecl;
 
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
@@ -471,10 +476,11 @@ static FuncDecl *makeRawValueTrivialGetter(StructDecl *optionSetDecl,
 ///   var rawValue: Raw
 /// }
 /// \endcode
-static FuncDecl *makeRawValueTrivialSetter(StructDecl *importedDecl,
+static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
+                                           StructDecl *importedDecl,
                                            ValueDecl *rawDecl) {
   // FIXME: Largely duplicated from the type checker.
-  ASTContext &C = importedDecl->getASTContext();
+  ASTContext &C = Impl.SwiftContext;
   auto selfType = importedDecl->getDeclaredTypeInContext();
   auto rawType = rawDecl->getType();
 
@@ -508,6 +514,10 @@ static FuncDecl *makeRawValueTrivialSetter(StructDecl *importedDecl,
   setterDecl->setType(fnTy);
   setterDecl->setBodyResultType(voidTy);
   setterDecl->setAccessibility(Accessibility::Public);
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return setterDecl;
 
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
   auto dest = new (C) MemberRefExpr(selfRef, SourceLoc(), rawDecl, SourceLoc(),
@@ -572,9 +582,10 @@ getOperatorRef(ASTContext &C, Identifier name) {
 ///   }
 /// }
 /// \endcode
-static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
-                                           SmallVectorImpl<Decl *> &NewDecls) {
-  ASTContext &C = optionSetDecl->getASTContext();
+static void makeOptionSetAllZerosProperty(ClangImporter::Implementation &Impl,
+                                          StructDecl *optionSetDecl,
+                                          SmallVectorImpl<Decl *> &NewDecls) {
+  ASTContext &C = Impl.SwiftContext;
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
 
   // Create the getter.
@@ -598,18 +609,9 @@ static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
   getterDecl->setBodyResultType(optionSetType);
   getterDecl->setAccessibility(Accessibility::Public);
 
-  // Fill in the body of the getter.
-  {
-    auto nilLiteral = new (C) NilLiteralExpr(SourceLoc(), /*implicit=*/true);
-    auto ret = new (C) ReturnStmt(SourceLoc(), nilLiteral);
-
-    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
-                                  /*Implicit=*/true);
-    getterDecl->setBody(body);
-  }
-
-  // Add as an external definition.
-  C.addedExternalDecl(getterDecl);
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return;
 
   NewDecls.push_back(getterDecl);
 
@@ -637,6 +639,24 @@ static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
                                          optionSetDecl);
   PBD->setImplicit();
   NewDecls.push_back(PBD);
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return;
+
+  // Fill in the body of the getter.
+  {
+    auto nilLiteral = new (C) NilLiteralExpr(SourceLoc(), /*implicit=*/true);
+    auto ret = new (C) ReturnStmt(SourceLoc(), nilLiteral);
+
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                  /*Implicit=*/true);
+    getterDecl->setBody(body);
+  }
+
+  // Add as an external definition.
+  C.addedExternalDecl(getterDecl);
+
 }
 
 // Build the NilLiteralConvertible conformance:
@@ -646,9 +666,11 @@ static void makeOptionSetAllZerosProperty(StructDecl *optionSetDecl,
 //    self = S()
 //  }
 // }
-static ConstructorDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
-                                                  ValueDecl *valueDecl) {
-  auto &C = optionSetDecl->getASTContext();
+static ConstructorDecl *
+makeNilLiteralConformance(ClangImporter::Implementation &Impl,
+                          StructDecl *optionSetDecl,
+                          ValueDecl *valueDecl) {
+  auto &C = Impl.SwiftContext;
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   
   VarDecl *selfDecl = createSelfDecl(optionSetDecl, /*staticMethod=*/false);
@@ -681,6 +703,10 @@ static ConstructorDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
   Type initFnType = FunctionType::get(optionSetType, fnType);
   initDecl->setType(allocFnType);
   initDecl->setInitializerType(initFnType);
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return initDecl;
 
   // Form the body of the initializer.
   auto *ctorRef = new (C) DeclRefExpr(ConcreteDeclRef(optionSetDecl),
@@ -716,9 +742,11 @@ static ConstructorDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
 //     return 0
 //   }
 // }
-static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDecl,
-                                                        ValueDecl *valueDecl) {
-  ASTContext &C = optionSetDecl->getASTContext();
+static ConstructorDecl *
+makeOptionSetDefaultConstructor(ClangImporter::Implementation &Impl,
+                                StructDecl *optionSetDecl,
+                                ValueDecl *valueDecl) {
+  ASTContext &C = Impl.SwiftContext;
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto metaTy = MetatypeType::get(optionSetType);
 
@@ -741,6 +769,10 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   auto initFnTy = FunctionType::get(optionSetType, fnTy);
   ctorDecl->setType(allocFnTy);
   ctorDecl->setInitializerType(initFnTy);
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return ctorDecl;
   
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
@@ -768,8 +800,10 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
 //   }
 // Unlike a standard init(rawValue:) enum initializer, this does a reinterpret
 // cast in order to preserve unknown or future cases from C.
-static ConstructorDecl *makeEnumRawValueConstructor(EnumDecl *enumDecl) {
-  ASTContext &C = enumDecl->getASTContext();
+static ConstructorDecl *
+makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
+                            EnumDecl *enumDecl) {
+  ASTContext &C = Impl.SwiftContext;
   auto enumTy = enumDecl->getDeclaredTypeInContext();
   auto metaTy = MetatypeType::get(enumTy);
   
@@ -811,6 +845,10 @@ static ConstructorDecl *makeEnumRawValueConstructor(EnumDecl *enumDecl) {
   auto initFnTy = FunctionType::get(enumTy, fnTy);
   ctorDecl->setType(allocFnTy);
   ctorDecl->setInitializerType(initFnTy);
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return ctorDecl;
   
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
   auto paramRef = new (C) DeclRefExpr(param, SourceLoc(),
@@ -841,9 +879,10 @@ static ConstructorDecl *makeEnumRawValueConstructor(EnumDecl *enumDecl) {
 //   }
 // Unlike a standard init(rawValue:) enum initializer, this does a reinterpret
 // cast in order to preserve unknown or future cases from C.
-static FuncDecl *makeEnumRawValueGetter(EnumDecl *enumDecl,
+static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
+                                        EnumDecl *enumDecl,
                                         VarDecl *rawValueDecl) {
-  ASTContext &C = enumDecl->getASTContext();
+  ASTContext &C = Impl.SwiftContext;
   
   VarDecl *selfDecl = createSelfDecl(enumDecl, false);
   Pattern *selfPattern = createTypedNamedPattern(selfDecl);
@@ -869,6 +908,10 @@ static FuncDecl *makeEnumRawValueGetter(EnumDecl *enumDecl,
 
   rawValueDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                              SourceLoc());
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return getterDecl;
   
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
   auto reinterpretCast
@@ -1772,18 +1815,19 @@ namespace {
         auto valueConstructor =
             createValueConstructor(structDecl, var,
                                    /*wantCtorParamNames=*/false,
-                                   /*wantBody=*/true);
+                                   /*wantBody=*/!Impl.hasFinishedTypeChecking());
         auto labeledValueConstructor =
             createValueConstructor( structDecl, var,
                                    /*wantCtorParamNames=*/true,
-                                   /*wantBody=*/true);
+                                   /*wantBody=*/!Impl.hasFinishedTypeChecking());
 
         // Add delayed implicit members to the type.
+        auto &Impl = this->Impl;
         DelayedDecl delayedMembers[] = {
-          [=](SmallVectorImpl<Decl *> &NewDecls) {
-            auto rawGetter = makeRawValueTrivialGetter(structDecl, var);
+          [=, &Impl](SmallVectorImpl<Decl *> &NewDecls) {
+            auto rawGetter = makeRawValueTrivialGetter(Impl, structDecl, var);
             NewDecls.push_back(rawGetter);
-            auto rawSetter = makeRawValueTrivialSetter(structDecl, var);
+            auto rawSetter = makeRawValueTrivialSetter(Impl, structDecl, var);
             NewDecls.push_back(rawSetter);
             // FIXME: MaterializeForSet?
             var->addTrivialAccessors(rawGetter, rawSetter, nullptr);
@@ -1855,7 +1899,7 @@ namespace {
         // conversions that just do a bitcast. We can't reliably filter a
         // C enum without additional knowledge that the type has no
         // undeclared values, and won't ever add cases.
-        auto rawValueConstructor = makeEnumRawValueConstructor(enumDecl);
+        auto rawValueConstructor = makeEnumRawValueConstructor(Impl, enumDecl);
 
         auto varName = Impl.SwiftContext.Id_rawValue;
         auto rawValue = new (Impl.SwiftContext) VarDecl(/*static*/ false,
@@ -1875,7 +1919,7 @@ namespace {
                                      StaticSpellingKind::None, SourceLoc(),
                                      varPattern, nullptr, enumDecl);
 
-        auto rawValueGetter = makeEnumRawValueGetter(enumDecl, rawValue);
+        auto rawValueGetter = makeEnumRawValueGetter(Impl, enumDecl, rawValue);
 
         enumDecl->addMember(rawValueConstructor);
         enumDecl->addMember(rawValueGetter);
@@ -1928,7 +1972,8 @@ namespace {
                                        varPattern, nullptr, structDecl);
         
         // Create a default initializer to get the value with no options set.
-        auto defaultConstructor = makeOptionSetDefaultConstructor(structDecl,
+        auto defaultConstructor = makeOptionSetDefaultConstructor(Impl,
+                                                                  structDecl,
                                                                   var);
         
         // Create a constructor to initialize that value from a value of the
@@ -1938,11 +1983,11 @@ namespace {
         auto valueConstructor = createValueConstructor(
                                   structDecl, varDecl,
                                   /*wantCtorParamNames=*/false,
-                                  /*wantBody=*/ true);
+                                  /*wantBody=*/!Impl.hasFinishedTypeChecking());
         auto labeledValueConstructor = createValueConstructor(
-                                                 structDecl, varDecl,
-                                                 /*wantCtorParamNames=*/true,
-                                                 /*wantBody=*/true);
+                                  structDecl, varDecl,
+                                  /*wantCtorParamNames=*/true,
+                                  /*wantBody=*/!Impl.hasFinishedTypeChecking());
 
         // Build a delayed RawOptionSetType conformance for the type.
         DelayedProtocolDecl delayedProtocols[] = {
@@ -1952,11 +1997,13 @@ namespace {
             Impl.SwiftContext.AllocateCopy(delayedProtocols));
 
         // Add delayed implicit members to the type.
+        auto &Impl = this->Impl;
         DelayedDecl delayedMembers[] = {
-          [=](SmallVectorImpl<Decl *> &NewDecls) {
-            makeOptionSetAllZerosProperty(structDecl, NewDecls);
-            NewDecls.push_back(makeNilLiteralConformance(structDecl, var));
-            auto rawGetter = makeRawValueTrivialGetter(structDecl, var);
+          [=, &Impl](SmallVectorImpl<Decl *> &NewDecls) {
+            makeOptionSetAllZerosProperty(Impl, structDecl, NewDecls);
+            NewDecls.push_back(makeNilLiteralConformance(Impl, structDecl,
+                                                         var));
+            auto rawGetter = makeRawValueTrivialGetter(Impl, structDecl, var);
             NewDecls.push_back(rawGetter);
             var->addTrivialAccessors(rawGetter, nullptr, nullptr);
           }
@@ -5437,12 +5484,16 @@ void ClangImporter::Implementation::finishedImportingEntity() {
 void ClangImporter::Implementation::finishPendingActions() {
   while (true) {
     if (!RegisteredExternalDecls.empty()) {
-      Decl *D = RegisteredExternalDecls.pop_back_val();
-      SwiftContext.addedExternalDecl(D);
-      if (auto typeResolver = getTypeResolver())
-        if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
-          if (!nominal->hasDelayedMembers())
-            typeResolver->resolveExternalDeclImplicitMembers(nominal);
+      if (hasFinishedTypeChecking()) {
+        RegisteredExternalDecls.clear();
+      } else {
+        Decl *D = RegisteredExternalDecls.pop_back_val();
+        SwiftContext.addedExternalDecl(D);
+        if (auto typeResolver = getTypeResolver())
+          if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
+            if (!nominal->hasDelayedMembers())
+              typeResolver->resolveExternalDeclImplicitMembers(nominal);
+      }
     } else if (!DelayedProtocolConformances.empty()) {
       NormalProtocolConformance *conformance =
           DelayedProtocolConformances.pop_back_val();
@@ -5738,42 +5789,45 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setBodyResultType(type);
   func->setAccessibility(Accessibility::Public);
 
-  auto expr = valueExpr;
+  // If we're not done type checking, build the getter body.
+  if (!hasFinishedTypeChecking()) {
+    auto expr = valueExpr;
 
-  // If we need a conversion, add one now.
-  switch (convertKind) {
-  case ConstantConvertKind::None:
-    break;
+    // If we need a conversion, add one now.
+    switch (convertKind) {
+    case ConstantConvertKind::None:
+      break;
 
-  case ConstantConvertKind::Construction:
-  case ConstantConvertKind::ConstructionWithUnwrap: {
-    auto typeRef = TypeExpr::createImplicit(type, context);
-    expr = new (context) ParenExpr(SourceLoc(), expr, SourceLoc(),
-                                   /*Implicit=*/true);
-    expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
-    if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
-      expr = new (context) ForceValueExpr(expr, SourceLoc());
-    break;
+    case ConstantConvertKind::Construction:
+    case ConstantConvertKind::ConstructionWithUnwrap: {
+      auto typeRef = TypeExpr::createImplicit(type, context);
+      expr = new (context) ParenExpr(SourceLoc(), expr, SourceLoc(),
+                                     /*Implicit=*/true);
+      expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
+      if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
+        expr = new (context) ForceValueExpr(expr, SourceLoc());
+      break;
+    }
+
+    case ConstantConvertKind::Coerce:
+      break;
+
+    case ConstantConvertKind::Downcast: {
+      expr = new (context) ForcedCheckedCastExpr(expr, SourceLoc(), SourceLoc(),
+                                                 TypeLoc::withoutLoc(type));
+      expr->setImplicit();
+      break;
+    }
+    }
+
+    // Create the return statement.
+    auto ret = new (context) ReturnStmt(SourceLoc(), expr);
+
+    // Finally, set the body.
+    func->setBody(BraceStmt::create(context, SourceLoc(),
+                                    ASTNode(ret),
+                                    SourceLoc()));
   }
-
-  case ConstantConvertKind::Coerce:
-    break;
-
-  case ConstantConvertKind::Downcast: {
-    expr = new (context) ForcedCheckedCastExpr(expr, SourceLoc(), SourceLoc(),
-                                               TypeLoc::withoutLoc(type));
-    expr->setImplicit();
-    break;
-  }
-  }
-
-  // Create the return statement.
-  auto ret = new (context) ReturnStmt(SourceLoc(), expr);
-
-  // Finally, set the body.
-  func->setBody(BraceStmt::create(context, SourceLoc(),
-                                  ASTNode(ret),
-                                  SourceLoc()));
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));

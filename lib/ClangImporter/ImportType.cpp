@@ -1745,7 +1745,7 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
 
   assert(!type->hasClangNode() && "picked up the original type?");
 
-  if (typeResolver)
+  if (auto *typeResolver = getTypeResolver())
     typeResolver->resolveDeclSignature(type);
   return type->getDeclaredType();
 }
@@ -1763,7 +1763,7 @@ getNamedSwiftTypeSpecialization(Module *module, StringRef name,
                       NLKind::UnqualifiedLookup, results);
   if (results.size() == 1) {
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(results.front())) {
-      if (typeResolver)
+      if (auto *typeResolver = getTypeResolver())
         typeResolver->resolveDeclSignature(nominalDecl);
       if (auto params = nominalDecl->getGenericParams()) {
         if (params->size() == args.size()) {
@@ -1820,7 +1820,7 @@ bool ClangImporter::Implementation::matchesNSObjectBound(Type type) {
     return false;
 
   // Class type or existential that inherits from NSObject.
-  if (NSObjectType->isSuperclassOf(type, typeResolver))
+  if (NSObjectType->isSuperclassOf(type, getTypeResolver()))
     return true;
 
   // Struct or enum type must have been bridged.
