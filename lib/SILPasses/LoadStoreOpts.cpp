@@ -425,6 +425,17 @@ public:
 
   MutableArrayRef<SILInstruction *> getInsts() { return Insts; }
 
+#ifndef NDEBUG
+  friend raw_ostream &operator<<(raw_ostream &os, const LSValue &Val) {
+    os << "value in bb" << Val.ParentBB->getDebugID() << ": " <<
+      Val.ForwardingValue;
+    for (SILInstruction *I : Val.Insts) {
+      os << "             " << *I;
+    }
+    return os;
+  }
+#endif
+
 protected:
   /// Returns true if this LSValue represents a singular inst instruction.
   bool isSingleInst() const { return Insts.size() == 1; }
@@ -721,6 +732,20 @@ private:
                            llvm::SmallVectorImpl<SILInstruction *> &V);
 };
 
+#ifndef NDEBUG
+inline raw_ostream &operator<<(raw_ostream &os,
+                               const std::pair<SILValue, LSLoad> &Value) {
+  os << "load " << Value.first << "              -> " << Value.second;
+  return os;
+}
+
+inline raw_ostream &operator<<(raw_ostream &os,
+                               const std::pair<SILValue, LSStore> &Value) {
+  os << "store " << Value.first << "              -> " << Value.second;
+  return os;
+}
+#endif
+
 } // end anonymous namespace
 
 void
@@ -891,7 +916,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     }
 
     DEBUG(llvm::dbgs() << "        Found a dead previous store... Removing...:"
-                       << P.first);
+                       << P);
     Changed = true;
     StoresToDelete.push_back(P.first);
     NumDeadStores++;
@@ -1120,12 +1145,12 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
   DEBUG(llvm::dbgs() << "    Final State\n");
   DEBUG(llvm::dbgs() << "        Tracking Load Ops:\n";
         for (auto &P : Loads) {
-          llvm::dbgs() << "            " << P.first;
+          llvm::dbgs() << "            " << P;
         });
 
   DEBUG(llvm::dbgs() << "        Tracking Store Ops:\n";
         for (auto &P : Stores) {
-          llvm::dbgs() << "            " << P.first;
+          llvm::dbgs() << "            " << P;
         });
 
   return Changed;
@@ -1204,8 +1229,6 @@ updateStoreMap(llvm::DenseMap<SILBasicBlock *,
       StoreMap.clear();
       return;
     }
-    auto BBId = I->second;
-    (void) BBId;
     LSBBForwarder &Other = BBIDToForwarderMap[I->second];
 
     // Calculate SILValues that are stored once in this predecessor.
@@ -1229,8 +1252,9 @@ updateStoreMap(llvm::DenseMap<SILBasicBlock *,
       for (auto I = StoredMapOfThisPred.begin(), E = StoredMapOfThisPred.end();
            I != E; I++) {
         StoreMap[I->first].push_back(I->second);
-        DEBUG(llvm::dbgs() << "        Updating StoreMap BB#" << BBId << ": "
-                           << I->first << "          " << *I->second);
+        DEBUG(llvm::dbgs() << "        Updating StoreMap bb" <<
+              Pred->getDebugID() << ": " << I->first << "          " <<
+              *I->second);
       }
     } else {
       // Merge in stores from other predecessors.
@@ -1239,15 +1263,15 @@ updateStoreMap(llvm::DenseMap<SILBasicBlock *,
         if (!StoredMapOfThisPred.count(Current) ||
             I->second[0]->getSrc().getType() !=
             StoredMapOfThisPred[Current]->getSrc().getType()) {
-          DEBUG(llvm::dbgs() << "        Removing StoreMap: " << Current);
+          DEBUG(llvm::dbgs() << "        Removing from StoreMap: " << Current);
           I++; // Move to the next before erasing the current.
           StoreMap.erase(Current);
         }
         else {
           I->second.push_back(StoredMapOfThisPred[Current]);
-          DEBUG(llvm::dbgs() << "        Updating StoreMap BB#" << BBId << ": "
-                             << Current
-                             << "          " << *StoredMapOfThisPred[Current]);
+          DEBUG(llvm::dbgs() << "        Updating StoreMap bb" <<
+                Pred->getDebugID() << ": " << Current <<
+                "          " << *StoredMapOfThisPred[Current]);
           I++;
         }
       }
@@ -1310,22 +1334,23 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
 
       DEBUG(llvm::dbgs() << "        Tracking Loads:\n";
             for (auto &P : Loads) {
-              llvm::dbgs() << "            " << P.first;
+              llvm::dbgs() << "            " << P;
             });
 
       DEBUG(llvm::dbgs() << "        Tracking Stores:\n";
             for (auto &P : Stores) {
-              llvm::dbgs() << "            " << P.first;
+              llvm::dbgs() << "            " << P;
             });
     } else if (Pred != BB) {
-      DEBUG(llvm::dbgs() << "    Merging with pred: " << I->second << "\n");
+      DEBUG(llvm::dbgs() << "    Merging with pred  bb" << Pred->getDebugID() <<
+            "\n");
       mergePredecessorState(Other);
     }
     HasAtLeastOnePred = true;
   }
 
   for (auto &P : Stores) {
-    DEBUG(llvm::dbgs() << "        Removing StoreMap: " << P.first);
+    DEBUG(llvm::dbgs() << "        Removing from StoreMap: " << P);
     StoreMap.erase(P.first);
   }
 }
@@ -1370,7 +1395,7 @@ LSContext::runIteration() {
     LSBBForwarder &Forwarder = BBIDToForwarderMap[ID];
     assert(Forwarder.getBB() == BB && "We just constructed this!?");
 
-    DEBUG(llvm::dbgs() << "Visiting BB #" << ID << "\n");
+    DEBUG(llvm::dbgs() << "Visiting bb" << BB->getDebugID() << "\n");
 
     CoveredStoreMap StoreMap;
     PredOrderInStoreList PredOrder;
