@@ -13,22 +13,22 @@
 /// A sequence of pairs built out of two underlying sequences, where
 /// the elements of the `i`th pair are the `i`th elements of each
 /// underlying sequence.
-public func zip<Sequence1 : SequenceType, Sequence2 : SequenceType>(
-  sequence1: Sequence1, _ sequence2: Sequence2
-) -> Zip2<Sequence1, Sequence2> {
-  return Zip2(sequence1, sequence2)
+public func zip<S0: SequenceType, S1: SequenceType>(
+  s0: S0, _ s1: S1
+) -> Zip2<S0, S1> {
+  return Zip2(s0, s1)
 }
 
 /// A generator for the `Zip2` sequence
 public struct ZipGenerator2<
-  Generator1 : GeneratorType, Generator2 : GeneratorType
+  E0 : GeneratorType, E1 : GeneratorType
 > : GeneratorType {
   /// The type of element returned by `next()`.
-  public typealias Element = (Generator1.Element, Generator2.Element)
+  public typealias Element = (E0.Element,E1.Element)
 
   /// Construct around a pair of underlying generators.
-  public init(_ generator1: Generator1, _ generator2: Generator2) {
-    baseStreams = (generator1, generator2)
+  public init(_ e0: E0, _ e1: E1) {
+    baseStreams = (e0,e1)
   }
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -61,27 +61,26 @@ public struct ZipGenerator2<
     return .Some((e0!, e1!))
   }
 
-  internal var _baseStreams: (Generator1, Generator2)
-  internal var _reachedEnd: Bool = false
+  var baseStreams: (E0, E1)
+  var reachedEnd: Bool = false
 }
 
 /// A sequence of pairs built out of two underlying sequences, where
 /// the elements of the `i`th pair are the `i`th elements of each
 /// underlying sequence.
-public struct Zip2<Sequence1 : SequenceType, Sequence2 : SequenceType>
-  : SequenceType {
-
-  public typealias Stream1 = Sequence1.Generator
-  public typealias Stream2 = Sequence2.Generator
-
+public struct Zip2<S0: SequenceType, S1: SequenceType> : SequenceType
+{
+  public typealias Stream1 = S0.Generator
+  public typealias Stream2 = S1.Generator
+  
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
   public typealias Generator = ZipGenerator2<Stream1, Stream2>
 
-  /// Construct an instance that makes pairs of elements from `sequence1` and
-  /// `sequence2`.
-  public init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
-    _sequences = (sequence1, sequence2)
+  /// Construct an instance that makes pairs of elements from `s0` and
+  /// `s1`.
+  public init(_ s0: S0, _ s1: S1) {
+    sequences = (s0,s1)
   }
 
   /// Return a *generator* over the elements of this *sequence*.
@@ -89,9 +88,9 @@ public struct Zip2<Sequence1 : SequenceType, Sequence2 : SequenceType>
   /// - complexity: O(1)
   public func generate() -> Generator {
     return Generator(
-      _sequences.0.generate(),
-      _sequences.1.generate())
+      sequences.0.generate(), 
+      sequences.1.generate())
   }
 
-  internal let _sequences: (Sequence1, Sequence2)
+  var sequences: (S0,S1)
 }
