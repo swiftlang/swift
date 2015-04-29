@@ -48,17 +48,17 @@ public struct ZipGenerator2<
       return nil
     }
 
-    var e0 = _baseStreams.0.next()
-    if e0 == nil {
+    let e0? = _baseStreams.0.next() else {
       _reachedEnd = true
       return nil
     }
-    var e1 = _baseStreams.1.next()
-    if e1 ==  nil {
+
+    var e1? = _baseStreams.1.next() else {
       _reachedEnd = true
       return nil
     }
-    return .Some((e0!, e1!))
+
+    return .Some((e0, e1))
   }
 
   internal var _baseStreams: (Generator1, Generator2)
