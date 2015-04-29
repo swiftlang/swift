@@ -620,10 +620,12 @@ func invalidDictionaryLiteral() {
 [1].join([[[4]]]) // expected-error {{cannot invoke 'join' with an argument list of type '([Array<Array<Int>>])'}}
 
 //===----------------------------------------------------------------------===//
-// nil/.None comparisons
+// nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-.None == nil // expected-error {{could not find member 'None'}}
-nil == .None // expected-error {{could not find member 'None'}}
+Int.self == nil // expected-error {{binary operator '==' cannot be applied to operands}}
+nil == Int.self // expected-error {{binary operator '==' cannot be applied to operands}}
+Int.self != nil // expected-error {{binary operator '!=' cannot be applied to operands}}
+nil != Int.self // expected-error {{binary operator '!=' cannot be applied to operands}}
 
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining

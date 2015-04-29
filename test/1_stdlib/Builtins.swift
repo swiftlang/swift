@@ -136,4 +136,95 @@ tests.test("_getSuperclass") {
   expectTrue(_getSuperclass(C.self)! == B.self)
 }
 
+tests.test("type comparison") {
+  class B {}
+  class D : B {}
+  
+  let t1 = B.self
+  let t1o = Optional(t1)
+  let t2 = D.self
+  let t2o = Optional(t2)
+
+  expectTrue(t1 == t1)
+  expectFalse(t1 != t1)
+  expectTrue(t2 == t2)
+  expectFalse(t2 != t2)
+  
+  expectFalse(t1 == t2)
+  expectFalse(t2 == t1)
+  expectTrue(t1 != t2)
+  expectTrue(t2 != t1)
+
+  expectTrue(t1 == t1o)
+  expectFalse(t1 != t1o)
+  expectTrue(t2 == t2o)
+  expectFalse(t2 != t2o)
+  
+  expectFalse(t1 == t2o)
+  expectFalse(t2 == t1o)
+  expectTrue(t1 != t2o)
+  expectTrue(t2 != t1o)
+  
+  expectTrue(t1o == t1)
+  expectFalse(t1o != t1)
+  expectTrue(t2o == t2)
+  expectFalse(t2o != t2)
+  
+  expectFalse(t1o == t2)
+  expectFalse(t2o == t1)
+  expectTrue(t1o != t2)
+  expectTrue(t2o != t1)
+
+  expectTrue(t1o == t1o)
+  expectFalse(t1o != t1o)
+  expectTrue(t2o == t2o)
+  expectFalse(t2o != t2o)
+  
+  expectFalse(t1o == t2o)
+  expectFalse(t2o == t1o)
+  expectTrue(t1o != t2o)
+  expectTrue(t2o != t1o)
+
+  let nil1 : B.Type? = nil
+  let nil2 : D.Type? = nil
+
+  expectTrue(nil1 == nil2)
+  expectTrue(nil1 == nil1)
+  
+  expectTrue(nil1 == nil)
+  expectTrue(nil == nil1)
+  
+  expectTrue(nil2 == nil)
+  expectTrue(nil == nil2)
+  
+  expectFalse(t1 == nil1)
+  expectFalse(nil1 == t1)
+  
+  expectFalse(t2 == nil1)
+  expectFalse(nil1 == t2)
+  
+  expectFalse(t1 == nil2)
+  expectFalse(nil2 == t1)
+  
+  expectFalse(t2 == nil2)
+  expectFalse(nil2 == t2)
+
+  expectFalse(t1o == nil)
+  expectFalse(nil == t1o)
+  
+  expectFalse(t2o == nil)
+  expectFalse(nil == t2o)
+  
+  expectFalse(t1o == nil1)
+  expectFalse(nil1 == t1o)
+  
+  expectFalse(t2o == nil1)
+  expectFalse(nil1 == t2o)
+  
+  expectFalse(t1o == nil2)
+  expectFalse(nil2 == t1o)
+  
+  expectFalse(t2o == nil2)
+  expectFalse(nil2 == t2o)
+}
 runAllTests()
