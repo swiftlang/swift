@@ -505,6 +505,13 @@ class swift::ConformanceLookupTable {
   /// conformance checking.
   LastProcessedEntry LastProcessed[NumConformanceStages];
 
+  /// The list of parsed extension declarations that have been delayed because
+  /// no resolver was available at the time.
+  ///
+  /// FIXME: This is insane. The resolver should be there or we shouldn't
+  /// have paresed extensions.
+  llvm::SetVector<ExtensionDecl *> DelayedExtensionDecls[NumConformanceStages];
+
   struct ConformanceEntry;
 
   /// Describes the "source" of a conformance, indicating where the
@@ -1009,9 +1016,6 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
   if (!lastProcessed.getInt()) {
     lastProcessed.setInt(true);
 
-    if (resolver)
-      resolver->resolveDeclSignature(nominal);
-
     // If we have conformances we can load, do so.
     // FIXME: This could be more lazy.
     auto loader = nominal->takeConformanceLoader();
@@ -1019,6 +1023,8 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       SmallVector<ProtocolConformance *, 2> conformances;
       loader.first->loadAllConformances(nominal, loader.second, conformances);
       loadAllConformances(nominal, nominal, conformances);
+    } else if (nominal->getParentSourceFile() && resolver) {
+      resolver->resolveDeclSignature(nominal);
     }
 
     nominalFunc(nominal);
@@ -1032,6 +1038,8 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     return;
 
   // Handle the extensions that we have not yet visited.
+  llvm::SetVector<ExtensionDecl *> &delayedExtensionDecls
+    = DelayedExtensionDecls[static_cast<unsigned>(stage)];
   nominal->prepareExtensions();
   for (auto next = lastProcessed.getPointer()
                      ? lastProcessed.getPointer()->NextExtension.getPointer()
@@ -1040,9 +1048,6 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
        next = next->NextExtension.getPointer()) {
     lastProcessed.setPointer(next);
 
-    if (resolver)
-      resolver->resolveExtension(next);
-
     // If we have conformances we can load, do so.
     // FIXME: This could be more lazy.
     auto loader = next->takeConformanceLoader();
@@ -1050,9 +1055,34 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       SmallVector<ProtocolConformance *, 2> conformances;
       loader.first->loadAllConformances(next, loader.second, conformances);
       loadAllConformances(nominal, next, conformances);
+    } else if (next->getParentSourceFile()) {
+      if (!resolver) {
+        // We have a parsed extension that we can't resolve well enough to
+        // get any information from. Queue it for later.
+        // FIXME: Per the comment on DelayedExtensionDecls, this is insane.
+        delayedExtensionDecls.insert(next);
+        continue;
+      }
+
+      // Resolve this extension.
+      delayedExtensionDecls.remove(next);
+      resolver->resolveExtension(next);
     }
 
     extensionFunc(next);
+  }
+
+  // If we delayed any extension declarations because we didn't have a resolver
+  // then, but we have a resolver now, process them.
+  if (resolver) {
+    while (!delayedExtensionDecls.empty()) {
+      // Remove the last extension declaration.
+      auto ext = delayedExtensionDecls.back();
+      delayedExtensionDecls.remove(ext);
+
+      resolver->resolveExtension(ext);
+      extensionFunc(ext);
+    }
   }
 }
 
