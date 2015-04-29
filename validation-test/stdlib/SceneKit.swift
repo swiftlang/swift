@@ -126,9 +126,7 @@ if #available(iOS >= 8.0, *) {
     expectEqual(1, element.bytesPerIndex)
   }
 
-  SceneKitTests.test("SCNSceneSource.entryWithIdentifier(uid:withClass:)")
-    .xfail(.Custom({ true }, reason: "rdar://20384835"))
-    .code {
+  SceneKitTests.test("SCNSceneSource.entryWithIdentifier(uid:withClass:)") {
     let sceneDescription =
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
       "<COLLADA xmlns=\"http://www.collada.org/2005/11/COLLADASchema\" version=\"1.4.1\">" +
