@@ -2048,7 +2048,7 @@ SequenceTypeAlgorithms.test("zip") {
       test.sequence.map { OpaqueValue($0) })
     let other = MinimalSequence<OpaqueValue<Int32>>(
       test.other.map { OpaqueValue($0) })
-    var result = s._prext_zip(other)
+    var result = zip(s, other)
     expectType(
       Zip2<MinimalSequence<OpaqueValue<Int>>, MinimalSequence<OpaqueValue<Int32>>>.self,
       &result)

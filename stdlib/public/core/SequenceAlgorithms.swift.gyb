@@ -425,21 +425,3 @@ extension SequenceType {
   }
 }
 
-//===----------------------------------------------------------------------===//
-// zip()
-//===----------------------------------------------------------------------===//
-
-extension SequenceType {
-  /// Returns a sequence of pairs built out of two underlying sequences,
-  /// where the elements of the `i`th pair are the `i`th elements
-  /// of each underlying sequence.
-  final public func _prext_zip<OtherSequence : SequenceType>(
-    other: OtherSequence
-  ) -> Zip2<Self, OtherSequence> {
-    return Zip2(self, other)
-  }
-}
-
-// FIXME: we could have an overload on collections that returns a collection
-// and preserves the index kind.  Zip2 is only a sequence.
-
