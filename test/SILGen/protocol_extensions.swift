@@ -267,3 +267,20 @@ extension InitRequirement {
     self.init(c: d)
   }
 }
+
+protocol ClassInitRequirement: class {
+  init(c: C)
+}
+
+class Butt: ClassInitRequirement { required init(c: C) { } }
+
+extension ClassInitRequirement {
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions20ClassInitRequirementCUS0___fMQPS0_FT1dCS_1D_S1_ : $@convention(thin) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
+  // CHECK:       bb0([[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
+  // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
+  // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
+  // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_UP]], [[SELF_TYPE]])
+  init(d: D) {
+    self.init(c: d)
+  }
+}

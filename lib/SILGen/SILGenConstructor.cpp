@@ -179,7 +179,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   auto &lowering = getTypeLowering(selfDecl->getType()->getInOutObjectType());
   SILType selfTy = lowering.getLoweredType();
   (void)selfTy;
-  assert(!selfTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
+  assert(!selfTy.getClassOrBoundGenericClass()
+         && "can't emit a class ctor here");
 
   
   // Allocate the local variable for 'self'.
