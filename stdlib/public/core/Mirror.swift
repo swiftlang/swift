@@ -235,7 +235,7 @@ public struct Mirror {
   /// collections, e.g.:
   ///
   ///     extension MyArray : CustomReflectable {
-  ///       func customMirror() -> Mirror
+  ///       func customMirror() -> Mirror {
   ///         return Mirror(self, unlabeledChildren: self, displayStyle: .Collection)
   ///       }
   ///     }
