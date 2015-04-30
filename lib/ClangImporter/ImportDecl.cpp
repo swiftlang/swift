@@ -3476,10 +3476,11 @@ namespace {
       }
 
       // Create the getter thunk.
-      auto thunk = FuncDecl::create(
+      FuncDecl *thunk = FuncDecl::create(
           context, SourceLoc(), StaticSpellingKind::None, loc,
           Identifier(), SourceLoc(), SourceLoc(), nullptr, getterType,
-          getterArgs, TypeLoc::withoutLoc(elementTy), dc);
+          getterArgs, TypeLoc::withoutLoc(elementTy), dc,
+          getter->getClangNode());
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
       thunk->setAccessibility(Accessibility::Public);
@@ -3553,10 +3554,11 @@ namespace {
       }
 
       // Create the setter thunk.
-      auto thunk = FuncDecl::create(
+      FuncDecl *thunk = FuncDecl::create(
           context, SourceLoc(), StaticSpellingKind::None, setter->getLoc(),
           Identifier(), SourceLoc(), SourceLoc(), nullptr, setterType,
-          setterArgs, TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
+          setterArgs, TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc,
+          setter->getClangNode());
       thunk->setBodyResultType(TupleType::getEmpty(context));
       thunk->setInterfaceType(interfaceType);
       thunk->setAccessibility(Accessibility::Public);

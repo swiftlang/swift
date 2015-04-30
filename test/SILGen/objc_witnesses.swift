@@ -57,4 +57,15 @@ extension Gizmo : Bells {
 // CHECK:   dealloc_stack [[UNWRAPPED_RESULT_TEMP]]#0 : $*@local_storage Gizmo
 // CHECK:   dealloc_stack [[IUO_RESULT_TEMP]]#0 : $*@local_storage ImplicitlyUnwrappedOptional<Gizmo>
 
+// Test extension of a native @objc class to conform to a protocol with a
+// subscript requirement. rdar://problem/20371661
 
+protocol Subscriptable {
+  subscript(x: Int) -> AnyObject { get }
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo7NSArray14objc_witnesses13SubscriptableS0_FS1_g9subscriptFSiPSs9AnyObject_ : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @owned AnyObject {
+// CHECK:         function_ref @_TTOFCSo7NSArrayg9subscriptFSiPSs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject
+// CHECK-LABEL: sil shared @_TTOFCSo7NSArrayg9subscriptFSiPSs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject {
+// CHECK:         class_method [volatile] %1 : $NSArray, #NSArray.subscript!getter.1.foreign
+extension NSArray: Subscriptable {}

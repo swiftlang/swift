@@ -13,6 +13,9 @@
 
 - (instancetype)initWithObjects:(const id *)objects count:(int)count;
 - (instancetype)initWithArray:(NSArray*)array;
+
+- (id)objectAtIndexedSubscript:(NSInteger)i;
+
 @end
 
 @interface NSDictionary : NSObject
