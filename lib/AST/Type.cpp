@@ -823,7 +823,7 @@ static void addMinimumProtocols(Type T,
     }
 
     if (Visited.insert(Proto->getDecl()).second) {
-      for (auto Inherited : Proto->getDecl()->getProtocols())
+      for (auto Inherited : Proto->getDecl()->getInheritedProtocols(nullptr))
         addProtocols(Inherited->getDeclaredType(), Stack);
     }
     return;
@@ -884,7 +884,7 @@ void ProtocolType::canonicalizeProtocols(
     stack.pop_back();
     
     // Add the protocols we inherited.
-    for (auto Inherited : Current->getProtocols()) {
+    for (auto Inherited : Current->getInheritedProtocols(nullptr)) {
       addMinimumProtocols(Inherited->getDeclaredType(), protocols, known,
                           visited, stack, zappedAny);
     }
