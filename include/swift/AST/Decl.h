@@ -1767,7 +1767,7 @@ public:
   }
 
   /// \brief Retrieve the set of protocols to which this extension conforms.
-  ArrayRef<ProtocolDecl *> getProtocols(bool forceDelayedMembers = true) const {
+  ArrayRef<ProtocolDecl *> getProtocols() const {
     return Protocols;
   }
 
@@ -2443,15 +2443,7 @@ public:
   ///
   /// FIXME: Include protocol conformance from extensions? This will require
   /// semantic analysis to compute.
-  ArrayRef<ProtocolDecl *> getProtocols(bool forceDelayedMembers = true) const;
-
-  /// \brief For declarations that are initially composed of a mix of delayed
-  /// and non-delayed protocols, allow the setting of a temporary list of
-  /// non-delayed protocols that will be copied over to the "official" protocol
-  /// list when the delayed protocol declarations are forced.
-  void setInitialUndelayedProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    Protocols = protocols;
-  }
+  ArrayRef<ProtocolDecl *> getProtocols() const;
 
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
     assert((!TypeDeclBits.ProtocolsSet || protocols.empty()) &&
@@ -2557,9 +2549,8 @@ public:
   /// Retrieve the set of protocols to which this abstract type
   /// parameter conforms.
   ArrayRef<ProtocolDecl *> getConformingProtocols(
-                             LazyResolver *resolver,
-                             bool forceDelayedMembers = true) const {
-    return getProtocols(forceDelayedMembers);
+                             LazyResolver *resolver) const {
+    return getProtocols();
   }
 
   static bool classof(const Decl *D) {
@@ -2905,10 +2896,6 @@ enum PointerTypeKind : unsigned {
 /// These are not added to their enclosing type unless forced.
 typedef std::function<void(SmallVectorImpl<Decl *> &)> DelayedDecl;
 
-/// An implicitly created protocol decl, used when importing a Clang enum type.
-/// These are not added to their enclosing type unless forced.
-typedef std::function<ProtocolDecl *()> DelayedProtocolDecl;
-
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext,
@@ -2921,7 +2908,6 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   ///
   /// FIXME: These should be side-table-allocated.
   ArrayRef<DelayedDecl> DelayedMembers;
-  ArrayRef<DelayedProtocolDecl> DelayedProtocols;
   
   GenericParamList *GenericParams;
   
@@ -3224,10 +3210,6 @@ private:
     Optional<VarDecl *> operator()(Decl *decl) const;
   };
 
-  /// Force delayed implicit protocol declarations to be added to the type
-  /// declaration.
-  void forceDelayedProtocolDecls();
-  
   /// Force delayed implicit member declarations to be added to the type
   /// declaration.
   void forceDelayedMemberDecls();
@@ -3259,25 +3241,11 @@ public:
     setHasDelayedMembers();
   }
   
-  bool hasDelayedProtocolDecls() {
-    return DelayedProtocols.size() != 0;
-  }
-  
-  void setDelayedProtocolDecls(ArrayRef<DelayedProtocolDecl> delayedProtocols) {
-    DelayedProtocols = delayedProtocols;
-    setHasDelayedMembers();
-  }
-  
   /// Force delayed implicit member and protocol declarations to be added to the
   /// type declaration.
   void forceDelayed() {
-    forceDelayedProtocolDecls();
     forceDelayedMemberDecls();
   }
-  
-  /// Override of getProtocols that forces any delayed protocol members to be
-  /// resolved before returning the protocol array.
-  ArrayRef<ProtocolDecl *> getProtocols(bool forceDelayedMembers = true) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -3613,9 +3581,8 @@ public:
 
   /// Retrieve the set of protocols inherited from this protocol.
   ArrayRef<ProtocolDecl *> getInheritedProtocols(
-                             LazyResolver *resolver,
-                             bool forceDelayedMembers = true) const {
-    return getProtocols(forceDelayedMembers);
+                             LazyResolver *resolver) const {
+    return getProtocols();
   }
 
   /// \brief Determine whether this protocol inherits from the given ("super")

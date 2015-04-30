@@ -954,38 +954,6 @@ void NominalTypeDecl::forceDelayedMemberDecls() {
   }
 }
 
-void NominalTypeDecl::forceDelayedProtocolDecls() {
-  if (!hasDelayedProtocolDecls())
-    return;
-  
-  SmallVector<ProtocolDecl *, 4> protocols;
-  
-  // Copy over any non-delayed protocols.
-  if (Protocols.size()) {
-    protocols.append(Protocols.begin(), Protocols.end());
-    Protocols = {};
-  }
-  
-  for (auto delayedProtocolCreator : DelayedProtocols) {
-    protocols.push_back(delayedProtocolCreator());
-  }
-  
-  setProtocols((getASTContext()).AllocateCopy(
-                                       llvm::makeArrayRef(protocols)));
-  
-  // Set the delayed protocol list to empty so we don't attempt to re-force it
-  // later.
-  DelayedProtocols = {};
-}
-
-ArrayRef<ProtocolDecl *>
-NominalTypeDecl::getProtocols(bool forceDelayedMembers) const {
-  if (forceDelayedMembers)
-    const_cast<NominalTypeDecl*>(this)->forceDelayedProtocolDecls();
-  
-  return Protocols;
-}
-
 void NominalTypeDecl::addedMember(Decl *member) {
   // If we have a lookup table, add the new member to it.
   if (LookupTable.getPointer()) {

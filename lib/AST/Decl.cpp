@@ -1754,9 +1754,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   return interfaceType->castTo<MetatypeType>()->getInstanceType();
 }
 
-ArrayRef<ProtocolDecl *> TypeDecl::getProtocols(bool forceDelayedMembers) const {
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
-    return NTD->getProtocols(forceDelayedMembers);
+ArrayRef<ProtocolDecl *> TypeDecl::getProtocols() const {
   return Protocols;
 }
 

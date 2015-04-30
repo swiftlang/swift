@@ -1779,13 +1779,10 @@ namespace {
           Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
 
-        DelayedProtocolDecl delayedProtocols[] = {
-          [&]() {return cxt.getProtocol(
-              KnownProtocolKind::RawRepresentable);},
-        };
-        auto delayedProtoList = Impl.SwiftContext.AllocateCopy(
-                                                      delayedProtocols);
-        structDecl->setDelayedProtocolDecls(delayedProtoList);
+        ProtocolDecl *protocols[]
+          = {cxt.getProtocol(KnownProtocolKind::RawRepresentable)};
+        auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
+        structDecl->setProtocols(protoList);
 
         // Note that this is a raw representable type.
         structDecl->getAttrs().add(
@@ -1870,30 +1867,13 @@ namespace {
         enumDecl->setRawType(underlyingType);
         
         // Add protocol declarations to the enum declaration.
-        // FIXME: Delay the protocol conformances in playground mode and code-
-        // completion only as a performance hack. This is not generally handled
-        // correctly in multi-file builds. rdar://problem/20047340
-        const auto &LangOpts = Impl.SwiftContext.LangOpts;
-        if (LangOpts.Playground ||
-            LangOpts.EnableCodeCompletionDelayedEnumConformanceHack) {
-          DelayedProtocolDecl delayedProtocols[] = {
-            [&]() {return cxt.getProtocol(
-                KnownProtocolKind::RawRepresentable);},
-            [&]() {return cxt.getProtocol(KnownProtocolKind::Hashable);},
-            [&]() {return cxt.getProtocol(KnownProtocolKind::Equatable);}
-          };
-          auto delayedProtoList = Impl.SwiftContext.AllocateCopy(
-                                                        delayedProtocols);
-          enumDecl->setDelayedProtocolDecls(delayedProtoList);
-        } else {
-          ProtocolDecl *protocols[] = {
-            cxt.getProtocol(KnownProtocolKind::RawRepresentable),
-            cxt.getProtocol(KnownProtocolKind::Hashable),
-            cxt.getProtocol(KnownProtocolKind::Equatable),
-          };
-          auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
-          enumDecl->setProtocols(protoList);
-        }
+        ProtocolDecl *protocols[] = {
+          cxt.getProtocol(KnownProtocolKind::RawRepresentable),
+          cxt.getProtocol(KnownProtocolKind::Hashable),
+          cxt.getProtocol(KnownProtocolKind::Equatable),
+        };
+        auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
+        enumDecl->setProtocols(protoList);
         
         // Provide custom implementations of the init(rawValue:) and rawValue
         // conversions that just do a bitcast. We can't reliably filter a
@@ -1989,12 +1969,11 @@ namespace {
                                   /*wantCtorParamNames=*/true,
                                   /*wantBody=*/!Impl.hasFinishedTypeChecking());
 
-        // Build a delayed RawOptionSetType conformance for the type.
-        DelayedProtocolDecl delayedProtocols[] = {
-          [&]() {return cxt.getProtocol(KnownProtocolKind::RawOptionSetType);}
-        };
-        structDecl->setDelayedProtocolDecls(
-            Impl.SwiftContext.AllocateCopy(delayedProtocols));
+        // Build a RawOptionSetType conformance for the type.
+        ProtocolDecl *protocols[]
+          = {cxt.getProtocol(KnownProtocolKind::RawOptionSetType)};
+        structDecl->setProtocols(
+            Impl.SwiftContext.AllocateCopy(protocols));
 
         // Add delayed implicit members to the type.
         auto &Impl = this->Impl;

@@ -166,8 +166,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
   // Force any delayed members added to the nominal type declaration.
-  if (nominalDecl->hasDelayedProtocolDecls() ||
-      nominalDecl->hasDelayedMemberDecls()) {
+  if (nominalDecl->hasDelayedMemberDecls()) {
     nominalDecl->forceDelayed();
   }
   
