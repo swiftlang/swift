@@ -554,6 +554,11 @@ private:
   /// The next delayed conformance ID to use with \c DelayedConformances.
   unsigned NextDelayedConformanceID = 0;
 
+  /// The set of imported protocols for a declaration, used only to
+  /// load all members of the declaration.
+  llvm::DenseMap<const Decl *, SmallVector<ProtocolDecl *, 4>>
+    ImportedProtocols;
+
   void startedImportingEntity();
   void finishedImportingEntity();
   void finishPendingActions();
@@ -1024,6 +1029,33 @@ public:
       = std::move(conformances->second);
     DelayedConformances.erase(conformances);
     return std::move(result);
+  }
+
+  /// Record the set of imported protocols for the given declaration,
+  /// to be used by member loading.
+  ///
+  /// FIXME: This is all a hack; we should have lazier deserialization
+  /// of protocols separate from their conformances.
+  void recordImportedProtocols(const Decl *decl,
+                               ArrayRef<ProtocolDecl *> protocols) {
+    if (protocols.empty())
+      return;
+
+    auto &recorded = ImportedProtocols[decl];
+    recorded.insert(recorded.end(), protocols.begin(), protocols.end());
+  }
+
+  /// Retrieve the imported protocols for the given declaration.
+  SmallVector<ProtocolDecl *, 4> takeImportedProtocols(const Decl *decl) {
+    SmallVector<ProtocolDecl *, 4> result;
+
+    auto known = ImportedProtocols.find(decl);
+    if (known != ImportedProtocols.end()) {
+      result = std::move(known->second);
+      ImportedProtocols.erase(known);
+    }
+
+    return result;
   }
 
   virtual void

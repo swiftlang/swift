@@ -3946,6 +3946,8 @@ namespace {
       if (isa<ProtocolDecl>(decl))
         return;
 
+      Impl.recordImportedProtocols(decl, protocols);
+
       // Synthesize trivial conformances for each of the protocols.
       SmallVector<ProtocolConformance *, 4> conformances;
 ;
@@ -5861,7 +5863,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused,
 
   DeclContext *DC;
   IterableDeclContext *IDC;
-  ArrayRef<ProtocolDecl *> protos;
+  SmallVector<ProtocolDecl *, 4> protos;
 
   // Figure out the declaration context we're importing into.
   if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
@@ -5883,9 +5885,9 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused,
   converter.importObjCMembers(clangDecl, DC,
                               members, *hasMissingRequiredMembers);
 
+  protos = takeImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
     auto swiftClass = cast<ClassDecl>(D);
-    protos = swiftClass->getProtocols();
     clangDecl = clangClass = clangClass->getDefinition();
 
     // Imported inherited initializers.
@@ -5896,10 +5898,6 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused,
 
   } else if (auto clangProto = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
     clangDecl = clangProto->getDefinition();
-
-  } else {
-    auto extension = cast<ExtensionDecl>(D);
-    protos = extension->getProtocols();
   }
 
   // Import mirrored declarations for protocols to which this category
