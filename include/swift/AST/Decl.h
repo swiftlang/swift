@@ -2633,7 +2633,7 @@ public:
 /// An associated type introduces a new, named type in a protocol that
 /// can vary from one conforming type to the next. Associated types have a
 /// set of requirements to which the type that replaces it much realize,
-/// describes via conformance to specific protocols, or inheritance from a
+/// described via conformance to specific protocols, or inheritance from a
 /// specific class type.
 ///
 /// In the following example, 'Element' is an associated type with no
