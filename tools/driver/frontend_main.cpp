@@ -380,8 +380,6 @@ private:
   bool shouldFix(DiagnosticKind Kind, const DiagnosticInfo &Info) {
     if (Kind == DiagnosticKind::Error)
       return true;
-    if (Info.ID == diag::conditional_pattern_bind_not_refutable.ID)
-      return true;
     return false;
   }
 

@@ -34,6 +34,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_return:
   case tok::kw_defer:
   case tok::kw_if:
+  case tok::kw_unless:
   case tok::kw_while:
   case tok::kw_do:
   case tok::kw_repeat:
@@ -497,6 +498,9 @@ ParserResult<Stmt> Parser::parseStmt() {
     return parseStmtDefer();
   case tok::kw_if:
     return parseStmtIf(LabelInfo);
+  case tok::kw_unless:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    return parseStmtUnless();
   case tok::pound_if:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtIfConfig();
@@ -1130,6 +1134,48 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
                                    IfLoc, Condition, NormalBody.get(),
                                    ElseLoc, ElseBody.getPtrOrNull()));
 }
+
+///   stmt-unless:
+///     'unless' condition stmt-brace
+///
+ParserResult<Stmt> Parser::parseStmtUnless() {
+  SourceLoc UnlessLoc = consumeToken(tok::kw_unless);
+  
+  ParserStatus Status;
+  StmtCondition Condition;
+  ParserResult<BraceStmt> Body;
+  
+  // A scope encloses the condition and true branch for any variables bound
+  // by a conditional binding. The else branch does *not* see these variables.
+  {
+    Scope S(this, ScopeKind::IfVars);
+    
+    if (Tok.is(tok::l_brace)) {
+      SourceLoc LBraceLoc = Tok.getLoc();
+      diagnose(UnlessLoc, diag::missing_condition_after_unless)
+        .highlight(SourceRange(UnlessLoc, LBraceLoc));
+      SmallVector<StmtConditionElement, 1> ConditionElems;
+      ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
+      Condition = Context.AllocateCopy(ConditionElems);
+    } else {
+      Status |= parseStmtCondition(Condition, diag::expected_condition_unless);
+      if (Status.isError() || Status.hasCodeCompletion()) {
+        // FIXME: better recovery
+        return makeParserResult<Stmt>(Status, nullptr);
+      }
+    }
+    
+    Body = parseBraceItemList(diag::expected_lbrace_after_unless);
+    if (Body.isNull())
+      return nullptr; // FIXME: better recovery
+    
+    Status |= Body;
+  }
+  
+  return makeParserResult(Status,
+              new (Context) UnlessStmt(UnlessLoc, Condition, Body.get()));
+}
+
 
 // Evaluate a subset of expression types suitable for build configuration
 // conditional expressions.  The accepted expression types are:

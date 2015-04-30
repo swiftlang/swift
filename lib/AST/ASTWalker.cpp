@@ -879,6 +879,18 @@ Stmt *Traversal::visitIfStmt(IfStmt *IS) {
   return IS;
 }
 
+Stmt *Traversal::visitUnlessStmt(UnlessStmt *US) {
+  if (doIt(US->getCond()))
+    return nullptr;
+  
+  if (Stmt *S2 = doIt(US->getBody()))
+    US->setBody(S2);
+  else
+    return nullptr;
+  return US;
+}
+
+
 Stmt *Traversal::visitIfConfigStmt(IfConfigStmt *ICS) {
   // Active members are attached to the enclosing declaration, so there's no
   // need to walk anything within.

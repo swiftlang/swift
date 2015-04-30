@@ -390,6 +390,19 @@ public:
     return IS;
   }
   
+  Stmt *visitUnlessStmt(UnlessStmt *US) {
+    StmtCondition C = US->getCond();
+    if (TC.typeCheckCondition(C, DC)) return 0;
+    US->setCond(C);
+    
+    AddLabeledStmt ifNest(*this, US);
+    
+    Stmt *S = US->getBody();
+    if (typeCheckStmt(S)) return 0;
+    US->setBody(S);
+    return US;
+  }
+
   Stmt *visitIfConfigStmt(IfConfigStmt *ICS) {
     
     // Active members are attached to the enclosing declaration, so there's no

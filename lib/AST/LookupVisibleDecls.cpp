@@ -710,6 +710,14 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     if (S->getElseStmt())
       visit(S->getElseStmt());
   }
+  void visitUnlessStmt(UnlessStmt *S) {
+    for (auto entry : S->getCond())
+      if (auto *PBD = entry.getBinding())
+        for (auto entry : PBD->getPatternList())
+          checkPattern(entry.ThePattern, DeclVisibilityKind::LocalVariable);
+    visit(S->getBody());
+  }
+
   void visitIfConfigStmt(IfConfigStmt * S) {
     // Active members are attached to the enclosing declaration, so there's no
     // need to walk anything within.

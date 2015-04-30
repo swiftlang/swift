@@ -754,6 +754,11 @@ struct ASTNodeBase {};
       verifyCheckedBase(S);
     }
 
+    void verifyChecked(UnlessStmt *S) {
+      checkCondition(S->getCond());
+      verifyCheckedBase(S);
+    }
+
     void verifyChecked(WhileStmt *S) {
       checkCondition(S->getCond());
       verifyCheckedBase(S);

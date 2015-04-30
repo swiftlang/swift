@@ -1800,6 +1800,12 @@ void PrintAST::visitIfStmt(IfStmt *stmt) {
     visit(elseStmt);
   }
 }
+void PrintAST::visitUnlessStmt(UnlessStmt *stmt) {
+  Printer << "unless ";
+  // FIXME: print condition
+  Printer << " ";
+  visit(stmt->getBody());
+}
 
 void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
   for (auto &Clause : stmt->getClauses()) {

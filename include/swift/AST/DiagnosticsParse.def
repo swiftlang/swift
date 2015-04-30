@@ -758,6 +758,14 @@ ERROR(expected_lbrace_after_if,stmt_parsing,PointsToFirstBadToken,
 ERROR(expected_lbrace_after_else,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'else'", ())
 
+// If Statement
+ERROR(expected_condition_unless,stmt_parsing,PointsToFirstBadToken,
+      "expected expression, var, or let in 'unless' condition", ())
+ERROR(missing_condition_after_unless,stmt_parsing,none,
+      "missing condition in an 'unless' statement", ())
+ERROR(expected_lbrace_after_unless,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'unless' condition", ())
+
 // While Statement
 ERROR(expected_condition_while,stmt_parsing,PointsToFirstBadToken,
       "expected expression, var, or let in 'while' condition", ())

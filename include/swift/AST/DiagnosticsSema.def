@@ -659,9 +659,6 @@ ERROR(pattern_binds_no_variables,sema_tcd,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
       (unsigned))
-WARNING(conditional_pattern_bind_not_refutable,sema_tcd,none,
-      "condition requires a refutable pattern; "
-      "did you mean to match an optional?", ())
 
 
 // Generic types

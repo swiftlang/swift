@@ -369,6 +369,11 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
   SGF.BreakContinueDestStack.pop_back();
 }
 
+void StmtEmitter::visitUnlessStmt(UnlessStmt *S) {
+  llvm_unreachable("silgen for unless not implemented yet");
+}
+
+
 void StmtEmitter::visitIfConfigStmt(IfConfigStmt *S) {
   // Active members are attached to the enclosing declaration, so there's no
   // need to walk anything within.

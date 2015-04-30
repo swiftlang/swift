@@ -167,6 +167,8 @@ public:
       return transformBraceStmt(llvm::cast<BraceStmt>(S));
     case StmtKind::If:
       return transformIfStmt(llvm::cast<IfStmt>(S));
+    case StmtKind::Unless:
+      return transformUnlessStmt(llvm::cast<UnlessStmt>(S));
     case StmtKind::While: {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
         return transformWhileStmt(llvm::cast<WhileStmt>(S));
@@ -208,6 +210,12 @@ public:
     }
 
     return IS;
+  }
+  
+  UnlessStmt *transformUnlessStmt(UnlessStmt *US) {
+    if (Stmt *BS = US->getBody())
+      US->setBody(transformStmt(BS));
+    return US;
   }
 
   WhileStmt *transformWhileStmt(WhileStmt *WS) {

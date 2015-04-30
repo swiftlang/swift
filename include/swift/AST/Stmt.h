@@ -514,6 +514,42 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::If; }
 };
 
+/// UnlessStmt - unless statement.  Evaluate a condition and if it fails, run
+/// its body.  The body is always guaranteed to exit the current scope (or
+/// abort), it never falls through.
+///
+class UnlessStmt : public LabeledConditionalStmt {
+  SourceLoc UnlessLoc;
+  Stmt *Body;
+  
+public:
+  UnlessStmt(SourceLoc UnlessLoc, StmtCondition Cond,
+             Stmt *Body, Optional<bool> implicit = None)
+  : LabeledConditionalStmt(StmtKind::Unless,
+                           getDefaultImplicitFlag(implicit, UnlessLoc),
+                           LabeledStmtInfo(), Cond),
+    UnlessLoc(UnlessLoc), Body(Body) {}
+  
+  UnlessStmt(SourceLoc UnlessLoc, Expr *Cond, Stmt *Body,
+             Optional<bool> implicit, ASTContext &Ctx);
+  
+  SourceLoc getUnlessLoc() const { return UnlessLoc; }
+  
+  SourceLoc getStartLoc() const {
+    return getLabelLocOrKeywordLoc(UnlessLoc);
+  }
+  SourceLoc getEndLoc() const {
+    return Body->getEndLoc();
+  }
+  
+  Stmt *getBody() const { return Body; }
+  void setBody(Stmt *s) { Body = s; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Unless;}
+};
+
+  
 /// This represents one part of a #if block.  If the condition field is
 /// non-null, then this represents a #if or a #elseif, otherwise it represents
 /// an #else block.

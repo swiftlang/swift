@@ -177,8 +177,8 @@ bool LabeledStmt::isPossibleContinueTarget() const {
 
   // Sema has diagnostics with hard-coded expectations about what
   // statements return false from this method.
-
   case StmtKind::If:
+  case StmtKind::Unless:
   case StmtKind::Switch:
     return false;
 
@@ -203,6 +203,7 @@ bool LabeledStmt::requiresLabelOnJump() const {
   case StmtKind::If:
   case StmtKind::Do:
   case StmtKind::DoCatch:
+  case StmtKind::Unless:  // Unless doesn't allow labels, so no break/continue.
     return true;
 
   case StmtKind::RepeatWhile:
@@ -282,6 +283,14 @@ IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
   : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc, Else,
            implicit) {
 }
+
+UnlessStmt::UnlessStmt(SourceLoc UnlessLoc, Expr *Cond, Stmt *Body,
+                       Optional<bool> implicit, ASTContext &Ctx)
+  : UnlessStmt(UnlessLoc, exprToCond(Cond, Ctx), Body, implicit) {
+    
+}
+  
+
 
 SourceLoc RepeatWhileStmt::getEndLoc() const { return Cond->getEndLoc(); }
 

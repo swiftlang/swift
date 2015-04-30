@@ -306,12 +306,15 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     // Nothing should look in the defer itself.
   }
 
-  void visitIfStmt(IfStmt * S) {
+  void visitIfStmt(IfStmt *S) {
     visit(S->getThenStmt());
     if (S->getElseStmt())
       visit(S->getElseStmt());
   }
-  void visitIfConfigStmt(IfConfigStmt * S) {
+  void visitUnlessStmt(UnlessStmt *S) {
+    visit(S->getBody());
+  }
+  void visitIfConfigStmt(IfConfigStmt *S) {
     // Active members are attached to the enclosing declaration, so there's no
     // need to walk anything within.
   }

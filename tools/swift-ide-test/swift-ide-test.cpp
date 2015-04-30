@@ -936,6 +936,7 @@ private:
       case SyntaxStructureKind::WhileStatement: return "while";
       case SyntaxStructureKind::RepeatWhileStatement: return "repeat-while";
       case SyntaxStructureKind::IfStatement: return "if";
+      case SyntaxStructureKind::UnlessStatement: return "unless";
       case SyntaxStructureKind::SwitchStatement: return "switch";
       case SyntaxStructureKind::CaseStatement: return "case";
       case SyntaxStructureKind::BraceStatement: return "brace";

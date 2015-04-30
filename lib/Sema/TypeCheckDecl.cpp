@@ -1361,32 +1361,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     auto init = new (tc.Context) ErrorExpr(pattern->getSourceRange());
     binding->setInit(entryNumber, init);
   }
-
-  // If the 'else' on this is provided contextually, but none of the patterns
-  // are refutable, then we give it special handling: Swift 1.x patterns were
-  // written as irrefutable patterns that implicitly destructured an
-  // optional.  Detect this case, and produce an error with a fixit that
-  // introduces the missing '?' pattern.
-  if (binding->getElse().isContextual() && !pattern->isRefutablePattern()) {
-    // Check to see if any of the patterns are refutable.  This is similar to
-    // checking that a PBD is refutable, except we want to catch where clauses.
-    bool anyRefutable = false;
-    for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
-      if (binding->getPattern(i)->isRefutablePattern())
-        anyRefutable = true;
-    
-    if (!anyRefutable) {
-      tc.diagnose(pattern->getStartLoc(),
-                  diag::conditional_pattern_bind_not_refutable)
-        .fixItInsertAfter(pattern->getEndLoc(), "?");
-      pattern = new (tc.Context) OptionalSomePattern(pattern,
-                                                     pattern->getEndLoc(),
-                                                     true);
-      binding->setPattern(entryNumber, pattern);
-    }
-  }
-  
-  
+ 
   // If this is the last pattern in the list, check the overall pattern binding
   // refutability.
   if (entryNumber == binding->getNumPatternEntries()-1) {
@@ -1425,12 +1400,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       if (auto *Body = binding->getElse().getExplicitBody())
         tc.diagnose(Body->getStartLoc(),
                     diag::decl_cannot_fail_no_else_allowed);
-      else {
-        assert(binding->getElse().isContextual() && "Unknown conditional else");
-        tc.diagnose(pattern->getStartLoc(),
-                    diag::conditional_pattern_bind_not_refutable);
-      }
-        
+      
       binding->setInvalid();
     }
   }

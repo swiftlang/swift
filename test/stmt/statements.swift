@@ -376,3 +376,20 @@ class SomeTestClass {
   }
 }
 
+
+func test_unless(x : Int, y : Int??, cond : Bool) {
+  
+  // These are all ok.
+  unless let a = y {}
+  unless let b = y where cond {}
+  unless case let c = x where cond {}
+  unless case let Optional.Some(d) = y {}
+  
+  unless let n1 where cond {}    // expected-error {{variable binding in a condition requires an initializer}}
+  unless case let n2? : Int? where cond {}    // expected-error {{variable binding in a condition requires an initializer}}
+  
+  
+  // TODO: condition is always true.
+  unless case _ = x {}
+}
+
