@@ -848,7 +848,7 @@ DictionaryTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let (key, value)? = gen.next() {
+  while let (key, value) = gen.next() {
     pairs += [(key, value)]
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
@@ -861,7 +861,7 @@ DictionaryTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let (key, value)? = gen.next() {
+  while let (key, value) = gen.next() {
     // FIXME: This doesn't work (<rdar://problem/17751308> Can't +=
     // with array literal of pairs)
     // pairs += [(key.value, value.value)]
@@ -2131,7 +2131,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let (key, value)? = gen.next() {
+  while let (key, value) = gen.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2151,7 +2151,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let (key, value)? = gen.next() {
+  while let (key, value) = gen.next() {
     let kv = (key.value, value.value)
     pairs.append(kv)
   }
@@ -2208,7 +2208,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let (key, value)? = gen.next() {
+  while let (key, value) = gen.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2232,7 +2232,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let (key, value)? = gen.next() {
+  while let (key, value) = gen.next() {
     let kv = (key.value, value.value)
     pairs.append(kv)
   }
@@ -2261,7 +2261,7 @@ autoreleasepool {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let (key, value)? = gen.next() {
+  while let (key, value) = gen.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
@@ -2287,7 +2287,7 @@ autoreleasepool {
 
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
-  while let (key, value)? = gen.next() {
+  while let (key, value) = gen.next() {
     let kv = (key.value, value.value)
     pairs.append(kv)
   }
@@ -2452,7 +2452,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
     var d = a[i]
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
-    while let (key, value)? = gen.next() {
+    while let (key, value) = gen.next() {
       let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
       pairs.append(kv)
     }
@@ -2473,7 +2473,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
     var d = a[i]
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
-    while let (key, value)? = gen.next() {
+    while let (key, value) = gen.next() {
       let kv = (key.value, value.value)
       pairs.append(kv)
     }
