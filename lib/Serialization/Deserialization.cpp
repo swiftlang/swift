@@ -1704,6 +1704,23 @@ T *ModuleFile::createDecl(Args &&... args) {
   return result;
 }
 
+static const uint64_t lazyConformanceContextDataPositionMask = 0xFFFFFFFFFFFF;
+
+/// Decode the context data for lazily-loaded conformances.
+static std::pair<uint64_t, uint64_t> decodeLazyConformanceContextData(
+                                       uint64_t contextData) {
+  return std::make_pair(contextData >> 48,
+                        contextData & lazyConformanceContextDataPositionMask);
+}
+
+/// Encode the context data for lazily-loaded conformances.
+static uint64_t encodeLazyConformanceContextData(uint64_t numProtocols,
+                                                 uint64_t bitPosition) {
+  assert(numProtocols < 0xFFFF);
+  assert(bitPosition < lazyConformanceContextDataPositionMask);
+  return (numProtocols << 48) | bitPosition;
+}
+
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
@@ -2149,7 +2166,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     theStruct->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
-    theStruct->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
+    theStruct->setConformanceLoader(
+      this,
+      encodeLazyConformanceContextData(protocols.size(),
+                                       DeclTypeCursor.GetCurrentBitNo()));
 
     theStruct->setCheckedInheritanceClause();
     break;
@@ -2730,7 +2750,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theClass->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     theClass->setHasDestructor();
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
-    theClass->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
+    theClass->setConformanceLoader(
+      this,
+      encodeLazyConformanceContextData(protocols.size(),
+                                       DeclTypeCursor.GetCurrentBitNo()));
 
     theClass->setCheckedInheritanceClause();
     theClass->setCircularityCheck(CircularityCheck::Checked);
@@ -2798,7 +2821,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     theEnum->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
-    theEnum->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
+    theEnum->setConformanceLoader(
+      this,
+      encodeLazyConformanceContextData(protocols.size(),
+                                       DeclTypeCursor.GetCurrentBitNo()));
 
     theEnum->setCheckedInheritanceClause();
     break;
@@ -2999,7 +3025,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
-    extension->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
+    extension->setConformanceLoader(
+      this,
+      encodeLazyConformanceContextData(protocols.size(),
+                                       DeclTypeCursor.GetCurrentBitNo()));
 
     nominal->addExtension(extension);
     extension->setValidated(true);
@@ -3884,15 +3913,15 @@ void ModuleFile::loadAllMembers(Decl *D,
 void
 ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
                          SmallVectorImpl<ProtocolConformance *> &conformances) {
+  uint64_t numConformances;
+  uint64_t bitPosition;
+  std::tie(numConformances, bitPosition)
+    = decodeLazyConformanceContextData(contextData);
+
   // FIXME: Add PrettyStackTrace.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(contextData);
+  DeclTypeCursor.JumpToBit(bitPosition);
 
-  unsigned numConformances;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(D))
-    numConformances = nominal->getProtocols().size();
-  else
-    numConformances = cast<ExtensionDecl>(D)->getProtocols().size();
   while (numConformances--)
     conformances.push_back(readConformance(DeclTypeCursor));
 }
