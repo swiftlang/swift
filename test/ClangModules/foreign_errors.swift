@@ -16,3 +16,11 @@ func testAndReturnError() throws {
   try ErrorProne.go()
   try ErrorProne.tryAndReturnError() // collides with 'try' keyword
 }
+
+func testInheritedInit() throws {
+  try ReallyErrorProne(one: nil)
+}
+
+func testInheritedFactory() throws {
+  try ReallyErrorProne(two: nil)
+}

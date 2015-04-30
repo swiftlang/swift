@@ -4412,15 +4412,24 @@ namespace {
           if (objcMethod->isClassMethod()) {
             assert(ctor->getInitKind() ==
                      CtorInitializerKind::ConvenienceFactory);
+
+            // Re-import the declaration name so that we can re-apply
+            // the transformations done by importMethodType.
+            ObjCSelector selector = ctor->getObjCSelector();
+            auto objcClass = objcMethod->getClassInterface();
+            assert(objcClass && "imported factory initializer from protocol?");
+            DeclName name = Impl.mapFactorySelectorToInitializerName(selector,
+                                                         objcClass->getName());
+            assert(name && "reimporting factory selector failed?");
+
             bool redundant;
             if (auto newCtor = importConstructor(objcMethod, dc, 
                                                  /*implicit=*/true,
                                                  ctor->getInitKind(),
                                                  /*required=*/false, 
-                                                 ctor->getObjCSelector(),
-                                                 ctor->getFullName(),
-                                                 {objcMethod->param_begin(),
-                                                  objcMethod->param_size()},
+                                                 selector,
+                                                 name,
+                                                 objcMethod->parameters(),
                                                  objcMethod->isVariadic(),
                                                  redundant))
               newMembers.push_back(newCtor);

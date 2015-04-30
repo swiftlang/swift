@@ -8,4 +8,10 @@
 + (BOOL) tryAndReturnError: (NSError**) error;
 
 + (BOOL) consume: (id) object error: (NSError**) error;
+
+- (instancetype) initWithOne: (nullable id) other error: (NSError**) error;
++ (instancetype) errorProneWithTwo: (nullable id) other error: (NSError**) error;
+@end
+
+@interface ReallyErrorProne : ErrorProne
 @end
