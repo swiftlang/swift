@@ -749,17 +749,17 @@ extension NSArray : SequenceType {
   }
 }
 
+/* TODO: API review
 extension NSArray : Swift.CollectionType {
-  // TODO: should be @nonobjc
   final public var startIndex: Int {
     return 0
   }
 
-  // TODO: should be @nonobjc
   final public var endIndex: Int {
     return count
   }
 }
+ */
 
 extension Set {
   /// Private initializer used for bridging.
