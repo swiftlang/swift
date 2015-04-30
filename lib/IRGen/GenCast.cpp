@@ -28,6 +28,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/ABI/MetadataValues.h"
 
 using namespace swift;
@@ -441,7 +442,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   bool requiresClassCheck = false;
   
   for (auto proto : allProtos) {
-    if (requiresProtocolWitnessTable(IGF.IGM, proto))
+    if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
       requiresWitnessTableLookup = true;
     if (!proto->isObjC())
       continue;
@@ -600,7 +601,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // Look up witness tables for the protocols that need them.
   SmallVector<llvm::Value*, 4> witnessTableProtos;
   for (auto proto : allProtos) {
-    if (!requiresProtocolWitnessTable(IGF.IGM, proto))
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
       continue;
     auto descriptor = emitProtocolDescriptorRef(IGF, proto);
     witnessTableProtos.push_back(descriptor);

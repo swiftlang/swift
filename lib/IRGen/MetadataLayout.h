@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Decl.h"
+#include "swift/SIL/TypeLowering.h"
 #include "GenProto.h"
 
 namespace swift {
@@ -71,7 +72,7 @@ public:
     for (auto archetype : generics.getAllArchetypes()) {
       asImpl().beginGenericWitnessTables(archetype, args...);
       for (auto protocol : archetype->getConformsTo()) {
-        if (requiresProtocolWitnessTable(IGM, protocol))
+        if (Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
           asImpl().addGenericWitnessTable(archetype, protocol, args...);
       }
       asImpl().endGenericWitnessTables(archetype, args...);
