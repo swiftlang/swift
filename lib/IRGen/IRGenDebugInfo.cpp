@@ -691,8 +691,6 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
     else
       Name = getName(DS->Loc);
   }
-  if (Name.empty())
-    Name = LinkageName;
 
   Location L = {};
   unsigned ScopeLine = 0; /// The source line used for the function prologue.

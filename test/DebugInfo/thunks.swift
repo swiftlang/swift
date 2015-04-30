@@ -16,7 +16,7 @@ let i = foo.foo(-, x: y)
 // CHECK: define {{.*}}@_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_
 // CHECK-NOT: ret
 // CHECK: call {{.*}}, !dbg ![[LOC:.*]]
-// CHECK: ![[THUNK:.*]] = !DISubprogram(name: "_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_"
+// CHECK: ![[THUNK:.*]] = !DISubprogram(linkageName: "_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_"
 // CHECK-NOT:                           line:
 // CHECK-SAME:                          ){{$}}
 // CHECK: ![[LOC]] = !DILocation(line: 0, scope: ![[THUNK]])
