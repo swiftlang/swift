@@ -285,7 +285,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   /// Return true iff we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
   func canStoreElementsOfDynamicType(proposedElementType: Any.Type) -> Bool {
-    if let s? = _storage {
+    if let s = _storage {
       return s.canStoreElementsOfDynamicType(proposedElementType)
     }
     return false

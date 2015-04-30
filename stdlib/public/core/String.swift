@@ -114,7 +114,7 @@ extension String {
     let (stringBufferOptional, _) =
         _StringBuffer.fromCodeUnits(encoding, input: input,
             repairIllFormedSequences: false)
-    if let stringBuffer? = stringBufferOptional {
+    if let stringBuffer = stringBufferOptional {
       return String(_storage: stringBuffer)
     } else {
       return .None
@@ -1016,7 +1016,7 @@ extension String.Index {
     _ utf16Index: String.UTF16Index,
     within characters: String
   ) {
-    if let me? = utf16Index.samePositionIn(
+    if let me = utf16Index.samePositionIn(
       characters.unicodeScalars
     )?.samePositionIn(characters) {
       self = me
@@ -1035,7 +1035,7 @@ extension String.Index {
     _ utf8Index: String.UTF8Index,
     within characters: String
   ) {
-    if let me? = utf8Index.samePositionIn(
+    if let me = utf8Index.samePositionIn(
       characters.unicodeScalars
     )?.samePositionIn(characters) {
       self = me

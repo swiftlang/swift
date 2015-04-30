@@ -116,7 +116,7 @@ class MyNSData : NSData {
 }
 
 // CHECK-NOT: should not be executed
-if let myNSData? = MyNSData(base64EncodedString:"\n\n\n") {
+if let myNSData = MyNSData(base64EncodedString:"\n\n\n") {
   println("NSData came back non-nil?")
 } else {
   // CHECK: nil MyNSData as expected

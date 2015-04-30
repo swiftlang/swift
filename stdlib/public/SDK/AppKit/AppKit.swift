@@ -103,7 +103,7 @@ struct _NSViewMirror : MirrorType {
           _NSViewMirror._views.addObject(_v)
 
           let bounds = _v.bounds
-          if var b? = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
+          if var b = _v.bitmapImageRepForCachingDisplayInRect(bounds) {
               _v.cacheDisplayInRect(bounds, toBitmapImageRep: b)
               result = .Some(.View(b))
           }

@@ -970,38 +970,6 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
 }
 
 
-// Swift 1.x supported irrefutable patterns that unwrapped optionals and
-// allowed type annotations.  We specifically handle the common case of
-// "if let x : AnyObject = foo()" for good QoI and migration.  This is not
-// a valid modern 'if let' sequences: it isn't a valid matching pattern.
-//
-ParserResult<Pattern> Parser::
-parseSwift1IfLetPattern(bool isLet, SourceLoc VarLoc) {
-  assert(Tok.is(tok::identifier) && peekToken().is(tok::colon) &&
-         "caller didn't check our requirements");
-  
-  Identifier Name;
-  SourceLoc idLoc = consumeIdentifier(&Name);
-
-  // If the type annotation is present, parse it and error.
-  SourceLoc ColonLoc = consumeToken(tok::colon);
-  auto type = parseType();
-  if (type.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Pattern>();
-  if (type.isNull())
-    return nullptr;
-  
-  diagnose(idLoc, diag::no_type_annotation_in_condition)
-    .fixItInsertAfter(idLoc, "?")
-    .fixItRemove(SourceRange(ColonLoc, type.get()->getEndLoc()));
-
-  // Return a pattern of "let x?".
-  auto result = createBindingFromPattern(idLoc, Name, isLet);
-  result = new (Context) OptionalSomePattern(result, idLoc, true);
-  result = new (Context) VarPattern(VarLoc, isLet, result);
-  return makeParserResult(result);
-}
-
 bool Parser::isOnlyStartOfMatchingPattern() {
   return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is);
 }

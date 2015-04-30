@@ -685,7 +685,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") 
       })
     var maybeResult = s._prext_${algorithmKind}Element()
     expectType(Optional<MinimalComparableValue>.self, &maybeResult)
-    if let result? = maybeResult {
+    if let result = maybeResult {
       expectEqual(
         test.expected${AlgorithmKind}Value!, result.value,
         stackTrace: test.loc.withCurrentLoc())
@@ -717,7 +717,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
       return lhs.value < rhs.value
     }
     expectType(Optional<OpaqueValue<Int>>.self, &maybeResult)
-    if let result? = maybeResult {
+    if let result = maybeResult {
       expectEqual(
         test.expected${AlgorithmKind}Value!, result.value,
         stackTrace: test.loc.withCurrentLoc())
@@ -2608,7 +2608,7 @@ SequenceTypeAlgorithms.test("first") {
       OpaqueValue<Int>(1, identity: 10),
       OpaqueValue<Int>(2, identity: 20)
     ])
-    if let result? = s._prext_first {
+    if let result = s._prext_first {
       expectEqual(1, result.value)
       expectEqual(10, result.identity)
     } else {
@@ -2631,7 +2631,7 @@ SequenceTypeAlgorithms.test("last") {
       OpaqueValue<Int>(1, identity: 10),
       OpaqueValue<Int>(2, identity: 20)
     ])
-    if let result? = s._prext_last {
+    if let result = s._prext_last {
       expectEqual(2, result.value)
       expectEqual(20, result.identity)
     } else {

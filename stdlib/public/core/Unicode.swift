@@ -337,7 +337,7 @@ public struct UTF8 : UnicodeCodecType {
     if _lookaheadFlags & 0b1111_0000 == 0 {
       // Add more bytes into the buffer until we have 4.
       while _lookaheadFlags != 0b0000_1111 {
-        if let codeUnit? = next.next() {
+        if let codeUnit = next.next() {
           _decodeLookahead = (_decodeLookahead << 8) | UInt32(codeUnit)
           _lookaheadFlags = (_lookaheadFlags << 1) | 1
         } else {
@@ -526,7 +526,7 @@ public struct UTF16 : UnicodeCodecType {
 
     var unit0: UInt32
     if _fastPath(_lookaheadFlags & 0b10 == 0) {
-      if let first? = input.next() {
+      if let first = input.next() {
         unit0 = UInt32(first)
       } else {
         // Set EOF flag.
@@ -556,7 +556,7 @@ public struct UTF16 : UnicodeCodecType {
     // At this point we know that `unit0` is a high-surrogate.
 
     var unit1: UInt32
-    if let second? = input.next() {
+    if let second = input.next() {
       unit1 = UInt32(second)
     } else {
       // EOF reached.  Set EOF flag.

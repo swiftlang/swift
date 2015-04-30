@@ -1341,7 +1341,8 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   // Resolve the pattern.
   auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
-                                    binding->getDeclContext());
+                                    binding->getDeclContext(),
+                                    /*isStmtCondition*/true);
   if (!pattern) {
     binding->setInvalid();
     binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));

@@ -31,7 +31,7 @@ struct GuineaPig {
 }
 
 // CHECK: it's alive
-if let x? = GuineaPig(fail: false) {
+if let x = GuineaPig(fail: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -42,7 +42,7 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let y? = GuineaPig(fail: true) {
+if let y = GuineaPig(fail: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -52,7 +52,7 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
-if let a? = GuineaPig(failBefore: false) {
+if let a = GuineaPig(failBefore: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -61,7 +61,7 @@ if let a? = GuineaPig(failBefore: false) {
 println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's dead
-if let b? = GuineaPig(failBefore: true) {
+if let b = GuineaPig(failBefore: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -70,7 +70,7 @@ if let b? = GuineaPig(failBefore: true) {
 println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's dead
-if let c? = GuineaPig(alwaysFail: ()) {
+if let c = GuineaPig(alwaysFail: ()) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -79,17 +79,7 @@ if let c? = GuineaPig(alwaysFail: ()) {
 println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's dead
-if let d? = GuineaPig(delegateFailure: false, failBefore: true, failAfter: false) {
-  println("it's alive")
-} else {
-  println("it's dead")
-}
-
-println("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let e? = GuineaPig(delegateFailure: true, failBefore: false, failAfter: false) {
+if let d = GuineaPig(delegateFailure: false, failBefore: true, failAfter: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -99,7 +89,17 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let f? = GuineaPig(delegateFailure: false, failBefore: false, failAfter: true) {
+if let e = GuineaPig(delegateFailure: true, failBefore: false, failAfter: false) {
+  println("it's alive")
+} else {
+  println("it's dead")
+}
+
+println("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+// CHECK-NEXT: it's dead
+if let f = GuineaPig(delegateFailure: false, failBefore: false, failAfter: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -107,7 +107,7 @@ if let f? = GuineaPig(delegateFailure: false, failBefore: false, failAfter: true
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
-if let g? = GuineaPig(delegateFailure: false, failBefore: false, failAfter: false) {
+if let g = GuineaPig(delegateFailure: false, failBefore: false, failAfter: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -139,7 +139,7 @@ struct Chimera {
 }
 
 // CHECK-NEXT: it's dead
-if let q? = Chimera(failBefore: true) {
+if let q = Chimera(failBefore: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -150,7 +150,7 @@ println("--") // CHECK-NEXT: --
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
-if let r? = Chimera(failBefore: false) {
+if let r = Chimera(failBefore: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -160,7 +160,7 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let s? = Chimera(failBetween: true) {
+if let s = Chimera(failBetween: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -171,7 +171,7 @@ println("--") // CHECK-NEXT: --
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
-if let t? = Chimera(failBetween: false) {
+if let t = Chimera(failBetween: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -182,7 +182,7 @@ println("--") // CHECK-NEXT: --
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let u? = Chimera(failAfter: true) {
+if let u = Chimera(failAfter: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -193,7 +193,7 @@ println("--") // CHECK-NEXT: --
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
-if let v? = Chimera(failAfter: false) {
+if let v = Chimera(failAfter: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -232,7 +232,7 @@ final class PolarBear: Bear {
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
-if let ba? = Bear(fail: false) {
+if let ba = Bear(fail: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -242,7 +242,7 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let bb? = Bear(fail: true) {
+if let bb = Bear(fail: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -252,7 +252,7 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
-if let bc? = Bear(delegateFailure: false, failAfter: false) {
+if let bc = Bear(delegateFailure: false, failAfter: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -262,7 +262,7 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let bd? = Bear(delegateFailure: false, failAfter: true) {
+if let bd = Bear(delegateFailure: false, failAfter: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -272,7 +272,7 @@ println("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let bd? = Bear(delegateFailure: true, failAfter: true) {
+if let bd = Bear(delegateFailure: true, failAfter: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -283,7 +283,7 @@ println("--") // CHECK-NEXT: --
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
-if let be? = PolarBear(chainFailure: false, failAfter: false) {
+if let be = PolarBear(chainFailure: false, failAfter: false) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -294,7 +294,7 @@ println("--") // CHECK-NEXT: --
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let bf? = PolarBear(chainFailure: false, failAfter: true) {
+if let bf = PolarBear(chainFailure: false, failAfter: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -305,7 +305,7 @@ println("--") // CHECK-NEXT: --
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
-if let bf? = PolarBear(chainFailure: true, failAfter: true) {
+if let bf = PolarBear(chainFailure: true, failAfter: true) {
   println("it's alive")
 } else {
   println("it's dead")
@@ -341,7 +341,7 @@ final class IUOPolarBear: Bear, FailableOnDemand {
 }
 
 func tryInitFail<T: FailableOnDemand>(_: T.Type, #fail: Bool) {
-  if let x? = T(fail: fail) {
+  if let x = T(fail: fail) {
     println("it's alive")
   } else {
     println("it's dead")

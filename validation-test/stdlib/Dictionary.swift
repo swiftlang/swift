@@ -2536,7 +2536,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
 
     var dataPairs = Array<(Int, Int)>()
     var identityPairs = Array<(UWord, UWord)>()
-    while let key? = enumerator.nextObject() {
+    while let key = enumerator.nextObject() {
       let value: AnyObject = d.objectForKey(key)!
 
       let dataPair =
@@ -2660,7 +2660,7 @@ DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
   let enumerator = d.keyEnumerator()
 
   var pairs = Array<(Int, Int)>()
-  while let key? = enumerator.nextObject() {
+  while let key = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
@@ -2767,7 +2767,7 @@ DictionaryTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
   let enumerator = d.keyEnumerator()
 
   var pairs = Array<(Int, Int)>()
-  while let key? = enumerator.nextObject() {
+  while let key = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
@@ -2797,7 +2797,7 @@ DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
   let enumerator = d.keyEnumerator()
 
   var pairs = Array<(Int, Int)>()
-  while let key? = enumerator.nextObject() {
+  while let key = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
@@ -2840,7 +2840,7 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
   let enumerator = d.keyEnumerator()
 
   var pairs = Array<(Int, Int)>()
-  while let key? = enumerator.nextObject() {
+  while let key = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
@@ -3086,7 +3086,7 @@ DictionaryTestSuite.test("DictionaryDowncastConditionalEntryPoint") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  if let dCC?
+  if let dCC
        = _dictionaryDownCastConditional(d) as Dictionary<TestObjCKeyTy, TestObjCValueTy>? {
     assert(dCC.count == 3)
     var v = dCC[TestObjCKeyTy(10)]
@@ -3103,7 +3103,7 @@ DictionaryTestSuite.test("DictionaryDowncastConditionalEntryPoint") {
 
   // Unsuccessful downcast
   d["hello"] = 17
-  if let dCC?
+  if let dCC
        = _dictionaryDownCastConditional(d) as Dictionary<TestObjCKeyTy, TestObjCValueTy>? {
     assert(false)
   }
@@ -3116,7 +3116,7 @@ DictionaryTestSuite.test("DictionaryDowncastConditional") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  if let dCC? = d as? Dictionary<TestObjCKeyTy, TestObjCValueTy> {
+  if let dCC = d as? Dictionary<TestObjCKeyTy, TestObjCValueTy> {
     assert(dCC.count == 3)
     var v = dCC[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -3132,7 +3132,7 @@ DictionaryTestSuite.test("DictionaryDowncastConditional") {
 
   // Unsuccessful downcast
   d["hello"] = 17
-  if let dCC? = d as? Dictionary<TestObjCKeyTy, TestObjCValueTy> {
+  if let dCC = d as? Dictionary<TestObjCKeyTy, TestObjCValueTy> {
     assert(false)
   }
 }
@@ -3245,7 +3245,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  if let dCV?
+  if let dCV
        = _dictionaryBridgeFromObjectiveCConditional(d) as
          Dictionary<TestObjCKeyTy, TestBridgedValueTy>? {
     assert(dCV.count == 3)
@@ -3262,7 +3262,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   }
 
   // Successful downcast.
-  if let dVC?
+  if let dVC
        = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestObjCValueTy>? {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
@@ -3278,7 +3278,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   }
 
   // Successful downcast.
-  if let dVV?
+  if let dVV
        = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>? {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]
@@ -3295,15 +3295,15 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
 
   // Unsuccessful downcasts
   d["hello"] = 17
-  if let dCV?
+  if let dCV
        = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestObjCKeyTy, TestBridgedValueTy>?{
     assert(false)
   }
-  if let dVC?
+  if let dVC
        = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestObjCValueTy>?{
     assert(false)
   }
-  if let dVV?
+  if let dVV
        = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>?{
     assert(false)
   }
@@ -3316,7 +3316,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditional") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  if let dCV? = d as? Dictionary<TestObjCKeyTy, TestBridgedValueTy>  {
+  if let dCV = d as? Dictionary<TestObjCKeyTy, TestBridgedValueTy>  {
     assert(dCV.count == 3)
     var v = dCV[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -3331,7 +3331,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditional") {
   }
 
   // Successful downcast.
-  if let dVC? = d as? Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
+  if let dVC = d as? Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3346,7 +3346,7 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditional") {
   }
 
   // Successful downcast.
-  if let dVV? = d as? Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  if let dVV = d as? Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3362,13 +3362,13 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditional") {
 
   // Unsuccessful downcasts
   d["hello"] = 17
-  if let dCV? = d as? Dictionary<TestObjCKeyTy, TestBridgedValueTy> {
+  if let dCV = d as? Dictionary<TestObjCKeyTy, TestBridgedValueTy> {
     assert(false)
   }
-  if let dVC? = d as? Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
+  if let dVC = d as? Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
     assert(false)
   }
-  if let dVV? = d as? Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  if let dVV = d as? Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
     assert(false)
   }
 }

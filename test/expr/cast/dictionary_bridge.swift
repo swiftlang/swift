@@ -131,19 +131,19 @@ func testConditionalDowncastBridge() {
   var dictOB = Dictionary<ObjC, BridgedToObjC>()
 
   // Downcast to bridged value types.
-  if let d? = dictRR as? Dictionary<BridgedToObjC, BridgedToObjC> { }
-  if let d? = dictRR as? Dictionary<BridgedToObjC, ObjC> { }
-  if let d? = dictRR as? Dictionary<ObjC, BridgedToObjC> { }
+  if let d = dictRR as? Dictionary<BridgedToObjC, BridgedToObjC> { }
+  if let d = dictRR as? Dictionary<BridgedToObjC, ObjC> { }
+  if let d = dictRR as? Dictionary<ObjC, BridgedToObjC> { }
 
-  if let d? = dictRO as? Dictionary<BridgedToObjC, BridgedToObjC> { }
-  if let d? = dictRO as? Dictionary<BridgedToObjC, ObjC> { }
-  if let d? = dictRO as? Dictionary<ObjC, BridgedToObjC> { }
+  if let d = dictRO as? Dictionary<BridgedToObjC, BridgedToObjC> { }
+  if let d = dictRO as? Dictionary<BridgedToObjC, ObjC> { }
+  if let d = dictRO as? Dictionary<ObjC, BridgedToObjC> { }
 
-  if let d? = dictBO as? Dictionary<BridgedToObjC, BridgedToObjC> { }
-  if let d? = dictOB as? Dictionary<BridgedToObjC, BridgedToObjC> { }
+  if let d = dictBO as? Dictionary<BridgedToObjC, BridgedToObjC> { }
+  if let d = dictOB as? Dictionary<BridgedToObjC, BridgedToObjC> { }
 
   // We don't do mixed down/upcasts.
-  if let d? = dictDO as? Dictionary<BridgedToObjC, BridgedToObjC> { } // expected-error{{'ObjC' is not a subtype of 'DerivesObjC'}}
+  if let d = dictDO as? Dictionary<BridgedToObjC, BridgedToObjC> { } // expected-error{{'ObjC' is not a subtype of 'DerivesObjC'}}
 }
 
 

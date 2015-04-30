@@ -496,7 +496,7 @@ extension Array : _ObjectiveCBridgeable {
       "array element type is not bridged to Objective-C")
 
     // If we have the appropriate native storage already, just adopt it.
-    if let native? = Array._bridgeFromObjectiveCAdoptingNativeStorage(source) {
+    if let native = Array._bridgeFromObjectiveCAdoptingNativeStorage(source) {
       result = native
       return
     }
@@ -620,7 +620,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     d: NSDictionary,
     inout result: Dictionary?
   ) {
-    if let native? = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorage(
+    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorage(
         d as AnyObject) {
       result = native
       return
@@ -823,7 +823,7 @@ public struct NSIndexSetGenerator : GeneratorType {
     if _first {
       _current = _set.firstIndex
       _first = false
-    } else if let c? = _current {
+    } else if let c = _current {
       _current = _set.indexGreaterThanIndex(c)
     } else {
       // current is already nil
@@ -893,7 +893,7 @@ extension Set : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(s: NSSet, inout result: Set?) {
-    if let native? = Set<T>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
+    if let native = Set<T>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
       result = native
       return
     }

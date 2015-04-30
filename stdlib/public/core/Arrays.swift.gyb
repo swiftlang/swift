@@ -1105,7 +1105,7 @@ func _arrayOutOfPlaceUpdate<
   let newEnd = newStart + newCount
 
   // Check to see if we have storage we can move from
-  if let backing? = source.requestUniqueMutableBackingBuffer(sourceCount) {
+  if let backing = source.requestUniqueMutableBackingBuffer(sourceCount) {
     let sourceStart = source.baseAddress
     let oldStart = sourceStart + headCount
 
@@ -1186,7 +1186,7 @@ public func _extractOrCopyToNativeArrayBuffer<
 >(source: Buffer)
   -> _ContiguousArrayBuffer<Buffer.Generator.Element>
 {
-  if let n? = source.requestNativeBuffer() {
+  if let n = source.requestNativeBuffer() {
     return n
   }
   return _copyCollectionToNativeArrayBuffer(source)
@@ -1284,8 +1284,8 @@ extension Array {
   public static func _bridgeFromObjectiveCAdoptingNativeStorage(
     source: AnyObject
   ) -> Array? {
-    if let deferred? = source as? _SwiftDeferredNSArray {
-      if let nativeStorage? =
+    if let deferred = source as? _SwiftDeferredNSArray {
+      if let nativeStorage =
         deferred._nativeStorage as? _ContiguousArrayStorage<T> {
         return Array(_ContiguousArrayBuffer(nativeStorage))
       }

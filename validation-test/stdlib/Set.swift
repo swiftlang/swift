@@ -968,7 +968,7 @@ SetTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
 
   var gen = s.generate()
   var items = Array<Int>()
-  while let value? = gen.next() {
+  while let value = gen.next() {
     items += [value]
   }
   expectTrue(equalsUnordered(items, [ 1010, 2020, 3030 ]))
@@ -981,7 +981,7 @@ SetTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
 
   var gen = s.generate()
   var items = Array<Int>()
-  while let value? = gen.next() {
+  while let value = gen.next() {
     items.append(value.value)
   }
   expectTrue(equalsUnordered(items, [ 1010, 2020, 3030 ]))
@@ -1864,7 +1864,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
 
   var gen = s.generate()
   var members = Array<Int>()
-  while let member? = gen.next() {
+  while let member = gen.next() {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
@@ -1883,7 +1883,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
 
   var gen = s.generate()
   var members = Array<Int>()
-  while let member? = gen.next() {
+  while let member = gen.next() {
     members.append(member.value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
@@ -1932,7 +1932,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
 
   var gen = s.generate()
   var members = [Int]()
-  while let member? = gen.next() {
+  while let member = gen.next() {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
@@ -1951,7 +1951,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 
   var gen = s.generate()
   var members = [Int]()
-  while let member? = gen.next() as AnyObject? {
+  while let member = gen.next() as AnyObject? {
     members.append((member as! TestBridgedKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
@@ -2052,7 +2052,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
     var s = a[i]
     var gen = s.generate()
     var items = Array<Int>()
-    while let value? = gen.next() {
+    while let value = gen.next() {
       let v = (value as! TestObjCKeyTy).value
       items.append(v)
     }
@@ -2073,7 +2073,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
     var d = a[i]
     var gen = d.generate()
     var items = Array<Int>()
-    while let value? = gen.next() {
+    while let value = gen.next() {
       items.append(value.value)
     }
     var expectedItems = [ 1 + i, 2 + i, 3 + i ]
@@ -2110,7 +2110,7 @@ SetTestSuite.test("BridgingRoundtrip") {
   let enumerator = s.objectEnumerator()
 
   var items = Array<Int>()
-  while let value? = enumerator.nextObject() {
+  while let value = enumerator.nextObject() {
     let v = (value as! TestObjCKeyTy).value
     items.append(v)
   }
@@ -2244,7 +2244,7 @@ SetTestSuite.test("BridgedToObjC.ObjectEnumerator.NextObject") {
   let enumerator = s.objectEnumerator()
 
   var members = [Int]()
-  while let nextObject? = enumerator.nextObject() {
+  while let nextObject = enumerator.nextObject() {
     members.append((nextObject as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([1010, 2020, 3030], members))
@@ -2274,7 +2274,7 @@ SetTestSuite.test("BridgedToObjC.MemberTypesCustomBridged") {
   let enumerator = s.objectEnumerator()
 
   var members = [Int]()
-  while let nextObject? = enumerator.nextObject() {
+  while let nextObject = enumerator.nextObject() {
     members.append((nextObject as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([ 1010, 2020, 3030 ], members))
@@ -2291,7 +2291,7 @@ SetTestSuite.test("BridgingRoundTrip") {
   let enumerator = s.objectEnumerator()
 
   var members = [Int]()
-  while let nextObject? = enumerator.nextObject() {
+  while let nextObject = enumerator.nextObject() {
     members.append((nextObject as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered([1010, 2020, 3030] ,members))
@@ -2452,7 +2452,7 @@ SetTestSuite.test("SetDowncastConditionalEntryPoint") {
   }
 
   // Successful downcast.
-  if let sCC?  = _setDownCastConditional(s) as Set<TestObjCKeyTy>? {
+  if let sCC  = _setDownCastConditional(s) as Set<TestObjCKeyTy>? {
     expectEqual(3, sCC.count)
     expectTrue(sCC.contains(TestObjCKeyTy(1010)))
     expectTrue(sCC.contains(TestObjCKeyTy(2020)))
@@ -2463,7 +2463,7 @@ SetTestSuite.test("SetDowncastConditionalEntryPoint") {
 
   // Unsuccessful downcast
   s.insert("Hello, world")
-  if let sCC? = _setDownCastConditional(s) as Set<TestObjCKeyTy>? {
+  if let sCC = _setDownCastConditional(s) as Set<TestObjCKeyTy>? {
     expectTrue(false)
   }
 }
@@ -2475,7 +2475,7 @@ SetTestSuite.test("SetDowncastConditional") {
   }
 
   // Successful downcast.
-  if let sCC? = s as? Set<TestObjCKeyTy> {
+  if let sCC = s as? Set<TestObjCKeyTy> {
     expectEqual(3, sCC.count)
     expectTrue(sCC.contains(TestObjCKeyTy(1010)))
     expectTrue(sCC.contains(TestObjCKeyTy(2020)))
@@ -2486,7 +2486,7 @@ SetTestSuite.test("SetDowncastConditional") {
 
   // Unsuccessful downcast
   s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
-  if let sCC? = s as? Set<TestObjCKeyTy> {
+  if let sCC = s as? Set<TestObjCKeyTy> {
     expectTrue(false)
   }
 }
@@ -2541,7 +2541,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
   }
 
   // Successful downcast.
-  if let sVC? = _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
+  if let sVC = _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
     expectEqual(3, sVC.count)
     expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
     expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
@@ -2552,7 +2552,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
 
   // Unsuccessful downcasts
   s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
-  if let sVC? = _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
+  if let sVC = _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
     expectTrue(false)
   }
 }
@@ -2564,7 +2564,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
   }
 
   // Successful downcast.
-  if let sCV? = s as? Set<TestObjCKeyTy>  {
+  if let sCV = s as? Set<TestObjCKeyTy>  {
     expectEqual(3, sCV.count)
     expectTrue(sCV.contains(TestObjCKeyTy(1010)))
     expectTrue(sCV.contains(TestObjCKeyTy(2020)))
@@ -2574,7 +2574,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
   }
 
   // Successful downcast.
-  if let sVC? = s as? Set<TestBridgedKeyTy> {
+  if let sVC = s as? Set<TestBridgedKeyTy> {
     expectEqual(3, sVC.count)
     expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
     expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
@@ -2585,13 +2585,13 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
 
   // Unsuccessful downcasts
   s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb")
-  if let sCm? = s as? Set<TestObjCKeyTy> {
+  if let sCm = s as? Set<TestObjCKeyTy> {
     expectTrue(false)
   }
-  if let sVC? = s as? Set<TestBridgedKeyTy> {
+  if let sVC = s as? Set<TestBridgedKeyTy> {
     expectTrue(false)
   }
-  if let sVm? = s as? Set<TestBridgedKeyTy> {
+  if let sVm = s as? Set<TestBridgedKeyTy> {
     expectTrue(false)
   }
 }

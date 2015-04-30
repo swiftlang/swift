@@ -940,7 +940,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   // For error recovery purposes, keep track of the disposition of the last
   // pattern binding we saw ('let' vs 'var') in multiple PBD cases.
   enum BK_BindingKind {
-    BK_Let, BK_Var, BK_Case
+    BK_Let, BK_Var, BK_Case, BK_LetCase, BK_VarCase
   } BindingKind = BK_Let;
   StringRef BindingKindStr = "let";
  
@@ -956,20 +956,22 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
       // If will probably  be a common typo to write "if let case" instead of
       // "if case let" so detect this and produce a nice fixit.
-      if (BindingKind != BK_Case && Tok.is(tok::kw_case)) {
+      if ((BindingKind == BK_Let || BindingKind == BK_Var) &&
+          Tok.is(tok::kw_case)) {
         diagnose(VarLoc, diag::wrong_condition_case_location, BindingKindStr)
           .fixItRemove(VarLoc)
           .fixItInsertAfter(Tok.getLoc(), " " + BindingKindStr.str());
 
         BindingKindStr = "case";
+        BindingKind = BindingKind == BK_Let ? BK_LetCase : BK_VarCase;
         VarLoc = consumeToken(tok::kw_case);
       }
 
     } else {
       // We get here with erroneous code like:
-      //    if let x? = foo() where cond(), y? = bar()
+      //    if let x = foo() where cond(), y? = bar()
       // which is a common typo for:
-      //    if let x? = foo() where cond(),
+      //    if let x = foo() where cond(),
       //       LET y? = bar()
       // diagnose this specifically and produce a nice fixit.
       diagnose(Tok, diag::where_end_of_binding_use_letvar, BindingKindStr)
@@ -981,34 +983,41 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     
     // Parse the list of name binding's within a let/var clauses.
     do {
-      ParserResult<Pattern> Pattern;
+      ParserResult<Pattern> ThePattern;
 
       if (BindingKind == BK_Case) {
-        // In our recursive parse, remember that we're in a var/let pattern.
+        // In our recursive parse, remember that we're in a matching pattern.
         llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
           T(InVarOrLetPattern, IVOLP_InMatchingPattern);
-        Pattern = parseMatchingPattern(/*isExprBasic*/ true);
+        ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
+      } else if (BindingKind == BK_LetCase || BindingKind == BK_VarCase) {
+        // Recover from the 'if let case' typo gracefully.
+
+        // In our recursive parse, remember that we're in a var/let pattern.
+        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+        T(InVarOrLetPattern,
+          BindingKind == BK_LetCase ? IVOLP_InLet : IVOLP_InVar);
+        ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
+
+        if (ThePattern.isNonNull()) {
+          auto *P = new (Context) VarPattern(VarLoc, BindingKind == BK_LetCase,
+                                             ThePattern.get(), /*impl*/false);
+          ThePattern = makeParserResult(P);
+        }
+      } else {
+        // Otherwise, this is an implicit optional binding "if let".
+        ThePattern =
+          parseMatchingPatternAsLetOrVar(BindingKind == BK_Let, VarLoc,
+                                         /*isExprBasic*/ true);
+        // The let/var pattern is part of the statement.
+        if (Pattern *P = ThePattern.getPtrOrNull())
+          P->setImplicit();
       }
-      // The "if let" construct requires a refutable matching pattern, so parse
-      // it now.
-      //
-      // Swift 1.x supported irrefutable patterns that unwrapped optionals and
-      // allowed type annotations.  We specifically handle the common case of
-      // "if let x : AnyObject = foo()" for good QoI and migration.  This is not
-      // a valid modern 'if let' sequences: it isn't a valid matching pattern.
-      //
-      else if (Tok.is(tok::identifier) && peekToken().is(tok::colon))
-        Pattern = parseSwift1IfLetPattern(BindingKind == BK_Let, VarLoc);
-      else {
-        Pattern = parseMatchingPatternAsLetOrVar(BindingKind == BK_Let, VarLoc,
-                                                 /*isExprBasic*/ true);
-        if (auto *P = Pattern.getPtrOrNull())
-          P->setImplicit();  // The let/var pattern is part of the statement.
-        Pattern = parseOptionalPatternTypeAnnotation(Pattern);
-      }
-      Status |= Pattern;
-      
-      if (Pattern.isNull() || Pattern.hasCodeCompletion())
+
+      ThePattern = parseOptionalPatternTypeAnnotation(ThePattern);
+      Status |= ThePattern;
+
+      if (ThePattern.isNull() || ThePattern.hasCodeCompletion())
         return Status;
 
       Expr *Init;
@@ -1028,10 +1037,10 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         Init = new (Context) ErrorExpr(Tok.getLoc());
       }
       
-      entries.push_back(PatternBindingEntry(Pattern.get(), Init));
+      entries.push_back(PatternBindingEntry(ThePattern.get(), Init));
     
       // Add variable bindings from the pattern to the case scope.
-      addPatternVariablesToScope(Pattern.get());
+      addPatternVariablesToScope(ThePattern.get());
 
     } while (Tok.is(tok::comma) &&
              peekToken().isNot(tok::kw_let, tok::kw_var, tok::kw_case) &&

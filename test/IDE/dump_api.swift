@@ -191,7 +191,7 @@ internal class _CollectionBox<S: CollectionType>
     return 0
   }
   override subscript(position: _ForwardIndexBoxType) -> Element {
-    if let i? = position._unbox() as S.Index? {
+    if let i = position._unbox() as S.Index? {
       return _base[i]
     }
     fatalError("Index type mismatch!")

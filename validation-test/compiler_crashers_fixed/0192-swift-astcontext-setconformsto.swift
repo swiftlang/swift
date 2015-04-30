@@ -10,7 +10,7 @@ struct B : A {
 }
 struct C<D, E: A where D.C == EType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
     for (mx : T?) in xs {
-        if let x? = mx {
+        if let x = mx {
             return x
         }
     }

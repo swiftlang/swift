@@ -7,7 +7,7 @@ import CoreGraphics
 
 var roomName : String? = nil
 
-if let realRoomName? = roomName as! NSString { // expected-error {{optional present pattern cannot match values of type 'NSString'}} expected-warning {{cast from 'String?' to unrelated type 'NSString' always fails}}
+if let realRoomName = roomName as! NSString { // expected-error {{optional present pattern cannot match values of type 'NSString'}} expected-warning {{cast from 'String?' to unrelated type 'NSString' always fails}}
 			
 }
 

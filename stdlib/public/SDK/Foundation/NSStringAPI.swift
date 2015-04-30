@@ -200,7 +200,7 @@ extension String {
     encoding enc: NSStringEncoding,
     error: NSErrorPointer = nil
   ) {
-    if let ns? = NSString(contentsOfFile: path, encoding: enc, error: error) {
+    if let ns = NSString(contentsOfFile: path, encoding: enc, error: error) {
       self = ns as String
     } else {
       return nil
@@ -220,7 +220,7 @@ extension String {
     usedEncoding: UnsafeMutablePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
   ) {
-    if let ns? = NSString(
+    if let ns = NSString(
       contentsOfFile: path, usedEncoding: usedEncoding, error: error) {
 
       self = ns as String
@@ -242,7 +242,7 @@ extension String {
     encoding enc: NSStringEncoding,
     error: NSErrorPointer = nil
   ) {
-    if let ns? = NSString(contentsOfURL: url, encoding: enc, error: error) {
+    if let ns = NSString(contentsOfURL: url, encoding: enc, error: error) {
       self = ns as String
     } else {
       return nil
@@ -262,7 +262,7 @@ extension String {
     usedEncoding enc: UnsafeMutablePointer<NSStringEncoding> = nil,
     error: NSErrorPointer = nil
   ) {
-    if let ns? = NSString(contentsOfURL: url, usedEncoding: enc, error: error) {
+    if let ns = NSString(contentsOfURL: url, usedEncoding: enc, error: error) {
       self = ns as String
     } else {
       return nil
@@ -279,7 +279,7 @@ extension String {
     CString: UnsafePointer<CChar>,
     encoding enc: NSStringEncoding
   ) {
-    if let ns? = NSString(CString: CString, encoding: enc) {
+    if let ns = NSString(CString: CString, encoding: enc) {
       self = ns as String
     } else {
       return nil
@@ -296,7 +296,7 @@ extension String {
   /// Produces a string created by copying the data from a given
   /// C array of UTF8-encoded bytes.
   public init?(UTF8String bytes: UnsafePointer<CChar>) {
-    if let ns? = NSString(UTF8String: bytes) {
+    if let ns = NSString(UTF8String: bytes) {
       self = ns as String
     } else {
       return nil
@@ -428,13 +428,13 @@ extension String {
       }
     }
 
-    if let matches? = nsMatches {
+    if let matches = nsMatches {
       // Since this function is effectively a bridge thunk, use the
       // bridge thunk semantics for the NSArray conversion
       matchesIntoArray._setIfNonNil { _convertNSArrayToArray(matches) }
     }
 
-    if let n? = nsOutputName {
+    if let n = nsOutputName {
       outputName._setIfNonNil { n as String }
     }
     return result
@@ -761,7 +761,7 @@ extension String {
     bytes: S, encoding: NSStringEncoding
   ) {
     let byteArray = Array(bytes)
-    if let ns? = NSString(
+    if let ns = NSString(
       bytes: byteArray, length: byteArray.count, encoding: encoding) {
 
       self = ns as String
@@ -784,7 +784,7 @@ extension String {
     bytesNoCopy bytes: UnsafeMutablePointer<Void>, length: Int,
     encoding: NSStringEncoding, freeWhenDone flag: Bool
   ) {
-    if let ns? = NSString(
+    if let ns = NSString(
       bytesNoCopy: bytes, length: length, encoding: encoding,
       freeWhenDone: flag) {
 

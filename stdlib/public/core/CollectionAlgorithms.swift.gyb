@@ -49,7 +49,7 @@ extension CollectionType where Self.${GElement} : Equatable {
   ///
   /// - complexity: O(`self.count()`)
   final public func _prext_indexOf(element: ${GElement}) -> Index? {
-    if let result? = _customIndexOfEquatableElement(element) {
+    if let result = _customIndexOfEquatableElement(element) {
       return result
     }
 

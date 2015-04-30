@@ -170,7 +170,7 @@ struct _UIViewMirror : MirrorType {
       
           UIGraphicsEndImageContext()
       
-          if let image? = maybe_image {
+          if let image = maybe_image {
             result = .Some(.View(image))
           }
 

@@ -557,7 +557,7 @@ public func ~> <
     (p++).initialize(generator.next()!)
   }
 
-  while let element? = generator.next() {
+  while let element = generator.next() {
     result += CollectionOfOne(element)
   }
 

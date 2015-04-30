@@ -223,8 +223,8 @@ class TestObjCKeyTy : NSObject, NSCopying {
   }
 
   override func isEqual(object: AnyObject!) -> Bool {
-    if let other? = object {
-      if let otherObjcKey? = other as? TestObjCKeyTy {
+    if let other = object {
+      if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
       }
     }
@@ -304,8 +304,8 @@ class TestObjCEquatableValueTy : NSObject {
   }
 
   override func isEqual(object: AnyObject!) -> Bool {
-    if let other? = object {
-      if let otherObjcKey? = other as? TestObjCEquatableValueTy {
+    if let other = object {
+      if let otherObjcKey = other as? TestObjCEquatableValueTy {
         return self.value == otherObjcKey.value
       }
     }
@@ -710,7 +710,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift<
 ) {
   slurpFastEnumerationFromSwift(
     a, enumerator, &sink, maxItems: maxFastEnumerationItems)
-  while let value? = enumerator.nextObject() {
+  while let value = enumerator.nextObject() {
     sink.put(value)
   }
 }
@@ -723,7 +723,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift<
 ) {
   slurpFastEnumerationFromSwift(
     d, enumerator, &sink, maxItems: maxFastEnumerationItems)
-  while let key? = enumerator.nextObject() {
+  while let key = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = (key, value)
     sink.put(kv)
@@ -988,7 +988,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift<
 ) {
   slurpFastEnumerationFromSwift(
     s, enumerator, &sink, maxItems: maxFastEnumerationItems)
-  while let value? = enumerator.nextObject() {
+  while let value = enumerator.nextObject() {
     sink.put(value)
   }
 }
@@ -1250,7 +1250,7 @@ func getBridgedNSArrayOfRefTypeVerbatimBridged(
   assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
 
   var a = [TestObjCValueTy]()
-  if let requestedCapacity? = capacity {
+  if let requestedCapacity = capacity {
     a.reserveCapacity(requestedCapacity)
   }
   for i in 1..<(numElements + 1) {
@@ -1270,7 +1270,7 @@ func getBridgedNSArrayOfValueTypeCustomBridged(
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
 
   var a = [TestBridgedValueTy]()
-  if let requestedCapacity? = capacity {
+  if let requestedCapacity = capacity {
     a.reserveCapacity(requestedCapacity)
   }
   for i in 1..<(numElements + 1) {

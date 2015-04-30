@@ -741,7 +741,8 @@ public:
       for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
         // Resolve the pattern in the label.
         Pattern *pattern = labelItem.getPattern();
-        if (auto *newPattern = TC.resolvePattern(pattern, DC)) {
+        if (auto *newPattern = TC.resolvePattern(pattern, DC,
+                                                 /*isStmtCondition*/false)) {
           pattern = newPattern;
         } else {
           hadTypeError = true;
@@ -797,7 +798,8 @@ public:
 
     // Type-check the catch pattern.
     Pattern *pattern = S->getErrorPattern();
-    if (Pattern *newPattern = TC.resolvePattern(pattern, DC)) {
+    if (Pattern *newPattern = TC.resolvePattern(pattern, DC,
+                                                /*isStmtCondition*/false)) {
       pattern = newPattern;
 
       // Coerce the pattern to the exception type.

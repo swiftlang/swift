@@ -266,13 +266,13 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
              : maxDepth <= 0 ? "▹" : "▿"
   print("\(bullet) ", &targetStream)
 
-  if let nam? = name {
+  if let nam = name {
     print("\(nam): ", &targetStream)
   }
   print(mirror.summary, &targetStream)
 
-  if let id? = mirror.objectIdentifier {
-    if let previous? = visitedItems[id] {
+  if let id = mirror.objectIdentifier {
+    if let previous = visitedItems[id] {
       println(" #\(previous)", &targetStream)
       return
     }

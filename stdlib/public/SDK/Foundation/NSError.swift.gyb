@@ -138,7 +138,7 @@ public enum ${EnumName} : _ObjectiveCBridgeableErrorType {
 public func _stdlib_bridgeNSErrorToErrorType<
   T : _ObjectiveCBridgeableErrorType
 >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
-  if let bridged? = T(_bridgedNSError: error) {
+  if let bridged = T(_bridgedNSError: error) {
     out.initialize(bridged)
     return true
   } else {

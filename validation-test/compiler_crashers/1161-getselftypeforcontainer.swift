@@ -26,7 +26,7 @@ func g<T where T.E == F>(f: B<T>) {
 }
 func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
 for (mx : T?) in xs {
-if let x? = mx {
+if let x = mx {
 }
 }
 }

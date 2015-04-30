@@ -26,8 +26,8 @@ class ValueObserver: NSObject {
 	
 	override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [NSObject : AnyObject]?, context: UnsafeMutablePointer<Void>) {
 		if context == &observeContext {
-      if let change_? = change {
-        if let amount? = change_[NSKeyValueChangeNewKey as NSString] as? Int {
+      if let change_ = change {
+        if let amount = change_[NSKeyValueChangeNewKey as NSString] as? Int {
           println("Observed value updated to \(amount)")
         }
       }

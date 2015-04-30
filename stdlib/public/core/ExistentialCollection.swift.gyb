@@ -166,7 +166,7 @@ internal class _${Kind}Box<S : ${Kind}Type>
     return numericCast(_base._prext_count())
   }
   override subscript(position: _ForwardIndexBoxType) -> Element {
-    if let i? = position._unbox() as S.Index? {
+    if let i = position._unbox() as S.Index? {
       return _base[i]
     }
     fatalError("Index type mismatch!")

@@ -19,7 +19,7 @@ class Evaluator
 
     func evaluate(n: Int)
     {
-        if let problemBlock? = map[n]
+        if let problemBlock = map[n]
         {
             let foo = problemBlock()
             println("foo = \(foo)")

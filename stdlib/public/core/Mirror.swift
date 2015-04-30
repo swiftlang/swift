@@ -101,10 +101,9 @@ public struct Mirror {
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
   public init(reflecting subject: Any) {
-    if let customized as CustomReflectable = subject {
+    if case let customized as CustomReflectable = subject {
       self = customized.customMirror()
-    }
-    else {
+    } else {
       self = Mirror(
         legacy: Swift.reflect(subject),
         subjectType: subject.dynamicType)
@@ -126,7 +125,7 @@ public struct Mirror {
   /// 20 children of a mirror if they can be accessed efficiently, you
   /// might write:
   ///
-  ///     if let b? = AnyBidirectionalCollection(someMirror.children) {
+  ///     if let b = AnyBidirectionalCollection(someMirror.children) {
   ///       for i in advance(b.endIndex, -20, b.startIndex)..<b.endIndex {
   ///          println(b[i])
   ///       }
@@ -154,7 +153,7 @@ public struct Mirror {
     var clsMirror = Swift.reflect(subject)
 
     // Walk up the chain of mirrors/classes until we find staticSubclass
-    while let superclass?: AnyClass? = _getSuperclass(cls) {
+    while let superclass: AnyClass? = _getSuperclass(cls) {
       let superclassMirror? = clsMirror._superMirror()
         else { break }
       
@@ -170,9 +169,9 @@ public struct Mirror {
     subject: T, _ ancestorRepresentation: AncestorRepresentation
   ) -> ()->Mirror? {
 
-    if let subject? = subject as? AnyObject,
-      let subjectClass? = T.self as? AnyClass,
-      let superclass? = _getSuperclass(subjectClass) {
+    if let subject = subject as? AnyObject,
+      let subjectClass = T.self as? AnyClass,
+      let superclass = _getSuperclass(subjectClass) {
 
       switch ancestorRepresentation {
       case .Generated: return {
@@ -417,10 +416,10 @@ extension Mirror {
     for e in [first] + rest {
       let children = Mirror(reflecting: result).children
       let position: Children.Index
-      if let label as String = e {
+      if case let label as String = e {
         position = _find(children) { $0.label == label } ?? children.endIndex
       }
-      else if let offset? = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
+      else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
         position = advance(children.startIndex, offset, children.endIndex)
       }
       else {
@@ -543,10 +542,10 @@ internal extension Mirror {
     subjectType: Any.Type,
     makeSuperclassMirror: (()->Mirror?)? = nil
   ) {
-    if let makeSuperclassMirror? = makeSuperclassMirror {
+    if let makeSuperclassMirror = makeSuperclassMirror {
       self._makeSuperclassMirror = makeSuperclassMirror
     }
-    else if let subjectSuperclass? = _getSuperclass(subjectType) {
+    else if let subjectSuperclass = _getSuperclass(subjectType) {
       self._makeSuperclassMirror = {
         legacyMirror._superMirror().map {
           Mirror(legacy: $0, subjectType: subjectSuperclass) }
@@ -600,11 +599,11 @@ extension PlaygroundQuickLook {
   /// `Mirror`.  In general, though, the observability of such
   /// mutations is unspecified.
   public init(reflecting subject: Any) {
-    if let customized as CustomPlaygroundQuickLookable = subject {
+    if let customized = subject as? CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook()
     }
     else {
-      if let q? = Swift.reflect(subject).quickLookObject {
+      if let q = Swift.reflect(subject).quickLookObject {
         self = q
       }
       else {

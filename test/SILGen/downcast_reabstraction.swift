@@ -8,7 +8,7 @@
 // CHECK:         [[SUBST_VAL:%.*]] = partial_apply [[REABSTRACT]]([[ORIG_VAL]])
 
 func condFunctionFromAny(x: Any) {
-  if let f? = x as? () -> () {
+  if let f = x as? () -> () {
     f()
   }
 }

@@ -15,7 +15,7 @@ class StaticBar {
   // CHECK: checked_cast_addr_br
   @inline(never)
   class func mightHaveFoo() -> String {
-    if let selfAsFoo? = self as? StaticFoo.Type {
+    if let selfAsFoo = self as? StaticFoo.Type {
       return selfAsFoo.foo()
     } else {
       return "no Foo for you"

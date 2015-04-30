@@ -1711,6 +1711,12 @@ ERROR(invalid_pattern,sema_tcd,none,
 WARNING(var_pattern_didnt_bind_variables, sema_tcp,none,
         "'%0' pattern has no effect; sub-pattern didn't bind any variables",
         (StringRef))
+ERROR(iflet_pattern_matching,stmt_parsing,none,
+      "pattern matching in a condition requires the 'case' keyword", ())
+ERROR(iflet_implicitly_unwraps,stmt_parsing,none,
+      "pattern matching in a condition implicitly unwraps optionals", ())
+
+
 
 ERROR(pattern_type_mismatch_context,sema_tcp,none,
       "type annotation does not match contextual type %0", (Type))

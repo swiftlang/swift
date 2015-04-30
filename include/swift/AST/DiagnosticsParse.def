@@ -748,11 +748,6 @@ ERROR(where_end_of_binding_use_letvar,stmt_parsing,none,
       "binding ended by previous 'where' clause; "
       "use '%0' to introduce a new one", (StringRef))
 
-ERROR(no_type_annotation_in_condition,stmt_parsing,none,
-      "type annotation is not permitted in condition; did you mean to match"
-      " an optional?", ())
-
-
 // If Statement
 ERROR(expected_condition_if,stmt_parsing,PointsToFirstBadToken,
       "expected expression, var, or let in 'if' condition", ())

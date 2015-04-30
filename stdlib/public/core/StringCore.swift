@@ -63,7 +63,7 @@ public struct _StringCore {
       _sanityCheck(count == 0, "Empty string storage with non-zero length")
       _sanityCheck(_owner == nil, "String pointing at empty storage has owner")
     }
-    else if let buffer? = nativeBuffer {
+    else if let buffer = nativeBuffer {
       _sanityCheck(!hasCocoaBuffer)
       _sanityCheck(elementWidth == buffer.elementWidth,
         "_StringCore elementWidth doesn't match its buffer's")
@@ -591,7 +591,7 @@ extension _StringCore : ExtensibleCollectionType {
   >(s: S) {
     var width = elementWidth
     if width == 1 {
-      if let hasNonAscii? = s~>_preprocessingPass({
+      if let hasNonAscii = s~>_preprocessingPass({
           s in contains(s) { $0 > 0x7f }
         }) {
         width = hasNonAscii ? 2 : 1

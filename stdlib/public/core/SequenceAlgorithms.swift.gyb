@@ -136,7 +136,7 @@ else:
   ) -> Bool {
     var otherGenerator = other.generate()
     for e0 in self {
-      if let e1? = otherGenerator.next() {
+      if let e1 = otherGenerator.next() {
         if ${"!isEquivalent(e0, e1)" if preds else "e0 != e1"} {
           return false
         }
@@ -253,8 +253,8 @@ else:
     var g1 = self.generate()
     var g2 = other.generate()
     while true {
-      if let e1? = g1.next() {
-        if let e2? = g2.next() {
+      if let e1 = g1.next() {
+        if let e2 = g2.next() {
           if ${"isOrderedBefore(e1, e2)" if preds else "e1 < e2"} {
             return true
           }
@@ -280,7 +280,7 @@ else:
 extension SequenceType where Self.Generator.Element : Equatable {
   /// Return `true` iff `x` is in `self`.
   final public func _prext_contains(element: ${GElement}) -> Bool {
-    if let result? = _customContainsEquatableElement(element) {
+    if let result = _customContainsEquatableElement(element) {
       return result
     }
 
@@ -429,7 +429,7 @@ extension SequenceType {
   ) -> [T] {
     var result: [T] = []
     for element in self {
-      if let newElement? = transform(element) {
+      if let newElement = transform(element) {
         result.append(newElement)
       }
     }

@@ -163,15 +163,15 @@ public func join<
       return r - separatorSize
   }
 
-  if let n? = reservation {
+  if let n = reservation {
     result.reserveCapacity(n)
   }
 
   if separatorSize != 0 {
     var gen = elements.generate()
-    if let first? = gen.next() {
+    if let first = gen.next() {
       result.extend(first)
-      while let next? = gen.next() {
+      while let next = gen.next() {
         result.extend(separator)
         result.extend(next)
       }

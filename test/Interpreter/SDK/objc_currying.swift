@@ -14,7 +14,7 @@ foo(x.componentsJoinedByString)
 // CHECK: foo • bar • bas
 
 let a: AnyObject = x
-if let componentsJoinedByString? = a.componentsJoinedByString {
+if let componentsJoinedByString = a.componentsJoinedByString {
   foo(componentsJoinedByString)
 }
 // CHECK: foo, bar, bas

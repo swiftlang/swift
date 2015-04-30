@@ -10,7 +10,7 @@ protocol Fooable {
 }
 
 func fooify<T>(x: T) {
-  if let foo? = x as? Fooable {
+  if let foo = x as? Fooable {
     foo.foo()
   } else {
     println("not fooable")

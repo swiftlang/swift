@@ -78,8 +78,8 @@ while var v? = o, z? = o where v > z {}
 while v == 0 {}
 // CHECK: <repeat-while>repeat <brace>{}</brace> while <elem-expr>v == 0</elem-expr></repeat-while>
 repeat {} while v == 0
-// CHECK: <if>if <elem-condexpr>var v? = o, z? = o where v > z</elem-condexpr> <brace>{}</brace></if>
-if var v? = o, z? = o where v > z {}
+// CHECK: <if>if <elem-condexpr>var v = o, z = o where v > z</elem-condexpr> <brace>{}</brace></if>
+if var v = o, z = o where v > z {}
 
 // CHECK: <switch>switch <elem-expr>v</elem-expr> {
 // CHECK:   <case>case <elem-pattern>1</elem-pattern>: break;</case>

@@ -696,7 +696,7 @@ class rdar18414728Base {
   let aaaaa:String  // expected-note 3 {{'self.aaaaa' not initialized}}
 
   init() {
-    if let p1? = prop { // expected-error {{use of 'self' in property access 'prop' before all stored properties are initialized}}
+    if let p1 = prop { // expected-error {{use of 'self' in property access 'prop' before all stored properties are initialized}}
       aaaaa = p1
     }
     aaaaa = "foo"  // expected-error {{immutable value 'self.aaaaa' may only be initialized once}}
@@ -728,7 +728,7 @@ class rdar18414728Derived : rdar18414728Base {
   let aaaaa2:String
 
   override init() {
-    if let p1? = prop2 {  // expected-error {{use of 'self' in property access 'prop2' before super.init initializes self}}
+    if let p1 = prop2 {  // expected-error {{use of 'self' in property access 'prop2' before super.init initializes self}}
       aaaaa2 = p1
     }
     aaaaa2 = "foo"    // expected-error {{immutable value 'self.aaaaa2' may only be initialized once}}
@@ -764,7 +764,7 @@ struct rdar18414728Struct {
 
   init() {
     j = 42
-    if let p1? = computed { // expected-error {{'self' used before all stored properties are initialized}}
+    if let p1 = computed { // expected-error {{'self' used before all stored properties are initialized}}
       i = p1
     }
     i = 1

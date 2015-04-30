@@ -24,7 +24,7 @@ public struct _FDInputStream {
   }
 
   public mutating func getline() -> String? {
-    if let newlineIndex? =
+    if let newlineIndex =
       find(_buffer[0..<_bufferUsed], UInt8(UnicodeScalar("\n").value)) {
       var result = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: _buffer[0..<newlineIndex])

@@ -574,12 +574,55 @@ public:
 /// pattern interpretation if it forms a valid pattern; otherwise, leave it as
 /// an expression. This does no type-checking except for the bare minimum to
 /// disambiguate semantics-dependent pattern forms.
-Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC) {
+Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
+                                     bool isStmtCondition) {
   bool DiagnosedError = false;
   P = ResolvePattern(*this, DC, DiagnosedError).visit(P);
-  
-  // If an error was produced walking the pattern, reject it.
-  return DiagnosedError ? nullptr : P;
+
+  if (DiagnosedError) return nullptr;
+
+  // Look through a TypedPattern if present.
+  auto *InnerP = P;
+  if (auto *TP = dyn_cast<TypedPattern>(P))
+    InnerP = TP->getSubPattern();
+
+  // If the pattern was valid, check for an implicit VarPattern on the outer
+  // level.  If so, we have an "if let" condition and we want to enforce some
+  // more structure on it.
+  if (isStmtCondition && isa<VarPattern>(InnerP) && InnerP->isImplicit()) {
+    auto *Body = cast<VarPattern>(InnerP)->getSubPattern();
+
+    // If they wrote a "x?" pattern, they probably meant "if let x".
+    // Check for this and recover nicely if they wrote that.
+    if (auto *OSP = dyn_cast<OptionalSomePattern>(Body)) {
+      if (!OSP->getSubPattern()->isRefutablePattern()) {
+        diagnose(OSP->getStartLoc(), diag::iflet_implicitly_unwraps)
+          .highlight(OSP->getSourceRange())
+          .fixItRemove(OSP->getQuestionLoc());
+        return P;
+      }
+    }
+
+    // If the pattern bound is some other refutable pattern, then they
+    // probably meant:
+    //   if case let <pattern> =
+    if (Body->isRefutablePattern()) {
+      diagnose(P->getLoc(), diag::iflet_pattern_matching)
+        .fixItInsert(P->getLoc(), "case ");
+      return P;
+    }
+
+    // "if let" implicitly looks inside of an optional, so wrap it in an
+    // OptionalSome pattern.
+    InnerP = new (Context) OptionalSomePattern(InnerP, InnerP->getEndLoc(),
+                                               true);
+    if (auto *TP = dyn_cast<TypedPattern>(P))
+      TP->setSubPattern(InnerP);
+    else
+      P = InnerP;
+  }
+
+  return P;
 }
 
 static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,

@@ -34,7 +34,7 @@ extension Q_SequenceDefaultsType {
       count: initialCapacity, minimumCapacity: 0)
 
     var g = self.generate()
-    while let x? = g.next() {
+    while let x = g.next() {
       result += CollectionOfOne(x)
     }
     return ContiguousArray(result)
@@ -47,7 +47,7 @@ extension Q_SequenceDefaultsType {
   ) {
     var p = baseAddress
     var g = self.generate()
-    while let element? = g.next() {
+    while let element = g.next() {
       p.initialize(element)
       ++p
     }

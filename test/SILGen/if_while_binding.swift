@@ -17,7 +17,7 @@ func if_no_else() {
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3fooFT_GSqSS_
   // CHECK:   [[OPT_RES:%.*]] = apply [[FOO]]()
   // CHECK:   switch_enum [[OPT_RES]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YES:bb[0-9]+]], default [[CONT:bb[0-9]+]]
-  if let x? = foo() {
+  if let x = foo() {
   // CHECK: [[YES]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
   // CHECK:   retain_value [[VAL]]
@@ -35,7 +35,7 @@ func if_else_chain() {
   // CHECK:   [[FOO:%.*]] = function_ref @_TF16if_while_binding3foo
   // CHECK-NEXT:   [[OPT_RES:%.*]] = apply [[FOO]]()
   // CHECK-NEXT:   switch_enum [[OPT_RES]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESX:bb[0-9]+]], default [[NOX:bb[0-9]+]]
-  if let x? = foo() {
+  if let x = foo() {
   // CHECK: [[YESX]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   debug_value [[VAL]] : $String  // let x
   // CHECK:   [[A:%.*]] = function_ref @_TF16if_while_binding
@@ -50,7 +50,7 @@ func if_else_chain() {
     // CHECK: [[ELSE1]]:
     // CHECK:   dealloc_box $String
     // CHECK:   br [[ELSE:bb[0-9]+]]
-  } else if var y? = bar() {
+  } else if var y = bar() {
   // CHECK: [[YESY]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   br [[CONT_Y:bb[0-9]+]]
     b(y)
@@ -72,10 +72,10 @@ func while_loop() {
   // CHECK: [[LOOP_ENTRY]]:
   
   // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.Some!enumelt.1: [[LOOP_BODY:bb[0-9]+]], default [[LOOP_EXIT:bb[0-9]+]]
-  while let x? = foo() {
+  while let x = foo() {
   // CHECK: [[LOOP_BODY]]([[X:%[0-9]+]] : $String):
   // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.Some!enumelt.1: [[YES:bb[0-9]+]], default [[NO:bb[0-9]+]]
-    if let y? = bar() {
+    if let y = bar() {
   // CHECK: [[YES]]([[Y:%[0-9]+]] : $String):
       a(y)
       break
@@ -113,7 +113,7 @@ func while_loop() {
 // CHECK:       [[DONE]]:
 // CHECK:         strong_release %0
 func while_loop_generic<T>(source: () -> T?) {
-  while let x? = source() {
+  while let x = source() {
   }
 }
 
@@ -134,7 +134,7 @@ func while_loop_multi() {
   // CHECK: br [[LOOP_EXIT0]]
 
   // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : $String):
-  while let a? = foo(), b? = bar() {
+  while let a = foo(), b = bar() {
     // CHECK:   debug_value [[B]] : $String  // let b
     // CHECK:   debug_value [[A]] : $String  // let c
     // CHECK:   release_value [[B]]
@@ -162,7 +162,7 @@ func if_multi() {
   // CHECK:   br [[IF_DONE]]
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
-  if let a? = foo(), var b? = bar() {
+  if let a = foo(), var b = bar() {
     // CHECK:   store [[BVAL]] to [[B]]#1 : $*String
     // CHECK:   debug_value {{.*}} : $String  // let c
     // CHECK:   strong_release [[B]]
@@ -189,7 +189,7 @@ func if_multi_else() {
     // CHECK:   br [[ELSE]]
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : $String):
-  if let a? = foo(), var b? = bar() {
+  if let a = foo(), var b = bar() {
     // CHECK:   store [[BVAL]] to [[B]]#1 : $*String
     // CHECK:   debug_value {{.*}} : $String  // let c
     // CHECK:   strong_release [[B]]
@@ -226,7 +226,7 @@ func if_multi_where() {
   // CHECK:   strong_release [[BBOX]]#0
   // CHECK:   release_value [[A]]
   // CHECK:   br [[IF_DONE:bb[0-9]+]]
-  if let a? = foo(), var b? = bar() where a == b {
+  if let a = foo(), var b = bar() where a == b {
     // CHECK: [[IF_BODY]]:
     // CHECK:   debug_value [[CVAL:%[0-9]+]] : $String  // let c
     // CHECK:   strong_release [[BBOX]]#0
@@ -262,7 +262,7 @@ func if_leading_boolean(a : Int) {
   // CHECK-NEXT:   debug_value [[B:%[0-9]+]] : $String  // let c
   // CHECK-NEXT:   release_value [[B]]
   // CHECK-NEXT:   br [[IFDONE]]
-  if a == a, let b? = foo() {
+  if a == a, let b = foo() {
     let c = b
   }
   // CHECK: [[IFDONE]]:
@@ -307,7 +307,7 @@ func testAsPatternInIfLet(a : BaseClass?) {
   // CHECK-NEXT:   release_value %0 : $Optional<BaseClass>
   // CHECK-NEXT:   tuple ()
   // CHECK-NEXT:   return
-  if let b as DerivedClass = a {
+  if case let b as DerivedClass = a {
 
   }
 }

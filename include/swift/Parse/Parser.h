@@ -1026,7 +1026,6 @@ public:
   ParserResult<Pattern> parseMatchingPatternAsLetOrVar(bool isLet,
                                                        SourceLoc VarLoc,
                                                        bool isExprBasic);
-  ParserResult<Pattern> parseSwift1IfLetPattern(bool isLet, SourceLoc VarLoc);
   
 
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);

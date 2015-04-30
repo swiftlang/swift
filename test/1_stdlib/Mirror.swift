@@ -190,7 +190,7 @@ mirrors.test("Legacy") {
     expectEqual(1, first(md.children)?.value as? Int)
     
     expectNotEmpty(md.superclassMirror())
-    if let mb2? = md.superclassMirror() { expectBMirror(mb2) }
+    if let mb2 = md.superclassMirror() { expectBMirror(mb2) }
   }
 
   do {
@@ -203,7 +203,7 @@ mirrors.test("Legacy") {
     expectEqual(1, first(md.children)?.value as? Int)
     
     expectNotEmpty(md.superclassMirror())
-    if let mb2? = md.superclassMirror() { expectBMirror(mb2) }
+    if let mb2 = md.superclassMirror() { expectBMirror(mb2) }
   }
 }
 
@@ -262,13 +262,13 @@ mirrors.test("class/Plain/Plain") {
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
   
-  if let bChild? = expectNotEmpty(first(b.children)) {
+  if let bChild = expectNotEmpty(first(b.children)) {
     expectEqual("b", bChild.label)
     expectEqual(42, bChild.value as? UInt)
   }
-  if let a? = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror()) {
     expectTrue(a.subjectType == A.self)
-    if let aChild? = expectNotEmpty(first(a.children)) {
+    if let aChild = expectNotEmpty(first(a.children)) {
       expectEqual("a", aChild.label)
       expectEqual(1, aChild.value as? Int)
     }
@@ -287,7 +287,7 @@ mirrors.test("class/UncustomizedSuper/Synthesized/Implicit") {
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a? = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror()) {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", first(a.children)?.label)
     expectEmpty(a.superclassMirror())
@@ -307,7 +307,7 @@ mirrors.test("class/UncustomizedSuper/Synthesized/Explicit") {
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a? = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror()) {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", first(a.children)!.label)
     expectEmpty(a.superclassMirror())
@@ -336,7 +336,7 @@ mirrors.test("class/CustomizedSuper/Synthesized") {
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a? = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror()) {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", first(a.children)!.label)
     expectEmpty(a.superclassMirror())
@@ -419,7 +419,7 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Direct") {
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a? = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror()) {
     expectTrue(a.subjectType == A.self)
     expectEqual("aye", first(a.children)!.label)
     expectEmpty(a.superclassMirror())
@@ -450,14 +450,14 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let y? = expectNotEmpty(b.superclassMirror()) {
+  if let y = expectNotEmpty(b.superclassMirror()) {
     expectTrue(y.subjectType == Y.self)
-    if let x? = expectNotEmpty(y.superclassMirror()) {
+    if let x = expectNotEmpty(y.superclassMirror()) {
       expectTrue(x.subjectType == X.self)
       expectEqual(0, count(x.children))
-      if let a? = expectNotEmpty(x.superclassMirror()) {
+      if let a = expectNotEmpty(x.superclassMirror()) {
         expectTrue(a.subjectType == A.self)
-        if let aye? = expectNotEmpty(first(a.children)) {
+        if let aye = expectNotEmpty(first(a.children)) {
           expectEqual("aye", aye.label)
         }
       }
@@ -490,9 +490,9 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect2") {
 
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
-  if let a? = expectNotEmpty(b.superclassMirror()) {
+  if let a = expectNotEmpty(b.superclassMirror()) {
     expectTrue(a.subjectType == A.self)
-    if let aye? = expectNotEmpty(first(a.children)) {
+    if let aye = expectNotEmpty(first(a.children)) {
       expectEqual("aye", aye.label)
     }
   }
@@ -513,7 +513,7 @@ mirrors.test("class/Cluster") {
 
   let a = Mirror(reflecting: Y())
   expectTrue(a.subjectType == A.self)
-  if let aye? = expectNotEmpty(first(a.children)) {
+  if let aye = expectNotEmpty(first(a.children)) {
     expectEqual("aye", aye.label)
   }
 }

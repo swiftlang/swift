@@ -338,7 +338,7 @@ public struct MsgPackDecoder {
   }
 
   internal mutating func _readBigEndianInt64() -> Int64? {
-    if let result? = _readBigEndianUInt64() {
+    if let result = _readBigEndianUInt64() {
       return Int64(bitPattern: result)
     }
     return nil
@@ -360,7 +360,7 @@ public struct MsgPackDecoder {
     @noescape code: () -> T?
   ) -> T? {
     let originalPosition = _consumedCount
-    if let result? = code() {
+    if let result = code() {
       return result
     }
     _consumedCount = originalPosition
@@ -401,7 +401,7 @@ public struct MsgPackDecoder {
 
   public mutating func readFloat32() -> Float32? {
     return _rewindIfReturnsNil {
-      if _consumeByteIf(0xca), let bitPattern? = _readBigEndianUInt32() {
+      if _consumeByteIf(0xca), let bitPattern = _readBigEndianUInt32() {
         return Float32._fromBitPattern(bitPattern)
       }
       return nil
@@ -410,7 +410,7 @@ public struct MsgPackDecoder {
 
   public mutating func readFloat64() -> Float64? {
     return _rewindIfReturnsNil {
-      if _consumeByteIf(0xcb), let bitPattern? = _readBigEndianUInt64() {
+      if _consumeByteIf(0xcb), let bitPattern = _readBigEndianUInt64() {
         return Float64._fromBitPattern(bitPattern)
       }
       return nil
@@ -420,13 +420,13 @@ public struct MsgPackDecoder {
   public mutating func readString() -> String? {
     return _rewindIfReturnsNil {
       var maybeLength: Int? = nil
-      if let byte? = _lookByte() where byte & 0b1110_0000 == 0b1010_0000 {
+      if let byte = _lookByte() where byte & 0b1110_0000 == 0b1010_0000 {
         // fixstr
         _consumeByte()
         maybeLength = Int(byte & 0b0001_1111)
       } else if _consumeByteIf(0xd9) {
         // str8
-        if let length? = _consumeByte() {
+        if let length = _consumeByte() {
           if length <= 0x1f {
             // Reject overlong encodings.
             return nil
@@ -435,7 +435,7 @@ public struct MsgPackDecoder {
         }
       } else if _consumeByteIf(0xda) {
         // str16
-        if let length? = _readBigEndianUInt16() {
+        if let length = _readBigEndianUInt16() {
           if length <= 0xff {
             // Reject overlong encodings.
             return nil
@@ -444,7 +444,7 @@ public struct MsgPackDecoder {
         }
       } else if _consumeByteIf(0xdb) {
         // str32
-        if let length? = _readBigEndianUInt32() {
+        if let length = _readBigEndianUInt32() {
           if length <= 0xffff {
             // Reject overlong encodings.
             return nil
@@ -452,7 +452,7 @@ public struct MsgPackDecoder {
           maybeLength = Int(length)
         }
       }
-      if let length? = maybeLength {
+      if let length = maybeLength {
         if _haveNBytes(length) {
           let utf8 = _bytes[_consumedCount..<_consumedCount + length]
           _consumedCount += length
@@ -468,12 +468,12 @@ public struct MsgPackDecoder {
       var maybeLength: Int? = nil
       if _consumeByteIf(0xc4) {
         // bin8
-        if let length? = _consumeByte() {
+        if let length = _consumeByte() {
           maybeLength = Int(length)
         }
       } else if _consumeByteIf(0xc5) {
         // bin16
-        if let length? = _readBigEndianUInt16() {
+        if let length = _readBigEndianUInt16() {
           if length <= 0xff {
             // Reject overlong encodings.
             return nil
@@ -482,7 +482,7 @@ public struct MsgPackDecoder {
         }
       } else if _consumeByteIf(0xc6) {
         // bin32
-        if let length? = _readBigEndianUInt32() {
+        if let length = _readBigEndianUInt32() {
           if length <= 0xffff {
             // Reject overlong encodings.
             return nil
@@ -490,7 +490,7 @@ public struct MsgPackDecoder {
           maybeLength = Int(length)
         }
       }
-      if let length? = maybeLength {
+      if let length = maybeLength {
         if _haveNBytes(length) {
           let result = Array(_bytes[_consumedCount..<_consumedCount + length])
           _consumedCount += length
@@ -503,13 +503,13 @@ public struct MsgPackDecoder {
 
   public mutating func readBeginArray() -> Int? {
     return _rewindIfReturnsNil {
-      if let byte? = _lookByte() where byte & 0b1111_0000 == 0b1001_0000 {
+      if let byte = _lookByte() where byte & 0b1111_0000 == 0b1001_0000 {
         // fixarray
         _consumeByte()
         return Int(byte & 0b0000_1111)
       } else if _consumeByteIf(0xdc) {
         // array16
-        if let length? = _readBigEndianUInt16() {
+        if let length = _readBigEndianUInt16() {
           if length <= 0xf {
             // Reject overlong encodings.
             return nil
@@ -518,7 +518,7 @@ public struct MsgPackDecoder {
         }
       } else if _consumeByteIf(0xdd) {
         // array32
-        if let length? = _readBigEndianUInt32() {
+        if let length = _readBigEndianUInt32() {
           if length <= 0xffff {
             // Reject overlong encodings.
             return nil
@@ -532,13 +532,13 @@ public struct MsgPackDecoder {
 
   public mutating func readBeginMap() -> Int? {
     return _rewindIfReturnsNil {
-      if let byte? = _lookByte() where byte & 0b1111_0000 == 0b1000_0000 {
+      if let byte = _lookByte() where byte & 0b1111_0000 == 0b1000_0000 {
         // fixarray
         _consumeByte()
         return Int(byte & 0b0000_1111)
       } else if _consumeByteIf(0xde) {
         // array16
-        if let length? = _readBigEndianUInt16() {
+        if let length = _readBigEndianUInt16() {
           if length <= 0xf {
             // Reject overlong encodings.
             return nil
@@ -547,7 +547,7 @@ public struct MsgPackDecoder {
         }
       } else if _consumeByteIf(0xdf) {
         // array32
-        if let length? = _readBigEndianUInt32() {
+        if let length = _readBigEndianUInt32() {
           if length <= 0xffff {
             // Reject overlong encodings.
             return nil
@@ -579,7 +579,7 @@ public struct MsgPackDecoder {
         maybeLength = 16
       } else if _consumeByteIf(0xc7) {
         // ext8
-        if let length? = _consumeByte() {
+        if let length = _consumeByte() {
           if length == 1 || length == 2 || length == 4 || length == 8 ||
             length == 16 {
             // Reject overlong encodings.
@@ -589,7 +589,7 @@ public struct MsgPackDecoder {
         }
       } else if _consumeByteIf(0xc8) {
         // ext16
-        if let length? = _readBigEndianUInt16() {
+        if let length = _readBigEndianUInt16() {
           if length <= 0xff {
             // Reject overlong encodings.
             return nil
@@ -598,7 +598,7 @@ public struct MsgPackDecoder {
         }
       } else if _consumeByteIf(0xc9) {
         // ext32
-        if let length? = _readBigEndianUInt32() {
+        if let length = _readBigEndianUInt32() {
           if length <= 0xffff {
             // Reject overlong encodings.
             return nil
@@ -606,7 +606,7 @@ public struct MsgPackDecoder {
           maybeLength = Int(length)
         }
       }
-      if let length? = maybeLength, let type? = _consumeByte() {
+      if let length = maybeLength, let type = _consumeByte() {
         if _haveNBytes(length) {
           let result = Array(_bytes[_consumedCount..<_consumedCount + length])
           _consumedCount += length
@@ -778,36 +778,36 @@ public enum MsgPackVariant {
 
   internal static func _deserializeFrom(
     inout decoder: MsgPackDecoder) -> MsgPackVariant? {
-    if let i? = decoder.readInt64() {
+    if let i = decoder.readInt64() {
       return MsgPackVariant.Int64(i)
     }
-    if let i? = decoder.readUInt64() {
+    if let i = decoder.readUInt64() {
       return MsgPackVariant.UInt64(i)
     }
     if decoder.readNil() {
       return MsgPackVariant.Nil
     }
-    if let b? = decoder.readBool() {
+    if let b = decoder.readBool() {
       return MsgPackVariant.Bool(b)
     }
-    if let f? = decoder.readFloat32() {
+    if let f = decoder.readFloat32() {
       return MsgPackVariant.Float32(f)
     }
-    if let f? = decoder.readFloat64() {
+    if let f = decoder.readFloat64() {
       return MsgPackVariant.Float64(f)
     }
-    if let s? = decoder.readString() {
+    if let s = decoder.readString() {
       return MsgPackVariant.String(s)
     }
-    if let dataBytes? = decoder.readBinary() {
+    if let dataBytes = decoder.readBinary() {
       return MsgPackVariant.Binary(dataBytes)
     }
-    if let count? = decoder.readBeginArray() {
+    if let count = decoder.readBeginArray() {
       var array: [MsgPackVariant] = []
       array.reserveCapacity(count)
       for i in 0..<count {
         let maybeValue = MsgPackVariant._deserializeFrom(&decoder)
-        if let value? = maybeValue {
+        if let value = maybeValue {
           array.append(value)
         } else {
           return nil
@@ -816,13 +816,13 @@ public enum MsgPackVariant {
       return .Array(MsgPackVariantArray(array))
 
     }
-    if let count? = decoder.readBeginMap() {
+    if let count = decoder.readBeginMap() {
       var map: [(MsgPackVariant, MsgPackVariant)] = []
       map.reserveCapacity(count)
       for i in 0..<count {
         let maybeKey = MsgPackVariant._deserializeFrom(&decoder)
         let maybeValue = MsgPackVariant._deserializeFrom(&decoder)
-        if let key? = maybeKey, value? = maybeValue {
+        if let key = maybeKey, value = maybeValue {
           let keyValue = (key, value)
           map.append(key, value)
         } else {
@@ -831,7 +831,7 @@ public enum MsgPackVariant {
       }
       return .Map(MsgPackVariantMap(map))
     }
-    if let (type, data)? = decoder.readExtended() {
+    if let (type, data) = decoder.readExtended() {
       return MsgPackVariant.Extended(type: type, data: data)
     }
     return nil
@@ -839,7 +839,7 @@ public enum MsgPackVariant {
 
   public init?(bytes: [UInt8]) {
     var decoder = MsgPackDecoder(bytes)
-    if let result? = MsgPackVariant._deserializeFrom(&decoder) {
+    if let result = MsgPackVariant._deserializeFrom(&decoder) {
       self = result
     } else {
       return nil
