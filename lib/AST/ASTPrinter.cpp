@@ -2028,6 +2028,8 @@ void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
 
 namespace {
 class TypePrinter : public TypeVisitor<TypePrinter> {
+  using super = TypeVisitor;
+  
   ASTPrinter &Printer;
   const PrintOptions &Options;
   Optional<std::vector<GenericParamList *>> UnwrappedGenericParams;
@@ -2190,6 +2192,18 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 public:
   TypePrinter(ASTPrinter &Printer, const PrintOptions &PO)
       : Printer(Printer), Options(PO) {}
+  
+  void visit(Type T) {
+    // If we have an alternate name for this type, use it.
+    if (Options.AlternativeTypeNames) {
+      auto found = Options.AlternativeTypeNames->find(T.getCanonicalTypeOrNull());
+      if (found != Options.AlternativeTypeNames->end()) {
+        Printer << found->second.str();
+        return;
+      }
+    }
+    super::visit(T);
+  }
 
   void visitErrorType(ErrorType *T) {
     Printer << "<<error type>>";

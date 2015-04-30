@@ -434,3 +434,13 @@ final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassR
   init!(foo: Int) {}
 }
 
+protocol GenericParameterNameCollisionType {
+  func foo<T>(x: T)
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWU__GV9witnesses29GenericParameterNameCollisionQ__S_33GenericParameterNameCollisionTypeS_FS1_3fooUS1___fQPS1_U__FQ_T_ : $@convention(witness_method) <T1><T> (@in T, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
+// CHECK:       bb0(%0 : $*T, %1 : $*GenericParameterNameCollision<T1>):
+// CHECK:         apply {{%.*}}<T1, T>
+struct GenericParameterNameCollision<T>: GenericParameterNameCollisionType {
+  func foo<U>(x: U) {}
+}

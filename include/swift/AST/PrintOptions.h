@@ -18,6 +18,7 @@
 
 namespace swift {
 class GenericParamList;
+class CanType;
 enum DeclAttrKind : unsigned;
 
 /// Options for printing AST nodes.
@@ -160,6 +161,9 @@ struct PrintOptions {
   /// \brief Print dependent types as references into this generic parameter
   /// list.
   GenericParamList *ContextGenericParams = nullptr;
+  
+  /// \brief Print types with alternative names from their canonical names.
+  llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
