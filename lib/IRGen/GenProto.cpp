@@ -193,12 +193,13 @@ namespace {
       Entries.push_back(WitnessTableEntry::forFunction(ctor, getNextIndex()));
     }
 
-    void addAssociatedType(AssociatedTypeDecl *ty) {
+    void addAssociatedType(AssociatedTypeDecl *ty,
+                           ArrayRef<ProtocolDecl *> protos) {
       // An associated type takes up a spot for the type metadata and for the
       // witnesses to all its conformances.
       Entries.push_back(
                       WitnessTableEntry::forAssociatedType(ty, getNextIndex()));
-      for (auto *proto : ty->getConformingProtocols(nullptr))
+      for (auto *proto : protos)
         if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
           ++NumWitnesses;
     }
@@ -2965,7 +2966,8 @@ namespace {
       return addMethodFromSILWitnessTable(iface);
     }
 
-    void addAssociatedType(AssociatedTypeDecl *ty) {
+    void addAssociatedType(AssociatedTypeDecl *ty,
+                           ArrayRef<ProtocolDecl *> protos) {
 #ifndef NDEBUG
       auto &entry = SILEntries.front();
       assert(entry.getKind() == SILWitnessTable::AssociatedType
@@ -2989,7 +2991,7 @@ namespace {
       Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
 
       // FIXME: Add static witness tables for type conformances.
-      for (auto protocol : ty->getConformingProtocols(nullptr)) {
+      for (auto protocol : protos) {
         if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
           continue;
 

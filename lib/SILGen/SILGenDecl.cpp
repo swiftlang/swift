@@ -1388,7 +1388,8 @@ public:
                 witness.getSubstitutions());
   }
 
-  void addAssociatedType(AssociatedTypeDecl *td) {
+  void addAssociatedType(AssociatedTypeDecl *td,
+                         ArrayRef<ProtocolDecl *> protos) {
     // Find the substitution info for the witness type.
     const auto &witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
 
@@ -1397,8 +1398,7 @@ public:
                                 witness.getReplacement()->getCanonicalType()});
 
     // Emit records for the protocol requirements on the type.
-    assert(td->getConformingProtocols(nullptr).size()
-             == witness.getConformances().size()
+    assert(protos.size() == witness.getConformances().size()
            && "number of conformances in assoc type substitution do not match "
               "number of requirements on assoc type");
     // The conformances should be all null or all nonnull.
@@ -1415,10 +1415,7 @@ public:
                                  return !C;
                                })));
 
-    for (unsigned i = 0, e = td->getConformingProtocols(nullptr).size(); i < e;
-         ++i) {
-      auto protocol = td->getConformingProtocols(nullptr)[i];
-
+    for (auto *protocol : protos) {
       // Only reference the witness if the protocol requires it.
       if (!SGM.Types.protocolRequiresWitnessTable(protocol))
         continue;

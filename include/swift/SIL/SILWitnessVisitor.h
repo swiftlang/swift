@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -87,7 +88,11 @@ public:
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
-    asDerived().addAssociatedType(td);
+    SmallVector<ProtocolDecl *, 4> protos;
+    for (auto p : td->getConformingProtocols(nullptr))
+      protos.push_back(p);
+    ProtocolType::canonicalizeProtocols(protos);
+    asDerived().addAssociatedType(td, protos);
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
