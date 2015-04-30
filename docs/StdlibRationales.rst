@@ -142,6 +142,21 @@ call an API with a different name, say ``lazyEnumerate()`` to opt into
 laziness.  The problem is that the eager API, which would have a shorter and
 less obscure name, would be less efficient for the common case.
 
+Use of ``BooleanType`` in library APIs
+--------------------------------------
+
+Use ``Bool`` instead of a generic function over a ``BooleanType``, unless there
+are special cicrumstances (for example, ``func &&`` is designed to work on all
+boolean values so that ``&&`` feels like a part of the language).
+
+``BooleanType`` is a protocol to which only ``Bool`` and ``ObjCBool`` conform.
+Users don't usually interact ``ObjCBool`` instances, except when using certain
+specific APIs (for example, APIs that operate on pointers to ``BOOL``).  If
+someone already has an ``ObjCBool`` instance for whatever strange reason, they
+can just convert it to ``Bool``.  We think this is the right tradeoff:
+simplifying function signatures is more important than making a marginal
+usecase a bit more convenient.
+
 Possible future directions
 ==========================
 
