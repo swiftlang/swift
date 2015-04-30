@@ -21,6 +21,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -1228,7 +1229,7 @@ static IsFreeFunctionWitness_t isFreeFunctionWitness(ValueDecl *requirement,
 }
 
 /// Emit a witness table for a protocol conformance.
-class SILGenConformance : public Lowering::ASTVisitor<SILGenConformance> {
+class SILGenConformance : public swift::ASTVisitor<SILGenConformance> {
 public:
   SILGenModule &SGM;
   NormalProtocolConformance *Conformance;
@@ -1290,7 +1291,7 @@ public:
 
     // Otherwise if we have no witness table yet, create it.
     return SILWitnessTable::create(SGM.M, Linkage, SGM.makeModuleFragile,
-                                 Conformance, Entries);
+                                   Conformance, Entries);
   }
 
   void emitBaseProtocolWitness(ProtocolDecl *baseProtocol) {
