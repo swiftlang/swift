@@ -71,6 +71,10 @@ struct MapRegionCounters : public ASTWalker {
       CounterMap[SS] = NextCounter++;
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
       CounterMap[CS] = NextCounter++;
+    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      CounterMap[DCS] = NextCounter++;
+    } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
+      CounterMap[CS->getBody()] = NextCounter++;
     }
     return {true, S};
   }
@@ -295,8 +299,13 @@ private:
       return;
 
     CounterExpr *JumpsToLabel = nullptr;
-    if (auto *LS = dyn_cast_or_null<LabeledStmt>(Parent.getAsStmt()))
-      JumpsToLabel = &getCounter(LS);
+    Stmt *ParentStmt = Parent.getAsStmt();
+    if (ParentStmt) {
+      if (isa<DoCatchStmt>(ParentStmt) || isa<CatchStmt>(ParentStmt))
+        return;
+      if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
+        JumpsToLabel = &getCounter(LS);
+    }
 
     if (!ControlFlowAdjust && !JumpsToLabel)
       return;
@@ -468,6 +477,13 @@ public:
 
     } else if (isa<CaseStmt>(S)) {
       pushRegion(S);
+
+    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      assignCounter(DCS->getBody(), CounterExpr::Ref(getCurrentCounter()));
+      assignCounter(DCS);
+
+    } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
+      assignCounter(CS->getBody());
     }
     return {true, S};
   }
@@ -519,6 +535,9 @@ public:
     } else if (isa<CaseStmt>(S)) {
       popRegions(S);
 
+    } else if (isa<DoCatchStmt>(S)) {
+      replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
+
     } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S)) {
       terminateRegion(S);
     }
@@ -554,6 +573,10 @@ public:
   Expr *walkToExprPost(Expr *E) override {
     if (hasCounter(E))
       popRegions(E);
+
+    if (isa<ThrowExpr>(E))
+      terminateRegion(E);
+
     return E;
   }
 

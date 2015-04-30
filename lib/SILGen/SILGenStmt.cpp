@@ -109,8 +109,8 @@ void SILGenFunction::emitStmt(Stmt *S) {
 
 /// emitOrDeleteBlock - If there are branches to the specified basic block,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
-/// turns out to have not been needed.
-static void emitOrDeleteBlock(SILGenFunction &SGF, SILBasicBlock *BB,
+/// turns out to have not been needed. Returns true if the block was emitted.
+static bool emitOrDeleteBlock(SILGenFunction &SGF, SILBasicBlock *BB,
                               SILLocation BranchLoc) {
   // If we ever add a single-use optimization here (to just continue
   // the predecessor instead of branching to a separate block), we'll
@@ -122,10 +122,11 @@ static void emitOrDeleteBlock(SILGenFunction &SGF, SILBasicBlock *BB,
   if (BB->pred_empty()) {
     // If the block is unused, we don't need it; just delete it.
     SGF.eraseBasicBlock(BB);
-  } else {
-    // Otherwise, continue emitting code in BB.
-    SGF.B.emitBlock(BB, BranchLoc);
+    return false;
   }
+  // Otherwise, continue emitting code in BB.
+  SGF.B.emitBlock(BB, BranchLoc);
+  return true;
 }
 
 Condition SILGenFunction::emitCondition(Expr *E,
@@ -512,7 +513,8 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // left in the original function section after this.  So if
   // emitOrDeleteBlock ever learns to just continue in the
   // predecessor, we'll need to suppress that here.
-  emitOrDeleteBlock(SGF, endDest.getBlock(), S);
+  if (emitOrDeleteBlock(SGF, endDest.getBlock(), S))
+    SGF.emitProfilerIncrement(S);
 }
 
 void StmtEmitter::visitCatchStmt(CatchStmt *S) {
