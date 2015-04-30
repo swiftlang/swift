@@ -127,9 +127,6 @@ struct BridgeObject<NativeType : AnyObject, ObjCType : AnyObject>
 import StdlibUnittest
 var allTests = TestSuite("DiscriminatedBridgeObject")
 
-// CHECK: testing...
-println("testing...")
-
 class C {
   deinit {
     println("bye C!")
@@ -259,4 +256,3 @@ allTests.test("${Self}") {
 % end
 
 runAllTests()
-println("done.") // CHECK- NEXT: done
