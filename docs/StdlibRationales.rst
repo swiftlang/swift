@@ -119,6 +119,29 @@ We can't make ``map()``, ``filter()``, etc. all return ``Self``:
   are the same in spirit, like the ``flatMap()`` that selects the non-nil
   elements of the result sequence.
 
+Lazy functions that operate on sequences and collections
+--------------------------------------------------------
+
+In many cases functions that operate on sequences can be implemented either
+lazily or eagerly without compromising performance.  To decide between a lazy
+and an eager implementation, the standard library uses the following rule.
+When there is a choice, and not explicitly required by the API semantics,
+functions don't return lazy collection wrappers that refer to users' closures.
+The consequence is that all users' closures are ``@noescape``, except in an
+explicitly lazy context.
+
+Based on this rule, we conclude that ``enumeraate()``, ``zip()`` and
+``reverse()`` return lazy wrappers, but ``filter()`` and ``map()`` don't.  For
+the first three functions being lazy is the right default, since usually the
+result is immediately consumed by for-in, so we don't want to allocate memory
+for it.
+
+A different design that was rejected is to preserve consistency with other
+strict functions by making these methods strict, but then client code needs to
+call an API with a different name, say ``lazyEnumerate()`` to opt into
+laziness.  The problem is that the eager API, which would have a shorter and
+less obscure name, would be less efficient for the common case.
+
 Possible future directions
 ==========================
 
