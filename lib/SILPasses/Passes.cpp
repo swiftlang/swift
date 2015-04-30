@@ -201,7 +201,8 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
       PM.addEarlyInliner();
       break;
     case OptimizationLevelKind::MidLevel:
-      // Does inline semantics-functions, but not global-init functions.
+      // Does inline semantics-functions (except "availability"), but not
+      // global-init functions.
       PM.addPerfInliner();
       break;
     case OptimizationLevelKind::LowLevel:

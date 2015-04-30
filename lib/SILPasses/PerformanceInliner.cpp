@@ -210,7 +210,7 @@ namespace {
   // global_init attributes.
   enum class InlineSelection {
     Everything,
-    NoGlobalInit,
+    NoGlobalInit, // and no availability semantics calls
     NoSemanticsAndGlobalInit
   };
 
@@ -579,6 +579,12 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(ApplyInst *AI) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
       DEBUG(llvm::dbgs() << "        FAIL: Function " << Callee->getName()
             << " has special semantics or effects attribute.\n");
+      return nullptr;
+    }
+    // The "availability" semantics attribute is treated like global-init.
+    if (Callee->hasDefinedSemantics() &&
+        WhatToInline != InlineSelection::Everything &&
+        Callee->getSemanticsString().startswith("availability")) {
       return nullptr;
     }
   } else if (Callee->isGlobalInit()) {
@@ -1343,7 +1349,7 @@ SILTransform *swift::createEarlyInliner() {
 }
 
 /// Create an inliner pass that does not inline functions that are marked with
-/// the global_init attribute.
+/// the global_init attribute or have an "availability" semantics attribute.
 SILTransform *swift::createPerfInliner() {
   return new SILPerformanceInlinerPass(InlineSelection::NoGlobalInit, "Middle");
 }
