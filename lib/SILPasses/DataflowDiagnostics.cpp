@@ -98,6 +98,11 @@ static void diagnoseUnreachable(const SILInstruction *I,
                diag::letvar_else_must_not_fallthrough, Kind);
       return;
     }
+    if (auto *Unless = L.getAsASTNode<UnlessStmt>()) {
+      diagnose(Context, Unless->getBody()->getEndLoc(),
+               diag::unless_body_must_not_fallthrough);
+      return;
+    }
   }
 }
 

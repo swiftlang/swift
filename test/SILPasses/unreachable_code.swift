@@ -330,6 +330,17 @@ func testLetElseExprPattern(a : Int) {
   }
 }
 
+func testUnless(a : Int) {
+  unless case 4 = a {  }  // expected-error {{unless body may not fall through}}
+
+  unless case 4 = a { return }  // ok
+  unless case 4 = a { die() }  // ok
+  unless case 4 = a { fatalError("baaad") }  // ok
+
+  for i in 0...100 {
+    unless case 4 = a { continue } // ok
+  }
+}
 
 public func testFailingCast(s:String) -> Int {
    // There should be no notes or warnings about a call to a noreturn function, because we do not expose
