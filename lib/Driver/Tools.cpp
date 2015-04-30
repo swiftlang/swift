@@ -313,6 +313,51 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   }
   }
 
+  // Only white-listed flags below are allowed to be embedded.
+  if (Args.hasArg(options::OPT_embed_bitcode) &&
+      isa<BackendJobAction>(JA)) {
+    Arguments.push_back("-target");
+    std::string TripleStr = getToolChain().getTripleString();
+    Arguments.push_back(Args.MakeArgString(TripleStr));
+    const llvm::Triple &Triple = getToolChain().getTriple();
+
+    // Enable address top-byte ignored in the ARM64 backend.
+    if (Triple.getArch() == llvm::Triple::aarch64) {
+      Arguments.push_back("-Xllvm");
+      Arguments.push_back("-aarch64-use-tbi");
+    }
+
+    // Handle the CPU and its preferences.
+    if (auto arg = Args.getLastArg(options::OPT_target_cpu))
+      arg->render(Args, Arguments);
+
+    // Pass through any subsystem flags.
+    Args.AddAllArgs(Arguments, options::OPT_Xllvm);
+    Args.AddAllArgs(Arguments, options::OPT_Xcc);
+
+    // Pass the optimization level down to the frontend.
+    Args.AddLastArg(Arguments, options::OPT_O_Group);
+
+    Arguments.push_back("-module-name");
+    Arguments.push_back(Args.MakeArgString(OI.ModuleName));
+
+    // Add the output file argument if necessary.
+    if (Output->getPrimaryOutputType() != types::TY_Nothing) {
+      for (const std::string &FileName : Output->getPrimaryOutputFilenames()) {
+        Arguments.push_back("-o");
+        Arguments.push_back(FileName.c_str());
+      }
+    }
+
+    // Add flags implied by -embed-bitcode.
+    Arguments.push_back("-embed-bitcode");
+    // Disable all llvm IR level optimizations.
+    Arguments.push_back("-disable-llvm-optzns");
+
+    return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
+                   Arguments);
+  }
+
   if (Args.hasArg(options::OPT_parse_stdlib))
     Arguments.push_back("-disable-objc-attr-requires-foundation-module");
 
@@ -404,14 +449,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   if (OI.CompilerMode == OutputInfo::Mode::Immediate)
     Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
-
-  if (Args.hasArg(options::OPT_embed_bitcode) &&
-      isa<BackendJobAction>(JA)) {
-    // Add flags implied by -embed-bitcode.
-    Arguments.push_back("-embed-bitcode");
-    // Disable all llvm IR level optimizations.
-    Arguments.push_back("-disable-llvm-optzns");
-  }
 
   if (Args.hasArg(options::OPT_embed_bitcode_marker))
     Arguments.push_back("-embed-bitcode-marker");
