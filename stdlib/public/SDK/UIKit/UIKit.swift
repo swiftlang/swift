@@ -160,7 +160,7 @@ struct _UIViewMirror : MirrorType {
             return nil
           }
       
-          UIGraphicsBeginImageContext(bounds.size)
+          UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
       
           var ctx = UIGraphicsGetCurrentContext()
           UIColor(white:1.0, alpha:0.0).set()
