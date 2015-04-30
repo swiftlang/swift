@@ -152,6 +152,47 @@ bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
   return LoopBlocks.count(CurBB);
 }
 
+/// Returns true if the block \p BB is terminated with a cond_br based on an
+/// availability check.
+static bool isAvailabilityCheck(SILBasicBlock *BB) {
+  CondBranchInst *CBR = dyn_cast<CondBranchInst>(BB->getTerminator());
+  if (!CBR)
+    return false;
+  
+  ApplyInst *AI = dyn_cast<ApplyInst>(CBR->getCondition());
+  if (!AI)
+    return false;
+  
+  FunctionRefInst *FR = dyn_cast<FunctionRefInst>(AI->getCallee());
+  if (!FR)
+    return false;
+  
+  SILFunction *F = FR->getReferencedFunction();
+  if (!F->hasDefinedSemantics())
+    return false;
+  
+  return F->getSemanticsString().startswith("availability");
+}
+
+/// Returns true if there are any availability checks along the dominator tree
+/// from \p From to \p To.
+static bool isAvailabilityCheckOnDomPath(SILBasicBlock *From, SILBasicBlock *To,
+                                         DominanceInfo *DT) {
+  if (From == To)
+    return false;
+
+  auto *Node = DT->getNode(To)->getIDom();
+  for(;;) {
+    SILBasicBlock *BB = Node->getBlock();
+    if (isAvailabilityCheck(BB))
+      return true;
+    if (BB == From)
+      return false;
+    Node = Node->getIDom();
+    assert(Node && "Should have hit To-block");
+  }
+}
+
 /// Optimize placement of initializer calls given a list of calls to the
 /// same initializer. All original initialization points must be dominated by
 /// the final initialization calls.
@@ -183,17 +224,21 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
              "ill-formed global init call");
       SILBasicBlock *DomBB =
         DT->findNearestCommonDominator(AI->getParent(), CommonAI->getParent());
-      if (DomBB != CommonAI->getParent()) {
-        CommonAI->moveBefore(DomBB->begin());
-        placeFuncRef(CommonAI, DT);
-        
-        // Try to hoist the existing AI again if we move it to another block,
-        // e.g. from a loop exit into the loop.
-        HoistAI = CommonAI;
+      
+      // We must not move initializers around availability-checks.
+      if (!isAvailabilityCheckOnDomPath(DomBB, CommonAI->getParent(), DT)) {
+        if (DomBB != CommonAI->getParent()) {
+          CommonAI->moveBefore(DomBB->begin());
+          placeFuncRef(CommonAI, DT);
+          
+          // Try to hoist the existing AI again if we move it to another block,
+          // e.g. from a loop exit into the loop.
+          HoistAI = CommonAI;
+        }
+        AI->replaceAllUsesWith(CommonAI);
+        AI->eraseFromParent();
+        HasChanged = true;
       }
-      AI->replaceAllUsesWith(CommonAI);
-      AI->eraseFromParent();
-      HasChanged = true;
     } else {
       ParentFuncs[ParentF] = AI;
       
@@ -207,7 +252,13 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
       DomTreeNode *Node = DT->getNode(BB);
       while (Node) {
-        BB = Node->getBlock();
+        SILBasicBlock *DomParentBB = Node->getBlock();
+        if (isAvailabilityCheck(DomParentBB)) {
+          DEBUG(llvm::dbgs() << "  don't hoist above availibility check at bb" <<
+                DomParentBB->getDebugID() << "\n");
+          break;
+        }
+        BB = DomParentBB;
         if (!isInLoop(BB))
           break;
         Node = Node->getIDom();

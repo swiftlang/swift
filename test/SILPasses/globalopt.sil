@@ -348,3 +348,100 @@ bb2:
   %15 = load %14 : $*Builtin.Int64
   cond_br %0, bb2, bb1
 }
+
+// An init-call, which is guarded by an availability-check may not be speculated.
+// In this test it may not be hoisted out of the loop.
+// CHECK-LABEL: sil @test_availability_loop
+// CHECK: [[INIT:%[0-9]+]] = function_ref @_TF4libga8MyGlobalSi
+// CHECK: {{^bb2:}}
+// CHECK-NEXT: apply [[INIT]]()
+sil @test_availability_loop : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %f1 = function_ref @test_availability : $@convention(thin) () -> Builtin.Int1
+  %f2 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
+  br bb1
+
+bb1:
+  %a1 = apply %f1() : $@convention(thin) () -> Builtin.Int1
+  cond_br %a1, bb2, bb4
+
+bb2:
+  %a2 = apply %f2() : $@convention(thin) () -> Builtin.RawPointer
+  br bb3
+
+bb3:
+  cond_br %0, bb1, bb4
+
+bb4:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The init-call should be hoisted out of the inner loop, but not out of the
+// outer loop, because of the availability check around the inner loop.
+// CHECK-LABEL: sil @test_availability_loop_nest
+// CHECK: [[INIT:%[0-9]+]] = function_ref @_TF4libga8MyGlobalSi
+// CHECK: {{^bb2:}}
+// CHECK-NEXT: apply [[INIT]]()
+sil @test_availability_loop_nest : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %f1 = function_ref @test_availability : $@convention(thin) () -> Builtin.Int1
+  %f2 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
+  br bb1
+
+bb1:
+  %a1 = apply %f1() : $@convention(thin) () -> Builtin.Int1
+  cond_br %a1, bb2, bb4
+
+bb2:
+  br bb3
+
+bb3:
+  %a2 = apply %f2() : $@convention(thin) () -> Builtin.RawPointer
+  cond_br %0, bb3, bb4
+
+bb4:
+  cond_br %0, bb1, bb5
+
+bb5:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The init-calls may not be moved to their common dominator because of
+// availability guards.
+// CHECK-LABEL: sil @test_availability_common_dominator
+// CHECK: [[INIT:%[0-9]+]] = function_ref @_TF4libga8MyGlobalSi
+// CHECK: {{^bb2:}}
+// CHECK-NEXT: apply [[INIT]]()
+// CHECK: {{^bb4:}}
+// CHECK-NEXT: apply [[INIT]]()
+sil @test_availability_common_dominator : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %f1 = function_ref @test_availability : $@convention(thin) () -> Builtin.Int1
+  %f2 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
+  cond_br %0, bb1, bb3
+
+bb1:
+  %a1 = apply %f1() : $@convention(thin) () -> Builtin.Int1
+  cond_br %a1, bb2, bb5
+
+bb2:
+  %a2 = apply %f2() : $@convention(thin) () -> Builtin.RawPointer
+  br bb5
+
+bb3:
+  %a3 = apply %f1() : $@convention(thin) () -> Builtin.Int1
+  cond_br %0, bb4, bb5
+
+bb4:
+  %a4 = apply %f2() : $@convention(thin) () -> Builtin.RawPointer
+  br bb5
+
+bb5:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [_semantics "availability.test"] @test_availability : $@convention(thin) () -> Builtin.Int1
+
