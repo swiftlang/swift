@@ -2312,45 +2312,13 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.InheritedProtocolsWereDeserialized = false;
 }
 
-bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {
-  if (this == Super)
+bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
+  if (this == super)
     return false;
   
-  llvm::SmallPtrSet<const ProtocolDecl *, 4> Visited;
-  SmallVector<const ProtocolDecl *, 4> Stack;
-  
-  Stack.push_back(this);
-  Visited.insert(this);
-  while (!Stack.empty()) {
-    const ProtocolDecl *Current = Stack.back();
-    Stack.pop_back();
-
-    for (auto InheritedProto : Current->getProtocols()) {
-      if (InheritedProto == Super)
-        return true;
-
-      if (Visited.insert(InheritedProto).second)
-        Stack.push_back(InheritedProto);
-    }
-  }
-  
-  return false;
-}
-
-void ProtocolDecl::collectInherited(
-       llvm::SmallPtrSet<ProtocolDecl *, 4> &Inherited) {
-  SmallVector<const ProtocolDecl *, 4> Stack;
-  
-  Stack.push_back(this);
-  while (!Stack.empty()) {
-    const ProtocolDecl *Current = Stack.back();
-    Stack.pop_back();
-
-    for (auto InheritedProto : Current->getProtocols()) {
-      if (Inherited.insert(InheritedProto).second)
-        Stack.push_back(InheritedProto);
-    }
-  }
+  auto allProtocols = getLocalProtocols();
+  return std::find(allProtocols.begin(), allProtocols.end(), super)
+           != allProtocols.end();
 }
 
 bool ProtocolDecl::requiresClassSlow() {

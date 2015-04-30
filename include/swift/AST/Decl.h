@@ -3589,9 +3589,6 @@ public:
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
   
-  /// \brief Collect all of the inherited protocols into the given set.
-  void collectInherited(llvm::SmallPtrSet<ProtocolDecl *, 4> &Inherited);
-  
   ProtocolType *getDeclaredType() const {
     return reinterpret_cast<ProtocolType *>(DeclaredTy.getPointer());
   }
