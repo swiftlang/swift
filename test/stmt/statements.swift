@@ -3,6 +3,8 @@
 /* block comments */
 /* /* nested too */ */
 
+func markUsed<T>(t: T) {}
+
 func f1(a: Int, _ y: Int) {}
 func f2() {}
 func f3() -> Int {}
@@ -290,11 +292,11 @@ Loop:  // expected-note {{previously declared here}}
   // <rdar://problem/16798323> Following a 'break' statment by another statement on a new line result in an error/fit-it
   switch 5 {
   case 5:
-    println("before the break")
+    markUsed("before the break")
     break
-    println("after the break")    // println is not a label for the break.
+    markUsed("after the break")    // println is not a label for the break.
   default:
-    println("")
+    markUsed("")
   }
   
   var x : Int? = 42
@@ -381,7 +383,7 @@ func test_unless(x : Int, y : Int??, cond : Bool) {
   
   // These are all ok.
   unless let a = y {}
-  print(a)
+  markUsed(a)
   unless let b = y where cond {}
   unless case let c = x where cond {}
   unless case let Optional.Some(d) = y {}
@@ -390,7 +392,7 @@ func test_unless(x : Int, y : Int??, cond : Bool) {
   unless case let f? : Int? where cond {}    // expected-error {{variable binding in a condition requires an initializer}}
 
   unless let g = y {
-    print(g)  // expected-error {{variable declared in 'unless' condition is not usable in its body}}
+    markUsed(g)  // expected-error {{variable declared in 'unless' condition is not usable in its body}}
   }
 
   // TODO: condition is always true.
