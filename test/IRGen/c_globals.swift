@@ -2,10 +2,12 @@
 
 import c_layout
 
+func blackHole<T>(t: T) { }
+
 public func testStaticGlobal() {
-  println(c_layout.glowingArable)
+  blackHole(c_layout.glowingArable)
   doubleTrouble()
-  println(c_layout.glowingArable)
+  blackHole(c_layout.glowingArable)
 }
 
 // CHECK: @glowingArable = internal global float 1.700000e+01, align 4
