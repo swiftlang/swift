@@ -1908,7 +1908,7 @@ void Serializer::writeDecl(const Decl *D) {
     (void)addDeclRef(baseTy->getAnyNominal());
 
     SmallVector<DeclID, 8> protocolsAndRefTypes;
-    for (auto proto : extension->getProtocols())
+    for (auto proto : extension->getLocalProtocols())
       protocolsAndRefTypes.push_back(addDeclRef(proto));
     for (const auto &ref : extension->getRefComponents())
       protocolsAndRefTypes.push_back(addTypeRef(ref.IdentType.getType()));
@@ -2015,8 +2015,6 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
     assert(!typeAlias->isObjC() && "ObjC typealias is not meaningful");
-    assert(typeAlias->getProtocols().empty() &&
-           "concrete typealiases cannot have protocols");
     verifyAttrSerializable(typeAlias);
 
     auto contextID = addDeclContextRef(typeAlias->getDeclContext());
@@ -2092,7 +2090,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theStruct->getDeclContext());
 
     SmallVector<DeclID, 8> protocols;
-    for (auto proto : theStruct->getProtocols())
+    for (auto proto : theStruct->getLocalProtocols())
       protocols.push_back(addDeclRef(proto));
 
     uint8_t rawAccessLevel =
@@ -2122,7 +2120,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theEnum->getDeclContext());
 
     SmallVector<DeclID, 8> protocols;
-    for (auto proto : theEnum->getProtocols())
+    for (auto proto : theEnum->getLocalProtocols())
       protocols.push_back(addDeclRef(proto));
 
     uint8_t rawAccessLevel =
@@ -2152,7 +2150,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
     SmallVector<DeclID, 8> protocols;
-    for (auto proto : theClass->getProtocols())
+    for (auto proto : theClass->getLocalProtocols())
       protocols.push_back(addDeclRef(proto));
 
     uint8_t rawAccessLevel =

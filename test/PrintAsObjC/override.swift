@@ -1,6 +1,14 @@
 // RUN: rm -rf %t && mkdir %t
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -I %S/Inputs/custom-modules -o %t %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/override.swiftmodule -parse -emit-objc-header-path %t/override.h
+
+// FIXME: BEGIN -enable-source-import hackaround
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
+// FIXME: END -enable-source-import hackaround
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-module -I %t -I %S/Inputs/custom-modules -o %t %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -parse-as-library %t/override.swiftmodule -I %t -parse -emit-objc-header-path %t/override.h
 // RUN: FileCheck %s < %t/override.h
 // RUN: %check-in-clang %t/override.h -I %S/Inputs/custom-modules -Wno-super-class-method-mismatch -Wno-overriding-method-mismatch
 // RUN: not %check-in-clang %t/override.h -Wno-super-class-method-mismatch -I %S/Inputs/custom-modules 2>&1 | FileCheck -check-prefix=CLANG %s
