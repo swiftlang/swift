@@ -345,6 +345,15 @@ sil.never
   @_semantics("optimize.sil.never")
   func miscompile() { ... }
 
+Availability checks
+~~~~~~~~~~~~~~~~~~~
 
+The availability attribute is used for functions which implement the ``if #available``
+guards.
 
+The availability attribute supports the following tags:
+
+availability.osversion(major: Builtin.Word, minor: Builtin.Word, patch: Builtin.Word) -> Builtin.Int1
+
+  Returns true if the OS version matches the parameters.
 

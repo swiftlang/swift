@@ -16,6 +16,7 @@ import SwiftShims
 /// major.minor.patchVersion and 0 otherwise.
 /// This is a magic entrypoint known to the compiler. It is called in
 /// generated code for API availability checking.
+@_semantics("availability.osversion")
 public func _stdlib_isOSVersionAtLeast(
   major: Builtin.Word,
   _ minor: Builtin.Word,
