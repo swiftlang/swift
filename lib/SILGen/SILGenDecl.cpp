@@ -19,9 +19,9 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -1229,7 +1229,7 @@ static IsFreeFunctionWitness_t isFreeFunctionWitness(ValueDecl *requirement,
 }
 
 /// Emit a witness table for a protocol conformance.
-class SILGenConformance : public swift::ASTVisitor<SILGenConformance> {
+class SILGenConformance : public SILWitnessVisitor<SILGenConformance> {
 public:
   SILGenModule &SGM;
   NormalProtocolConformance *Conformance;
@@ -1252,14 +1252,7 @@ public:
     if (!Conformance)
       return nullptr;
 
-    // Reference conformances for refined protocols.
-    auto protocol = Conformance->getProtocol();
-    for (auto base : protocol->getInheritedProtocols(nullptr))
-      emitBaseProtocolWitness(base);
-
-    // Emit witnesses in protocol declaration order.
-    for (auto reqt : protocol->getMembers())
-      visit(reqt);
+    visitProtocolDecl(Conformance->getProtocol());
 
     // Check if we already have a declaration or definition for this witness
     // table.
@@ -1294,7 +1287,7 @@ public:
                                    Conformance, Entries);
   }
 
-  void emitBaseProtocolWitness(ProtocolDecl *baseProtocol) {
+  void addOutOfLineBaseProtocol(ProtocolDecl *baseProtocol) {
     // Only include the witness if the base protocol requires it.
     if (!SGM.Types.protocolRequiresWitnessTable(baseProtocol))
       return;
@@ -1322,25 +1315,14 @@ public:
       SGM.getWitnessTable(conformance->getRootNormalConformance());
   }
 
-  /// Fallback for unexpected protocol requirements.
-  void visitDecl(Decl *d) {
-    d->print(llvm::errs());
-    llvm_unreachable("unhandled protocol requirement");
-  }
-
-  void visitFuncDecl(FuncDecl *fd) {
-    // FIXME: Emit getter and setter (if settable) witnesses.
-    // For now we ignore them, like the IRGen witness table builder did.
-    if (fd->isAccessor())
-      return;
-
+  void addMethod(FuncDecl *fd) {
     // Find the witness in the conformance.
     ConcreteDeclRef witness = Conformance->getWitness(fd, nullptr);
-    emitFuncEntry(fd, witness.getDecl(), witness.getSubstitutions());
+    addMethod(fd, witness.getDecl(), witness.getSubstitutions());
   }
 
-  void emitFuncEntry(FuncDecl *fd, ValueDecl *witnessDecl,
-                     ArrayRef<Substitution> WitnessSubstitutions) {
+  void addMethod(FuncDecl *fd, ValueDecl *witnessDecl,
+                 ArrayRef<Substitution> WitnessSubstitutions) {
     // Emit the witness thunk and add it to the table.
 
     // If this is a non-present optional requirement, emit a MissingOptional.
@@ -1373,7 +1355,7 @@ public:
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
 
-  void visitConstructorDecl(ConstructorDecl *cd) {
+  void addConstructor(ConstructorDecl *cd) {
     SILDeclRef requirementRef(cd, SILDeclRef::Kind::Allocator,
                               ResilienceExpansion::Minimal);
 
@@ -1389,21 +1371,24 @@ public:
       SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
 
+  /// Override SILWitnessVisitor::visitAbstractStorageDecl() since
+  /// we need the conformance for the top-level declaration d to be
+  /// passed down into our own version of addMethod().
   void visitAbstractStorageDecl(AbstractStorageDecl *d) {
     // Find the witness in the conformance.
     ConcreteDeclRef witness = Conformance->getWitness(d, nullptr);
     auto *witnessSD = cast<AbstractStorageDecl>(witness.getDecl());
-    emitFuncEntry(d->getGetter(), witnessSD->getGetter(),
-                  witness.getSubstitutions());
+    addMethod(d->getGetter(), witnessSD->getGetter(),
+              witness.getSubstitutions());
     if (d->isSettable(d->getDeclContext()))
-      emitFuncEntry(d->getSetter(), witnessSD->getSetter(),
-                    witness.getSubstitutions());
+      addMethod(d->getSetter(), witnessSD->getSetter(),
+                witness.getSubstitutions());
     if (auto materializeForSet = d->getMaterializeForSetFunc())
-      emitFuncEntry(materializeForSet, witnessSD->getMaterializeForSetFunc(),
-                    witness.getSubstitutions());
+      addMethod(materializeForSet, witnessSD->getMaterializeForSetFunc(),
+                witness.getSubstitutions());
   }
 
-  void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
+  void addAssociatedType(AssociatedTypeDecl *td) {
     // Find the substitution info for the witness type.
     const auto &witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
 
@@ -1455,15 +1440,6 @@ public:
         td, protocol, conformance
       });
     }
-  }
-
-  void visitPatternBindingDecl(PatternBindingDecl *pbd) {
-    // We only care about the contained VarDecls.
-  }
-
-  void visitIfConfigDecl(IfConfigDecl *icd) {
-    // We only care about the active members, which were already subsumed by the
-    // enclosing type.
   }
 };
 

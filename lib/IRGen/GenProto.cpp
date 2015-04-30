@@ -29,7 +29,6 @@
 
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
@@ -37,6 +36,7 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/SmallString.h"
@@ -169,79 +169,8 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 
 namespace {
 
-  /// A CRTP class for visiting the witnesses of a protocol.
-  ///
-  /// The design here is that each entry (or small group of entries)
-  /// gets turned into a call to the implementation class describing
-  /// the exact variant of witness.  For example, for member
-  /// variables, there should be separate callbacks for adding a
-  /// getter/setter pair, for just adding a getter, and for adding a
-  /// physical projection (if we decide to support that).
-  template <class T> class WitnessVisitor : public ASTVisitor<T> {
-    T &asDerived() { return *static_cast<T*>(this); }
-
-  public:
-    void visitProtocolDecl(ProtocolDecl *protocol) {
-      // Visit inherited protocols.
-      // TODO: We need to figure out all the guarantees we want here.
-      // It would be abstractly good to allow conversion to a base
-      // protocol to be trivial, but it's not clear that there's
-      // really a structural guarantee we can rely on here.
-      for (auto baseProto : protocol->getInheritedProtocols(nullptr)) {
-        // ObjC protocols do not have witnesses.
-        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(baseProto))
-          continue;
-
-        asDerived().addOutOfLineBaseProtocol(baseProto);
-      }
-
-      /// Visit the witnesses for the direct members of a protocol.
-      for (Decl *member : protocol->getMembers())
-        ASTVisitor<T>::visit(member);
-    }
-
-    /// Fallback for unexpected protocol requirements.
-    void visitDecl(Decl *d) {
-      d->print(llvm::errs());
-      llvm_unreachable("unhandled protocol requirement");
-    }
-
-    void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
-      asDerived().addMethod(sd->getGetter());
-      if (sd->isSettable(sd->getDeclContext())) {
-        asDerived().addMethod(sd->getSetter());
-        if (sd->getMaterializeForSetFunc())
-          asDerived().addMethod(sd->getMaterializeForSetFunc());
-      }
-    }
-
-    void visitConstructorDecl(ConstructorDecl *cd) {
-      asDerived().addConstructor(cd);
-    }
-
-    void visitFuncDecl(FuncDecl *func) {
-      // Accessors are emitted by their var/subscript declaration.
-      if (func->isAccessor())
-        return;
-      asDerived().addMethod(func);
-    }
-
-    void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
-      asDerived().addAssociatedType(td);
-    }
-
-    void visitPatternBindingDecl(PatternBindingDecl *pbd) {
-      // We only care about the contained VarDecls.
-    }
-
-    void visitIfConfigDecl(IfConfigDecl *icd) {
-      // We only care about the active members, which were already subsumed by the
-      // enclosing type.
-    }
-  };
-
   /// A class which lays out a witness table in the abstract.
-  class WitnessTableLayout : public WitnessVisitor<WitnessTableLayout> {
+  class WitnessTableLayout : public SILWitnessVisitor<WitnessTableLayout> {
     unsigned NumWitnesses = 0;
     SmallVector<WitnessTableEntry, 16> Entries;
 
@@ -2911,7 +2840,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 
 namespace {
   /// A class which lays out a specific conformance to a protocol.
-  class WitnessTableBuilder : public WitnessVisitor<WitnessTableBuilder> {
+  class WitnessTableBuilder : public SILWitnessVisitor<WitnessTableBuilder> {
     IRGenModule &IGM;
     SmallVectorImpl<llvm::Constant*> &Table;
     CanType ConcreteType;
