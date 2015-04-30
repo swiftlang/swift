@@ -1027,6 +1027,15 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       resolver->resolveDeclSignature(nominal);
     }
 
+    // For a protocol that has been deserialized, adopt the inherited
+    // protocols as explicit conformances.
+    if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+      for (auto inherited : proto->takeDirectlyInheritedProtocols()) {
+        addProtocol(proto, inherited, SourceLoc(),
+                    ConformanceSource::forExplicit(proto));
+      }
+    }
+
     nominalFunc(nominal);
   }
 

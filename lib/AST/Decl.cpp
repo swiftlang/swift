@@ -2308,6 +2308,7 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   ProtocolDeclBits.HasMissingRequirements = false;
+  ProtocolDeclBits.InheritedProtocolsWereDeserialized = false;
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {

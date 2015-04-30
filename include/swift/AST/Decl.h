@@ -491,8 +491,14 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
     unsigned HasMissingRequirements : 1;
+
+    /// Whether the set of inherited protocols was deserialized and
+    /// has not yet been pulled into the
+    ///
+    /// FIXME: this should be much, much lazier.
+    unsigned InheritedProtocolsWereDeserialized : 1;
   };
-  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 12 };
+  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 13 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
   class ClassDeclBitfields {
@@ -3702,6 +3708,23 @@ public:
 
   void setHasMissingRequirements(bool newValue) {
     ProtocolDeclBits.HasMissingRequirements = newValue;
+  }
+
+  /// Set the directly inherited protocols from a non-parsed
+  /// representation, e.g., a module file or imported Clang module.
+  void setDirectlyInheritedProtocols(ArrayRef<ProtocolDecl *> protocols) {
+    setProtocols(protocols);
+    ProtocolDeclBits.InheritedProtocolsWereDeserialized = true;
+  }
+
+  /// Take the directly-inherited protocols set by \c
+  /// setDirectlyInheritedProtocols.
+  ArrayRef<ProtocolDecl *> takeDirectlyInheritedProtocols() {
+    if (!ProtocolDeclBits.InheritedProtocolsWereDeserialized)
+      return { };
+
+    ProtocolDeclBits.InheritedProtocolsWereDeserialized = false;
+    return getInheritedProtocols(nullptr);
   }
 
   /// Retrieve the name to use for this protocol when interoperating

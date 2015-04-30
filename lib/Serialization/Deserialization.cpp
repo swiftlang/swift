@@ -2584,7 +2584,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     for_each(inherited, protocolIDs, [this](ProtocolDecl *&p, uint64_t rawID) {
       p = cast<ProtocolDecl>(getDecl(rawID));
     });
-    proto->setProtocols(inherited);
+    proto->setDirectlyInheritedProtocols(inherited);
 
     proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     proto->setCheckedInheritanceClause();

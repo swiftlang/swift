@@ -3954,7 +3954,10 @@ namespace {
 
       // Set the protocols.
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        nominal->setProtocols(allProtocols);
+        if (auto proto = dyn_cast<ProtocolDecl>(nominal))
+          proto->setDirectlyInheritedProtocols(allProtocols);
+        else
+          nominal->setProtocols(allProtocols);
       } else {
         auto ext = cast<ExtensionDecl>(decl);
         ext->setProtocols(allProtocols);
