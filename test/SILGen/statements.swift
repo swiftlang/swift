@@ -4,10 +4,22 @@ class MyClass {
   func foo() { }
 }
 
+func marker_1() {}
+func marker_2() {}
+func marker_3() {}
+
+class BaseClass {}
+class DerivedClass : BaseClass {}
+
 var global_cond: Bool = false
 
 func bar(x: Int) {}
 func foo(x: Int, _ y: Bool) {}
+
+@noreturn
+func abort() { abort() }
+
+
 
 func assignment(var x: Int, var y: Int) {
   x = 42
@@ -499,4 +511,162 @@ func testDeferOpenExistential(b: Bool, type: StaticFooProtocol.Type) {
 }
 
 
+
+
+// CHECK-LABEL: sil hidden @_TF10statements21testUnlessExprPatternFSiT_
+
+func testUnlessExprPattern(a : Int) {
+  marker_1()
+  // CHECK: [[M1:%[0-9]+]] = function_ref @_TF10statements8marker_1FT_T_ : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply [[M1]]() : $@convention(thin) () -> ()
+
+  // CHECK: function_ref static Swift.~= infix <A : Swift.Equatable>(A, A) -> Swift.Bool
+  // CHECK: cond_br {{.*}}, bb1, bb2
+  unless case 4 = a { marker_2(); return }
+
+  // Fall through case comes first.
+
+  // CHECK: bb1:
+  // CHECK: [[M3:%[0-9]+]] = function_ref @_TF10statements8marker_3FT_T_ : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply [[M3]]() : $@convention(thin) () -> ()
+  // CHECK-NEXT: br bb3
+  marker_3()
+
+  // CHECK: bb2:
+  // CHECK: [[M2:%[0-9]+]] = function_ref @_TF10statements8marker_2FT_T_ : $@convention(thin) () -> ()
+  // CHECK-NEXT: apply [[M2]]() : $@convention(thin) () -> ()
+  // CHECK-NEXT: br bb3
+
+  // CHECK: bb3:
+  // CHECK-NEXT: tuple ()
+  // CHECK-NEXT: return
+}
+
+
+// CHECK-LABEL: sil hidden @_TF10statements19testUnlessOptional1FGSqSi_Si
+// CHECK-NEXT: bb0(%0 : $Optional<Int>):
+// CHECK-NEXT:   debug_value %0 : $Optional<Int>  // let a
+// CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, default bb2
+func testUnlessOptional1(a : Int?) -> Int {
+
+  // CHECK: bb1(%3 : $Int):
+  // CHECK-NEXT:   debug_value %3 : $Int  // let t
+  // CHECK-NEXT:   return %3 : $Int
+  unless let t = a { abort() }
+
+  // CHECK:  bb2:
+  // CHECK-NEXT:    // function_ref statements.abort () -> ()
+  // CHECK-NEXT:    %6 = function_ref @_TF10statements5abortFT_T_
+  // CHECK-NEXT:    %7 = apply %6() : $@convention(thin) @noreturn () -> ()
+  // CHECK-NEXT:    unreachable
+  return t
+}
+
+// CHECK-LABEL: sil hidden @_TF10statements19testUnlessOptional2FGSqSS_SS
+// CHECK-NEXT: bb0(%0 : $Optional<String>):
+// CHECK-NEXT:   debug_value %0 : $Optional<String>  // let a
+// CHECK-NEXT:   retain_value %0 : $Optional<String>
+// CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb1, default bb2
+func testUnlessOptional2(a : String?) -> String {
+  unless let t = a { abort() }
+
+  // CHECK:  bb1(%4 : $String):
+  // CHECK-NEXT:   debug_value %4 : $String  // let t
+  // CHECK-NEXT:   release_value %0 : $Optional<String>
+  // CHECK-NEXT:   return %4 : $String
+
+  // CHECK:        bb2:
+  // CHECK-NEXT:   // function_ref statements.abort () -> ()
+  // CHECK-NEXT:   %8 = function_ref @_TF10statements5abortFT_T_
+  // CHECK-NEXT:   %9 = apply %8()
+  // CHECK-NEXT:   unreachable
+  return t
+}
+
+enum MyOpt<T> {
+  case None, Some(T)
+}
+
+// CHECK-LABEL: sil hidden @_TF10statements27testAddressOnlyEnumInUnlessU__FGOS_5MyOptQ__Q_
+// CHECK-NEXT: bb0(%0 : $*T, %1 : $*MyOpt<T>):
+// CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>  // let a
+// CHECK-NEXT: %3 = alloc_stack $T  // let t
+// CHECK-NEXT: %4 = alloc_stack $MyOpt<T>
+// CHECK-NEXT: copy_addr %1 to [initialization] %4#1 : $*MyOpt<T>
+// CHECK-NEXT: switch_enum_addr %4#1 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
+func testAddressOnlyEnumInUnless<T>(a : MyOpt<T>) -> T {
+  // CHECK:  bb1:
+  // CHECK-NEXT:   dealloc_stack %4#0
+  // CHECK-NEXT:   dealloc_stack %3#0
+  // CHECK-NEXT:   br bb3
+  unless let t = a { abort() }
+
+  // CHECK:    bb2:
+  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
+  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3#1 : $*T
+  // CHECK-NEXT:     dealloc_stack %4#0
+  // CHECK-NEXT:     copy_addr [take] %3#1 to [initialization] %0 : $*T
+  // CHECK-NEXT:     dealloc_stack %3#0
+  // CHECK-NEXT:     destroy_addr %1 : $*MyOpt<T>
+  // CHECK-NEXT:     tuple ()
+  // CHECK-NEXT:     return
+
+  // CHECK:    bb3:
+  // CHECK-NEXT:     // function_ref statements.abort () -> ()
+  // CHECK-NEXT:     %18 = function_ref @_TF10statements5abortFT_T_
+  // CHECK-NEXT:     %19 = apply %18() : $@convention(thin) @noreturn () -> ()
+  // CHECK-NEXT:     unreachable
+
+  return t
+}
+
+
+
+// CHECK-LABEL: sil hidden @_TF10statements19testCleanupEmissionU__FQ_T_
+// <rdar://problem/20563234> let-else problem: cleanups for bound patterns shouldn't be run in the else block
+protocol MyProtocol {}
+func testCleanupEmission<T>(x: T) {
+  // SILGen shouldn't crash/verify abort on this example.
+  unless let x2 = x as? MyProtocol { return }
+}
+
+
+// CHECK-LABEL: sil hidden @_TF10statements15test_is_patternFCS_9BaseClassT_
+func test_is_pattern(y : BaseClass) {
+  // checked_cast_br %0 : $BaseClass to $DerivedClass
+  unless case is DerivedClass = y { marker_1(); return }
+
+  marker_2()
+}
+
+// CHECK-LABEL: sil hidden @_TF10statements15test_as_patternFCS_9BaseClassCS_12DerivedClass
+func test_as_pattern(y : BaseClass) -> DerivedClass {
+  // checked_cast_br %0 : $BaseClass to $DerivedClass
+  unless case let result as DerivedClass = y {  }
+  // CHECK: bb{{.*}}({{.*}} : $DerivedClass):
+
+
+  // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : $DerivedClass):
+  // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass  // let result
+  // CHECK-NEXT: strong_release %0 : $BaseClass
+  // CHECK-NEXT: return [[PTR]] : $DerivedClass
+  return result
+}
+// CHECK-LABEL: sil hidden @_TF10statements22let_else_tuple_bindingFGSqTSiSi__Si
+func let_else_tuple_binding(a : (Int, Int)?) -> Int {
+
+  // CHECK-NEXT: bb0(%0 : $Optional<(Int, Int)>):
+  // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>  // let a
+  // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.Some!enumelt.1: bb1, default bb2
+
+  unless let (x, y) = a { }
+  return x
+
+  // CHECK: bb1(%3 : $(Int, Int)):
+  // CHECK-NEXT:   %4 = tuple_extract %3 : $(Int, Int), 0
+  // CHECK-NEXT:   debug_value %4 : $Int  // let x
+  // CHECK-NEXT:   %6 = tuple_extract %3 : $(Int, Int), 1
+  // CHECK-NEXT:   debug_value %6 : $Int  // let y
+  // CHECK-NEXT:   return %4 : $Int
+}
 

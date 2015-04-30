@@ -370,7 +370,29 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
 }
 
 void StmtEmitter::visitUnlessStmt(UnlessStmt *S) {
-  llvm_unreachable("silgen for unless not implemented yet");
+  // Create a block for the body and emit code into it before processing any of
+  // the patterns, because none of the bound variables will be in scope in the
+  // 'body' context.
+  JumpDest bodyBB =
+    JumpDest(createBasicBlock(), SGF.getCleanupsDepth(), CleanupLocation(S));
+
+  {
+    // Move the insertion point to the 'body' block temporarily and emit it.
+    // Note that we don't push break/continue locations since they aren't valid
+    // in this statement.
+    SavedInsertionPoint savedIP(SGF, bodyBB.getBlock());
+    SGF.emitStmt(S->getBody());
+
+    // The body block must end in a noreturn call, return, break etc.  It
+    // isn't valid to fall off into the normal flow.  To model this, we emit
+    // an unreachable instruction and then have SIL diagnostic check this.
+    if (SGF.B.hasValidInsertionPoint())
+      SGF.B.createUnreachable(S);
+  }
+
+  // Emit the condition bindings, branching to the bodyBB if they fail.  Since
+  // we didn't push a scope, the bound variables are live after this statement.
+  SGF.emitStmtCondition(S->getCond(), bodyBB, S);
 }
 
 
