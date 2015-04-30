@@ -1145,46 +1145,40 @@ ParserResult<Stmt> Parser::parseStmtUnless() {
   StmtCondition Condition;
   ParserResult<BraceStmt> Body;
   
-  // A scope encloses the condition and true branch for any variables bound
-  // by a conditional binding. The else branch does *not* see these variables.
-  {
-    Scope S(this, ScopeKind::IfVars);
-    
-    if (Tok.is(tok::l_brace)) {
-      SourceLoc LBraceLoc = Tok.getLoc();
-      diagnose(UnlessLoc, diag::missing_condition_after_unless)
-        .highlight(SourceRange(UnlessLoc, LBraceLoc));
-      SmallVector<StmtConditionElement, 1> ConditionElems;
-      ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
-      Condition = Context.AllocateCopy(ConditionElems);
-    } else {
-      Status |= parseStmtCondition(Condition, diag::expected_condition_unless);
-      if (Status.isError() || Status.hasCodeCompletion()) {
-        // FIXME: better recovery
-        return makeParserResult<Stmt>(Status, nullptr);
-      }
+  if (Tok.is(tok::l_brace)) {
+    SourceLoc LBraceLoc = Tok.getLoc();
+    diagnose(UnlessLoc, diag::missing_condition_after_unless)
+      .highlight(SourceRange(UnlessLoc, LBraceLoc));
+    SmallVector<StmtConditionElement, 1> ConditionElems;
+    ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
+    Condition = Context.AllocateCopy(ConditionElems);
+  } else {
+    Status |= parseStmtCondition(Condition, diag::expected_condition_unless);
+    if (Status.isError() || Status.hasCodeCompletion()) {
+      // FIXME: better recovery
+      return makeParserResult<Stmt>(Status, nullptr);
     }
-
-    // Before parsing the body, disable all of the bound variables so that they
-    // cannot be used unbound.
-    SmallVector<VarDecl *, 4> Vars;
-    for (auto &elt : Condition)
-      if (auto pbd = elt.getBinding())
-        for (auto patternEntry : pbd->getPatternList())
-          patternEntry.ThePattern->collectVariables(Vars);
-
-    llvm::SaveAndRestore<decltype(DisabledVars)>
-    RestoreCurVars(DisabledVars, Vars);
-
-    llvm::SaveAndRestore<decltype(DisabledVarReason)>
-    RestoreReason(DisabledVarReason, diag::bound_var_unless_body);
-
-    Body = parseBraceItemList(diag::expected_lbrace_after_unless);
-    if (Body.isNull())
-      return nullptr; // FIXME: better recovery
-    
-    Status |= Body;
   }
+
+  // Before parsing the body, disable all of the bound variables so that they
+  // cannot be used unbound.
+  SmallVector<VarDecl *, 4> Vars;
+  for (auto &elt : Condition)
+    if (auto pbd = elt.getBinding())
+      for (auto patternEntry : pbd->getPatternList())
+        patternEntry.ThePattern->collectVariables(Vars);
+
+  llvm::SaveAndRestore<decltype(DisabledVars)>
+  RestoreCurVars(DisabledVars, Vars);
+
+  llvm::SaveAndRestore<decltype(DisabledVarReason)>
+  RestoreReason(DisabledVarReason, diag::bound_var_unless_body);
+
+  Body = parseBraceItemList(diag::expected_lbrace_after_unless);
+  if (Body.isNull())
+    return nullptr; // FIXME: better recovery
+  
+  Status |= Body;
   
   return makeParserResult(Status,
               new (Context) UnlessStmt(UnlessLoc, Condition, Body.get()));
