@@ -1410,25 +1410,17 @@ bool DeclContext::lookupQualified(Type type,
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
 
-    // Local function object used to add protocols to the stack.
-    auto addProtocols = [&](ArrayRef<ProtocolDecl *> protocols) {
-      for (auto proto : protocols) {
-        if (visited.insert(proto).second) {
-          stack.push_back(proto);
-        }
+    SmallVector<ProtocolDecl *, 4> protocols;
+    for (auto proto : current->getAllProtocols()) {
+      if (visited.insert(proto).second) {
+        stack.push_back(proto);
       }
-    };
-
-    // Add protocols from the current type.
-    addProtocols(current->getProtocols());
-
-    // Add protocols from the extensions of the current type.
-    for (auto ext : current->getExtensions()) {
-      if (typeResolver)
-        typeResolver->resolveExtension(ext);
-
-      addProtocols(ext->getProtocols());
     }
+
+    // For a class, we don't need to visit the protocol members of the
+    // superclass: that's already handled.
+    if (isa<ClassDecl>(current))
+      wantProtocolMembers = false;
   }
 
   // If we want to perform lookup into all classes, do so now.

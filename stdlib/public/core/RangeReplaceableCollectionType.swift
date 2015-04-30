@@ -176,7 +176,7 @@ public func removeAtIndex<
   C: RangeReplaceableCollectionType
 >(inout x: C, _ index: C.Index) -> C.Generator.Element {
   _precondition(!isEmpty(x), "can't remove from an empty collection")
-  let result = x[index]
+  let result: C.Generator.Element = x[index]
   _replaceRange(&x, index...index, with: EmptyCollection())
   return result
 }
