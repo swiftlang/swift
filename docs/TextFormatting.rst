@@ -59,25 +59,25 @@ Non-Goals
 
 * **Matching the terseness of C**\ 's ``printf`` is a non-goal. 
 
-Printable Types
----------------
+CustomStringConvertible Types
+-----------------------------
 
-``Printable`` types can be used in string literal interpolations,
+``CustomStringConvertible`` types can be used in string literal interpolations,
 printed with ``print(x)`` and ``println(x)``, and can be converted to
 ``String`` with ``x.toString()``.
 
 The simple extension story for beginners is as follows: 
 
-  “To make your type ``Printable``, simply declare conformance to
-  ``Printable``::
+  “To make your type ``CustomStringConvertible``, simply declare conformance to
+  ``CustomStringConvertible``::
 
-    extension Person : Printable {}
+    extension Person : CustomStringConvertible {}
 
   and it will have the same printed representation you see in the
   interpreter (REPL). To customize the representation, give your type
   a ``func format()`` that returns a ``String``::
 
-    extension Person : Printable {
+    extension Person : CustomStringConvertible {
       func format() -> String {
         return "\(lastName), \(firstName)"
       }
@@ -89,7 +89,7 @@ flexible formatting as a natural extension of this simple story.
 Formatting Variants
 -------------------
 
-``Printable`` types with parameterized textual representations
+``CustomStringConvertible`` types with parameterized textual representations
 (e.g. number types) *additionally* support a ``format(…)`` method
 parameterized according to that type's axes of variability::
 
@@ -127,13 +127,13 @@ Every ``String`` can be used as an ``OutputStream`` directly::
 Debug Printing
 ..............
 
-Via compiler magic, *everything* conforms to the ``DebugPrintable``
+Via compiler magic, *everything* conforms to the ``CustomDebugStringConvertible``
 protocol. To change the debug representation for a type, you don't
 need to declare conformance: simply give the type a ``debugFormat()``
 ::
 
   /// \brief A thing that can be printed in the REPL and the Debugger
-  protocol DebugPrintable {
+  protocol CustomDebugStringConvertible {
     typealias DebugRepresentation : Streamable = String
 
     /// \brief Produce a textual representation for the REPL and
@@ -160,18 +160,18 @@ directly to the ``OutputStream`` for efficiency reasons,
 (Non-Debug) Printing
 ....................
 
-The ``Printable`` protocol provides a "pretty" textual representation
+The ``CustomStringConvertible`` protocol provides a "pretty" textual representation
 that can be distinct from the debug format. For example, when ``s``
 is a ``String``, ``s.format()`` returns the string itself,
 without quoting.
 
-Conformance to ``Printable`` is explicit, but if you want to use the
+Conformance to ``CustomStringConvertible`` is explicit, but if you want to use the
 ``debugFormat()`` results for your type's ``format()``, all you
-need to do is declare conformance to ``Printable``; there's nothing to
+need to do is declare conformance to ``CustomStringConvertible``; there's nothing to
 implement::
 
   /// \brief A thing that can be print()ed and toString()ed.
-  protocol Printable : DebugPrintable {
+  protocol CustomStringConvertible : CustomDebugStringConvertible {
     typealias PrintRepresentation: Streamable = DebugRepresentation
 
     /// \brief produce a "pretty" textual representation.
@@ -198,10 +198,10 @@ implement::
 Because it's not always efficient to construct a ``String``
 representation before writing an object to a stream, we provide a
 ``Streamable`` protocol, for types that can write themselves into an
-``OutputStream``. Every ``Streamable`` is also a ``Printable``,
+``OutputStream``. Every ``Streamable`` is also a ``CustomStringConvertible``,
 naturally ::
 
-  protocol Streamable : Printable {
+  protocol Streamable : CustomStringConvertible {
     func writeTo<T: OutputStream>(target: [inout] T)
 
     // You'll never want to reimplement this
@@ -216,7 +216,7 @@ How ``String`` Fits In
 ``String``\ 's ``debugFormat()`` yields a ``Streamable`` that
 adds surrounding quotes and escapes special characters::
 
-  extension String : DebugPrintable {
+  extension String : CustomDebugStringConvertible {
     func debugFormat() -> EscapedStringRepresentation {
       return EscapedStringRepresentation(self)
     }
@@ -259,8 +259,8 @@ The following code is a scaled-down version of the formatting code
 used for ``Int``. It represents an example of how a relatively
 complicated ``format(…)`` might be written::
 
-  protocol PrintableInteger 
-    : IntegerLiteralConvertible, Comparable, SignedNumber, Printable {
+  protocol CustomStringConvertibleInteger 
+    : IntegerLiteralConvertible, Comparable, SignedNumber, CustomStringConvertible {
     func %(lhs: Self, rhs: Self) -> Self
     func /(lhs: Self, rhs: Self) -> Self
     constructor(x: Int)
@@ -273,7 +273,7 @@ complicated ``format(…)`` might be written::
     }
   }
 
-  struct RadixFormat<T: PrintableInteger> : Streamable {
+  struct RadixFormat<T: CustomStringConvertibleInteger> : Streamable {
     var value: T, radix = 10, fill = " ", width = 0
 
     func writeTo<S: OutputStream>(target: [inout] S) {
@@ -281,7 +281,7 @@ complicated ``format(…)`` might be written::
     }
 
     // Write the given positive value to stream
-    func _writePositive<T:PrintableInteger, S: OutputStream>( 
+    func _writePositive<T:CustomStringConvertibleInteger, S: OutputStream>( 
       value: T, stream: [inout] S
     ) -> Int {
       if value == 0 { return 0 }
@@ -294,7 +294,7 @@ complicated ``format(…)`` might be written::
       return nDigits + 1
     }
 
-    func _writeSigned<T:PrintableInteger, S: OutputStream>(
+    func _writeSigned<T:CustomStringConvertibleInteger, S: OutputStream>(
       value: T, target: [inout] S
     ) {
       var width = 0
@@ -321,7 +321,7 @@ complicated ``format(…)`` might be written::
     }
   }
 
-  extension Int : PrintableInteger {
+  extension Int : CustomStringConvertibleInteger {
     func toInt() -> Int { return this }
   }
 

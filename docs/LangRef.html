@@ -2539,9 +2539,9 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   generic parameters. The generic parameters each have a name as well
   as some set of requirements that specify the capabilities that any
   corresponding generic argument might have. For example, the generic
-  parameter <code>T : Printable</code> requires that any generic
+  parameter <code>T : CustomStringConvertible</code> requires that any generic
   argument substituted for the generic parameter <code>T</code> 
-  conform to the protocol <code>Printable</code>. Similarly, a generic
+  conform to the protocol <code>CustomStringConvertible</code>. Similarly, a generic
   parameter <code>U : SomeClass</code> requires that any generic
   argument substituted for the generic parameter <code>U</code>
   inherit from the class <code>SomeClass</code>.
@@ -2550,8 +2550,8 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   of generic parameters can be introduced via the "where" clause,
   which can include additional protocol-conformance requirements
   (e.g., the generic parameter list <code>&lt;T where T :
-  Printable&gt;</code>, which is equivalent to <code>&lt;T :
-  Printable&gt;</code>), as well as same-type requirements that
+  CustomStringConvertible&gt;</code>, which is equivalent to <code>&lt;T :
+  CustomStringConvertible&gt;</code>), as well as same-type requirements that
   require two types to be identical (e.g., <code>&lt;T : Collection, U
   : Collection where T.Element == U.Element&gt;</code>). 
 
