@@ -1438,9 +1438,16 @@ Expr *Parser::parseExprIdentifier() {
   }
   
   ValueDecl *D = lookupInScope(name);
-  if (!D) {
-    // FIXME: We want this to work: "var x = { x() }", but for now it's better
-    // to disallow it than to crash.
+  // FIXME: We want this to work: "var x = { x() }", but for now it's better
+  // to disallow it than to crash.
+  if (D) {
+    for (auto activeVar : DisabledVars) {
+      if (activeVar == D) {
+        diagnose(loc, DisabledVarReason);
+        return new (Context) ErrorExpr(loc);
+      }
+    }
+  } else {
     for (auto activeVar : DisabledVars) {
       if (activeVar->getName() == name) {
         diagnose(loc, DisabledVarReason);

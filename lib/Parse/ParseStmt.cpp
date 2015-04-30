@@ -1164,7 +1164,21 @@ ParserResult<Stmt> Parser::parseStmtUnless() {
         return makeParserResult<Stmt>(Status, nullptr);
       }
     }
-    
+
+    // Before parsing the body, disable all of the bound variables so that they
+    // cannot be used unbound.
+    SmallVector<VarDecl *, 4> Vars;
+    for (auto &elt : Condition)
+      if (auto pbd = elt.getBinding())
+        for (auto patternEntry : pbd->getPatternList())
+          patternEntry.ThePattern->collectVariables(Vars);
+
+    llvm::SaveAndRestore<decltype(DisabledVars)>
+    RestoreCurVars(DisabledVars, Vars);
+
+    llvm::SaveAndRestore<decltype(DisabledVarReason)>
+    RestoreReason(DisabledVarReason, diag::bound_var_unless_body);
+
     Body = parseBraceItemList(diag::expected_lbrace_after_unless);
     if (Body.isNull())
       return nullptr; // FIXME: better recovery

@@ -387,8 +387,11 @@ func test_unless(x : Int, y : Int??, cond : Bool) {
   
   unless let n1 where cond {}    // expected-error {{variable binding in a condition requires an initializer}}
   unless case let n2? : Int? where cond {}    // expected-error {{variable binding in a condition requires an initializer}}
-  
-  
+
+  unless let a = y {
+    print(a)  // expected-error {{variable declared in 'unless' condition is not usable in its body}}
+  }
+
   // TODO: condition is always true.
   unless case _ = x {}
 }
