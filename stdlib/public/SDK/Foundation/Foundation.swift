@@ -749,24 +749,17 @@ extension NSArray : SequenceType {
   }
 }
 
-/*
-// FIXME: <rdar://problem/16951124> prevents this from being used
 extension NSArray : Swift.CollectionType {
-  final
-  var startIndex: Int {
+  // TODO: should be @nonobjc
+  final public var startIndex: Int {
     return 0
   }
 
-  final
-  var endIndex: Int {
+  // TODO: should be @nonobjc
+  final public var endIndex: Int {
     return count
   }
-
-  subscript(i: Int) -> AnyObject {
-    return self.objectAtIndex(i)
-  }
 }
-*/
 
 extension Set {
   /// Private initializer used for bridging.
