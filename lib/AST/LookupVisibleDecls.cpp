@@ -412,7 +412,7 @@ static void lookupVisibleProtocolMemberDecls(
   if (!Visited.insert(PT->getDecl()).second)
     return;
 
-  for (auto Proto : PT->getDecl()->getProtocols())
+  for (auto Proto : PT->getDecl()->getInheritedProtocols(nullptr))
     lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(), Consumer, CurrDC,
                                  LS, getReasonForSuper(Reason), TypeResolver,
                                  Visited);
