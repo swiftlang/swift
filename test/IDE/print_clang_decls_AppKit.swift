@@ -17,7 +17,7 @@
 
 // APPKIT-LABEL: {{^}}extension NSString {{{$}}
 
-// APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility, NSObjectProtocol {{{$}}
+// APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility {{{$}}
 // APPKIT-NEXT: init?(coder aDecoder: NSCoder)
 // APPKIT-NEXT: func isDescendantOf(aView: NSView) -> Bool
 // APPKIT-NEXT: func ancestorSharedWithView(aView: NSView) -> NSView?

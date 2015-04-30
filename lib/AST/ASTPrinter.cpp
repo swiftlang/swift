@@ -307,7 +307,8 @@ private:
                       bool explicitClass = false,
                       bool PrintAsProtocolComposition = false);
 
-  void printInherited(const TypeDecl *decl, bool explicitClass = false);
+  void printInherited(const NominalTypeDecl *decl,
+                      bool explicitClass = false);
   void printInherited(const EnumDecl *D);
   void printInherited(const ExtensionDecl *decl);
   void printInherited(const GenericTypeParamDecl *D);
@@ -598,7 +599,7 @@ bool PrintAST::shouldPrint(const Decl *D) {
     auto Ext = cast<ExtensionDecl>(D);
     // If the extension doesn't add protocols or has no members that we should
     // print then skip printing it.
-    if (Ext->getProtocols().empty()) {
+    if (Ext->getLocalProtocols().empty()) {
       bool HasMemberToPrint = false;
       for (auto Member : Ext->getMembers()) {
         if (shouldPrint(Member)) {
@@ -983,17 +984,26 @@ void PrintAST::printInherited(const Decl *decl,
   }
 }
 
-void PrintAST::printInherited(const TypeDecl *decl, bool explicitClass) {
-  printInherited(decl, decl->getInherited(), decl->getProtocols(), nullptr,
-                 explicitClass);
+void PrintAST::printInherited(const NominalTypeDecl *decl,
+                              bool explicitClass) {
+  printInherited(
+    decl, decl->getInherited(),
+    decl->getLocalProtocols(ConformanceLookupKind::OnlyExplicit), nullptr,
+    explicitClass);
 }
 
-void PrintAST::printInherited(const EnumDecl *D) {
-  printInherited(D, D->getInherited(), D->getProtocols(), D->getRawType());
+void PrintAST::printInherited(const EnumDecl *decl) {
+  printInherited(
+    decl, decl->getInherited(),
+    decl->getLocalProtocols(ConformanceLookupKind::OnlyExplicit),
+    decl->getRawType());
 }
 
 void PrintAST::printInherited(const ExtensionDecl *decl) {
-  printInherited(decl, decl->getInherited(), decl->getProtocols());
+  printInherited(
+    decl,
+    decl->getInherited(),
+    decl->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
 }
 
 void PrintAST::printInherited(const GenericTypeParamDecl *D) {
@@ -1255,8 +1265,10 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
       printNominalDeclName(decl);
     });
 
-  printInherited(decl, decl->getInherited(), decl->getProtocols(),
-                 decl->getSuperclass());
+  printInherited(
+    decl, decl->getInherited(),
+    decl->getLocalProtocols(ConformanceLookupKind::OnlyExplicit),
+    decl->getSuperclass());
 
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());
@@ -1278,7 +1290,8 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   bool explicitClass = false;
   if (decl->requiresClass() && !decl->isObjC()) {
     bool inheritsRequiresClass = false;
-    for (auto proto : decl->getInheritedProtocols(nullptr)) {
+    for (auto proto : decl->getLocalProtocols(
+                        ConformanceLookupKind::OnlyExplicit)) {
       if (proto->requiresClass()) {
         inheritsRequiresClass = true;
         break;

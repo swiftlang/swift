@@ -1823,7 +1823,8 @@ void ConformanceLookupTable::lookupConformances(
 
                      // If we are to filter out this result, do so now.
                      if (lookupKind == ConformanceLookupKind::OnlyExplicit &&
-                         entry->getKind() != ConformanceEntryKind::Explicit)
+                         entry->getKind() != ConformanceEntryKind::Explicit &&
+                         entry->getKind() != ConformanceEntryKind::Synthesized)
                        return false;
 
                      // Record the protocol.

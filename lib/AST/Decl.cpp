@@ -1884,6 +1884,9 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
     return DeclaredTyInContext;
   
   Type Ty = getDeclaredType();
+  if (!Ty)
+    return Ty;
+  
   if (UnboundGenericType *UGT = Ty->getAs<UnboundGenericType>()) {
     // If we have an unbound generic type, bind the type to the archetypes
     // in the type's definition.
