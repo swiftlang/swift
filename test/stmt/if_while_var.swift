@@ -76,3 +76,18 @@ if a == 0, where b == 0 {}  // expected-error {{expected 'let' or 'var' in condi
 
 
 
+
+func testIfCase(a : Int?) {
+  if case nil = a where a != nil {}
+  if case let (b?) = a where b != 42 {}
+  
+  if let case (b?) = a where b != 42 {}  // expected-error {{pattern matching binding is spelled with 'case let', not 'let case'}} {{6-9=}} {{14-14= let}}
+  
+  if a != nil, let c = a, case nil = a { }
+  
+  if let p? = a {}  // expected-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
+  
+  
+  if let .Some(x) = a {}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
+}
+
