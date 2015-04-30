@@ -29,6 +29,7 @@
 
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
@@ -176,14 +177,11 @@ namespace {
   /// variables, there should be separate callbacks for adding a
   /// getter/setter pair, for just adding a getter, and for adding a
   /// physical projection (if we decide to support that).
-  template <class T> class WitnessVisitor {
-  protected:
-    IRGenModule &IGM;
-
-    WitnessVisitor(IRGenModule &IGM) : IGM(IGM) {}
+  template <class T> class WitnessVisitor : public ASTVisitor<T> {
+    T &asDerived() { return *static_cast<T*>(this); }
 
   public:
-    void visit(ProtocolDecl *protocol) {
+    void visitProtocolDecl(ProtocolDecl *protocol) {
       // Visit inherited protocols.
       // TODO: We need to figure out all the guarantees we want here.
       // It would be abstractly good to allow conversion to a base
@@ -197,95 +195,54 @@ namespace {
         asDerived().addOutOfLineBaseProtocol(baseProto);
       }
 
-      visitMembers(protocol->getMembers());
+      /// Visit the witnesses for the direct members of a protocol.
+      for (Decl *member : protocol->getMembers())
+        ASTVisitor<T>::visit(member);
     }
 
-  private:
-    T &asDerived() { return *static_cast<T*>(this); }
+    /// Fallback for unexpected protocol requirements.
+    void visitDecl(Decl *d) {
+      d->print(llvm::errs());
+      llvm_unreachable("unhandled protocol requirement");
+    }
 
-    /// Visit the witnesses for the direct members of a protocol.
-    void visitMembers(DeclRange members) {
-      for (Decl *member : members) {
-        visitMember(member);
+    void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
+      asDerived().addMethod(sd->getGetter());
+      if (sd->isSettable(sd->getDeclContext())) {
+        asDerived().addMethod(sd->getSetter());
+        if (sd->getMaterializeForSetFunc())
+          asDerived().addMethod(sd->getMaterializeForSetFunc());
       }
     }
 
-    void visitMember(Decl *member) {
-      switch (member->getKind()) {
-      case DeclKind::Import:
-      case DeclKind::Extension:
-      case DeclKind::TopLevelCode:
-      case DeclKind::Enum:
-      case DeclKind::Struct:
-      case DeclKind::Class:
-      case DeclKind::Protocol:
-      case DeclKind::EnumCase:
-      case DeclKind::EnumElement:
-      case DeclKind::Destructor:
-      case DeclKind::InfixOperator:
-      case DeclKind::PrefixOperator:
-      case DeclKind::PostfixOperator:
-      case DeclKind::TypeAlias:
-      case DeclKind::GenericTypeParam:
-      case DeclKind::Param:
-        llvm_unreachable("declaration not legal as a protocol member");
-
-      case DeclKind::PatternBinding:
-        // We only care about the var decls in the pattern binding.
-        return;
-
-      // Active members of the IfConfig block are handled separately.
-      case DeclKind::IfConfig:
-        return;
-
-      case DeclKind::Func:
-        return visitFunc(cast<FuncDecl>(member));
-
-      case DeclKind::Subscript:
-      case DeclKind::Var: {
-        auto *SD = cast<AbstractStorageDecl>(member);
-        emitFunc(SD->getGetter());
-        if (SD->isSettable(member->getDeclContext())) {
-          emitFunc(SD->getSetter());
-          if (SD->getMaterializeForSetFunc())
-            emitFunc(SD->getMaterializeForSetFunc());
-        }
-        return;
-      }
-
-      case DeclKind::Constructor:
-        // Only the allocating entry point gets a witness.
-        return asDerived().addConstructor(cast<ConstructorDecl>(member));
-
-      case DeclKind::AssociatedType:
-        return visitAssociatedType(cast<AssociatedTypeDecl>(member));
-      }
-      llvm_unreachable("bad decl kind");
+    void visitConstructorDecl(ConstructorDecl *cd) {
+      asDerived().addConstructor(cd);
     }
 
-    void visitFunc(FuncDecl *func) {
+    void visitFuncDecl(FuncDecl *func) {
       // Accessors are emitted by their var/subscript declaration.
       if (func->isAccessor())
         return;
-      emitFunc(func);
+      asDerived().addMethod(func);
     }
 
-    void emitFunc(FuncDecl *func) {
-      if (func->isStatic()) {
-        asDerived().addStaticMethod(func);
-      } else {
-        asDerived().addInstanceMethod(func);
-      }
+    void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
+      asDerived().addAssociatedType(td);
     }
 
-    void visitAssociatedType(AssociatedTypeDecl *ty) {
-      asDerived().addAssociatedType(ty);
+    void visitPatternBindingDecl(PatternBindingDecl *pbd) {
+      // We only care about the contained VarDecls.
+    }
+
+    void visitIfConfigDecl(IfConfigDecl *icd) {
+      // We only care about the active members, which were already subsumed by the
+      // enclosing type.
     }
   };
 
   /// A class which lays out a witness table in the abstract.
   class WitnessTableLayout : public WitnessVisitor<WitnessTableLayout> {
-    unsigned NumWitnesses;
+    unsigned NumWitnesses = 0;
     SmallVector<WitnessTableEntry, 16> Entries;
 
     WitnessIndex getNextIndex() {
@@ -293,20 +250,13 @@ namespace {
     }
 
   public:
-    WitnessTableLayout(IRGenModule &IGM)
-      : WitnessVisitor(IGM), NumWitnesses(0) {}
-
     /// The next witness is an out-of-line base protocol.
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
       Entries.push_back(
              WitnessTableEntry::forOutOfLineBase(baseProto, getNextIndex()));
     }
 
-    void addStaticMethod(FuncDecl *func) {
-      Entries.push_back(WitnessTableEntry::forFunction(func, getNextIndex()));
-    }
-
-    void addInstanceMethod(FuncDecl *func) {
+    void addMethod(FuncDecl *func) {
       Entries.push_back(WitnessTableEntry::forFunction(func, getNextIndex()));
     }
 
@@ -2962,6 +2912,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 namespace {
   /// A class which lays out a specific conformance to a protocol.
   class WitnessTableBuilder : public WitnessVisitor<WitnessTableBuilder> {
+    IRGenModule &IGM;
     SmallVectorImpl<llvm::Constant*> &Table;
     CanType ConcreteType;
     GenericParamList *ConcreteGenerics = nullptr;
@@ -2998,7 +2949,7 @@ namespace {
     WitnessTableBuilder(IRGenModule &IGM,
                         SmallVectorImpl<llvm::Constant*> &table,
                         SILWitnessTable *SILWT)
-      : WitnessVisitor(IGM), Table(table),
+      : IGM(IGM), Table(table),
         ConcreteType(SILWT->getConformance()->getType()->getCanonicalType()),
         ConcreteTI(
                IGM.getTypeInfoForUnlowered(SILWT->getConformance()->getType())),
@@ -3077,11 +3028,7 @@ namespace {
       return;
     }
 
-    void addStaticMethod(FuncDecl *iface) {
-      return addMethodFromSILWitnessTable(iface);
-    }
-
-    void addInstanceMethod(FuncDecl *iface) {
+    void addMethod(FuncDecl *iface) {
       return addMethodFromSILWitnessTable(iface);
     }
 
@@ -3237,9 +3184,9 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
   if (it != Protocols.end()) return *it->second;
 
   // If not, lay out the protocol's witness table, if it needs one.
-  WitnessTableLayout layout(IGM);
+  WitnessTableLayout layout;
   if (Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-    layout.visit(protocol);
+    layout.visitProtocolDecl(protocol);
 
   // Create a ProtocolInfo object from the layout.
   ProtocolInfo *info = ProtocolInfo::create(layout.getNumWitnesses(),
@@ -3366,7 +3313,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Build the witnesses.
   SmallVector<llvm::Constant*, 32> witnesses;
   WitnessTableBuilder(*this, witnesses, wt)
-    .visit(wt->getConformance()->getProtocol());
+    .visitProtocolDecl(wt->getConformance()->getProtocol());
   
   assert(getProtocolInfo(wt->getConformance()->getProtocol())
            .getNumWitnesses() == witnesses.size()
