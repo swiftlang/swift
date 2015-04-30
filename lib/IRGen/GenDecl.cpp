@@ -124,7 +124,7 @@ public:
     Builder.CreateCall(IGM.getGetInitializedObjCClassFn(), classMetadata);
 
     // Register ObjC protocol conformances.
-    for (auto *p : ext->getProtocols()) {
+    for (auto *p : ext->getLocalProtocols()) {
       if (!p->isObjC())
         continue;
       
