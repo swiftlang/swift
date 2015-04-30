@@ -96,22 +96,12 @@ classifyDynamicCastToProtocol(CanType source,
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
 
-  auto SourceProtocols = SourceNominalTy->getProtocols();
-  auto SourceExtensions = SourceNominalTy->getExtensions();
+  auto SourceProtocols = SourceNominalTy->getAllProtocols();
 
   // Check all protocols implemented by the type.
   for (auto *Protocol : SourceProtocols) {
     if (Protocol == TargetProtocol)
       return DynamicCastFeasibility::WillSucceed;
-  }
-
-  // Check all protocols implemented by the type extensions.
-  for (auto *Extension : SourceExtensions) {
-    SourceProtocols = Extension->getProtocols();
-    for (auto *Protocol : SourceProtocols) {
-      if (Protocol == TargetProtocol)
-        return DynamicCastFeasibility::WillSucceed;
-    }
   }
 
   // If we are casting a protocol, then the cast will fail
