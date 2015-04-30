@@ -3601,23 +3601,6 @@ public:
     TC.checkDeclAttributes(CD);
   }
 
-  void validateAncestorProtocols(ArrayRef<ProtocolDecl *> initialProtos) {
-    llvm::SmallPtrSet<ProtocolDecl *, 16> seenProtos;
-    SmallVector<ProtocolDecl *, 16> queue(initialProtos.begin(),
-                                          initialProtos.end());
-
-    while (!queue.empty()) {
-      ProtocolDecl *proto = queue.pop_back_val();
-      if (!seenProtos.insert(proto).second)
-        continue;
-
-      queue.append(proto->getProtocols().begin(), proto->getProtocols().end());
-      for (auto *member : proto->getMembers())
-        if (auto *requirement = dyn_cast<ValueDecl>(member))
-          TC.validateDecl(requirement);
-    }
-  }
-
   void visitProtocolDecl(ProtocolDecl *PD) {
     // This protocol declaration is technically a parse error, so do not type
     // check.
@@ -3645,12 +3628,17 @@ public:
                        diag::protocol_here, path);
 
       // Make sure the parent protocols have been fully validated.
-      validateAncestorProtocols(PD->getProtocols());
+      for (auto inherited : PD->getLocalProtocols()) {
+        TC.validateDecl(inherited);
+        for (auto *member : inherited->getMembers())
+          if (auto *requirement = dyn_cast<ValueDecl>(member))
+            TC.validateDecl(requirement);
+      }
 
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
           bool isNonPrivate = (PD->getFormalAccess() != Accessibility::Private);
-          for (auto *parentProto : PD->getProtocols())
+          for (auto *parentProto : PD->getInheritedProtocols(nullptr))
             tracker->addUsedNominal(parentProto, isNonPrivate);
         }
       }
@@ -5974,7 +5962,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
       bool isObjC = true;
 
-      for (auto inherited : proto->getProtocols()) {
+      for (auto inherited : proto->getInheritedProtocols(nullptr)) {
         if (!inherited->isObjC()) {
           diagnose(proto->getLoc(),
                    diag::objc_protocol_inherits_non_objc_protocol,
