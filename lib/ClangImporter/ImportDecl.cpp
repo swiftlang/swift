@@ -3438,8 +3438,8 @@ namespace {
       return { type, interfaceType };
     }
 
-    /// Build a thunk for an Objective-C subscript getter.
-    FuncDecl *buildGetterThunk(const FuncDecl *getter, Type elementTy,
+    /// Build a declaration for an Objective-C subscript getter.
+    FuncDecl *buildSubscriptGetterDecl(const FuncDecl *getter, Type elementTy,
                                DeclContext *dc, Pattern *indices) {
       auto &context = Impl.SwiftContext;
       auto loc = getter->getLoc();
@@ -3493,8 +3493,8 @@ namespace {
       return thunk;
     }
 
-      /// Build a thunk for an Objective-C subscript setter.
-    FuncDecl *buildSetterThunk(const FuncDecl *setter, Type elementTy,
+      /// Build a declaration for an Objective-C subscript setter.
+    FuncDecl *buildSubscriptSetterDecl(const FuncDecl *setter, Type elementTy,
                                DeclContext *dc, Pattern *indices) {
       auto &context = Impl.SwiftContext;
       auto loc = setter->getLoc();
@@ -3778,9 +3778,11 @@ namespace {
         }
       }
 
-      getterThunk = buildGetterThunk(getter, elementTy, dc, getterIndices);
+      getterThunk = buildSubscriptGetterDecl(getter, elementTy, dc,
+                                             getterIndices);
       if (setter)
-        setterThunk = buildSetterThunk(setter, elementTy, dc, setterIndices);
+        setterThunk = buildSubscriptSetterDecl(setter, elementTy, dc,
+                                               setterIndices);
 
       // Build the subscript declaration.
       auto bodyPatterns =
