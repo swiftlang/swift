@@ -143,7 +143,8 @@ public protocol CollectionType
   /// Though it can't currently be enforced by the type system, the
   /// `_prext_SubSlice` type in a concrete implementation of `CollectionType`
   /// should also be `CollectionType`.
-  typealias _prext_SubSlice : _CollectionDefaultsType
+  typealias _prext_SubSlice
+    : _CollectionDefaultsType, _CollectionGeneratorDefaultsType
   // <rdar://problem/20715031> CollectionType.SubSlice should be constrained to CollectionType
   // <rdar://problem/20715697> CollectionType.SubSlice should constrain its Element type
 
