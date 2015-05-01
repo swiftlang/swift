@@ -294,7 +294,7 @@ Loop:  // expected-note {{previously declared here}}
   case 5:
     markUsed("before the break")
     break
-    markUsed("after the break")    // println is not a label for the break.
+    markUsed("after the break")    // 'markUsed' is not a label for the break.
   default:
     markUsed("")
   }
