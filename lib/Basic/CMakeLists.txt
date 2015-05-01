@@ -16,6 +16,7 @@ add_swift_library(swiftBasic
   DiagnosticConsumer.cpp
   DiverseStack.cpp
   EditorPlaceholder.cpp
+  FileSystem.cpp
   JSONSerialization.cpp
   LangOptions.cpp
   Platform.cpp
