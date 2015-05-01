@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 enum TrivialGeneric<T, U> {
   case x(T, U)
 }
@@ -19,5 +21,5 @@ func wrapTrivialGeneric<T, U>(t: T, u: U) -> TrivialGeneric<T, U> {
 var tg : TrivialGeneric<Int, String> = .x(23, "skidoo")
 switch tg {
 case .x(var t, var u):
-  println("\(t) \(u)")
+  markUsed("\(t) \(u)")
 }
