@@ -676,3 +676,8 @@ typedef struct NonNilableReferences {
 @interface NSClassWithMethodFromNSProtocolWithOptionalRequirement
 -(void)optionalRequirement  __attribute__((availability(macosx, introduced=10.10)));
 @end
+
+@interface UnusedResults : NSObject
+-(NSInteger)producesResult __attribute__((warn_unused_result));
+@end
+

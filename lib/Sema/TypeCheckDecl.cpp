@@ -4954,6 +4954,8 @@ public:
     UNINTERESTING_ATTR(SILStored)
     UNINTERESTING_ATTR(Testable)
 
+    UNINTERESTING_ATTR(WarnUnusedResult)
+
 #undef UNINTERESTING_ATTR
 
     void visitAvailabilityAttr(AvailabilityAttr *attr) {

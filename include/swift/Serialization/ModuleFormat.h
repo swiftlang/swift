@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 197; // Last change: foreign error convention
+const uint16_t VERSION_MINOR = 198; // Last change: warn_unused_result
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1308,6 +1308,14 @@ namespace decls_block {
     BCFixed<1>, // implicit name flag
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
+  >;
+
+  using WarnUnusedResultDeclAttrLayout = BCRecordLayout<
+    WarnUnusedResult_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCVBR<6>,  // index at the end of the message,
+    BCBlob     // blob contains the message and mutating-version
+               // strings, separated by the prior index
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \

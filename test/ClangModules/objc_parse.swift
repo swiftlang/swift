@@ -476,3 +476,8 @@ class ProtoAdopter : NSObject, ExplicitSetterProto, OptionalSetterProto {
   var foo: AnyObject? // no errors about conformance
   var bar: AnyObject? // no errors about conformance
 }
+
+func testUnusedResults(ur: UnusedResults) {
+  let x = ur.producesResult()
+  ur.producesResult() // expected-warning{{result of call to 'producesResult()' is unused}}
+}

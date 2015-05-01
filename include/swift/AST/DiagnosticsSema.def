@@ -1307,6 +1307,12 @@ ERROR(lazy_not_observable,sema_tcd,none,
 ERROR(attr_for_debugger_support_only,sema_tcd,none,
       "@LLDBDebuggerSupport may only be used when debugger support is on", ())
 
+// warn_unused_result
+ERROR(attr_warn_unused_result_mutable_variable,sema_tcd,none,
+      "'mutable_variant' parameter of 'warn_unused_result' attribute does not "
+      "make sense on a %select{non-function|non-method|non-instance method|"
+      "method of a class|mutating method}0", (unsigned))
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------
@@ -1651,6 +1657,13 @@ ERROR(expression_unused_function,sema_tcs,none,
       "expression resolves to an unused function", ())
 ERROR(expression_unused_lvalue,sema_tcs,none,
       "expression resolves to an unused l-value", ())
+WARNING(expression_unused_result,sema_tcs,none,
+        "result of call to %0 is unused", (DeclName))
+WARNING(expression_unused_result_message,sema_tcs,none,
+        "result of call to %0 is unused: %1", (DeclName, StringRef))
+WARNING(expression_unused_result_nonmutating,sema_tcs,none,
+        "result of call to non-mutating function %0 is unused; "
+        "use %1 to mutate in-place", (DeclName, DeclName))
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
 ERROR(assignment_lhs_is_let,sema_tcs,none,

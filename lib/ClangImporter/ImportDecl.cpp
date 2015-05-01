@@ -5385,7 +5385,7 @@ void ClangImporter::Implementation::importAttributes(
 
   // Ban CFRelease|CFRetain|CFAutorelease(CFTypeRef) as well as custom ones
   // such as CGColorRelease(CGColorRef).
-  if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl))
+  if (auto FD = dyn_cast<clang::FunctionDecl>(ClangDecl)) {
     if (FD->getNumParams() == 1 &&
          (FD->getName().endswith("Release") ||
           FD->getName().endswith("Retain") ||
@@ -5397,6 +5397,14 @@ void ClangImporter::Implementation::importAttributes(
           MappedDecl->getAttrs().add(attr);
           return;
         }
+  }
+
+  // Map __attribute__((warn_unused_result)).
+  if (ClangDecl->hasAttr<clang::WarnUnusedResultAttr>()) {
+    MappedDecl->getAttrs().add(new (C) WarnUnusedResultAttr(SourceLoc(),
+                                                            SourceLoc(),
+                                                            false));
+  }
 }
 
 Decl *

@@ -1112,6 +1112,20 @@ ERROR(attr_unowned_invalid_specifier,attribute_parsing,none,
 ERROR(attr_unowned_expected_rparen,attribute_parsing,none,
       "expected ')' after specifier for 'unowned'", ())
 
+// warn_unused_result
+WARNING(attr_warn_unused_result_expected_name,attribute_parsing,none,
+        "expected parameter 'message' or 'mutable_variant'", ())
+WARNING(attr_warn_unused_result_duplicate_parameter,attribute_parsing,none,
+      "duplicate '%0' parameter; previous value will be ignored", (StringRef))
+ERROR(attr_warn_unused_result_expected_eq,attribute_parsing,none,
+      "expected '=' following '%0' parameter", (StringRef))
+ERROR(attr_warn_unused_result_expected_string,attribute_parsing,none,
+      "expected a string following '=' for '%0' parameter", (StringRef))
+WARNING(attr_warn_unused_result_unknown_parameter,attribute_parsing,none,
+        "unknown parameter '%0' in 'warn_unused_result' attribute", (StringRef))
+ERROR(attr_warn_unused_result_expected_rparen,attribute_parsing,none,
+      "expected ')' after 'warn_unused_result' attribute", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------

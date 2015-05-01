@@ -950,6 +950,117 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     recordObjCAttr(CurDeclContext, attr);
     break;
   }
+
+  case DAK_WarnUnusedResult: {
+    // @warn_unused_result with no arguments.
+    if (Tok.isNot(tok::l_paren)) {
+      auto attr = new (Context) WarnUnusedResultAttr(AtLoc, Loc, false);
+      Attributes.add(attr);
+      break;
+    }
+
+    // @warn_unused_result with arguments.
+    StringRef message;
+    StringRef mutableVariant;
+    SourceLoc lParenLoc = consumeToken();
+    bool invalid = false;
+    do {
+      // If we see a closing parenthesis, 
+      if (Tok.is(tok::r_paren))
+        break;
+
+      if (Tok.isNot(tok::identifier)) {
+        diagnose(Tok, diag::attr_warn_unused_result_expected_name);
+        if (Tok.isNot(tok::r_paren))
+          skipUntil(tok::r_paren);
+        invalid = true;
+        break;
+      }
+
+      // Consume the identifier.
+      StringRef name = Tok.getText();
+      SourceLoc nameLoc = consumeToken();
+
+      // Figure out which parameter it is.
+      enum class KnownParameter {
+        Message,
+        MutableVariant
+       };
+
+      Optional<KnownParameter> known
+        = llvm::StringSwitch<Optional<KnownParameter>>(name)
+            .Case("message", KnownParameter::Message)
+            .Case("mutable_variant", KnownParameter::MutableVariant)
+            .Default(None);
+      
+      // If we don't have the '=', complain.
+      SourceLoc equalLoc;
+      if (!consumeIf(tok::equal, equalLoc)) {
+        if (known)
+          diagnose(Tok, diag::attr_warn_unused_result_expected_eq, name);
+        else
+          diagnose(Tok, diag::attr_warn_unused_result_unknown_parameter, name);
+        continue;
+      }
+
+      // If we don't have a string, complain.
+      if (Tok.isNot(tok::string_literal)) {
+        diagnose(Tok, diag::attr_warn_unused_result_expected_string, name);
+        if (Tok.isNot(tok::r_paren))
+          skipUntil(tok::r_paren);
+        invalid = true;
+        break;        
+      }
+
+      // Dig out the string.
+      auto string = getStringLiteralIfNotInterpolated(*this, nameLoc, Tok,
+                                                      name.str());
+      consumeToken(tok::string_literal);
+      if (!string) {
+        continue;
+      }
+
+      if (!known) {
+        diagnose(nameLoc, diag::attr_warn_unused_result_unknown_parameter,
+                 name);
+        continue;
+      }
+
+      StringRef *whichParam;
+      switch (*known) {
+      case KnownParameter::Message:
+        whichParam = &message;
+        break; 
+
+      case KnownParameter::MutableVariant:
+        whichParam = &mutableVariant;
+        break;
+      }
+
+      if (!whichParam->empty()) {
+        diagnose(nameLoc, diag::attr_warn_unused_result_duplicate_parameter, 
+                 name);
+      }
+
+      *whichParam = *string;
+    } while (consumeIf(tok::comma));
+
+    // Parse the closing ')'.
+    SourceLoc rParenLoc;
+    if (Tok.isNot(tok::r_paren)) {
+      parseMatchingToken(tok::r_paren, rParenLoc,
+                         diag::attr_warn_unused_result_expected_rparen,
+                         lParenLoc);
+    }
+    if (Tok.is(tok::r_paren)) {
+      rParenLoc = consumeToken();
+    }
+
+    Attributes.add(new (Context) WarnUnusedResultAttr(AtLoc, Loc, lParenLoc,
+                                                      message, mutableVariant,
+                                                      rParenLoc, false));
+    break;
+    }
   }
 
   if (DuplicateAttribute) {

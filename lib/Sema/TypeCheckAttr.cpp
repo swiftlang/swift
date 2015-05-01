@@ -73,6 +73,7 @@ public:
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(Testable)
+  IGNORED_ATTR(WarnUnusedResult)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -628,6 +629,8 @@ public:
   void visitInfixAttr(InfixAttr *attr) { checkOperatorAttribute(attr); }
   void visitPostfixAttr(PostfixAttr *attr) { checkOperatorAttribute(attr); }
   void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
+
+  void visitWarnUnusedResultAttr(WarnUnusedResultAttr *attr);
 };
 } // end anonymous namespace
 
@@ -939,7 +942,6 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
   }
 }
 
-
 void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   // The @NSCopying attribute is only allowed on stored properties.
   auto *VD = cast<VarDecl>(D);
@@ -1241,6 +1243,43 @@ AttributeChecker::visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr) {
   }
 
   visitAbstractAccessibilityAttr(attr);
+}
+
+void AttributeChecker::visitWarnUnusedResultAttr(WarnUnusedResultAttr *attr) {
+  if (!attr->getMutableVariant().empty()) {
+    // mutable_variant only makes sense for non-mutating methods where
+    // it's possible to have a mutating variant.
+    auto func = dyn_cast<FuncDecl>(D);
+    if (!func) {
+      TC.diagnose(attr->getLocation(),
+                  diag::attr_warn_unused_result_mutable_variable, 0);
+      return;
+    }
+
+    if (!func->getDeclContext()->isTypeContext()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::attr_warn_unused_result_mutable_variable, 1);
+      return;
+    }
+
+    if (!func->isInstanceMember()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::attr_warn_unused_result_mutable_variable, 2);
+      return;
+    }
+
+    if (func->getExtensionType()->getClassOrBoundGenericClass()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::attr_warn_unused_result_mutable_variable, 3);
+      return;      
+    }
+
+    if (func->isMutating()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::attr_warn_unused_result_mutable_variable, 4);
+      return;      
+    }
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

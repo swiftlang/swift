@@ -1517,7 +1517,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
   case DAK_Count:
-    llvm_unreachable("cannot serialize DAK_Count");
+    llvm_unreachable("cannot serialize attribute");
     return;
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)\
@@ -1637,6 +1637,22 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     ObjCDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    theAttr->isImplicit(), 
                                    theAttr->isNameImplicit(), numArgs, pieces);
+    return;
+  }
+
+  case DAK_WarnUnusedResult: {
+    auto *theAttr = cast<WarnUnusedResultAttr>(DA);
+
+    // Compute the blob.
+    SmallString<128> blob;
+    blob += theAttr->getMessage();
+    uint64_t endOfMessageIndex = blob.size();
+    blob += theAttr->getMutableVariant();
+    auto abbrCode = DeclTypeAbbrCodes[WarnUnusedResultDeclAttrLayout::Code];
+    WarnUnusedResultDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                               theAttr->isImplicit(),
+                                               endOfMessageIndex,
+                                               blob);
     return;
   }
   }

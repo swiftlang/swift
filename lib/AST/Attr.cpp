@@ -294,6 +294,27 @@ void DeclAttribute::print(ASTPrinter &Printer,
     // Not printed.
     return;
 
+  case DAK_WarnUnusedResult: {
+    Printer << "@warn_unused_result";
+    auto *attr = cast<WarnUnusedResultAttr>(this);
+    bool printedParens = false;
+    if (!attr->getMessage().empty()) {
+      Printer << "(message=\"" << attr->getMessage() << "\"";
+      printedParens = true;
+    }
+    if (!attr->getMutableVariant().empty()) {
+      if (printedParens)
+        Printer << ", ";
+      else
+        Printer << "(";
+      Printer << ", mutable_variant=\"" << attr->getMutableVariant() << "\"";
+      printedParens = true;
+    }
+    if (printedParens)
+      Printer << ")";
+    return;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
   }
@@ -384,6 +405,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<ObjC bridged>>";
   case DAK_SynthesizedProtocol:
     return "<<synthesized protocol>>";
+  case DAK_WarnUnusedResult:
+    return "warn_unused_result";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

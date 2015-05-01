@@ -43,12 +43,13 @@ func method(@#^KEYWORD1^#) {}
 @#^KEYWORD2^#
 func method(){}
 
-// KEYWORD2:                  Begin completions, 5 items
+// KEYWORD2:                  Begin completions, 6 items
 // KEYWORD2-NEXT:             Keyword/None:                       availability[#Func Attribute#]; name=availability{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       IBAction[#Func Attribute#]; name=IBAction{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       inline[#Func Attribute#]; name=inline{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       warn_unused_result[#Func Attribute#]; name=warn_unused_result{{$}}
 // KEYWORD2-NEXT:             End completions
 
 @#^KEYWORD3^#
@@ -81,7 +82,7 @@ struct S{}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 16 items
+// KEYWORD_LAST:                  Begin completions, 17 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       availability[#Declaration Attribute#]; name=availability{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
@@ -98,4 +99,5 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noescape[#Declaration Attribute#]; name=noescape{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Declaration Attribute#]; name=objc_non_lazy_realization{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unused_result[#Declaration Attribute#]; name=warn_unused_result
 // KEYWORD_LAST-NEXT:             End completions

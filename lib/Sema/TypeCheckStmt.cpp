@@ -902,6 +902,57 @@ static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
   }
 
   // FIXME: Complain about literals
+
+  // Check if we have a call to a function marked warn_unused_result.
+  if (auto call = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr())) {
+    // Dig through all levels of calls.
+    Expr *fn = call->getFn()->getSemanticsProvidingExpr();
+    bool baseIsLValue = false;
+    while (auto applyFn = dyn_cast<ApplyExpr>(fn)) {
+      if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(applyFn)) {
+        Expr *base = dotSyntax->getBase();
+        baseIsLValue = isa<LoadExpr>(base);
+      }
+      fn = applyFn->getFn()->getSemanticsProvidingExpr();
+    }
+
+    // Find the callee.
+    AbstractFunctionDecl *callee = nullptr;
+    if (auto declRef = dyn_cast<DeclRefExpr>(fn))
+      callee = dyn_cast<AbstractFunctionDecl>(declRef->getDecl());
+    else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn))
+      callee = ctorRef->getDecl();
+    else if (auto memberRef = dyn_cast<MemberRefExpr>(fn))
+      callee = dyn_cast<AbstractFunctionDecl>(memberRef->getMember().getDecl());
+    else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(fn))
+      callee = dyn_cast<AbstractFunctionDecl>(
+                 dynMemberRef->getMember().getDecl());
+
+    if (callee) {
+      if (auto attr = callee->getAttrs().getAttribute<WarnUnusedResultAttr>()) {
+        if (!attr->getMutableVariant().empty() && baseIsLValue) {
+          DeclName replacementName(TC.Context,
+                                   TC.Context.getIdentifier(
+                                     attr->getMutableVariant()),
+                                   callee->getFullName().getArgumentNames());
+          TC.diagnose(fn->getLoc(), diag::expression_unused_result_nonmutating,
+                      callee->getFullName(), replacementName)
+            .fixItReplace(fn->getLoc(), attr->getMutableVariant());
+          return;
+        }
+
+        if (!attr->getMessage().empty()) {
+          TC.diagnose(fn->getLoc(), diag::expression_unused_result_message,
+                      callee->getFullName(), attr->getMessage());
+          return;
+        }
+
+        TC.diagnose(fn->getLoc(), diag::expression_unused_result,
+                    callee->getFullName());
+        return;
+      }
+    }
+  }
 }
 
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
