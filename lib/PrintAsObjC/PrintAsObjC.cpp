@@ -674,11 +674,11 @@ private:
       
       // Use typedefs we set up for SIMD vector types.
 #define MAP_SIMD_TYPE(_, __, BASENAME) \
-      specialNames[{ctx.Id_SIMD, ctx.getIdentifier(#BASENAME "2")}] \
+      specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "2")}] \
         = { "swift_" #BASENAME "2", false };                        \
-      specialNames[{ctx.Id_SIMD, ctx.getIdentifier(#BASENAME "3")}] \
+      specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "3")}] \
         = { "swift_" #BASENAME "3", false };                        \
-      specialNames[{ctx.Id_SIMD, ctx.getIdentifier(#BASENAME "4")}] \
+      specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "4")}] \
         = { "swift_" #BASENAME "4", false };
 #include "swift/ClangImporter/SIMDMappedTypes.def"
       static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
@@ -1234,7 +1234,7 @@ public:
     if (otherModule->isStdlibModule())
       return true;
     // Don't need a module for SIMD types in C.
-    if (otherModule->getName() == M.Ctx.Id_SIMD)
+    if (otherModule->getName() == M.Ctx.Id_simd)
       return true;
 
     // If there's a Clang node, see if it comes from an explicit submodule.

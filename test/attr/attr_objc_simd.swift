@@ -3,7 +3,7 @@
 // REQUIRES: objc_interop
 
 import Foundation
-import SIMD
+import simd
 
 @objc class Foo: NSObject {
   @objc func doStuffWithFloat4(x: Float4) -> Float4 { return x }

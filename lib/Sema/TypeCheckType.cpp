@@ -3105,7 +3105,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   }
   
   // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
-  Identifier ID_SIMD = Context.Id_SIMD;
+  Identifier ID_SIMD = Context.Id_simd;
   if (auto SIMDModule = Context.getLoadedModule(ID_SIMD)) {
     StdlibTypeNames.clear();
 #define MAP_SIMD_TYPE(_, __, BASENAME)                                   \

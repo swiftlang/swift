@@ -607,7 +607,7 @@ void ClangTypeConverter::fillSpeciallyImportedTypeCache(IRGenModule &IGM) {
   }
   
   // Handle SIMD types.
-  if (auto SIMDModule = IGM.Context.getLoadedModule(IGM.Context.Id_SIMD)) {
+  if (auto SIMDModule = IGM.Context.getLoadedModule(IGM.Context.Id_simd)) {
 #define MAP_SIMD_TYPE(_, CLANG_KIND, SWIFT_NAME)                               \
     {                                                                          \
       char name[] = #SWIFT_NAME "0";                                           \

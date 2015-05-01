@@ -1723,7 +1723,7 @@ Module *ClangImporter::Implementation::tryLoadFoundationModule() {
 }
 
 Module *ClangImporter::Implementation::tryLoadSIMDModule() {
-  return tryLoadModule(SwiftContext, SwiftContext.Id_SIMD,
+  return tryLoadModule(SwiftContext, SwiftContext.Id_simd,
                        ImportForwardDeclarations, checkedSIMDModule);
 }
 
