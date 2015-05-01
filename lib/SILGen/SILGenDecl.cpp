@@ -981,7 +981,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
   
   for (const auto &elt : Cond) {
     // Handle boolean conditions.
-    if (auto *expr = elt.getCondition()) {
+    if (auto *expr = elt.getConditionOrNull()) {
       // Evaluate the condition as an i1 value (guaranteed by Sema).
       SILValue V;
       {
@@ -1003,41 +1003,12 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
       continue;
     }
     
-    auto *PBD = elt.getBinding();
-    for (auto entry : PBD->getPatternList()) {
-      InitializationPtr initialization =
-        InitializationForPattern(*this, FailDest).visit(entry.ThePattern);
+    InitializationPtr initialization =
+      InitializationForPattern(*this, FailDest).visit(elt.getPattern());
       
-      // If an initial value expression was specified by the decl, emit it into
-      // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-      if (auto *Init = entry.Init) {
-        FullExpr Scope(Cleanups, CleanupLocation(Init));
-        emitExprInto(Init, initialization.get());
-      } else {
-        initialization->finishInitialization(*this);
-      }
-    }
-    
-    if (auto where = PBD->getWhereExpr()) {
-      // Evaluate the condition as an i1 value (guaranteed by Sema).
-      SILValue V;
-      {
-        FullExpr Scope(Cleanups, CleanupLocation(where));
-        V = emitRValue(where).forwardAsSingleValue(*this, where);
-      }
-      assert(V.getType().castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
-             "Sema forces conditions to have Builtin.i1 type");
-      
-      // Just branch on the condition.  On failure, we unwind any active cleanups,
-      // on success we fall through to a new block.
-      SILBasicBlock *ContBB = createBasicBlock();
-      auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
-      B.createCondBranch(where, V, ContBB, FailBB);
-      
-      // Finally, emit the continue block and keep emitting the rest of the
-      // condition.
-      B.emitBlock(ContBB);
-    }
+    // Emit the initial value into the initialization.
+    FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
+    emitExprInto(elt.getInitializer(), initialization.get());
   }
 }
 

@@ -724,24 +724,15 @@ struct ASTNodeBase {};
       }
     }
 
-    void checkConditionElement(StmtConditionElement elt) {
-      if (auto E = elt.getCondition()) {
+    void checkConditionElement(const StmtConditionElement &elt) {
+      if (auto E = elt.getConditionOrNull()) {
         checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
                       "condition type");
         return;
       }
-      auto CB = elt.getBinding();
-
-      PrettyStackTraceDecl debugStack("verifying condition binding", CB);
-      for (auto entry : CB->getPatternList()) {
-        if (!entry.Init) {
-          Out << "conditional binding does not have initializer\n";
-          CB->print(Out);
-          abort();
-        }
-        checkSameType(entry.ThePattern->getType(), entry.Init->getType(),
-                      "conditional binding type");
-      }
+      checkSameType(elt.getPattern()->getType(),
+                    elt.getInitializer()->getType(),
+                    "conditional binding type");
     }
     
     void checkCondition(StmtCondition C) {

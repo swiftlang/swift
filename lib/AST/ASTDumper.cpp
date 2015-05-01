@@ -1050,11 +1050,17 @@ public:
   }
   
   void printRec(StmtConditionElement C) {
-    if (C.isCondition())
-      return printRec(C.getCondition());
-    if (C.getBinding())
-      return printRec(C.getBinding());
-    OS.indent(Indent+2) << "(**NULL CONDITION**)";
+    if (auto E = C.getConditionOrNull())
+      return printRec(E);
+
+    Indent += 2;
+    OS.indent(Indent) << "(pattern\n";
+
+    printRec(C.getPattern());
+    OS << "\n";
+    printRec(C.getInitializer());
+    OS << ")";
+    Indent -= 2;
   }
   
   void visitBraceStmt(BraceStmt *S) {

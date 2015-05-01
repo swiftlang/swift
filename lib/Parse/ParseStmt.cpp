@@ -906,7 +906,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       return Status;
     }
     
-    // If a let-binding doesn't follow, diagnose the problem.
+    // If a let-binding doesn't follow, diagnose the problem with a tailored
+    // error message.
     if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case)) {
       // If an { exists after the comma, assume it is a stray comma and this is
       // the start of the if/while body.  If a non-expression thing exists after
@@ -982,10 +983,12 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         .fixItInsert(Tok.getLoc(), BindingKindStr.str() + " ");
       VarLoc = Tok.getLoc();
     }
-    
-    SmallVector<PatternBindingEntry, 4> entries;
-    
-    // Parse the list of name binding's within a let/var clauses.
+
+    // The first pattern entry we parse will record the location of the
+    // let/var/case into the StmtCondition.
+    SourceLoc IntroducerLoc = VarLoc;
+
+    // Parse the list of name bindings within a let/var clauses.
     do {
       ParserResult<Pattern> ThePattern;
 
@@ -1040,11 +1043,17 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         diagnose(Tok, diag::conditional_var_initializer_required);
         Init = new (Context) ErrorExpr(Tok.getLoc());
       }
-      
-      entries.push_back(PatternBindingEntry(ThePattern.get(), Init));
-    
-      // Add variable bindings from the pattern to the case scope.
-      addPatternVariablesToScope(ThePattern.get());
+
+      result.push_back({IntroducerLoc, ThePattern.get(), Init});
+      IntroducerLoc = SourceLoc();
+
+      // Add variable bindings from the pattern to our current scope and mark
+      // them as being having a non-pattern-binding initializer.
+      ThePattern.get()->forEachVariable([&](VarDecl *VD) {
+        if (VD->hasName())
+          addToScope(VD);
+        VD->setHasNonPatternBindingInit();
+      });
 
     } while (Tok.is(tok::comma) &&
              peekToken().isNot(tok::kw_let, tok::kw_var, tok::kw_case) &&
@@ -1052,25 +1061,15 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
     // If there is a where clause on this let/var specification, parse and
     // remember it.
-    Expr *Where = nullptr;
     if (consumeIf(tok::kw_where)) {
-      ParserResult<Expr> InitExpr
+      ParserResult<Expr> WhereExpr
         = parseExprBasic(diag::expected_expr_conditional_where);
-      Status |= InitExpr;
-      if (InitExpr.isNull() || InitExpr.hasCodeCompletion())
+      Status |= WhereExpr;
+      if (WhereExpr.isNull() || WhereExpr.hasCodeCompletion())
         return Status;
-      Where = InitExpr.get();
+      result.push_back(WhereExpr.get());
     }
 
-    // Finally, create and remember a PatternBindingDecl for the list of
-    // pattern/init pairs and the optional where clause.
-    auto PBD = PatternBindingDecl::create(Context, SourceLoc(),
-                                          StaticSpellingKind::None,
-                                          VarLoc, entries, Where,
-                                          PatternBindingElse::getContextual(),
-                                          /*parent*/CurDeclContext);
-    result.push_back(PBD);
-    
   } while (consumeIf(tok::comma));
 
   Condition = Context.AllocateCopy(result);
@@ -1164,9 +1163,8 @@ ParserResult<Stmt> Parser::parseStmtUnless() {
   // cannot be used unbound.
   SmallVector<VarDecl *, 4> Vars;
   for (auto &elt : Condition)
-    if (auto pbd = elt.getBinding())
-      for (auto patternEntry : pbd->getPatternList())
-        patternEntry.ThePattern->collectVariables(Vars);
+    if (auto pattern = elt.getPatternOrNull())
+      pattern->collectVariables(Vars);
 
   llvm::SaveAndRestore<decltype(DisabledVars)>
   RestoreCurVars(DisabledVars, Vars);

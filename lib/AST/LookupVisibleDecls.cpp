@@ -701,20 +701,21 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitDeferStmt(DeferStmt *DS) {
     // Nothing in the defer is visible.
   }
+
+  void checkStmtCondition(const StmtCondition &Cond) {
+    for (auto entry : Cond)
+      if (auto *P = entry.getPatternOrNull())
+        checkPattern(P, DeclVisibilityKind::LocalVariable);
+  }
+
   void visitIfStmt(IfStmt *S) {
-    for (auto entry : S->getCond())
-      if (auto *PBD = entry.getBinding())
-        for (auto entry : PBD->getPatternList())
-          checkPattern(entry.ThePattern, DeclVisibilityKind::LocalVariable);
+    checkStmtCondition(S->getCond());
     visit(S->getThenStmt());
     if (S->getElseStmt())
       visit(S->getElseStmt());
   }
   void visitUnlessStmt(UnlessStmt *S) {
-    for (auto entry : S->getCond())
-      if (auto *PBD = entry.getBinding())
-        for (auto entry : PBD->getPatternList())
-          checkPattern(entry.ThePattern, DeclVisibilityKind::LocalVariable);
+    checkStmtCondition(S->getCond());
     visit(S->getBody());
   }
 
@@ -723,10 +724,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     // need to walk anything within.
   }
   void visitWhileStmt(WhileStmt *S) {
-    for (auto entry : S->getCond())
-      if (auto *PBD = entry.getBinding())
-        for (auto entry : PBD->getPatternList())
-          checkPattern(entry.ThePattern, DeclVisibilityKind::LocalVariable);
+    checkStmtCondition(S->getCond());
     visit(S->getBody());
   }
   void visitRepeatWhileStmt(RepeatWhileStmt *S) {

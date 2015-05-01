@@ -250,27 +250,30 @@ bool CatchStmt::isSyntacticallyExhaustive() const {
 }
 
 SourceRange StmtConditionElement::getSourceRange() const {
-  if (auto *E = getCondition())
+  if (auto *E = getConditionOrNull())
     return E->getSourceRange();
-  if (auto *B = getBinding())
-    return B->getSourceRange();
-  return SourceRange();
+
+  SourceLoc Start;
+  if (IntroducerLoc.isValid())
+    Start = IntroducerLoc;
+  else
+    Start = getPattern()->getStartLoc();
+
+  return SourceRange(Start, getInitializer()->getEndLoc());
 }
 
 SourceLoc StmtConditionElement::getStartLoc() const {
-  if (auto *E = getCondition())
+  if (auto *E = getConditionOrNull())
     return E->getStartLoc();
-  if (auto *B = getBinding())
-    return B->getStartLoc();
-  return SourceLoc();
+  if (IntroducerLoc.isValid())
+    return IntroducerLoc;
+  return getPattern()->getStartLoc();
 }
 
 SourceLoc StmtConditionElement::getEndLoc() const {
-  if (auto *E = getCondition())
+  if (auto *E = getConditionOrNull())
     return E->getEndLoc();
-  if (auto *B = getBinding())
-    return B->getEndLoc();
-  return SourceLoc();
+  return getInitializer()->getEndLoc();
 }
 
 static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {

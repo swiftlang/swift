@@ -244,34 +244,73 @@ public:
 /// "z"'s binding.  A simple "if" statement is represented as a single binding.
 ///
 class StmtConditionElement {
-  /// This is either a PBD for a variable binding or an expression for a boolean
-  /// condition.
-  llvm::PointerUnion<PatternBindingDecl*, Expr*> Data;
-public:
-  StmtConditionElement() : Data() {}
-  StmtConditionElement(PatternBindingDecl *PBD) : Data(PBD) {}
-  StmtConditionElement(Expr *cond) : Data(cond) {}
+  /// If this is a pattern binding, it may be the first one in a declaration, in
+  /// which case this is the location of the var/let/case keyword.  If this is
+  /// the second pattern (e.g. for 'y' in "var x = ..., y = ...") then this
+  /// location is invalid.
+  SourceLoc IntroducerLoc;
 
+  /// In a pattern binding, this is pattern being matched.  In the case of an
+  /// "implicit optional" pattern, the OptionalSome pattern is explicitly added
+  /// to this as an 'implicit' pattern.
+  Pattern *ThePattern = nullptr;
+
+  /// This is either the boolean condition or the initializer for a pattern
+  /// binding.
+  Expr *CondOrInit;
+
+public:
+  StmtConditionElement() {}
+  StmtConditionElement(SourceLoc IntroducerLoc, Pattern *ThePattern,
+                       Expr *Init)
+    : IntroducerLoc(IntroducerLoc), ThePattern(ThePattern), CondOrInit(Init) {}
+  StmtConditionElement(Expr *cond)
+    : CondOrInit(cond) {}
+
+
+  /// Boolean Condition Accessors.
   bool isCondition() const {
-    return Data.is<Expr*>();
+    return ThePattern == nullptr;
   }
 
-  bool isBinding() const {
-    return Data.is<PatternBindingDecl*>();
+  Expr *getConditionOrNull() const {
+    return isCondition() ? CondOrInit : nullptr;
   }
 
   Expr *getCondition() const {
-    return Data.dyn_cast<Expr*>();
+    assert(isCondition() && "Not a condition");
+    return CondOrInit;
   }
   void setCondition(Expr *E) {
-    Data = E;
+    assert(isCondition() && "Not a condition");
+    CondOrInit = E;
   }
-  
-  PatternBindingDecl *getBinding() const {
-    return Data.dyn_cast<PatternBindingDecl*>();
+
+  /// Pattern Binding Accessors.
+  bool isBinding() const {
+    return ThePattern != nullptr;
   }
-  void setBinding(PatternBindingDecl *D) {
-    Data = D;
+  Pattern *getPatternOrNull() const {
+    return ThePattern;
+  }
+
+  Pattern *getPattern() const {
+    assert(isBinding() && "Not a pattern binding condition");
+    return ThePattern;
+  }
+
+  void setPattern(Pattern *P) {
+    assert(isBinding() && "Not a pattern binding condition");
+    ThePattern = P;
+  }
+
+  Expr *getInitializer() const {
+    assert(isBinding() && "Not a pattern binding condition");
+    return CondOrInit;
+  }
+  void setInitializer(Expr *E) {
+    assert(isBinding() && "Not a pattern binding condition");
+    CondOrInit = E;
   }
 
   SourceLoc getStartLoc() const;

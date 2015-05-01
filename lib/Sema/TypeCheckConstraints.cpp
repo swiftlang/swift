@@ -1101,7 +1101,8 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   return false;
 }
 
-bool TypeChecker::typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC) {
+bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
+                                   DeclContext *DC) {
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
@@ -1171,16 +1172,31 @@ bool TypeChecker::typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC) {
     }
   };
 
-  assert(Init && "type-checking an uninitialized binding?");
-  BindingListener listener(P, Init, DC);
+  assert(initializer && "type-checking an uninitialized binding?");
+  BindingListener listener(pattern, initializer, DC);
 
-  auto contextualType = P->hasType() ? P->getType() : Type();
+  auto contextualType = pattern->hasType() ? pattern->getType() : Type();
 
   // Type-check the initializer.
-  return typeCheckExpression(Init, DC, Type(),
-                             contextualType, /*discardedExpr=*/false,
-                             FreeTypeVariableBinding::Disallow,
-                             &listener);
+  bool hadError = typeCheckExpression(initializer, DC, Type(),
+                                      contextualType, /*discardedExpr=*/false,
+                                      FreeTypeVariableBinding::Disallow,
+                                      &listener);
+
+  if (hadError && !pattern->hasType()) {
+    pattern->setType(ErrorType::get(Context));
+    pattern->forEachVariable([&](VarDecl *var) {
+      // Don't change the type of a variable that we've been able to
+      // compute a type for.
+      if (var->hasType() && !var->getType()->is<ErrorType>())
+        return;
+
+      var->overwriteType(ErrorType::get(Context));
+      var->setInvalid();
+    });
+  }
+
+  return hadError;
 }
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
@@ -1233,19 +1249,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
   if (hadError) {
     PBD->setInvalid();
-    if (!pattern->hasType()) {
-      pattern->setType(ErrorType::get(Context));
-      pattern->forEachVariable([&](VarDecl *var) {
-        // Don't change the type of a variable that we've been able to
-        // compute a type for.
-        if (var->hasType() && !var->getType()->is<ErrorType>())
-          return;
-
-        var->overwriteType(ErrorType::get(Context));
-        var->setInvalid();
-      });
-    }
-  }
+   }
 
   PBD->setInitializerChecked();
   return hadError;
@@ -1527,19 +1531,61 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
   bool hadError = false;
   bool hadAnyFalsable = false;
   for (auto &elt : cond) {
-    if (auto E = elt.getCondition()) {
+    if (auto E = elt.getConditionOrNull()) {
       hadError |= typeCheckCondition(E, dc);
       elt.setCondition(E);
       hadAnyFalsable = true;
-    } else {
-      auto PBD = elt.getBinding();
-      assert(PBD && "Unknown kind of condition");
-      typeCheckDecl(PBD, false);
-      hadError |= PBD->isInvalid();
-      hadAnyFalsable |= PBD->isRefutable();
+      continue;
     }
+
+    // This is cleanup goop run on the various paths where type checking of the
+    // pattern binding fails.
+    auto typeCheckPatternFailed = [&] {
+      hadError = true;
+      elt.getPattern()->setType(ErrorType::get(Context));
+      elt.getInitializer()->setType(ErrorType::get(Context));
+
+      elt.getPattern()->forEachVariable([&](VarDecl *var) {
+        // Don't change the type of a variable that we've been able to
+        // compute a type for.
+        if (var->hasType() && !var->getType()->is<ErrorType>())
+          return;
+        var->overwriteType(ErrorType::get(Context));
+        var->setInvalid();
+      });
+    };
+
+    // Resolve the pattern.
+    auto *pattern = resolvePattern(elt.getPattern(), dc,
+                                   /*isStmtCondition*/true);
+    if (!pattern) {
+      typeCheckPatternFailed();
+      continue;
+    }
+    elt.setPattern(pattern);
+
+    // Check the pattern, it allows unspecified types because the pattern can
+    // provide type information.
+    TypeResolutionOptions options = TR_InExpression;
+    options |= TR_AllowUnspecifiedTypes;
+    options |= TR_AllowUnboundGenerics;
+    if (typeCheckPattern(pattern, dc, options)) {
+      typeCheckPatternFailed();
+      continue;
+    }
+
+    // If the pattern didn't get a type, it's because we ran into some
+    // unknown types along the way. We'll need to check the initializer.
+    auto init = elt.getInitializer();
+    if (typeCheckBinding(pattern, init, dc)) {
+      hadError = true;
+      continue;
+    }
+    elt.setPattern(pattern);
+    elt.setInitializer(init);
+    hadAnyFalsable |= pattern->isRefutablePattern();
   }
-  
+
   
   // If the binding is not refutable, and there *is* an else, reject it as
   // unreachable.

@@ -763,17 +763,24 @@ public:
     return P;
   }
   
-  bool doIt(StmtCondition C) {
+  bool doIt(const StmtCondition &C) {
     for (auto &elt : C) {
-      if (auto E = elt.getCondition()) {
+      if (auto E = elt.getConditionOrNull()) {
         // Walk an expression condition normally.
         E = doIt(E);
         if (!E)
           return true;
         elt.setCondition(E);
-      } else if (auto CB = elt.getBinding()) {
-        doIt(CB);
+        continue;
       }
+
+      auto *P = doIt(elt.getPattern());
+      if (!P) return true;
+      elt.setPattern(P);
+
+      auto *I = doIt(elt.getInitializer());
+      if (!I) return true;
+      elt.setInitializer(I);
     }
     
     return false;
