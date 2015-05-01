@@ -1188,9 +1188,6 @@ public:
   
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
-  
-  /// Parse a version comparison operator. Returns true on error.
-  bool parseVersionComparison(VersionComparison &Comparison, SourceLoc &OpLoc);
 };
 
 } // end namespace swift

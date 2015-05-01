@@ -1172,8 +1172,7 @@ ERROR(avail_query_expected_condition,parsing,PointsToFirstBadToken,
       "expected availability condition", ())
 ERROR(avail_query_expected_platform_name,parsing,PointsToFirstBadToken,
       "expected platform name", ())
-ERROR(avail_query_config_expected_comparison,parsing,
-      none,"expected version comparison", ())
+
 ERROR(avail_query_expected_version_number,parsing,PointsToFirstBadToken,
       "expected version number", ())
 ERROR(avail_query_expected_rparen,parsing,PointsToFirstBadToken,
@@ -1185,6 +1184,8 @@ ERROR(avail_query_unrecognized_platform_name,parsing,
 ERROR(avail_query_disallowed_operator,parsing, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))
 
+ERROR(avail_query_version_comparison_not_needed,parsing,
+      none,"version comparison not needed", ())
 
 
 #ifndef DIAG_NO_UNDEF

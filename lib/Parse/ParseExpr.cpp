@@ -2373,11 +2373,10 @@ Parser::parseVersionConstraintSpec() {
     return nullptr;
   }
 
-  VersionComparison Comparison;
-  SourceLoc ComparisonLoc;
-
-  if (parseVersionComparison(Comparison, ComparisonLoc)) {
-    return nullptr;
+  if (Tok.isBinaryOperator() && Tok.getText() == ">=") {
+    diagnose(Tok, diag::avail_query_version_comparison_not_needed)
+        .fixItRemove(Tok.getLoc());
+    consumeToken();
   }
 
   clang::VersionTuple Version;
@@ -2398,33 +2397,5 @@ Parser::parseVersionConstraintSpec() {
   }
 
   return makeParserResult(new (Context) VersionConstraintAvailabilitySpec(
-      Platform.getValue(), PlatformLoc, Comparison, ComparisonLoc, Version,
-      VersionRange));
-}
-
-bool Parser::parseVersionComparison(VersionComparison &Comparison,
-                                    SourceLoc &OpLoc) {
-  if (!Tok.isBinaryOperator()) {
-    diagnose(Tok, diag::avail_query_config_expected_comparison);
-    return true;
-  }
-
-  // For the moment, we only handle greater-than-or-equal comparisons. We will
-  // extend this to additional comparison operators in the future.
-  Optional<VersionComparison> ParsedComparison =
-      llvm::StringSwitch<Optional<VersionComparison>>(Tok.getText())
-          .Case(">=", VersionComparison::GreaterThanEqual)
-          .Default(None);
-
-  if (!ParsedComparison.hasValue()) {
-    diagnose(Tok, diag::avail_query_config_expected_comparison);
-    return true;
-  }
-
-  Comparison = ParsedComparison.getValue();
-
-  OpLoc = Tok.getLoc();
-  consumeToken();
-
-  return false;
+      Platform.getValue(), PlatformLoc, Version, VersionRange));
 }

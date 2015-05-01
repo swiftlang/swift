@@ -20,7 +20,7 @@ let _ = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0)
 let _ = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0)
 
 // QOS_CLASS_DEFAULT is not always available
-if #available(iOS >= 8.0, OSX >= 10.10, *) {
+if #available(iOS 8.0, OSX 10.10, *) {
   let _ = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0)
 }
 

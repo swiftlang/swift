@@ -1213,10 +1213,7 @@ private:
     }
 
     auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
-    switch (VersionSpec->getComparison()) {
-    case VersionComparison::GreaterThanEqual:
-      return VersionRange::allGTE(VersionSpec->getVersion());
-    }
+    return VersionRange::allGTE(VersionSpec->getVersion());
   }
   
   virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1876,7 +1873,7 @@ static void fixAvailabilityByAddingVersionCheck(
     PlatformKind Target = targetPlatform(TC.getLangOpts());
 
     Out << "if #available(" << platformString(Target)
-        << " >= " << RequiredRange.getLowerEndpoint().getAsString()
+        << " " << RequiredRange.getLowerEndpoint().getAsString()
         << ", *) {\n";
 
     Out << OriginalIndent << ExtraIndent << GuardedText << "\n";

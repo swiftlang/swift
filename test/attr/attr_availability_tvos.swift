@@ -53,24 +53,24 @@ func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn8_0) { }
 @availability(tvOS, introduced=9.2)
 func functionIntroducedOntvOS9_2() { }
 
-if #available(iOS >= 9.3, *) {
+if #available(iOS 9.3, *) {
   functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}}
       // expected-note@-1 {{guard with version check}}
 }
 
-if #available(iOS >= 9.3, tvOS >= 9.1, *) {
+if #available(iOS 9.3, tvOS 9.1, *) {
   functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}}
       // expected-note@-1 {{guard with version check}}
 }
 
-if #available(iOS >= 9.1, tvOS >= 9.2, *) {
+if #available(iOS 9.1, tvOS 9.2, *) {
   functionIntroducedOntvOS9_2()
 }
 
-if #available(iOS >= 8.0, tvOS >= 9.2, *) {
+if #available(iOS 8.0, tvOS 9.2, *) {
 }
 
-if #available(iOS >= 9.2, tvOS >= 8.0, *) { // expected-warning {{unnecessary check for 'tvOS'; minimum deployment target ensures guard will always be true}}
+if #available(iOS 9.2, tvOS 8.0, *) { // expected-warning {{unnecessary check for 'tvOS'; minimum deployment target ensures guard will always be true}}
 }
 
 

@@ -38,13 +38,6 @@ void *AvailabilitySpec::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-StringRef VersionConstraintAvailabilitySpec::getComparisonAsString() const {
-  switch (getComparison()) {
-  case VersionComparison::GreaterThanEqual:
-    return ">=";
-  }
-  llvm_unreachable("bad VersionComparison");
-}
 
 SourceRange VersionConstraintAvailabilitySpec::getSourceRange() const {
   return SourceRange(PlatformLoc, VersionSrcRange.End);
@@ -54,7 +47,6 @@ void VersionConstraintAvailabilitySpec::print(raw_ostream &OS,
                                               unsigned Indent) const {
   OS.indent(Indent) << '(' << "version_constraint_availability_spec"
                     << " platform='" << platformString(getPlatform()) << "'"
-                    << " comparison='" << getComparisonAsString() << "'"
                     << " version='" << getVersion() << "'"
                     << ')';
 }

@@ -137,7 +137,7 @@ import Foundation
 func isOSAtLeast(major: Int, _ minor: Int, patch: Int = 0) -> Bool {
   let vers = (majorVersion: major, minorVersion: minor, patchVersion: patch)
   // isOperatingSystemAtLeastVersion() is unavailable on some OS versions.
-  if #available(iOS >= 8.0, OSX >= 10.10, *) {
+  if #available(iOS 8.0, OSX 10.10, *) {
     let procInfo: AnyObject = NSProcessInfo.processInfo()
     return procInfo.isOperatingSystemAtLeastVersion(
                     NSOperatingSystemVersion(vers)

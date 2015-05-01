@@ -28,7 +28,7 @@ class ASTContext;
 enum class VersionComparison { GreaterThanEqual };
 
 enum class AvailabilitySpecKind {
-    /// A version constraint of the form PlatformName >= X.Y.Z
+    /// A version constraint of the form PlatformName X.Y.Z
     VersionConstraint,
 
     /// A wildcard constraint, spelled '*', that is be equivalent
@@ -61,34 +61,22 @@ class VersionConstraintAvailabilitySpec : public AvailabilitySpec {
   PlatformKind Platform;
   SourceLoc PlatformLoc;
 
-  VersionComparison Comparison;
-  SourceLoc ComparisonLoc;
-
   clang::VersionTuple Version;
   SourceRange VersionSrcRange;
 
 public:
   VersionConstraintAvailabilitySpec(PlatformKind Platform,
                                     SourceLoc PlatformLoc,
-                                    VersionComparison Comparison,
-                                    SourceLoc ComparisonLoc,
                                     clang::VersionTuple Version,
                                     SourceRange VersionSrcRange)
       : AvailabilitySpec(AvailabilitySpecKind::VersionConstraint),
         Platform(Platform),
-        PlatformLoc(PlatformLoc), Comparison(Comparison),
-        ComparisonLoc(ComparisonLoc), Version(Version),
+        PlatformLoc(PlatformLoc), Version(Version),
         VersionSrcRange(VersionSrcRange) {}
 
   /// The required platform.
   PlatformKind getPlatform() const { return Platform; }
   SourceLoc getPlatformLoc() const { return PlatformLoc; }
-
-  /// The comparison operator for the specified version.
-  VersionComparison getComparison() const { return Comparison; }
-  SourceLoc getConstraintLoc() const { return ComparisonLoc; }
-
-  StringRef getComparisonAsString() const;
   
   // The platform version to compare against.
   clang::VersionTuple getVersion() const { return Version; }
