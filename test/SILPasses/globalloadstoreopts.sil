@@ -769,7 +769,7 @@ bb0(%0: $*A):
 //
 // CHECK-LABEL: sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) () -> () {
 // CHECK-NOT: load
-// CHECK-NOT: store
+// CHECK-NOT: {{%.*}} = store
 sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Optional<Builtin.Int32>
@@ -781,4 +781,55 @@ bb0:
   dealloc_stack %0#0 : $*@local_storage Optional<Builtin.Int32>
   %9999 = tuple()
   return %9999 : $()
+}
+
+class Empty {}
+struct HoldsRef { @sil_stored var c: Empty }
+
+sil @mutator : $@convention(method) (@inout HoldsRef) -> ()
+
+// Ensure we don't forward the stored value from the switch_enum
+// branches past the inout appearance of the stored-to location.
+// CHECK-LABEL: sil @bad_store_forward
+sil @bad_store_forward : $@convention(thin) (@guaranteed Optional<HoldsRef>) -> () {
+// CHECK: bb0
+bb0(%0 : $Optional<HoldsRef>):
+// CHECK: [[LOC:%.*]] = alloc_stack
+  %1 = alloc_stack $HoldsRef
+  switch_enum %0 : $Optional<HoldsRef>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
+
+// CHECK: bb1([[ARG:%.*]] : ${{.*}}):
+bb1(%3 : $HoldsRef):
+// CHECK: store [[ARG]] to [[LOC]]#1
+  store %3 to %1#1 : $*HoldsRef
+// CHECK-NOT: br bb3(
+  br bb3
+
+// CHECK-NOT: bb2(
+bb2:
+  %6 = alloc_ref $Empty
+// CHECK: [[STRUCT:%.*]] = struct
+  %7 = struct $HoldsRef (%6 : $Empty)
+// CHECK: store [[STRUCT]] to [[LOC]]#1
+  store %7 to %1#1 : $*HoldsRef
+// CHECK-NOT: br bb3(
+  br bb3
+
+// CHECK-NOT: bb3(
+// CHECK: bb3
+bb3:
+// CHECK: [[FNREF:%.*]] = function_ref
+  %10 = function_ref @mutator : $@convention(method) (@inout HoldsRef) -> ()
+  retain_value %0 : $Optional<HoldsRef>
+// CHECK: apply [[FNREF]]([[LOC]]#1)
+  %12 = apply %10(%1#1) : $@convention(method) (@inout HoldsRef) -> ()
+// CHECK: [[ELEM:%.*]] = struct_element_addr [[LOC]]#1
+  %13 = struct_element_addr %1#1 : $*HoldsRef, #HoldsRef.c
+// CHECK: [[REF:%.*]] = load [[ELEM]]
+  %14 = load %13 : $*Empty
+// CHECK: strong_release [[REF]]
+  strong_release %14 : $Empty
+  %16 = tuple ()
+  dealloc_stack %1#0 : $*@local_storage HoldsRef
+  return %16 : $()
 }

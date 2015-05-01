@@ -832,6 +832,16 @@ invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst,
   }
 }
 
+static bool WriteAliasesStoreInList(AliasAnalysis *AA,
+                                    SILInstruction *Writer,
+                                    ArrayRef<StoreInst *> Stores) {
+  for (auto *S : Stores)
+    if (LSValue(S).aliasingWrite(AA, Writer))
+      return true;
+
+  return false;
+}
+
 void
 LSBBForwarder::
 invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
@@ -840,6 +850,10 @@ invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
   llvm::SmallVector<SILValue, 4> InvalidatedStoreList;
   for (auto &P : Stores)
     if (P.second.aliasingWrite(AA, Inst))
+      InvalidatedStoreList.push_back(P.first);
+
+  for (auto &P : StoreMap)
+    if (WriteAliasesStoreInList(AA, Inst, P.second))
       InvalidatedStoreList.push_back(P.first);
 
   for (SILValue SIOp : InvalidatedStoreList) {
