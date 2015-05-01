@@ -1015,12 +1015,20 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
 static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
                                                          CanType type,
                                                  ForDefinition_t shouldDefine) {
+  // If we already cached the metadata, use it.
+  if (auto local = IGF.tryGetLocalTypeData(type, LocalTypeData::Metatype))
+    return local;
+  
   llvm::Constant *accessor =
     getTypeMetadataAccessFunction(IGF.IGM, type, shouldDefine);
   llvm::CallInst *call = IGF.Builder.CreateCall(accessor);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotAccessMemory();
   call->setDoesNotThrow();
+  
+  // Save the metadata for future lookups.
+  IGF.setScopedLocalTypeData(type, call);
+  
   return call;
 }
 

@@ -38,8 +38,7 @@ func remapToSubstitutedMetatypes(x: Foo, y: Bar)
 // CHECK: define hidden void @_TF17generic_metatypes23remapToGenericMetatypesFT_T_()
 func remapToGenericMetatypes() {
   // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
-  // CHECK: [[T1:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
-  // CHECK: call void @_TF17generic_metatypes16genericMetatypes{{.*}}(%swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type* [[T1]])
+  // CHECK: call void @_TF17generic_metatypes16genericMetatypes{{.*}}(%swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type* [[T0]], %swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type* [[T0]])
   genericMetatypes(Foo.self, Bar.self)
 }
 
@@ -127,15 +126,13 @@ func makeGenericMetatypes() {
 
 // CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes8FourArgsVS_3FooCS_3BarS1_S2__() [[NOUNWIND_READNONE]]
 // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
-// CHECK: [[T1:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK: [[T2:%.*]] = bitcast %swift.type* [[T0]] to i8*
-// CHECK: [[T3:%.*]] = bitcast %swift.type* [[T1]] to i8*
+// CHECK: [[T3:%.*]] = bitcast %swift.type* [[T0]] to i8*
 // CHECK: call %swift.type* @swift_getGenericMetadata4(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes8FourArgs {{.*}}, i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* [[T2]], i8* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, i8* [[T3]]) [[NOUNWIND_READNONE]]
 
 // CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes8FiveArgsVS_3FooCS_3BarS1_S2_S1__() [[NOUNWIND_READNONE]]
 // CHECK:   [[BUFFER:%.*]] = alloca [[BUFFER_T:.*]], align
 // CHECK:   [[BAR0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
-// CHECK:   [[BAR1:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 0
 // CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
 // CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 1
@@ -143,7 +140,7 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 2
 // CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
 // CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 3
-// CHECK:   store %swift.type* [[BAR1]], %swift.type** [[T0]]
+// CHECK:   store %swift.type* [[BAR0]], %swift.type** [[T0]]
 // CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 4
 // CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
 
