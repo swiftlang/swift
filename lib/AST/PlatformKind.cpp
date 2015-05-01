@@ -70,9 +70,10 @@ bool swift::isPlatformActive(PlatformKind Platform, LangOptions &LangOpts) {
       return LangOpts.Target.isMacOSX();
     case PlatformKind::iOS:
     case PlatformKind::iOSApplicationExtension:
+      return LangOpts.Target.isiOS() && !LangOpts.Target.isTvOS();
     case PlatformKind::tvOS:
     case PlatformKind::tvOSApplicationExtension:
-      return LangOpts.Target.isiOS();
+      return LangOpts.Target.isTvOS();
     case PlatformKind::watchOS:
     case PlatformKind::watchOSApplicationExtension:
       return LangOpts.Target.isWatchOS();
@@ -88,6 +89,15 @@ PlatformKind swift::targetPlatform(LangOptions &LangOpts) {
                 ? PlatformKind::OSXApplicationExtension
                 : PlatformKind::OSX);
   }
+
+  if (LangOpts.Target.isTvOS()) {
+    return (LangOpts.EnableAppExtensionRestrictions
+            ? PlatformKind::tvOSApplicationExtension
+            : PlatformKind::tvOS);
+  }
+
+  // We need to handle watchOS here, as well.
+  // rdar://problem/20774229
 
   if (LangOpts.Target.isiOS()) {
     return (LangOpts.EnableAppExtensionRestrictions

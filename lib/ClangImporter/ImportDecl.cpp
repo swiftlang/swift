@@ -5268,13 +5268,18 @@ void ClangImporter::Implementation::importAttributes(
         continue;
 
       // Translate from Clang platform strings to known Swift platforms.
+      // We need to handle watchOS here, as well.
+      // rdar://problem/20774229
       auto platformK =
         llvm::StringSwitch<Optional<PlatformKind>>(Platform)
           .Case("ios", PlatformKind::iOS)
           .Case("macosx", PlatformKind::OSX)
+          .Case("tvos", PlatformKind::tvOS)
           .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
           .Case("macosx_app_extension",
                 PlatformKind::OSXApplicationExtension)
+          .Case("tvos_app_extension",
+                PlatformKind::tvOSApplicationExtension)
           .Default(None);
       if (!platformK)
         continue;

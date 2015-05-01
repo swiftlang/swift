@@ -795,7 +795,10 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   // Add filters to determine if a Clang availability attribute
   // applies in Swift, and if so, what is the cutoff for deprecated
   // declarations that are now considered unavailable in Swift.
-  if (ctx.LangOpts.Target.isiOS()) {
+
+  // We need to handle watchOS here, as well.
+  // rdar://problem/20774229
+  if (ctx.LangOpts.Target.isiOS() && !ctx.LangOpts.Target.isTvOS()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
         [](StringRef Platform) { return Platform == "ios"; };
@@ -805,6 +808,23 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
         [](StringRef Platform) {
           return Platform == "ios" ||
                  Platform == "ios_app_extension"; };
+    }
+    // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
+    DeprecatedAsUnavailableFilter =
+      [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
+    DeprecatedAsUnavailableMessage =
+      "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+  }
+  else if (ctx.LangOpts.Target.isTvOS()) {
+    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
+      PlatformAvailabilityFilter =
+        [](StringRef Platform) { return Platform == "tvos"; };
+    }
+    else {
+      PlatformAvailabilityFilter =
+        [](StringRef Platform) {
+          return Platform == "tvos" ||
+                 Platform == "tvos_app_extension"; };
     }
     // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
     DeprecatedAsUnavailableFilter =

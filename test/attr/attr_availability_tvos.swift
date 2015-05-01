@@ -47,3 +47,48 @@ class DeprecatedClassIn8_0 { }
 
 // Elements deprecated later than the minimum deployment target (which is 9.0, in this case) should not generate warnings
 func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn8_0) { }
+
+// Treat tvOS as distinct from iOS in availability queries
+
+@availability(tvOS, introduced=9.2)
+func functionIntroducedOntvOS9_2() { }
+
+if #available(iOS >= 9.3, *) {
+  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}}
+      // expected-note@-1 {{guard with version check}}
+}
+
+if #available(iOS >= 9.3, tvOS >= 9.1, *) {
+  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}}
+      // expected-note@-1 {{guard with version check}}
+}
+
+if #available(iOS >= 9.1, tvOS >= 9.2, *) {
+  functionIntroducedOntvOS9_2()
+}
+
+if #available(iOS >= 8.0, tvOS >= 9.2, *) {
+}
+
+if #available(iOS >= 9.2, tvOS >= 8.0, *) { // expected-warning {{unnecessary check for 'tvOS'; minimum deployment target ensures guard will always be true}}
+}
+
+
+// Swift-originated iOS availability attributes should not be transcribed to tvOS
+
+@availability(iOS, unavailable)
+func swiftOriginatedFunctionUnavailableOnIOS() { }
+
+@availability(iOS, introduced=6.0, deprecated=9.0)
+func swiftOriginatedFunctionDeprecatedOnIOS() { }
+
+@availability(iOS, introduced=10.0)
+func swiftOriginatedFunctionPotentiallyUnavailableOnIOS() { }
+
+func useSwiftOriginatedFunctions() {
+  // We do not expect diagnostics here because iOS availability attributes coming from
+  // Swift should not be transcribed to tvOS.
+  swiftOriginatedFunctionUnavailableOnIOS()
+  swiftOriginatedFunctionDeprecatedOnIOS()
+  swiftOriginatedFunctionPotentiallyUnavailableOnIOS()
+}
