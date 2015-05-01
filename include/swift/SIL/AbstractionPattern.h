@@ -57,19 +57,32 @@ class AbstractionPattern {
     /// type.  ClangType is valid and is a function type, a function
     /// pointer type, or a block pointer type.
     ClangFunctionParamTupleType,
-    /// A type reference with an Objective-C method.  OrigType is
-    /// valid and is a function type.  ObjCMethod is valid.
-    /// OtherData is an encoded foreign error index.
+    /// The curried imported type of an Objective-C method (that is,
+    /// 'Self -> Input -> Result').  OrigType is valid and is a function
+    /// type.  ObjCMethod is valid.  OtherData is an encoded foreign
+    /// error index.
+    CurriedObjCMethodType,
+    /// The partially-applied curried imported type of an Objective-C
+    /// method (that is, 'Input -> Result').  OrigType is valid and is a
+    /// function type.  ObjCMethod is valid.  OtherData is an encoded
+    /// foreign error index.
+    PartialCurriedObjCMethodType,
+    /// The uncurried imported type of an Objective-C method (that is,
+    /// '(Input, Self) -> Result').  OrigType is valid and is a function
+    /// type.  ObjCMethod is valid.  OtherData is an encoded foreign
+    /// error index.
     ObjCMethodType,
     /// A reference to the uncurried parameters of a Clang Objective-C
-    /// method type, imported as a tuple type.  OrigType is valid and
-    /// is a tuple type with two elements.  ObjCMethod is valid.
-    /// OtherData is an encoded foreign error index.
+    /// method type, imported as a tuple type (that is, '(Input,
+    /// Self').  OrigType is valid and is a tuple type with two
+    /// elements.  ObjCMethod is valid.  OtherData is an encoded
+    /// foreign error index.
     ObjCMethodParamTupleType,
     /// A reference to the formal parameters of a Clang Objective-C
-    /// method type, imported as a tuple type.  OrigType is valid and
-    /// is a tuple type.  ObjCMethod is valid.
-    /// OtherData is an encoded foreign error index.
+    /// method type when they were imported as a tuple type (that is,
+    /// 'Input', if it's a tuple type).  OrigType is valid and is a
+    /// tuple type.  ObjCMethod is valid.  OtherData is an encoded
+    /// foreign error index.
     ObjCMethodFormalParamTupleType,
   };
 
@@ -153,7 +166,9 @@ class AbstractionPattern {
   }
 
   bool hasStoredObjCMethod() const {
-    return (getKind() == Kind::ObjCMethodType ||
+    return (getKind() == Kind::CurriedObjCMethodType ||
+            getKind() == Kind::PartialCurriedObjCMethodType ||
+            getKind() == Kind::ObjCMethodType ||
             getKind() == Kind::ObjCMethodParamTupleType ||
             getKind() == Kind::ObjCMethodFormalParamTupleType);
   }
@@ -244,13 +259,48 @@ private:
   }
 
 public:
+  /// Return an abstraction pattern for the curried type of an
+  /// Objective-C method.
+  static AbstractionPattern
+  getCurriedObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
+                       const Optional<ForeignErrorConvention> &foreignError);
+
+private:
+  /// Return an abstraction pattern for the curried type of an
+  /// Objective-C method.
+  static AbstractionPattern
+  getCurriedObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
+                       EncodedForeignErrorInfo errorInfo) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initObjCMethod(nullptr, origType, method,
+                           Kind::CurriedObjCMethodType, errorInfo);
+    return pattern;
+  }
+
+  /// Return an abstraction pattern for the partially-applied curried
+  /// type of an Objective-C method.
+  static AbstractionPattern
+  getPartialCurriedObjCMethod(CanGenericSignature signature,
+                              CanType origType,
+                              const clang::ObjCMethodDecl *method,
+                              EncodedForeignErrorInfo errorInfo) {
+    assert(isa<AnyFunctionType>(origType));
+    AbstractionPattern pattern;
+    pattern.initObjCMethod(signature, origType, method,
+                           Kind::PartialCurriedObjCMethodType, errorInfo);
+    return pattern;
+  }
+
+public:
   /// Return an abstraction pattern for the type of an Objective-C method.
   static AbstractionPattern
   getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
                 const Optional<ForeignErrorConvention> &foreignError);
 
 private:
-  /// Return an abstraction pattern for the type of an Objective-C method.
+  /// Return an abstraction pattern for the uncurried type of an
+  /// Objective-C method.
   static AbstractionPattern
   getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
                 EncodedForeignErrorInfo errorInfo) {
@@ -274,6 +324,14 @@ private:
                            Kind::ObjCMethodParamTupleType, errorInfo);
     return pattern;
   }
+
+  /// Return a pattern correspond to the 'self' parameter of the
+  /// current Objective-C method.
+  AbstractionPattern getObjCMethodSelfPattern(CanType paramType) const;
+
+  /// Return a pattern correspond to the formal parameters of the
+  /// current Objective-C method.
+  AbstractionPattern getObjCMethodFormalParamPattern(CanType paramType) const;
 
   /// Return an abstraction pattern for a tuple representing the
   /// formal parameters to an Objective-C method.
@@ -335,6 +393,8 @@ public:
       llvm_unreachable("open-coded tuple pattern has no type");
     case Kind::ClangType:
     case Kind::ClangFunctionParamTupleType:
+    case Kind::CurriedObjCMethodType:
+    case Kind::PartialCurriedObjCMethodType:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
@@ -359,6 +419,8 @@ public:
       return false;
     case Kind::ClangType:
     case Kind::ClangFunctionParamTupleType:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::CurriedObjCMethodType:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
@@ -381,7 +443,8 @@ public:
   /// Return whether this abstraction pattern represents an
   /// Objective-C method.  If so, it is legal to call getObjCMethod().
   bool isObjCMethod() const {
-    return (getKind() == Kind::ObjCMethodType);
+    return (getKind() == Kind::ObjCMethodType ||
+            getKind() == Kind::CurriedObjCMethodType);
   }
 
   const clang::ObjCMethodDecl *getObjCMethod() const {
@@ -408,6 +471,8 @@ public:
     case Kind::ClangType:
     case Kind::Type:
       return false;
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::CurriedObjCMethodType:
     case Kind::ObjCMethodType: {
       auto errorInfo = getEncodedForeignErrorInfo();
       return (errorInfo.hasValue() && errorInfo.stripsResultOptionality());
@@ -428,6 +493,8 @@ public:
       return typename CanTypeWrapperTraits<TYPE>::type();
     case Kind::ClangType:
     case Kind::ClangFunctionParamTupleType:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::CurriedObjCMethodType:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
@@ -450,6 +517,8 @@ public:
     case Kind::Tuple:
     case Kind::ClangType:
     case Kind::ClangFunctionParamTupleType:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::CurriedObjCMethodType:
     case Kind::ObjCMethodType:
     case Kind::ObjCMethodParamTupleType:
     case Kind::ObjCMethodFormalParamTupleType:
@@ -472,6 +541,8 @@ public:
     case Kind::Invalid:
       llvm_unreachable("querying invalid abstraction pattern!");
     case Kind::Opaque:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::CurriedObjCMethodType:
     case Kind::ObjCMethodType:
       return false;
     case Kind::Tuple:
@@ -491,6 +562,8 @@ public:
     case Kind::Invalid:
       llvm_unreachable("querying invalid abstraction pattern!");
     case Kind::Opaque:
+    case Kind::PartialCurriedObjCMethodType:
+    case Kind::CurriedObjCMethodType:
     case Kind::ObjCMethodType:
       llvm_unreachable("pattern is not a tuple");      
     case Kind::Tuple:

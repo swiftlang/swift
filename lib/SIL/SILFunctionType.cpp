@@ -1841,25 +1841,6 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   llvm_unreachable("bad calling convention");
 }
 
-static CanType getUncurriedObjCMethodType(ASTContext &ctx,
-                                          CanAnyFunctionType outerFn,
-                                          AnyFunctionType::ExtInfo extInfo) {
-  auto innerFn = cast<AnyFunctionType>(outerFn.getResult());
-
-  TupleTypeElt elts[] = { innerFn.getInput(), outerFn.getInput() };
-  auto input = CanType(TupleType::get(elts, ctx));
-  auto result = innerFn.getResult();
-
-  if (auto genericFn = dyn_cast<GenericFunctionType>(outerFn)) {
-    return CanGenericFunctionType::get(genericFn.getGenericSignature(),
-                                       input, result, extInfo);
-  }
-
-  // This is just going into an abstraction pattern and doesn't
-  // actually need to preserve a GenericParamList.
-  return CanFunctionType::get(input, result, extInfo);
-}
-
 static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   switch (declRef.kind) {
   case SILDeclRef::Kind::Func:
@@ -1897,12 +1878,12 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
       // Don't implicitly turn non-optional results to optional if
       // we're going to apply a foreign error convention that checks
       // for nil results.
-      auto foreignError = bridgedFn->getForeignErrorConvention();
       if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
         assert(uncurryLevel == 1 && "getting curried ObjC method type?");
-        auto methodType = getUncurriedObjCMethodType(Context, fnType, extInfo);
+        auto foreignError = bridgedFn->getForeignErrorConvention();
         bridgingFnPattern =
-          AbstractionPattern::getObjCMethod(methodType, method, foreignError);
+          AbstractionPattern::getCurriedObjCMethod(fnType, method,
+                                                   foreignError);
       } else if (auto value = dyn_cast<clang::ValueDecl>(clangDecl)) {
         bridgingFnPattern =
           AbstractionPattern(fnType, value->getType().getTypePtr());
@@ -1979,17 +1960,19 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   case SILFunctionTypeRepresentation::ObjCMethod: {
     assert(inputs.size() == 2);
     // The "self" parameter should not get bridged unless it's a metatype.
-    unsigned skip = 1;
-    if (inputs.front().getType()->is<AnyMetatypeType>())
-      skip = 0;
+    if (inputs.front().getType()->is<AnyMetatypeType>()) {
+      auto inputPattern = bridgingFnPattern.getFunctionInputType();
+      inputs[0] = inputs[0].getWithType(
+        getBridgedInputType(rep, inputPattern, CanType(inputs[0].getType())));
+    }
 
-    auto inputPattern = bridgingFnPattern.getFunctionInputType();
-    for (unsigned i = skip; i != 2; ++i)
-      inputs[i] = inputs[i].getWithType(getBridgedInputType(rep,
-                                   inputPattern.getTupleElementType(1 - i),
-                                   CanType(inputs[i].getType())));
+    auto partialFnPattern = bridgingFnPattern.getFunctionResultType();
+    inputs[1] = inputs[1].getWithType(
+        getBridgedInputType(rep, partialFnPattern.getFunctionInputType(),
+                            CanType(inputs[1].getType())));
+
     resultType = getBridgedResultType(rep,
-                                   bridgingFnPattern.getFunctionResultType(),
+                                   partialFnPattern.getFunctionResultType(),
                                    resultType, suppressOptionalResult);
     break;
   }
