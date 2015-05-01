@@ -1774,9 +1774,9 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
                                                patch._builtinWordValue))
   }
 
-// _stdlib_isOSVersionAtLeast is broken for AppleTV and
+// _stdlib_isOSVersionAtLeast is broken for
 // watchOS. rdar://problem/20234735
-#if os(OSX) || os(iOS)
+#if os(OSX) || os(iOS) || os(tvOS)
   // This test assumes that no version component on an OS we test upon
   // will ever be greater than 1066 and that every major version will always
   // be greater than 1.
