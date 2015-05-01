@@ -79,9 +79,9 @@ public protocol CustomDebugStringConvertible {
   var debugDescription: String { get }
 }
 
-@availability(*, deprecated, renamed="CustomDebugStringConvertible")
+@availability(*, unavailable, renamed="CustomDebugStringConvertible")
 public typealias DebugPrintable = CustomDebugStringConvertible
-@availability(*, deprecated, renamed="CustomStringConvertible")
+@availability(*, unavailable, renamed="CustomStringConvertible")
 public typealias Printable = CustomStringConvertible
 
 //===----------------------------------------------------------------------===//
