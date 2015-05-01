@@ -9,8 +9,6 @@ class NSObject { }
 class BridgedClass : NSObject { 
 }
 
-class SubclassOfBridgedClass : BridgedClass { }
-
 struct BridgedStruct : _ObjectiveCBridgeable {
   static func _isBridgedToObjectiveC() -> Bool {
     return true
@@ -69,17 +67,12 @@ func testBridgeDowncastSuperclass(obj: NSObject, objOpt: NSObject?,
 
 func testBridgeDowncastExact(obj: BridgedClass, objOpt: BridgedClass?,
                              objImplicitOpt: BridgedClass!) -> BridgedStruct? {
-  var s1Opt = obj as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass' to 'BridgedStruct' always succeeds}}
+  var s1Opt = obj as? BridgedStruct
   var s2Opt = objOpt as? BridgedStruct
-  var s3Opt = objImplicitOpt as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass!' to 'BridgedStruct' always succeeds}}
+  var s3Opt = objImplicitOpt as? BridgedStruct
 }
 
 func testExplicitBridging(var object: BridgedClass, var value: BridgedStruct) {
   object = value as BridgedClass
   value = object as BridgedStruct
-}
-
-func testBridgingFromSubclass(obj: SubclassOfBridgedClass) {
-  var s = obj as! BridgedStruct // expected-warning{{forced cast from 'SubclassOfBridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}}
-  var s = obj as BridgedStruct
 }
