@@ -772,23 +772,23 @@ StringTests.test("reserveCapacity") {
 }
 
 StringTests.test("toInt") {
-  expectEmpty("".toInt())
-  expectEmpty("+".toInt())
-  expectEmpty("-".toInt())
-  expectOptionalEqual(20, "+20".toInt())
-  expectOptionalEqual(0, "0".toInt())
-  expectOptionalEqual(-20, "-20".toInt())
-  expectEmpty("-cc20".toInt())
-  expectEmpty("  -20".toInt())
-  expectEmpty("  \t 20ddd".toInt())
+  expectEmpty(Int(""))
+  expectEmpty(Int("+"))
+  expectEmpty(Int("-"))
+  expectOptionalEqual(20, Int("+20"))
+  expectOptionalEqual(0, Int("0"))
+  expectOptionalEqual(-20, Int("-20"))
+  expectEmpty(Int("-cc20"))
+  expectEmpty(Int("  -20"))
+  expectEmpty(Int("  \t 20ddd"))
 
-  expectOptionalEqual(Int.min, "\(Int.min)".toInt())
-  expectOptionalEqual(Int.min + 1, "\(Int.min + 1)".toInt())
-  expectOptionalEqual(Int.max, "\(Int.max)".toInt())
-  expectOptionalEqual(Int.max - 1, "\(Int.max - 1)".toInt())
+  expectOptionalEqual(Int.min, Int("\(Int.min)"))
+  expectOptionalEqual(Int.min + 1, Int("\(Int.min + 1)"))
+  expectOptionalEqual(Int.max, Int("\(Int.max)"))
+  expectOptionalEqual(Int.max - 1, Int("\(Int.max - 1)"))
 
-  expectEmpty("\(Int.min)0".toInt())
-  expectEmpty("\(Int.max)0".toInt())
+  expectEmpty(Int("\(Int.min)0"))
+  expectEmpty(Int("\(Int.max)0"))
 
   // Make a String from an Int, mangle the String's characters,
   // then print if the new String is or is not still an Int.
@@ -799,7 +799,7 @@ StringTests.test("toInt") {
     var chars = Array(String(initialValue).utf8)
     modification(chars: &chars)
     var str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
-    expectEmpty(str.toInt())
+    expectEmpty(Int(str))
   }
 
   testConvertabilityOfStringWithModification(Int.min) {
@@ -813,10 +813,10 @@ StringTests.test("toInt") {
   // Test values lower than min.
   if true {
     let base = UInt(Int.max)
-    expectOptionalEqual(Int.min + 1, "-\(base)".toInt())
-    expectOptionalEqual(Int.min, "-\(base + 1)".toInt())
+    expectOptionalEqual(Int.min + 1, Int("-\(base)"))
+    expectOptionalEqual(Int.min, Int("-\(base + 1)"))
     for i in 2..<20 {
-      expectEmpty("-\(base + UInt(i))".toInt())
+      expectEmpty(Int("-\(base + UInt(i))"))
     }
   }
 
@@ -824,16 +824,16 @@ StringTests.test("toInt") {
   if true {
     let base = UInt(Int.max)
     for i in UInt(0)..<20 {
-      expectOptionalEqual(-Int(base - i) , "-\(base - i)".toInt())
+      expectOptionalEqual(-Int(base - i) , Int("-\(base - i)"))
     }
   }
 
   // Test values greater than max.
   if true {
     let base = UInt(Int.max)
-    expectOptionalEqual(Int.max, "\(base)".toInt())
+    expectOptionalEqual(Int.max, Int("\(base)"))
     for i in 1..<20 {
-      expectEmpty("\(base + UInt(i))".toInt())
+      expectEmpty(Int("\(base + UInt(i))"))
     }
   }
 
@@ -841,7 +841,7 @@ StringTests.test("toInt") {
   if true {
     let base = Int.max
     for i in 0..<20 {
-      expectOptionalEqual(base - i, "\(base - i)".toInt())
+      expectOptionalEqual(base - i, Int("\(base - i)"))
     }
   }
 }
