@@ -978,7 +978,8 @@ public:
                             Type type);
 
   /// Type-check an initialized variable pattern declaration.
-  bool typeCheckBinding(PatternBindingDecl *D, unsigned PatternEntry);
+  bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
+  bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
 
   /// Type-check a for-each loop's pattern binding and sequence together.
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);

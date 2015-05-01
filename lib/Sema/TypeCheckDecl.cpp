@@ -678,13 +678,11 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   pattern->forEachVariable([&](VarDecl *var) {
     // Don't change the type of a variable that we've been able to
     // compute a type for.
-    if (var->hasType()) {
-      if (var->getType()->is<ErrorType>())
-        var->setInvalid();
-    } else {
-      var->setType(ErrorType::get(ctx));
-      var->setInvalid();
-    }
+    if (var->hasType() && !var->getType()->is<ErrorType>())
+      return;
+
+    var->overwriteType(ErrorType::get(ctx));
+    var->setInvalid();
   });
 }
 
@@ -1440,15 +1438,10 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   // If the pattern didn't get a type, it's because we ran into some
   // unknown types along the way. We'll need to check the initializer.
-  if (!pattern->hasType()) {
-    if (tc.typeCheckBinding(binding, entryNumber)) {
-      setBoundVarsTypeError(binding->getPattern(entryNumber), tc.Context);
-      binding->setInvalid();
-      binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
+  if (!pattern->hasType())
+    if (tc.typeCheckPatternBinding(binding, entryNumber))
       return;
-    }
-  }
-  
+
   // If the pattern binding appears in a type or library file context, then
   // it must bind at least one variable.
   if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
@@ -2949,19 +2942,12 @@ public:
     if (PBD->isInvalid())
       return;
 
+    // If the initializers in the PBD aren't checked yet, do so now.
     if (!IsFirstPass && !PBD->isInitializerChecked()) {
-      bool HadError = false;
       for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-        if (PBD->getInit(i) && TC.typeCheckBinding(PBD, i)) {
-          PBD->setInvalid();
-          if (!PBD->getPattern(i)->hasType()) {
-            PBD->getPattern(i)->setType(ErrorType::get(TC.Context));
-            setBoundVarsTypeError(PBD->getPattern(i), TC.Context);
-            HadError = true;
-          }
-        }
+        if (PBD->getInit(i))
+          TC.typeCheckPatternBinding(PBD, i);
       }
-      if (HadError) return;
     }
 
     TC.checkDeclAttributesEarly(PBD);
@@ -2999,7 +2985,7 @@ public:
               // If we got a default initializer, install it and re-type-check it
               // to make sure it is properly coerced to the pattern type.
               PBD->setInit(i, defaultInit);
-              TC.typeCheckBinding(PBD, i);
+              TC.typeCheckPatternBinding(PBD, i);
             }
           }
         }

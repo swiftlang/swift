@@ -1101,16 +1101,13 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   return false;
 }
 
-bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
-                                   unsigned PatternEntry) {
+bool TypeChecker::typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC) {
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
-    /// The pattern binding declaration whose initializer we're checking.
-    PatternBindingDecl *Binding;
-    
-    /// The entry in the PatternList that we are checking.
-    unsigned PatternEntry;
+    Pattern *&pattern;
+    Expr *&initializer;
+    DeclContext *DC;
 
     /// The locator we're using.
     ConstraintLocator *Locator;
@@ -1119,15 +1116,15 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
     Type InitType;
     
   public:
-    explicit BindingListener(PatternBindingDecl *binding, unsigned entry)
-      : Binding(binding), PatternEntry(entry) { }
+    explicit BindingListener(Pattern *&pattern, Expr *&initializer,
+                             DeclContext *DC)
+      : pattern(pattern), initializer(initializer), DC(DC) { }
 
     virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
 
       // Collect constraints from the pattern.
-      auto pattern = Binding->getPattern(PatternEntry);
       InitType = cs.generateConstraints(pattern, Locator);
       if (!InitType)
         return true;
@@ -1137,8 +1134,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
                        InitType, Locator);
 
       // The expression has been pre-checked; save it in case we fail later.
-      Binding->setInit(PatternEntry, expr);
-
+      initializer = expr;
       return false;
     }
 
@@ -1161,56 +1157,61 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
       expr = tc.coerceToMaterializable(expr);
 
       // Apply the solution to the pattern as well.
-      Pattern *pattern = Binding->getPattern(PatternEntry);
       Type patternType = expr->getType();
       patternType = patternType->getWithoutDefaultArgs(tc.Context);
 
       TypeResolutionOptions options;
       options |= TR_OverrideType;
       options |= TR_InExpression;
-      if (tc.coercePatternToType(pattern, Binding->getDeclContext(),
-                                 patternType, options)) {
+      if (tc.coercePatternToType(pattern, DC, patternType, options)) {
         return nullptr;
       }
-      Binding->setPattern(PatternEntry, pattern);
-      Binding->setInit(PatternEntry, expr);
-      Binding->setInitializerChecked();
+      initializer = expr;
       return expr;
     }
   };
 
-  BindingListener listener(binding, PatternEntry);
-  Expr *init = binding->getInit(PatternEntry);
-  assert(init && "type-checking an uninitialized binding?");
+  assert(Init && "type-checking an uninitialized binding?");
+  BindingListener listener(P, Init, DC);
+
+  auto contextualType = P->hasType() ? P->getType() : Type();
+
+  // Type-check the initializer.
+  return typeCheckExpression(Init, DC, Type(),
+                             contextualType, /*discardedExpr=*/false,
+                             FreeTypeVariableBinding::Disallow,
+                             &listener);
+}
+
+bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
+                                          unsigned patternNumber) {
+
+  Pattern *pattern = PBD->getPattern(patternNumber);
+  Expr *init = PBD->getInit(patternNumber);
+
 
   // Enter an initializer context if necessary.
-  DeclContext *DC = binding->getDeclContext();
   PatternBindingInitializer *initContext = nullptr;
+  DeclContext *DC = PBD->getDeclContext();
   bool initContextIsNew = false;
   if (!DC->isLocalContext()) {
     // Check for an existing context created by the parser.
     initContext = cast_or_null<PatternBindingInitializer>(
-                                       init->findExistingInitializerContext());
+                              init->findExistingInitializerContext());
 
     // If we didn't find one, create it.
     if (!initContext) {
       initContext = Context.createPatternBindingContext(DC);
-      initContext->setBinding(binding);
+      initContext->setBinding(PBD);
       initContextIsNew = true;
     }
     DC = initContext;
   }
-  
-  auto pattern = binding->getPattern(PatternEntry);
-  auto contextualType = pattern->hasType() ?
-                            pattern->getType() :
-                            Type();
 
-  // Type-check the initializer.
-  bool hadError = typeCheckExpression(init, DC, Type(),
-                                      contextualType, /*discardedExpr=*/false,
-                                      FreeTypeVariableBinding::Disallow,
-                                      &listener);
+  bool hadError = typeCheckBinding(pattern, init, DC);
+  PBD->setPattern(patternNumber, pattern);
+  PBD->setInit(patternNumber, init);
+
 
   // If we entered an initializer context, contextualize any
   // auto-closures we might have created.
@@ -1221,15 +1222,32 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding,
     }
 
     bool hasClosures =
-      (!hadError && contextualizeInitializer(initContext, init));
+      !hadError && contextualizeInitializer(initContext, init);
 
     // If we created a fresh context and didn't make any autoclosures,
-    // destroy the initializer context.
+    // destroy the initializer context so it can be recycled.
     if (!hasClosures && initContextIsNew) {
       Context.destroyPatternBindingContext(initContext);
     }
   }
 
+  if (hadError) {
+    PBD->setInvalid();
+    if (!pattern->hasType()) {
+      pattern->setType(ErrorType::get(Context));
+      pattern->forEachVariable([&](VarDecl *var) {
+        // Don't change the type of a variable that we've been able to
+        // compute a type for.
+        if (var->hasType() && !var->getType()->is<ErrorType>())
+          return;
+
+        var->overwriteType(ErrorType::get(Context));
+        var->setInvalid();
+      });
+    }
+  }
+
+  PBD->setInitializerChecked();
   return hadError;
 }
 
