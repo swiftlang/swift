@@ -440,6 +440,9 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 
     next->collectLinkLibraries([this](LinkLibrary linkLib) {
       this->addLinkLibrary(linkLib);
+      if (ObjCInterop)
+        if (linkLib.getName().equals("swiftCore"))
+          this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
     });
   });
 }

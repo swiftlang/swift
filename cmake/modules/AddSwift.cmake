@@ -171,6 +171,8 @@ function(_add_variant_link_flags
 
   if("${sdk}" STREQUAL "LINUX")
     list(APPEND result "-lpthread" "-ldl")
+  else()
+    list(APPEND result "-lobjc")
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)

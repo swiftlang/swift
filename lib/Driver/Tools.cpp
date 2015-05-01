@@ -709,6 +709,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
     Arguments.push_back(Args.MakeArgString(OI.SDKPath));
   }
 
+  Arguments.push_back("-lobjc");
   Arguments.push_back("-lSystem");
 
   StringRef ArchName = TC.getDarwinArchName(Args);
@@ -755,8 +756,6 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
                             "libclang_rt.profile_" + RT + ".a");
     Arguments.push_back(Args.MakeArgString(LibProfile));
   }
-
-
 
   // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
   // of time the standard library won't be copied.
