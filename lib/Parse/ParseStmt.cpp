@@ -1588,18 +1588,30 @@ ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
   if (Tok.is(tok::semi))
     return parseStmtForCStyle(ForLoc, LabelInfo);
 
-  // Otherwise, we have to do lookahead.  A for-each loop will start with a
-  // "<pattern> in".  Check for that.
-  bool isForEach;
+  // Otherwise, we have to do lookahead.  An unparenthesized valid C-style
+  // for-each loop will start with "let/var <irrefutable pattern> =".  Check for
+  // that.
+  bool isCStyleFor = false;
   {
     Parser::BacktrackingScope Backtrack(*this);
-    isForEach = canParseTypedPattern() && Tok.is(tok::kw_in);
+
+    // The condition of a foreach loop can be parenthesized.
+    consumeIf(tok::l_paren);
+
+    // Skip until we see eof, "in" (in which case we have a for-in loop),
+    // ";" in which case we have a simple expression as the first part of a
+    // c-style for loop, or "{" in which case we have a malformed statement.
+    while (Tok.isNot(tok::eof, tok::kw_in, tok::semi, tok::l_brace))
+      skipSingle();
+
+    isCStyleFor = Tok.isAny(tok::semi, tok::l_brace, tok::eof);
   }
-  if (isForEach)
-    return parseStmtForEach(ForLoc, LabelInfo);
   
   // Otherwise, this is some sort of c-style for loop.
-  return parseStmtForCStyle(ForLoc, LabelInfo);
+  if (isCStyleFor)
+    return parseStmtForCStyle(ForLoc, LabelInfo);
+
+  return parseStmtForEach(ForLoc, LabelInfo);
 }
 
 ///   stmt-for-c-style:

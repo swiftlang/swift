@@ -368,7 +368,7 @@ void Parser::skipUntil(tok T1, tok T2) {
   // tok::unknown is a sentinel that means "don't skip".
   if (T1 == tok::unknown && T2 == tok::unknown) return;
   
-  while (Tok.isNot(tok::eof) && Tok.isNot(T1) && Tok.isNot(T2))
+  while (Tok.isNot(tok::eof, T1, T2))
     skipSingle();
 }
 

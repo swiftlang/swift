@@ -436,10 +436,7 @@ public:
   /// \brief Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
-  void skipUntil(tok T1) {
-    skipUntil(T1, tok::unknown);
-  }
-  void skipUntil(tok T1, tok T2);
+  void skipUntil(tok T1, tok T2 = tok::unknown);
   void skipUntilAnyOperator();
 
   /// \brief Skip until a token that starts with '>'.  Applies heuristics that
