@@ -8,6 +8,7 @@
 func testFuncsNegative() {
   let x = f1()
   let _ = f1()
+  _ = f1()
   for a in f1() { } 
 }
 
