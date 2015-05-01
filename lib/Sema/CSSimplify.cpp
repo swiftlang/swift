@@ -2518,22 +2518,15 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   case CheckedCastKind::BridgeFromObjectiveC: {
     // This existential-to-concrete cast might bridge through an Objective-C
     // class type.
-    if (auto classType = TC.getDynamicBridgedThroughObjCClass(DC, true,
-                                                              fromType,
-                                                              toType)) {
-      // The class we're bridging through must be a subtype of the type we're
-      // coming from.
-      addConstraint(ConstraintKind::Subtype, classType, fromType,
-                    getConstraintLocator(locator));
-      return SolutionKind::Solved;
-    }
-
     Type objCClass = TC.getDynamicBridgedThroughObjCClass(DC, true,
                                                           fromType,
                                                           toType);
     assert(objCClass && "Type must be bridged");
-    addConstraint(ConstraintKind::Subtype, objCClass, fromType,
-                  getConstraintLocator(locator));
+    (void)objCClass;
+    // Otherwise no constraint is necessary; as long as both objCClass and
+    // fromType are Objective-C types, they can't have any open type variables,
+    // and conversion between unrelated classes will be diagnosed in
+    // typeCheckCheckedCast.
     return SolutionKind::Solved;
   }
 

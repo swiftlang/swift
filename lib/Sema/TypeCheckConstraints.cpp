@@ -2023,9 +2023,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  SourceRange diagToRange,
                                  std::function<bool (Type)> convertToType,
                                  bool suppressDiagnostics) {
-  // If the from/to types are equivalent or implicitly convertible,
+  // If the from/to types are equivalent or explicitly convertible,
   // this is a coercion.
-  if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType, dc)) {
+  if (fromType->isEqual(toType) ||
+      isExplicitlyConvertibleTo(fromType, toType, dc)) {
     return CheckedCastKind::Coercion;
   }
 
