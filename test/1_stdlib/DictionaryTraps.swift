@@ -201,7 +201,6 @@ DictionaryTraps.test("Downcast2") {
                                             NSObject() : NSObject() ]
 
   expectCrashLater()
-  println("OK")
   let d2: Dictionary<TestBridgedKeyTy, NSObject>
     = _dictionaryBridgeFromObjectiveC(d)
   let v1 = d2[TestBridgedKeyTy(10)]
