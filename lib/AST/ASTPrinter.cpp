@@ -1652,7 +1652,30 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   recordDeclLoc(decl,
     [&]{
       Printer << "subscript ";
-      printPattern(decl->getIndices());
+      auto *IndicePat = decl->getIndices();
+      if (auto *BodyTuple = dyn_cast<TuplePattern>(IndicePat)) {
+        Printer << "(";
+        for (unsigned i = 0, e = BodyTuple->getNumElements(); i != e; ++i) {
+          if (i > 0)
+            Printer << ", ";
+
+          printOneParameter(BodyTuple->getElement(i).getPattern(),
+                            /*ArgNameIsAPIByDefault=*/false,
+                            /*StripOuterSliceType=*/i == e - 1 &&
+                              BodyTuple->hasVararg(),
+                            /*Curried=*/false);
+        }
+        if (BodyTuple->hasVararg())
+          Printer << "...";
+      } else {
+        auto *BodyParen = cast<ParenPattern>(IndicePat);
+        Printer << "(";
+        printOneParameter(BodyParen->getSubPattern(),
+                          /*ArgNameIsAPIByDefault=*/false,
+                          /*StripOuterSliceType=*/false,
+                          /*Curried=*/false);
+      }
+      Printer << ")";
     });
   Printer << " -> ";
   decl->getElementType().print(Printer, Options);

@@ -903,7 +903,9 @@ class d0700_InClassSubscript1 {
       return 42
     }
   }
+  subscript(index i: Float) -> Int { return 42 }
 // PASS_COMMON: {{^}}  subscript (i: Int) -> Int { get }{{$}}
+// PASS_COMMON: {{^}}  subscript (index i: Float) -> Int { get }{{$}}
 // PASS_COMMON-NOT: subscript
 }
 // PASS_COMMON: {{^}}}{{$}}
