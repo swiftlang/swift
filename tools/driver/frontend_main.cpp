@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
@@ -35,6 +36,11 @@
 #include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/SILPasses/Passes.h"
+
+// FIXME: We're just using CompilerInstance::createOutputFile.
+// This API should be sunk down to LLVM.
+#include "clang/Frontend/CompilerInstance.h"
+
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -314,21 +320,42 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
   return false;
 }
 
-static bool printAsObjC(const std::string &path, Module *M,
+static bool printAsObjC(const std::string &outputPath, Module *M,
                         StringRef bridgingHeader, bool moduleIsPublic) {
-  std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+  using namespace llvm::sys;
 
-  if (out.has_error() || EC) {
-    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                      path, EC.message());
-    out.clear_error();
+  std::string tmpFilePath;
+  std::error_code EC;
+  std::unique_ptr<llvm::raw_fd_ostream> out{
+    clang::CompilerInstance::createOutputFile(outputPath, EC,
+                                              /*binary=*/false,
+                                              /*removeOnSignal=*/true,
+                                              /*inputPath=*/"",
+                                              path::extension(outputPath),
+                                              /*temporary=*/true,
+                                              /*createDirs=*/false,
+                                              /*finalPath=*/nullptr,
+                                              &tmpFilePath)
+  };
+  if (!out) {
+    M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                          tmpFilePath, EC.message());
     return true;
   }
 
   auto requiredAccess = moduleIsPublic ? Accessibility::Public
                                        : Accessibility::Internal;
-  return printAsObjC(out, M, bridgingHeader, requiredAccess);
+  bool hadError = printAsObjC(*out, M, bridgingHeader, requiredAccess);
+  out->flush();
+
+  EC = swift::moveFileIfDifferent(tmpFilePath, outputPath);
+  if (EC) {
+    M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                          outputPath, EC.message());
+    return true;
+  }
+
+  return hadError;
 }
 
 /// Returns the OutputKind for the given Action.
