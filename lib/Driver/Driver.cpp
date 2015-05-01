@@ -595,43 +595,48 @@ static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
   }
 }
 
+static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
+                        StringRef firstPrefix, StringRef secondPrefix = {}) {
+  // FIXME: This is a hack.
+  // We should be looking at the SDKSettings.plist.
+  StringRef sdkDirName = llvm::sys::path::filename(sdkPath);
+
+  size_t versionStart = sdkDirName.rfind(firstPrefix);
+  if (versionStart != StringRef::npos) {
+    versionStart += firstPrefix.size();
+  } else if (!secondPrefix.empty()) {
+    versionStart = sdkDirName.rfind(secondPrefix);
+    if (versionStart != StringRef::npos)
+      versionStart += secondPrefix.size();
+  }
+  if (versionStart == StringRef::npos)
+    return false;
+
+  size_t versionEnd = sdkDirName.rfind(".Internal");
+  if (versionEnd == StringRef::npos)
+    versionEnd = sdkDirName.rfind(".sdk");
+  if (versionEnd == StringRef::npos)
+    return false;
+
+  clang::VersionTuple version;
+  if (version.tryParse(sdkDirName.slice(versionStart, versionEnd)))
+    return false;
+  return version < minVersion;
+}
+
 /// Returns true if the given SDK path points to an SDK that is too old for
 /// the given target.
 static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
-  // FIXME: This is a hack.
-  // We should be looking at the SDKSettings.plist.
   if (target.isMacOSX()) {
-    StringRef sdkDirName = llvm::sys::path::filename(sdkPath);
-
-    size_t versionStart = sdkDirName.find("OSX");
-    if (versionStart == StringRef::npos)
-      return false;
-    versionStart += strlen("OSX");
-
-    size_t versionEnd = sdkDirName.find(".Internal");
-    if (versionEnd == StringRef::npos)
-      versionEnd = sdkDirName.find(".sdk");
-    if (versionEnd == StringRef::npos)
-      return false;
-
-    clang::VersionTuple version;
-    if (version.tryParse(sdkDirName.slice(versionStart, versionEnd)))
-      return false;
-    return version < clang::VersionTuple(10, 10);
+    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 11), "OSX");
 
   } else if (target.isiOS()) {
-    if (target.isTvOS())
-      return sdkPath.find("OS8") != StringRef::npos ||
-        sdkPath.find("Simulator8") != StringRef::npos;
-    // iOS SDKs don't always have the version number in the name, but
-    // fortunately that started with the first version that supports Swift.
-    // Just check for one version before that, just in case.
-    return sdkPath.find("OS7") != StringRef::npos ||
-      sdkPath.find("Simulator7") != StringRef::npos;
+    // Includes both iOS and TVOS.
+    return isSDKTooOld(sdkPath, clang::VersionTuple(9, 0), "Simulator", "OS");
 
   } else if(target.isWatchOS()) {
-    return sdkPath.find("OS1") != StringRef::npos ||
-        sdkPath.find("Simulator1") != StringRef::npos;
+    return isSDKTooOld(sdkPath, clang::VersionTuple(2, 0), "Simulator", "OS");
+
   } else {
     return false;
   }

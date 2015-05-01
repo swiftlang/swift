@@ -100,7 +100,7 @@ WARNING(incremental_requires_build_record_entry,driver,none,
 ERROR(error_os_minimum_deployment,driver,none,
       "Swift requires a minimum deployment target of %0", (StringRef))
 ERROR(error_sdk_too_old,driver,none,
-      "the SDK '%0' does not support Swift", (StringRef))
+      "Swift does not support the SDK '%0'", (StringRef))
 
 ERROR(error_two_files_same_name,driver,none,
       "filename \"%0\" used twice: '%1' and '%2'", (StringRef, StringRef, StringRef))
