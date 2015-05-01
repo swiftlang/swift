@@ -907,7 +907,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     }
     
     // If a let-binding doesn't follow, diagnose the problem.
-    if (Tok.isNot(tok::kw_var, tok::kw_let)) {
+    if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case)) {
       // If an { exists after the comma, assume it is a stray comma and this is
       // the start of the if/while body.  If a non-expression thing exists after
       // the comma, then we don't know what is going on.

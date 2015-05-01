@@ -1638,6 +1638,15 @@ ERROR(return_init_non_nil,sema_tcs,none,
       "'nil' is the only return value permitted in an initializer",
       ())
 
+WARNING(if_always_true,sema_tcd,none,
+        "'if' condition is always true", ())
+WARNING(while_always_true,sema_tcd,none,
+        "'while' condition is always true", ())
+
+WARNING(unless_always_succeeds,sema_tcd,none,
+        "'unless' condition is always true, body is unreachable", ())
+
+
 ERROR(expression_unused_function,sema_tcs,none,
       "expression resolves to an unused function", ())
 ERROR(expression_unused_lvalue,sema_tcs,none,

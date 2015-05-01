@@ -1504,19 +1504,30 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
                              &listener);
 }
 
-bool TypeChecker::typeCheckCondition(StmtCondition &cond, DeclContext *dc) {
+bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
+                                         Diag<> diagnosticForAlwaysTrue) {
   bool hadError = false;
+  bool hadAnyFalsable = false;
   for (auto &elt : cond) {
     if (auto E = elt.getCondition()) {
       hadError |= typeCheckCondition(E, dc);
       elt.setCondition(E);
+      hadAnyFalsable = true;
     } else {
       auto PBD = elt.getBinding();
       assert(PBD && "Unknown kind of condition");
       typeCheckDecl(PBD, false);
       hadError |= PBD->isInvalid();
+      hadAnyFalsable |= PBD->isRefutable();
     }
   }
+  
+  
+  // If the binding is not refutable, and there *is* an else, reject it as
+  // unreachable.
+  if (!hadAnyFalsable && !hadError)
+    diagnose(cond[0].getStartLoc(), diagnosticForAlwaysTrue);
+  
   return false;
 }
 

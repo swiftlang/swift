@@ -877,7 +877,8 @@ public:
   /// \param cond The condition to type-check, which will be modified in place.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckCondition(StmtCondition &cond, DeclContext *dc);
+  bool typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
+                              Diag<> diagnosticForAlwaysTrue);
   
   /// \brief Determine the semantics of a checked cast operation.
   ///

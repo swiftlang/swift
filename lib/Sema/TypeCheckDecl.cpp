@@ -1397,11 +1397,12 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     // unreachable.
     if (!binding->isRefutable() && !binding->getElse().isUnconditional() &&
         !binding->isInvalid()) {
-      if (auto *Body = binding->getElse().getExplicitBody())
+      if (auto *Body = binding->getElse().getExplicitBody()) {
         tc.diagnose(Body->getStartLoc(),
                     diag::decl_cannot_fail_no_else_allowed);
       
-      binding->setInvalid();
+        binding->setInvalid();
+      }
     }
   }
   

@@ -373,7 +373,8 @@ public:
   
   Stmt *visitIfStmt(IfStmt *IS) {
     StmtCondition C = IS->getCond();
-    if (TC.typeCheckCondition(C, DC)) return 0;
+
+    if (TC.typeCheckStmtCondition(C, DC, diag::if_always_true)) return 0;
     IS->setCond(C);
 
     AddLabeledStmt ifNest(*this, IS);
@@ -392,7 +393,8 @@ public:
   
   Stmt *visitUnlessStmt(UnlessStmt *US) {
     StmtCondition C = US->getCond();
-    if (TC.typeCheckCondition(C, DC)) return 0;
+    if (TC.typeCheckStmtCondition(C, DC, diag::unless_always_succeeds))
+      return 0;
     US->setCond(C);
     
     AddLabeledStmt ifNest(*this, US);
@@ -421,7 +423,7 @@ public:
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
     StmtCondition C = WS->getCond();
-    if (TC.typeCheckCondition(C, DC)) return 0;
+    if (TC.typeCheckStmtCondition(C, DC, diag::while_always_true)) return 0;
     WS->setCond(C);
 
     AddLabeledStmt loopNest(*this, WS);

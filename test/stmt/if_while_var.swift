@@ -89,5 +89,9 @@ func testIfCase(a : Int?) {
   
   
   if let .Some(x) = a {}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
+
+  if case _ = a {}  // expected-warning {{'if' condition is always true}}
+  while case _ = a {}  // expected-warning {{'while' condition is always true}}
+
 }
 
