@@ -6345,9 +6345,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (ext->isInvalid())
     return;
 
-  // If the type being extended is an unbound generic type, complain and
-  // conjure up generic parameters for it.
-
   // FIXME: We need to check whether anything is specialized, because
   // the innermost extended type might itself be a non-generic type
   // within a generic type.
@@ -6387,7 +6384,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   }
 
   // If we're extending a protocol, check the generic parameters.
-  if (extendedType->is<ProtocolType>()) {
+  if (isa<ProtocolType>(extendedType.getPointer())) {
     GenericSignature *sig = nullptr;
     extendedType = checkExtensionGenericParams(*this, ext,
                                                ext->getRefComponents(),
@@ -6400,6 +6397,17 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     ext->setGenericSignature(sig);
     ext->setExtendedType(extendedType);
+    return;
+  }
+
+  // Protocols cannot be extended via a typealias.
+  if (auto proto = extendedType->getAs<ProtocolType>()) {
+    diagnose(ext->getLoc(), diag::extension_protocol_via_typealias,
+             proto, extendedType)
+      .fixItReplace(ext->getRefComponents().back().IdentType.getSourceRange(),
+                    proto->getDecl()->getName().str());
+    ext->setInvalid();
+    ext->setExtendedType(ErrorType::get(Context));
     return;
   }
 }
