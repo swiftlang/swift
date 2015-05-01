@@ -40,7 +40,7 @@ func test_class_avail(x:NSObject, obj: AnyObject) {
 
 func test_unavailable_app_extension() {
   // No expected error here.  See corresponding App extension test.
-  println(SomeCrazyAppExtensionForbiddenAPI()) // no-error
+  let x = SomeCrazyAppExtensionForbiddenAPI() // no-error
 }
 
 func test_swift_unavailable() {

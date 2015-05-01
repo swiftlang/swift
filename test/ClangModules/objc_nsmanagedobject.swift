@@ -4,6 +4,8 @@
 
 import CoreData
 
+func markUsed<T>(t: T) {}
+
 // Inferred @requires_stored_property_inits.
 class MyManagedObject : NSManagedObject {
   var foo: String // expected-error{{stored property 'foo' requires an initial value}}
@@ -23,7 +25,7 @@ class MyManagedObject : NSManagedObject {
 
   var wobble: String { // expected-error{{stored property 'wobble' requires an initial value}}
     willSet(value) {
-      println(value)
+      markUsed(value)
     }
   }
 }

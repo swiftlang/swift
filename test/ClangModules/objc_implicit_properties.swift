@@ -5,16 +5,16 @@
 import ObjectiveC
 import ObjCImplicitProperties
 
+func acceptsInt(_: Int) {}
+func acceptsInt(_: UInt) {}
+
 func implicitProperties(obj: ImplicitProperties, other: AnyObject) {
   obj.implicitProperty = other // no-warning
   obj.implicitProperty.hash // no-warning
 
   obj.anotherImplicitProperty = 42 // no-warning
-  println(Int(obj.anotherImplicitProperty)) // no-warning
+  acceptsInt(Int(obj.anotherImplicitProperty)) // no-warning
 }
-
-func acceptsInt(_: Int) {}
-func acceptsInt(_: UInt) {}
 
 func badImplicitProperties(obj: BadImplicitProperties) {
   acceptsInt(obj.nonVoidReturn) // expected-error {{cannot find an overload for 'acceptsInt' that accepts an argument list of type '(() -> Int32)'}}

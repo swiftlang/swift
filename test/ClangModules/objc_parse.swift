@@ -11,6 +11,8 @@ import TestProtocols
 import ObjCParseExtras
 import ObjCParseExtrasToo
 
+func markUsed<T>(t: T) {}
+
 func testAnyObject(obj: AnyObject) {
   var optStr = obj.nsstringProperty
 }
@@ -291,8 +293,8 @@ class NSObjectable : NSObjectProtocol {
 
 // Properties with custom accessors
 func customAccessors(hive: Hive, bee: B) {
-  println(hive.makingHoney)
-  println(hive.isMakingHoney()) // expected-error{{'Hive' does not have a member named 'isMakingHoney'}}
+  markUsed(hive.makingHoney)
+  markUsed(hive.isMakingHoney()) // expected-error{{'Hive' does not have a member named 'isMakingHoney'}}
   hive.setMakingHoney(true) // expected-error{{'Hive' does not have a member named 'setMakingHoney'}}
 
   hive.guard.description // okay
@@ -397,14 +399,14 @@ func testSubscriptAndPropertyWithProtocols(obj: SubscriptAndPropertyWithProto) {
 }
 
 func testProtocolMappingSameModule(obj: AVVideoCompositionInstruction, p: AVVideoCompositionInstructionProtocol) {
-  println(p.enablePostProcessing)
-  println(obj.enablePostProcessing)
+  markUsed(p.enablePostProcessing)
+  markUsed(obj.enablePostProcessing)
   let _ = obj.backgroundColor
 }
 
 func testProtocolMappingDifferentModules(obj: ObjCParseExtrasToo.ProtoOrClass, p: ObjCParseExtras.ProtoOrClass) {
-  println(p.thisIsTheProto)
-  println(obj.thisClassHasAnAwfulName)
+  markUsed(p.thisIsTheProto)
+  markUsed(obj.thisClassHasAnAwfulName)
 
   let _: ProtoOrClass? // expected-error{{'ProtoOrClass' is ambiguous for type lookup in this context}}
 
@@ -431,9 +433,9 @@ func testDealloc(obj: NSObject) {
 }
 
 func testConstantGlobals() {
-  println(MAX)
-  println(SomeImageName)
-  println(SomeNumber.description)
+  markUsed(MAX)
+  markUsed(SomeImageName)
+  markUsed(SomeNumber.description)
 
   MAX = 5 // expected-error{{cannot assign to 'let' value 'MAX'}}
   SomeImageName = "abc" // expected-error{{cannot assign to 'let' value 'SomeImageName'}}
