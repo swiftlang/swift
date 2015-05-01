@@ -1080,10 +1080,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
       Piece = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
 
     if (IsPiece) {
-      if (Indirection)
-        // Indirect pieces are not supported by LLVM.
-        return;
-
       // Try to get the size from the type if possible.
       auto StorageSize = getSizeFromExplosionValue(CI.getTargetInfo(), Piece);
       // FIXME: Occasionally, there is a discrepancy between the AST
@@ -1104,7 +1100,13 @@ void IRGenDebugInfo::emitVariableDeclaration(
       assert(Dim.SizeInBits < VarSizeInBits
              && "piece covers entire var");
       assert(OffsetInBits+Dim.SizeInBits <= VarSizeInBits && "pars > totum");
-      Expr = DBuilder.createBitPieceExpression(OffsetInBits, Dim.SizeInBits);
+      SmallVector<uint64_t, 3> Elts;
+      if (Indirection)
+        Elts.push_back(llvm::dwarf::DW_OP_deref);
+      Elts.push_back(llvm::dwarf::DW_OP_bit_piece);
+      Elts.push_back(OffsetInBits);
+      Elts.push_back(Dim.SizeInBits);
+      Expr = DBuilder.createExpression(Elts);
 
       auto Size = Dim.SizeInBits;
       Dim = EltSizes.getNext();
