@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -verify -g -o - | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 protocol AProtocol {
   func f() -> String;
 }
@@ -20,7 +22,7 @@ class AnotherClass : AProtocol {
 // CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "y", arg: 2,{{.*}} type: ![[Q:.*]])
 // CHECK-DAG: ![[Q]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq0_F12generic_args9aFunction{{.*}}
 func aFunction<T : AProtocol, Q : AProtocol>(var x: T, var _ y: Q, _ z: String) {
-     println("I am in \(z): \(x.f()) \(y.f())")
+   markUsed("I am in \(z): \(x.f()) \(y.f())")
 }
 
 aFunction(AClass(),AnotherClass(),"aFunction")

@@ -6,6 +6,8 @@
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtT4NameSS2IdSi_",{{.*}} identifier: [[TT1:[^,)]+]])
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtTSS2IdSi_",{{.*}} identifier: [[TT2:[^,)]+]])
 
+func markUsed<T>(t: T) {}
+
 // Variable:
 // mangling.myDict : Swift.Dictionary<Swift.Int64, Swift.String>
 // CHECK: !DIGlobalVariable(name: "myDict", linkageName: "_Tv8mangling6myDictGVSs10DictionarySiSS_",
@@ -29,8 +31,8 @@ var myTuple2 : (      String, Id: Int) = ("B", 2)
 // FIXME: Pending <rdar://problem/16860038>
 // FIXME: \00myTuple3\00_Tv8mangling8myTuple3TSSSi_\00[[@LINE+1]]\000\001"{{, [^,]+, [^,]+}}, metadata ![[TT3]], {{.*}} [ DW_TAG_variable ] [myTuple3]
 // var myTuple3 : (      String,     Int) = ("C", 3)
-// println({ $$0.1 }(myTuple3))
+// markUsed({ $$0.1 }(myTuple3))
 
-println(myTuple1.Id)
-println(myTuple2.Id)
+markUsed(myTuple1.Id)
+markUsed(myTuple2.Id)
 

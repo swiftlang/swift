@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 // CHECK: @_TFC12generic_arg25Class3foo{{.*}}, %swift.type* %U
 // CHECK: %[[Y:.*]] = call %swift.opaque* %allocateBuffer3([{{(24|12)}} x i8]* %{{.*}}, %swift.type* %U)
 // store %swift.opaque* %[[Y]], %swift.opaque** %[[Y_SHADOW:.*]], align
@@ -8,24 +10,23 @@
 // CHECK-NOT: dbg.value{{.*}}metadata ![[U]]
 class Class <T> {
 // CHECK: ![[U]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "y",{{.*}} line: [[@LINE+1]],
-	func foo <U> (var x : T, var y : U)
-	{
-		println("hello world")
-	}
+  func foo<U>(var x: T, var y: U) {
+    markUsed("hello world")
+  }
 
-	func bar (var x : String, var y : Int) {
-		println("hello world")
-	}
+  func bar(var x: String, var y: Int) {
+    markUsed("hello world")
+  }
 
-	init() {}
+  init() {}
 }
 
 func main() {
-	var object : Class<String> = Class()
-	var x = "hello"
-	var y = 1234
-	object.bar(x, y: y)
-	object.foo(x, y: y)
+  var object: Class<String> = Class()
+  var x = "hello"
+  var y = 1234
+  object.bar(x, y: y)
+  object.foo(x, y: y)
 }
 
 main()

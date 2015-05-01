@@ -6,6 +6,8 @@
 // RUN: %target-swift-frontend %S/../Inputs/empty.swift -primary-file %s -emit-ir -g | FileCheck %s
 // CHECK: !DICompileUnit({{.*}}flags: {{[^,]*}}-private-discriminator [[DISCRIMINATOR:_[A-Z0-9]+]]
 
+func markUsed<T>(t: T) {}
+
 private class A {
   init(val : Int) { member = val }
   private let member : Int
@@ -19,5 +21,5 @@ private class A {
 
 func f() {
   let a = A(val: 42)
-  println(a.getVal())
+  markUsed(a.getVal())
 }

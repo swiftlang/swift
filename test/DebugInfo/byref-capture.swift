@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 func makeIncrementor(inc : Int) -> () -> Int
 {
   var sum = 0
@@ -17,4 +19,4 @@ func makeIncrementor(inc : Int) -> () -> Int
 var incrementor = makeIncrementor (5)
 var a = 5
 var more_than_a = incrementor ()
-println ("a was \(a) and more_than_a was \(more_than_a)")
+markUsed("a was \(a) and more_than_a was \(more_than_a)")

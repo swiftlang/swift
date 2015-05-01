@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 func foo(inout x : Int) {
   // Make sure the shadow copy is being made in the prologue, but the
   // code to load the value from the inout storage is not.
@@ -14,7 +16,7 @@ func foo(inout x : Int) {
 func main() {
   var x = 1
   foo(&x)
-  println("break here to see \(x)")
+  markUsed("break here to see \(x)")
 }
 
 main()

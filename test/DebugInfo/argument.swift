@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 // CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "arg", arg: 1,{{.*}} line: [[@LINE+1]]
 func a(arg : Int)
 {
@@ -48,7 +50,7 @@ class A {
 
 // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "self", arg: 1,{{.*}} line: [[@LINE+1]]
   deinit {
-    println(member)
+    markUsed(member)
   }
 
 }

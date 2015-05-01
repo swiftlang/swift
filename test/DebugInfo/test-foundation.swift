@@ -65,7 +65,7 @@ class MyObject : NSObject {
 // SANITY-DAG: !DISubprogram(name: "blah",{{.*}} line: [[@LINE+2]],{{.*}} isDefinition: true
 extension MyObject {
   func blah() {
-    println("blah blah blah")
+    MyObject()
   }
 }
 

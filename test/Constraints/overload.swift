@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+func markUsed<T>(t: T) {}
+
 func f0(_: Float) -> Float {}
 func f0(_: Int) -> Int {}
 
@@ -88,7 +90,7 @@ f4(5)
 
 func f1() {
   var c : Class // expected-error{{use of undeclared type 'Class'}}
-  print(c.x) // make sure error does not cascade here
+  markUsed(c.x) // make sure error does not cascade here
 }
 
 // We don't provide return-type sensitivity unless there is context.
@@ -110,7 +112,7 @@ struct HasX1aProperty {
 // rdar://problem/16554496
 @availability(*, unavailable)
 func availTest(x: Int) {}
-func availTest(x: Any) { println("this one") }
+func availTest(x: Any) { markUsed("this one") }
 func doAvailTest(x: Int) {
   availTest(x)
 }

@@ -16,7 +16,8 @@
 import basic
 import typealias Swift.Optional
 
-println(basic.foo(1, 2))
+func markUsed<T>(t: T) {}
+markUsed(basic.foo(1, 2))
 
 // DWARF: .debug_info
 // DWARF: DW_TAG_module

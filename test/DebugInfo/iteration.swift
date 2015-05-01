@@ -1,20 +1,22 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o %t.ll
 // RUN: FileCheck %s < %t.ll
 
+func markUsed<T>(t: T) {}
+
 var puzzleInput = "great minds think alike"
 var puzzleOutput = ""
 // CHECK-NOT: !DILocalVariable(tag: DW_TAG_auto_variable, name: "$letter$generator"
 // CHECK: !DILocalVariable(tag: DW_TAG_auto_variable, name: "letter",
 // CHECK-SAME:             line: [[@LINE+1]]
 for letter in puzzleInput {
-    switch letter {
-        case "a", "e", "i", "o", "u", " ":
-            continue
-        default:
-            puzzleOutput.append(letter)
-    }
+  switch letter {
+  case "a", "e", "i", "o", "u", " ":
+    continue
+  default:
+    puzzleOutput.append(letter)
+  }
 }
-println(puzzleOutput)
+markUsed(puzzleOutput)
 
 
 func count() {
@@ -22,7 +24,7 @@ func count() {
 // CHECK: !DILocalVariable(tag: DW_TAG_auto_variable, name: "i",
 // CHECK-SAME:             line: [[@LINE+1]]
   for i in 0...100 {
-    println(i)
+    markUsed(i)
   }
 }
 count()

@@ -26,7 +26,7 @@ func bar() -> Int { return 42 }
 
 // Some toplevel code that should not be serialized.
 var foo: Foo = Foo()
-println(foo.bar())
+Double(foo.bar())
 
 #if OBJC
 func objCUser(obj: ObjCClass) {}

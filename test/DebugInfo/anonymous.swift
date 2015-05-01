@@ -2,6 +2,9 @@
 
 // Don't crash when emitting debug info for anonymous variables.
 // CHECK: !DILocalVariable({{.*}} name: "_"
+
+func markUsed<T>(t: T) {}
+
 protocol F_ {
   func successor() -> Self
 }
@@ -14,6 +17,6 @@ struct _Distance {}
 
 func ~> <I: F_>(self_:I, (_Distance, (I))) -> Int {
   self_.successor()
-  println("F")
+  markUsed("F")
   return 0
 }

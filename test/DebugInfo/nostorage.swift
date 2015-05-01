@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 class AClass {
   func f () -> Int { return 1 }
 }
@@ -14,13 +16,13 @@ struct AStruct {
 
 // CHECK: define hidden void @_TF9nostorage3appFT_T_()
 func app() {
-	var ac : AClass = AnotherClass()
-        // No members? No storage! Emitted as a constant 0, because.
-        // CHECK: call void @llvm.dbg.value(metadata {{.*}}, i64 0, metadata ![[AT:.*]], metadata !{{[0-9]+}}), !dbg
-        // CHECK: ![[AT]] = !DILocalVariable(tag: DW_TAG_auto_variable, name: "at",
-        // CHECK-SAME:                       line: [[@LINE+1]]
-	var at = AStruct()
-	println("\(ac.f()) \(at.f())")
+  var ac: AClass = AnotherClass()
+  // No members? No storage! Emitted as a constant 0, because.
+  // CHECK: call void @llvm.dbg.value(metadata {{.*}}, i64 0, metadata ![[AT:.*]], metadata !{{[0-9]+}}), !dbg
+  // CHECK: ![[AT]] = !DILocalVariable(tag: DW_TAG_auto_variable, name: "at",
+  // CHECK-SAME:                       line: [[@LINE+1]]
+  var at = AStruct()
+  markUsed("\(ac.f()) \(at.f())")
 }
 
 app()

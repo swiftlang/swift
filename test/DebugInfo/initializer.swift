@@ -83,8 +83,6 @@ func test() {
     echo(string)
     echo(tuple)
     echo(point)
-
-    println("Hello, World!")
 }
 
 test()

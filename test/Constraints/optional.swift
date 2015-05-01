@@ -2,6 +2,8 @@
 
 // REQUIRES: objc_interop
 
+func markUsed<T>(t: T) {}
+
 class A {
   @objc func do_a() {}
 
@@ -42,7 +44,7 @@ extension Optional {
 }
 
 var c: String? = Optional<Int>(1)
-  .bind {(x: Int) in println("\(x)!"); return "two" }
+  .bind {(x: Int) in markUsed("\(x)!"); return "two" }
 
 func test4() {
   func foo() -> Int { return 0 }

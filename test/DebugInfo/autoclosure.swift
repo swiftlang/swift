@@ -4,6 +4,8 @@
 // CHECK: call void @llvm.dbg.declare{{.*}}, !dbg
 // CHECK: , !dbg ![[DBG:.*]]
 
+func markUsed<T>(t: T) {}
+
 func get_truth(input: Int) -> Int {
     return input % 2
 }
@@ -25,10 +27,9 @@ func call_me(var input: Int) -> Void {
 // CHECK-DAG: !DISubprogram({{.*}}linkageName: "_TFF11autoclosure7call_meFSiT_u_KT_PSs11BooleanType_",{{.*}} line: [[@LINE+3]],{{.*}} isLocal: false, isDefinition: true
 // But not in the line table.
 // CHECK-DAG: ![[DBG]] = !DILocation(line: [[@LINE+1]],
-    if input != 0 &&&&& ( get_truth (input * 2 + 1) > 0 )
-    {
-        println ("Whew, passed that test.")
-    }
+  if input != 0 &&&&& ( get_truth (input * 2 + 1) > 0 ) {
+    markUsed("Whew, passed that test.")
+  }
 
 }
 

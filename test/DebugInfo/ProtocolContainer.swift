@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 protocol AProtocol {
   func print()
 }
@@ -7,7 +9,7 @@ protocol AProtocol {
 class AClass : AProtocol {
    var x: UInt32
    init() { x = 0xDEADBEEF }
-   func print() { println("x = \(x)")}
+   func print() { markUsed("x = \(x)")}
 }
 // CHECK: define hidden void @_TF17ProtocolContainer3foo
 // CHECK-NEXT: entry:

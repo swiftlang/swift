@@ -13,6 +13,8 @@
 
 import FooBar
 
+func markUsed<T>(t: T) {}
+
 func square(x: Int64) -> Int64 {
 // CHECK-DAG: ![[MULSCOPE]] = !DILocation(line: [[@LINE+2]], column: {{.*}}, scope: ![[MUL:.*]], inlinedAt: ![[INLINED:.*]])
 // CHECK-DAG: ![[MUL:.*]] = distinct !DILexicalBlock(
@@ -25,7 +27,7 @@ let c = Int64(x)
 // CHECK-DAG ![[INLINED]] = !DILocation(i32 [[@LINE+1]], column: {{.*}}, scope: !{{.*}}, inlinedAt: ![[INLINED_TOPLEVEL:.*]])
 // CHECK-DAG: !DIGlobalVariable(name: "y",{{.*}} file: ![[TOPLEVEL]],{{.*}} line: [[@LINE+1]]
 let y = square(c)
-println(y)
+markUsed(y)
 
 // Check if the inlined and removed square function still has the correct linkage name in the debug info.
 // CHECK-DAG: !DISubprogram(name: "square", linkageName: "_TF4main6squareFVSs5Int64S0_"
