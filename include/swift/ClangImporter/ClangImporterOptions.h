@@ -49,7 +49,7 @@ public:
 
   /// If true, function and method declarations with error
   /// out-parameters should be imported as "throws".
-  bool ErrorHandling = false;
+  bool ErrorHandling = true;
 };
 
 } // end namespace swift
