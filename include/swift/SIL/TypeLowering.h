@@ -712,15 +712,16 @@ public:
   /// \see getLoweredBridgedType
   enum BridgedTypePurpose {
     ForArgument,
+    ForNonOptionalResult, // A result that should not be made more optional
     ForResult,
     ForMemory,
   };
 
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.
-  Type getLoweredBridgedType(Type t, SILFunctionTypeRepresentation rep,
-                             const clang::Type *clangTy,
-                             BridgedTypePurpose forResult);
+  Type getLoweredBridgedType(AbstractionPattern pattern, Type t,
+                             SILFunctionTypeRepresentation rep,
+                             BridgedTypePurpose purpose);
 
   /// Convert a nested function type into an uncurried AST representation.
   CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
@@ -800,16 +801,17 @@ private:
                               bool bridgedCollectionsAreOptional);
 
   CanType getBridgedInputType(SILFunctionTypeRepresentation rep,
-                              CanType input,
-                              const clang::Decl *clangDecl);
+                              AbstractionPattern pattern,
+                              CanType input);
 
   CanType getBridgedResultType(SILFunctionTypeRepresentation rep,
+                               AbstractionPattern pattern,
                                CanType result,
-                               const clang::Decl *clangDecl);
+                               bool suppressOptional);
 
-  CanAnyFunctionType getBridgedFunctionType(CanAnyFunctionType t,
-                                            AnyFunctionType::ExtInfo extInfo,
-                                            const clang::Decl *decl);
+  CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
+                                            CanAnyFunctionType fnType,
+                                            AnyFunctionType::ExtInfo extInfo);
 };
 
 inline const TypeLowering &

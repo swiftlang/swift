@@ -36,35 +36,16 @@ SILType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
 }
 
 CanType TypeConverter::getBridgedInputType(SILFunctionTypeRepresentation rep,
-                                           CanType input,
-                                           const clang::Decl *clangDecl) {
-
-  auto getClangParamType = [&](unsigned i) -> const clang::Type * {
-    if (!clangDecl)
-      return nullptr;
-    if (auto methodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-      if (i < methodDecl->param_size())
-        return methodDecl->param_begin()[i]->getType()
-          ->getUnqualifiedDesugaredType();
-      return nullptr;
-    } else if (auto fnTy = dyn_cast_or_null<clang::FunctionProtoType>
-                 (clangDecl->getFunctionType())) {
-      return fnTy->getParamType(i)->getUnqualifiedDesugaredType();
-    } else {
-      return nullptr;
-    }
-  };
-
+                                           AbstractionPattern pattern,
+                                           CanType input) {
   if (auto tuple = dyn_cast<TupleType>(input)) {
     SmallVector<TupleTypeElt, 4> bridgedFields;
     bool changed = false;
 
     for (unsigned i : indices(tuple->getElements())) {
       auto &elt = tuple->getElement(i);
-
-      auto clangInputTy = getClangParamType(i);
-
-      Type bridged = getLoweredBridgedType(elt.getType(), rep, clangInputTy,
+      Type bridged = getLoweredBridgedType(pattern.getTupleElementType(i),
+                                           elt.getType(), rep,
                                            TypeConverter::ForArgument);
       if (!bridged) {
         Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
@@ -87,8 +68,7 @@ CanType TypeConverter::getBridgedInputType(SILFunctionTypeRepresentation rep,
     return CanType(TupleType::get(bridgedFields, input->getASTContext()));
   }
 
-  auto clangInputTy = getClangParamType(0);
-  auto loweredBridgedType = getLoweredBridgedType(input, rep, clangInputTy,
+  auto loweredBridgedType = getLoweredBridgedType(pattern, input, rep,
                                                   TypeConverter::ForArgument);
 
   if (!loweredBridgedType) {
@@ -103,19 +83,14 @@ CanType TypeConverter::getBridgedInputType(SILFunctionTypeRepresentation rep,
 
 /// Bridge a result type.
 CanType TypeConverter::getBridgedResultType(SILFunctionTypeRepresentation rep,
+                                            AbstractionPattern pattern,
                                             CanType result,
-                                            const clang::Decl *clangDecl) {
-  const clang::Type *clangResultTy = nullptr;
-  if (clangDecl) {
-    if (auto methodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-      clangResultTy = methodDecl->getReturnType()->getUnqualifiedDesugaredType();
-    } else if (auto fnTy = clangDecl->getFunctionType()) {
-      clangResultTy = fnTy->getReturnType()->getUnqualifiedDesugaredType();
-    }
-  }
-
-  auto loweredType = getLoweredBridgedType(result, rep, clangResultTy,
-                                           TypeConverter::ForResult);
+                                            bool suppressOptional) {
+  auto loweredType =
+    getLoweredBridgedType(pattern, result, rep,
+                          suppressOptional
+                            ? TypeConverter::ForNonOptionalResult
+                            : TypeConverter::ForResult);
 
   if (!loweredType) {
     Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
@@ -127,9 +102,9 @@ CanType TypeConverter::getBridgedResultType(SILFunctionTypeRepresentation rep,
   return loweredType->getCanonicalType();
 }
 
-Type TypeConverter::getLoweredBridgedType(Type t,
+Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
+                                          Type t,
                                           SILFunctionTypeRepresentation rep,
-                                          const clang::Type *clangTy,
                                           BridgedTypePurpose purpose) {
   switch (rep) {
   case SILFunctionTypeRepresentation::Thick:
@@ -143,14 +118,13 @@ Type TypeConverter::getLoweredBridgedType(Type t,
   case SILFunctionTypeRepresentation::Block:
     // Map native types back to bridged types.
 
+    auto clangTy = pattern.isClangType() ? pattern.getClangType() : nullptr;
+
     // Look through optional types.
-    if (auto valueTy = t->getOptionalObjectType()) {
-      auto Ty = getLoweredCBridgedType(valueTy, clangTy, false);
-      return Ty ? OptionalType::get(Ty) : Ty;
-    }
-    if (auto valueTy = t->getImplicitlyUnwrappedOptionalObjectType()) {
-      auto Ty = getLoweredCBridgedType(valueTy, clangTy, false);
-      return Ty ? ImplicitlyUnwrappedOptionalType::get(Ty) : Ty;
+    OptionalTypeKind optKind;
+    if (auto valueTy = t->getAnyOptionalObjectType(optKind)) {
+      auto ty = getLoweredCBridgedType(valueTy, clangTy, false);
+      return ty ? OptionalType::get(optKind, ty) : ty;
     }
     return getLoweredCBridgedType(t, clangTy, purpose == ForResult);
   }

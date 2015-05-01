@@ -73,13 +73,32 @@ class AbstractionPattern {
     ObjCMethodFormalParamTupleType,
   };
 
-  struct EncodedForeignErrorInfo {
+  class EncodedForeignErrorInfo {
     unsigned Value;
 
-    bool hasErrorParameter() const { return Value != 0; }
+  public:
+    EncodedForeignErrorInfo() : Value(0) {}
+    EncodedForeignErrorInfo(unsigned errorParameterIndex,
+                            bool stripsResultOptionality)
+      : Value(1 + unsigned(stripsResultOptionality) +
+              (errorParameterIndex << 1)) {}
+
+    bool hasValue() const { return Value != 0; }
+    bool hasErrorParameter() const { return hasValue(); }
+    bool stripsResultOptionality() const {
+      assert(hasValue());
+      return (Value - 1) & 1;
+    }
     unsigned getErrorParameterIndex() const {
-      assert(hasErrorParameter());
-      return Value - 1;
+      assert(hasValue());
+      return (Value - 1) >> 1;
+    }
+
+    unsigned getOpaqueValue() const { return Value; }
+    static EncodedForeignErrorInfo fromOpaqueValue(unsigned value) {
+      EncodedForeignErrorInfo result;
+      result.Value = value;
+      return result;
     }
   };
 
@@ -90,8 +109,8 @@ class AbstractionPattern {
     const clang::Type *ClangType;
     const clang::ObjCMethodDecl *ObjCMethod;
     const AbstractionPattern *OrigTupleElements;
-    GenericSignature *GenericSig; // always canonical
   };
+  CanGenericSignature GenericSig;
 
   static bool isOpaqueType(CanGenericSignature signature, CanType type) {
     assert(signature || !type->isDependentType());
@@ -109,8 +128,18 @@ class AbstractionPattern {
   Kind getKind() const { return Kind(TheKind); }
 
   CanGenericSignature getGenericSignature() const {
-    assert(getKind() == Kind::Type);
+    assert(getKind() == Kind::Type ||
+           hasStoredClangType() ||
+           hasStoredObjCMethod());
     return CanGenericSignature(GenericSig);
+  }
+
+  CanGenericSignature getGenericSignatureForFunctionComponent() const {
+    if (auto genericFn = dyn_cast<GenericFunctionType>(getType())) {
+      return genericFn.getGenericSignature();
+    } else {
+      return getGenericSignature();
+    }
   }
 
   unsigned getNumTupleElements_Stored() const {
@@ -144,21 +173,25 @@ class AbstractionPattern {
     }
   }
 
-  void initClangType(CanType origType, const clang::Type *clangType,
+  void initClangType(CanGenericSignature signature,
+                     CanType origType, const clang::Type *clangType,
                      Kind kind = Kind::ClangType) {
-    assert(!isOpaqueType(nullptr, origType));
+    assert(!isOpaqueType(signature, origType));
     TheKind = unsigned(kind);
     OrigType = origType;
     ClangType = clangType;
+    GenericSig = signature;
   }
 
-  void initObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
+  void initObjCMethod(CanGenericSignature signature,
+                      CanType origType, const clang::ObjCMethodDecl *method,
                       Kind kind, EncodedForeignErrorInfo errorInfo) {
-    assert(!isOpaqueType(nullptr, origType));
+    assert(!isOpaqueType(signature, origType));
     TheKind = unsigned(kind);
     OrigType = origType;
     ObjCMethod = method;
-    OtherData = errorInfo.Value;
+    OtherData = errorInfo.getOpaqueValue();
+    GenericSig = signature;
   }
 
   AbstractionPattern() {}
@@ -172,8 +205,11 @@ public:
   explicit AbstractionPattern(CanGenericSignature signature, CanType origType) {
     initSwiftType(signature, origType);
   }
-  explicit AbstractionPattern(CanType origType, const clang::Type *clangType) {
-    initClangType(origType, clangType);
+  explicit AbstractionPattern(CanType origType, const clang::Type *clangType)
+    : AbstractionPattern(nullptr, origType, clangType) {}
+  explicit AbstractionPattern(CanGenericSignature signature, CanType origType,
+                              const clang::Type *clangType) {
+    initClangType(signature, origType, clangType);
   }
 
   static AbstractionPattern getOpaque() {
@@ -197,53 +233,57 @@ public:
 private:
   /// Return an abstraction pattern for a tuple representing all the
   /// parameters to a C or block function.
-  static AbstractionPattern getClangFunctionParamTuple(CanType origType,
-                                               const clang::Type *clangType) {
+  static AbstractionPattern
+  getClangFunctionParamTuple(CanGenericSignature signature, CanType origType,
+                             const clang::Type *clangType) {
     assert(isa<TupleType>(origType));
     AbstractionPattern pattern;
-    pattern.initClangType(origType, clangType, Kind::ClangFunctionParamTupleType);
+    pattern.initClangType(signature, origType, clangType,
+                          Kind::ClangFunctionParamTupleType);
     return pattern;
   }
 
 public:
   /// Return an abstraction pattern for the type of an Objective-C method.
-  static AbstractionPattern getObjCMethod(CanType origType,
-                                          const clang::ObjCMethodDecl *method,
-                         const Optional<ForeignErrorConvention> &foreignError);
+  static AbstractionPattern
+  getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
+                const Optional<ForeignErrorConvention> &foreignError);
 
 private:
   /// Return an abstraction pattern for the type of an Objective-C method.
-  static AbstractionPattern getObjCMethod(CanType origType,
-                                          const clang::ObjCMethodDecl *method,
-                                          EncodedForeignErrorInfo errorInfo) {
+  static AbstractionPattern
+  getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
+                EncodedForeignErrorInfo errorInfo) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initObjCMethod(origType, method, Kind::ObjCMethodType,
+    pattern.initObjCMethod(nullptr, origType, method, Kind::ObjCMethodType,
                            errorInfo);
     return pattern;
   }
 
   /// Return an abstraction pattern for a tuple representing the
   /// uncurried parameter clauses of an Objective-C method.
-  static AbstractionPattern getObjCMethodParamTuple(CanType origType,
-                                          const clang::ObjCMethodDecl *method,
-                                          EncodedForeignErrorInfo errorInfo) {
+  static AbstractionPattern
+  getObjCMethodParamTuple(CanGenericSignature signature, CanType origType,
+                          const clang::ObjCMethodDecl *method,
+                          EncodedForeignErrorInfo errorInfo) {
     assert(isa<TupleType>(origType));
     assert(cast<TupleType>(origType)->getNumElements() == 2);
     AbstractionPattern pattern;
-    pattern.initObjCMethod(origType, method, Kind::ObjCMethodParamTupleType,
-                           errorInfo);
+    pattern.initObjCMethod(signature, origType, method,
+                           Kind::ObjCMethodParamTupleType, errorInfo);
     return pattern;
   }
 
   /// Return an abstraction pattern for a tuple representing the
   /// formal parameters to an Objective-C method.
-  static AbstractionPattern getObjCMethodFormalParamTuple(CanType origType,
-                                          const clang::ObjCMethodDecl *method,
-                                          EncodedForeignErrorInfo errorInfo) {
+  static AbstractionPattern
+  getObjCMethodFormalParamTuple(CanGenericSignature signature, CanType origType,
+                                const clang::ObjCMethodDecl *method,
+                                EncodedForeignErrorInfo errorInfo) {
     assert(isa<TupleType>(origType));
     AbstractionPattern pattern;
-    pattern.initObjCMethod(origType, method,
+    pattern.initObjCMethod(signature, origType, method,
                            Kind::ObjCMethodFormalParamTupleType, errorInfo);
     return pattern;
   }
@@ -351,7 +391,29 @@ public:
 
   EncodedForeignErrorInfo getEncodedForeignErrorInfo() const {
     assert(hasStoredForeignErrorInfo());
-    return { OtherData };
+    return EncodedForeignErrorInfo::fromOpaqueValue(OtherData);
+  }
+
+  bool hasForeignErrorStrippingResultOptionality() const {
+    switch (getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("querying invalid abstraction pattern!");
+    case Kind::Tuple:
+    case Kind::ClangFunctionParamTupleType:
+    case Kind::ObjCMethodParamTupleType:
+    case Kind::ObjCMethodFormalParamTupleType:
+      llvm_unreachable("querying foreign-error bits on non-function pattern");
+
+    case Kind::Opaque:
+    case Kind::ClangType:
+    case Kind::Type:
+      return false;
+    case Kind::ObjCMethodType: {
+      auto errorInfo = getEncodedForeignErrorInfo();
+      return (errorInfo.hasValue() && errorInfo.stripsResultOptionality());
+    }
+    }
+    llvm_unreachable("bad kind");
   }
 
   template<typename TYPE>

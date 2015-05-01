@@ -11,6 +11,8 @@
 
 - (instancetype) initWithOne: (nullable id) other error: (NSError**) error;
 + (instancetype) errorProneWithTwo: (nullable id) other error: (NSError**) error;
+
++ (NSArray*) collectionWithCount: (NSInteger) i error: (NSError**) error;
 @end
 
 @interface ReallyErrorProne : ErrorProne

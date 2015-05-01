@@ -1037,7 +1037,8 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
-    AbstractionPattern origPattern(origType, func->getType().getTypePtr());
+    AbstractionPattern origPattern(origType,
+                                   func->getType().getTypePtr());
     return getSILFunctionType(M, origPattern, substType, substInterfaceType,
                               extInfo, CFunctionConventions(func),
                               foreignError);
@@ -1780,9 +1781,9 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
 
 /// Fast path for bridging types in a function type without uncurrying.
 CanAnyFunctionType
-TypeConverter::getBridgedFunctionType(CanAnyFunctionType t,
-                                      AnyFunctionType::ExtInfo extInfo,
-                                      const clang::Decl *decl) {
+TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
+                                      CanAnyFunctionType t,
+                                      AnyFunctionType::ExtInfo extInfo) {
   // Pull out the generic signature.
   CanGenericSignature genericSig;
   if (auto gft = dyn_cast<GenericFunctionType>(t)) {
@@ -1831,31 +1832,98 @@ TypeConverter::getBridgedFunctionType(CanAnyFunctionType t,
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::ObjCMethod:
-    // FIXME: Should consider the originating Clang types of e.g. blocks.
-    return rebuild(getBridgedInputType(rep, t.getInput(), decl),
-                   getBridgedResultType(rep, t.getResult(), decl));
+    return rebuild(getBridgedInputType(rep, pattern.getFunctionInputType(),
+                                       t.getInput()),
+                   getBridgedResultType(rep, pattern.getFunctionResultType(),
+                                        t.getResult(),
+                        pattern.hasForeignErrorStrippingResultOptionality()));
   }
   llvm_unreachable("bad calling convention");
 }
 
+static CanType getUncurriedObjCMethodType(ASTContext &ctx,
+                                          CanAnyFunctionType outerFn,
+                                          AnyFunctionType::ExtInfo extInfo) {
+  auto innerFn = cast<AnyFunctionType>(outerFn.getResult());
+
+  TupleTypeElt elts[] = { innerFn.getInput(), outerFn.getInput() };
+  auto input = CanType(TupleType::get(elts, ctx));
+  auto result = innerFn.getResult();
+
+  if (auto genericFn = dyn_cast<GenericFunctionType>(outerFn)) {
+    return CanGenericFunctionType::get(genericFn.getGenericSignature(),
+                                       input, result, extInfo);
+  }
+
+  // This is just going into an abstraction pattern and doesn't
+  // actually need to preserve a GenericParamList.
+  return CanFunctionType::get(input, result, extInfo);
+}
+
+static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
+  switch (declRef.kind) {
+  case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::Allocator:
+  case SILDeclRef::Kind::Initializer:
+    return (declRef.hasDecl()
+            ? cast<AbstractFunctionDecl>(declRef.getDecl())
+            : nullptr);
+
+  case SILDeclRef::Kind::EnumElement:
+  case SILDeclRef::Kind::Destroyer:
+  case SILDeclRef::Kind::Deallocator:
+  case SILDeclRef::Kind::GlobalAccessor:
+  case SILDeclRef::Kind::GlobalGetter:
+  case SILDeclRef::Kind::DefaultArgGenerator:
+  case SILDeclRef::Kind::IVarInitializer:
+  case SILDeclRef::Kind::IVarDestroyer:
+    return nullptr;
+  }
+  llvm_unreachable("bad SILDeclRef kind");
+}
+
 CanAnyFunctionType
-TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
+TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
                                          unsigned uncurryLevel,
                                          AnyFunctionType::ExtInfo extInfo,
                                          Optional<SILDeclRef> constant) {
-  // Get the original Clang type of a node, if we have one.
-  const clang::Decl *clangDecl = nullptr;
-  if (constant && constant->hasDecl())
-    clangDecl = constant->getDecl()->getClangDecl();
+  // Form an abstraction pattern for bridging purposes.
+  // Foreign functions are only available at very specific uncurry levels.
+  auto bridgingFnPattern = AbstractionPattern::getOpaque();
+  if (constant && constant->isForeign) {
+    auto bridgedFn = getBridgedFunction(*constant);
+    const clang::Decl *clangDecl;
+    if (bridgedFn && (clangDecl = bridgedFn->getClangDecl())) {
+      // Don't implicitly turn non-optional results to optional if
+      // we're going to apply a foreign error convention that checks
+      // for nil results.
+      auto foreignError = bridgedFn->getForeignErrorConvention();
+      if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+        assert(uncurryLevel == 1 && "getting curried ObjC method type?");
+        auto methodType = getUncurriedObjCMethodType(Context, fnType, extInfo);
+        bridgingFnPattern =
+          AbstractionPattern::getObjCMethod(methodType, method, foreignError);
+      } else if (auto value = dyn_cast<clang::ValueDecl>(clangDecl)) {
+        bridgingFnPattern =
+          AbstractionPattern(fnType, value->getType().getTypePtr());
+      }
+    }
+  }
 
   // Fast path: no uncurrying required.
   if (uncurryLevel == 0)
-    return getBridgedFunctionType(t, extInfo, clangDecl);
+    return getBridgedFunctionType(bridgingFnPattern, fnType, extInfo);
 
   SILFunctionTypeRepresentation rep = extInfo.getSILRepresentation();
   assert(!extInfo.isAutoClosure() && "autoclosures cannot be curried");
   assert(rep != SILFunctionType::Representation::Block
          && "objc blocks cannot be curried");
+
+  // The dependent generic signature.
+  CanGenericSignature genericSig;
+  if (auto gft = dyn_cast<GenericFunctionType>(fnType)) {
+    genericSig = gft.getGenericSignature();
+  }
 
   // The uncurried input types.
   SmallVector<TupleTypeElt, 4> inputs;
@@ -1864,17 +1932,11 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
   // FIXME: Interface types make this unnecessary.
   Optional<GenericParamList *> genericParams;
 
-  // The dependent generic signature.
-  CanGenericSignature genericSig;
-  if (auto gft = dyn_cast<GenericFunctionType>(t)) {
-    genericSig = gft.getGenericSignature();
-  }
-
   // Merge inputs and generic parameters from the uncurry levels.
   for (;;) {
-    inputs.push_back(TupleTypeElt(t->getInput()));
+    inputs.push_back(TupleTypeElt(fnType->getInput()));
 
-    if (auto pft = dyn_cast<PolymorphicFunctionType>(t)) {
+    if (auto pft = dyn_cast<PolymorphicFunctionType>(fnType)) {
       assert(!genericParams
              || pft->getGenericParams().getOuterParameters() == *genericParams);
       genericParams = &pft->getGenericParams();
@@ -1882,15 +1944,17 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
 
     // The uncurried function calls all of the intermediate function
     // levels and so throws if any of them do.
-    if (t->getExtInfo().throws())
+    if (fnType->getExtInfo().throws())
       extInfo = extInfo.withThrows();
 
     if (uncurryLevel-- == 0)
       break;
-    t = cast<AnyFunctionType>(t.getResult());
+    fnType = cast<AnyFunctionType>(fnType.getResult());
   }
 
-  CanType resultType = t.getResult();
+  CanType resultType = fnType.getResult();
+  bool suppressOptionalResult =
+    bridgingFnPattern.hasForeignErrorStrippingResultOptionality();
 
   // Bridge input and result types.
   switch (rep) {
@@ -1903,21 +1967,30 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
+    assert(inputs.size() == 1);
     for (auto &input : inputs)
-      input = input.getWithType(
-               getBridgedInputType(rep, CanType(input.getType()), clangDecl));
-    resultType = getBridgedResultType(rep, resultType, clangDecl);
+      input = input.getWithType(getBridgedInputType(rep,
+                                   bridgingFnPattern.getFunctionInputType(),
+                                   CanType(input.getType())));
+    resultType = getBridgedResultType(rep,
+                                   bridgingFnPattern.getFunctionResultType(),
+                                   resultType, suppressOptionalResult);
     break;
   case SILFunctionTypeRepresentation::ObjCMethod: {
+    assert(inputs.size() == 2);
     // The "self" parameter should not get bridged unless it's a metatype.
     unsigned skip = 1;
     if (inputs.front().getType()->is<AnyMetatypeType>())
       skip = 0;
 
-    for (auto &input : make_range(inputs.begin() + skip, inputs.end()))
-      input = input.getWithType(
-                getBridgedInputType(rep, CanType(input.getType()), clangDecl));
-    resultType = getBridgedResultType(rep, resultType, clangDecl);
+    auto inputPattern = bridgingFnPattern.getFunctionInputType();
+    for (unsigned i = skip; i != 2; ++i)
+      inputs[i] = inputs[i].getWithType(getBridgedInputType(rep,
+                                   inputPattern.getTupleElementType(1 - i),
+                                   CanType(inputs[i].getType())));
+    resultType = getBridgedResultType(rep,
+                                   bridgingFnPattern.getFunctionResultType(),
+                                   resultType, suppressOptionalResult);
     break;
   }
   }
