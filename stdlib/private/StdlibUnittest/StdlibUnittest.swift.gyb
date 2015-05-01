@@ -351,6 +351,20 @@ public func expectUnreachable(
   println()
 }
 
+public func expectUnreachableCatch(
+  error: _ErrorType,
+  stackTrace: SourceLocStack? = nil,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  _anyExpectFailed = true
+  println("check failed at \(file), line \(line)")
+  _printStackTrace(stackTrace)
+  println("error should not be thrown: \"\(error)\"")
+  if collectMoreInfo != nil { println(collectMoreInfo!()) }
+  println()
+}
+
 %for BoolType in ['Bool', 'AssertionResult']:
 
 public func expectTrue(

@@ -103,48 +103,45 @@ NSStringAPIs.test("pathWithComponents(_:)") {
 
 NSStringAPIs.test("init(contentsOfFile:encoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
-  if true {
-    var err: NSError?
-    let content = String(contentsOfFile: existingPath,
-        encoding: NSASCIIStringEncoding, error: &err)
 
-    expectEmpty(err)
-    expectOptionalEqual(
-        "Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
-        content?._lines[0])
+  do {
+    let content = try String(contentsOfFile: existingPath,
+                             encoding: NSASCIIStringEncoding)
+    expectEqual("Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
+                content._lines[0])
+  } catch {
+    expectUnreachableCatch(error)
   }
-  if true {
-    var err: NSError?
-    let content = String(contentsOfFile: nonExistentPath,
-        encoding: NSASCIIStringEncoding, error: &err)
 
-    expectNotEmpty(err)
-    expectEmpty(content)
+  do {
+    let content = try String(contentsOfFile: nonExistentPath,
+                             encoding: NSASCIIStringEncoding)
+    expectUnreachable()
+  } catch {
   }
 }
 
 NSStringAPIs.test("init(contentsOfFile:usedEncoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
-  if true {
-    var usedEncoding: NSStringEncoding = 0
-    var err: NSError?
-    var content = String(contentsOfFile: existingPath,
-        usedEncoding: &usedEncoding, error: &err)
 
+  do {
+    var usedEncoding: NSStringEncoding = 0
+    let content = try String(contentsOfFile: existingPath,
+                             usedEncoding: &usedEncoding)
     expectNotEqual(0, usedEncoding)
-    expectEmpty(err)
-    expectOptionalEqual(
+    expectEqual(
         "Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
-        content?._lines[0])
+        content._lines[0])
+  } catch {
+    expectUnreachableCatch(error)
   }
-  if true {
-    var usedEncoding: NSStringEncoding = 0
-    var err: NSError?
-    var content = String(contentsOfFile: nonExistentPath, error: &err)
 
+  var usedEncoding: NSStringEncoding = 0
+  do {
+    var content = try String(contentsOfFile: nonExistentPath)
+    expectUnreachable()
+  } catch {
     expectEqual(0, usedEncoding)
-    expectNotEmpty(err)
-    expectEmpty(content)
   }
 }
 
@@ -153,23 +150,21 @@ NSStringAPIs.test("init(contentsOfURL:encoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   let existingURL = NSURL(string: "file://" + existingPath)!
   let nonExistentURL = NSURL(string: "file://" + nonExistentPath)!
-  if true {
-    var err: NSError?
-    var content = String(contentsOfURL: existingURL,
-        encoding: NSASCIIStringEncoding, error: &err)
-
-    expectEmpty(err)
-    expectOptionalEqual(
+  do {
+    var content = try String(contentsOfURL: existingURL,
+                             encoding: NSASCIIStringEncoding)
+    expectEqual(
         "Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
-        content?._lines[0])
+        content._lines[0])
+  } catch {
+    expectUnreachableCatch(error)
   }
-  if true {
-    var err: NSError?
-    var content = String(contentsOfURL: nonExistentURL,
-        encoding: NSASCIIStringEncoding, error: &err)
-
-    expectNotEmpty(err)
-    expectEmpty(content)
+  
+  do {
+    var content = try String(contentsOfURL: nonExistentURL,
+                             encoding: NSASCIIStringEncoding)
+    expectUnreachable()
+  } catch {
   }
 }
 
@@ -177,27 +172,26 @@ NSStringAPIs.test("init(contentsOfURL:usedEncoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
   let existingURL = NSURL(string: "file://" + existingPath)!
   let nonExistentURL = NSURL(string: "file://" + nonExistentPath)!
-  if true {
+  do {
     var usedEncoding: NSStringEncoding = 0
-    var err: NSError?
-    var content = String(contentsOfURL: existingURL,
-        usedEncoding: &usedEncoding, error: &err)
+    var content = try String(contentsOfURL: existingURL,
+                             usedEncoding: &usedEncoding)
 
     expectNotEqual(0, usedEncoding)
-    expectEmpty(err)
-    expectOptionalEqual(
+    expectEqual(
         "Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
-        content?._lines[0])
+        content._lines[0])
+  } catch {
+    expectUnreachableCatch(error)
   }
-  if true {
-    var usedEncoding: NSStringEncoding = 0
-    var err: NSError?
-    var content = String(contentsOfURL: nonExistentURL,
-        usedEncoding: &usedEncoding, error: &err)
 
+  var usedEncoding: NSStringEncoding = 0
+  do {
+    var content = try String(contentsOfURL: nonExistentURL,
+                             usedEncoding: &usedEncoding)
+    expectUnreachable()
+  } catch {
     expectEqual(0, usedEncoding)
-    expectNotEmpty(err)
-    expectEmpty(content)
   }
 }
 
@@ -1559,36 +1553,32 @@ NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
 
 NSStringAPIs.test("writeToFile(_:atomically:encoding:error:)") {
   let (_, nonExistentPath) = createNSStringTemporaryFile()
-  if true {
+  do {
     let s = "Lorem ipsum dolor sit amet, consectetur adipisicing elit"
-    var err: NSError?
-    let result = s.writeToFile(
-      nonExistentPath, atomically: false, encoding: NSASCIIStringEncoding,
-      error: &err)
-    expectEmpty(err)
-    expectTrue(result)
+    try s.writeToFile(
+      nonExistentPath, atomically: false, encoding: NSASCIIStringEncoding)
 
-    expectOptionalEqual(
-      s, String(contentsOfFile: 
+    expectEqual(
+      s, try String(contentsOfFile: 
         nonExistentPath, encoding: NSASCIIStringEncoding))
+  } catch {
+    expectUnreachableCatch(error)
   }
 }
 
 NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
   let (_, nonExistentPath) = createNSStringTemporaryFile()
   let nonExistentURL = NSURL(string: "file://" + nonExistentPath)!
-  if true {
+  do {
     let s = "Lorem ipsum dolor sit amet, consectetur adipisicing elit"
-    var err: NSError?
-    let result = s.writeToURL(
-      nonExistentURL, atomically: false, encoding: NSASCIIStringEncoding,
-      error: &err)
-    expectEmpty(err)
-    expectTrue(result)
+    try s.writeToURL(
+      nonExistentURL, atomically: false, encoding: NSASCIIStringEncoding)
 
-    expectOptionalEqual(
-      s, String(contentsOfFile: 
+    expectEqual(
+      s, try String(contentsOfFile: 
         nonExistentPath, encoding: NSASCIIStringEncoding))
+  } catch {
+    expectUnreachableCatch(error)
   }
 }
 

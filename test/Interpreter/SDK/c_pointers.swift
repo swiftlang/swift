@@ -84,20 +84,13 @@ func hangCanary(o: AnyObject) {
 // CHECK-LABEL: NSError out:
 println("NSError out:")
 autoreleasepool {
-  var err: NSError? = NSError()
-  hangCanary(err!)
-  if let s = NSString(contentsOfFile: "/hopefully/does/not/exist\u{1B}",
-                      encoding: NSUTF8StringEncoding,
-                      error: &err) {
+  do {
+    let s = try NSString(contentsOfFile: "/hopefully/does/not/exist\u{1B}",
+                         encoding: NSUTF8StringEncoding)
     _preconditionFailure("file should not actually exist")
-  } else if let err_ = err {
-    // The original value should have died
-    // CHECK-NEXT: died
-    println(err_.code) // CHECK-NEXT: 260
-    hangCanary(err_)
-    err = nil
-  } else {
-    _preconditionFailure("should have gotten an error")
+  } catch {
+    println(error.code) // CHECK-NEXT: 260
+    hangCanary(error as NSError)
   }
 }
 // The result error should have died with the autorelease pool
@@ -106,24 +99,22 @@ class DumbString: NSString {
   override func characterAtIndex(x: Int) -> unichar { _preconditionFailure("nope") }
   override var length: Int { return 0 }
 
-  convenience init?(contentsOfFile s: String, encoding: NSStringEncoding,
-                    error: AutoreleasingUnsafeMutablePointer<NSError?>) {
+  convenience init(contentsOfFile s: String, encoding: NSStringEncoding) throws {
     self.init()
-    error.memory = NSError(domain: "Malicious Mischief", code: 594, userInfo: nil)
-    return nil
+    throw NSError(domain: "Malicious Mischief", code: 594, userInfo: nil)
   }
 }
 
 // CHECK-LABEL: NSError in:
 println("NSError in:")
 autoreleasepool {
-  var err: NSError? = nil
-  DumbString(contentsOfFile: "foo", encoding: NSUTF8StringEncoding, error: &err)
-  let err_ = err!
-  println(err_.domain) // CHECK-NEXT: Malicious Mischief
-  println(err_.code) // CHECK-NEXT: 594
-  hangCanary(err_)
-  err = nil
+  do {
+    try DumbString(contentsOfFile: "foo", encoding: NSUTF8StringEncoding)
+  } catch {
+    println(error.domain) // CHECK-NEXT: Malicious Mischief
+    println(error.code) // CHECK-NEXT: 594
+    hangCanary(error as NSError)
+  }
 }
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died

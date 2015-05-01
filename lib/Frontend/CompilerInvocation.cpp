@@ -751,7 +751,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   Opts.InferImplicitProperties |=
     Args.hasArg(OPT_enable_objc_implicit_properties);
 
-  Opts.ErrorHandling |= Args.hasArg(OPT_import_error_handling);
+  Opts.ErrorHandling = true;
+  //Opts.ErrorHandling |= Args.hasArg(OPT_import_error_handling);
 
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 

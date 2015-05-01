@@ -51,9 +51,8 @@ func constPointerToObjC(objects: [AnyObject?]) -> NSArray {
   return NSArray(objects: objects, count: objects.count)
 }
 
-func mutablePointerToObjC(path: String) -> NSString {
-  var err: NSError? = nil
-  return NSString(contentsOfFile: path, error:&err)
+func mutablePointerToObjC(path: String) throws -> NSString {
+  return try NSString(contentsOfFile: path)
 }
 
 func objcStructs(s: StructOfNSStrings) {

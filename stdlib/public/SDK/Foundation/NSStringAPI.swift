@@ -195,16 +195,12 @@ extension String {
 
   /// Produces a string created by reading data from the file at a
   /// given path interpreted using a given encoding.
-  public init?(
+  public init(
     contentsOfFile path: String,
-    encoding enc: NSStringEncoding,
-    error: NSErrorPointer = nil
-  ) {
-    if let ns = NSString(contentsOfFile: path, encoding: enc, error: error) {
-      self = ns as String
-    } else {
-      return nil
-    }
+    encoding enc: NSStringEncoding
+  ) throws {
+    let ns = try NSString(contentsOfFile: path, encoding: enc)
+    self = ns as String
   }
 
   // + (instancetype)
@@ -215,18 +211,12 @@ extension String {
   /// Produces a string created by reading data from the file at
   /// a given path and returns by reference the encoding used to
   /// interpret the file.
-  public init?(
+  public init(
     contentsOfFile path: String,
-    usedEncoding: UnsafeMutablePointer<NSStringEncoding> = nil,
-    error: NSErrorPointer = nil
-  ) {
-    if let ns = NSString(
-      contentsOfFile: path, usedEncoding: usedEncoding, error: error) {
-
-      self = ns as String
-    } else {
-      return nil
-    }
+    usedEncoding: UnsafeMutablePointer<NSStringEncoding> = nil
+  ) throws {
+    let ns = try NSString(contentsOfFile: path, usedEncoding: usedEncoding)
+    self = ns as String
   }
 
   // + (instancetype)
@@ -237,16 +227,12 @@ extension String {
   /// Produces a string created by reading data from a given URL
   /// interpreted using a given encoding.  Errors are written into the
   /// inout `error` argument.
-  public init?(
+  public init(
     contentsOfURL url: NSURL,
-    encoding enc: NSStringEncoding,
-    error: NSErrorPointer = nil
-  ) {
-    if let ns = NSString(contentsOfURL: url, encoding: enc, error: error) {
-      self = ns as String
-    } else {
-      return nil
-    }
+    encoding enc: NSStringEncoding
+  ) throws {
+    let ns = try NSString(contentsOfURL: url, encoding: enc)
+    self = ns as String
   }
 
   // + (instancetype)
@@ -257,16 +243,12 @@ extension String {
   /// Produces a string created by reading data from a given URL
   /// and returns by reference the encoding used to interpret the
   /// data.  Errors are written into the inout `error` argument.
-  public init?(
+  public init(
     contentsOfURL url: NSURL,
-    usedEncoding enc: UnsafeMutablePointer<NSStringEncoding> = nil,
-    error: NSErrorPointer = nil
-  ) {
-    if let ns = NSString(contentsOfURL: url, usedEncoding: enc, error: error) {
-      self = ns as String
-    } else {
-      return nil
-    }
+    usedEncoding enc: UnsafeMutablePointer<NSStringEncoding> = nil
+  ) throws {
+    let ns = try NSString(contentsOfURL: url, usedEncoding: enc)
+    self = ns as String
   }
 
   // + (instancetype)
@@ -1465,10 +1447,10 @@ extension String {
   /// path using a given encoding.
   public func writeToFile(
     path: String, atomically useAuxiliaryFile:Bool,
-    encoding enc: NSStringEncoding, error: NSErrorPointer = nil
-  ) -> Bool {
-    return self._ns.writeToFile(
-      path, atomically: useAuxiliaryFile, encoding: enc, error: error)
+    encoding enc: NSStringEncoding
+  ) throws {
+    try self._ns.writeToFile(
+      path, atomically: useAuxiliaryFile, encoding: enc)
   }
 
   // - (BOOL)
@@ -1481,10 +1463,10 @@ extension String {
   /// by url using the specified encoding.
   public func writeToURL(
     url: NSURL, atomically useAuxiliaryFile: Bool,
-    encoding enc: NSStringEncoding, error: NSErrorPointer = nil
-  ) -> Bool {
-    return self._ns.writeToURL(
-      url, atomically: useAuxiliaryFile, encoding: enc, error: error)
+    encoding enc: NSStringEncoding
+  ) throws {
+    try self._ns.writeToURL(
+      url, atomically: useAuxiliaryFile, encoding: enc)
   }
 }
 

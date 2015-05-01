@@ -10,15 +10,13 @@ func testDictionary() {
   if dictNonOpt == nil { } // expected-error{{binary operator '==' cannot be applied to operands of type 'NSDictionary' and 'nil'}}
 }
 
-func testString() {
-  var error: NSError?
-
+func testString() throws {
   // Optional
-  var stringOpt = NSString(contentsOfFile: "blah", encoding: 0, error: &error)
+  var stringOpt = NSString(path: "blah", encoding: 0)
   var nsStr: NSString = stringOpt // expected-error{{value of optional type 'NSString?' not unwrapped; did you mean to use '!' or '?'?}}
 
   // Implicitly unwrapped optional
-  var stringIUO = NSString(contentsOfFile: "blah", error: &error)
+  var stringIUO = NSString(path: "blah")
   if stringIUO == nil { }
   var nsStr2: NSString = stringIUO
 }

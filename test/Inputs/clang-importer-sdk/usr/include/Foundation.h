@@ -154,6 +154,9 @@ __attribute__((availability(macosx,introduced=10.9)))
 - (void)onlyOnNSString;
 + (instancetype)stringWithContentsOfFile:(NSString*)path error:(NSError**)error;
 + (instancetype)stringWithContentsOfFile:(NSString*)path encoding:(int)encoding error:(NSError**)error;
+
++ (instancetype)stringWithPath:(NSString*)path;
++ (nullable instancetype)stringWithPath:(NSString*)path encoding:(int)encoding;
 @end
 
 NSString *NSStringToNSString(NSString *str);

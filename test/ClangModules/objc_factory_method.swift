@@ -22,9 +22,8 @@ func testInstanceTypeFactoryMethodInherited() {
   var of5 = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{cannot find an initializer for type 'NSObjectFactorySub' that accepts an argument list of type '(buildingWidgets: ())'}}
 }
 
-func testNSErrorFactoryMethod(path: String) {
-  var error: NSError?
-  var s1 = NSString(contentsOfFile: path, error: &error)
+func testNSErrorFactoryMethod(path: String) throws {
+  var s1 = try NSString(contentsOfFile: path)
 }
 
 func testNonInstanceTypeFactoryMethod(s: String) {
