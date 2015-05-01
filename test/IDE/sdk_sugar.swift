@@ -7,5 +7,5 @@
 
 import Foundation
 
-// CHECK: func loadAndReturnError(error: NSErrorPointer) -> Bool
+// CHECK: func load() throws
 
