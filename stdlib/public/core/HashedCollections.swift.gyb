@@ -2703,12 +2703,12 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
   internal mutating func isUniquelyReferenced() -> Bool {
     if _fastPath(guaranteedNative) {
-      return Bool(Builtin.isUnique_native(&self))
+      return _isUnique_native(&self)
     }
 
     switch self {
     case .Native:
-      return Bool(Builtin.isUnique_native(&self))
+      return _isUnique_native(&self)
     case .Cocoa:
       // Don't consider Cocoa storage mutable, even if it is mutable and is
       // uniquely referenced.

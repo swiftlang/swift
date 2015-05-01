@@ -31,6 +31,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -3047,8 +3048,26 @@ void IRGenSILFunction::visitUnownedReleaseInst(swift::UnownedReleaseInst *i) {
   ti.unownedRelease(*this, lowered);
 }
 
+static void requireRefCountedType(IRGenSILFunction &IGF,
+                                  SourceLoc loc,
+                                  SILType silType) {
+  auto operType = silType.getSwiftRValueType();
+  auto valueType = operType->getOptionalObjectType();
+  auto objType = valueType ? valueType : operType;
+  if (objType->mayHaveSuperclass()
+      || objType->isClassExistentialType()
+      || objType->is<BuiltinNativeObjectType>()
+      || objType->is<BuiltinBridgeObjectType>()
+      || objType->is<BuiltinUnknownObjectType>()) {
+    return;
+  }
+  IGF.IGM.error(loc, "isUnique operand type (" + Twine(operType.getString())
+                + ") is not a refcounted class");
+}
+
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
                                  SourceLoc loc, bool checkPinned) {
+  requireRefCountedType(IGF, loc, operand.getType());
   auto &operTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(operand.getType()));
   LoadedRef ref =
     operTI.loadRefcountedPtr(IGF, loc, IGF.getLoweredAddress(operand));

@@ -272,7 +272,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   ///
   /// See `isUniquelyReferenced` for details.
   public mutating func holdsUniqueReference() -> Bool {
-    return Bool(Builtin.isUnique(&_nativeBuffer))
+    return _isUnique(&_nativeBuffer)
   }
 
   /// Returns true iff either `self` holds the only strong reference
@@ -280,7 +280,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   ///
   /// See `isUniquelyReferenced` for details.
   public mutating func holdsUniqueOrPinnedReference() -> Bool {
-    return Bool(Builtin.isUniqueOrPinned(&_nativeBuffer))
+    return _isUniqueOrPinned(&_nativeBuffer)
   }
 
   //===--- internal/private API -------------------------------------------===//
@@ -458,11 +458,11 @@ public func == <Value, Element>(
 /// is already a user-level data race on the value being mutated.
 public func isUniquelyReferencedNonObjC<T : AnyObject>(inout object: T) -> Bool
 {
-  return Bool(Builtin.isUnique(&object))
+  return _isUnique(&object)
 }
 
 internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T) -> Bool {
-  return Bool(Builtin.isUniqueOrPinned(&object))
+  return _isUniqueOrPinned(&object)
 }
 
 /// Returns `true` iff `object` is a non-`@objc` class instance with a single
@@ -490,7 +490,7 @@ internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(inout object: T
 public func isUniquelyReferenced<T : NonObjectiveCBase>(
   inout object: T
 ) -> Bool {
-  return Bool(Builtin.isUnique(&object))
+  return _isUnique(&object)
 }
 
 /// Returns `true` iff `object` is a non-`@objc` class instance with
@@ -519,6 +519,5 @@ public func isUniquelyReferenced<T : NonObjectiveCBase>(
 public func isUniquelyReferencedNonObjC<T : AnyObject>(
   inout object: T?
 ) -> Bool {
-  return Bool(Builtin.isUnique(&object))
+  return _isUnique(&object)
 }
-
