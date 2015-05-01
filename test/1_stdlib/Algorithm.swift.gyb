@@ -1860,6 +1860,7 @@ let flatMapTests = [
 ]
 
 SequenceTypeAlgorithms.test("flatMap/SequenceType") {
+  expectEqual(0, LifetimeTracked.instances)
   for test in flatMapTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -1868,9 +1869,12 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       let s = MinimalSequence<OpaqueValue<Int>>(
         test.sequence.map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
+      let closureLifetimeTracker = LifetimeTracked(0)
+      expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
       var result = s._prext_flatMap {
         (element: OpaqueValue<Int>) -> MinimalSequence<OpaqueValue<Int32>> in
+        _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled
         return MinimalSequence<OpaqueValue<Int32>>(
           test.transform(element.value).map { OpaqueValue(Int32($0)) })
@@ -1888,6 +1892,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       }
     }
   }
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 struct FlatMapToOptionalTest {
@@ -1933,6 +1938,7 @@ let flatMapToOptionalTests = [
 ]
 
 SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
+  expectEqual(0, LifetimeTracked.instances)
   for test in flatMapToOptionalTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -1941,9 +1947,12 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       let s = MinimalSequence<OpaqueValue<Int>>(
         test.sequence.map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
+      let closureLifetimeTracker = LifetimeTracked(0)
+      expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
       var result = s._prext_flatMap {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32>? in
+        _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled
         return test.transform(element.value).map { OpaqueValue(Int32($0)) }
       }
@@ -1960,6 +1969,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       }
     }
   }
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 //===----------------------------------------------------------------------===//
@@ -2891,15 +2901,23 @@ SequenceTypeAlgorithms.test("Set<T>.find/WhereElementIsEquatable/CustomImplement
 % end
 
 SequenceTypeAlgorithms.test("find/Predicate") {
+  expectEqual(0, LifetimeTracked.instances)
   for test in findTests {
     let s = MinimalForwardCollection<MinimalEquatableValue>(
       test.sequence.map { MinimalEquatableValue($0) })
+    let closureLifetimeTracker = LifetimeTracked(0)
+    expectEqual(1, LifetimeTracked.instances)
+    let result = s._prext_indexOf {
+      (candidate) in
+      _blackHole(closureLifetimeTracker)
+      return candidate.value == test.element
+    }
     expectEqual(
       test.expected,
-      s._prext_indexOf { $0.value == test.element }
-        .map { $0.position },
+      result.map { $0.position },
       stackTrace: test.loc.withCurrentLoc())
   }
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 //===----------------------------------------------------------------------===//
@@ -3121,6 +3139,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
   CustomComparableValue.equalImpl = { $0 == $1 }
   CustomComparableValue.lessImpl = { $0 < $1 }
 %   end
+  expectEqual(0, LifetimeTracked.instances)
 
   for test in partitionExhaustiveTests {
     forAllPermutations(test.sequence) { (sequence) in
@@ -3147,7 +3166,13 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         let indices = s._prext_indices
 %       end
 
-        let pivot = s._prext_partition(indices) { $0.value < $1.value }
+        let closureLifetimeTracker = LifetimeTracked(0)
+        expectEqual(1, LifetimeTracked.instances)
+        let pivot = s._prext_partition(indices) {
+          (lhs, rhs) in
+          _blackHole(closureLifetimeTracker)
+          return lhs.value < rhs.value
+        }
 %     else:
         var sequenceAsArray: [CustomComparableValue] =
           zip(sequence, 0..<sequence.count)._prext_map {
@@ -3198,6 +3223,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 %   end
     }
   }
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 % end
@@ -3205,14 +3231,19 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 % for predicate in [ False, True ]:
 
 SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
+  expectEqual(0, LifetimeTracked.instances)
   withInvalidOrderings { (comparisonPredicate) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
 %   if predicate:
         var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
           sequence._prext_map { OpaqueValue($0) })
+        let closureLifetimeTracker = LifetimeTracked(0)
+        expectEqual(1, LifetimeTracked.instances)
         let pivot = s._prext_partition(s._prext_indices) {
-          comparisonPredicate($0.value, $1.value)
+          (lhs, rhs) in
+          _blackHole(closureLifetimeTracker)
+          return comparisonPredicate(lhs.value, rhs.value)
         }
 %    else:
         var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
@@ -3234,6 +3265,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
       }
     }
   }
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 % end
