@@ -21,6 +21,9 @@ func privateNominalMembers(a: String) {
 }
 
 // PRIVATE_NOMINAL_MEMBERS_1: Begin completions
+
+// FIXME: we should show the qualified String.Index type.
+// rdar://problem/20788802
 // PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#Index#]{{; name=.+$}}
 // PRIVATE_NOMINAL_MEMBERS_1: End completions
 

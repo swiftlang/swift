@@ -39,6 +39,9 @@
 
 // LITERAL4:         Begin completions
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(f): UnsafePointer<Int8> -> Result##UnsafePointer<Int8> -> Result#})[#Result#]; name=withCString(f: UnsafePointer<Int8> -> Result){{$}}
+
+// FIXME: we should show the qualified String.Index type.
+// rdar://problem/20788802
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      startIndex[#Index#]; name=startIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#Index#]; name=endIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
