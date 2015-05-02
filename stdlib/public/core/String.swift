@@ -580,7 +580,9 @@ extension String : Sliceable {
       unicodeScalars[subRange.startIndex._base..<subRange.endIndex._base]._core)
   }
 
-  @availability(*, unavailable, message="cannot subscript String with a range of Int")
+  @availability(
+    *, unavailable,
+    message="cannot subscript String with a range of Int")
   public subscript(subRange: Range<Int>) -> String {
     return ""
   }
@@ -640,7 +642,9 @@ extension String {
   >(
     subRange: Range<Index>, with newElements: C
   ) {
-    withMutableCharacters { (inout v: CharacterView) in v.replaceRange(subRange, with: newElements) }
+    withMutableCharacters {
+      (inout v: CharacterView) in v.replaceRange(subRange, with: newElements)
+    }
   }
   
   /// Insert `newElement` at index `i`.
@@ -649,7 +653,9 @@ extension String {
   ///
   /// - complexity: O(`count(self)`).
   public mutating func insert(newElement: Character, atIndex i: Index) {
-    withMutableCharacters { (inout v: CharacterView) in v.insert(newElement, atIndex: i) }
+    withMutableCharacters {
+      (inout v: CharacterView) in v.insert(newElement, atIndex: i)
+    }
   }
 
   /// Insert `newElements` at index `i`
@@ -660,7 +666,9 @@ extension String {
   public mutating func splice<
     S : CollectionType where S.Generator.Element == Character
   >(newElements: S, atIndex i: Index) {
-    withMutableCharacters { (inout v: CharacterView) in v.splice(newElements, atIndex: i) }
+    withMutableCharacters {
+      (inout v: CharacterView) in v.splice(newElements, atIndex: i)
+    }
   }
 
   /// Remove and return the element at index `i`
@@ -669,7 +677,9 @@ extension String {
   ///
   /// - complexity: O(`count(self)`).
   public mutating func removeAtIndex(i: Index) -> Character {
-    return withMutableCharacters { (inout v: CharacterView) in v.removeAtIndex(i) }
+    return withMutableCharacters {
+      (inout v: CharacterView) in v.removeAtIndex(i)
+    }
   }
 
   /// Remove the indicated `subRange` of characters
@@ -678,7 +688,9 @@ extension String {
   ///
   /// - complexity: O(`count(self)`).
   public mutating func removeRange(subRange: Range<Index>) {
-    withMutableCharacters { (inout v: CharacterView) in v.removeRange(subRange) }
+    withMutableCharacters {
+      (inout v: CharacterView) in v.removeRange(subRange)
+    }
   }
 
   /// Remove all characters.
@@ -689,7 +701,9 @@ extension String {
   ///   allocated storage, which can be a useful optimization
   ///   when `self` is going to be grown again.
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    withMutableCharacters { (inout v: CharacterView) in v.removeAll(keepCapacity: keepCapacity) }
+    withMutableCharacters {
+      (inout v: CharacterView) in v.removeAll(keepCapacity: keepCapacity)
+    }
   }
 }
 #if _runtime(_ObjC)
