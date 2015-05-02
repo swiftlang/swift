@@ -1030,10 +1030,11 @@ StringTests.test("unicodeViews") {
 // Validate that index conversion does something useful for Cocoa
 // programmers.
 StringTests.test("indexConversion") {
-  var err: NSError? = nil
-
-  let re = NSRegularExpression(
-    pattern: "([^ ]+)er", options: NSRegularExpressionOptions(), error: &err)!
+  let re : NSRegularExpression
+  do {
+    re = try NSRegularExpression(pattern: "([^ ]+)er",
+                                 options: NSRegularExpressionOptions())
+  } catch { fatalError("couldn't build regexp: \(error)") }
 
   let s = "go further into the larder to barter."
 

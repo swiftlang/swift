@@ -7,7 +7,8 @@
 
 import CoreData
 class A : NSManagedObjectContext {
-    override func save(a: NSErrorPointer) -> Bool {
-        return self.hasChanges || super.save(a)
+    // Error-handling mutilates this test a lot.
+    override func isEqual(other: AnyObject?) -> Bool {
+        self.hasChanges || super.isEqual(other)
     }
 }
