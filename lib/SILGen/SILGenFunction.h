@@ -655,7 +655,7 @@ public:
   ///
   /// The block should be empty and have no predecessors.
   void eraseBasicBlock(SILBasicBlock *block);
-  
+
   //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//
@@ -1093,6 +1093,11 @@ public:
                                            ArrayRef<Substitution> subs,
                                            ArrayRef<ManagedValue> args,
                                            SGFContext ctx);
+
+  SILValue emitApplyWithRethrow(SILLocation loc, SILValue fn,
+                                SILType substFnType,
+                                ArrayRef<Substitution> subs,
+                                ArrayRef<SILValue> args);
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       SILResultInfo exnResult);

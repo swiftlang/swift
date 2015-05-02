@@ -185,3 +185,85 @@ func DoesNotThrow() throws -> Int32 {
   return 2
 }
 
+// rdar://20782111
+protocol Doomed {
+  func check() throws
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors12DoomedStructS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error _ErrorType
+// CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedStruct
+// CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
+// CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*DoomedStruct
+// CHECK:      [[T0:%.*]] = function_ref @_TFV6errors12DoomedStruct5checkfS0_FzT_T_ : $@convention(method) (DoomedStruct) -> @error _ErrorType
+// CHECK-NEXT: try_apply [[T0]]([[SELF]])
+// CHECK:    bb1([[T0:%.*]] : $()):
+// CHECK:      dealloc_stack [[TEMP]]#0
+// CHECK:      return [[T0]] : $()
+// CHECK:    bb2([[T0:%.*]] : $_ErrorType):
+// CHECK:      builtin "willThrow"([[T0]] : $_ErrorType)
+// CHECK:      dealloc_stack [[TEMP]]#0
+// CHECK:      throw [[T0]] : $_ErrorType
+struct DoomedStruct : Doomed {
+  func check() throws {}
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors11DoomedClassS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error _ErrorType {
+// CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
+// CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
+// CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*DoomedClass
+// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : DoomedClass -> () throws -> () , $@convention(method) (@guaranteed DoomedClass) -> @error _ErrorType
+// CHECK-NEXT: try_apply [[T0]]([[SELF]])
+// CHECK:    bb1([[T0:%.*]] : $()):
+// CHECK:      strong_release [[SELF]] : $DoomedClass
+// CHECK:      dealloc_stack [[TEMP]]#0
+// CHECK:      return [[T0]] : $()
+// CHECK:    bb2([[T0:%.*]] : $_ErrorType):
+// CHECK:      builtin "willThrow"([[T0]] : $_ErrorType)
+// CHECK:      strong_release [[SELF]] : $DoomedClass
+// CHECK:      dealloc_stack [[TEMP]]#0
+// CHECK:      throw [[T0]] : $_ErrorType
+class DoomedClass : Doomed {
+  func check() throws {}
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors11HappyStructS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error _ErrorType
+// CHECK:      [[TEMP:%.*]] = alloc_stack $HappyStruct
+// CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
+// CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*HappyStruct
+// CHECK:      [[T0:%.*]] = function_ref @_TFV6errors11HappyStruct5checkfS0_FT_T_ : $@convention(method) (HappyStruct) -> ()
+// CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
+// CHECK:      dealloc_stack [[TEMP]]#0
+// CHECK:      return [[T1]] : $()
+struct HappyStruct : Doomed {
+  func check() {}
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors10HappyClassS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error _ErrorType
+// CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
+// CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
+// CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*HappyClass
+// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : HappyClass -> () -> () , $@convention(method) (@guaranteed HappyClass) -> ()
+// CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
+// CHECK:      strong_release [[SELF]] : $HappyClass
+// CHECK:      dealloc_stack [[TEMP]]#0
+// CHECK:      return [[T1]] : $()
+class HappyClass : Doomed {
+  func check() {}
+}
+
+func create<T>(fn: () throws -> T) throws -> T {
+  return try fn()
+}
+func testThunk(fn: () throws -> Int) throws -> Int {
+  return try create(fn)
+}
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@out Int, @owned @callee_owned () -> (Int, @error _ErrorType)) -> @error _ErrorType
+// CHECK: bb0(%0 : $*Int, %1 : $@callee_owned () -> (Int, @error _ErrorType)):
+// CHECK:   try_apply %1()
+// CHECK: bb1([[T0:%.*]] : $Int):
+// CHECK:   store [[T0]] to %0 : $*Int
+// CHECK:   [[T0:%.*]] = tuple ()
+// CHECK:   return [[T0]]
+// CHECK: bb2([[T0:%.*]] : $_ErrorType):
+// CHECK:   builtin "willThrow"([[T0]] : $_ErrorType)
+// CHECK:   throw [[T0]] : $_ErrorType

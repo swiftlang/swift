@@ -1581,6 +1581,42 @@ static bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
   return (type1 != type2);
 }
 
+/// Emit either an 'apply' or a 'try_apply', with the error branch of
+/// the 'try_apply' simply branching out of all cleanups and throwing.
+SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
+                                              SILValue fn,
+                                              SILType substFnType,
+                                              ArrayRef<Substitution> subs,
+                                              ArrayRef<SILValue> args) {
+  CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
+  SILType resultType = silFnType->getResult().getSILType();
+
+  if (!silFnType->hasErrorResult()) {
+    return B.createApply(loc, fn, substFnType, resultType, subs, args);
+  }
+
+  SILBasicBlock *errorBB = createBasicBlock();
+  SILBasicBlock *normalBB = createBasicBlock();
+  B.createTryApply(loc, fn, substFnType, subs, args, normalBB, errorBB);
+
+  // Emit the rethrow logic.
+  {
+    B.emitBlock(errorBB);
+    SILValue error =
+      errorBB->createBBArg(silFnType->getErrorResult().getSILType());
+
+    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
+                    SGM.Types.getEmptyTupleType(), {}, {error});
+
+    Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc));
+    B.createThrow(loc, error);
+  }
+
+  // Enter the normal path.
+  B.emitBlock(normalBB);
+  return normalBB->createBBArg(resultType);
+}
+
 /// Emit a raw apply operation, performing no additional lowering of
 /// either the arguments or the result.
 static SILValue emitRawApply(SILGenFunction &gen,

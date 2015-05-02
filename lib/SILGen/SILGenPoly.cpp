@@ -962,11 +962,10 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   forwardFunctionArguments(gen, loc, fnType, args, argValues);
 
   SILValue innerResultValue =
-    gen.B.createApply(loc, fnValue.forward(gen),
-                      /*substFnType*/ fnValue.getType(),
-                      fnType->getResult().getSILType(),
-                      /*substitutions*/ {},
-                      argValues);
+    gen.emitApplyWithRethrow(loc, fnValue.forward(gen),
+                             /*substFnType*/ fnValue.getType(),
+                             /*substitutions*/ {},
+                             argValues);
 
   // Translate the result value.
   auto origResultType = origFormalType.getFunctionResultType();
@@ -1688,9 +1687,8 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   SILValue witnessFnRef = getWitnessFunctionRef(*this, conformance,
                                                 witness, isFree,
                                                 witnessParams, witnessSILTy, loc);
-  SILValue witnessResultValue = B.createApply(
-      loc, witnessFnRef, witnessSILTy,
-      witnessFTy->getResult().getSILType(), witnessSubs, args);
+  SILValue witnessResultValue =
+    emitApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs, args);
 
   auto thunkResultTy = F.mapTypeIntoContext(thunkTy->getSemanticResultSILType());
   

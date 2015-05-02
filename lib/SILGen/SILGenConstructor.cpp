@@ -503,32 +503,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
         genericParamList->getForwardingSubstitutions(getASTContext());
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
-  SILType resultTy = getLoweredLoadableType(ctor->getResultType());
 
-  auto initFnType = initTy.castTo<SILFunctionType>();
-
-  SILValue initedSelfValue;
-  if (!initFnType->hasErrorResult()) {
-    initedSelfValue =
-      B.createApply(Loc, initVal.forward(*this), initTy, resultTy, subs, args);
-  } else {
-    SILBasicBlock *errorBB = createBasicBlock();
-    SILBasicBlock *normalBB = createBasicBlock();
-    B.createTryApply(Loc, initVal.forward(*this), initTy, subs, args,
-                     normalBB, errorBB);
-
-    B.emitBlock(errorBB);
-    SILValue error =
-      errorBB->createBBArg(initFnType->getErrorResult().getSILType());
-
-    B.createBuiltin(Loc, SGM.getASTContext().getIdentifier("willThrow"),
-                    SGM.Types.getEmptyTupleType(), {}, {error});
-
-    B.createThrow(Loc, error);
-
-    B.emitBlock(normalBB);
-    initedSelfValue = normalBB->createBBArg(resultTy);
-  }
+  SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
+                                                  initTy, subs, args);
 
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
