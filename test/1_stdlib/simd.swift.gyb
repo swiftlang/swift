@@ -1,0 +1,277 @@
+// RUN: rm -f %t.swift %t.out
+
+// RUN: %S/../../utils/gyb %s -o %t.swift
+// RUN: %S/../../utils/line-directive %t.swift -- %target-build-swift %t.swift -o %t.out
+// RUN: %S/../../utils/line-directive %t.swift -- %target-run %t.out
+
+import simd
+import StdlibUnittest
+
+func same<S: SIMDScalarType>(x:S, _ y:S) -> Bool {
+  return x == y
+}
+
+func same(x: Float, _ y: Float) -> Bool {
+  return x == y || x.isNaN && y.isNaN
+}
+
+func same(x: Double, _ y: Double) -> Bool {
+  return x == y || x.isNaN && y.isNaN
+}
+
+func same<V: SIMDVectorType>(x:V, _ y:V) -> Bool {
+  for i in 0 ..< x.count {
+    if (!same(x[i], y[i])) { return false }
+  }
+  return true
+}
+
+func same<M: SIMDMatrixType>(x:M, _ y:M) -> Bool {
+  for i in 0 ..< x.columns {
+    if (!same(x[i], y[i])) { return false }
+  }
+  return true
+}
+
+var simdTestSuite = TestSuite("simd")
+
+simdTestSuite.test("sizes") {
+//  C interop requires that vector be the right size.
+  expectEqual(sizeof(Float.Vector2.self), 8)
+  expectEqual(sizeof(Float.Vector3.self), 16)
+  expectEqual(sizeof(Float.Vector4.self), 16)
+  expectEqual(sizeof(Int32.Vector2.self), 8)
+  expectEqual(sizeof(Int32.Vector3.self), 16)
+  expectEqual(sizeof(Int32.Vector4.self), 16)
+  expectEqual(sizeof(Double.Vector2.self), 16)
+  expectEqual(sizeof(Double.Vector3.self), 32)
+  expectEqual(sizeof(Double.Vector4.self), 32)
+
+  expectEqual(sizeof(Float.Matrix2x2.self), 16)
+  expectEqual(sizeof(Float.Matrix2x3.self), 32)
+  expectEqual(sizeof(Float.Matrix2x4.self), 32)
+  expectEqual(sizeof(Float.Matrix3x2.self), 24)
+  expectEqual(sizeof(Float.Matrix3x3.self), 48)
+  expectEqual(sizeof(Float.Matrix3x4.self), 48)
+  expectEqual(sizeof(Float.Matrix4x2.self), 32)
+  expectEqual(sizeof(Float.Matrix4x3.self), 64)
+  expectEqual(sizeof(Float.Matrix4x4.self), 64)
+
+  expectEqual(sizeof(Double.Matrix2x2.self), 32)
+  expectEqual(sizeof(Double.Matrix2x3.self), 64)
+  expectEqual(sizeof(Double.Matrix2x4.self), 64)
+  expectEqual(sizeof(Double.Matrix3x2.self), 48)
+  expectEqual(sizeof(Double.Matrix3x3.self), 96)
+  expectEqual(sizeof(Double.Matrix3x4.self), 96)
+  expectEqual(sizeof(Double.Matrix4x2.self), 64)
+  expectEqual(sizeof(Double.Matrix4x3.self), 128)
+  expectEqual(sizeof(Double.Matrix4x4.self), 128)
+
+  expectEqual(sizeof(Float.Matrix2x2.self), sizeof(Float.Matrix2x2.CMatrix.self))
+  expectEqual(sizeof(Float.Matrix2x3.self), sizeof(Float.Matrix2x3.CMatrix.self))
+  expectEqual(sizeof(Float.Matrix2x4.self), sizeof(Float.Matrix2x4.CMatrix.self))
+  expectEqual(sizeof(Float.Matrix3x2.self), sizeof(Float.Matrix3x2.CMatrix.self))
+  expectEqual(sizeof(Float.Matrix3x3.self), sizeof(Float.Matrix3x3.CMatrix.self))
+  expectEqual(sizeof(Float.Matrix3x4.self), sizeof(Float.Matrix3x4.CMatrix.self))
+  expectEqual(sizeof(Float.Matrix4x2.self), sizeof(Float.Matrix4x2.CMatrix.self))
+  expectEqual(sizeof(Float.Matrix4x3.self), sizeof(Float.Matrix4x3.CMatrix.self))
+  expectEqual(sizeof(Float.Matrix4x4.self), sizeof(Float.Matrix4x4.CMatrix.self))
+
+  expectEqual(sizeof(Double.Matrix2x2.self), sizeof(Double.Matrix2x2.CMatrix.self))
+  expectEqual(sizeof(Double.Matrix2x3.self), sizeof(Double.Matrix2x3.CMatrix.self))
+  expectEqual(sizeof(Double.Matrix2x4.self), sizeof(Double.Matrix2x4.CMatrix.self))
+  expectEqual(sizeof(Double.Matrix3x2.self), sizeof(Double.Matrix3x2.CMatrix.self))
+  expectEqual(sizeof(Double.Matrix3x3.self), sizeof(Double.Matrix3x3.CMatrix.self))
+  expectEqual(sizeof(Double.Matrix3x4.self), sizeof(Double.Matrix3x4.CMatrix.self))
+  expectEqual(sizeof(Double.Matrix4x2.self), sizeof(Double.Matrix4x2.CMatrix.self))
+  expectEqual(sizeof(Double.Matrix4x3.self), sizeof(Double.Matrix4x3.CMatrix.self))
+  expectEqual(sizeof(Double.Matrix4x4.self), sizeof(Double.Matrix4x4.CMatrix.self))
+}
+
+% scalar_types = ['Float', 'Double', 'Int32']
+% float_types = ['Float', 'Double']
+% member = ['.x', '.y', '.z', '.w']
+
+simdTestSuite.test("vector init") {
+% for type in scalar_types:
+%   for size in [2,3,4]:
+//    Workaround <rdar://problem/18900352>
+%     vectype = type + '.Vector' + str(size)
+%     vec = type.lower() + str(size)
+
+  //  Check empty initializer.
+  var ${vec} = ${vectype}()
+  expectEqual(${vec}, ${[0]*size}, same)
+
+  //  Check zero property.
+  expectEqual(${vec}, ${vectype}.zero, same)
+
+  //  Check literal initializer.
+  ${vec} = ${vectype}(2)
+  expectEqual(${vec}, ${[2]*size}, same)
+
+  //  Check scalar initializer.
+  expectEqual(${vectype}(${type}(2)), ${vec}, same)
+
+  //  Previous checks implicitly used the array initializer, so we're good
+  //  with that one already.
+
+%   end # for size in [2,3,4]
+% end # for type in scalar_types
+}
+
+simdTestSuite.test("vector elements") {
+% for type in scalar_types:
+%   for size in [2,3,4]:
+//    Workaround <rdar://problem/18900352>
+%     vectype = type + '.Vector' + str(size)
+%     vec = type.lower() + str(size)
+  var ${vec} = ${vectype}.zero
+
+  //  Check getting and setting .xyzw
+% for i in range(size):
+  ${vec + member[i]} = ${-i}
+  expectEqual(${vec + member[i]}, ${-i})
+% end
+
+  //  Check getting and setting [i]
+  for i in 0..<${size} { ${vec}[i] = -${vec}[i] }
+  expectEqual(${vec}, ${range(size)}, same)
+
+%   end # for size in [2,3,4]
+% end # for type in scalar_types
+}
+
+simdTestSuite.test("vector debugDescription") {
+  var f2 = Float.Vector2([1, 2])
+  expectEqual("Float.Vector2([1.0, 2.0])", f2.debugDescription)
+  var f3 = Float.Vector3([1, 2, 3])
+  expectEqual("Float.Vector3([1.0, 2.0, 3.0])", f3.debugDescription)
+  var f4 = Float.Vector4([1, 2, 3, 4])
+  expectEqual("Float.Vector4([1.0, 2.0, 3.0, 4.0])", f4.debugDescription)
+
+  var d2 = Double.Vector2([1, 2])
+  expectEqual("Double.Vector2([1.0, 2.0])", d2.debugDescription)
+  var d3 = Double.Vector3([1, 2, 3])
+  expectEqual("Double.Vector3([1.0, 2.0, 3.0])", d3.debugDescription)
+  var d4 = Double.Vector4([1, 2, 3, 4])
+  expectEqual("Double.Vector4([1.0, 2.0, 3.0, 4.0])", d4.debugDescription)
+
+  var i2 = Int32.Vector2([1, 2])
+  expectEqual("Int32.Vector2([1, 2])", i2.debugDescription)
+  var i3 = Int32.Vector3([1, 2, 3])
+  expectEqual("Int32.Vector3([1, 2, 3])", i3.debugDescription)
+  var i4 = Int32.Vector4([1, 2, 3, 4])
+  expectEqual("Int32.Vector4([1, 2, 3, 4])", i4.debugDescription)
+}
+
+simdTestSuite.test("matrix init") {
+% for type in float_types:
+%   for cols in [2,3,4]:
+//    Workaround <rdar://problem/18900352>
+%     for rows in [2,3,4]:
+//      Workaround <rdar://problem/18900352>
+%       mattype = type + '.Matrix' + str(cols) + 'x' + str(rows)
+%       coltype = type + '.Vector' + str(rows)
+%       mat = type.lower() + str(cols) + 'x' + str(rows)
+%       diagsize = rows if rows < cols else cols
+
+  //  Check empty intializer.
+  var ${mat} = ${mattype}()
+  expectEqual(${mat}, ${mattype}(${[[0]*rows]*cols}), same)
+
+  //  Check zero property.
+  expectEqual(${mat}, ${mattype}.zero, same)
+
+  //  Check scalar initializer.
+  ${mat} = ${mattype}(2)
+  for i in 0..<${mat}.rows {
+    for j in 0..<${mat}.columns {
+      if i == j { expectEqual(${mat}[i, i], 2) }
+      else { expectEqual(${mat}[j, i], 0) }
+    }
+  }
+
+  //  Check identity property (and scalar product).
+  expectEqual(${mat}, 2*${mattype}.identity, same)
+
+  //  Check diagonal initializer.
+  ${mat} = ${mattype}(diagonal: ${range(diagsize)})
+  for i in 0..<${mat}.rows {
+    for j in 0..<${mat}.columns {
+      if i == j { expectEqual(${mat}[i, i], ${mattype}.Scalar(i)) }
+      else { expectEqual(${mat}[j, i], 0) }
+    }
+  }
+
+  //  All the previous checks implicitly used the column initializer.
+
+  //  Check row initializer.
+  ${mat} = ${mattype}(rows:[
+% for i in range(rows):
+    ${range(i*cols, (i+1)*cols)},
+% end # for i
+  ])
+  for i in 0..<${mat}.rows {
+    for j in 0..<${mat}.columns {
+      expectEqual(${mat}[j, i], ${mattype}.Scalar(${cols}*i + j))
+    }
+  }
+
+  //  Round-trip through C matrix type.
+  expectEqual(${mat}, ${mattype}(${mat}.cmatrix), same)
+
+%     end # for rows
+%   end # for cols
+% end # for type
+}
+
+simdTestSuite.test("matrix elements") {
+% for type in float_types:
+%   for cols in [2,3,4]:
+//    Workaround <rdar://problem/18900352>
+%     for rows in [2,3,4]:
+//      Workaround <rdar://problem/18900352>
+%       mattype = type + '.Matrix' + str(cols) + 'x' + str(rows)
+%       coltype = type + '.Vector' + str(rows)
+%       mat = type.lower() + str(cols) + 'x' + str(rows)
+%       basis = type.lower() + 'basis' + str(cols) + 'x' + str(rows)
+%       diagsize = rows if rows < cols else cols
+
+  //  Check getting and setting columns.
+  let ${basis} : [${coltype}] = [
+% for i in range(cols):
+    [${', '.join(map(lambda j:
+     '1' if i == j else '0',
+     range(rows)))}],
+% end
+  ]
+  var ${mat} = ${mattype}.zero
+  for i in 0..<${mat}.columns {
+    ${mat}[i] = ${mattype}.Scalar(i+1)*${basis}[i]
+  }
+  expectEqual(${mat}, ${mattype}(diagonal:${range(1,diagsize+1)}), same)
+  for i in 0..<${mat}.columns {
+    expectEqual(${mat}[i], ${mattype}.Scalar(i+1)*${basis}[i], same)
+  }
+
+  //  Check getting and setting elements (and transpose).
+  ${mat} = ${mattype}.zero
+  for i in 0..<${mat}.rows {
+    for j in 0..<${mat}.columns {
+      ${mat}[j, i] = ${mattype}.Scalar(${cols}*i + j)
+    }
+  }
+  var ${'trans'+mat} = ${mat}.transpose
+  for j in 0..<${mat}.columns {
+    for i in 0..<${mat}.rows {
+      expectEqual(${'trans'+mat}[i, j], ${mattype}.Scalar(${cols}*i + j))
+    }
+  }
+
+%     end # for rows
+%   end # for cols
+% end # for type
+}
+
+runAllTests()

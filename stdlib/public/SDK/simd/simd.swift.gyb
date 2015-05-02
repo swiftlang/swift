@@ -1,0 +1,1030 @@
+//===----------------------------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// simd.h overlays for Swift
+//===----------------------------------------------------------------------===//
+
+import Darwin
+import simd
+
+public protocol SIMDScalarType : Equatable {
+  func +(lhs: Self, rhs: Self) -> Self
+  func -(lhs: Self, rhs: Self) -> Self
+  func *(lhs: Self, rhs: Self) -> Self
+  func /(lhs: Self, rhs: Self) -> Self
+}
+
+extension Float : SIMDScalarType {
+  @_alignment(8)
+  public struct Vector2 { public var x, y: Float }
+  @_alignment(16)
+  public struct Vector3 {
+    public var x, y, z: Float
+    // In C, Obj-C and C++, sizeof(float3) is 16; we need an extra padding
+    // element to make that true for Swift as well, otherwise the types will
+    // not be layout compatable.
+    internal let _padding: Float = 0
+  }
+  @_alignment(16)
+  public struct Vector4 { public var x, y, z, w: Float }
+}
+
+extension Double : SIMDScalarType {
+  @_alignment(16)
+  public struct Vector2 { public var x, y: Double }
+  @_alignment(32)
+  public struct Vector3 {
+    public var x, y, z: Double
+    // In C, Obj-C and C++, sizeof(double3) is 32; we need an extra padding
+    // element to make that true for Swift as well, otherwise the types will
+    // not be layout compatable.
+    internal let _padding: Double = 0
+  }
+  @_alignment(32)
+  public struct Vector4 { public var x, y, z, w: Double }
+}
+
+extension Int32 : SIMDScalarType {
+  @_alignment(8)
+  public struct Vector2 { public var x, y: Int32 }
+  @_alignment(16)
+  public struct Vector3 {
+    public var x, y, z: Int32
+    // In C, Obj-C and C++, sizeof(int3) is 16; we need an extra padding
+    // element to make that true for Swift as well, otherwise the types will
+    // not be layout compatable.
+    internal let _padding: Int32 = 0
+  }
+  @_alignment(16)
+  public struct Vector4 { public var x, y, z, w: Int32 }
+}
+
+public protocol SIMDVectorType :
+  ArrayLiteralConvertible, CustomDebugStringConvertible {
+
+  /// The type of the elements of the vector.
+  typealias Scalar : SIMDScalarType
+
+  /// Initialize a vector to zero.
+  init()
+
+  /// A vector with all elements equal to `scalar`.
+  init(_ scalar: Scalar)
+
+  /// Generate a vector from `array`.
+  ///
+  /// - precondition: requires that the array has the same number of elements
+  ///   as the vector type being initialized.
+  init(_ array: [Scalar])
+
+  /// Access to individual vector elements.
+  subscript(index: Int) -> Scalar { get set }
+
+  /// A hash of the vector's content
+  ///
+  /// VectorType is not Hashable, because Hashable requires Equatable, and
+  /// vector comparisons would produce vector results, not Bool, if we had
+  /// them.  However, VectorType does provide hashValue, so you can easily
+  /// extend it to be Hashable if needed.
+  var hashValue: Int { get }
+
+  /// The zero vector.
+  static var zero: Self { get }
+
+  /// The number of elements in the vector.
+  var count: Int { get }
+}
+
+public protocol SIMDVectorArithmeticType : SIMDVectorType {
+
+  /// Vector addition.
+  func +(lhs: Self, rhs: Self) -> Self
+
+  /// Vector addition.
+  func +=(inout lhs: Self, rhs: Self) -> Void
+
+  /// Vector negation.
+  prefix func - (rhs: Self) -> Self
+
+  /// Vector subtraction.
+  func -(lhs: Self, rhs: Self) -> Self
+
+  /// Vector subtraction.
+  func -=(inout lhs: Self, rhs: Self) -> Void
+
+  /// The elementwise (aka Hadamard, aka Schur) product of two vectors.
+  /// The dot and cross products are available as `dot(x,y)` and `cross(x,y)`.
+  func *(lhs: Self, rhs: Self) -> Self
+
+  /// Elementwise (aka Hadamard, aka Schur) product.
+  func *=(inout lhs: Self, rhs: Self) -> Void
+
+  /// Scalar-Vector product.
+  func *(lhs: Scalar, rhs: Self) -> Self
+
+  /// Scalar-Vector product.
+  func *(lhs: Self, rhs: Scalar) -> Self
+
+  /// Scalar-Vector product.
+  func *=(inout lhs: Self, rhs: Scalar) -> Void
+
+  /// Elementwise division (inverse operation of the elementwise product).
+  func /(lhs: Self, rhs: Self) -> Self
+
+  /// Elementwise division.
+  func /=(inout lhs: Self, rhs: Self) -> Void
+}
+
+% scalar_types = ['Float','Double','Int32']
+% floating_types = ['Float','Double']
+% components = ['x','y','z','w']
+% cardinals = { 2:'two', 3:'three', 4:'four'}
+% hash_scales = ['1', '3', '5', '11']
+% one_minus_ulp = { 'Float':'0x1.fffffep-1', 'Double':'0x1.fffffffffffffp-1' }
+
+% for type in scalar_types:
+%   for size in [2, 3, 4]:
+//    Workaround <rdar://problem/18900352>
+%     vectype = type + '.Vector' + str(size)
+
+extension ${vectype}: SIMDVectorType {
+
+  /// The type of the elements of the vector.
+  public typealias Scalar = ${type}
+
+  /// Initialize to the zero vector.
+  public init() { self.init(0) }
+
+  /// Initialize all vector elements to `scalar`.
+  public init(_ scalar: Scalar) {
+    self.init(${', '.join(map(lambda c:  \
+              c + ':scalar',             \
+              components[:size]))})
+  }
+
+  /// Initialize using `array`.
+  ///
+  /// - precondition: the array must have the correct number of elements for
+  /// the vector type.
+  public init(_ array: [Scalar]) {
+    _precondition(array.count == ${size},
+                  "${vectype} requires a ${cardinals[size]}-element array")
+    self.init(${', '.join(map(lambda i:
+              components[i] + ':array[' + str(i) + ']',
+              range(size)))})
+  }
+
+  /// Initialize using `arrayLiteral`.
+  ///
+  /// - precondition: the array literal must have the correct number of elements.
+  public init(arrayLiteral elements: Scalar...) { self.init(elements) }
+
+  /// Access individual elements of the vector via subscript.
+  public subscript(index: Int) -> Scalar {
+    get {
+      switch index {
+% for i in range(size):
+      case ${i}: return ${components[i]}
+% end
+      default: _preconditionFailure("Vector index out of range")
+      }
+    }
+    set(value) {
+      switch index {
+% for i in range(size):
+      case ${i}: ${components[i]} = value
+% end
+      default: _preconditionFailure("Vector index out of range")
+      }
+    }
+  }
+
+  /// Get debug string representation of vector
+  public var debugDescription: String {
+    return "${vectype}(\(_descriptionAsArray))"
+  }
+
+  /// Internal helper function prints vector as array literal
+  internal var _descriptionAsArray: String {
+    return "[${', '.join(map(lambda c:
+             '\\(' + c + ')',
+             components[:size]))}]"
+  }
+
+  // A passable hash function.  Can likely be improved further, but if the hash
+  // of the scalar type is sound then this is pretty good.  Key properties:
+  // if corresponding elements of two vectors hash equal, the vectors hash
+  // equal, repeated values don't cause collapse, and permuting the vector
+  // changes the hash.
+  public var hashValue: Int {
+    return ${' ^ '.join(map(lambda i: \
+           hash_scales[i] + '&*' + components[i] + '.hashValue', \
+           range(size)))}
+  }
+
+  /// Constant zero vector.
+  public static var zero: ${vectype} { return ${vectype}() }
+
+  /// The number of elements in the vector.
+  public var count: Int { return ${size} }
+}
+
+//  Operators and free functions don't go inside extensions, so there's nothing
+//  in the brackets.
+extension ${vectype} : SIMDVectorArithmeticType { }
+
+/// Vector sum of `lhs` and `rhs`.
+@inline(__always)
+public func +(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c: \
+                    c + ':lhs.' + c + '+rhs.' + c,
+                    components[:size]))})
+}
+
+/// Vector difference of `lhs` and `rhs`.
+@inline(__always)
+public func -(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c: \
+                    c + ':lhs.' + c + '-rhs.' + c,
+                    components[:size]))})
+}
+
+/// Negation of `rhs`.
+@inline(__always)
+public prefix func -(rhs: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c: \
+                    c + ':-rhs.' + c,
+                    components[:size]))})
+}
+
+/// Elementwise product of `lhs` and `rhs`.  A.k.a. the Hadamard or Schur
+/// product of the two vectors.
+@inline(__always)
+public func *(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c: \
+                    c + ':lhs.' + c + '*rhs.' + c,
+                    components[:size]))})
+}
+
+/// Elementwise quotient of `lhs` and `rhs`.  This is the inverse operation
+/// of the elementwise product.
+@inline(__always)
+public func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c: \
+                    c + ':lhs.' + c + '/rhs.' + c,
+                    components[:size]))})
+}
+
+/// Add `rhs` to `lhs`.
+@inline(__always)
+public func +=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
+  lhs = lhs + rhs
+}
+
+/// Subtract `rhs` from `lhs`.
+@inline(__always)
+public func -=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
+  lhs = lhs - rhs
+}
+
+/// Multiply `lhs` by `rhs` (elementwise).
+@inline(__always)
+public func *=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
+  lhs = lhs * rhs
+}
+
+/// Divide `lhs` by `rhs` (elementwise).
+@inline(__always)
+public func /=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
+  lhs = lhs / rhs
+}
+
+/// Scalar-Vector product.
+@inline(__always)
+public func *(lhs: ${type}, rhs: ${vectype}) -> ${vectype} {
+  return ${vectype}(lhs) * rhs
+}
+
+/// Scalar-Vector product.
+@inline(__always)
+public func *(lhs: ${vectype}, rhs: ${type}) -> ${vectype} {
+  return lhs * ${vectype}(rhs)
+}
+
+/// Scales `lhs` by `rhs`.
+@inline(__always)
+public func *=(inout lhs: ${vectype}, rhs: ${type}) -> Void {
+  lhs = lhs * rhs
+}
+
+/// Elementwise absolute value of a vector.  The result is a vector of the same
+/// length with all elements positive.
+@inline(__always)
+public func abs(x: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c: \
+                    c + ': abs(x.' + c + ')', \
+                    components[:size]))})
+}
+
+/// Elementwise minimum of two vectors.  Each component of the result is the
+/// smaller of the corresponding components of the inputs.
+@inline(__always)
+public func min(x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c:             \
+                    c + ': min(x.' + c + ',y.' + c + ')', \
+                    components[:size]))})
+}
+
+/// Elementwise maximum of two vectors.  Each component of the result is the
+/// larger of the corresponding components of the inputs.
+@inline(__always)
+public func max(x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c:             \
+                    c + ': max(x.' + c + ',y.' + c + ')', \
+                    components[:size]))})
+}
+
+/// Vector-scalar minimum.  Each component of the result is the minimum of the
+/// corresponding element of the input vector and the scalar.
+@inline(__always)
+public func min(vector: ${vectype}, _ scalar: ${type}) -> ${vectype} {
+  return min(vector, ${vectype}(scalar))
+}
+
+/// Vector-scalar maximum.  Each component of the result is the maximum of the
+/// corresponding element of the input vector and the scalar.
+@inline(__always)
+public func max(vector: ${vectype}, _ scalar: ${type}) -> ${vectype} {
+  return max(vector, ${vectype}(scalar))
+}
+
+/// Each component of the result is the corresponding element of x clamped to
+/// the range formed by the corresponding elements of min and max.  Any lanes
+/// of x that contain NaN will end up with the min value.
+@inline(__always)
+public func clamp(x: ${vectype},
+                  min: ${vectype},
+                  max: ${vectype}) -> ${vectype} {
+  return simd.min(simd.max(x, min), max)
+}
+
+/// Clamp each element of x to the range [min, max].  If any lane of x is NaN,
+/// the corresponding lane of the result is min.
+@inline(__always)
+public func clamp(x: ${vectype}, min: ${type}, max: ${type}) -> ${vectype} {
+  return simd.min(simd.max(x, min), max)
+}
+
+/// Sum of the elements of the vector.
+@inline(__always)
+public func reduceAdd(x: ${vectype}) -> ${type} {
+  return ${' + '.join(map(lambda x:'x.'+x, components[:size]))}
+}
+
+/// Minimum element of the vector.
+@inline(__always)
+public func reduceMin(x: ${vectype}) -> ${type} {
+  return min(${', '.join(map(lambda x:'x.'+x, components[:size]))})
+}
+
+/// Maximum element of the vector.
+@inline(__always)
+public func reduceMax(x: ${vectype}) -> ${type} {
+  return max(${', '.join(map(lambda x:'x.'+x, components[:size]))})
+}
+
+%     if type in floating_types:
+
+/// Sign of a vector.  Each lane contains -1 if the corresponding lane of x is
+/// less than zero, +1 if the corresponding lane of x is greater than zero, and
+/// zero otherwise.
+@inline(__always)
+public func sign(x: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c:  \
+                    c + ': sign(x.' + c + ')', \
+                    components[:size]))})
+}
+
+/// Linear interpolation between x (t=0) and y (t=1).  May be used with t
+/// outside of [0, 1] as well.
+@inline(__always)
+public func mix(x: ${vectype}, _ y: ${vectype}, t: ${vectype}) -> ${vectype} {
+  return x + t*(y-x)
+}
+
+/// Linear interpolation between x (t=0) and y (t=1).  May be used with t
+/// outside of [0, 1] as well.
+@inline(__always)
+public func mix(x: ${vectype}, _ y: ${vectype}, t: ${type}) -> ${vectype} {
+  return x + t*(y-x)
+}
+
+/// Elementwise reciprocal.
+@inline(__always)
+public func recip(x: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c:  \
+                    c + ': recip(x.' + c + ')', \
+                    components[:size]))})
+}
+
+/// Elementwise reciprocal square root.
+@inline(__always)
+public func rsqrt(x: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c:  \
+                    c + ': rsqrt(x.' + c + ')', \
+                    components[:size]))})
+}
+
+/// Each element of the result is the smallest integral value greater than or
+/// equal to the corresponding element of the input.
+@inline(__always)
+public func ceil(x: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c:  \
+                    c + ': ceil(x.' + c + ')', \
+                    components[:size]))})
+}
+
+/// Each element of the result is the largest integral value less than or equal
+/// to the corresponding element of the input.
+@inline(__always)
+public func floor(x: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c:  \
+                    c + ': floor(x.' + c + ')', \
+                    components[:size]))})
+}
+
+/// Each element of the result is the closest integral value with magnitude
+/// less than or equal to that of the corresponding element of the input.
+@inline(__always)
+public func trunc(x: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c:  \
+                    c + ': trunc(x.' + c + ')', \
+                    components[:size]))})
+}
+
+/// x - floor(x), clamped to lie in the range [0,1).  Without this clamp step,
+/// the result would be 1.0 when x is a very small negative number, which may
+/// result in out-of-bounds table accesses in common usage.
+@inline(__always)
+public func fract(x: ${vectype}) -> ${vectype} {
+  return min(x - floor(x), ${vectype}(${one_minus_ulp[type]}))
+}
+
+/// 0.0 if x < edge, and 1.0 otherwise.
+@inline(__always)
+public func step(x: ${vectype}, edge: ${vectype}) -> ${vectype} {
+  return ${vectype}(${', '.join(map(lambda c:                 \
+                    c + ': step(x.' + c + ', edge: edge.' + c + ')', \
+                    components[:size]))})
+}
+
+/// 0.0 if x < edge0, 1.0 if x > edge1, and cubic interpolation between 0 and 1
+/// in the interval [edge0, edge1].
+@inline(__always)
+public func smoothstep(x: ${vectype},
+                       edge0: ${vectype},
+                       edge1: ${vectype}) -> ${vectype} {
+  let t = clamp((x-edge0)/(edge1-edge0), min: 0, max: 1)
+  return t*t*(${vectype}(3) - 2*t)
+}
+
+/// Dot product of x and y.
+@inline(__always)
+public func dot(x: ${vectype}, _ y: ${vectype}) -> ${type} {
+  return reduceAdd(x*y)
+}
+
+/// Projection of x onto y.
+@inline(__always)
+public func project(x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
+  return dot(x,y)/dot(y,y)*y
+}
+
+/// Length of x, squared.  This is more efficient to compute than the length,
+/// so you should use it if you only need to compare lengths to eachother.
+/// I.e. instead of writing:
+///
+///   if (length(x) < length(y)) { ... }
+///
+/// use:
+///
+///   if (lengthSquared(x) < lengthSquared(y)) { ... }
+///
+/// Doing it this way avoids one or two square roots, which is a fairly costly
+/// operation.
+@inline(__always)
+public func lengthSquared(x: ${vectype}) -> ${type} {
+  return dot(x,x)
+}
+
+/// Length (two-norm or "Euclidean norm") of x.
+@inline(__always)
+public func length(x: ${vectype}) -> ${type} {
+  return sqrt(lengthSquared(x))
+}
+
+/// The one-norm (or "taxicab norm") of x.
+@inline(__always)
+public func normOne(x: ${vectype}) -> ${type} {
+  return reduceAdd(abs(x))
+}
+
+/// The infinity-norm (or "sup norm") of x.
+@inline(__always)
+public func normInf(x: ${vectype}) -> ${type} {
+  return reduceMax(abs(x))
+}
+
+/// Distance between x and y, squared.
+@inline(__always)
+public func distanceSquared(x: ${vectype}, y: ${vectype}) -> ${type} {
+  return lengthSquared(x - y)
+}
+
+/// Distance between x and y.
+@inline(__always)
+public func distance(x: ${vectype}, y: ${vectype}) -> ${type} {
+  return length(x - y)
+}
+
+/// Normalize a vector so that it has length 1.  normalize(0) is 0.
+@inline(__always)
+public func normalize(x: ${vectype}) -> ${vectype} {
+  return x * rsqrt(lengthSquared(x))
+}
+
+/// x reflected through the hyperplane with unit normal vector n, passing
+/// through the origin.  E.g. if x is [1,2,3] and n is [0,0,1], the result
+/// is [1,2,-3].
+@inline(__always)
+public func reflect(x: ${vectype}, n: ${vectype}) -> ${vectype} {
+  return x - 2*dot(x,n)*n
+}
+
+/// The refraction direction given unit incident vector x, unit surface normal
+/// n, and index of refraction eta.  If the angle between the incident vector
+/// and the surface is so small that total internal reflection occurs, zero is
+/// returned.
+@inline(__always)
+public func refract(x: ${vectype}, n: ${vectype}, eta: ${type}) -> ${vectype} {
+  let k = 1 - eta*eta*(1 - dot(x,n)*dot(x,n))
+  if k >= 0 { return eta*x - (eta*dot(x,n) + sqrt(k))*n }
+  return ${vectype}(0)
+}
+
+%     end # if type in floating_types
+%   end # for size in [2, 3, 4]
+%   if type in floating_types:
+//  Scalar versions of common operations:
+
+/// Returns -1 if x < 0, +1 if x > 0, and 0 otherwise (sign(NaN) is 0).
+@inline(__always)
+public func sign(x: ${type}) -> ${type} {
+  return x < 0 ? -1 : (x > 0 ? 1 : 0)
+}
+
+/// Reciprocal.
+@inline(__always)
+public func recip(x: ${type}) -> ${type} { return 1/x }
+
+/// Reciprocal square root.
+@inline(__always)
+public func rsqrt(x: ${type}) -> ${type} { return 1/sqrt(x) }
+
+/// Returns 0.0 if x < edge, and 1.0 otherwise.
+@inline(__always)
+public func step(x: ${type}, edge: ${type}) -> ${type} {
+  return x < edge ? 0.0 : 1.0
+}
+
+/// Interprets two two-dimensional vectors as three-dimensional vectors in the
+/// xy-plane and computes their cross product, which lies along the z-axis.
+@inline(__always)
+public func cross(x: ${type}.Vector2, _ y: ${type}.Vector2) -> ${type}.Vector3 {
+  return ${type}.Vector3(x: 0, y: 0, z: x.x*y.y - x.y*y.x)
+}
+
+/// Cross-product of two three-dimensional vectors.  The resulting vector is
+/// perpendicular to the plane determined by x and y, with length equal to the
+/// oriented area of the parallelogram they determine.
+@inline(__always)
+public func cross(x: ${type}.Vector3, _ y: ${type}.Vector3) -> ${type}.Vector3 {
+  return ${type}.Vector3(x: x.y*y.z - x.z*y.y,
+                    y: x.z*y.x - x.x*y.z,
+                    z: x.x*y.y - x.y*y.x)
+}
+
+%   end # type in floating_types
+% end # for type in scalar_types
+
+extension Float {
+  public struct Matrix2x2 {
+    internal var _columns: (Float.Vector2, Float.Vector2)
+  }
+  public struct Matrix3x2 {
+    internal var _columns: (Float.Vector2, Float.Vector2, Float.Vector2)
+  }
+  public struct Matrix4x2 {
+    internal var _columns: (Float.Vector2, Float.Vector2, Float.Vector2, Float.Vector2)
+  }
+  public struct Matrix2x3 {
+    internal var _columns: (Float.Vector3, Float.Vector3)
+  }
+  public struct Matrix3x3 {
+    internal var _columns: (Float.Vector3, Float.Vector3, Float.Vector3)
+  }
+  public struct Matrix4x3 {
+    internal var _columns: (Float.Vector3, Float.Vector3, Float.Vector3, Float.Vector3)
+  }
+  public struct Matrix2x4 {
+    internal var _columns: (Float.Vector4, Float.Vector4)
+  }
+  public struct Matrix3x4 {
+    internal var _columns: (Float.Vector4, Float.Vector4, Float.Vector4)
+  }
+  public struct Matrix4x4 {
+    internal var _columns: (Float.Vector4, Float.Vector4, Float.Vector4, Float.Vector4)
+  }
+}
+
+extension Double {
+  public struct Matrix2x2 {
+    internal var _columns: (Double.Vector2, Double.Vector2)
+  }
+  public struct Matrix3x2 {
+    internal var _columns: (Double.Vector2, Double.Vector2, Double.Vector2)
+  }
+  public struct Matrix4x2 {
+    internal var _columns: (Double.Vector2, Double.Vector2, Double.Vector2, Double.Vector2)
+  }
+  public struct Matrix2x3 {
+    internal var _columns: (Double.Vector3, Double.Vector3)
+  }
+  public struct Matrix3x3 {
+    internal var _columns: (Double.Vector3, Double.Vector3, Double.Vector3)
+  }
+  public struct Matrix4x3 {
+    internal var _columns: (Double.Vector3, Double.Vector3, Double.Vector3, Double.Vector3)
+  }
+  public struct Matrix2x4 {
+    internal var _columns: (Double.Vector4, Double.Vector4)
+  }
+  public struct Matrix3x4 {
+    internal var _columns: (Double.Vector4, Double.Vector4, Double.Vector4)
+  }
+  public struct Matrix4x4 {
+    internal var _columns: (Double.Vector4, Double.Vector4, Double.Vector4, Double.Vector4)
+  }
+}
+
+public protocol SIMDMatrixType : CustomDebugStringConvertible {
+
+  /// The type of the elements of the matrix.
+  typealias Scalar : SIMDScalarType
+
+  /// The type of the columns of the matrix.
+  typealias Column : SIMDVectorType
+
+  /// The type of the (main) diagonal of the matrix.
+  typealias Diagonal : SIMDVectorType
+
+  /// The type of the rows of the matrix.
+  typealias Row : SIMDVectorType
+
+  /// The type of the transpose of the matrix.
+  typealias Transpose
+
+  /// The corresponding C matrix type.
+  typealias CMatrix
+
+  /// Initialize a matrix to zero.
+  init()
+
+  /// Create a matrix with a scalar value repeated on the main diagonal, and
+  /// zeros in the off-diagonal entries.  Use this to create an identity matrix
+  /// like this: Float.Matrix2x2(1)
+  init(_ scalar: Scalar)
+
+  /// Create a matrix with specfied entries on the main diagonal, and zero in
+  /// the off-diagonal entries.
+  init(diagonal: Diagonal)
+
+  /// Create a matrix with `columns`.
+  init(_ columns: [Column])
+
+  /// Create a matrix with `rows`.
+  init(rows: [Row])
+
+  /// Initialize from C matrix.
+  init(_ cmatrix: CMatrix)
+
+  /// This matrix as a C matrix.
+  var cmatrix: CMatrix { get }
+
+  /// The zero matrix
+  static var zero: Self { get }
+
+  /// The identity matrix
+  static var identity: Self { get }
+
+  /// The number of columns
+  var columns: Int { get }
+
+  /// The number of rows
+  var rows: Int { get }
+
+  /// Access to matrix columns.
+  subscript(column: Int) -> Column { get set }
+
+  /// Access to individual matrix elements.
+  subscript(column: Int, row: Int) -> Scalar { get set }
+
+  /// Matrix addition
+  func +(lhs: Self, rhs: Self) -> Self
+
+  /// Matrix addition
+  func +=(inout lhs: Self, rhs: Self) -> Void
+
+  /// Matrix negation (additive inverse)
+  prefix func - (rhs: Self) -> Self
+
+  /// Matrix subtraction
+  func -(lhs: Self, rhs: Self) -> Self
+
+  /// Matrix subtraction
+  func -=(inout lhs: Self, rhs: Self) -> Void
+
+  /// Matrix-Vector product
+  /// Note: even though `rhs` is conceptually a column vector, it has the same
+  /// length as a *row* of the matrix (hence why its type is Row).
+  func *(lhs: Self, rhs: Row) -> Column
+
+  /// Vector-Matrix product
+  /// Note: even though `lhs` is conceptually a row vector, it has the same
+  /// length as a *column* of the matrix, so its type is `Column`.
+  func *(lhs: Column, rhs: Self) -> Row
+
+  /// Scalar-Matrix product
+  func *(lhs: Scalar, rhs: Self) -> Self
+
+  /// Matrix-Scalar product
+  func *(lhs: Self, rhs: Scalar) -> Self
+
+  /// Matrix-Scalar product
+  func *=(inout lhs: Self, rhs: Scalar) -> Void
+
+  /// Transpose of the matrix
+  var transpose: Transpose { get }
+}
+
+public protocol SIMDSquareMatrixType : SIMDMatrixType {
+  /// Inverse of the matrix, if it is invertible.  Otherwise, a matrix
+  /// is returned, but it will not be the inverse of this matrix.
+  var inverse: Self { get }
+}
+
+% for type in floating_types:
+%   for rows in [2,3,4]:
+//      Workaround <rdar://problem/18900352>
+%     for cols in [2,3,4]:
+//      Workaround <rdar://problem/18900352>
+%       mattype = type + '.Matrix' + str(cols) + 'x' + str(rows)
+%       diagsize = rows if rows < cols else cols
+
+extension ${mattype} : SIMDMatrixType {
+
+  /// Type of individual elements of the matrix.
+  public typealias Scalar = ${type}
+
+  /// Type of matrix columns.
+  public typealias Column = ${type}.Vector${rows}
+
+  /// Type of matrix rows.
+  public typealias Row = ${type}.Vector${cols}
+
+  /// Type of matrix diagonals.
+  public typealias Diagonal = ${type}.Vector${diagsize}
+
+  /// Type of matrix transpose.
+  public typealias Transpose = ${type}.Matrix${rows}x${cols}
+
+  /// Corresponding C matrix type.
+  public typealias CMatrix = matrix_${type.lower()}${cols}x${rows}
+
+  /// Initialize matrix to zero.
+  public init() {
+%   for i in range(cols):
+    _columns.${i} = Column()
+%   end
+  }
+
+  /// Initialize matrix to have `scalar` on main diagonal, zeros elsewhere.
+  public init(_ scalar: Scalar) {
+    self.init(diagonal: Diagonal(scalar))
+  }
+
+  /// Initialize matrix to have specified `diagonal`, and zeros elsewhere.
+  public init(diagonal: Diagonal) {
+%   for i in range(cols):
+      self._columns.${i} = Column()
+%   end
+%   for i in range(diagsize):
+      self._columns.${i}.${components[i]} = diagonal.${components[i]}
+%   end
+  }
+
+  /// Initialize matrix to have specified `columns`.
+  public init(_ columns: [Column]) {
+    _precondition(columns.count == ${cols}, "Requires array of ${cols} vectors")
+%   for i in range(cols):
+    self._columns.${i} = columns[${i}]
+%   end
+  }
+
+  /// Initialize matrix to have specified `rows`.
+  public init(rows: [Row]) {
+    _precondition(rows.count == ${rows}, "Requires array of ${rows} vectors")
+%   for i in range(cols):
+      self._columns.${i} = [${', '.join(map(lambda j:
+                            'rows[' + str(j) + '].' + components[i],
+                            range(rows)))}]
+%   end
+  }
+
+  /// Initialize matrix to have specified `columns`, passed as a tuple.
+  internal init(${', '.join(map(lambda i:
+                '_ col' + str(i) + ': Column',
+                range(cols)))}) {
+    self.init(_columns: (${', '.join(map(lambda i:
+                         'col' + str(i),
+                         range(cols)))}))
+  }
+
+  /// Initialize matrix from corresponding C matrix type.
+  public init(_ cmatrix: CMatrix) {
+    self = unsafeBitCast(cmatrix, ${mattype}.self)
+  }
+
+  /// Get the matrix as the corresponding C matrix type.
+  public var cmatrix: CMatrix { return unsafeBitCast(self, CMatrix.self) }
+
+  /// The zero matrix of this type.
+  public static var zero: ${mattype} { return ${mattype}() }
+
+  /// The identity matrix of this type.
+  public static var identity: ${mattype} { return ${mattype}(1) }
+
+  /// Number of columns in the matrix.
+  public var columns: Int { return ${cols} }
+
+  /// Number of rows in the matrix.
+  public var rows: Int { return ${rows} }
+
+  /// Access to individual columns.
+  public subscript(column: Int) -> Column {
+    get {
+      switch(column) {
+% for i in range(cols):
+      case ${i}: return _columns.${i}
+% end
+      default: _preconditionFailure("Column index out of range")
+      }
+    }
+    set (value) {
+      switch(column) {
+% for i in range(cols):
+      case ${i}: _columns.${i} = value
+% end
+      default: _preconditionFailure("Column index out of range")
+      }
+    }
+  }
+
+  /// Access to individual elements.
+  public subscript(column: Int, row: Int) -> Scalar {
+    get { return self[column][row] }
+    set (value) { self[column][row] = value }
+  }
+
+  public var debugDescription: String {
+    return "${mattype}([${', '.join(map(lambda i: \
+                        '\(_columns.' + str(i) + '._descriptionAsArray)',
+                        range(cols)))}])"
+  }
+
+  /// Get transpose of the matrix.
+  public var transpose: Transpose {
+    return ${type}.Matrix${rows}x${cols}([
+% for i in range(rows):
+      [${', '.join(map(lambda j: \
+       'self[' + str(j) + ',' + str(i) + ']', \
+       range(cols)))}],
+% end # for i in range(rows)
+    ])
+  }
+}
+
+/// Sum of two matrices.
+public func +(lhs: ${mattype}, rhs: ${mattype}) -> ${mattype} {
+  return ${mattype}(${', '.join(map(lambda i: \
+                    'lhs._columns.'+str(i)+' + rhs._columns.'+str(i), \
+                    range(cols)))})
+}
+
+/// Negation of a matrix.
+public prefix func -(rhs: ${mattype}) -> ${mattype} {
+  return ${mattype}(${', '.join(map(lambda i: \
+                    '-rhs._columns.'+str(i),  \
+                    range(cols)))})
+}
+
+/// Difference of two matrices.
+public func -(lhs: ${mattype}, rhs: ${mattype}) -> ${mattype} {
+  return ${mattype}(${', '.join(map(lambda i: \
+                    'lhs._columns.'+str(i)+' - rhs._columns.'+str(i), \
+                    range(cols)))})
+}
+
+public func +=(inout lhs: ${mattype}, rhs: ${mattype}) -> Void {
+  lhs = lhs + rhs
+}
+
+public func -=(inout lhs: ${mattype}, rhs: ${mattype}) -> Void {
+  lhs = lhs - rhs;
+}
+
+/// Scalar-Matrix multiplication.
+public func *(lhs: ${type}, rhs: ${mattype}) -> ${mattype} {
+  return ${mattype}(${', '.join(map(lambda i: \
+                    'lhs*rhs._columns.'+str(i), \
+                    range(cols)))})
+}
+
+/// Matrix-Scalar multiplication.
+public func *(lhs: ${mattype}, rhs: ${type}) -> ${mattype} {
+  return rhs*lhs
+}
+
+public func *=(inout lhs: ${mattype}, rhs: ${type}) -> Void {
+  lhs = lhs*rhs
+}
+
+% coltype = type + '.Vector' + str(rows)
+% rowtype = type + '.Vector' + str(cols)
+
+/// Matrix-Vector multiplication.  Keep in mind that matrix types are named
+/// MatrixNxM where N is the number of *columns* and M is the number of *rows*,
+/// so we multiply a Matrix3x2 * Vector3 to get a Vector2, for example.
+public func *(lhs: ${mattype}, rhs: ${rowtype}) -> ${coltype} {
+  return ${' + '.join(map(lambda i: \
+         'lhs._columns.'+str(i)+'*rhs.'+components[i], \
+  range(cols)))}
+}
+
+/// Vector-Matrix multiplication.
+public func *(lhs: ${coltype}, rhs: ${mattype}) -> ${rowtype} {
+  return ${rowtype}(${', '.join(map(lambda i: \
+                    components[i]+': dot(lhs, rhs._columns.'+str(i)+')', \
+                    range(cols)))})
+}
+
+% for k in [2,3,4]:
+/// Matrix multiplication (the "usual" matrix product, not the elementwise
+/// product).
+public func *(lhs: ${type}.Matrix${k}x${rows}, rhs: ${type}.Matrix${cols}x${k}) -> ${mattype} {
+  return ${mattype}(${', '.join(map(lambda i: \
+                    'lhs*rhs._columns.'+str(i), \
+                    range(cols)))})
+}
+
+% end # for k in [2,3,4]
+
+/// Matrix multiplication (the "usual" matrix product, not the elementwise
+/// product).
+public func *=(inout lhs: ${mattype}, rhs: ${type}.Matrix${cols}x${cols}) -> Void {
+  lhs = lhs*rhs
+}
+
+% if cols == rows:
+
+extension ${mattype} : SIMDSquareMatrixType {
+  /// Inverse of the matrix if it exists, otherwise the contents of the
+  /// resulting matrix are undefined.
+  public var inverse: ${mattype} {
+    % inverse_func = '__invert_' + ('f' if type == 'Float' else 'd') + str(cols)
+    return ${mattype}(${inverse_func}(self.cmatrix))
+  }
+}
+
+% end # if cols == rows
+% end # for cols in [2,3,4]
+% end # for rows in [2,3,4]
+% end # for type in floating_types
