@@ -7,5 +7,5 @@
 
 import Foundation
 
-// CHECK: func load() throws
+// CHECK: func loadAndReturnError(_: ()) throws
 
