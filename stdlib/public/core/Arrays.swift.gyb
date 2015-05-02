@@ -811,6 +811,11 @@ extension ${Self} {
   /// within an array algorithm, but when that fails, invoking the
   /// same algorithm on `body`'s argument lets you trade safety for
   /// speed.
+  ///
+  /// - warning: Do not rely on anything about `self` (the `${Self}`
+  ///   that is the target of this method) during the execution of
+  ///   `body`: it may not appear to have its correct value.  Instead,
+  ///   use only the `UnsafeMutableBufferPointer` argument to `body`.
   public mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (inout UnsafeMutableBufferPointer<T>) -> R
   ) -> R {
