@@ -34,6 +34,7 @@ namespace swift {
   class Module;
   class ValueDecl;
   class ASTContext;
+  class CompilerInvocation;
 
 namespace ide {
 struct SourceCompleteResult {
@@ -61,6 +62,10 @@ struct SourceCompleteResult {
 
 SourceCompleteResult isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 SourceCompleteResult isSourceInputComplete(StringRef Text);
+
+bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
+                                    CompilerInvocation &Invok,
+                                    std::string &Error);
 
 /// Visits all overridden declarations exhaustively from VD, including protocol
 /// conformances and clang declarations.

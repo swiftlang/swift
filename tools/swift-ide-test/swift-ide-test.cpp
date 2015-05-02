@@ -74,6 +74,7 @@ enum class ActionType {
   PrintASTNotTypeChecked,
   PrintASTTypeChecked,
   PrintModule,
+  PrintHeader,
   PrintTypes,
   PrintComments,
   PrintModuleComments,
@@ -153,6 +154,8 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "print-ast-typechecked", "Print the typechecked AST"),
            clEnumValN(ActionType::PrintModule,
                       "print-module", "Print visible declarations in a module"),
+           clEnumValN(ActionType::PrintHeader,
+                      "print-header", "Print visible declarations in a header file"),
            clEnumValN(ActionType::PrintTypes,
                       "print-types", "Print types of all subexpressions and declarations in the AST"),
            clEnumValN(ActionType::PrintComments,
@@ -407,6 +410,10 @@ CommentsXMLSchema("comments-xml-schema",
 
 static llvm::cl::list<std::string>
 ClangXCC("Xcc", llvm::cl::desc("option to pass to clang"));
+
+static llvm::cl::list<std::string>
+HeaderToPrint("header-to-print",
+              llvm::cl::desc("Header filename to print swift interface for"));
 
 } // namespace options
 
@@ -1584,17 +1591,8 @@ public:
 static int doPrintModules(const CompilerInvocation &InitInvok,
                           const std::vector<std::string> ModulesToPrint,
                           ide::ModuleTraversalOptions TraversalOptions,
-                          bool FullyQualifiedTypesIfAmbiguous,
-                          bool SynthesizeSugarOnTypes,
-                          bool AnnotatePrint,
-                          bool AbstractAccessors,
-                          bool PrintImplicitAttrs,
-                          bool PrintAccessibility,
-                          bool PrintUnavailableDecls,
-                          bool PrintRegularComments,
-                          bool SkipDeinit,
-                          Accessibility AccessibilityFilter,
-                          bool PrintPrivateStdlibDecls) {
+                          const PrintOptions &Options,
+                          bool AnnotatePrint) {
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI;
@@ -1608,22 +1606,12 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
 
   // Load standard library so that Clang importer can use it.
   auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
-  if (!Stdlib)
+  if (!Stdlib) {
+    llvm::errs() << "Failed loading stdlib\n";
     return 1;
+  }
 
   int ExitCode = 0;
-
-  PrintOptions Options = PrintOptions::printEverything();
-  Options.FullyQualifiedTypesIfAmbiguous = FullyQualifiedTypesIfAmbiguous;
-  Options.SynthesizeSugarOnTypes = SynthesizeSugarOnTypes;
-  Options.AbstractAccessors = AbstractAccessors;
-  Options.PrintImplicitAttrs = PrintImplicitAttrs;
-  Options.PrintAccessibility = PrintAccessibility;
-  Options.AccessibilityFilter = AccessibilityFilter;
-  Options.PrintRegularClangComments = PrintRegularComments;
-  Options.SkipPrivateStdlibDecls = !PrintPrivateStdlibDecls;
-  Options.SkipUnavailable = !PrintUnavailableDecls;
-  Options.SkipDeinit = SkipDeinit;
 
   std::unique_ptr<ASTPrinter> Printer;
   if (AnnotatePrint)
@@ -1665,6 +1653,56 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     }
 
     printSubmoduleInterface(M, ModuleName, TraversalOptions, *Printer, Options);
+  }
+
+  return ExitCode;
+}
+
+static int doPrintHeaders(const CompilerInvocation &InitInvok,
+                          const std::vector<std::string> HeadersToPrint,
+                          const PrintOptions &Options,
+                          bool AnnotatePrint) {
+  CompilerInvocation Invocation(InitInvok);
+
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+
+  auto &Context = CI.getASTContext();
+
+  // Load standard library so that Clang importer can use it.
+  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
+  if (!Stdlib) {
+    llvm::errs() << "Failed loading stdlib\n";
+    return 1;
+  }
+
+  auto &FEOpts = Invocation.getFrontendOptions();
+  if (!FEOpts.ImplicitObjCHeaderPath.empty()) {
+    auto &Importer = static_cast<ClangImporter &>(
+                                              *Context.getClangModuleLoader());
+    Importer.importBridgingHeader(FEOpts.ImplicitObjCHeaderPath,
+                                  CI.getMainModule());
+  }
+
+  int ExitCode = 0;
+
+  std::unique_ptr<ASTPrinter> Printer;
+  if (AnnotatePrint)
+    Printer.reset(new AnnotatingPrinter(llvm::outs()));
+  else
+    Printer.reset(new StreamPrinter(llvm::outs()));
+
+  for (StringRef HeaderToPrint : HeadersToPrint) {
+    if (HeaderToPrint.empty()) {
+      ExitCode = 1;
+      continue;
+    }
+
+    printHeaderInterface(HeaderToPrint, Context, *Printer, Options);
   }
 
   return ExitCode;
@@ -2216,6 +2254,15 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  // '--cc-args' separates swift-ide-test options from clang arguments.
+  ArrayRef<const char *> CCArgs;
+  for (int i = 1; i < argc; ++i) {
+    if (StringRef(argv[i]) == "--cc-args") {
+      CCArgs = llvm::makeArrayRef(argv+i+1, argc-i-1);
+      argc = i;
+    }
+  }
+
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift IDE Test\n");
 
   if (options::Action == ActionType::None) {
@@ -2306,6 +2353,30 @@ int main(int argc, char *argv[]) {
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addBuildConfigOption(ConfigName);
 
+  // Process the clang arguments last and allow them to override previously
+  // set options.
+  if (!CCArgs.empty()) {
+    std::string Error;
+    if (initInvocationByClangArguments(CCArgs, InitInvok, Error)) {
+      llvm::errs() << "error initializing invocation with clang args: "
+        << Error << '\n';
+      return 1;
+    }
+  }
+
+  PrintOptions PrintOpts = PrintOptions::printEverything();
+  PrintOpts.FullyQualifiedTypesIfAmbiguous =
+    options::FullyQualifiedTypesIfAmbiguous;
+  PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;
+  PrintOpts.AbstractAccessors = options::AbstractAccessors;
+  PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;
+  PrintOpts.PrintAccessibility = options::PrintAccessibility;
+  PrintOpts.AccessibilityFilter = options::AccessibilityFilter;
+  PrintOpts.PrintRegularClangComments = options::PrintRegularComments;
+  PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
+  PrintOpts.SkipUnavailable = options::SkipUnavailable;
+  PrintOpts.SkipDeinit = options::SkipDeinit;
+
   int ExitCode;
 
   switch (options::Action) {
@@ -2390,18 +2461,15 @@ int main(int argc, char *argv[]) {
       TraversalOptions |= ide::ModuleTraversal::SkipOverlay;
 
     ExitCode = doPrintModules(
-        InitInvok, options::ModuleToPrint, TraversalOptions,
-        options::FullyQualifiedTypesIfAmbiguous,
-        options::SynthesizeSugarOnTypes,
-        options::AnnotatePrint,
-        options::AbstractAccessors,
-        options::PrintImplicitAttrs,
-        options::PrintAccessibility,
-        !options::SkipUnavailable,
-        options::PrintRegularComments,
-        options::SkipDeinit,
-        options::AccessibilityFilter,
-        !options::SkipPrivateStdlibDecls);
+        InitInvok, options::ModuleToPrint, TraversalOptions, PrintOpts,
+        options::AnnotatePrint);
+    break;
+  }
+
+  case ActionType::PrintHeader: {
+    ExitCode = doPrintHeaders(
+        InitInvok, options::HeaderToPrint, PrintOpts,
+        options::AnnotatePrint);
     break;
   }
 

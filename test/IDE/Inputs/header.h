@@ -4,6 +4,7 @@ void doSomethingInHead(int arg);
 - (void)doIt:(int)arg;
 @end
 
+/// Awesome name.
 @interface SameName
 @end
 @protocol SameName

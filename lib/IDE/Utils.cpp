@@ -11,12 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Utils.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -180,6 +184,106 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
 
 SourceCompleteResult ide::isSourceInputComplete(StringRef Text) {
   return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text));
+}
+
+bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
+                                         CompilerInvocation &Invok,
+                                         std::string &Error) {
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> DiagOpts{
+    new clang::DiagnosticOptions()
+  };
+
+  clang::TextDiagnosticBuffer DiagBuf;
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> ClangDiags =
+    clang::CompilerInstance::createDiagnostics(DiagOpts.get(),
+                                               &DiagBuf,
+                                               /*ShouldOwnClient=*/false);
+
+  // Create a new Clang compiler invocation.
+  llvm::IntrusiveRefCntPtr<clang::CompilerInvocation> ClangInvok{
+    clang::createInvocationFromCommandLine(ArgList, ClangDiags)
+  };
+  if (!ClangInvok || ClangDiags->hasErrorOccurred()) {
+    for (auto I = DiagBuf.err_begin(), E = DiagBuf.err_end(); I != E; ++I) {
+      Error += I->second;
+      Error += " ";
+    }
+    return true;
+  }
+
+  auto &PPOpts = ClangInvok->getPreprocessorOpts();
+  auto &HSOpts = ClangInvok->getHeaderSearchOpts();
+
+  Invok.setTargetTriple(ClangInvok->getTargetOpts().Triple);
+  if (!HSOpts.Sysroot.empty())
+    Invok.setSDKPath(HSOpts.Sysroot);
+  if (!HSOpts.ModuleCachePath.empty())
+    Invok.setClangModuleCachePath(HSOpts.ModuleCachePath);
+
+  auto &CCArgs = Invok.getClangImporterOptions().ExtraArgs;
+  for (auto MacroEntry : PPOpts.Macros) {
+    std::string MacroFlag;
+    if (MacroEntry.second)
+      MacroFlag += "-U";
+    else
+      MacroFlag += "-D";
+    MacroFlag += MacroEntry.first;
+    CCArgs.push_back(MacroFlag);
+  }
+
+  for (auto &Entry : HSOpts.UserEntries) {
+    switch (Entry.Group) {
+      case clang::frontend::Quoted:
+        CCArgs.push_back("-iquote");
+        CCArgs.push_back(Entry.Path);
+        break;
+      case clang::frontend::IndexHeaderMap:
+        CCArgs.push_back("-index-header-map");
+        SWIFT_FALLTHROUGH;
+      case clang::frontend::Angled: {
+        std::string Flag;
+        if (Entry.IsFramework)
+          Flag += "-F";
+        else
+          Flag += "-I";
+        Flag += Entry.Path;
+        CCArgs.push_back(Flag);
+        break;
+      }
+      case clang::frontend::System:
+        if (Entry.IsFramework)
+          CCArgs.push_back("-iframework");
+        else
+          CCArgs.push_back("-isystem");
+        CCArgs.push_back(Entry.Path);
+        break;
+      case clang::frontend::ExternCSystem:
+      case clang::frontend::CSystem:
+      case clang::frontend::CXXSystem:
+      case clang::frontend::ObjCSystem:
+      case clang::frontend::ObjCXXSystem:
+      case clang::frontend::After:
+        break;
+    }
+  }
+
+  for (auto &Entry : HSOpts.ModulesIgnoreMacros) {
+    std::string Flag = "-fmodules-ignore-macro=";
+    Flag += Entry;
+    CCArgs.push_back(Flag);
+  }
+
+  for (auto &Entry : HSOpts.VFSOverlayFiles) {
+    CCArgs.push_back("-ivfsoverlay");
+    CCArgs.push_back(Entry);
+  }
+
+  if (!ClangInvok->getFrontendOpts().Inputs.empty()) {
+    Invok.getFrontendOptions().ImplicitObjCHeaderPath =
+      ClangInvok->getFrontendOpts().Inputs[0].getFile();
+  }
+
+  return false;
 }
 
 template <typename FnTy>

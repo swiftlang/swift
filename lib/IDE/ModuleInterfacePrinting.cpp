@@ -16,6 +16,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -27,6 +28,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Lex/Lexer.h"
 #include "clang/Lex/MacroInfo.h"
+#include "clang/Lex/Preprocessor.h"
 #include <queue>
 #include <utility>
 
@@ -115,14 +117,7 @@ void swift::ide::printModuleInterface(Module *M,
   printSubmoduleInterface(M, M->Name.str(), TraversalOptions, Printer, Options);
 }
 
-void swift::ide::printSubmoduleInterface(
-       Module *M,
-       ArrayRef<StringRef> FullModuleName,
-       ModuleTraversalOptions TraversalOptions,
-       ASTPrinter &Printer,
-       const PrintOptions &Options) {
-  auto AdjustedOptions = Options;
-
+static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   // Don't print empty curly braces while printing the module interface.
   AdjustedOptions.FunctionDefinitions = false;
 
@@ -133,6 +128,16 @@ void swift::ide::printSubmoduleInterface(
   AdjustedOptions.VarInitializers = false;
 
   AdjustedOptions.PrintDefaultParameterPlaceholder = true;
+}
+
+void swift::ide::printSubmoduleInterface(
+       Module *M,
+       ArrayRef<StringRef> FullModuleName,
+       ModuleTraversalOptions TraversalOptions,
+       ASTPrinter &Printer,
+       const PrintOptions &Options) {
+  auto AdjustedOptions = Options;
+  adjustPrintOptions(AdjustedOptions);
 
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
@@ -387,6 +392,81 @@ void swift::ide::printSubmoduleInterface(
       if (PrintDecl(D))
         Printer << "\n";
     }
+  }
+}
+
+namespace {
+class ImportedHeaderFilter : public VisibleDeclConsumer {
+  ClangImporter &Importer;
+  llvm::function_ref<void(ValueDecl *)> Receiver;
+  const clang::FileEntry *File;
+
+public:
+  ImportedHeaderFilter(StringRef Filename,
+                       ClangImporter &Importer,
+                       llvm::function_ref<void(ValueDecl *)> Receiver)
+  : Importer(Importer),
+    Receiver(Receiver) {
+    File = Importer.getClangPreprocessor().getFileManager().getFile(Filename);
+  }
+
+private:
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    auto ClangN = VD->getClangNode();
+    if (ClangN.isNull())
+      return;
+
+    auto &SM = Importer.getClangPreprocessor().getSourceManager();
+    auto ClangLoc = SM.getFileLoc(ClangN.getLocation());
+    if (ClangLoc.isInvalid())
+      return;
+
+    if (SM.getFileEntryForID(SM.getFileID(ClangLoc)) == File)
+      Receiver(VD);
+  }
+};
+}
+
+void swift::ide::printHeaderInterface(
+       StringRef Filename,
+       ASTContext &Ctx,
+       ASTPrinter &Printer,
+       const PrintOptions &Options) {
+  auto AdjustedOptions = Options;
+  adjustPrintOptions(AdjustedOptions);
+
+  SmallVector<ValueDecl *, 32> ClangDecls;
+  auto DeclReceiver = [&](ValueDecl *D) {
+    // If requested, skip unavailable declarations.
+    if (Options.SkipUnavailable && D->getAttrs().isUnavailable(Ctx))
+      return;
+
+    ClangDecls.push_back(D);
+  };
+
+  auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
+  ImportedHeaderFilter Filter(Filename, Importer, DeclReceiver);
+  Importer.lookupVisibleDecls(Filter);
+
+  auto &ClangSM = Importer.getClangASTContext().getSourceManager();
+  // Sort imported declarations in source order.
+  std::sort(ClangDecls.begin(), ClangDecls.end(),
+            [&](ValueDecl *LHS, ValueDecl *RHS) -> bool {
+              return ClangSM.isBeforeInTranslationUnit(
+                                            LHS->getClangNode().getLocation(),
+                                            RHS->getClangNode().getLocation());
+            });
+
+  ASTPrinter *PrinterToUse = &Printer;
+
+  ClangCommentPrinter RegularCommentPrinter(Printer, Importer);
+  if (Options.PrintRegularClangComments)
+    PrinterToUse = &RegularCommentPrinter;
+
+  for (auto *D : ClangDecls) {
+    ASTPrinter &Printer = *PrinterToUse;
+    if (D->print(Printer, AdjustedOptions))
+      Printer << "\n";
   }
 }
 

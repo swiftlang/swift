@@ -17,6 +17,7 @@
 #include "swift/Basic/OptionSet.h"
 
 namespace swift {
+class ASTContext;
 class ASTPrinter;
 class Module;
 struct PrintOptions;
@@ -45,6 +46,11 @@ void printModuleInterface(Module *M,
 void printSubmoduleInterface(Module *M, ArrayRef<StringRef> FullModuleName,
                              ModuleTraversalOptions TraversalOptions,
                              ASTPrinter &Printer, const PrintOptions &Options);
+
+/// Print the interface for a header that has been imported via the implicit
+/// objc header importing feature.
+void printHeaderInterface(StringRef Filename, ASTContext &Ctx,
+                          ASTPrinter &Printer, const PrintOptions &Options);
 
 } // namespace ide
 
