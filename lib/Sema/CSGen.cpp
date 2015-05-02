@@ -1668,16 +1668,23 @@ namespace {
     
     /// \brief Walk a closure AST to determine if it can throw.
     static bool closureCanThrow(ClosureExpr *expr) {
-      
-      class FindInnerTryExpressions : public ASTWalker {
-        bool FoundTry = false;
+      // A walker that looks for 'try' or 'throw' expressions
+      // that aren't nested within closures, nested declarations,
+      // or exhaustive catches.
+      class FindInnerThrows : public ASTWalker {
+        bool FoundThrow = false;
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-          
-          // If we've found a 'try', record it and terminate the traversal.
-          if (isa<TryExpr>(expr)) {
-            FoundTry = true;
+          // If we've found a 'try' or a 'throw', record it and
+          // terminate the traversal.
+          if (isa<TryExpr>(expr) || isa<ThrowExpr>(expr)) {
+            FoundThrow = true;
             return { false, nullptr };
+          }
+
+          // Don't walk into a 'try!'.
+          if (isa<ForceTryExpr>(expr)) {
+            return { false, expr };
           }
           
           // Do not recurse into other closures.
@@ -1689,20 +1696,29 @@ namespace {
         
         bool walkToDeclPre(Decl *decl) override {
           // Do not walk into function or type declarations.
-          if (isa<AbstractFunctionDecl>(decl) ||
-              isa<AbstractStorageDecl>(decl) ||
-              isa<OperatorDecl>(decl) ||
-              isa<TypeDecl>(decl))
+          if (!isa<PatternBindingDecl>(decl))
             return false;
           
           return true;
         }
         
         std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-          
-          // Do not walk into the 'do' clause of a do/catch statement.
-          if (isa<BraceStmt>(stmt) && Parent.getAsStmt() &&
-              isa<DoCatchStmt>(Parent.getAsStmt())) {
+          // Handle do/catch differently.
+          if (auto doCatch = dyn_cast<DoCatchStmt>(stmt)) {
+            // Only walk into the 'do' clause of a do/catch statement
+            // if the catch isn't syntactically exhaustive.
+            if (!doCatch->isSyntacticallyExhaustive()) {
+              if (!doCatch->getBody()->walk(*this))
+                return { false, nullptr };
+            }
+
+            // Walk into all the catch clauses.
+            for (auto catchClause : doCatch->getCatches()) {
+              if (!catchClause->walk(*this))
+                return { false, nullptr };
+            }
+
+            // We've already walked all the children we care about.
             return { false, stmt };
           }
           
@@ -1710,7 +1726,7 @@ namespace {
         }
         
       public:
-        bool foundTry() { return FoundTry; }
+        bool foundThrow() { return FoundThrow; }
       };
       
       if (expr->getThrowsLoc().isValid())
@@ -1721,9 +1737,9 @@ namespace {
       if (!body)
         return false;
       
-      auto tryFinder = FindInnerTryExpressions();
+      auto tryFinder = FindInnerThrows();
       body->walk(tryFinder);
-      return tryFinder.foundTry();
+      return tryFinder.foundThrow();
     }
     
 

@@ -241,6 +241,30 @@ bool CatchStmt::isSyntacticallyExhaustive() const {
   // Ignore 'var', 'let', and parens.
   auto pattern = getErrorPattern()->getSemanticsProvidingPattern();
 
+  // We might be calling this on an non-type-checked pattern.
+  // Deal with some untranslated cases here.
+  if (auto exprPattern = dyn_cast<ExprPattern>(pattern)) {
+    // If the pattern has a registered match expression, it's
+    // a type-checked ExprPattern.
+    if (exprPattern->getMatchExpr()) return false;
+
+    auto expr = exprPattern->getSubExpr();
+    while (true) {
+      // Drill into parens.
+      if (auto parens = dyn_cast<ParenExpr>(expr)) {
+        expr = parens->getSubExpr();
+
+      // A '_' is an untranslated AnyPattern.
+      } else if (isa<DiscardAssignmentExpr>(expr)) {
+        return true;
+
+      // Everything else is non-exhaustive.
+      } else {
+        return false;
+      }
+    }
+  }
+
   // Must be '_' or a variable binding.  We do not want to allow tuple
   // patterns: in an existential context, those are potentially
   // refutable patterns (assuming tuples can someday conform to
