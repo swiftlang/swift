@@ -20,14 +20,11 @@ import SwiftShims
 /// Swift strings are designed to be Unicode-correct.  In particular,
 /// the APIs make it easy to write code that works correctly, and does
 /// not surprise end-users, regardless of where you venture in the
-/// Unicode character space.  For example,
-///
-/// * The `==` operator checks for [Unicode canonical equivalence](http://www.unicode.org/glossary/#deterministic_comparison),
-///   so two different representations of the same string will always
-///   compare equal.
-///
-/// * String elements are `Characters` ([extended grapheme clusters](http://www.unicode.org/glossary/#extended_grapheme_cluster)),
-///   a unit of text that is meaningful to most humans.
+/// Unicode character space.  For example, the `==` operator checks
+/// for [Unicode canonical
+/// equivalence](http://www.unicode.org/glossary/#deterministic_comparison),
+/// so two different representations of the same string will always
+/// compare equal.
 ///
 /// Locale-Insensitive
 /// ==================
@@ -36,8 +33,9 @@ import SwiftShims
 /// locale settings.  That's because, for example, the validity of a
 /// `Dictionary<String, T>` in a running program depends on a given
 /// string comparison having a single, stable result.  Therefore,
-/// Swift always uses the default, un-[tailored](http://www.unicode.org/glossary/#tailorable)
-/// Unicode algorithms for basic string operations.
+/// Swift always uses the default,
+/// un-[tailored](http://www.unicode.org/glossary/#tailorable) Unicode
+/// algorithms for basic string operations.
 ///
 /// Importing `Foundation` endows swift strings with the full power of
 /// the `NSString` API, which allows you to choose more complex
@@ -52,14 +50,37 @@ import SwiftShims
 ///
 ///     var a = "foo"
 ///     var b = a
-///     b[b.endIndex.predecessor()] = "x"
-///     println("a=\(a), b=\(b)")     // a=foo, b=fox
+///     b.extend("bar")
+///     println("a=\(a), b=\(b)")     // a=foo, b=foobar
 ///
 /// Strings use Copy-on-Write so that their data is only copied
 /// lazily, upon mutation, when more than one string instance is using
 /// the same buffer.  Therefore, the first in any sequence of mutating
 /// operations may cost `O(N)` time and space, where `N` is the length
-/// of the string's (unspecified) underlying representation,.
+/// of the string's (unspecified) underlying representation.
+///
+/// Views
+/// =====
+///
+/// `String` is not itself a collection of anything.  Instead, it has
+/// properties that present the string's contents as meaningful
+/// collections:
+///
+///   - `characters`: a collection of `Character` ([extended grapheme
+///     cluster](http://www.unicode.org/glossary/#extended_grapheme_cluster))
+///     elements, a unit of text that is meaningful to most humans.
+///
+///   - `unicodeScalars`: a collection of `UnicodeScalar` ([Unicode
+///     scalar
+///     values](http://www.unicode.org/glossary/#unicode_scalar_value))
+///     the 21-bit codes that are the basic unit of Unicode.  These
+///     values are equivalent to UTF-32 code units.
+///
+///   - `utf16`: a collection of `UTF16.CodeUnit`, the 16-bit
+///     elements of the string's UTF-16 encoding.
+///
+///   - `utf8`: a collection of `UTF8.CodeUnit`, the 8-bit
+///     elements of the string's UTF-8 encoding.
 ///
 /// Growth and Capacity
 /// ===================
@@ -84,6 +105,7 @@ import SwiftShims
 /// more, if the underlying `NSString` is has unusual performance
 /// characteristics).
 public struct String {
+  /// An empty `String`.
   public init() {
     _core = _StringCore()
   }
