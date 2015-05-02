@@ -56,6 +56,11 @@ public:
     return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
                                                 std::forward<Args>(AA)...);
   }
+
+  // For SILGen's purposes, try! is not an IdentityExpr.
+  ExprRetTy visitForceTryExpr(ForceTryExpr *E, Args...AA) {
+    return static_cast<ImplClass*>(this)->visitExpr(E, std::forward<Args>(AA)...);
+  }
 };
 
 template <typename ImplClass,

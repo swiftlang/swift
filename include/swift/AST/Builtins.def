@@ -343,6 +343,9 @@ BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
 /// willThrow: T -> ()
 BUILTIN_RUNTIME_CALL(WillThrow, "willThrow", "n")
 
+/// unexpectedError: T -> ()
+BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "n")
+
 #undef BUILTIN_RUNTIME_CALL
 
 // BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.

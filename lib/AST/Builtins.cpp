@@ -696,7 +696,15 @@ static ValueDecl *getFenceOperation(ASTContext &Context, Identifier Id) {
 }
 
 static ValueDecl *getWillThrowOperation(ASTContext &Context, Identifier Id) {
-  return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
+  return getBuiltinFunction(Id, {Context.getExceptionType()},
+                            TupleType::getEmpty(Context));
+}
+
+static ValueDecl *getUnexpectedErrorOperation(ASTContext &Context,
+                                              Identifier Id) {
+  return getBuiltinFunction(Id, {Context.getExceptionType()},
+                            TupleType::getEmpty(Context),
+                            AnyFunctionType::ExtInfo().withIsNoReturn());
 }
 
 static ValueDecl *getCmpXChgOperation(ASTContext &Context, Identifier Id,
@@ -1540,6 +1548,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::WillThrow:
     return getWillThrowOperation(Context, Id);
+
+  case BuiltinValueKind::UnexpectedError:
+    return getUnexpectedErrorOperation(Context, Id);
 
   case BuiltinValueKind::ExtractElement:
     if (Types.size() != 2) return nullptr;

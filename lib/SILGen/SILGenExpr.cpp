@@ -156,6 +156,7 @@ namespace {
                                             SGFContext C);
 
     RValue visitThrowExpr(ThrowExpr *E, SGFContext C);
+    RValue visitForceTryExpr(ForceTryExpr *E, SGFContext C);
 
     RValue visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C);
     RValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
@@ -874,6 +875,39 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
     return ManagedValue::forUnmanaged(buffer);
 
   return ManagedValue(buffer, enterDestroyCleanup(buffer));
+}
+
+RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
+  SILGenFunction::ForceTryScope scope(SGF, E);
+  return visit(E->getSubExpr(), C);
+}
+
+SILGenFunction::ForceTryScope::ForceTryScope(SILGenFunction &gen,
+                                             SILLocation loc)
+  : SGF(gen), TryBB(gen.createBasicBlock(FunctionSection::Postmatter)),
+    Loc(loc), OldThrowDest(gen.ThrowDest) {
+  gen.ThrowDest = JumpDest(TryBB, gen.Cleanups.getCleanupsDepth(),
+                           CleanupLocation::get(loc));
+}
+
+SILGenFunction::ForceTryScope::~ForceTryScope() {
+  // Restore the old throw dest.
+  SGF.ThrowDest = OldThrowDest;
+
+  // If there are no uses of the try block, just drop it.
+  if (TryBB->pred_empty()) {
+    SGF.eraseBasicBlock(TryBB);
+    return;
+  }
+
+  // Otherwise, we need to emit it.
+  SavedInsertionPoint scope(SGF, TryBB, FunctionSection::Postmatter);
+
+  ASTContext &ctx = SGF.getASTContext();
+  auto error = TryBB->createBBArg(SILType::getExceptionType(ctx));
+  SGF.B.createBuiltin(Loc, ctx.getIdentifier("unexpectedError"),
+                      SGF.SGM.Types.getEmptyTupleType(), {}, {error});
+  SGF.B.createUnreachable(Loc);
 }
 
 RValue RValueEmitter::visitThrowExpr(ThrowExpr *E, SGFContext C) {

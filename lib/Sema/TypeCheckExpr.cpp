@@ -148,8 +148,10 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     return nullptr;
 
   // If the left-hand-side is a 'try', hoist it up.
-  TryExpr *tryEval = nullptr;
+  IdentityExpr *tryEval = nullptr;
   if ((tryEval = dyn_cast<TryExpr>(LHS))) {
+    LHS = tryEval->getSubExpr();
+  } else if ((tryEval = dyn_cast<ForceTryExpr>(LHS))) {
     LHS = tryEval->getSubExpr();
   }
   
@@ -178,17 +180,19 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   //   x ? try foo() : try bar() $#! 1
   // assuming $#! is some crazy operator with lower precedence
   // than the conditional operator.
-  if (auto tryRHS = dyn_cast<TryExpr>(RHS)) {
+  if (isa<TryExpr>(RHS) || isa<ForceTryExpr>(RHS)) {
     if (isa<IfExpr>(Op) || infixData.isAssignment()) {
       if (!isEndOfSequence) {
         if (isa<IfExpr>(Op)) {
-          TC.diagnose(tryRHS->getTryLoc(), diag::try_if_rhs_noncovering);
+          TC.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
+                      isa<ForceTryExpr>(RHS));
         } else {
-          TC.diagnose(tryRHS->getTryLoc(), diag::try_assign_rhs_noncovering);
+          TC.diagnose(RHS->getStartLoc(), diag::try_assign_rhs_noncovering,
+                      isa<ForceTryExpr>(RHS));
         }
       }
     } else {
-      TC.diagnose(tryRHS->getTryLoc(), diag::try_rhs);
+      TC.diagnose(RHS->getStartLoc(), diag::try_rhs, isa<ForceTryExpr>(RHS));
     }
   }
 

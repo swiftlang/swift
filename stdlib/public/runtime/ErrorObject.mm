@@ -416,11 +416,16 @@ void swift::swift_errorRelease(SwiftError *error) {
   return _swift_errorRelease(error);
 }
 
-
 static void _swift_willThrow_(SwiftError *error) { }
 
 extern "C" auto *_swift_willThrow = _swift_willThrow_;
 
 void swift::swift_willThrow(SwiftError *error) {
   return _swift_willThrow(error);
+}
+
+void swift::swift_unexpectedError(SwiftError *object) {
+  // FIXME: terrible stub implementation
+  fprintf(stderr, "unexpected error thrown\n");
+  abort();
 }

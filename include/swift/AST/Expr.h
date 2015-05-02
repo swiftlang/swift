@@ -1424,6 +1424,30 @@ public:
     return e->getKind() == ExprKind::Try;
   }
 };
+
+/// ForceTryExpr - A 'try!' surrounding an expression, marking that
+/// the expression contains code which might throw, but that the code
+/// should dynamically assert if it does.
+class ForceTryExpr : public IdentityExpr {
+  SourceLoc TryLoc;
+  SourceLoc ExclaimLoc;
+
+public:
+  ForceTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc exclaimLoc,
+          Type type = Type(), bool implicit = false)
+    : IdentityExpr(ExprKind::ForceTry, sub, type, implicit),
+      TryLoc(tryLoc), ExclaimLoc(exclaimLoc) {}
+
+  SourceLoc getTryLoc() const { return TryLoc; }
+  SourceLoc getExclaimLoc() const { return ExclaimLoc; }
+
+  SourceLoc getStartLoc() const { return TryLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::ForceTry;
+  }
+};
   
 /// A parenthesized expression like '(x+x)'.  Syntactically,
 /// this is just a TupleExpr with exactly one element that has no label.

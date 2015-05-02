@@ -210,7 +210,7 @@ public:
     llvm_unreachable("bad context kind");
   }
 
-  void diagnoseUnhandledTry(TypeChecker &TC, TryExpr *E) {
+  void diagnoseUnhandledTry(TypeChecker &TC, Expr *E) {
     switch (getKind()) {
     case Kind::Handled:
       llvm_unreachable("try is handled!");
@@ -346,6 +346,11 @@ private:
       checkTry(tryExpr);
       return {false, E};
     }
+    if (auto forceTryExpr = dyn_cast<ForceTryExpr>(E)) {
+      checkForceTry(forceTryExpr);
+      return {false, E};
+    }
+
 
     // To preserve source order of diagnostics, check the validity
     // of throwing operations before checking their sub-expressions.
@@ -487,6 +492,21 @@ private:
     }
 
     scope.preserveInfoFromTryOperand();
+  }
+
+  void checkForceTry(ForceTryExpr *E) {
+    // Walk the operand.  'try!' handles errors.
+    ContextScope scope(*this);
+    CurContext = Context::getHandled();
+    IsInTry = true;
+    HasTryThrowSite = false;
+
+    E->getSubExpr()->walk(*this);
+
+    // Warn about 'try' expressions that weren't actually needed.
+    if (!HasTryThrowSite) {
+      TC.diagnose(E->getLoc(), diag::no_throw_in_try);
+    }
   }
 };
 

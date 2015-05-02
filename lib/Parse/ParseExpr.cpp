@@ -341,11 +341,18 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
                                                     bool isExprBasic) {
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
+  SourceLoc exclaimLoc;
+  bool hadExclaim = (hadTry && consumeIf(tok::exclaim_postfix, exclaimLoc));
 
   ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
-    sub = makeParserResult(new (Context) TryExpr(tryLoc, sub.get()));
+    if (hadExclaim) {
+      sub = makeParserResult(new (Context) ForceTryExpr(tryLoc, sub.get(),
+                                                        exclaimLoc));
+    } else {
+      sub = makeParserResult(new (Context) TryExpr(tryLoc, sub.get()));
+    }
   }
 
   return sub;

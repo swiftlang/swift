@@ -316,6 +316,7 @@ bool Expr::canAppendCallParentheses() const {
     return true;
 
   case ExprKind::Throw:
+  case ExprKind::ForceTry:
   case ExprKind::Try:
   case ExprKind::InOut:
     return false;

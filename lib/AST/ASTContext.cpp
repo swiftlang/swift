@@ -502,6 +502,15 @@ static NominalTypeDecl *findStdlibType(const ASTContext &ctx, StringRef name) {
   return nullptr;
 }
 
+CanType ASTContext::getExceptionType() const {
+  if (auto exn = getExceptionTypeDecl()) {
+    return exn->getDeclaredType()->getCanonicalType();
+  } else {
+    // Use Builtin.NativeObject just as a stand-in.
+    return TheNativeObjectType;
+  }
+}
+
 NominalTypeDecl *ASTContext::getExceptionTypeDecl() const {
   return getProtocol(KnownProtocolKind::_ErrorType);
 }

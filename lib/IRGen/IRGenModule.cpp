@@ -359,6 +359,7 @@ static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
 namespace RuntimeConstants {
   const auto ReadNone = llvm::Attribute::ReadNone;
   const auto ReadOnly = llvm::Attribute::ReadOnly;
+  const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto C_CC = llvm::CallingConv::C;
 }

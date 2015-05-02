@@ -8,7 +8,6 @@ func %%%%<T,U>(x:T, y:U) -> Int { return 0 }
 infix operator %%% { associativity none precedence 95 }
 func %%%<T,U>(x:T, y:U) -> Int { return 1 }
 
-// These can be 'throws' later.
 func foo() throws -> Int { return 0 }
 func bar() throws -> Int { return 0 }
 
@@ -21,3 +20,13 @@ x = foo() + try bar() // expected-error {{'try' cannot appear to the right of a 
 
 var y = true ? try foo() : try bar() + 0
 var z = true ? try foo() : try bar() %%% 0 // expected-error {{'try' following conditional operator does not cover everything to its right}}
+
+var a = try! foo() + bar()
+a = try! foo() + bar()
+a += try! foo() + bar()
+a += try! foo() %%%% bar() // expected-error {{'try!' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}}
+a += try! foo() %%% bar()
+a = foo() + try! bar() // expected-error {{'try!' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
+
+var b = true ? try! foo() : try! bar() + 0
+var c = true ? try! foo() : try! bar() %%% 0 // expected-error {{'try!' following conditional operator does not cover everything to its right}}

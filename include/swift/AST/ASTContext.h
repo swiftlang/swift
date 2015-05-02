@@ -345,6 +345,7 @@ public:
 
   /// Retrieve the declaration of Swift.ErrorType.
   NominalTypeDecl *getExceptionTypeDecl() const;
+  CanType getExceptionType() const;
   
   /// Retrieve the declaration of Swift.Bool.
   NominalTypeDecl *getBoolDecl() const;

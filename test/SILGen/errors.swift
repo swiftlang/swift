@@ -267,3 +267,15 @@ func testThunk(fn: () throws -> Int) throws -> Int {
 // CHECK: bb2([[T0:%.*]] : $_ErrorType):
 // CHECK:   builtin "willThrow"([[T0]] : $_ErrorType)
 // CHECK:   throw [[T0]] : $_ErrorType
+
+func createInt(fn: () -> Int) throws {}
+func testForceTry(fn: () -> Int) {
+  try! createInt(fn)
+}
+// CHECK-LABEL: sil hidden @_TF6errors12testForceTryFFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> ()
+// CHECK: [[T0:%.*]] = function_ref @_TF6errors9createIntFzFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @error _ErrorType
+// CHECK: try_apply [[T0]](%0)
+// CHECK: strong_release
+// CHECK: return
+// CHECK: builtin "unexpectedError"
+// CHECK: unreachable
