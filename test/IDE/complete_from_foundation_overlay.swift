@@ -1,5 +1,4 @@
 import Foundation
-// XFAIL: *
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
@@ -26,5 +25,5 @@ func privateNominalMembers(a: String) {
 }
 
 // PRIVATE_NOMINAL_MEMBERS_1: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#String.Index#]{{; name=.+$}}
+// PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#Index#]{{; name=.+$}}
 // PRIVATE_NOMINAL_MEMBERS_1: End completions

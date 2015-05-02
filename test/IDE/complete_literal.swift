@@ -1,4 +1,3 @@
-// XFAIL: *
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL1 | FileCheck %s -check-prefix=LITERAL1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL2 | FileCheck %s -check-prefix=LITERAL2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL3 | FileCheck %s -check-prefix=LITERAL3
@@ -40,10 +39,10 @@
 
 // LITERAL4:         Begin completions
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(f): UnsafePointer<Int8> -> Result##UnsafePointer<Int8> -> Result#})[#Result#]; name=withCString(f: UnsafePointer<Int8> -> Result){{$}}
-// LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      startIndex[#String.Index#]; name=startIndex{{$}}
-// LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#String.Index#]; name=endIndex{{$}}
+// LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      startIndex[#Index#]; name=startIndex{{$}}
+// LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#Index#]; name=endIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   extend({#(newElements): S#})[#Void#]; name=extend(newElements: S){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   splice({#(newElements): S#}, {#atIndex: String.Index#})[#Void#]; name=splice(newElements: S, atIndex: String.Index){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   removeAtIndex({#(i): String.Index#})[#Character#]; name=removeAtIndex(i: String.Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   splice({#(newElements): S#}, {#atIndex: Index#})[#Void#]; name=splice(newElements: S, atIndex: Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   removeAtIndex({#(i): Index#})[#Character#]; name=removeAtIndex(i: Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      lowercaseString[#String#]; name=lowercaseString{{$}}
