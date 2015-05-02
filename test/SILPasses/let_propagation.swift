@@ -93,6 +93,24 @@ public func testUseLet(a:A0) -> Int32 {
 }
 
 
+struct Goo {
+  var x: Int32
+  var y: Int32
+}
+
+struct Foo { 
+  var g: Goo
+}
+
+struct Bar { 
+  let f: Foo
+  var h: Foo
+  
+  @inline(never)
+  mutating func action() {
+  }
+}
+
 @inline(never)
 func getVal() -> Int32 {
    return 9
@@ -208,3 +226,92 @@ final class B2 {
      return i
   }
 }
+
+@inline(never)
+func oops() {
+
+}
+
+struct S {
+  let elt : Int32
+}
+
+// Check that we can handle reassignments to a variable
+// of struct type properly.
+// CHECK-LABEL: sil {{.*}}testStructWithLetElement
+// CHECK-NOT: function_ref @{{.*}}oops
+// CHECK: return 
+public func testStructWithLetElement() -> Int32 {
+    var someVar = S(elt: 12)
+    let tmp1 = someVar.elt
+
+    someVar = S(elt: 15)
+    let tmp2 = someVar.elt
+
+    // This check should get eliminated
+    if (tmp2 == tmp1) {
+       // If we get here, the compiler has propagated
+       // the old value someVar.elt into tmp2, which 
+       // is wrong.
+       oops()
+    }
+    return tmp1+tmp2
+}
+
+
+public typealias Tuple3 = (Int32, Int32, Int32)
+
+final public class S3 {
+  let x: Tuple3
+  var y: Tuple3
+  
+  init(x: Tuple3, y:Tuple3) {
+    self.x = x
+    self.y = y
+  }
+}
+
+// Check that s.x.0 is loaded only once and then reused.
+// CHECK-LABEL: sil {{.*}}testLetTuple
+// CHECK: tuple_element_addr
+// CHECK: %[[X:[0-9]+]] = struct_element_addr
+// CHECK: load %[[X]]
+// CHECK-NOT: load %[[X]]
+// CHECK: return
+public func testLetTuple(s: S3) ->Int32 {
+  var counter: Int32 = 0
+  counter += s.x.0
+  action()
+  counter += s.x.0
+  action()
+  counter += s.x.0
+  action()
+  counter += s.x.0
+  action()
+  return counter
+}
+
+
+// Check that s.x.0 is reloaded every time.
+// CHECK-LABEL: sil {{.*}}testVarTuple
+// CHECK: tuple_element_addr
+// CHECK: %[[X:[0-9]+]] = struct_element_addr
+// CHECK: load %[[X]]
+// CHECK: load %[[X]]
+// CHECK: load %[[X]]
+// CHECK: load %[[X]]
+// CHECK: return
+public func testVarTuple(s: S3) ->Int32 {
+  var counter: Int32 = 0
+  counter += s.y.0
+  action()
+  counter += s.y.0
+  action()
+  counter += s.y.0
+  action()
+  counter += s.y.0
+  action()
+  return counter
+}
+
+

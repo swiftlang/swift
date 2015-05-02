@@ -551,16 +551,29 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
 /// Check if this is the address of a "let" member.
 /// Nobody can write into let members.
 bool swift::isLetPointer(SILValue V) {
+  // Traverse the "access" path for V and check that starts with "let"
+  // and everything along this path is a value-type (i.e. struct or tuple).
+
+  // Is this an address of a "let" class member?
   if (auto *REA = dyn_cast<RefElementAddrInst>(V))
     return REA->getField()->isLet();
 
-  if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(V)) {
+  // Is this an address of a global "let"?
+  if (auto *GAI = dyn_cast<GlobalAddrInst>(V)) {
     auto *GlobalDecl = GAI->getReferencedGlobal()->getDecl();
     return GlobalDecl && GlobalDecl->isLet();
   }
 
+  // Is this an address of a struct "let" member?
   if (auto *SEA = dyn_cast<StructElementAddrInst>(V))
+    // Check if it is a "let" in the parent struct.
+    // Check if its parent is a "let".
     return isLetPointer(SEA->getOperand());
+
+
+  // Check if a parent of a tuple is a "let"
+  if (TupleElementAddrInst *TEA = dyn_cast<TupleElementAddrInst>(V))
+    return isLetPointer(TEA->getOperand());
 
   return false;
 }
@@ -727,7 +740,9 @@ MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
 }
 
 MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
-  if (isLetPointer(V))
+  // No store besides the initialization of a "let"-variable
+  // can have any effect on the value of this "let" variable.
+  if (isLetPointer(V) && SI->getDest() != V)
     return MemBehavior::None;
 
   // If the store dest cannot alias the pointer in question, then the
