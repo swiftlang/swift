@@ -107,8 +107,8 @@ sil public_external @createSIMDStruct : $@convention(c) () -> SIMDStruct
 sil public_external @consumeSIMDStruct : $@convention(c) SIMDStruct -> ()
 
 // CHECK-x86_64-LABEL: define void @testSIMDStruct()
-// CHECK-x86_64:         alloca i128, align 16
-// CHECK-x86_64:         alloca i128, align 16
+// CHECK-x86_64:         alloca { float, float, float, float }, align 16
+// CHECK-x86_64:         alloca %VSC10SIMDStruct, align 16
 sil @testSIMDStruct : $() -> () {
 bb0:
   %f = function_ref @createSIMDStruct : $@convention(c) () -> SIMDStruct
