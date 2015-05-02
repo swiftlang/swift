@@ -1468,5 +1468,13 @@ extension String {
     try self._ns.writeToURL(
       url, atomically: useAuxiliaryFile, encoding: enc)
   }
+
+  @availability(iOS, introduced=9.0)
+  @availability(OSX, introduced=10.11)
+  public func stringByApplyingTransform(
+    transform: String, reverse: Bool
+  ) -> String? {
+    return _ns.stringByApplyingTransform(transform, reverse: reverse)
+  }
 }
 
