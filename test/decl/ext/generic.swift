@@ -94,3 +94,12 @@ extension MemberTypeCheckB<T> {
 extension MemberTypeCheckB<T> {
   var t2: Element { return t1 }  
 }
+
+// rdar://problem/19795284
+extension Array {
+  var pairs: [(T,T)] {
+    get {
+      return []
+    }
+  }
+}

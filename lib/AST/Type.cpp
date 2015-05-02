@@ -2613,7 +2613,7 @@ case TypeKind::Id:
       if (!eltTy)
         return Type();
 
-      // If nothing has changd, just keep going.
+      // If nothing has changed, just keep going.
       if (!anyChanged && eltTy.getPointer() == elt.getType().getPointer()) {
         ++Index;
         continue;

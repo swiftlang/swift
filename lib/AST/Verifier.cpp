@@ -1516,11 +1516,42 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
+    static bool hasEnclosingFunctionContext(DeclContext *dc) {
+      switch (dc->getContextKind()) {
+      case DeclContextKind::AbstractClosureExpr:
+      case DeclContextKind::AbstractFunctionDecl:
+      case DeclContextKind::SerializedLocal:
+        return true;
+
+      case DeclContextKind::TopLevelCodeDecl:
+      case DeclContextKind::Module:
+      case DeclContextKind::FileUnit:
+        return false;
+
+      case DeclContextKind::Initializer:
+      case DeclContextKind::NominalTypeDecl:
+      case DeclContextKind::ExtensionDecl:
+        return hasEnclosingFunctionContext(dc->getParent());
+      }
+    }
+
     void verifyChecked(ValueDecl *VD) {
       if (!VD->hasAccessibility() && !VD->getDeclContext()->isLocalContext() &&
           !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
         dumpRef(VD);
         Out << " does not have accessibility";
+        abort();
+      }
+
+      // Make sure that there are no archetypes in the interface type.
+      if (VD->getDeclContext()->isTypeContext() &&
+          !hasEnclosingFunctionContext(VD->getDeclContext()) &&
+          !isa<ParamDecl>(VD) && /* because of subscripts */
+          VD->getInterfaceType().findIf([](Type type) {
+            return type->is<ArchetypeType>();
+          })) {
+        Out << "Interface type contains archetypes\n";
+        VD->dump(Out);
         abort();
       }
 

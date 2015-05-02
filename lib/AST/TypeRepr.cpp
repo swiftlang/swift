@@ -153,15 +153,20 @@ TypeRepr *CloneVisitor::visitOptionalTypeRepr(OptionalTypeRepr *T) {
   return new (Ctx) OptionalTypeRepr(visit(T->getBase()), T->getQuestionLoc());
 }
 
-TypeRepr *
-CloneVisitor::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
+TypeRepr * CloneVisitor::visitImplicitlyUnwrappedOptionalTypeRepr(
+             ImplicitlyUnwrappedOptionalTypeRepr *T) {
   return new (Ctx) ImplicitlyUnwrappedOptionalTypeRepr(visit(T->getBase()),
-                                             T->getExclamationLoc());
+                                                       T->getExclamationLoc());
 }
 
 TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
-  return new (Ctx) TupleTypeRepr(Ctx.AllocateCopy(T->getElements()),
-                                 T->getParens(), T->getEllipsisLoc());
+  // Clone the tuple elements.
+  auto elements = Ctx.Allocate<TypeRepr*>(T->getElements().size());
+  for (unsigned argI : indices(elements)) {
+    elements[argI] = visit(T->getElements()[argI]);
+  }
+
+  return new (Ctx) TupleTypeRepr(elements, T->getParens(), T->getEllipsisLoc());
 }
 
 TypeRepr *CloneVisitor::visitNamedTypeRepr(NamedTypeRepr *T) {
@@ -171,10 +176,15 @@ TypeRepr *CloneVisitor::visitNamedTypeRepr(NamedTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitProtocolCompositionTypeRepr(
                           ProtocolCompositionTypeRepr *T) {
-  return new (Ctx) ProtocolCompositionTypeRepr(
-                     Ctx.AllocateCopy(T->getProtocols()),
-                     T->getProtocolLoc(),
-                     T->getAngleBrackets());
+  // Clone the protocols.
+  auto protocols = Ctx.Allocate<IdentTypeRepr*>(T->getProtocols().size());
+  for (unsigned argI : indices(protocols)) {
+    protocols[argI] = cast<IdentTypeRepr>(visit(T->getProtocols()[argI]));
+  }
+
+  return new (Ctx) ProtocolCompositionTypeRepr(protocols,
+                                               T->getProtocolLoc(),
+                                               T->getAngleBrackets());
 }
 
 TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
