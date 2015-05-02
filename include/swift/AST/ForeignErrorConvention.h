@@ -51,14 +51,21 @@ public:
     NonNilError,
   };
 
+  /// Is the error owned by the caller, given that it exists?
   enum IsOwned_t : bool {
     IsNotOwned = false, IsOwned = true
+  };
+
+  /// Was the error parameter replaced by () or just removed?
+  enum IsReplaced_t : bool {
+    IsNotReplaced = false, IsReplaced = true
   };
 
 private:  
   unsigned TheKind : 8;
   unsigned ErrorIsOwned : 1;
-  unsigned ErrorParameterIndex : 23;
+  unsigned ErrorParameterIsReplaced : 1;
+  unsigned ErrorParameterIndex : 22;
 
   /// The error parameter type.  This is currently assumed to be an
   /// indirect out-parameter.
@@ -69,9 +76,10 @@ private:
   CanType ResultType;
 
   ForeignErrorConvention(Kind kind, unsigned parameterIndex,
-                         IsOwned_t isOwned, Type parameterType,
-                         Type resultType = Type())
+                         IsOwned_t isOwned, IsReplaced_t isReplaced,
+                         Type parameterType, Type resultType = Type())
     : TheKind(unsigned(kind)), ErrorIsOwned(bool(isOwned)),
+      ErrorParameterIsReplaced(bool(isOwned)),
       ErrorParameterIndex(parameterIndex), ErrorParameterType(parameterType),
       ResultType(resultType) {
   }
@@ -79,30 +87,34 @@ private:
 public:
   static ForeignErrorConvention getZeroResult(unsigned parameterIndex,
                                               IsOwned_t isOwned,
+                                              IsReplaced_t isReplaced,
                                               CanType parameterType,
                                               CanType resultType) {
-    return { ZeroResult, parameterIndex, isOwned, parameterType,
-             resultType };
+    return { ZeroResult, parameterIndex, isOwned, isReplaced,
+             parameterType, resultType };
   }
 
   static ForeignErrorConvention getNonZeroResult(unsigned parameterIndex,
                                                  IsOwned_t isOwned,
+                                                 IsReplaced_t isReplaced,
                                                  CanType parameterType,
                                                  CanType resultType) {
-    return { NonZeroResult, parameterIndex, isOwned, parameterType,
-             resultType };
+    return { NonZeroResult, parameterIndex, isOwned, isReplaced,
+             parameterType, resultType };
   }
 
   static ForeignErrorConvention getNilResult(unsigned parameterIndex,
                                              IsOwned_t isOwned,
+                                             IsReplaced_t isReplaced,
                                              CanType parameterType) {
-    return { NilResult, parameterIndex, isOwned, parameterType };
+    return { NilResult, parameterIndex, isOwned, isReplaced, parameterType };
   }
 
   static ForeignErrorConvention getNonNilError(unsigned parameterIndex,
                                                IsOwned_t isOwned,
+                                               IsReplaced_t isReplaced,
                                                CanType parameterType) {
-    return { NilResult, parameterIndex, isOwned, parameterType };
+    return { NilResult, parameterIndex, isOwned, isReplaced, parameterType };
   }
 
   /// Returns the error convention in use.
@@ -119,6 +131,11 @@ public:
   /// Returns the index of the error parameter.
   unsigned getErrorParameterIndex() const {
     return ErrorParameterIndex;
+  }
+
+  /// Has the error parameter been replaced with void?
+  IsReplaced_t isErrorParameterReplacedWithVoid() const {
+    return IsReplaced_t(ErrorParameterIsReplaced);
   }
 
   /// Returns whether the error result is owned.  It's assumed that the

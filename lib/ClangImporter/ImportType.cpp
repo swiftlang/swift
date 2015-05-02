@@ -1271,6 +1271,7 @@ namespace {
   struct ErrorImportInfo {
     ForeignErrorConvention::Kind Kind;
     ForeignErrorConvention::IsOwned_t IsOwned;
+    ForeignErrorConvention::IsReplaced_t ReplaceParamWithVoid;
     unsigned ParamIndex;
     CanType ParamType;
     CanType OrigResultType;
@@ -1280,15 +1281,17 @@ namespace {
       using FEC = ForeignErrorConvention;
       switch (Kind) {
       case FEC::ZeroResult:
-        return FEC::getZeroResult(ParamIndex, IsOwned, ParamType,
-                                  OrigResultType);
+        return FEC::getZeroResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
+                                  ParamType, OrigResultType);
       case FEC::NonZeroResult:
-        return FEC::getNonZeroResult(ParamIndex, IsOwned, ParamType,
-                                     OrigResultType);
+        return FEC::getNonZeroResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
+                                     ParamType, OrigResultType);
       case FEC::NilResult:
-        return FEC::getNilResult(ParamIndex, IsOwned, ParamType);
+        return FEC::getNilResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
+                                 ParamType);
       case FEC::NonNilError:
-        return FEC::getNonNilError(ParamIndex, IsOwned, ParamType);
+        return FEC::getNonNilError(ParamIndex, IsOwned, ReplaceParamWithVoid,
+                                   ParamType);
       }
       llvm_unreachable("bad error convention");
     }
@@ -1356,6 +1359,47 @@ classifyMethodErrorHandling(ClangImporter::Implementation &importer,
   return None;
 }
 
+static const char ErrorSuffix[] = "AndReturnError";
+
+/// Look for a method that will import to have the same name as the
+/// given method after importing the Nth parameter as an elided error
+/// parameter.
+static bool hasErrorMethodNameCollision(const clang::ObjCMethodDecl *method,
+                                        unsigned paramIndex,
+                                        bool stripErrorSuffix) {
+  // Copy the existing selector pieces into an array.
+  auto selector = method->getSelector();
+  unsigned numArgs = selector.getNumArgs();
+  assert(numArgs > 0);
+
+  SmallVector<clang::IdentifierInfo *, 4> chunks;
+  for (unsigned i = 0, e = selector.getNumArgs(); i != e; ++i) {
+    chunks.push_back(selector.getIdentifierInfoForSlot(i));
+  }
+
+  auto &ctx = method->getASTContext();
+  if (paramIndex == 0 && stripErrorSuffix) {
+    assert(stripErrorSuffix);
+    StringRef name = chunks[0]->getName();
+    assert(name.endswith(ErrorSuffix));
+    name = name.drop_back(sizeof(ErrorSuffix) - 1);
+    chunks[0] = &ctx.Idents.get(name);
+  } else if (paramIndex != 0) {
+    chunks.erase(chunks.begin() + paramIndex);
+  }
+
+  auto newSelector = ctx.Selectors.getSelector(numArgs - 1, chunks.data());
+  const clang::ObjCMethodDecl *conflict;
+  if (auto iface = method->getClassInterface()) {
+    conflict = iface->lookupMethod(newSelector, method->isInstanceMethod());
+  } else {
+    auto protocol = cast<clang::ObjCProtocolDecl>(method->getDeclContext());
+    conflict = protocol->getMethod(newSelector, method->isInstanceMethod());
+  }
+
+  return (conflict != nullptr);
+}
+
 
 static Optional<ErrorImportInfo>
 considerErrorImport(ClangImporter::Implementation &importer,
@@ -1387,8 +1431,51 @@ considerErrorImport(ClangImporter::Implementation &importer,
       classifyMethodErrorHandling(importer, clangDecl, importedResultType);
     if (!errorKind) return None;
 
+    // Consider adjusting the imported declaration name to remove the
+    // parameter.
+    bool adjustName = true;
+    auto replaceWithVoid = ForeignErrorConvention::IsNotReplaced;
+
+    // Never do this if it's the first parameter of a constructor.
+    if (methodKind == SpecialMethodKind::Constructor && index == 0) {
+      adjustName = false;
+      replaceWithVoid = ForeignErrorConvention::IsReplaced;
+    }
+
+    // If the error parameter is the first parameter, try removing the
+    // standard error suffix from the base name.
+    bool stripErrorSuffix = false;
+    Identifier newBaseName = methodName.getBaseName();
+    if (adjustName && index == 0 && paramNames[0].empty()) {
+      StringRef baseNameStr = newBaseName.str();
+      if (baseNameStr.endswith(ErrorSuffix)) {
+        baseNameStr = baseNameStr.drop_back(sizeof(ErrorSuffix) - 1);
+        if (baseNameStr.empty() || importer.isSwiftReservedName(baseNameStr)) {
+          adjustName = false;
+          replaceWithVoid = ForeignErrorConvention::IsReplaced;
+        } else {
+          newBaseName = importer.SwiftContext.getIdentifier(baseNameStr);
+          stripErrorSuffix = true;
+        }
+      }
+    }
+
+    // Also suppress name changes if there's a collision.
+    // TODO: this logic doesn't really work with init methods
+    // TODO: this privileges the old API over the new one
+    if (adjustName &&
+        hasErrorMethodNameCollision(clangDecl, index, stripErrorSuffix)) {
+      // If there was a conflict on the first argument, and this was
+      // the first argument and we're not stripping error suffixes, just
+      // give up completely on error import.
+      if (index == 0 && !stripErrorSuffix) return None;
+
+      adjustName = false;
+      replaceWithVoid = ForeignErrorConvention::IsReplaced;
+    }
+    
     ErrorImportInfo errorInfo = {
-      *errorKind, isErrorOwned, index, CanType(),
+      *errorKind, isErrorOwned, replaceWithVoid, index, CanType(),
       importedResultType->getCanonicalType()
     };
     
@@ -1409,26 +1496,10 @@ considerErrorImport(ClangImporter::Implementation &importer,
       break;
     }
 
-    // Adjust the declaration name to remove the parameter, unless
-    // this was the first parameter of a constructor.
-    if (methodKind == SpecialMethodKind::Constructor && index == 0)
+    if (!adjustName)
       return errorInfo;
 
-    // If the error is an unlabeled first parameter, try to slice
-    // "AndReturnError" off the end of the base method name, unless that
-    // creates a reserved identifier.
-    static const char errorSuffix[] = "AndReturnError";
-    Identifier newBaseName = methodName.getBaseName();
-    if (index == 0 && paramNames[0].empty()) {
-      StringRef baseNameStr = newBaseName.str();
-      if (baseNameStr.endswith(errorSuffix)) {
-        baseNameStr = baseNameStr.drop_back(sizeof(errorSuffix) - 1);
-        if (!importer.isSwiftReservedName(baseNameStr)) {
-          newBaseName = importer.SwiftContext.getIdentifier(baseNameStr);
-        }
-      }
-    }
-
+    // Build the new declaration name.
     SmallVector<Identifier, 8> newParamNames;
     newParamNames.append(paramNames.begin(),
                          paramNames.begin() + index);
@@ -1604,10 +1675,8 @@ Type ClangImporter::Implementation::importMethodType(
     if (errorInfo && paramIndex == errorInfo->ParamIndex) {
       errorInfo->ParamType = swiftParamTy->getCanonicalType();
 
-      // Unless this is the first argument of a constructor, in which
-      // case build an argument with () type.  We have to do this here
-      // in case there were trailing closure arguments.
-      if (kind == SpecialMethodKind::Constructor && paramIndex == 0) {
+      // ...unless we're supposed to replace it with ().
+      if (errorInfo->ReplaceParamWithVoid) {
         addEmptyTupleParameter(argNames[nameIndex]);
         ++nameIndex;
       }

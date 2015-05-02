@@ -3971,10 +3971,12 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
 
   uint8_t rawKind;
   bool isOwned;
+  bool isReplaced;
   unsigned errorParameterIndex;
   TypeID errorParameterTypeID;
   TypeID resultTypeID;
-  ForeignErrorConventionLayout::readRecord(scratch, rawKind, isOwned,
+  ForeignErrorConventionLayout::readRecord(scratch, rawKind,
+                                           isOwned, isReplaced,
                                            errorParameterIndex,
                                            errorParameterTypeID,
                                            resultTypeID);
@@ -3999,27 +4001,28 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
 
   auto owned = isOwned ? ForeignErrorConvention::IsOwned
                        : ForeignErrorConvention::IsNotOwned;
+  auto replaced = ForeignErrorConvention::IsReplaced_t(isOwned);
   switch (kind) {
   case ForeignErrorConvention::ZeroResult:
     return ForeignErrorConvention::getZeroResult(errorParameterIndex,
-                                                 owned,
+                                                 owned, replaced,
                                                  canErrorParameterType,
                                                  canResultType);
 
   case ForeignErrorConvention::NonZeroResult:
     return ForeignErrorConvention::getNonZeroResult(errorParameterIndex,
-                                                    owned,
+                                                    owned, replaced,
                                                     canErrorParameterType,
                                                     canResultType);
 
   case ForeignErrorConvention::NilResult:
     return ForeignErrorConvention::getNilResult(errorParameterIndex,
-                                                owned,
+                                                owned, replaced,
                                                 canErrorParameterType);
 
   case ForeignErrorConvention::NonNilError:
     return ForeignErrorConvention::getNonNilError(errorParameterIndex,
-                                                  owned,
+                                                  owned, replaced,
                                                   canErrorParameterType);
   }
 }

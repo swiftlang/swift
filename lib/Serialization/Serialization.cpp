@@ -1829,6 +1829,7 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
 
   auto kind = getRawStableForeignErrorConventionKind(fec.getKind());
   uint8_t isOwned = fec.isErrorOwned() == ForeignErrorConvention::IsOwned;
+  uint8_t isReplaced = bool(fec.isErrorParameterReplacedWithVoid());
   TypeID errorParameterTypeID = addTypeRef(fec.getErrorParameterType());
   TypeID resultTypeID;
   switch (fec.getKind()) {
@@ -1847,6 +1848,7 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
   ForeignErrorConventionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            static_cast<uint8_t>(kind),
                                            isOwned,
+                                           isReplaced,
                                            fec.getErrorParameterIndex(),
                                            errorParameterTypeID,
                                            resultTypeID);

@@ -24,3 +24,31 @@ func testInheritedInit() throws {
 func testInheritedFactory() throws {
   try ReallyErrorProne(two: nil)
 }
+
+// Resolve a conflict between -foo and -foo: by just not
+// importing the latter as throwing.
+func testConflict1(obj: ErrorProne) throws {
+  try obj.conflict1() // expected-warning {{no calls to throwing functions occur within 'try'}}
+}
+func testConflict1_error(obj: ErrorProne) throws {
+  var error: NSError?
+  obj.conflict1(&error)
+}
+
+// Resolve a conflict between -foo and -fooAndReturnError:
+// by not changing the name of the latter.
+func testConflict2(obj: ErrorProne) throws {
+  try obj.conflict2() // expected-warning {{no calls to throwing functions occur within 'try'}}
+}
+func testConflict2_error(obj: ErrorProne) throws {
+  try obj.conflict2AndReturnError()
+}
+
+// Resolve a conflict between -foo: and -foo:error: by not
+// changing the name of the latter.
+func testConflict3(obj: ErrorProne) throws {
+  try obj.conflict3(nil) // expected-warning {{no calls to throwing functions occur within 'try'}}
+}
+func testConflict3_error(obj: ErrorProne) throws {
+  try obj.conflict3(nil, error: ())
+}

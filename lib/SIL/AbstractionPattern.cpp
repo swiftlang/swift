@@ -76,16 +76,24 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   return AbstractionPattern(decl->getArgumentType());
 }
 
-AbstractionPattern
-AbstractionPattern::getObjCMethod(CanType origType,
-                                  const clang::ObjCMethodDecl *method,
+AbstractionPattern::EncodedForeignErrorInfo
+AbstractionPattern::EncodedForeignErrorInfo::encode(
                          const Optional<ForeignErrorConvention> &foreignError) {
   EncodedForeignErrorInfo errorInfo;
   if (foreignError.hasValue()) {
     errorInfo =
       EncodedForeignErrorInfo(foreignError->getErrorParameterIndex(),
+                              foreignError->isErrorParameterReplacedWithVoid(),
                               foreignError->stripsResultOptionality());
   }
+  return errorInfo;
+}
+
+AbstractionPattern
+AbstractionPattern::getObjCMethod(CanType origType,
+                                  const clang::ObjCMethodDecl *method,
+                         const Optional<ForeignErrorConvention> &foreignError) {
+  auto errorInfo = EncodedForeignErrorInfo::encode(foreignError);
   return getObjCMethod(origType, method, errorInfo);
 }
 
@@ -93,12 +101,7 @@ AbstractionPattern
 AbstractionPattern::getCurriedObjCMethod(CanType origType,
                                          const clang::ObjCMethodDecl *method,
                          const Optional<ForeignErrorConvention> &foreignError) {
-  EncodedForeignErrorInfo errorInfo;
-  if (foreignError.hasValue()) {
-    errorInfo =
-      EncodedForeignErrorInfo(foreignError->getErrorParameterIndex(),
-                              foreignError->stripsResultOptionality());
-  }
+  auto errorInfo = EncodedForeignErrorInfo::encode(foreignError);
   return getCurriedObjCMethod(origType, method, errorInfo);
 }
 
@@ -181,6 +184,13 @@ const clang::Type *getClangArrayElementType(const clang::Type *ty,
   return cast<clang::ArrayType>(ty)->getElementType().getTypePtr();
 }
 
+static bool isVoidLike(CanType type) {
+  return (type->isVoid() ||
+          (isa<TupleType>(type) &&
+           cast<TupleType>(type)->getNumElements() == 1 &&
+           cast<TupleType>(type).getElementType(0)->isVoid()));
+}
+
 AbstractionPattern
 AbstractionPattern::getTupleElementType(unsigned index) const {
   switch (getKind()) {
@@ -215,9 +225,15 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
     // If we're asking for something after the error parameter, slide
     // the parameter index up by one.
     auto paramIndex = index;
-    if (errorInfo.hasErrorParameter() &&
-        paramIndex >= errorInfo.getErrorParameterIndex()) {
-      paramIndex++;
+    if (errorInfo.hasErrorParameter()) {
+      auto errorParamIndex = errorInfo.getErrorParameterIndex();
+      if (paramIndex == errorParamIndex &&
+          errorInfo.isErrorParameterReplacedWithVoid()) {
+        assert(isVoidLike(swiftEltType));
+        return AbstractionPattern(swiftEltType);
+      } else if (paramIndex >= errorParamIndex) {
+        paramIndex++;
+      }
     }
 
     return AbstractionPattern(getGenericSignature(), swiftEltType,
@@ -268,10 +284,7 @@ AbstractionPattern::getObjCMethodFormalParamPattern(CanType inputType) const {
       (method->parameters().size() == 1 &&
        errorInfo.hasErrorParameter())) {
     // Imported initializers also sometimes get "withFooBar: ()" clauses.
-    assert(inputType->isVoid() ||
-           (isa<TupleType>(inputType) &&
-            cast<TupleType>(inputType)->getNumElements() == 1 &&
-              cast<TupleType>(inputType).getElementType(0)->isVoid()));
+    assert(isVoidLike(inputType));
     return AbstractionPattern(inputType);
   }
 
@@ -283,7 +296,7 @@ AbstractionPattern::getObjCMethodFormalParamPattern(CanType inputType) const {
     assert(method->isVariadic() ||
            method->parameters().size() ==
              cast<TupleType>(inputType)->getNumElements()
-             + unsigned(errorInfo.hasErrorParameter()));
+             + unsigned(errorInfo.hasUnreplacedErrorParameter()));
     return getObjCMethodFormalParamTuple(signature, inputType,
                                          method, errorInfo);
   }
@@ -604,6 +617,8 @@ void AbstractionPattern::print(raw_ostream &out) const {
     if (errorInfo.hasValue()) {
       if (errorInfo.hasErrorParameter())
         out << ", errorParameter=" << errorInfo.getErrorParameterIndex();
+      if (errorInfo.isErrorParameterReplacedWithVoid())
+        out << ", replacedWithVoid";
       if (errorInfo.stripsResultOptionality())
         out << ", stripsResultOptionality";
     }

@@ -2632,6 +2632,7 @@ bool TypeChecker::isRepresentableInObjC(
       errorConvention = ForeignErrorConvention::getZeroResult(
                           errorParameterIndex,
                           ForeignErrorConvention::IsNotOwned,
+                          ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType,
                           errorResultType);
       break;
@@ -2640,6 +2641,7 @@ bool TypeChecker::isRepresentableInObjC(
       errorConvention = ForeignErrorConvention::getNonZeroResult(
                           errorParameterIndex,
                           ForeignErrorConvention::IsNotOwned,
+                          ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType,
                           errorResultType);
       break;
@@ -2648,6 +2650,7 @@ bool TypeChecker::isRepresentableInObjC(
       errorConvention = ForeignErrorConvention::getNilResult(
                           errorParameterIndex,
                           ForeignErrorConvention::IsNotOwned,
+                          ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
       break;
 
@@ -2655,6 +2658,7 @@ bool TypeChecker::isRepresentableInObjC(
       errorConvention = ForeignErrorConvention::getNilResult(
                           errorParameterIndex,
                           ForeignErrorConvention::IsNotOwned,
+                          ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
       break;
     }

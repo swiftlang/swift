@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 198; // Last change: warn_unused_result
+const uint16_t VERSION_MINOR = 199; // Last change: ForeignError.IsReplaced
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1222,6 +1222,7 @@ namespace decls_block {
     FOREIGN_ERROR_CONVENTION,
     ForeignErrorConventionKindField,  // kind
     BCFixed<1>,                       // owned
+    BCFixed<1>,                       // replaced
     BCVBR<4>,                         // error parameter index
     TypeIDField,                      // error parameter type
     TypeIDField                       // result type

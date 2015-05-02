@@ -92,19 +92,35 @@ class AbstractionPattern {
   public:
     EncodedForeignErrorInfo() : Value(0) {}
     EncodedForeignErrorInfo(unsigned errorParameterIndex,
+                            bool replaceParamWithVoid,
                             bool stripsResultOptionality)
-      : Value(1 + unsigned(stripsResultOptionality) +
-              (errorParameterIndex << 1)) {}
+      : Value(1 +
+              (unsigned(stripsResultOptionality)) +
+              (unsigned(replaceParamWithVoid) << 1) +
+              (errorParameterIndex << 2)) {}
+
+    static EncodedForeignErrorInfo
+    encode(const Optional<ForeignErrorConvention> &foreignError);
 
     bool hasValue() const { return Value != 0; }
     bool hasErrorParameter() const { return hasValue(); }
+    bool hasUnreplacedErrorParameter() const {
+      return hasValue() && !isErrorParameterReplacedWithVoid();
+    }
+
     bool stripsResultOptionality() const {
       assert(hasValue());
       return (Value - 1) & 1;
     }
+
+    bool isErrorParameterReplacedWithVoid() const {
+      assert(hasValue());
+      return (Value - 1) & 2;
+    }
+
     unsigned getErrorParameterIndex() const {
       assert(hasValue());
-      return (Value - 1) >> 1;
+      return (Value - 1) >> 2;
     }
 
     unsigned getOpaqueValue() const { return Value; }
