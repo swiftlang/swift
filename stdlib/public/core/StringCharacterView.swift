@@ -24,7 +24,7 @@ extension String {
 
     /// Create a view of the `Character`s in `text`
     public init(_ text: String) {
-      self._core = s._core
+      self._core = text._core
     }
     
     public // @testable
