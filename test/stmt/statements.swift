@@ -379,23 +379,27 @@ class SomeTestClass {
 }
 
 
-func test_unless(x : Int, y : Int??, cond : Bool) {
+func test_require(x : Int, y : Int??, cond : Bool) {
   
   // These are all ok.
-  unless let a = y {}
+  require let a = y else {}
   markUsed(a)
-  unless let b = y where cond {}
-  unless case let c = x where cond {}
-  unless case let Optional.Some(d) = y {}
-  unless x != 4, case _ = x { }
-  
-  unless let e where cond {}    // expected-error {{variable binding in a condition requires an initializer}}
-  unless case let f? : Int? where cond {}    // expected-error {{variable binding in a condition requires an initializer}}
+  require let b = y where cond else {}
+  require case let c = x where cond else {}
+  require case let Optional.Some(d) = y else {}
+  require x != 4, case _ = x else { }
 
-  unless let g = y {
-    markUsed(g)  // expected-error {{variable declared in 'unless' condition is not usable in its body}}
+
+  require let e where cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
+  require case let f? : Int? where cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
+
+  require let g = y else {
+    markUsed(g)  // expected-error {{variable declared in 'require' condition is not usable in its body}}
   }
 
-  unless case _ = x {}  // expected-warning {{'unless' condition is always true, body is unreachable}}
+  require let h = y where cond {}  // expected-error {{expected 'else' after 'require' condition}}
+
+
+  require case _ = x else {}  // expected-warning {{'require' condition is always true, body is unreachable}}
 }
 

@@ -745,7 +745,7 @@ struct ASTNodeBase {};
       verifyCheckedBase(S);
     }
 
-    void verifyChecked(UnlessStmt *S) {
+    void verifyChecked(RequireStmt *S) {
       checkCondition(S->getCond());
       verifyCheckedBase(S);
     }

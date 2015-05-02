@@ -369,7 +369,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
   SGF.BreakContinueDestStack.pop_back();
 }
 
-void StmtEmitter::visitUnlessStmt(UnlessStmt *S) {
+void StmtEmitter::visitRequireStmt(RequireStmt *S) {
   // Create a block for the body and emit code into it before processing any of
   // the patterns, because none of the bound variables will be in scope in the
   // 'body' context.

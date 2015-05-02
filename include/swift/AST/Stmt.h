@@ -553,29 +553,29 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::If; }
 };
 
-/// UnlessStmt - unless statement.  Evaluate a condition and if it fails, run
+/// RequireStmt - require statement.  Evaluate a condition and if it fails, run
 /// its body.  The body is always guaranteed to exit the current scope (or
 /// abort), it never falls through.
 ///
-class UnlessStmt : public LabeledConditionalStmt {
-  SourceLoc UnlessLoc;
+class RequireStmt : public LabeledConditionalStmt {
+  SourceLoc RequireLoc;
   Stmt *Body;
   
 public:
-  UnlessStmt(SourceLoc UnlessLoc, StmtCondition Cond,
+  RequireStmt(SourceLoc RequireLoc, StmtCondition Cond,
              Stmt *Body, Optional<bool> implicit = None)
-  : LabeledConditionalStmt(StmtKind::Unless,
-                           getDefaultImplicitFlag(implicit, UnlessLoc),
+  : LabeledConditionalStmt(StmtKind::Require,
+                           getDefaultImplicitFlag(implicit, RequireLoc),
                            LabeledStmtInfo(), Cond),
-    UnlessLoc(UnlessLoc), Body(Body) {}
+    RequireLoc(RequireLoc), Body(Body) {}
   
-  UnlessStmt(SourceLoc UnlessLoc, Expr *Cond, Stmt *Body,
+  RequireStmt(SourceLoc RequireLoc, Expr *Cond, Stmt *Body,
              Optional<bool> implicit, ASTContext &Ctx);
   
-  SourceLoc getUnlessLoc() const { return UnlessLoc; }
+  SourceLoc getRequireLoc() const { return RequireLoc; }
   
   SourceLoc getStartLoc() const {
-    return getLabelLocOrKeywordLoc(UnlessLoc);
+    return getLabelLocOrKeywordLoc(RequireLoc);
   }
   SourceLoc getEndLoc() const {
     return Body->getEndLoc();
@@ -585,7 +585,7 @@ public:
   void setBody(Stmt *s) { Body = s; }
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Unless;}
+  static bool classof(const Stmt *S) { return S->getKind() ==StmtKind::Require;}
 };
 
   

@@ -1836,8 +1836,8 @@ void PrintAST::visitIfStmt(IfStmt *stmt) {
     visit(elseStmt);
   }
 }
-void PrintAST::visitUnlessStmt(UnlessStmt *stmt) {
-  Printer << "unless ";
+void PrintAST::visitRequireStmt(RequireStmt *stmt) {
+  Printer << "require ";
   // FIXME: print condition
   Printer << " ";
   visit(stmt->getBody());

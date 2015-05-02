@@ -391,18 +391,18 @@ public:
     return IS;
   }
   
-  Stmt *visitUnlessStmt(UnlessStmt *US) {
-    StmtCondition C = US->getCond();
-    if (TC.typeCheckStmtCondition(C, DC, diag::unless_always_succeeds))
+  Stmt *visitRequireStmt(RequireStmt *RS) {
+    StmtCondition C = RS->getCond();
+    if (TC.typeCheckStmtCondition(C, DC, diag::require_always_succeeds))
       return 0;
-    US->setCond(C);
+    RS->setCond(C);
     
-    AddLabeledStmt ifNest(*this, US);
+    AddLabeledStmt ifNest(*this, RS);
     
-    Stmt *S = US->getBody();
+    Stmt *S = RS->getBody();
     if (typeCheckStmt(S)) return 0;
-    US->setBody(S);
-    return US;
+    RS->setBody(S);
+    return RS;
   }
 
   Stmt *visitIfConfigStmt(IfConfigStmt *ICS) {

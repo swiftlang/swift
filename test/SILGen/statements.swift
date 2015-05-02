@@ -513,16 +513,16 @@ func testDeferOpenExistential(b: Bool, type: StaticFooProtocol.Type) {
 
 
 
-// CHECK-LABEL: sil hidden @_TF10statements21testUnlessExprPatternFSiT_
+// CHECK-LABEL: sil hidden @_TF10statements22testRequireExprPatternFSiT_
 
-func testUnlessExprPattern(a : Int) {
+func testRequireExprPattern(a : Int) {
   marker_1()
   // CHECK: [[M1:%[0-9]+]] = function_ref @_TF10statements8marker_1FT_T_ : $@convention(thin) () -> ()
   // CHECK-NEXT: apply [[M1]]() : $@convention(thin) () -> ()
 
   // CHECK: function_ref static Swift.~= infix <A : Swift.Equatable>(A, A) -> Swift.Bool
   // CHECK: cond_br {{.*}}, bb1, bb2
-  unless case 4 = a { marker_2(); return }
+  require case 4 = a else { marker_2(); return }
 
   // Fall through case comes first.
 
@@ -543,16 +543,16 @@ func testUnlessExprPattern(a : Int) {
 }
 
 
-// CHECK-LABEL: sil hidden @_TF10statements19testUnlessOptional1FGSqSi_Si
+// CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional1FGSqSi_Si
 // CHECK-NEXT: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT:   debug_value %0 : $Optional<Int>  // let a
 // CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, default bb2
-func testUnlessOptional1(a : Int?) -> Int {
+func testRequireOptional1(a : Int?) -> Int {
 
   // CHECK: bb1(%3 : $Int):
   // CHECK-NEXT:   debug_value %3 : $Int  // let t
   // CHECK-NEXT:   return %3 : $Int
-  unless let t = a { abort() }
+  require let t = a else { abort() }
 
   // CHECK:  bb2:
   // CHECK-NEXT:    // function_ref statements.abort () -> ()
@@ -562,13 +562,13 @@ func testUnlessOptional1(a : Int?) -> Int {
   return t
 }
 
-// CHECK-LABEL: sil hidden @_TF10statements19testUnlessOptional2FGSqSS_SS
+// CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional2FGSqSS_SS
 // CHECK-NEXT: bb0(%0 : $Optional<String>):
 // CHECK-NEXT:   debug_value %0 : $Optional<String>  // let a
 // CHECK-NEXT:   retain_value %0 : $Optional<String>
 // CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb1, default bb2
-func testUnlessOptional2(a : String?) -> String {
-  unless let t = a { abort() }
+func testRequireOptional2(a : String?) -> String {
+  require let t = a else { abort() }
 
   // CHECK:  bb1(%4 : $String):
   // CHECK-NEXT:   debug_value %4 : $String  // let t
@@ -587,19 +587,19 @@ enum MyOpt<T> {
   case None, Some(T)
 }
 
-// CHECK-LABEL: sil hidden @_TF10statements27testAddressOnlyEnumInUnlessU__FGOS_5MyOptQ__Q_
+// CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequireU__FGOS_5MyOptQ__Q_
 // CHECK-NEXT: bb0(%0 : $*T, %1 : $*MyOpt<T>):
 // CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>  // let a
 // CHECK-NEXT: %3 = alloc_stack $T  // let t
 // CHECK-NEXT: %4 = alloc_stack $MyOpt<T>
 // CHECK-NEXT: copy_addr %1 to [initialization] %4#1 : $*MyOpt<T>
 // CHECK-NEXT: switch_enum_addr %4#1 : $*MyOpt<T>, case #MyOpt.Some!enumelt.1: bb2, default bb1
-func testAddressOnlyEnumInUnless<T>(a : MyOpt<T>) -> T {
+func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
   // CHECK:  bb1:
   // CHECK-NEXT:   dealloc_stack %4#0
   // CHECK-NEXT:   dealloc_stack %3#0
   // CHECK-NEXT:   br bb3
-  unless let t = a { abort() }
+  require let t = a else { abort() }
 
   // CHECK:    bb2:
   // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
@@ -627,14 +627,14 @@ func testAddressOnlyEnumInUnless<T>(a : MyOpt<T>) -> T {
 protocol MyProtocol {}
 func testCleanupEmission<T>(x: T) {
   // SILGen shouldn't crash/verify abort on this example.
-  unless let x2 = x as? MyProtocol { return }
+  require let x2 = x as? MyProtocol else { return }
 }
 
 
 // CHECK-LABEL: sil hidden @_TF10statements15test_is_patternFCS_9BaseClassT_
 func test_is_pattern(y : BaseClass) {
   // checked_cast_br %0 : $BaseClass to $DerivedClass
-  unless case is DerivedClass = y { marker_1(); return }
+  require case is DerivedClass = y else { marker_1(); return }
 
   marker_2()
 }
@@ -642,7 +642,7 @@ func test_is_pattern(y : BaseClass) {
 // CHECK-LABEL: sil hidden @_TF10statements15test_as_patternFCS_9BaseClassCS_12DerivedClass
 func test_as_pattern(y : BaseClass) -> DerivedClass {
   // checked_cast_br %0 : $BaseClass to $DerivedClass
-  unless case let result as DerivedClass = y {  }
+  require case let result as DerivedClass = y else {  }
   // CHECK: bb{{.*}}({{.*}} : $DerivedClass):
 
 
@@ -659,7 +659,7 @@ func let_else_tuple_binding(a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>  // let a
   // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.Some!enumelt.1: bb1, default bb2
 
-  unless let (x, y) = a { }
+  require let (x, y) = a else { }
   return x
 
   // CHECK: bb1(%3 : $(Int, Int)):

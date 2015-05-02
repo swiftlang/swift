@@ -59,7 +59,7 @@ struct MapRegionCounters : public ASTWalker {
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       CounterMap[IS->getThenStmt()] = NextCounter++;
-    } else if (auto *US = dyn_cast<UnlessStmt>(S)) {
+    } else if (auto *US = dyn_cast<RequireStmt>(S)) {
       CounterMap[US->getBody()] = NextCounter++;
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       CounterMap[WS->getBody()] = NextCounter++;
@@ -447,7 +447,7 @@ public:
       CounterExpr &ThenCounter = assignCounter(IS->getThenStmt());
       assignCounter(IS->getElseStmt(),
                     CounterExpr::Sub(getCurrentCounter(), ThenCounter));
-    } else if (auto *US = dyn_cast<UnlessStmt>(S)) {
+    } else if (auto *US = dyn_cast<RequireStmt>(S)) {
       assignCounter(US, CounterExpr::Zero());
       CounterExpr &BodyCounter = assignCounter(US->getBody());
       assignCounter(US->getBody(),

@@ -311,7 +311,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     if (S->getElseStmt())
       visit(S->getElseStmt());
   }
-  void visitUnlessStmt(UnlessStmt *S) {
+  void visitRequireStmt(RequireStmt *S) {
     visit(S->getBody());
   }
   void visitIfConfigStmt(IfConfigStmt *S) {

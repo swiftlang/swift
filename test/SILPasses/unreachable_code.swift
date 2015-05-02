@@ -330,15 +330,15 @@ func testLetElseExprPattern(a : Int) {
   }
 }
 
-func testUnless(a : Int) {
-  unless case 4 = a {  }  // expected-error {{unless body may not fall through}}
+func testRequire(a : Int) {
+  require case 4 = a else {  }  // expected-error {{require body may not fall through}}
 
-  unless case 4 = a { return }  // ok
-  unless case 4 = a { die() }  // ok
-  unless case 4 = a { fatalError("baaad") }  // ok
+  require case 4 = a else { return }  // ok
+  require case 4 = a else { die() }  // ok
+  require case 4 = a else { fatalError("baaad") }  // ok
 
   for i in 0...100 {
-    unless case 4 = a { continue } // ok
+    require case 4 = a else { continue } // ok
   }
 }
 

@@ -758,15 +758,17 @@ ERROR(expected_lbrace_after_if,stmt_parsing,PointsToFirstBadToken,
 ERROR(expected_lbrace_after_else,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'else'", ())
 
-// Unless Statement
-ERROR(expected_condition_unless,stmt_parsing,PointsToFirstBadToken,
-      "expected expression, var, or let in 'unless' condition", ())
-ERROR(missing_condition_after_unless,stmt_parsing,none,
-      "missing condition in an 'unless' statement", ())
-ERROR(expected_lbrace_after_unless,stmt_parsing,PointsToFirstBadToken,
-      "expected '{' after 'unless' condition", ())
-ERROR(bound_var_unless_body,expr_parsing,none,
-      "variable declared in 'unless' condition is not usable in its body", ())
+// Require Statement
+ERROR(expected_condition_require,stmt_parsing,PointsToFirstBadToken,
+      "expected expression, var, let or case in 'require' condition", ())
+ERROR(missing_condition_after_require,stmt_parsing,none,
+      "missing condition in an 'require' statement", ())
+ERROR(expected_else_after_require,stmt_parsing,PointsToFirstBadToken,
+      "expected 'else' after 'require' condition", ())
+ERROR(expected_lbrace_after_require,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'require' else", ())
+ERROR(bound_var_require_body,expr_parsing,none,
+      "variable declared in 'require' condition is not usable in its body", ())
 
 // While Statement
 ERROR(expected_condition_while,stmt_parsing,PointsToFirstBadToken,

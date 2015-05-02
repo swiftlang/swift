@@ -886,7 +886,7 @@ Stmt *Traversal::visitIfStmt(IfStmt *IS) {
   return IS;
 }
 
-Stmt *Traversal::visitUnlessStmt(UnlessStmt *US) {
+Stmt *Traversal::visitRequireStmt(RequireStmt *US) {
   if (doIt(US->getCond()))
     return nullptr;
   

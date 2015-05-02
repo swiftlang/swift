@@ -1113,8 +1113,8 @@ public:
     OS << ')';
   }
   
-  void visitUnlessStmt(UnlessStmt *S) {
-    OS.indent(Indent) << "(unless_stmt\n";
+  void visitRequireStmt(RequireStmt *S) {
+    OS.indent(Indent) << "(require_stmt\n";
     for (auto elt : S->getCond())
       printRec(elt);
     OS << '\n';
