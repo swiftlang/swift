@@ -110,15 +110,18 @@ public struct String {
     _core = _StringCore()
   }
 
-  public init(_ _core: _StringCore) {
+  public // @testable
+  init(_ _core: _StringCore) {
     self._core = _core
   }
 
-  public var _core: _StringCore
+  public // @testable
+  var _core: _StringCore
 }
 
 extension String {
-  public static func _fromWellFormedCodeUnitSequence<
+  public // @testable
+  static func _fromWellFormedCodeUnitSequence<
     Encoding: UnicodeCodecType, Input: CollectionType
     where Input.Generator.Element == Encoding.CodeUnit
   >(
@@ -127,7 +130,8 @@ extension String {
     return String._fromCodeUnitSequence(encoding, input: input)!
   }
 
-  public static func _fromCodeUnitSequence<
+  public // @testable
+  static func _fromCodeUnitSequence<
     Encoding: UnicodeCodecType, Input: CollectionType
     where Input.Generator.Element == Encoding.CodeUnit
   >(
@@ -143,7 +147,8 @@ extension String {
     }
   }
 
-  public static func _fromCodeUnitSequenceWithRepair<
+  public // @testable
+  static func _fromCodeUnitSequenceWithRepair<
     Encoding: UnicodeCodecType, Input: CollectionType
     where Input.Generator.Element == Encoding.CodeUnit
   >(
@@ -158,7 +163,8 @@ extension String {
 
 extension String : _BuiltinUnicodeScalarLiteralConvertible {
   @effects(readonly)
-  public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
+  public // @testable
+  init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF32.self, input: CollectionOfOne(UInt32(value)))
   }
