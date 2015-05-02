@@ -718,18 +718,19 @@ StringTests.test("StringCoreReplace") {
   }
 }
 
-StringTests.test("StringReplace") {
+StringTests.test("CharacterViewReplace") {
   let narrow = "01234567890"
   let wide = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪ"
+  
   for s1 in [narrow, wide] {
     for s2 in [narrow, wide] {
       checkRangeReplaceable(
-        { String(makeStringCore(s1)) },
-        { String(makeStringCore(s2 + s2)[0..<$0]) }
+        { String.CharacterView(makeStringCore(s1)) },
+        { String.CharacterView(makeStringCore(s2 + s2)[0..<$0]) }
       )
       checkRangeReplaceable(
-        { String(makeStringCore(s1)) },
-        { Array(String(makeStringCore(s2 + s2)[0..<$0])) }
+        { String.CharacterView(makeStringCore(s1)) },
+        { Array(String.CharacterView(makeStringCore(s2 + s2)[0..<$0])) }
       )
     }
   }

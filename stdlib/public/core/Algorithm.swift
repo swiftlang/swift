@@ -252,7 +252,9 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
 /// *n*s are consecutive `Int`s starting at zero, and *x*s are
 /// the elements of `base`:
 ///
-///     > for (n, c) in enumerate("Swift") { println("\(n): '\(c)'" )}
+///     > for (n, c) in enumerate("Swift".characters) {
+///         println("\(n): '\(c)'" )
+///       }
 ///     0: 'S'
 ///     1: 'w'
 ///     2: 'i'

@@ -175,7 +175,17 @@ JoinTestSuite.test("${ArrayType}") {
 
 %end
 
-JoinTestSuite.test("String") {
+func join<S: SequenceType where S.Generator.Element == String>(
+  separator: String, _ elements: S
+) -> String {
+  return String(
+    join(
+      separator.characters,
+      lazy(elements).map { $0.characters }
+    ))
+}
+
+JoinTestSuite.test("String.CharacterView") {
   //
   // Test the free function.
   //

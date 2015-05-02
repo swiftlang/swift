@@ -88,16 +88,17 @@ set(SWIFTLIB_ESSENTIAL
   StaticString.swift
   Stride.swift
   StrideMirrors.swift.gyb
+  StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
   StringBuffer.swift
   StringCore.swift
   StringInterpolation.swift.gyb
   StringLegacy.swift
+  StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
   StringUTFViewsMirrors.swift.gyb
-  StringUnicodeScalarView.swift
   SwiftNativeNSArray.swift
   Unicode.swift
   UnicodeScalar.swift

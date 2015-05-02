@@ -496,12 +496,17 @@ extension String {
   }
 }
 
-/// String is a CollectionType of Character
-extension String : CollectionType {
-  /// A character position in a `String`
+/// `String.CharacterView` is a collection of `Character`
+extension String.CharacterView : CollectionType {
+  internal typealias UnicodeScalarView = String.UnicodeScalarView
+  internal var unicodeScalars: UnicodeScalarView {
+    return UnicodeScalarView(_core)
+  }
+  
+  /// A character position
   public struct Index : BidirectionalIndexType, Comparable, Reflectable {
-    public // SPI(Foundation)
-    init(_base: UnicodeScalarView.Index) {
+    public // SPI(Foundation)    
+    init(_base: String.UnicodeScalarView.Index) {
       self._base = _base
       self._lengthUTF16 = Index._measureExtendedGraphemeClusterForward(_base)
     }
@@ -632,13 +637,13 @@ extension String : CollectionType {
     }
   }
 
-  /// The position of the first `Character` if the `String` is
+  /// The position of the first `Character` if `self` is
   /// non-empty; identical to `endIndex` otherwise.
   public var startIndex: Index {
     return Index(_base: unicodeScalars.startIndex)
   }
 
-  /// The `String`'s "past the end" position.
+  /// The "past the end" position.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
@@ -655,20 +660,10 @@ extension String : CollectionType {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 
-  @availability(*, unavailable, message="cannot subscript String with an Int")
-  public subscript(i: Int) -> Character {
-    _fatalErrorMessage(
-      "fatal error",
-      "cannot subscript String with an Int",
-      __FILE__,
-      __LINE__
-    )
-  }
-
-  /// Return a *generator* over the `Characters` in this `String`.
+  /// Return a *generator* over the `Character`s
   ///
   /// - complexity: O(1)
-  public func generate() -> IndexingGenerator<String> {
+  public func generate() -> IndexingGenerator<String.CharacterView> {
     return IndexingGenerator(self)
   }
 
@@ -699,6 +694,44 @@ extension String : CollectionType {
   }
 }
 
+extension String {
+  public typealias Index = CharacterView.Index
+  
+  /// The position of the first `Character` in `self.characters` if
+  /// `self` is non-empty; identical to `endIndex` otherwise.
+  public var startIndex: Index { return characters.startIndex }
+  
+  /// The "past the end" position in `self.characters`
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
+  public var endIndex: Index { return characters.endIndex }
+
+  /// Access the `Character` at `position`.
+  ///
+  /// Requires: `position` is a valid position in `self.characters`
+  /// and `position != endIndex`.
+  public subscript(i: Index) -> Character { return characters[i] }
+  
+  @availability(*, unavailable, message="cannot subscript String with an Int")
+  public subscript(i: Int) -> Character {
+    _fatalErrorMessage(
+      "fatal error",
+      "cannot subscript String with an Int",
+      __FILE__,
+      __LINE__
+    )
+  }
+
+  /// Return a *generator* over the `Character`s
+  ///
+  /// - complexity: O(1)
+  public func generate() -> IndexingGenerator<String.CharacterView> {
+    return characters.generate()
+  }
+}
+
 public func == (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base == rhs._base
 }
@@ -723,7 +756,12 @@ extension String : Sliceable {
   }
 }
 
-extension String : ExtensibleCollectionType {
+extension String.CharacterView : ExtensibleCollectionType {
+  /// Create an empty instance
+  public init() {
+    self.init("")
+  }
+  
   /// Reserve enough space to store `n` ASCII characters.
   ///
   /// - complexity: O(`n`)
@@ -760,12 +798,51 @@ extension String : ExtensibleCollectionType {
       S : SequenceType
       where S.Generator.Element == Character
   >(_ characters: S) {
-    self = ""
+    self = String.CharacterView()
     self.extend(characters)
   }
 }
 
+extension String {
+  public mutating func reserveCapacity(n: Int) {
+    withMutableCharacters {
+      (inout v: CharacterView) in v.reserveCapacity(n)
+    }
+  }
+  public mutating func append(c: Character) {
+    withMutableCharacters {
+      (inout v: CharacterView) in v.append(c)
+    }
+  }
+  
+  public mutating func extend<
+      S : SequenceType
+  where S.Generator.Element == Character
+  >(newElements: S) {
+    withMutableCharacters { (inout v: CharacterView) in v.extend(newElements) }
+  }
+  
+  /// Create an instance containing `characters`.
+  public init<
+      S : SequenceType
+      where S.Generator.Element == Character
+  >(_ characters: S) {
+    self._core = CharacterView(characters)._core
+  }
+}
+
 // Algorithms
+extension String.CharacterView {
+  /// Interpose `self` between every pair of consecutive `elements`,
+  /// then concatenate the result.  For example:
+  ///
+  ///     "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
+  public func join<
+      S : SequenceType where S.Generator.Element == String.CharacterView
+  >(elements: S) -> String.CharacterView {
+    return Swift.join(self, elements)
+  }
+}
 extension String {
   /// Interpose `self` between every pair of consecutive `elements`,
   /// then concatenate the result.  For example:
@@ -773,12 +850,14 @@ extension String {
   ///     "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
   public func join<
       S : SequenceType where S.Generator.Element == String
-  >(elements: S) -> String{
-    return Swift.join(self, elements)
+  >(elements: S) -> String {
+    return String(
+      characters.join(lazy(elements).map { $0.characters })
+    )
   }
 }
 
-extension String : RangeReplaceableCollectionType {
+extension String.CharacterView : RangeReplaceableCollectionType {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -848,6 +927,70 @@ extension String : RangeReplaceableCollectionType {
   }
 }
 
+extension String {
+  /// Replace the given `subRange` of elements with `newElements`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - complexity: O(`count(subRange)`) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  public mutating func replaceRange<
+    C: CollectionType where C.Generator.Element == Character
+  >(
+    subRange: Range<Index>, with newElements: C
+  ) {
+    withMutableCharacters { (inout v: CharacterView) in v.replaceRange(subRange, with: newElements) }
+  }
+  
+  /// Insert `newElement` at index `i`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - complexity: O(`count(self)`).
+  public mutating func insert(newElement: Character, atIndex i: Index) {
+    withMutableCharacters { (inout v: CharacterView) in v.insert(newElement, atIndex: i) }
+  }
+
+  /// Insert `newElements` at index `i`
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - complexity: O(`count(self) + count(newElements)`).
+  public mutating func splice<
+    S : CollectionType where S.Generator.Element == Character
+  >(newElements: S, atIndex i: Index) {
+    withMutableCharacters { (inout v: CharacterView) in v.splice(newElements, atIndex: i) }
+  }
+
+  /// Remove and return the element at index `i`
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - complexity: O(`count(self)`).
+  public mutating func removeAtIndex(i: Index) -> Character {
+    return withMutableCharacters { (inout v: CharacterView) in v.removeAtIndex(i) }
+  }
+
+  /// Remove the indicated `subRange` of characters
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - complexity: O(`count(self)`).
+  public mutating func removeRange(subRange: Range<Index>) {
+    withMutableCharacters { (inout v: CharacterView) in v.removeRange(subRange) }
+  }
+
+  /// Remove all characters.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - parameter keepCapacity: if `true`, prevents the release of
+  ///   allocated storage, which can be a useful optimization
+  ///   when `self` is going to be grown again.
+  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
+    withMutableCharacters { (inout v: CharacterView) in v.removeAll(keepCapacity: keepCapacity) }
+  }
+}
 #if _runtime(_ObjC)
 @asmname("swift_stdlib_NSStringLowercaseString")
 func _stdlib_NSStringLowercaseString(str: AnyObject) -> _CocoaStringType

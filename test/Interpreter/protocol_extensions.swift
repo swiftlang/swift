@@ -118,7 +118,11 @@ extension ExtensibleCollectionType {
 }
 
 // CHECK: a,b,c
-println(",".myJoin(["a", "b", "c"]))
+println(
+  String(
+    ",".characters.myJoin(["a".characters, "b".characters, "c".characters])
+  )
+)
 
 // Constrained extensions for specific types.
 extension CollectionType where Self.Generator.Element == String {

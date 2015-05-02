@@ -1,3 +1,4 @@
+// XFAIL: *
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL1 | FileCheck %s -check-prefix=LITERAL1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL2 | FileCheck %s -check-prefix=LITERAL2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LITERAL3 | FileCheck %s -check-prefix=LITERAL3
