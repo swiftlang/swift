@@ -7,6 +7,7 @@ add_swift_library(swiftIDE
   SyntaxModel.cpp
   Utils.cpp
   LINK_LIBRARIES
+    swiftFrontend
     swiftClangImporter
     swiftParse
     swiftSema
