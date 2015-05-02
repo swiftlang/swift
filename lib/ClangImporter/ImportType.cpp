@@ -424,37 +424,44 @@ namespace {
       if (!Impl.SwiftContext.LangOpts.EnableSIMDImport)
         return Type();
       
+      // Try to load the SIMD module, which contains the extensions that
+      // introduce the nested VectorN types.
       auto *SIMD = Impl.tryLoadSIMDModule();
       if (!SIMD)
         return Type();
+      // FIXME: Bump the extension generation to ensure we walk the SIMD
+      // module's extensions to find types.
+      Impl.SwiftContext.bumpGeneration();
       
-      // Map the element type and count to a Swift name, such as
-      // float x 3 => Float3.
-      SmallString<16> name;
-      {
-        llvm::raw_svector_ostream names(name);
-        
-        if (auto builtinTy
-              = dyn_cast<clang::BuiltinType>(type->getElementType())){
-          switch (builtinTy->getKind()) {
+      auto *stdlib = Impl.getStdlibModule();
+      
+      // Look up the base type, which should live in the stdlib.
+      StringRef baseTypeName;
+      if (auto builtinTy
+            = dyn_cast<clang::BuiltinType>(type->getElementType())) {
+        switch (builtinTy->getKind()) {
 #define MAP_SIMD_TYPE(_, BUILTIN_KIND, SWIFT_BASENAME) \
-          case clang::BuiltinType::BUILTIN_KIND:    \
-            names << #SWIFT_BASENAME;               \
-            break;
+        case clang::BuiltinType::BUILTIN_KIND:    \
+          baseTypeName = #SWIFT_BASENAME;         \
+          break;
 #include "swift/ClangImporter/SIMDMappedTypes.def"
-          default:
-            // A vector type we don't know how to map.
-            return Type();
-          }
-        } else {
+        default:
+          // A vector type we don't know how to map.
           return Type();
         }
-        
-        names << type->getNumElements();
-        names.flush();
+      } else {
+        return Type();
       }
+      auto baseType = Impl.getNamedSwiftType(stdlib, baseTypeName);
       
-      return Impl.getNamedSwiftType(SIMD, name);
+      // Look up the VectorN nested type.
+      if (auto vectorTypeDecl
+            = Impl.SwiftContext.getSIMDVectorType(baseType,
+                                                  type->getNumElements()))
+        return vectorTypeDecl->getDeclaredType();
+      
+      // If we didn't find one, give up.
+      return Type();
     }
 
     ImportResult VisitFunctionProtoType(const clang::FunctionProtoType *type) {

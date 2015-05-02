@@ -607,17 +607,20 @@ void ClangTypeConverter::fillSpeciallyImportedTypeCache(IRGenModule &IGM) {
   }
   
   // Handle SIMD types.
-  if (auto SIMDModule = IGM.Context.getLoadedModule(IGM.Context.Id_simd)) {
-#define MAP_SIMD_TYPE(_, CLANG_KIND, SWIFT_NAME)                               \
-    {                                                                          \
-      char name[] = #SWIFT_NAME "0";                                           \
-      for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) {       \
-        *(std::end(name) - 2) = '0' + i;                                       \
-        auto eltTy = getClangBuiltinTypeFromKind(ctx,                          \
+  if (IGM.Context.getLoadedModule(IGM.Context.Id_simd)) {
+#define MAP_SIMD_TYPE(_, CLANG_KIND, SWIFT_NAME) \
+    { \
+      if (CanType baseType = getNamedSwiftType(stdlib, #SWIFT_NAME)) {         \
+        for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) {     \
+          if (auto *vectorDecl = IGM.Context.getSIMDVectorType(baseType, i)) { \
+            auto eltTy = getClangBuiltinTypeFromKind(ctx,                      \
                                                clang::BuiltinType::CLANG_KIND);\
-        auto vecTy = ctx.getVectorType(eltTy,                                  \
-                                       i, clang::VectorType::GenericVector);   \
-        CACHE_TYPE(SIMDModule, name, ctx.getCanonicalType(vecTy));             \
+            auto vecTy = ctx.getVectorType(eltTy,                              \
+                                          i, clang::VectorType::GenericVector);\
+            Cache.insert({vectorDecl->getDeclaredType()->getCanonicalType(),   \
+                          ctx.getCanonicalType(vecTy)});                       \
+          }                                                                    \
+        }                                                                      \
       }                                                                        \
     }
 #include "swift/ClangImporter/SIMDMappedTypes.def"

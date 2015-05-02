@@ -48,14 +48,47 @@ static bool isNSObject(Type type) {
 #endif
 
 namespace {
+  // Key struct for the special names map.
+  struct SpecialName {
+    Identifier module, parent, type;
+  };
+}
+
+namespace llvm {
+  template<>
+  struct DenseMapInfo<SpecialName> {
+    using IdentifierInfo = DenseMapInfo<swift::Identifier>;
+    static inline SpecialName getEmptyKey() {
+      return {IdentifierInfo::getEmptyKey(),
+              IdentifierInfo::getEmptyKey(),
+              IdentifierInfo::getEmptyKey()};
+    }
+    static inline SpecialName getTombstoneKey() {
+      return {IdentifierInfo::getTombstoneKey(),
+              IdentifierInfo::getTombstoneKey(),
+              IdentifierInfo::getTombstoneKey()};
+    }
+    static unsigned getHashValue(SpecialName key) {
+      return llvm::hash_combine(IdentifierInfo::getHashValue(key.module),
+                                IdentifierInfo::getHashValue(key.parent),
+                                IdentifierInfo::getHashValue(key.type));
+    }
+    static bool isEqual(SpecialName a, SpecialName b) {
+      return a.module == b.module && a.parent == b.parent && a.type == b.type;
+    }
+  };
+}
+
+namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
                     private TypeVisitor<ObjCPrinter, void, 
                                         Optional<OptionalTypeKind>> {
   friend ASTVisitor;
   friend TypeVisitor;
 
-  llvm::DenseMap<std::pair<Identifier, Identifier>, std::pair<StringRef, bool>>
-    specialNames;
+  friend struct llvm::DenseMapInfo<SpecialName>;
+
+  llvm::DenseMap<SpecialName, std::pair<StringRef, bool>> specialNames;
   Identifier ID_CFTypeRef;
 
   ASTContext &ctx;
@@ -613,12 +646,15 @@ private:
   ///
   /// This handles typealiases and structs provided by the standard library
   /// for interfacing with C and Objective-C.
-  bool printIfKnownTypeName(Identifier moduleName, Identifier name,
+  bool printIfKnownTypeName(Identifier moduleName,
+                            Identifier parentName,
+                            Identifier name,
                             Optional<OptionalTypeKind> optionalKind) {
     if (specialNames.empty()) {
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                       \
-      specialNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = \
-        { CLANG_REPR, NEEDS_NULLABILITY}
+      specialNames[{ctx.StdlibModuleName, Identifier(),                      \
+                    ctx.getIdentifier(#SWIFT_NAME)}] =                       \
+        { CLANG_REPR, NEEDS_NULLABILITY }
 
       MAP(CBool, "bool", false);
 
@@ -665,28 +701,31 @@ private:
       MAP(CConstVoidPointer, "void const *", true);
 
       Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 
+      specialNames[{ID_ObjectiveC, Identifier(), ctx.getIdentifier("ObjCBool")}]
         = { "BOOL", false};
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] 
+      specialNames[{ID_ObjectiveC, Identifier(), ctx.getIdentifier("Selector")}]
         = { "SEL", true };
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] 
+      specialNames[{ID_ObjectiveC, Identifier(), ctx.getIdentifier("NSZone")}]
         = { "NSZone *", true };
       
       // Use typedefs we set up for SIMD vector types.
-#define MAP_SIMD_TYPE(_, __, BASENAME) \
-      specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "2")}] \
-        = { "swift_" #BASENAME "2", false };                        \
-      specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "3")}] \
-        = { "swift_" #BASENAME "3", false };                        \
-      specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "4")}] \
-        = { "swift_" #BASENAME "4", false };
+#define MAP_SIMD_TYPE(_, __, PARENT_NAME) \
+      specialNames[{ctx.Id_simd, ctx.getIdentifier(#PARENT_NAME),   \
+                    ctx.getIdentifier("Vector2")}]                  \
+        = { "swift_" #PARENT_NAME "_Vector2", false };              \
+      specialNames[{ctx.Id_simd, ctx.getIdentifier(#PARENT_NAME),   \
+                    ctx.getIdentifier("Vector3")}]                  \
+        = { "swift_" #PARENT_NAME "_Vector3", false };              \
+      specialNames[{ctx.Id_simd, ctx.getIdentifier(#PARENT_NAME),   \
+                    ctx.getIdentifier("Vector4")}]                  \
+        = { "swift_" #PARENT_NAME "_Vector4", false };
 #include "swift/ClangImporter/SIMDMappedTypes.def"
       static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
                     "must add or remove special name mappings if max number of "
                     "SIMD elements is changed");
     }
 
-    auto iter = specialNames.find({moduleName, name});
+    auto iter = specialNames.find({moduleName, parentName, name});
     if (iter == specialNames.end())
       return false;
 
@@ -720,7 +759,9 @@ private:
   void visitNameAliasType(NameAliasType *aliasTy,
                           Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
-    if (printIfKnownTypeName(alias->getModuleContext()->Name, alias->getName(),
+    if (printIfKnownTypeName(alias->getModuleContext()->Name,
+                             Identifier(),
+                             alias->getName(),
                              optionalKind))
       return;
 
@@ -776,7 +817,12 @@ private:
       return;
     }
 
-    if (printIfKnownTypeName(SD->getModuleContext()->Name, SD->getName(),
+    Identifier parentName{};
+    if (auto parentType = SD->getParent()->getDeclaredTypeOfContext())
+      parentName = parentType->getAnyNominal()->getName();
+    if (printIfKnownTypeName(SD->getModuleContext()->Name,
+                             parentName,
+                             SD->getName(),
                              optionalKind))
       return;
 
@@ -1541,9 +1587,9 @@ public:
            "#  define SWIFT_NULLABILITY(X)\n"
            "#endif\n"
 #define MAP_SIMD_TYPE(C_TYPE, _, SWIFT_NAME) \
-           "typedef " #C_TYPE " swift_" #SWIFT_NAME "2 __attribute__((__ext_vector_type__(2)));\n" \
-           "typedef " #C_TYPE " swift_" #SWIFT_NAME "3 __attribute__((__ext_vector_type__(3)));\n" \
-           "typedef " #C_TYPE " swift_" #SWIFT_NAME "4 __attribute__((__ext_vector_type__(4)));\n"
+           "typedef " #C_TYPE " swift_" #SWIFT_NAME "_Vector2 __attribute__((__ext_vector_type__(2)));\n" \
+           "typedef " #C_TYPE " swift_" #SWIFT_NAME "_Vector3 __attribute__((__ext_vector_type__(3)));\n" \
+           "typedef " #C_TYPE " swift_" #SWIFT_NAME "_Vector4 __attribute__((__ext_vector_type__(4)));\n"
 #include "swift/ClangImporter/SIMDMappedTypes.def"
            ;
     static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
