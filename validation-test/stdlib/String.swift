@@ -1032,8 +1032,8 @@ StringTests.test("unicodeViews") {
 StringTests.test("indexConversion") {
   let re : NSRegularExpression
   do {
-    re = try NSRegularExpression(pattern: "([^ ]+)er",
-                                 options: NSRegularExpressionOptions())
+    re = try NSRegularExpression(
+      pattern: "([^ ]+)er", options: NSRegularExpressionOptions())
   } catch { fatalError("couldn't build regexp: \(error)") }
 
   let s = "go further into the larder to barter."
