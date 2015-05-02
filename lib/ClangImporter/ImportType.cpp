@@ -1468,10 +1468,21 @@ considerErrorImport(ClangImporter::Implementation &importer,
       // If there was a conflict on the first argument, and this was
       // the first argument and we're not stripping error suffixes, just
       // give up completely on error import.
-      if (index == 0 && !stripErrorSuffix) return None;
+      if (index == 0 && !stripErrorSuffix) {
+        return None;
 
-      adjustName = false;
-      replaceWithVoid = ForeignErrorConvention::IsReplaced;
+      // If there was a conflict stripping an error suffix, adjust the
+      // name but don't change the base name.  This avoids creating a
+      // spurious _: () argument.
+      } else if (index == 0 && stripErrorSuffix) {
+        stripErrorSuffix = false;
+        newBaseName = methodName.getBaseName();
+
+      // Otherwise, give up on adjusting the name.
+      } else {
+        adjustName = false;
+        replaceWithVoid = ForeignErrorConvention::IsReplaced;
+      }
     }
     
     ErrorImportInfo errorInfo = {
