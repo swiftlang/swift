@@ -27,7 +27,7 @@
 // RUN: FileCheck -input-file %t/Foundation.NSString.printed.txt -check-prefix=CHECK_DICTIONARY %s
 
 // Make sure that we don't qualify 'NSErrorPointer'.
-// CHECK_NSSTRING: init?(contentsOfFile path: String, encoding enc: UInt, error: NSErrorPointer)
+// CHECK_NSSTRING: init(contentsOfFile path: String, encoding enc: UInt) throws
 
 // CHECK_DICTIONARY: func propertyListFromStringsFileFormat() -> [NSObject : AnyObject]
 
