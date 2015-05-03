@@ -1329,6 +1329,11 @@ TypeRepr *TypeRepr::walk(ASTWalker &walker) {
   return this;
 }
 
+StmtConditionElement *StmtConditionElement::walk(ASTWalker &walker) {
+  Traversal(walker).doIt(*this);
+  return this;
+}
+
 bool Decl::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }

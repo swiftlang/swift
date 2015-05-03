@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/SourceManager.h"
 
@@ -67,6 +68,18 @@ TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
       Ctx, S, Parent, S->getThenStmt()->getSourceRange(), Versions);
 }
 
+TypeRefinementContext *
+TypeRefinementContext::createForConditionFollowingQuery(ASTContext &Ctx,
+                                 AvailabilityQueryExpr *QE,
+                                 const StmtConditionElement &LastElement,
+                                 TypeRefinementContext *Parent,
+                                 const VersionRange &Versions) {
+  assert(QE);
+  assert(Parent);
+  SourceRange Range(QE->getEndLoc(), LastElement.getEndLoc());
+  return new (Ctx) TypeRefinementContext(Ctx, QE, Parent, Range, Versions);
+}
+
 // Only allow allocation of TypeRefinementContext using the allocator in
 // ASTContext.
 void *TypeRefinementContext::operator new(size_t Bytes, ASTContext &C,
@@ -110,7 +123,10 @@ SourceLoc TypeRefinementContext::getIntroductionLoc() const {
     return Node.get<Decl *>()->getLoc();
 
   case Reason::IfStmtThenBranch:
-    return Node.get<IfStmt *>()->getIfLoc();
+    return cast<IfStmt>(Node.get<Stmt *>())->getIfLoc();
+
+  case Reason::ConditionFollowingAvailabilityQuery:
+    return cast<AvailabilityQueryExpr>(Node.get<Expr *>())->getLoc();
 
   case Reason::Root:
     return SourceLoc();
@@ -148,6 +164,27 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
   OS << ")";
 }
 
+TypeRefinementContext::Reason TypeRefinementContext::getReason() const {
+  if (Node.is<Decl *>()) {
+    return Reason::Decl;
+  } else if (Node.is<Expr *>()) {
+    Expr *E = Node.get<Expr *>();
+    if (isa<AvailabilityQueryExpr>(E)) {
+      return Reason::ConditionFollowingAvailabilityQuery;
+    }
+  } else if (Node.is<Stmt *>()) {
+    Stmt *S = Node.get<Stmt *>();
+    if (isa<IfStmt>(S)) {
+      // We will need an additional bit to discriminate when we add
+      // refinement contexts for Else branches.
+      return Reason::IfStmtThenBranch;
+    }
+  } else if (Node.is<SourceFile *>()) {
+    return Reason::Root;
+  }
+  llvm_unreachable("Unhandled introduction node");
+}
+
 StringRef TypeRefinementContext::getReasonName(Reason R) {
   switch (R) {
   case Reason::Root:
@@ -158,5 +195,8 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
 
   case Reason::IfStmtThenBranch:
     return "if_then";
+
+  case Reason::ConditionFollowingAvailabilityQuery:
+    return "condition_following_availability";
   }
 }

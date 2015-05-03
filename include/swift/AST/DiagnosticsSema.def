@@ -2238,7 +2238,7 @@ NOTE(availability_query_useless_enclosing_scope_here, sema_avail, none,
      "enclosing scope here", ())
 
 ERROR(availability_query_outside_if_stmt_guard, sema_avail, none,
-      "check can only be used as guard of if statement", ())
+      "check can only be used as condition or where clause of if statement", ())
 
 ERROR(availability_global_script_no_potential, sema_avail,
       none, "global variable cannot be marked potentially "

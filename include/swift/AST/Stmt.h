@@ -316,6 +316,10 @@ public:
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
+
+  /// Recursively walks the AST rooted at this statement condition element
+  StmtConditionElement *walk(ASTWalker &walker);
+  StmtConditionElement *walk(ASTWalker &&walker) { return walk(walker); }
 };
 
 struct LabeledStmtInfo {

@@ -1047,48 +1047,28 @@ private:
     if (!IS)
       return std::make_pair(true, S);
 
-    bool BuiltTRC = buildIfStmtRefinementContext(IS);
-    return std::make_pair(!BuiltTRC, S);
+    buildIfStmtRefinementContext(IS);
+    return std::make_pair(false, S);
   }
 
   /// Builds the type refinement hierarchy for the IfStmt if the guard
-  /// introduces a new refinement context for either the Then or the Else
-  /// branch. Returns true if the statement introduced a new hierarchy. In this
-  /// case, there is no need for the caller to explicitly traverse the children
+  /// introduces a new refinement context for the Then branch.
+  /// There is no need for the caller to explicitly traverse the children
   /// of this node.
-  bool buildIfStmtRefinementContext(IfStmt *IS) {
-    // We don't refine for if let.
-    // FIXME: Should this refine for 'where' clauses?
-    if (IS->getCond().size() != 1 ||
-        !IS->getCond()[0].isCondition())
-      return false;
-    
-    auto CondExpr = IS->getCond()[0].getCondition();
-    if (!CondExpr)
-      return false;
+  void buildIfStmtRefinementContext(IfStmt *IS) {
+    Optional<VersionRange> RefinedRange =
+        buildStmtConditionRefinementContext(IS->getCond());
 
-    // For now, we only refine if the guard is an availability query expression.
-    auto QueryExpr =
-        dyn_cast<AvailabilityQueryExpr>(CondExpr->getSemanticsProvidingExpr());
-    if (!QueryExpr)
-      return false;
-
-    // If this query expression has no queries, we will not introduce a new
-    // refinement context. We do not diagnose here: a diagnostic will already
-    // have been emitted by the parser.
-    if (QueryExpr->getQueries().size() == 0)
-      return false;
-    
-    validateAvailabilityQuery(QueryExpr);
-
-    // There is no need to traverse the guard condition explicitly
-    // in the current context because AvailabilityQueryExprs do not have
-    // sub expressions.
-
-    // Create a new context for the Then branch and traverse it in that new
-    // context.
-    auto *ThenTRC = refinedThenContextForQuery(QueryExpr, IS);
-    TypeRefinementContextBuilder(ThenTRC, AC).build(IS->getThenStmt());
+    if (RefinedRange.hasValue()) {
+      // Create a new context for the Then branch and traverse it in that new
+      // context.
+      auto *ThenTRC =
+          TypeRefinementContext::createForIfStmtThen(AC, IS, getCurrentTRC(),
+                                                   RefinedRange.getValue());
+      TypeRefinementContextBuilder(ThenTRC, AC).build(IS->getThenStmt());
+    } else {
+      build(IS->getThenStmt());
+    }
 
     if (IS->getElseStmt()) {
       // For now, we imprecisely do not refine the context for the Else branch
@@ -1097,8 +1077,6 @@ private:
       // support "<") we should create a TRC for the Else branch.
       build(IS->getElseStmt());
     }
-
-    return true;
   }
 
   /// Validate the availability query, emitting diagnostics if necessary.
@@ -1134,48 +1112,98 @@ private:
     }
   }
 
-  /// Return the type refinement context for the Then branch of an
-  /// availability query.
-  TypeRefinementContext *refinedThenContextForQuery(AvailabilityQueryExpr *E,
-                                                    IfStmt *IS) {
-    TypeRefinementContext *CurTRC = getCurrentTRC();
+ /// Build the type refinement context for a StmtCondition and return the
+ /// refined range for the true-branch if the statement condition contains
+ /// any availability queries. Returns None if the guard condition does not
+ /// refine availability.
+ Optional<VersionRange>
+  buildStmtConditionRefinementContext(StmtCondition Cond) {
+    // Any refinement contexts introduced in the statement condition
+    // will end at the end of the last condition element.
+    StmtConditionElement LastElement = Cond.back();
     
-    AvailabilitySpec *Spec = bestActiveSpecForQuery(E);
-    if (!Spec) {
-      // We couldn't find an appropriate spec for the current platform,
-      // so rather than refining, emit a diagnostic and just use the current
-      // TRC.
-      AC.Diags.diagnose(E->getLoc(),
-                        diag::availability_query_required_for_platform,
-                        platformString(targetPlatform(AC.LangOpts)));
-      return CurTRC;
+    // Keep track of how many nested refinement contexts we have pushed on
+    // the context stack so we can pop them when we're done building the
+    // context for the StmtCondition.
+    unsigned NestedCount = 0;
+    for (StmtConditionElement Element : Cond) {
+      // If the element is not a condition, walk it in the current TRC.
+      if (!Element.isCondition()) {
+        Element.walk(*this);
+        continue;
+      }
+
+      // We have a condition: either a basic expression in the first position
+      // of the StmtCondition or a where clause in an optional binding.
+      // In either case, check to see if it is an availability query and, if so,
+      // introduce a new refinement context for the statement condition elements
+      // following it.
+      auto *ConditionExpr = Element.getCondition()->getSemanticsProvidingExpr();
+      auto *QueryExpr = dyn_cast<AvailabilityQueryExpr>(ConditionExpr);
+      if (!QueryExpr) {
+        ConditionExpr->walk(*this);
+        continue;
+      }
+
+      // If this query expression has no queries, we will not introduce a new
+      // refinement context. We do not diagnose here: a diagnostic will already
+      // have been emitted by the parser.
+      if (QueryExpr->getQueries().size() == 0)
+        continue;
+
+      validateAvailabilityQuery(QueryExpr);
+
+      AvailabilitySpec *Spec = bestActiveSpecForQuery(QueryExpr);
+      if (!Spec) {
+        // We couldn't find an appropriate spec for the current platform,
+        // so rather than refining, emit a diagnostic and just use the current
+        // TRC.
+        AC.Diags.diagnose(QueryExpr->getLoc(),
+                          diag::availability_query_required_for_platform,
+                          platformString(targetPlatform(AC.LangOpts)));
+        
+        continue;
+      }
+
+      VersionRange Range = rangeForSpec(Spec);
+      QueryExpr->setAvailableRange(Range);
+      TypeRefinementContext *CurTRC = getCurrentTRC();
+
+      // If the version range for the current TRC is completely contained in
+      // the range for the spec, then a version query can never be false, so the
+      // spec is useless. If so, report this.
+      if (Spec->getKind() == AvailabilitySpecKind::VersionConstraint &&
+          CurTRC->getPotentialVersions().isContainedIn(Range)) {
+        DiagnosticEngine &Diags = AC.Diags;
+        if (CurTRC->getReason() == TypeRefinementContext::Reason::Root) {
+          Diags.diagnose(QueryExpr->getLoc(),
+                         diag::availability_query_useless_min_deployment,
+                         platformString(targetPlatform(AC.LangOpts)));
+        } else {
+          Diags.diagnose(QueryExpr->getLoc(),
+                         diag::availability_query_useless_enclosing_scope,
+                         platformString(targetPlatform(AC.LangOpts)));
+          Diags.diagnose(CurTRC->getIntroductionLoc(),
+                         diag::availability_query_useless_enclosing_scope_here);
+        }
+      }
+
+      auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
+          AC, QueryExpr, LastElement, getCurrentTRC(), Range);
+
+      ContextStack.push_back(TRC);
+      NestedCount++;
     }
 
-    VersionRange range = rangeForSpec(Spec);
-    E->setAvailableRange(range);
-    
-    // If the version range for the current TRC is completely contained in
-    // the range for the spec, then a version query can never be false, so the
-    // spec is useless. If so, report this.
-    if (Spec->getKind() == AvailabilitySpecKind::VersionConstraint &&
-        CurTRC->getPotentialVersions().isContainedIn(range)) {
-      DiagnosticEngine &Diags = AC.Diags;
-      if (CurTRC->getReason() == TypeRefinementContext::Reason::Root) {
-        Diags.diagnose(E->getLoc(),
-                       diag::availability_query_useless_min_deployment,
-                       platformString(targetPlatform(AC.LangOpts)));
-      } else {
-        Diags.diagnose(E->getLoc(),
-                       diag::availability_query_useless_enclosing_scope,
-                       platformString(targetPlatform(AC.LangOpts)));
-        Diags.diagnose(CurTRC->getIntroductionLoc(),
-                       diag::availability_query_useless_enclosing_scope_here);
-        
-      }
+    if (NestedCount == 0)
+      return None;
+
+    TypeRefinementContext *NestedTRC = getCurrentTRC();
+    while (NestedCount-- > 0) {
+      ContextStack.pop_back();
     }
     
-    return TypeRefinementContext::createForIfStmtThen(AC, IS, getCurrentTRC(),
-                                                      range);
+    return NestedTRC->getPotentialVersions();
   }
 
   /// Return the best active spec for the target platform or nullptr if no

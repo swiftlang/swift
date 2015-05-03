@@ -31,6 +31,9 @@ namespace swift {
   class IfStmt;
   class SourceFile;
   class Stmt;
+  class AvailabilityQueryExpr;
+  class Expr;
+  class StmtConditionElement;
 
 /// Represents a lexical context in which types are refined. For now,
 /// types are refined solely for API availability checking, based on
@@ -53,10 +56,20 @@ public:
     Decl,
 
     /// The context was introduced for the Then branch of an IfStmt.
-    IfStmtThenBranch
+    IfStmtThenBranch,
+
+    /// The context was introduced for the remaining StmtConditionElements
+    /// following an #available(...) query in a StmtCondition.
+    /// For example, in the IfStmt below, the optional binding let x = expr()
+    /// would be contained in this kind of context:
+    ///
+    /// if #available(...),
+    ///    let x = expr() {
+    ///  }
+    ConditionFollowingAvailabilityQuery
   };
 
-  using IntroNode = llvm::PointerUnion3<SourceFile *, Decl *, IfStmt *>;
+  using IntroNode = llvm::PointerUnion4<SourceFile *, Decl *, Stmt *, Expr *>;
 
 private:
   /// The AST node that introduced this context.
@@ -88,20 +101,18 @@ public:
   static TypeRefinementContext *
   createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
                       const VersionRange &Versions);
+
+  /// Create a refinement context for the true-branch control flow to
+  /// further StmtConditionElements following a #available() query in
+  /// a StmtCondition.
+  static TypeRefinementContext *
+  createForConditionFollowingQuery(ASTContext &Ctx, AvailabilityQueryExpr *QE,
+                                   const StmtConditionElement &LastElement,
+                                   TypeRefinementContext *Parent,
+                                   const VersionRange &Versions);
   
   /// Returns the reason this context was introduced.
-  Reason getReason() const {
-    if (Node.is<Decl *>()) {
-      return Reason::Decl;
-    } else if (Node.is<IfStmt *>()) {
-      // We will need an additional bit to discriminate when we add
-      // refinement contexts for Else branches.
-      return Reason::IfStmtThenBranch;
-    } else if (Node.is<SourceFile *>()) {
-      return Reason::Root;
-    }
-    llvm_unreachable("Unhandled introduction node");
-  }
+  Reason getReason() const;
   
   /// Returns the AST node that introduced this refinement context. Note that
   /// this node may be different than the refined range. For example, a
