@@ -22,4 +22,6 @@ let cls:P.Type = A.self
 
 let p:P = cls(i:1)
 
-println(p)
+func markUsed<T>(t: T) {}
+markUsed(p)
+
