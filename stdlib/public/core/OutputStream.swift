@@ -91,7 +91,7 @@ public typealias Printable = CustomStringConvertible
 /// Do our best to print a value that can not be printed directly,
 /// using one of its conformances to `Streamable`,
 /// `CustomStringConvertible` or `CustomDebugStringConvertible`.
-func _adHocPrint<T, TargetStream : OutputStreamType>(
+internal func _adHocPrint<T, TargetStream : OutputStreamType>(
     value: T, inout _ target: TargetStream
 ) {
   var mirror = reflect(value)
