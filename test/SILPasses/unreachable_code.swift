@@ -317,19 +317,6 @@ class r20097963MyClass {
 @noreturn
 func die() { die() }
 
-func testLetElseExprPattern(a : Int) {
-  let 4 = a else {  }  // expected-error {{else block of let/else may not fall through}}
-  var 4 = a else {  }  // expected-error {{else block of var/else may not fall through}}
-  
-  var 4 = a else { return }  // ok
-  var 4 = a else { die() }  // ok
-  var 4 = a else { fatalError("baaad") }  // ok
-
-  for i in 0...100 {
-    var 4 = a else { continue } // ok
-  }
-}
-
 func testRequire(a : Int) {
   require case 4 = a else {  }  // expected-error {{require body may not fall through}}
 

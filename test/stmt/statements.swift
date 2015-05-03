@@ -327,34 +327,6 @@ func testMyEnumWithCaseLabels(a : MyEnumWithCaseLabels) {
 
 
 
-
-/// "let-else"
-func test_let_else(x : Int, y : Int??, cond : Bool) {
-  
-  // These are all ok.
-  let a? = y else {}
-  let b? = y where cond else {}
-  let c = x where cond else {}
-  let Optional.Some(d) = y else {}
-
-  let n1? where cond else {}    // expected-error {{refutable pattern requires an initializer value to match against}}
-  let n2? : Int? where cond else {}    // expected-error {{refutable pattern requires an initializer value to match against}}
-
-
-  let o? = y
-  // expected-error @-1 {{refutable pattern match can fail; add an else {} to handle this condition}}  {{13-13= else {}}}
-
-  let p = x where cond
-  // expected-error @-1 {{'where' clause on variable binding can fail; add an else {} to handle this condition}}  {{23-23= else {}}}
-
-  let q = x else {}                   // error: else is unreachable.
-  // expected-error @-1 {{'else' condition is unreachable, variable binding always succeeds}}
-
-  // error: Computed properties cannot have where/else.
-  // error: properties in structs, etc cannot be refutable.
-}
-
-
 // "defer"
 
 func test_defer(a : Int) {

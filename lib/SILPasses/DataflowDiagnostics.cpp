@@ -87,17 +87,7 @@ static void diagnoseUnreachable(const SILInstruction *I,
       diagnose(Context, L.getEndSourceLoc(), diag::non_exhaustive_switch);
       return;
     }
-    
-    if (auto *PBD = L.getAsASTNode<PatternBindingDecl>()) {
-      assert(PBD->isRefutable() && PBD->getElse().isExplicit() &&
-             "Not a refutable let/else?");
-      StringRef Kind = "let";
-      if (PBD->getLoc().isValid())
-        Kind = Context.SourceMgr.extractText({PBD->getLoc(), 3});
-      diagnose(Context, PBD->getElse().getExplicitBody()->getRBraceLoc(),
-               diag::letvar_else_must_not_fallthrough, Kind);
-      return;
-    }
+
     if (auto *Require = L.getAsASTNode<RequireStmt>()) {
       diagnose(Context, Require->getBody()->getEndLoc(),
                diag::require_body_must_not_fallthrough);

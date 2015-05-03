@@ -3538,9 +3538,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
 
-  Expr *WhereExpr = nullptr;
-  BraceStmt *ElseStmt = nullptr;
-  
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
   defer([&]{
@@ -3552,8 +3549,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // can finally create our PatternBindingDecl to represent the
     // pattern/initializer pairs.
     auto PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
-                                          VarLoc, PBDEntries, WhereExpr,
-                                          ElseStmt, CurDeclContext);
+                                          VarLoc, PBDEntries, /*where*/nullptr,
+                                          /*else*/nullptr, CurDeclContext);
     
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
     // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
@@ -3753,6 +3750,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     Status.setIsParseError();
   }
   
+  // FIXME: rdar://20794825 - Remove this migration logic for let/else.
+  
   // Check for a 'where' condition.
   SourceLoc WhereLoc;
   if (consumeIf(tok::kw_where, WhereLoc)) {
@@ -3762,19 +3761,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // suddenly cut off parsing and throw away the declaration.
     if (whereCond.hasCodeCompletion() && isCodeCompletionFirstPass())
       return makeParserCodeCompletionStatus();
-
-    if (HasAccessors) {
-      // If accessors are present, just drop the 'where' to simplify AST
-      // invariants.
-      diagnose(WhereLoc, diag::disallowed_accessors_refutable, isLet, false);
-      Status.setIsParseError();
-    } else if (whereCond.isNull()) {
-      // If we had a parse error, use an ErrorExpr as the guard value so
-      // downstream clients know that the human wrote a 'where' even though we
-      // don't know what it is.
-      WhereExpr = new (Context) ErrorExpr(WhereLoc);
-    } else
-      WhereExpr = whereCond.get();
   }
 
 
@@ -3785,36 +3771,20 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   // Check for an 'else' condition.
   SourceLoc ElseLoc;
   if (consumeIf(tok::kw_else, ElseLoc)) {
-    // Before parsing the body of the else, disable all of the bound variables
-    // so that the 'else' doesn't have access to them.
-    SmallVector<VarDecl *, 4> Vars;
-    for (auto &elt : PBDEntries)
-      elt.ThePattern->collectVariables(Vars);
-    
-    llvm::SaveAndRestore<decltype(DisabledVars)>
-    RestoreCurVars(DisabledVars, Vars);
-    
-    llvm::SaveAndRestore<decltype(DisabledVarReason)>
-    RestoreReason(DisabledVarReason, diag::refutable_var_not_bound_in_else);
-
     ParserResult<BraceStmt> Body =
-       parseBraceItemList(diag::let_else_expected_lbrace);
+       parseBraceItemList(diag::expected_lbrace_after_if);
     if (Body.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
-
-    if (HasAccessors) {
-      // If accessors are present, just drop the 'else' to simplify AST
-      // invariants.
-      diagnose(ElseLoc, diag::disallowed_accessors_refutable, isLet, true);
-      Status.setIsParseError();
-    } else if (Body.isNull()) {
-      // If we had a parse error, synthesize a BraceStmt.
-      ElseStmt = BraceStmt::create(Context, ElseLoc, {}, ElseLoc);
-    } else
-      ElseStmt = Body.get();
   }
 
-
+  if (WhereLoc.isValid() || ElseLoc.isValid()) {
+    diagnose(VarLoc, diag::let_else_rename)
+      .fixItInsert(VarLoc, "require case ");
+    
+    // Don't make a PBD.
+    PBDEntries.clear();
+  }
+  
   // NOTE: At this point, the DoAtScopeExit object is destroyed and the PBD
   // is added to the program.
   

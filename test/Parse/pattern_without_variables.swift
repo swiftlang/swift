@@ -33,7 +33,4 @@ func testVarLetPattern(a : SimpleEnum) {
   switch (a, 42) {
   case let (_, x): break    // ok
   }
-  
-  let .Bar = a else { return }  // Weird but ok.
-  
 }

@@ -84,29 +84,3 @@ func tuplePatternDestructuring(x : Int, y : Int) {
   let (x: g1, a: h1) = (b: x, a: y)  // expected-error {{'(b: Int, a: Int)' is not convertible to '(x: (b: Int, a: Int), a: (b: Int, a: Int))'}}
 }
 
-func testLetElse(a : Int?) {
-  let optUnwrap? = a else {  // expected-note {{previous definition of 'optUnwrap' is here}}
-    a = 42  // expected-error {{cannot assign to 'let' value 'a'}}
-  }
-  
-  // Check that the let-else vardecl got injected into our scope correctly.
-  let optUnwrap = 42  // expected-error {{definition conflicts with previous value}}
-  
-  let optUnwrap2? = a else { return }
-  
-  // Bound variables are not in scope in an else clause.
-  let x? = a, y = a else {
-    print(x)   // expected-error {{variable in refutable pattern is not bound in else block}}
-    print(y)   // expected-error {{variable in refutable pattern is not bound in else block}}
-  }
-}
-
-class RejectRefutableProperties {
-  let x? = Optional(1)           // expected-error {{refutable pattern match can fail; add an else {} to handle this condition}}
-  let y? = Optional(1) else { }  // expected-error {{refutable 'let/else' bindings are only allowed in executable code}}
-  let z = 42 else { }            // expected-error {{'else' condition is unreachable, variable binding always succeeds}}
-}
-extension RejectRefutableProperties {
-  // expected-error@+1 {{refutable 'let/else' bindings are only allowed in executable code}}
-  let a? = Optional(1) else { }  // expected-error {{extensions may not contain stored properties}}
-}
