@@ -652,22 +652,7 @@ public:
             return true;
         }
       }
-      
-      if (PBD->getWhereExpr()) {
-        if (Expr *E2 = doIt(PBD->getWhereExpr()))
-          PBD->setWhereExpr(E2);
-        else
-          return true;
-      }
-
-      if (auto *Else = PBD->getElse().getExplicitBody()) {
-        if (BraceStmt *E2 = cast<BraceStmt>(doIt(Else)))
-          PBD->setElse(PatternBindingElse(E2));
-        else
-          return true;
-      }
-      
-      
+            
     } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
 #ifndef NDEBUG
       PrettyStackTraceDecl debugStack("walking into body of", AFD);

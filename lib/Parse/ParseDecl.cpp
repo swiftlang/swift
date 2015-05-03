@@ -3549,8 +3549,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // can finally create our PatternBindingDecl to represent the
     // pattern/initializer pairs.
     auto PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
-                                          VarLoc, PBDEntries, /*where*/nullptr,
-                                          /*else*/nullptr, CurDeclContext);
+                                          VarLoc, PBDEntries, CurDeclContext);
     
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
     // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
@@ -3610,9 +3609,13 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
+      
+#if 1 // FIXME: rdar://20794825 - Remove this migration logic for let/else.
       auto patternRes = parseMatchingPattern(/*isExprBasic*/true);
       patternRes = parseOptionalPatternTypeAnnotation(patternRes);
-
+#else
+      auto patternRes = parseTypedPattern();
+#endif
       if (patternRes.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (patternRes.isNull())

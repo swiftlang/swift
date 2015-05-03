@@ -350,7 +350,6 @@ case (_?)?: break
 
 
 // <rdar://problem/20365753> Bogus diagnostic "refutable pattern match can fail"
-// expected-error @+4 {{refutable pattern match can fail; add an else {} to handle this condition}}
 // expected-error @+3 {{label is not allowed on single element tuple pattern}}
 // expected-note @+2 {{remove the parentheses to make this a type annotation}} {{5-6=}} {{26-27=}}
 // expected-note @+1 {{remove the label to make this a tuple pattern}} {{6-21=}}

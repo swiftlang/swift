@@ -1359,50 +1359,6 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     auto init = new (tc.Context) ErrorExpr(pattern->getSourceRange());
     binding->setInit(entryNumber, init);
   }
- 
-  // If this is the last pattern in the list, check the overall pattern binding
-  // refutability.
-  if (entryNumber == binding->getNumPatternEntries()-1) {
-    // If the overall PBD is refutable (i.e., a pattern is refutable or a where
-    // clause is present) then the PBD must have an else on it.  Only diagnose
-    // this if the PBD isn't already marked invalid.
-    if (binding->isRefutable() && binding->getElse().isUnconditional() &&
-        !binding->isInvalid()) {
-      // This PBD can have multiple patterns, find the refutable one.
-      Pattern *RefutablePattern = nullptr;
-      for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
-        if (binding->getPattern(i)->isRefutablePattern()) {
-          RefutablePattern = binding->getPattern(i);
-          break;
-        }
-      // If we found a refutable pattern, complain about it, otherwise there must
-      // be a 'where' clause.
-      if (RefutablePattern)
-        tc.diagnose(RefutablePattern->getStartLoc(),
-                    diag::decl_with_refutable_pattern_requires_else)
-          .highlight(RefutablePattern->getSourceRange())
-          .fixItInsertAfter(binding->getEndLoc(), " else {}");
-      else
-        tc.diagnose(binding->getWhereExpr()->getStartLoc(),
-                    diag::decl_with_where_requires_else)
-          .highlight(binding->getWhereExpr()->getSourceRange())
-          .fixItInsertAfter(binding->getEndLoc(), " else {}");
-
-      binding->setInvalid();
-    }
-
-    // If the binding is not refutable, and there *is* an else, reject it as
-    // unreachable.
-    if (!binding->isRefutable() && !binding->getElse().isUnconditional() &&
-        !binding->isInvalid()) {
-      if (auto *Body = binding->getElse().getExplicitBody()) {
-        tc.diagnose(Body->getStartLoc(),
-                    diag::decl_cannot_fail_no_else_allowed);
-      
-        binding->setInvalid();
-      }
-    }
-  }
   
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
@@ -2931,11 +2887,6 @@ public:
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
       validatePatternBindingDecl(TC, PBD, i);
 
-    // Type check the where condition, if present.
-    if (Expr *E = PBD->getWhereExpr())
-      if (!TC.typeCheckCondition(E, PBD->getDeclContext()))
-        PBD->setWhereExpr(E);
-
     // Note: The Else body is type checked when the enclosing BraceStmt is
     // checked.
     
@@ -3046,15 +2997,6 @@ public:
           return;
         }
       });
-    }
-
-    // Conditional pattern bindings can only exist in executable contexts, they
-    // cannot be (e.g.) properties.
-    if ((PBD->isRefutable() || PBD->getElse().isExplicit()) &&
-        !PBD->getDeclContext()->isLocalContext()) {
-      TC.diagnose(PBD->getLoc(),
-                  diag::refutable_patternbinding_executable_context);
-      PBD->setInvalid();
     }
 
     if (!IsFirstPass)

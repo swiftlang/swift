@@ -972,14 +972,11 @@ PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,
                                        unsigned NumPatternEntries,
-                                       Expr *whereExpr,
-                                       PatternBindingElse elseStmt,
                                        DeclContext *Parent)
   : Decl(DeclKind::PatternBinding, Parent),
     StaticLoc(StaticLoc), VarLoc(VarLoc),
     isInitializerTypeChecked(false),
-    numPatternEntries(NumPatternEntries),
-    whereExpr(whereExpr), elseStmt(elseStmt) {
+    numPatternEntries(NumPatternEntries) {
   PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
   PatternBindingDeclBits.StaticSpelling =
        static_cast<unsigned>(StaticSpelling);
@@ -990,15 +987,13 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc VarLoc,
                            ArrayRef<PatternBindingEntry> PatternList,
-                           Expr *whereExpr, PatternBindingElse elseStmt,
                            DeclContext *Parent) {
   size_t Size = sizeof(PatternBindingDecl) +
                 PatternList.size() * sizeof(PatternBindingEntry);
   void *D = allocateMemoryForDecl<PatternBindingDecl>(Ctx, Size,
                                                             false);
   auto PBD = ::new (D) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
-                                          PatternList.size(),
-                                          whereExpr, elseStmt, Parent);
+                                          PatternList.size(), Parent);
 
   // Set up the patterns.
   auto entries = PBD->getMutablePatternList();
@@ -1045,16 +1040,7 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
 
-  // If there is an 'else', it is the last part of the decl.
-  if (auto *elseBody = elseStmt.getExplicitBody())
-    return { startLoc, elseBody->getEndLoc() };
-
-  // If not, but there is a 'where' (e.g. in an if-let conditional), then
-  // it is the last.
-  if (whereExpr)
-    return { startLoc, whereExpr->getEndLoc() };
-
-  // Otherwise, we take the init of the last pattern in the list.
+   // Take the init of the last pattern in the list.
   if (auto init = getPatternList().back().Init) {
     SourceLoc EndLoc = init->getEndLoc();
     if (EndLoc.isValid())
@@ -1080,22 +1066,6 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
     return StaticSpellingKind::None;
 
   return getCorrectStaticSpellingForDecl(this);
-}
-
-/// Return true if this PBD has any refutable patterns in it or if there is a
-/// where clause.  This does not check to see if the 'else' is present.
-bool PatternBindingDecl::isRefutable() const {
-  // Any pattern binding with a 'where' clause is refutable, because that
-  // condition can fail.
-  if (getWhereExpr())
-    return true;
-
-  // If any of the patterns in the PBD are refutable, then the PBD is too.
-  for (auto entry : getPatternList())
-    if (entry.ThePattern->isRefutablePattern())
-      return true;
-  
-  return false;
 }
 
 

@@ -2537,7 +2537,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto binding = PatternBindingDecl::create(ctx, SourceLoc(),
                                               StaticSpelling.getValue(),
                                               SourceLoc(), patterns,
-                                              /*where*/nullptr, /*else*/nullptr,
                                               getDeclContext(contextID));
     binding->setEarlyAttrValidation(true);
     declOrOffset = binding;

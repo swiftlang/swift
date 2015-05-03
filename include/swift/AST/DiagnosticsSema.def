@@ -635,8 +635,6 @@ ERROR(unimplemented_type_var,decl_parsing,none,
       (unsigned, StaticSpellingKind, unsigned))
 ERROR(observingprop_requires_initializer,decl_parsing,none,
       "non-member observing properties require an initializer", ())
-ERROR(refutable_patternbinding_executable_context,decl_parsing,none,
-      "refutable 'let/else' bindings are only allowed in executable code", ())
 ERROR(global_requires_initializer,decl_parsing,none,
       "global '%select{var|let}0' declaration requires an initializer expression"
       "%select{ or getter/setter specifier}0", (bool))
@@ -1720,14 +1718,6 @@ ERROR(cannot_infer_type_for_pattern,sema_tcp,none,
       "type annotation missing in pattern", ())
 ERROR(refutable_pattern_requires_initializer,sema_tcd,none,
       "refutable pattern requires an initializer value to match against", ())
-ERROR(decl_with_where_requires_else,sema_tcd,none,
-      "'where' clause on variable binding can fail; "
-      "add an else {} to handle this condition", ())
-ERROR(decl_with_refutable_pattern_requires_else,sema_tcd,none,
-      "refutable pattern match can fail; "
-      "add an else {} to handle this condition", ())
-ERROR(decl_cannot_fail_no_else_allowed,sema_tcd,none,
-      "'else' condition is unreachable, variable binding always succeeds", ())
 ERROR(invalid_pattern,sema_tcd,none,
       "invalid pattern", ())
 WARNING(var_pattern_didnt_bind_variables, sema_tcp,none,

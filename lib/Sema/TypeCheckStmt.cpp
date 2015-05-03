@@ -998,11 +998,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       break;
 
     TC.typeCheckDecl(SubDecl, /*isFirstPass*/false);
-
-    // Make sure to type check the 'else' in a conditional PatternBinding.
-    if (auto *PBD = dyn_cast<PatternBindingDecl>(SubDecl))
-      if (auto *Else = PBD->getElse().getExplicitBody())
-        typeCheckStmt(Else);
   }
   
   return BS;
