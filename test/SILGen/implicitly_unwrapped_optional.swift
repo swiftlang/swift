@@ -1,15 +1,12 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func foo(var #f: (()->())!) {
+func foo(var f f: (()->())!) {
   f?()
 }
 // CHECK:    sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> () {
 // CHECK:    bb0([[T0:%.*]] : $ImplicitlyUnwrappedOptional<() -> ()>):
 // CHECK-NEXT: [[F:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
-// CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Optional<()>
-// CHECK-NEXT: [[TEMP_RESULT:%.*]] = init_enum_data_addr [[RESULT]]
-//   Switch out on the lvalue (() -> ())!:
 // CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
 // CHECK-NEXT: cond_br [[T1]], bb1, bb2
 //   If it does, project and load the value out of the implicitly unwrapped
@@ -25,21 +22,21 @@ func foo(var #f: (()->())!) {
 // CHECK:      br bb3
 //   (first nothing block)
 // CHECK:    bb2:
-// CHECK-NEXT: inject_enum_addr [[RESULT]]#1{{.*}}None
+// CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
 // CHECK-NEXT: br bb3
 //   The rest of this is tested in optional.swift
 
-func wrap<T>(#x: T) -> T! { return x }
+func wrap<T>(x x: T) -> T! { return x }
 
 // CHECK: sil hidden @_TF29implicitly_unwrapped_optional16wrap_then_unwrapU__FT1xQ__Q_
-func wrap_then_unwrap<T>(#x: T) -> T {
+func wrap_then_unwrap<T>(x x: T) -> T {
   // CHECK: [[FORCE:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
   // CHECK: apply [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x: x)!
 }
 
 // CHECK: sil hidden @_TF29implicitly_unwrapped_optional10tuple_bindFT1xGSQTSiSS___GSqSS_ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<(Int, String)>) -> @owned Optional<String> {
-func tuple_bind(#x: (Int, String)!) -> String? {
+func tuple_bind(x x: (Int, String)!) -> String? {
   return x?.1
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]
   // CHECK: [[NONNULL]]:
@@ -47,7 +44,7 @@ func tuple_bind(#x: (Int, String)!) -> String? {
   // CHECK-NOT: release_value [[STRING]]
 }
 
-func tuple_bind_implicitly_unwrapped(#x: (Int, String)!) -> String {
+func tuple_bind_implicitly_unwrapped(x x: (Int, String)!) -> String {
   return x.1
 }
 

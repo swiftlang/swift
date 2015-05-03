@@ -21,31 +21,25 @@ func test0(var #c: C) {
 
   weak var x = c
 // CHECK:      [[X:%.*]] = alloc_box $@sil_weak Optional<C>  // var x
-//   Implicit conversion: call _injectValueIntoOptional
-// CHECK-NEXT: [[OPT:%.*]] = alloc_stack $Optional<C>
-// CHECK-NEXT: [[TMP:%.*]] = init_enum_data_addr [[OPT]]
-// CHECK-NEXT: copy_addr [[C]]#1 to [initialization] [[TMP]] : $*C
-// CHECK-NEXT: inject_enum_addr [[OPT]]
-// CHECK-NEXT: [[OPTVAL:%.*]] = load [[OPT]]#1 : $*Optional<C>
+//   Implicit conversion
+// CHECK-NEXT: [[TMP:%.*]] = load [[C]]#1 : $*C
+// CHECK-NEXT: strong_retain [[TMP]] : $C
+// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.Some!enumelt.1, [[TMP]] : $C
 // CHECK-NEXT: store_weak [[OPTVAL]] to [initialization] [[X]]#1 : $*@sil_weak Optional<C>
 // CHECK-NEXT: release_value [[OPTVAL]] : $Optional<C>
-// CHECK-NEXT: dealloc_stack [[OPT]]#0
 
   a.x = c
-//   Implicit conversion: call _injectValueIntoOptional
-// CHECK-NEXT: [[OPT:%.*]] = alloc_stack $Optional<C>
-// CHECK-NEXT: [[TMP:%.*]] = init_enum_data_addr [[OPT]]
-// CHECK-NEXT: copy_addr [[C]]#1 to [initialization] [[TMP]] : $*C
-// CHECK-NEXT: inject_enum_addr [[OPT]]
-// CHECK-NEXT: [[OPTVAL:%.*]] = load [[OPT]]#1 : $*Optional<C>
+//   Implicit conversion
+// CHECK-NEXT: [[TMP:%.*]] = load [[C]]#1 : $*C
+// CHECK-NEXT: strong_retain [[TMP]] : $C
+// CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.Some!enumelt.1, [[TMP]] : $C
+
 //   Drill to a.x
 // CHECK-NEXT: [[A_X:%.*]] = struct_element_addr [[A]] : $*A, #A.x
-
 
 //   Store to a.x.
 // CHECK-NEXT: store_weak [[OPTVAL]] to [[A_X]] : $*@sil_weak Optional<C>
 // CHECK-NEXT: release_value [[OPTVAL]] : $Optional<C>
-// CHECK-NEXT: dealloc_stack [[OPT]]#0
 }
 
 // <rdar://problem/16871284> silgen crashes on weak capture

@@ -59,9 +59,7 @@ import Foundation
   }
 
   // CHECK-LABEL: sil hidden @_TFC20objc_blocks_bridging3Foo19optCFunctionPointerfS0_FTGSqcSSSS_1xSS_GSqSS_
-  // CHECK:         [[OPT_BUF:%.*]] = alloc_stack $Optional<@convention(c) String -> String>
-  // CHECK:         [[FP_BUF:%.*]] = unchecked_take_enum_data_addr [[OPT_BUF]]
-  // CHECK:         load [[FP_BUF]] : $*@convention(c) (NSString) -> @autoreleased NSString
+  // CHECK:         [[FP_BUF:%.*]] = unchecked_enum_data %0
   dynamic func optCFunctionPointer(fp: (@convention(c) String -> String)?, x: String) -> String? {
     return fp?(x)
   }

@@ -35,10 +35,9 @@ func test5(var g: Gizmo) {
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
   // CHECK-NEXT: [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      init_enum_data_addr
-  // CHECK:      copy_addr %1#1 to [initialization] {{%.*}} : $*Gizmo
-  // CHECK:      inject_enum_addr
-  // CHECK:      [[G:%.*]] = load {{%.*}}#1 : $*ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK:      [[V:%.*]] = load %1#1
+  // CHECK:      strong_retain [[V]]
+  // CHECK:      [[G:%.*]] = enum $ImplicitlyUnwrappedOptional<Gizmo>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[V]]
   // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK-NEXT: release_value [[G]]
 }
@@ -49,9 +48,9 @@ func test6(var g: Gizmo) {
   // CHECK:      [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
   // CHECK-NEXT: [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:      copy_addr %1#1 to [initialization] {{%.*}} : $*Gizmo
-  // CHECK:      inject_enum_addr {{.*}}Some
-  // CHECK:      [[G:%.*]] = load {{%.*}}#1 : $*ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK:      [[V:%.*]] = load %1#1
+  // CHECK:      strong_retain [[V]]
+  // CHECK:      [[G:%.*]] = enum $ImplicitlyUnwrappedOptional<Gizmo>, #ImplicitlyUnwrappedOptional.Some!
   // CHECK-NEXT: apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK-NOT:  release_value [[G]]
 }

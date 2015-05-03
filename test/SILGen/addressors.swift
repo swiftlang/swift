@@ -339,7 +339,7 @@ class G {
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
 
 //   materializeForSet for G.value
-// CHECK: sil hidden [transparent] @_TFC10addressors1Gm5valueVSs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed G) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Gm5valueVSs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed G) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $G):
 //   Call the addressor.
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVSs5Int32 : $@convention(method) (@guaranteed G) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
@@ -359,12 +359,8 @@ class G {
 // CHECK:   [[ADDR_OWNER:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
 // CHECK:   [[PTR:%.*]] = struct_extract [[T0]] :
 //   Set up the callback.
-// CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>
-// CHECK:   [[T0:%.*]] = init_enum_data_addr [[TEMP]]#1 : $*Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>, #Optional.Some!enumelt.1
 // CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Gm5valueVSs5Int32U_FTBpRBBRS0_MS0__T_ :
-// CHECK:   store [[T1]] to [[T0]] :
-// CHECK:   inject_enum_addr [[TEMP]]#1 : $*Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>, #Optional.Some!enumelt.1
-// CHECK:   [[CALLBACK:%.*]] = load [[TEMP]]#1 :
+// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[T1]]
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>)
 // CHECK:   strong_release [[ADDR_OWNER]]
@@ -372,7 +368,7 @@ class G {
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for G.value
-// CHECK: sil @_TFFC10addressors1Gm5valueVSs5Int32U_FTBpRBBRS0_MS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
+// CHECK-LABEL: sil @_TFFC10addressors1Gm5valueVSs5Int32U_FTBpRBBRS0_MS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*G, [[SELFTYPE:%3]] : $@thick G.Type):
 // CHECK:   [[T0:%.*]] = project_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
@@ -394,8 +390,8 @@ class H {
   }
 }
 
-// CHECK: sil hidden @_TFC10addressors1Hlp5valueVSs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>) {
-// CHECK: sil hidden @_TFC10addressors1Hap5valueVSs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>) {
+// CHECK-LABEL: sil hidden @_TFC10addressors1Hlp5valueVSs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>) {
+// CHECK-LABEL: sil hidden @_TFC10addressors1Hap5valueVSs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>) {
 
 func test_h0(f: H) -> Int32 {
   return f.value
@@ -488,12 +484,8 @@ class I {
 // CHECK:   [[T0:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[PTR:%.*]] = struct_extract [[T0]] :
 //   Set up the callback.
-// CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>
-// CHECK:   [[T0:%.*]] = init_enum_data_addr [[TEMP]]#1 : $*Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>, #Optional.Some!enumelt.1
 // CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Im5valueVSs5Int32U_FTBpRBBRS0_MS0__T_ :
-// CHECK:   store [[T1]] to [[T0]] :
-// CHECK:   inject_enum_addr [[TEMP]]#1 : $*Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>, #Optional.Some!enumelt.1
-// CHECK:   [[CALLBACK:%.*]] = load [[TEMP]]#1 :
+// CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[T1]] 
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>)
 // CHECK:   release_value [[TUPLE]]

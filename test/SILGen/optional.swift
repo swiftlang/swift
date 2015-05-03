@@ -1,41 +1,39 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func foo(var f: (()->())?) {
+func testCall(f: (()->())?) {
   f?()
 }
-// CHECK:    sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned Optional<() -> ()>) -> () {
+// CHECK:    sil hidden @{{.*}}testCall{{.*}}
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> ()>):
-// CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> ()>
-// CHECK-NEXT: store [[T0]] to [[F]]#1
-// CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Optional<()>
-// CHECK-NEXT: [[TEMP_RESULT:%.*]] = init_enum_data_addr [[RESULT]]
-//   Switch out on the lvalue (() -> ())!:
-// CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
-// CHECK-NEXT: cond_br [[T1]], bb1, bb2
+// CHECK:      [[T1:%.*]] = select_enum %0
+// CHECK-NEXT: cond_br [[T1]], bb2, bb1
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
 // CHECK:    bb1:
-// CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[F]]
-// CHECK-NEXT: [[FN0:%.*]] = load [[FN0_ADDR]]
+// CHECK-NEXT: release_value %0
+// CHECK:      br bb3
+
+// CHECK: bb2:
+// CHECK-NEXT: [[FN0:%.*]] = unchecked_enum_data %0 : $Optional<() -> ()>, #Optional.Some!enumelt.1
 //   ...unnecessarily reabstract back to () -> ()...
 // CHECK:      [[T0:%.*]] = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@owned @callee_owned (@out (), @in ()) -> ()) -> ()
 // CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
 //   .... then call it
 // CHECK-NEXT: apply [[FN1]]()
-// CHECK:      br bb3
+// CHECK:      br bb4(
 //   (first nothing block)
-// CHECK:    bb2:
-// CHECK-NEXT: inject_enum_addr [[RESULT]]
-// CHECK-NEXT: br bb3
+// CHECK:    bb3:
+// CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
+// CHECK-NEXT: br bb4
 
-func foo2<T>(var f: (()->T)?) {
+func testAddrOnlyCallResult<T>(var f: (()->T)?) {
   var x = f?()
 }
-// CHECK-LABEL: sil hidden @{{.*}}foo{{.*}} : $@convention(thin) <T> (@owned Optional<() -> T>) -> ()
+// CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<() -> T>) -> ()
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> T>):
-// CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> T>
+// CHECK-NEXT: [[F:%.*]] = alloc_box $Optional<() -> T> // var f
 // CHECK-NEXT: store [[T0]] to [[F]]#1
-// CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>
+// CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>  // var x
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[X]]
 //   Check whether 'f' holds a value.
 // CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
@@ -49,7 +47,7 @@ func foo2<T>(var f: (()->T)?) {
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned @callee_owned (@out τ_0_0, @in ()) -> ()) -> ()
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[THUNK]]<T>([[T0]])
-// CHECK-NEXT: apply [[T1]]([[TEMP_RESULT]])
+// CHECK-NEXT: apply [[T1]]([[TEMP]])
 //   ...and coerce to T?
 // CHECK-NEXT: inject_enum_addr [[X]]{{.*}}Some
 // CHECK-NEXT: br bb3
@@ -68,14 +66,14 @@ func foo2<T>(var f: (()->T)?) {
 
 func wrap<T>(x: T) -> T? { return x }
 
-// CHECK: sil hidden @_TF8optional16wrap_then_unwrap
+// CHECK-LABEL: sil hidden @_TF8optional16wrap_then_unwrap
 func wrap_then_unwrap<T>(x: T) -> T {
   // CHECK: [[FORCE:%.*]] = function_ref @_TFSs17_getOptionalValueU__FGSqQ__Q_
   // CHECK: apply [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x)!
 }
 
-// CHECK: sil hidden @_TF8optional10tuple_bind
+// CHECK-LABEL: sil hidden @_TF8optional10tuple_bind
 func tuple_bind(x: (Int, String)?) -> String? {
   return x?.1
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]
@@ -83,3 +81,29 @@ func tuple_bind(x: (Int, String)?) -> String? {
   // CHECK:   [[STRING:%.*]] = tuple_extract {{%.*}} : $(Int, String), 1
   // CHECK-NOT: release_value [[STRING]]
 }
+
+
+// CHECK-LABEL: sil hidden @_TF8optional15opt_to_impl_optFGSqSi_GSQSi_
+// CHECK-NEXT:  bb0(%0 : $Optional<Int>):
+// CHECK-NEXT:  debug_value %0 : $Optional<Int>  // let x
+// CHECK:   select_enum %0
+// CHECK-NEXT:  cond_br {{.*}}, bb1, bb2
+  
+// CHECK:  bb1:
+// CHECK-NEXT:  %6 = unchecked_enum_data %0 : $Optional<Int>, #Optional.Some!enumelt.1
+// CHECK-NEXT:  %7 = enum $ImplicitlyUnwrappedOptional<Int>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, %6 : $Int
+// CHECK-NEXT:  br bb3(%7 : $ImplicitlyUnwrappedOptional<Int>)
+  
+// CHECK:  bb2:
+// CHECK-NEXT:  %9 = enum $ImplicitlyUnwrappedOptional<Int>, #ImplicitlyUnwrappedOptional.None!enumelt
+// CHECK-NEXT:  br bb3(%9 : $ImplicitlyUnwrappedOptional<Int>)
+  
+// CHECK:  bb3(%11 : $ImplicitlyUnwrappedOptional<Int>):
+// CHECK-NEXT:  return %11 : $ImplicitlyUnwrappedOptional<Int>
+// CHECK-NEXT:}
+
+func opt_to_impl_opt(x: Int?) -> Int! {
+  return x
+}
+
+

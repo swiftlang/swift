@@ -54,10 +54,9 @@ func setFoo(f: Foo, var s: String) {
 // CHECK-LABEL: sil hidden @_TF13objc_bridging6setFoo
 // CHECK: bb0({{%.*}} : $Foo, {{%.*}} : $String):
 // CHECK:   [[SET_FOO:%.*]] = class_method [volatile] [[F:%.*]] : {{.*}}, #Foo.setFoo!1.foreign
-// CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
-// CHECK:   copy_addr {{%.*}} to [initialization] [[NATIVE_BUF]] : $*String
-// CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
-// CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]
+// CHECK:   [[NV:%.*]] = load
+// CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NV]]
+
 // CHECK:   select_enum [[OPT_NATIVE]]
 // CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString
@@ -165,10 +164,8 @@ func callSetBar(var s: String) {
 // CHECK-LABEL: sil hidden @_TF13objc_bridging10callSetBar
 // CHECK: bb0({{%.*}} : $String):
 // CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
-// CHECK:   [[NATIVE_BUF:%.*]] = init_enum_data_addr [[OPT_NATIVE_BUF:%[0-9]+]]
-// CHECK:   copy_addr {{%.*}} to [initialization] [[NATIVE_BUF]] : $*String
-// CHECK:   inject_enum_addr [[OPT_NATIVE_BUF]]
-// CHECK:   [[OPT_NATIVE:%.*]] = load [[OPT_NATIVE_BUF]]
+// CHECK:   [[NV:%.*]] = load
+// CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NV]]
 // CHECK:   select_enum [[OPT_NATIVE]]
 // CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @swift_StringToNSString

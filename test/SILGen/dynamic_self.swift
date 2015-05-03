@@ -129,13 +129,11 @@ func testObjCInit(meta: ObjCInit.Type) {
 class OptionalResult {
   func foo() -> Self? { return self }
 }
-// CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foofDS0_FT_GSqDS0__ : $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
-// CHECK:      [[SOME:%.*]] = init_enum_data_addr [[OPT:%[0-9]+]]
+// CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foofDS0_FT_GSqDS0__
+// CHECK-NEXT: bb0(
+// CHECK-NEXT: debug_value %0 : $OptionalResult
 // CHECK-NEXT: strong_retain [[VALUE:%[0-9]+]]
-// CHECK-NEXT: store [[VALUE]] to [[SOME]]
-// CHECK-NEXT: inject_enum_addr [[OPT]]{{.*}}Some
-// CHECK-NEXT: [[T0:%.*]] = load [[OPT]]#1
-// CHECK-NEXT: dealloc_stack [[OPT]]#0
+// CHECK-NEXT: [[T0:%.*]] = enum $Optional<OptionalResult>, #Optional.Some!enumelt.1, %0 : $OptionalResult
 // CHECK-NEXT: return [[T0]] : $Optional<OptionalResult>
 
 class OptionalResultInheritor : OptionalResult {

@@ -1045,7 +1045,7 @@ public:
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr
   /// is nil, and leaving the insertion point on the success branch.
-  void emitBindOptional(SILLocation loc, SILValue optionalAddr,
+  void emitBindOptional(SILLocation loc, SILValue optionalAddrOrValue,
                         unsigned depth);
 
   //

@@ -2371,8 +2371,7 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
   // result of an ObjC constructor into an optional, do it using an unchecked
   // bitcast, which is opaque to the optimizer.
   if (mayLieAboutNonOptionalReturn(E->getSubExpr())) {
-    auto result = SGF.emitRValue(E->getSubExpr())
-      .getAsSingleValue(SGF, E->getSubExpr());
+    auto result = SGF.emitRValueAsSingleValue(E->getSubExpr());
     auto optType = SGF.getLoweredLoadableType(E->getType());
     SILValue bitcast = SGF.B.createUncheckedRefBitCast(E, result.getValue(),
                                                        optType);
@@ -2380,23 +2379,21 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
     return RValue(SGF, E, bitcastMV);
   }
 
-  // Create a buffer for the result.  Abstraction difference will
-  // force this to be returned indirectly from
-  // _injectValueIntoOptional anyway, so there's not much point
-  // avoiding that.
+  // Create a buffer for the result if this is an address-only optional.
   auto &optTL = SGF.getTypeLowering(E->getType());
-  SILValue optAddr = SGF.getBufferForExprResult(E, optTL.getLoweredType(), C);
-
-  SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
-
-  ManagedValue result = SGF.manageBufferForExprResult(optAddr, optTL, C);
-  if (result.isInContext()) return RValue();
-
-  // If we're not address-only, the caller will expect a non-address value.
   if (!optTL.isAddressOnly()) {
-    auto optValue = optTL.emitLoadOfCopy(SGF.B, E, result.forward(SGF), IsTake);
-    result = SGF.emitManagedRValueWithCleanup(optValue, optTL);
+    auto result = SGF.emitRValueAsSingleValue(E->getSubExpr());
+    result = SGF.getOptionalSomeValue(E, result, optTL);
+    return RValue(SGF, E, result);
   }
+  
+  SILValue optAddr = SGF.getBufferForExprResult(E, optTL.getLoweredType(), C);
+  
+  SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
+  
+  ManagedValue result = SGF.manageBufferForExprResult(optAddr, optTL, C);
+  if (result.isInContext())
+    return RValue();
   return RValue(SGF, E, result);
 }
 
@@ -2804,7 +2801,7 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
 }
 
 void SILGenFunction::emitBindOptional(SILLocation loc,
-                                      SILValue optionalAddr,
+                                      SILValue optionalAddrOrValue,
                                       unsigned depth) {
   assert(depth < BindOptionalFailureDests.size());
   auto failureDest = BindOptionalFailureDests[BindOptionalFailureDests.size()
@@ -2812,7 +2809,7 @@ void SILGenFunction::emitBindOptional(SILLocation loc,
 
   // Check whether the optional has a value.
   SILBasicBlock *hasValueBB = createBasicBlock();
-  SILValue hasValue = emitDoesOptionalHaveValue(loc, optionalAddr);
+  SILValue hasValue = emitDoesOptionalHaveValue(loc, optionalAddrOrValue);
 
   // If not, thread out through a bunch of cleanups.
   SILBasicBlock *hasNoValueBB = Cleanups.emitBlockForCleanups(failureDest, loc);
@@ -2823,20 +2820,26 @@ void SILGenFunction::emitBindOptional(SILLocation loc,
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
-  // Create a temporary of type Optional<T>.
+  // Create a temporary of type Optional<T> if it is address-only.
   auto &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
-  auto temp = SGF.emitTemporary(E, optTL);
-
-  // Emit the operand into the temporary.
-  SGF.emitExprInto(E->getSubExpr(), temp.get());
-
-  SILValue addr = temp->getAddress();
-
-  // Branch out if the thing is nil.
-  SGF.emitBindOptional(E, addr, E->getDepth());
   
+  ManagedValue optValue;
+  if (optTL.isLoadable()) {
+    optValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  } else {
+    auto temp = SGF.emitTemporary(E, optTL);
+    optValue = temp->getManagedAddress();
+
+    // Emit the operand into the temporary.
+    SGF.emitExprInto(E->getSubExpr(), temp.get());
+
+  }
+
+  // Check to see whether the optional is present, if not, jump to the current
+  // nil handler block.
+  SGF.emitBindOptional(E, optValue.getValue(), E->getDepth());
+
   // If we continued, get the value out as the result of the expression.
-  auto optValue = temp->getManagedAddress();
   auto resultValue = SGF.emitUncheckedGetOptionalValueFrom(E, optValue,
                                                            optTL, C);
   return RValue(SGF, E, resultValue);
@@ -2872,10 +2875,15 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // scope we're about to push.
   auto &optTL = SGF.getTypeLowering(E->getType());
 
-  std::unique_ptr<TemporaryInitialization> optTemp;
   Initialization *optInit = C.getEmitInto();
   bool usingProvidedContext = optInit && optInit->isSingleBuffer();
-  if (!usingProvidedContext) {
+
+  // Form the optional using address operations if the type is address-only or
+  // if we already have an address to use.
+  bool isByAddress = usingProvidedContext || optTL.isAddressOnly();
+  
+  std::unique_ptr<TemporaryInitialization> optTemp;
+  if (!usingProvidedContext && isByAddress) {
     optTemp = SGF.emitTemporary(E, optTL);
     optInit = optTemp.get();
   }
@@ -2891,28 +2899,37 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   RestoreOptionalFailureDest restoreFailureDest(SGF,
                     JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E));
 
-  // Emit the operand into the temporary.
-  SGF.emitExprInto(E->getSubExpr(), optInit);
+  SILValue NormalArgument;
+  if (isByAddress) {
+    // Emit the operand into the temporary.
+    SGF.emitExprInto(E->getSubExpr(), optInit);
+  } else {
+    NormalArgument = SGF.emitRValueAsSingleValue(E->getSubExpr()).forward(SGF);
+  }
 
   // We fell out of the normal result, which generated a T? as either
-  // a scalar in subResult or directly into optInit.
+  // a scalar in NormalArgument or directly into optInit.
 
   // This concludes the conditional scope.
   scope.pop();
 
   // Branch to the continuation block.
-  SGF.B.createBranch(E, contBB);
+  if (NormalArgument)
+    SGF.B.createBranch(E, contBB, NormalArgument);
+  else
+    SGF.B.createBranch(E, contBB);
 
   // If control branched to the failure block, inject .None into the
   // result type.
   SGF.B.emitBlock(failureBB);
 
-  // FIXME: reset optInit here?
-  SGF.emitInjectOptionalNothingInto(E, optInit->getAddress(), optTL);
-
-  // FIXME: finish optInit within a conditional scope.
-
-  SGF.B.createBranch(E, contBB);
+  if (isByAddress) {
+    SGF.emitInjectOptionalNothingInto(E, optInit->getAddress(), optTL);
+    SGF.B.createBranch(E, contBB);
+  } else {
+    auto branchArg = SGF.getOptionalNoneValue(E, optTL);
+    SGF.B.createBranch(E, contBB, branchArg);
+  }
 
   // Emit the continuation block.
   SGF.B.emitBlock(contBB);
@@ -2921,6 +2938,13 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   if (usingProvidedContext)
     return RValue();
 
+  // If this was done in SSA registers, then the value is provided as an
+  // argument to the block.
+  if (!isByAddress) {
+    auto arg = new (SGF.SGM.M) SILArgument(contBB, optTL.getLoweredType());
+    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
+  }
+  
   assert(optTemp);
   auto result = optTemp->getManagedAddress();
   if (!optTL.isAddressOnly()) {
