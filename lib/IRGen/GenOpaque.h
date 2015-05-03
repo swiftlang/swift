@@ -57,7 +57,7 @@ namespace irgen {
 
   /// Emit a call to do an 'allocateBuffer' operation.
   llvm::Value *emitAllocateBufferCall(IRGenFunction &IGF,
-                                      llvm::Value *metadata,
+                                      SILType T,
                                       Address buffer);
 
   /// Emit a call to do a 'projectBuffer' operation.
@@ -67,38 +67,42 @@ namespace irgen {
 
   /// Emit a call to do an 'initializeWithCopy' operation.
   void emitInitializeWithCopyCall(IRGenFunction &IGF,
-                                  llvm::Value *metadata,
+                                  SILType T,
                                   llvm::Value *destObject,
                                   llvm::Value *srcObject);
 
   /// Emit a call to do an 'initializeArrayWithCopy' operation.
   void emitInitializeArrayWithCopyCall(IRGenFunction &IGF,
-                                       llvm::Value *metadata,
+                                       SILType T,
                                        llvm::Value *destObject,
                                        llvm::Value *srcObject,
                                        llvm::Value *count);
 
   /// Emit a call to do an 'initializeWithTake' operation.
   void emitInitializeWithTakeCall(IRGenFunction &IGF,
-                                  llvm::Value *metadata,
+                                  SILType T,
                                   llvm::Value *destObject,
                                   llvm::Value *srcObject);
 
   /// Emit a call to do an 'initializeArrayWithTakeFrontToBack' operation.
   void emitInitializeArrayWithTakeFrontToBackCall(IRGenFunction &IGF,
-                                                  llvm::Value *metadata,
+                                                  SILType T,
                                                   llvm::Value *destObject,
                                                   llvm::Value *srcObject,
                                                   llvm::Value *count);
 
   /// Emit a call to do an 'initializeArrayWithTakeBackToFront' operation.
   void emitInitializeArrayWithTakeBackToFrontCall(IRGenFunction &IGF,
-                                                  llvm::Value *metadata,
+                                                  SILType T,
                                                   llvm::Value *destObject,
                                                   llvm::Value *srcObject,
                                                   llvm::Value *count);
 
   /// Emit a call to do an 'assignWithCopy' operation.
+  void emitAssignWithCopyCall(IRGenFunction &IGF,
+                              SILType T,
+                              llvm::Value *destObject,
+                              llvm::Value *srcObject);
   void emitAssignWithCopyCall(IRGenFunction &IGF,
                               llvm::Value *metadata,
                               llvm::Value *destObject,
@@ -106,18 +110,18 @@ namespace irgen {
 
   /// Emit a call to do an 'assignWithTake' operation.
   void emitAssignWithTakeCall(IRGenFunction &IGF,
-                              llvm::Value *metadata,
+                              SILType T,
                               llvm::Value *destObject,
                               llvm::Value *srcObject);
 
   /// Emit a call to do a 'destroy' operation.
   void emitDestroyCall(IRGenFunction &IGF,
-                       llvm::Value *metadata,
+                       SILType T,
                        llvm::Value *object);
 
   /// Emit a call to do a 'destroyArray' operation.
   void emitDestroyArrayCall(IRGenFunction &IGF,
-                            llvm::Value *metadata,
+                            SILType T,
                             llvm::Value *object,
                             llvm::Value *count);
 
@@ -128,50 +132,49 @@ namespace irgen {
   
   /// Emit a call to do a 'deallocateBuffer' operation.
   void emitDeallocateBufferCall(IRGenFunction &IGF,
+                                SILType T,
+                                Address buffer);
+  void emitDeallocateBufferCall(IRGenFunction &IGF,
                                 llvm::Value *metadata,
                                 Address buffer);
   
   /// Emit a call to the 'getExtraInhabitantIndex' operation.
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
-                                               llvm::Value *metadata,
+                                               SILType T,
                                                llvm::Value *srcObject);
   
   /// Emit a call to the 'storeExtraInhabitant' operation.
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitStoreExtraInhabitantCall(IRGenFunction &IGF,
-                                            llvm::Value *metadata,
+                                            SILType T,
                                             llvm::Value *index,
                                             llvm::Value *destObject);
   
   /// Emit a load of the 'size' value witness.
-  llvm::Value *emitLoadOfSize(IRGenFunction &IGF, llvm::Value *vwtable);
+  llvm::Value *emitLoadOfSize(IRGenFunction &IGF, SILType T);
 
   /// Emit a load of the 'stride' value witness.
-  llvm::Value *emitLoadOfStride(IRGenFunction &IGF, llvm::Value *vwtable);
+  llvm::Value *emitLoadOfStride(IRGenFunction &IGF, SILType T);
 
   /// Emit a load of the 'alignmentMask' value witness.
-  llvm::Value *emitLoadOfAlignmentMask(IRGenFunction &IGF,
-                                       llvm::Value *vwtable);
+  llvm::Value *emitLoadOfAlignmentMask(IRGenFunction &IGF, SILType T);
 
   /// Emit a load of the 'isPOD' value witness.
-  llvm::Value *emitLoadOfIsPOD(IRGenFunction &IGF, llvm::Value *vwtable);
+  llvm::Value *emitLoadOfIsPOD(IRGenFunction &IGF, SILType T);
 
   /// Emit a load of the 'isBitwiseTakable' value witness.
-  llvm::Value *emitLoadOfIsBitwiseTakable(IRGenFunction &IGF,
-                                          llvm::Value *vwtable);
+  llvm::Value *emitLoadOfIsBitwiseTakable(IRGenFunction &IGF, SILType T);
 
   /// Emit a load of the 'isInline' value witness.
-  llvm::Value *emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *vwtable);
+  llvm::Value *emitLoadOfIsInline(IRGenFunction &IGF, SILType T);
 
   /// Emit a load of the 'hasExtraInhabitants' value witness.
-  llvm::Value *emitLoadOfHasExtraInhabitants(IRGenFunction &IGF,
-                                             llvm::Value *vwtable);
+  llvm::Value *emitLoadOfHasExtraInhabitants(IRGenFunction &IGF, SILType T);
   
   /// Emit a load of the 'extraInhabitantCount' value witness.
   /// The type must be dynamically known to have extra inhabitant witnesses.
-  llvm::Value *emitLoadOfExtraInhabitantCount(IRGenFunction &IGF,
-                                              llvm::Value *vwtable);
+  llvm::Value *emitLoadOfExtraInhabitantCount(IRGenFunction &IGF, SILType T);
 
 } // end namespace irgen
 } // end namespace swift

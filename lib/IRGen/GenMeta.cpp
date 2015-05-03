@@ -160,7 +160,8 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   for (auto archetype : generics.getAllArchetypes()) {
     llvm::Value *metadata = claimNext(IGF.IGM.TypeMetadataPtrTy);
     metadata->setName(archetype->getFullName());
-    IGF.setUnscopedLocalTypeData(CanType(archetype), LocalTypeData::Metatype,
+    IGF.setUnscopedLocalTypeData(CanType(archetype),
+                                 LocalTypeData::forMetatype(),
                                  metadata);
   }
 
@@ -168,7 +169,9 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   for (auto archetype : generics.getAllArchetypes()) {
     unsigned nextProtocolIndex = 0;
     for (auto protocol : archetype->getConformsTo()) {
-      LocalTypeData key = (LocalTypeData) nextProtocolIndex++;
+      LocalTypeData key
+        = LocalTypeData::forArchetypeProtocolWitness(nextProtocolIndex);
+      nextProtocolIndex++;
       if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
         continue;
       llvm::Value *wtable = claimNext(IGF.IGM.WitnessTablePtrTy);
@@ -272,7 +275,8 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   // If this is generic, check to see if we've maybe got a local
   // reference already.
   if (isPattern) {
-    if (auto cache = IGF.tryGetLocalTypeData(theType, LocalTypeData::Metatype))
+    if (auto cache = IGF.tryGetLocalTypeData(theType,
+                                             LocalTypeData::forMetatype()))
       return cache;
   }
 
@@ -337,7 +341,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
     result->setDoesNotThrow();
     result->addAttribute(llvm::AttributeSet::FunctionIndex,
                          llvm::Attribute::ReadNone);
-    IGF.setScopedLocalTypeData(theType, result);
+    IGF.setScopedLocalTypeData(theType, LocalTypeData::forMetatype(), result);
     return result;
   }
 
@@ -364,7 +368,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   result->addAttribute(llvm::AttributeSet::FunctionIndex,
                        llvm::Attribute::ReadOnly);
 
-  IGF.setScopedLocalTypeData(theType, result);
+  IGF.setScopedLocalTypeData(theType, LocalTypeData::forMetatype(), result);
   return result;
 }
 
@@ -886,7 +890,7 @@ namespace {
     }
 
     llvm::Value *visitArchetypeType(CanArchetypeType type) {
-      return IGF.getLocalTypeData(type, LocalTypeData::Metatype);
+      return IGF.getLocalTypeData(type, LocalTypeData::forMetatype());
     }
 
     llvm::Value *visitGenericTypeParamType(CanGenericTypeParamType type) {
@@ -910,12 +914,13 @@ namespace {
 
     /// Try to find the metatype in local data.
     llvm::Value *tryGetLocal(CanType type) {
-      return IGF.tryGetLocalTypeData(type, LocalTypeData::Metatype);
+      return IGF.tryGetLocalTypeData(type, LocalTypeData::forMetatype());
     }
 
     /// Set the metatype in local data.
     llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
-      IGF.setScopedLocalTypeData(type, metatype);
+      IGF.setScopedLocalTypeData(type,  LocalTypeData::forMetatype(),
+                                 metatype);
       return metatype;
     }
   };
@@ -1016,7 +1021,7 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
                                                          CanType type,
                                                  ForDefinition_t shouldDefine) {
   // If we already cached the metadata, use it.
-  if (auto local = IGF.tryGetLocalTypeData(type, LocalTypeData::Metatype))
+  if (auto local = IGF.tryGetLocalTypeData(type, LocalTypeData::forMetatype()))
     return local;
   
   llvm::Constant *accessor =
@@ -1027,7 +1032,7 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
   call->setDoesNotThrow();
   
   // Save the metadata for future lookups.
-  IGF.setScopedLocalTypeData(type, call);
+  IGF.setScopedLocalTypeData(type,  LocalTypeData::forMetatype(), call);
   
   return call;
 }
@@ -1228,12 +1233,16 @@ namespace {
 
     /// Try to find the metatype in local data.
     llvm::Value *tryGetLocal(CanType type) {
-      return IGF.tryGetLocalTypeDataForLayout(type, LocalTypeData::Metatype);
+      return IGF.tryGetLocalTypeDataForLayout(
+                                          SILType::getPrimitiveObjectType(type),
+                                          LocalTypeData::forMetatype());
     }
 
     /// Set the metatype in local data.
     llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
-      IGF.setScopedLocalTypeDataForLayout(type, metatype);
+      IGF.setScopedLocalTypeDataForLayout(SILType::getPrimitiveObjectType(type),
+                                          LocalTypeData::forMetatype(),
+                                          metatype);
       return metatype;
     }
   };
@@ -2298,7 +2307,8 @@ namespace {
         if (fillOp.Protocol) {
           value = emitWitnessTableRef(IGF, fillOp.Archetype, fillOp.Protocol);
         } else {
-          value = IGF.getLocalTypeData(fillOp.Archetype, LocalTypeData::Metatype);
+          value = IGF.getLocalTypeData(fillOp.Archetype,
+                                       LocalTypeData::forMetatype());
         }
         value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
         auto dest = createPointerSizedGEP(IGF, metadataWords,
@@ -3267,7 +3277,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 static llvm::Value *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
                                                 llvm::Value *metadata,
                                                 int index,
-                                                llvm::PointerType *objectTy) {
+                                                llvm::PointerType *objectTy,
+                                                const llvm::Twine &suffix = ""){
   // Require the metadata to be some type that we recognize as a
   // metadata pointer.
   assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
@@ -3278,24 +3289,59 @@ static llvm::Value *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
 
   // Cast to T*.
   auto objectPtrTy = objectTy->getPointerTo();
-  metadata = IGF.Builder.CreateBitCast(metadata, objectPtrTy);
+  auto metadataWords = IGF.Builder.CreateBitCast(metadata, objectPtrTy);
 
   auto indexV = llvm::ConstantInt::getSigned(IGF.IGM.SizeTy, index);
 
   // GEP to the slot.
-  Address slot(IGF.Builder.CreateInBoundsGEP(metadata, indexV),
+  Address slot(IGF.Builder.CreateInBoundsGEP(metadataWords, indexV),
                IGF.IGM.getPointerAlignment());
 
   // Load.
-  auto result = IGF.Builder.CreateLoad(slot);
+  auto result = IGF.Builder.CreateLoad(slot,
+                                       metadata->getName() + suffix);
   return result;
+}
+
+/// Given an AST type, load its value witness table.
+llvm::Value *
+IRGenFunction::emitValueWitnessTableRef(CanType type) {
+  // See if we have a cached projection we can use.
+  if (auto cached = tryGetLocalTypeData(type,
+                                      LocalTypeData::forValueWitnessTable())) {
+    return cached;
+  }
+  
+  auto metadata = emitTypeMetadataRef(type);
+  auto vwtable = emitValueWitnessTableRefForMetadata(metadata);
+  setScopedLocalTypeData(type, LocalTypeData::forValueWitnessTable(), vwtable);
+  return vwtable;
 }
 
 /// Given a type metadata pointer, load its value witness table.
 llvm::Value *
 IRGenFunction::emitValueWitnessTableRefForMetadata(llvm::Value *metadata) {
   return emitLoadFromMetadataAtIndex(*this, metadata, -1,
-                                     IGM.WitnessTablePtrTy);
+                                     IGM.WitnessTablePtrTy,
+                                     ".valueWitnesses");
+}
+
+/// Given a lowered SIL type, load a value witness table that represents its
+/// layout.
+llvm::Value *
+IRGenFunction::emitValueWitnessTableRefForLayout(SILType type) {
+  // See if we have a cached projection we can use.
+  if (auto cached = tryGetLocalTypeDataForLayout(type,
+                                      LocalTypeData::forValueWitnessTable())) {
+    return cached;
+  }
+  
+  auto metadata = emitTypeMetadataRefForLayout(type);
+  auto vwtable = emitValueWitnessTableRefForMetadata(metadata);
+  setScopedLocalTypeDataForLayout(type,
+                                  LocalTypeData::forValueWitnessTable(),
+                                  vwtable);
+  return vwtable;
 }
 
 /// Load the metadata reference at the given index.

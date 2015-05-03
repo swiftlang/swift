@@ -34,12 +34,12 @@ entry(%p : $*DifferentSizeStride, %i: $Builtin.Word):
 // CHECK:      define void @dynamic_size(%swift.opaque*, i64, %swift.type* %T) {
 // CHECK:        %3 = bitcast %swift.type* %T to i8***
 // CHECK-NEXT:   %4 = getelementptr inbounds i8**, i8*** %3, i64 -1
-// CHECK-NEXT:   %5 = load i8**, i8*** %4, align 8
-// CHECK-NEXT:   %6 = getelementptr inbounds i8*, i8** %5, i32 19
-// CHECK-NEXT:   %7 = load i8*, i8** %6, align 8
-// CHECK-NEXT:   %stride = ptrtoint i8* %7 to i64
-// CHECK-NEXT:   %8 = mul nsw i64 %1, %stride
-// CHECK-NEXT:   %9 = getelementptr inbounds i8, i8* %2, i64 %8
+// CHECK-NEXT:   %T.valueWitnesses = load i8**, i8*** %4, align 8
+// CHECK-NEXT:   %5 = getelementptr inbounds i8*, i8** %T.valueWitnesses, i32 19
+// CHECK-NEXT:   %6 = load i8*, i8** %5, align 8
+// CHECK-NEXT:   %stride = ptrtoint i8* %6 to i64
+// CHECK-NEXT:   %7 = mul nsw i64 %1, %stride
+// CHECK-NEXT:   %8 = getelementptr inbounds i8, i8* %2, i64 %7
 
 sil @dynamic_size : $@convention(thin) <T> (@in T, Builtin.Word) -> () {
 entry(%p : $*T, %i: $Builtin.Word):

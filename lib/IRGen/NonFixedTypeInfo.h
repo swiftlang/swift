@@ -83,59 +83,49 @@ public:
                                       name);
 
     // Allocate an object of the appropriate type within it.
-    llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(T);
-    llvm::Value *address =
-      emitAllocateBufferCall(IGF, metadata, buffer);
+    llvm::Value *address = emitAllocateBufferCall(IGF, T, buffer);
     return { buffer, getAsBitCastAddress(IGF, address) };
   }
 
   void deallocateStack(IRGenFunction &IGF, Address buffer,
                        SILType T) const override {
-    llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(T);
-    emitDeallocateBufferCall(IGF, metadata, buffer);
+    emitDeallocateBufferCall(IGF, T, buffer);
   }
 
   llvm::Value *getValueWitnessTable(IRGenFunction &IGF, SILType T) const {
-    auto metadata = IGF.emitTypeMetadataRefForLayout(T);
-    return IGF.emitValueWitnessTableRefForMetadata(metadata);
+    return IGF.emitValueWitnessTableRefForLayout(T);
   }
 
   std::pair<llvm::Value*,llvm::Value*>
   getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T) const override {
-    auto wtable = getValueWitnessTable(IGF, T);
-    auto size = emitLoadOfSize(IGF, wtable);
-    auto align = emitLoadOfAlignmentMask(IGF, wtable);
+    auto size = emitLoadOfSize(IGF, T);
+    auto align = emitLoadOfAlignmentMask(IGF, T);
     return { size, align };
   }
 
   std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
   getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, SILType T) const override {
-    auto wtable = getValueWitnessTable(IGF, T);
-    auto size = emitLoadOfSize(IGF, wtable);
-    auto align = emitLoadOfAlignmentMask(IGF, wtable);
-    auto stride = emitLoadOfStride(IGF, wtable);
+    auto size = emitLoadOfSize(IGF, T);
+    auto align = emitLoadOfAlignmentMask(IGF, T);
+    auto stride = emitLoadOfStride(IGF, T);
     return std::make_tuple(size, align, stride);
   }
 
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
-    auto wtable = getValueWitnessTable(IGF, T);
-    return emitLoadOfSize(IGF, wtable);
+    return emitLoadOfSize(IGF, T);
   }
 
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override {
-    auto wtable = getValueWitnessTable(IGF, T);
-    return emitLoadOfAlignmentMask(IGF, wtable);
+    return emitLoadOfAlignmentMask(IGF, T);
   }
 
   llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override {
-    auto wtable = getValueWitnessTable(IGF, T);
-    return emitLoadOfStride(IGF, wtable);
+    return emitLoadOfStride(IGF, T);
   }
 
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override {
-    auto wtable = getValueWitnessTable(IGF, T);
-    return emitLoadOfIsInline(IGF, wtable);
+    return emitLoadOfIsInline(IGF, T);
   }
 
   /// FIXME: Dynamic extra inhabitant lookup.

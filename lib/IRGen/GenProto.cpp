@@ -1255,7 +1255,8 @@ namespace {
                                  CanArchetypeType archetype,
                                  unsigned which) const {
       assert(which < getNumStoredProtocols());
-      return IGF.getLocalTypeData(archetype, LocalTypeData(which));
+      return IGF.getLocalTypeData(archetype,
+                            LocalTypeData::forArchetypeProtocolWitness(which));
     }
   };
 
@@ -1285,32 +1286,32 @@ namespace {
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T) const override {
-      emitAssignWithCopyCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
+      emitAssignWithCopyCall(IGF, T,
                              dest.getAddress(), src.getAddress());
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T) const override {
-      emitAssignWithTakeCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
+      emitAssignWithTakeCall(IGF, T,
                              dest.getAddress(), src.getAddress());
     }
 
     void initializeWithCopy(IRGenFunction &IGF,
                             Address dest, Address src, SILType T) const override {
-      emitInitializeWithCopyCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
+      emitInitializeWithCopyCall(IGF, T,
                                  dest.getAddress(), src.getAddress());
     }
 
     void initializeArrayWithCopy(IRGenFunction &IGF,
                                  Address dest, Address src, llvm::Value *count,
                                  SILType T) const override {
-      emitInitializeArrayWithCopyCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
+      emitInitializeArrayWithCopyCall(IGF, T,
                                  dest.getAddress(), src.getAddress(), count);
     }
 
     void initializeWithTake(IRGenFunction &IGF,
                             Address dest, Address src, SILType T) const override {
-      emitInitializeWithTakeCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
+      emitInitializeWithTakeCall(IGF, T,
                                  dest.getAddress(), src.getAddress());
     }
 
@@ -1318,8 +1319,7 @@ namespace {
                                             Address dest, Address src,
                                             llvm::Value *count,
                                             SILType T) const override {
-      emitInitializeArrayWithTakeFrontToBackCall(IGF,
-                                    IGF.emitTypeMetadataRefForLayout(T),
+      emitInitializeArrayWithTakeFrontToBackCall(IGF, T,
                                     dest.getAddress(), src.getAddress(), count);
     }
 
@@ -1327,43 +1327,36 @@ namespace {
                                             Address dest, Address src,
                                             llvm::Value *count,
                                             SILType T) const override {
-      emitInitializeArrayWithTakeBackToFrontCall(IGF,
-                                    IGF.emitTypeMetadataRefForLayout(T),
+      emitInitializeArrayWithTakeBackToFrontCall(IGF, T,
                                     dest.getAddress(), src.getAddress(), count);
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-      emitDestroyCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
-                      addr.getAddress());
+      emitDestroyCall(IGF, T, addr.getAddress());
     }
 
     void destroyArray(IRGenFunction &IGF, Address addr, llvm::Value *count,
                       SILType T) const override {
-      emitDestroyArrayCall(IGF, IGF.emitTypeMetadataRefForLayout(T),
-                           addr.getAddress(), count);
+      emitDestroyArrayCall(IGF, T, addr.getAddress(), count);
     }
 
     std::pair<llvm::Value*,llvm::Value*>
     getSizeAndAlignment(IRGenFunction &IGF, SILType T) const {
-      llvm::Value *wtable = getValueWitnessTable(IGF, T);
-      auto size = emitLoadOfSize(IGF, wtable);
-      auto align = emitLoadOfAlignmentMask(IGF, wtable);
+      auto size = emitLoadOfSize(IGF, T);
+      auto align = emitLoadOfAlignmentMask(IGF, T);
       return std::make_pair(size, align);
     }
 
     llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
-      llvm::Value *wtable = getValueWitnessTable(IGF, T);
-      return emitLoadOfSize(IGF, wtable);
+      return emitLoadOfSize(IGF, T);
     }
 
     llvm::Value *getAlignment(IRGenFunction &IGF, SILType T) const {
-      llvm::Value *wtable = getValueWitnessTable(IGF, T);
-      return emitLoadOfAlignmentMask(IGF, wtable);
+      return emitLoadOfAlignmentMask(IGF, T);
     }
 
     llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override {
-      llvm::Value *wtable = getValueWitnessTable(IGF, T);
-      return emitLoadOfStride(IGF, wtable);
+      return emitLoadOfStride(IGF, T);
     }
 
     llvm::Constant *getStaticSize(IRGenModule &IGM) const override { return nullptr; }
@@ -1385,15 +1378,13 @@ namespace {
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
                                          SILType T) const override {
-      auto metadata = IGF.emitTypeMetadataRefForLayout(T);
-      return emitGetExtraInhabitantIndexCall(IGF, metadata, src.getAddress());
+      return emitGetExtraInhabitantIndexCall(IGF, T, src.getAddress());
     }
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address dest,
                               SILType T) const override {
-      auto metadata = IGF.emitTypeMetadataRefForLayout(T);
-      emitStoreExtraInhabitantCall(IGF, metadata, index, dest.getAddress());
+      emitStoreExtraInhabitantCall(IGF, T, index, dest.getAddress());
     }
   };
 
@@ -1451,7 +1442,7 @@ static void setMetadataRef(IRGenFunction &IGF,
                            llvm::Value *metadata) {
   assert(metadata->getType() == IGF.IGM.TypeMetadataPtrTy);
   IGF.setUnscopedLocalTypeData(CanType(archetype),
-                               LocalTypeData::Metatype,
+                               LocalTypeData::forMetatype(),
                                metadata);
 
   // Create a shadow copy of the metadata in an alloca for the debug info.
@@ -1476,8 +1467,7 @@ static void setWitnessTable(IRGenFunction &IGF,
   assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
   assert(protocolIndex < archetype->getConformsTo().size());
   IGF.setUnscopedLocalTypeData(CanType(archetype),
-                               LocalTypeData(protocolIndex),
-                               wtable);
+             LocalTypeData::forArchetypeProtocolWitness(protocolIndex), wtable);
 }
 
 /// Detail about how an object conforms to a protocol.
@@ -4083,7 +4073,8 @@ namespace {
 
         // Mark this as the cached metatype for the l-value's object type.
         CanType argTy = getArgTypeInContext(source.getParamIndex());
-        IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::Metatype, metatype);
+        IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::forMetatype(),
+                                     metatype);
         return metatype;
       }
 
@@ -4094,7 +4085,8 @@ namespace {
         
         // Mark this as the cached metatype for Self.
         CanType argTy = getArgTypeInContext(FnType->getParameters().size() - 1);
-        IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::Metatype, metatype);
+        IGF.setUnscopedLocalTypeData(argTy,
+                                     LocalTypeData::forMetatype(), metatype);
         return metatype;
       }
           
@@ -4263,7 +4255,7 @@ void irgen::emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
   EmitPolymorphicParameters(IGF, ntd).emitForGenericValueWitness(selfMeta);
   // Register the 'Self' argument as generic metadata for the type.
   IGF.setUnscopedLocalTypeData(ntd->getDeclaredTypeInContext()->getCanonicalType(),
-                               LocalTypeData::Metatype, selfMeta);
+                               LocalTypeData::forMetatype(), selfMeta);
 }
 
 /// Get the next argument and use it as the 'self' type metadata.
@@ -4445,7 +4437,7 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
     // Find the metatype for the appropriate archetype and store it in
     // the slot.
     llvm::Value *metatype =
-      IGF.getLocalTypeData(CanType(archetype), LocalTypeData::Metatype);
+      IGF.getLocalTypeData(CanType(archetype), LocalTypeData::forMetatype());
     IGF.Builder.CreateStore(metatype, slot);
 
     // Find the witness tables for the archetype's protocol constraints and
@@ -4460,7 +4452,8 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
                                     IGF.IGM.WitnessTablePtrTy->getPointerTo());
       ++metadataI;
       llvm::Value *witness =
-        IGF.getLocalTypeData(CanType(archetype), LocalTypeData(protocolI));
+        IGF.getLocalTypeData(CanType(archetype),
+                         LocalTypeData::forArchetypeProtocolWitness(protocolI));
       IGF.Builder.CreateStore(witness, witnessSlot);
     }
   }
@@ -5080,7 +5073,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   if (needValueWitnessToAllocate) {
     // If we're using a witness-table to do this, we need to emit a
     // value-witness call to allocate the fixed-size buffer.
-    return Address(emitAllocateBufferCall(IGF, metadata, buffer),
+    return Address(emitAllocateBufferCall(IGF, loweredSrcType, buffer),
                    Alignment(1));
   } else {
     // Otherwise, allocate using what we know statically about the type.
@@ -5151,7 +5144,7 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
 
   // Acquire the archetype's static metadata.
   llvm::Value *metadata = IGF.getLocalTypeData(archetype,
-                                               LocalTypeData::Metatype);
+                                               LocalTypeData::forMetatype());
   return IGF.Builder.CreateCall2(IGF.IGM.getGetDynamicTypeFn(),
                                  addr.getAddress(), metadata);
 }

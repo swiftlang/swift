@@ -319,9 +319,6 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK:         [[T_OFFSET:%.*]] = and [[WORD]] [[T_UP_TO_ALIGN_1]], [[T_ALIGN_MASK_NOT]]
 
 // -- Add the size of T to start the Int field.
-// CHECK:         [[T_METADATA_BASE:%.*]] = bitcast %swift.type* %T to i8***
-// CHECK:         [[T_VWTABLE_ADDR:%.*]] = getelementptr {{.*}} [[T_METADATA_BASE]], [[WORD:i[0-9]+]] -1
-// CHECK:         [[T_VWTABLE:%.*]] = load {{.*}} [[T_VWTABLE_ADDR]]
 // CHECK:         [[T_SIZE_ADDR:%.*]] = getelementptr {{.*}} [[T_VWTABLE]], i32 17
 // CHECK:         [[T_SIZE_PTR:%.*]] = load {{.*}} [[T_SIZE_ADDR]]
 // CHECK:         [[T_SIZE:%.*]] = ptrtoint {{.*}} [[T_SIZE_PTR]] to [[WORD]]

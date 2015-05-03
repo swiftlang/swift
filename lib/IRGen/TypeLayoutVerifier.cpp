@@ -78,7 +78,6 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
       return;
     
     auto metadata = IGF.emitTypeMetadataRef(formalType);
-    auto vwtable = IGF.emitValueWitnessTableRefForMetadata(metadata);
     
     auto verify = [&](llvm::Value *runtimeVal,
                       llvm::Value *staticVal,
@@ -117,33 +116,34 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
     };
 
     // Check that the fixed layout matches the runtime layout.
-    verify(emitLoadOfSize(IGF, vwtable),
+    SILType layoutType = SILType::getPrimitiveObjectType(formalType);
+    verify(emitLoadOfSize(IGF, layoutType),
            getSizeConstant(fixedTI->getFixedSize()),
            "size");
-    verify(emitLoadOfAlignmentMask(IGF, vwtable),
+    verify(emitLoadOfAlignmentMask(IGF, layoutType),
            getAlignmentMaskConstant(fixedTI->getFixedAlignment()),
            "alignment mask");
-    verify(emitLoadOfStride(IGF, vwtable),
+    verify(emitLoadOfStride(IGF, layoutType),
            getSizeConstant(fixedTI->getFixedStride()),
            "stride");
-    verify(emitLoadOfIsInline(IGF, vwtable),
+    verify(emitLoadOfIsInline(IGF, layoutType),
            getBoolConstant(fixedTI->getFixedPacking(IGF.IGM)
                              == FixedPacking::OffsetZero),
            "is-inline bit");
-    verify(emitLoadOfIsPOD(IGF, vwtable),
+    verify(emitLoadOfIsPOD(IGF, layoutType),
            getBoolConstant(fixedTI->isPOD(ResilienceScope::Local)),
            "is-POD bit");
-    verify(emitLoadOfIsBitwiseTakable(IGF, vwtable),
+    verify(emitLoadOfIsBitwiseTakable(IGF, layoutType),
            getBoolConstant(fixedTI->isBitwiseTakable(ResilienceScope::Local)),
            "is-bitwise-takable bit");
     unsigned xiCount = fixedTI->getFixedExtraInhabitantCount(IGF.IGM);
-    verify(emitLoadOfHasExtraInhabitants(IGF, vwtable),
+    verify(emitLoadOfHasExtraInhabitants(IGF, layoutType),
            getBoolConstant(xiCount != 0),
            "has-extra-inhabitants bit");
 
     // Check extra inhabitants.
     if (xiCount > 0) {
-      verify(emitLoadOfExtraInhabitantCount(IGF, vwtable),
+      verify(emitLoadOfExtraInhabitantCount(IGF, layoutType),
              getSizeConstant(Size(xiCount)),
              "extra inhabitant count");
       
@@ -168,7 +168,7 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
         
         // Ask the runtime to store an extra inhabitant.
         auto index = llvm::ConstantInt::get(IGF.IGM.Int32Ty, i);
-        emitStoreExtraInhabitantCall(IGF, metadata, index,
+        emitStoreExtraInhabitantCall(IGF, layoutType, index,
                                      xiOpaque.getAddress());
         
         // Compare the stored extra inhabitant against the fixed extra
@@ -204,7 +204,7 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
         
         IGF.Builder.CreateStore(filledXI, xiBuf2);
         
-        auto runtimeIndex = emitGetExtraInhabitantIndexCall(IGF, metadata,
+        auto runtimeIndex = emitGetExtraInhabitantIndexCall(IGF, layoutType,
                                                         xiOpaque.getAddress());
         verify(runtimeIndex, index,
                llvm::Twine("extra inhabitant index calculation ")

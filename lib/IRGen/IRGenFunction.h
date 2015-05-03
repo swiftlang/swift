@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILType.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CallingConv.h"
 #include "IRBuilder.h"
@@ -61,17 +62,51 @@ namespace irgen {
   class LinkEntity;
   class Scope;
   class TypeInfo;
-
-/// LocalTypeData - A nonce value for storing some sort of
-/// locally-known information about a type.
-/// 
-/// The enumerated values are all in the "negative" range and so do
-/// not collide with reasonable index values.
-enum class LocalTypeData : unsigned {
-  /// A reference to a metatype.
-  Metatype = ~0U
-};
+  enum class ValueWitness : unsigned;
   
+/// A nonce value for storing some sort of
+/// locally-known information about a type.
+class LocalTypeData {
+  unsigned Value;
+  
+  explicit LocalTypeData(unsigned Value) : Value(Value) {}
+  
+  /// Magic values for special kinds of index.
+  enum : unsigned {
+    Metatype = ~0U,
+    ValueWitnessTable = ~1U,
+
+    ValueWitnessBase = 0xFFFFFF00U,
+  };
+  
+public:
+  LocalTypeData() = default;
+  
+  // The magic values are all in the "negative" range and so do
+  // not collide with reasonable index values.
+  
+  /// A reference to the type metadata.
+  static LocalTypeData forMetatype() { return LocalTypeData(Metatype); }
+  /// A reference to the value witness table.
+  static LocalTypeData forValueWitnessTable() {
+    return LocalTypeData(ValueWitnessTable);
+  }
+
+  /// A reference to a specific value witness.
+  static LocalTypeData forValueWitness(ValueWitness witness) {
+    return LocalTypeData((unsigned)witness + ValueWitnessBase);
+  }
+  
+  /// A reference to a protocol witness table for an archetype.
+  static LocalTypeData forArchetypeProtocolWitness(unsigned index) {
+    return LocalTypeData(index);
+  }
+  
+  unsigned getValue() const {
+    return Value;
+  }
+};
+
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -176,7 +211,12 @@ public:
   // than a metadata reference, and it would be more type-safe.
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
   
+  llvm::Value *emitValueWitnessTableRef(CanType type);
+  llvm::Value *emitValueWitnessTableRefForLayout(SILType type);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
+  
+  llvm::Value *emitValueWitness(CanType type, ValueWitness index);
+  llvm::Value *emitValueWitnessForLayout(SILType type, ValueWitness index);
 
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
@@ -280,8 +320,9 @@ public:
   }
 
   /// The same as tryGetLocalTypeData, just for the Layout metadata.
-  llvm::Value *tryGetLocalTypeDataForLayout(CanType type, LocalTypeData index) {
-    return lookupTypeDataMap(type, index, ScopedTypeDataMapForLayout);
+  llvm::Value *tryGetLocalTypeDataForLayout(SILType type, LocalTypeData index) {
+    return lookupTypeDataMap(type.getSwiftRValueType(), index,
+                             ScopedTypeDataMapForLayout);
   }
 
   /// Retrieve a local type-metadata reference which is known to exist.
@@ -300,23 +341,26 @@ public:
     auto key = getLocalTypeDataKey(type, index);
     assert(!LocalTypeDataMap.count(key) &&
            "existing mapping for local type data");
-    LocalTypeDataMap.insert(std::make_pair(key, data));
+    LocalTypeDataMap.insert({key, data});
   }
   
   /// Add a local type-metadata reference, which is valid for the containing
   /// block.
-  void setScopedLocalTypeData(CanType type, llvm::Instruction *data) {
-    assert(data->getParent() == Builder.GetInsertBlock() &&
+  void setScopedLocalTypeData(CanType type, LocalTypeData index,
+                              llvm::Value *data) {
+    assert(_isValidScopedLocalTypeData(data) &&
            "metadata instruction not inserted into the Builder's insert-block");
-    ScopedTypeDataMap[type] = data;
+    ScopedTypeDataMap[getLocalTypeDataKey(type, index)] = data;
   }
 
   /// Add a local type-metadata reference, which is valid for the containing
   /// block.
-  void setScopedLocalTypeDataForLayout(CanType type, llvm::Instruction *data) {
-    assert(data->getParent() == Builder.GetInsertBlock() &&
+  void setScopedLocalTypeDataForLayout(SILType type, LocalTypeData index,
+                                       llvm::Value *data) {
+    assert(_isValidScopedLocalTypeData(data) &&
            "metadata instruction not inserted into the Builder's insert-block");
-    ScopedTypeDataMapForLayout[type] = data;
+    ScopedTypeDataMapForLayout[
+                  getLocalTypeDataKey(type.getSwiftRValueType(), index)] = data;
   }
 
   /// The kind of value LocalSelf is.
@@ -333,18 +377,31 @@ public:
   void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
   
 private:
+#ifndef NDEBUG
+  bool _isValidScopedLocalTypeData(llvm::Value *v) {
+    // Constants are valid anywhere.
+    if (isa<llvm::Constant>(v))
+      return true;
+    // Instructions are valid only in the current insert block.
+    if (auto inst = dyn_cast<llvm::Instruction>(v))
+      return inst->getParent() == Builder.GetInsertBlock();
+    // TODO: Other kinds of value?
+    return false;
+  }
+#endif
+
   typedef unsigned LocalTypeDataDepth;
   typedef std::pair<TypeBase*,unsigned> LocalTypeDataPair;
   LocalTypeDataPair getLocalTypeDataKey(CanType type, LocalTypeData index) {
-    return LocalTypeDataPair(type.getPointer(), unsigned(index));
+    return LocalTypeDataPair(type.getPointer(), index.getValue());
   }
 
-  typedef llvm::DenseMap<CanType, llvm::Instruction*> TypeDataMap;
+  typedef llvm::DenseMap<LocalTypeDataPair, llvm::Value*> TypeDataMap;
 
   llvm::Value *lookupTypeDataMap(CanType type, LocalTypeData index,
                                  const TypeDataMap &scopedMap);
 
-  llvm::DenseMap<LocalTypeDataPair, llvm::Value*> LocalTypeDataMap;
+  TypeDataMap LocalTypeDataMap;
 
   TypeDataMap ScopedTypeDataMap;
 

@@ -188,19 +188,26 @@ llvm::Value *IRGenFunction::lookupTypeDataMap(CanType type, LocalTypeData index,
     return it->second;
   
   // Now try to lookup in the scoped cache.
-  auto it2 = scopedMap.find(type);
+  auto it2 = scopedMap.find(key);
   if (it2 == scopedMap.end())
     return nullptr;
   
-  llvm::Instruction *I = it2->second;
-  
-  // This is a very very simple dominance check: either the definition is in the
-  // entry block or in the current block.
-  // TODO: do a better dominance check.
-  if (I->getParent() == &CurFn->getEntryBlock() ||
-      I->getParent() == Builder.GetInsertBlock()) {
-    return I;
+  if (auto *I = dyn_cast<llvm::Instruction>(it2->second)) {
+    // This is a very very simple dominance check: either the definition is in the
+    // entry block or in the current block.
+    // TODO: do a better dominance check.
+    if (I->getParent() == &CurFn->getEntryBlock() ||
+        I->getParent() == Builder.GetInsertBlock()) {
+      return I;
+    }
+    return nullptr;
   }
+  
+  if (isa<llvm::Constant>(it2->second)) {
+    return it2->second;
+  }
+  
+  // TODO: other kinds of value?
   return nullptr;
 }
 

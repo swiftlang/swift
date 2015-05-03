@@ -560,9 +560,8 @@ namespace {
       // Get the value witness table for the element.
       CanType eltTy
        = ElementsWithPayload[0].decl->getArgumentType()->getCanonicalType();
-      llvm::Value *eltMetadata = IGF.emitTypeMetadataRef(eltTy);
       llvm::Value *eltVWT
-        = IGF.emitValueWitnessTableRefForMetadata(eltMetadata);
+        = IGF.emitValueWitnessTableRef(eltTy);
 
       Address vwtAddr(vwtable, IGF.IGM.getPointerAlignment());
       Address eltVWTAddr(eltVWT, IGF.IGM.getPointerAlignment());
