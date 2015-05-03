@@ -267,6 +267,9 @@ public:
   StmtConditionElement(Expr *cond)
     : CondOrInit(cond) {}
 
+  SourceLoc getIntroducerLoc() const { return IntroducerLoc; }
+  void setIntroducerLoc(SourceLoc loc) { IntroducerLoc = loc; }
+  
 
   /// Boolean Condition Accessors.
   bool isCondition() const {
