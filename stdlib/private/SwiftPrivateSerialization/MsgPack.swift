@@ -300,7 +300,7 @@ public struct MsgPackDecoder {
   }
 
   internal mutating func _consumeByte() -> UInt8? {
-    let result? = _lookByte() else { return nil }
+    require let result = _lookByte() else { return nil }
     _consumedCount++
     return result
   }
