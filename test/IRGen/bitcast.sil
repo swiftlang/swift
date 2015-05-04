@@ -32,6 +32,19 @@ entry(%c : $C):
   return %i : $Int
 }
 
+
+// CHECK-x86_64-LABEL: define { i64, i1 } @bitcast_trivial_optional(i64, i1) {
+// CHECK-x86_64-NEXT:  entry:
+// CHECK-x86_64-NEXT:   %2 = insertvalue { i64, i1 } undef, i64 %0, 0
+// CHECK-x86_64-NEXT:   %3 = insertvalue { i64, i1 } %2, i1 %1, 1
+// CHECK-x86_64-NEXT:   ret { i64, i1 } %3
+
+sil @bitcast_trivial_optional: $@convention(thin) (Optional<Int>) -> ImplicitlyUnwrappedOptional<Int> {
+entry(%c : $Optional<Int>):
+  %i = unchecked_trivial_bit_cast %c : $Optional<Int> to $ImplicitlyUnwrappedOptional<Int>
+  return %i : $ImplicitlyUnwrappedOptional<Int>
+}
+
 // CHECK-i386-LABEL: define i32 @bitcast_ref(%C7bitcast1C*) {
 // CHECK-i386:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 4
 // CHECK-i386:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
@@ -44,8 +57,8 @@ entry(%c : $C):
 // CHECK-x86_64-LABEL: define i64 @bitcast_ref(%C7bitcast1C*) {
 // CHECK-x86_64:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 8
 // CHECK-x86_64:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
-// CHECK-x86_64:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq*
-// CHECK-x86_64:         [[VALUE_BUF:%.*]] = bitcast %Sq* [[OUT_BUF]] to i64*
+// CHECK-x86_64:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq.16*
+// CHECK-x86_64:         [[VALUE_BUF:%.*]] = bitcast %Sq.16* [[OUT_BUF]] to i64*
 // CHECK-x86_64:         [[VALUE:%.*]] = load i64, i64* [[VALUE_BUF]], align 8
 // CHECK-x86_64:         ret i64 [[VALUE]]
 // CHECK-x86_64:       }
@@ -54,4 +67,21 @@ entry(%c : $C):
   %o = unchecked_ref_bit_cast %c : $C to $Optional<C>
   return %o : $Optional<C>
 }
+
+// CHECK-i386-LABEL:  define hidden i32 @bitcast_ref_optional(i32) {
+// CHECK-i386-NEXT: entry:
+// CHECK-i386-NEXT: ret i32 %0
+// CHECK-i386-NEXT: }
+
+// CHECK-x86_64-LABEL:  define hidden i64 @bitcast_ref_optional(i64) {
+// CHECK-x86_64-NEXT: entry:
+// CHECK-x86_64-NEXT: ret i64 %0
+// CHECK-x86_64-NEXT: }
+sil hidden @bitcast_ref_optional : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<C>) -> @owned Optional<C> {
+bb0(%0 : $ImplicitlyUnwrappedOptional<C>):
+  %o = unchecked_ref_bit_cast %0 : $ImplicitlyUnwrappedOptional<C> to $Optional<C>
+  return %o : $Optional<C>
+}
+
+
 

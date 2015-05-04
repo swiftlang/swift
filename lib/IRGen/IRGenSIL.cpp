@@ -3287,8 +3287,17 @@ void IRGenSILFunction::visitUncheckedAddrCastInst(
                                              swift::UncheckedAddrCastInst *i) {
   auto addr = getLoweredAddress(i->getOperand());
   auto &ti = getTypeInfo(i->getType());
-  auto result = Builder.CreateBitCast(addr, ti.getStorageType()->getPointerTo());
+  auto result = Builder.CreateBitCast(addr,ti.getStorageType()->getPointerTo());
   setLoweredAddress(SILValue(i, 0), result);
+}
+
+static bool isStructurallySame(const llvm::Type *T1, const llvm::Type *T2) {
+  if (T1 == T2) return true;
+  
+  if (auto *S1 = dyn_cast<llvm::StructType>(T1))
+    if (auto *S2 = dyn_cast<llvm::StructType>(T2))
+      return S1->isLayoutIdentical(const_cast<llvm::StructType*>(S2));
+  return false;
 }
 
 static void emitValueBitCast(IRGenSILFunction &IGF,
@@ -3326,6 +3335,15 @@ static void emitValueBitCast(IRGenSILFunction &IGF,
     return;
   }
 
+  // If the transfer is doable bitwise, and if the elements of the explosion are
+  // the same type, then just transfer the elements.
+  if (inTI.isBitwiseTakable(ResilienceScope::Component) &&
+      outTI.isBitwiseTakable(ResilienceScope::Component) &&
+      isStructurallySame(inTI.StorageType, outTI.StorageType)) {
+    in.transferInto(out, in.size());
+    return;
+  }
+  
   // TODO: We could do bitcasts entirely in the value domain in some cases, but
   // for simplicity, let's just always go through the stack for now.
   
