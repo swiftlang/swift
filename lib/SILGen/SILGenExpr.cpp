@@ -123,9 +123,10 @@ namespace {
   class RValueEmitter
       : public Lowering::ExprVisitor<RValueEmitter, RValue, SGFContext>
   {
-    SILGenFunction &SGF;
     typedef Lowering::ExprVisitor<RValueEmitter,RValue,SGFContext> super;
   public:
+    SILGenFunction &SGF;
+    
     RValueEmitter(SILGenFunction &SGF) : SGF(SGF) {}
 
     using super::visit;
@@ -2378,56 +2379,9 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
     ManagedValue bitcastMV = ManagedValue(bitcast, result.getCleanup());
     return RValue(SGF, E, bitcastMV);
   }
-
-  auto &optTL = SGF.getTypeLowering(E->getType());
-
-  // It is a common occurrence to get conversions back and forth from T! to T?.
-  // Peephole these by looking for a subexpression that is a BindOptionalExpr.
-  // If we see one, we can produce a single instruction, which doesn't require
-  // a CFG diamond.
-  if (auto *BOE = dyn_cast<BindOptionalExpr>(E->getSubExpr())) {
-    // If the subexpression type is exactly the same, then just peephole the
-    // whole thing away.
-    if (BOE->getSubExpr()->getType()->isEqual(E->getType()))
-      return visit(BOE->getSubExpr(), C);
-    
-    OptionalTypeKind Kind = OTK_None; (void)Kind;
-    assert(BOE->getSubExpr()->getType()->getAnyOptionalObjectType(Kind)
-           ->isEqual(E->getType()->getAnyOptionalObjectType(Kind)));
-    
-    if (!optTL.isAddressOnly()) {
-      auto subMV = SGF.emitRValueAsSingleValue(BOE->getSubExpr());
-      SILValue result;
-      if (optTL.isTrivial())
-        result = SGF.B.createUncheckedTrivialBitCast(E, subMV.forward(SGF),
-                                                     optTL.getLoweredType());
-      else
-        result = SGF.B.createUncheckedRefBitCast(E, subMV.forward(SGF),
-                                                 optTL.getLoweredType());
-      
-      return RValue(SGF, E,
-                    SGF.emitManagedRValueWithCleanup(result, optTL));
-    }
-
-    // If this is an address-only case, get the buffer we want the result in,
-    // cast the address of it to the right type, then emit into it.
-    SILValue optAddr = SGF.getBufferForExprResult(E, optTL.getLoweredType(), C);
-    
-    auto &subTL = SGF.getTypeLowering(BOE->getSubExpr()->getType());
-    SILValue subAddr = SGF.B.createUncheckedAddrCast(E, optAddr,
-                                       subTL.getLoweredType().getAddressType());
-    
-    KnownAddressInitialization subInit(subAddr);
-    SGF.emitExprInto(BOE->getSubExpr(), &subInit);
-    
-    ManagedValue result = SGF.manageBufferForExprResult(optAddr, optTL, C);
-    if (result.isInContext())
-      return RValue();
-    return RValue(SGF, E, result);
-  }
-  
   
   // Create a buffer for the result if this is an address-only optional.
+  auto &optTL = SGF.getTypeLowering(E->getType());
   if (!optTL.isAddressOnly()) {
     auto result = SGF.emitRValueAsSingleValue(E->getSubExpr());
     result = SGF.getOptionalSomeValue(E, result, optTL);
@@ -2927,6 +2881,79 @@ namespace {
   };
 }
 
+
+/// emitOptimizedOptionalEvaluation - Look for cases where we can short-circuit
+/// evaluation of an OptionalEvaluationExpr by pattern matching the AST.
+///
+static bool emitOptimizedOptionalEvaluation(OptionalEvaluationExpr *E,
+                                            SILValue &LoadableResult,
+                                            Initialization *optInit,
+                                            RValueEmitter &RVE) {
+  auto &SGF = RVE.SGF;
+  // It is a common occurrence to get conversions back and forth from T! to T?.
+  // Peephole these by looking for a subexpression that is a BindOptionalExpr.
+  // If we see one, we can produce a single instruction, which doesn't require
+  // a CFG diamond.
+  //
+  // Check for:
+  // (optional_evaluation_expr type='T?'
+  //   (inject_into_optional type='T?'
+  //     (bind_optional_expr type='T'
+  //       (whatever type='T?' ...)
+  auto *IIO = dyn_cast<InjectIntoOptionalExpr>(E->getSubExpr()
+                                               ->getSemanticsProvidingExpr());
+  if (!IIO) return false;
+  
+  // Make sure the bind is to the OptionalEvaluationExpr we're emitting.
+  auto *BO = dyn_cast<BindOptionalExpr>(IIO->getSubExpr()
+                                        ->getSemanticsProvidingExpr());
+  if (!BO || BO->getDepth() != 0) return false;
+  
+  auto &optTL = SGF.getTypeLowering(E->getType());
+
+  // If the subexpression type is exactly the same, then just peephole the
+  // whole thing away.
+  if (BO->getSubExpr()->getType()->isEqual(E->getType())) {
+    if (optInit)
+      SGF.emitExprInto(BO->getSubExpr(), optInit);
+    else
+      LoadableResult=SGF.emitRValueAsSingleValue(BO->getSubExpr()).forward(SGF);
+    return true;
+  }
+  
+  OptionalTypeKind Kind = OTK_None; (void)Kind;
+  assert(BO->getSubExpr()->getType()->getAnyOptionalObjectType(Kind)
+         ->isEqual(E->getType()->getAnyOptionalObjectType(Kind)));
+  
+  if (!optTL.isAddressOnly()) {
+    auto subMV = SGF.emitRValueAsSingleValue(BO->getSubExpr());
+    SILValue result;
+    if (optTL.isTrivial())
+      result = SGF.B.createUncheckedTrivialBitCast(E, subMV.forward(SGF),
+                                                   optTL.getLoweredType());
+    else
+      result = SGF.B.createUncheckedRefBitCast(E, subMV.forward(SGF),
+                                               optTL.getLoweredType());
+    
+    LoadableResult = result;
+    return true;
+  }
+  
+  // If this is an address-only case, get the address of the buffer we want the
+  // result in, then cast the address of it to the right type, then emit into
+  // it.
+  SILValue optAddr = getAddressForInPlaceInitialization(optInit);
+  assert(optAddr && "Caller should have provided a buffer");
+  
+  auto &subTL = SGF.getTypeLowering(BO->getSubExpr()->getType());
+  SILValue subAddr = SGF.B.createUncheckedAddrCast(E, optAddr,
+                                 subTL.getLoweredType().getAddressType());
+  
+  KnownAddressInitialization subInit(subAddr);
+  SGF.emitExprInto(BO->getSubExpr(), &subInit);
+  return true;
+}
+
 RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                                                   SGFContext C) {
   auto &optTL = SGF.getTypeLowering(E->getType());
@@ -2957,7 +2984,11 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                     JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E));
 
   SILValue NormalArgument;
-  if (isByAddress) {
+  bool hasEmittedResult = false;
+  if (emitOptimizedOptionalEvaluation(E, NormalArgument, optInit, *this)) {
+    // Already emitted code for this.
+    hasEmittedResult = true;
+  } else if (isByAddress) {
     // Emit the operand into the temporary.
     SGF.emitExprInto(E->getSubExpr(), optInit);
   } else {
