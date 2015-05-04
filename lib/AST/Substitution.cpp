@@ -124,6 +124,19 @@ Substitution Substitution::subst(Module *module,
             goto found_conformance;
           }
         }
+
+        // FIXME: AnyObject conformances can be synthesized from
+        // thin air. Gross.
+        if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+          auto classDecl
+            = substReplacement->getClassOrBoundGenericClass();
+          SmallVector<ProtocolConformance *, 1> conformances;
+          classDecl->lookupConformance(classDecl->getParentModule(),
+                                       proto, conformances);
+          substConformance.push_back(conformances.front());
+          goto found_conformance;
+        }
+
         assert(false && "did not find conformance for archetype requirement?!");
 found_conformance:;
       }
