@@ -30,3 +30,11 @@
 // CHECK-MODULE-NOT: -emit-module-path
 // CHECK-MODULE: -frontend
 // CHECK-MODULE: -emit-module
+
+// RUN: %target-swiftc_driver -embed-bitcode -force-single-frontend-invocation %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-SINGLE
+// CHECK-SINGLE: -frontend
+// CHECK-SINGLE: -emit-bc
+// CHECK-SINGLE: -frontend
+// CHECK-SINGLE: -c
+// CHECK-SINGLE: -embed-bitcode
+// CHECK-SINGLE: -disable-llvm-optzns

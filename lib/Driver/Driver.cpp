@@ -1103,7 +1103,36 @@ void Driver::buildActions(const ToolChain &TC,
     }
     break;
   }
-  case OutputInfo::Mode::SingleCompile:
+  case OutputInfo::Mode::SingleCompile: {
+    if (Inputs.empty()) break;
+    if (Args.hasArg(options::OPT_embed_bitcode)) {
+      // Make sure we can handle the inputs.
+      bool HandledHere = true;
+      for (const InputPair &Input : Inputs) {
+        types::ID InputType = Input.first;
+        if (InputType != types::TY_Swift && InputType != types::TY_SIL &&
+            InputType != types::TY_SIB) {
+          HandledHere = false;
+          break;
+        }
+      }
+      if (HandledHere) {
+        // Create a single CompileJobAction and a single BackendJobAction.
+        std::unique_ptr<Action> CA(new CompileJobAction(types::TY_LLVM_BC));
+        for (const InputPair &Input : Inputs) {
+          types::ID InputType = Input.first;
+          const Arg *InputArg = Input.second;
+
+          CA->addInput(new InputAction(*InputArg, InputType));
+        }
+        CA.reset(new BackendJobAction(CA.release(),
+                                      OI.CompilerOutputType));
+        CompileActions.push_back(CA.release());
+        break;
+      }
+    }
+    SWIFT_FALLTHROUGH;
+  }
   case OutputInfo::Mode::Immediate: {
     if (!Inputs.empty()) {
       // Create a single CompileJobAction for all of the driver's inputs.

@@ -14,6 +14,7 @@
 #include "ToolChains.h"
 
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -298,6 +299,15 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     break;
   }
   case OutputInfo::Mode::SingleCompile:
+    if (isa<BackendJobAction>(JA)) {
+      assert(Inputs->size() == 1 && "The Swift backend expects one input!");
+      Arguments.push_back("-primary-file");
+      const Job *Cmd = Inputs->front();
+      Arguments.push_back(
+        Cmd->getOutput().getPrimaryOutputFilename().c_str());
+      break;
+    }
+    SWIFT_FALLTHROUGH;
   case OutputInfo::Mode::Immediate: {
     for (const Action *A : InputActions) {
       const InputAction *IA = dyn_cast<InputAction>(A);
