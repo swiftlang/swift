@@ -3464,7 +3464,8 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
                                     Serializer::DeclTable &operatorMethodDecls,
                                     Serializer::DeclTable &topLevelDecls,
                                     Serializer::ObjCMethodTable &objcMethods,
-                                    bool isDerivedTopLevel) {
+                                    bool isDerivedTopLevel,
+                                    bool isLocal = false) {
   for (const Decl *member : members) {
     auto memberValue = dyn_cast<ValueDecl>(member);
     if (!memberValue)
@@ -3496,14 +3497,16 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
     }
 
     // Record Objective-C methods.
-    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-      if (func->isObjC()) {
-        TypeID owningTypeID
-          = S.addTypeRef(func->getDeclContext()->getDeclaredInterfaceType());
-        objcMethods[func->getObjCSelector()].push_back(
-          std::make_tuple(owningTypeID,
-                          func->isObjCInstanceMethod(),
-                          S.addDeclRef(memberValue)));
+    if (!isLocal) {
+      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+        if (func->isObjC()) {
+          TypeID owningTypeID
+            = S.addTypeRef(func->getDeclContext()->getDeclaredInterfaceType());
+          objcMethods[func->getObjCSelector()].push_back(
+            std::make_tuple(owningTypeID,
+                            func->isObjCInstanceMethod(),
+                            S.addDeclRef(memberValue)));
+        }
       }
     }
   }
@@ -3577,6 +3580,15 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       localTypeGenerator.insert(MangledName, {
         addDeclRef(TD), TD->getLocalDiscriminator()
       });
+
+      if (auto nominal = dyn_cast<NominalTypeDecl>(TD)) {
+        addOperatorsAndTopLevel(*this, nominal->getMembers(),
+                                operatorMethodDecls, topLevelDecls,
+                                objcMethods, false, /*isLocal=*/true);
+        addOperatorsAndTopLevel(*this, nominal->getDerivedGlobalDecls(),
+                                operatorMethodDecls, topLevelDecls,
+                                objcMethods, true, /*isLocal=*/true);
+      }
     }
   }
 
