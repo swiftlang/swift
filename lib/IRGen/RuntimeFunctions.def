@@ -85,6 +85,12 @@ FUNCTION(WillThrow, swift_willThrow, RuntimeCC,
          ARGS(ErrorPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_errorInMain(error *ptr);
+FUNCTION(ErrorInMain, swift_errorInMain, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(ErrorPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_unexpectedError(error *ptr);
 FUNCTION(UnexpectedError, swift_unexpectedError, RuntimeCC,
          RETURNS(VoidTy),

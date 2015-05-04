@@ -695,7 +695,7 @@ static ValueDecl *getFenceOperation(ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
 }
 
-static ValueDecl *getWillThrowOperation(ASTContext &Context, Identifier Id) {
+static ValueDecl *getVoidErrorOperation(ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Id, {Context.getExceptionType()},
                             TupleType::getEmpty(Context));
 }
@@ -1547,7 +1547,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getOnceOperation(Context, Id);
 
   case BuiltinValueKind::WillThrow:
-    return getWillThrowOperation(Context, Id);
+  case BuiltinValueKind::ErrorInMain:
+    return getVoidErrorOperation(Context, Id);
 
   case BuiltinValueKind::UnexpectedError:
     return getUnexpectedErrorOperation(Context, Id);

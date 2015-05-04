@@ -424,6 +424,11 @@ void swift::swift_willThrow(SwiftError *error) {
   return _swift_willThrow(error);
 }
 
+void swift::swift_errorInMain(SwiftError *object) {
+  // FIXME: terrible stub implementation
+  fprintf(stderr, "error caught in main()\n");
+}
+
 void swift::swift_unexpectedError(SwiftError *object) {
   // FIXME: terrible stub implementation
   fprintf(stderr, "unexpected error thrown\n");
