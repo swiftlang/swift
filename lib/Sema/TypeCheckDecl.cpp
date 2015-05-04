@@ -2280,7 +2280,7 @@ static Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
   // implicit override of an @objc declaration is not implicitly @objc.
   if (auto overridden = VD->getOverriddenDecl()) {
     if (overridden->isObjC()) {
-      return ObjCReason::DontDiagnose;
+      return ObjCReason::DoNotDiagnose;
     }
 
     // Overriding @nonobjc from an @objc class should not mark the
@@ -2297,7 +2297,7 @@ static Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
     Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
     auto classContext = contextTy->getClassOrBoundGenericClass();
     if (classContext && classContext->isObjC())
-      return ObjCReason::DontDiagnose;
+      return ObjCReason::DoNotDiagnose;
   }
 
   return None;
@@ -2410,7 +2410,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       // FIXME: this is for cases where we don't want to diagnose a
       // "X cannot be represented in Objective-C" error, but still
       // complain if the user specifies @nonobjc.
-      if (Reason == ObjCReason::DontDiagnose)
+      if (Reason == ObjCReason::DoNotDiagnose)
         Reason = ObjCReason::ExplicitlyObjC;
 
       TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
@@ -4195,7 +4195,7 @@ public:
         // Don't complain about accessors in protocols.  We will emit a
         // diagnostic about the property itself.
         if (isObjC)
-          isObjC = ObjCReason::DontDiagnose;
+          isObjC = ObjCReason::DoNotDiagnose;
       }
 
       if (!isObjC && FD->isGetterOrSetter()) {
@@ -4216,7 +4216,7 @@ public:
 
         if (prop->isObjC() || prop->isDynamic() ||
             prop->getAttrs().hasAttribute<IBOutletAttr>())
-          isObjC = ObjCReason::DontDiagnose;
+          isObjC = ObjCReason::DoNotDiagnose;
 
         // If the property is dynamic, propagate to this accessor.
         if (prop->isDynamic() && !FD->isDynamic())

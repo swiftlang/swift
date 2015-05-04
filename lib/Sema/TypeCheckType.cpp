@@ -2216,7 +2216,7 @@ static bool isParamRepresentableInObjC(TypeChecker &TC,
 static void diagnoseFunctionParamNotRepresentable(
     TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
     unsigned ParamIndex, const Pattern *P, ObjCReason Reason) {
-  if (Reason == ObjCReason::DontDiagnose)
+  if (Reason == ObjCReason::DoNotDiagnose)
     return;
 
   if (NumParams == 1) {
@@ -2239,14 +2239,14 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
                                               ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  bool Diagnose = (Reason != ObjCReason::DontDiagnose);
+  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
   if (auto *TP = dyn_cast<TuplePattern>(P)) {
     auto Fields = TP->getElements();
     unsigned NumParams = Fields.size();
 
     // Varargs are not representable in Objective-C.
     if (TP->hasVararg()) {
-      if (Diagnose && Reason != ObjCReason::DontDiagnose) {
+      if (Diagnose && Reason != ObjCReason::DoNotDiagnose) {
         TC.diagnose(TP->getEllipsisLoc(), diag::objc_invalid_on_func_variadic,
                     getObjCDiagnosticAttrKind(Reason));
         describeObjCReason(TC, AFD, Reason);
@@ -2372,7 +2372,7 @@ bool TypeChecker::isRepresentableInObjC(
 
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  bool Diagnose = (Reason != ObjCReason::DontDiagnose);
+  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
   
   // CF types cannot have @objc methods, because they don't have real class
   // objects.
@@ -2659,7 +2659,7 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     T = RST->getReferentType();
   }
   bool Result = isRepresentableInObjC(VD->getDeclContext(), T);
-  bool Diagnose = (Reason != ObjCReason::DontDiagnose);
+  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
 
   if (Result && checkObjCInGenericContext(*this, VD, Diagnose))
     return false;
@@ -2693,7 +2693,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
                                         ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  bool Diagnose = (Reason != ObjCReason::DontDiagnose);
+  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
 
   // CF types cannot have @objc methods, because they don't have real class
   // objects.

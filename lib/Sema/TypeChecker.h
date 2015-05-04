@@ -253,7 +253,7 @@ withoutContext(TypeResolutionOptions options) {
 /// Should only affect diagnostics. If you change this enum, also change
 // the OBJC_ATTR_SELECT macro in DiagnosticsSema.def.
 enum class ObjCReason {
-  DontDiagnose,
+  DoNotDiagnose,
   ExplicitlyDynamic,
   ExplicitlyObjC,
   ExplicitlyIBOutlet,
