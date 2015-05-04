@@ -1,13 +1,13 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_union.swift
-// RUN: llvm-bcanalyzer %t/def_union.swiftmodule | FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_enum.swift
+// RUN: llvm-bcanalyzer %t/def_enum.swiftmodule | FileCheck %s
 // RUN: %target-swift-frontend -parse -I %t %s -o /dev/null
 // RUN: %target-swift-frontend -emit-sil -I %t %s -o /dev/null
 
 // CHECK-NOT: UnknownCode
 
-import def_union
+import def_enum
 
 extension Basic {
   init(silly: Int) {
