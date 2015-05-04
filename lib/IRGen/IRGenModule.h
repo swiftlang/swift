@@ -141,17 +141,13 @@ public:
   /// Get an IRGenModule for a declaration context.
   /// Returns the IRGenModule of the containing source file, or if this cannot
   /// be determined, returns the primary IRGenModule.
-  IRGenModule *getGenModule(DeclContext *ctxt) {
-    if (GenModules.size() == 1 || !ctxt) {
-      return getPrimaryIGM();
-    }
-    SourceFile *SF = ctxt->getParentSourceFile();
-    if (!SF)
-      return getPrimaryIGM();
-    IRGenModule *IGM = GenModules[SF];
-    assert(IGM);
-    return IGM;
-  }
+  IRGenModule *getGenModule(DeclContext *ctxt);
+
+  /// Get an IRGenModule for a function.
+  /// Returns the IRGenModule of the containing source file, or if this cannot
+  /// be determined, returns the IGM from which the function is referenced the
+  /// first time.
+  IRGenModule *getGenModule(SILFunction *f);
 
   /// Returns the primary IRGenModule. This is the first added IRGenModule.
   /// It is used for everything which cannot be correlated to a specific source
@@ -181,8 +177,10 @@ public:
   
   void addLazyFunction(SILFunction *f) {
     // Add it to the queue if it hasn't already been put there.
-    if (LazilyEmittedFunctions.insert(f).second)
+    if (LazilyEmittedFunctions.insert(f).second) {
       LazyFunctionDefinitions.push_back(f);
+      DefaultIGMForFunction[f] = CurrentIGM;
+    }
   }
   
   void addLazyTypeMetadata(CanType type) {
@@ -219,8 +217,16 @@ public:
 private:
   llvm::DenseMap<SourceFile *, IRGenModule *> GenModules;
   
-  IRGenModule *PrimaryIGM = nullptr;
+  // Stores the IGM from which a function is referenced the first time.
+  // It is used if a function has no source-file association.
+  llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
   
+  // The IGM of the first source file.
+  IRGenModule *PrimaryIGM = nullptr;
+
+  // The current IGM for which IR is generated.
+  IRGenModule *CurrentIGM = nullptr;
+
   /// The set of type metadata that have been enqueue for lazy emission.
   llvm::SmallPtrSet<CanType, 4> LazilyEmittedTypeMetadata;
   
@@ -251,6 +257,8 @@ private:
   SmallVector<IRGenModule *, 8> Queue;
 
   std::atomic<int> QueueIndex;
+  
+  friend class CurrentIGMPtr;
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -647,6 +655,28 @@ public:
 private:
   void emitGlobalDecl(Decl *D);
   void emitExternalDefinition(Decl *D);
+};
+
+/// Stores a pointer to an IRGenModule.
+/// As long as the CurrentIGMPtr is alive, the CurrentIGM in the dispatcher
+/// is set to the containing IRGenModule.
+class CurrentIGMPtr {
+  IRGenModule *IGM;
+
+public:
+  CurrentIGMPtr(IRGenModule *IGM) : IGM(IGM)
+  {
+    assert(IGM);
+    assert(!IGM->dispatcher.CurrentIGM && "Another CurrentIGMPtr is alive");
+    IGM->dispatcher.CurrentIGM = IGM;
+  }
+
+  ~CurrentIGMPtr() {
+    IGM->dispatcher.CurrentIGM = nullptr;
+  }
+  
+  IRGenModule *get() const { return IGM; }
+  IRGenModule *operator->() const { return IGM; }
 };
 
 } // end namespace irgen

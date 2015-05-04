@@ -709,7 +709,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
 
   for (SILGlobalVariable &v : PrimaryIGM->SILMod->getSILGlobals()) {
     Decl *decl = v.getDecl();
-    IRGenModule *IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
+    CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
     IGM->emitSILGlobalVariable(&v);
   }
   PrimaryIGM->emitCoverageMapping();
@@ -721,7 +721,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
     if (!isPossiblyUsedExternally(f.getLinkage(), isWholeModule))
       continue;
 
-    IRGenModule *IGM = getGenModule(f.getDeclContext());
+    CurrentIGMPtr IGM = getGenModule(&f);
     IGM->emitSILFunction(&f);
   }
 
@@ -733,7 +733,7 @@ void IRGenModuleDispatcher::emitGlobalTopLevel() {
 
   // Emit witness tables.
   for (SILWitnessTable &wt : PrimaryIGM->SILMod->getWitnessTableList()) {
-    IRGenModule *IGM = getGenModule(wt.getConformance()->getDeclContext());
+    CurrentIGMPtr IGM = getGenModule(wt.getConformance()->getDeclContext());
     IGM->emitSILWitnessTable(&wt);
   }
   
@@ -791,8 +791,8 @@ void IRGenModuleDispatcher::emitLazyDefinitions() {
       CanType type = LazyTypeMetadata.pop_back_val();
       assert(isTypeMetadataEmittedLazily(type));
       auto nom = type->getAnyNominal();
-      IRGenModule *IGM = getGenModule(nom->getDeclContext());
-      emitLazyTypeMetadata(*IGM, type);
+      CurrentIGMPtr IGM = getGenModule(nom->getDeclContext());
+      emitLazyTypeMetadata(*IGM.get(), type);
     }
     while (!LazyFieldTypeAccessors.empty()) {
       auto accessor = LazyFieldTypeAccessors.pop_back_val();
@@ -803,7 +803,7 @@ void IRGenModuleDispatcher::emitLazyDefinitions() {
     // Emit any lazy function definitions we require.
     while (!LazyFunctionDefinitions.empty()) {
       SILFunction *f = LazyFunctionDefinitions.pop_back_val();
-      IRGenModule *IGM = getGenModule(f->getDeclContext());
+      CurrentIGMPtr IGM = getGenModule(f);
       assert(!isPossiblyUsedExternally(f->getLinkage(),
                                        IGM->SILMod->isWholeModule())
              && "function with externally-visible linkage emitted lazily?");

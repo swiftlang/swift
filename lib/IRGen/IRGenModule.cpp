@@ -629,3 +629,35 @@ void IRGenModuleDispatcher::addGenModule(SourceFile *SF, IRGenModule *IGM) {
   Queue.push_back(IGM);
 }
 
+IRGenModule *IRGenModuleDispatcher::getGenModule(DeclContext *ctxt) {
+  if (GenModules.size() == 1 || !ctxt) {
+    return getPrimaryIGM();
+  }
+  SourceFile *SF = ctxt->getParentSourceFile();
+  if (!SF) {
+    return getPrimaryIGM();
+  }
+  IRGenModule *IGM = GenModules[SF];
+  assert(IGM);
+  return IGM;
+}
+
+IRGenModule *IRGenModuleDispatcher::getGenModule(SILFunction *f) {
+  if (GenModules.size() == 1) {
+    return getPrimaryIGM();
+  }
+
+  if (DeclContext *ctxt = f->getDeclContext()) {
+    if (SourceFile *SF = ctxt->getParentSourceFile()) {
+      IRGenModule *IGM = GenModules[SF];
+      assert(IGM);
+      return IGM;
+    }
+  }
+  // We have no source file for the function.
+  // Let's use the IGM from which the function is referenced the first time.
+  if (IRGenModule *IGM = DefaultIGMForFunction[f])
+    return IGM;
+
+  return getPrimaryIGM();
+}
