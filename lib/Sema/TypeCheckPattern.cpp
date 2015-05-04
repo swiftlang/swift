@@ -1313,8 +1313,15 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     auto *OP = cast<OptionalSomePattern>(P);
     auto *enumDecl = type->getEnumOrBoundGenericEnum();
     if (!enumDecl) {
-      diagnose(OP->getLoc(), diag::optional_element_pattern_not_valid_type,
-               type);
+      auto diagID = diag::optional_element_pattern_not_valid_type;
+      SourceLoc loc = OP->getQuestionLoc();
+      // Produce tailored diagnostic for if/let and other conditions.
+      if (OP->isImplicit()) {
+        diagID = diag::condition_optional_element_pattern_not_valid_type;
+        loc = OP->getLoc();
+      }
+
+      diagnose(loc, diagID, type);
       return true;
     }
 

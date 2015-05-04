@@ -267,7 +267,7 @@ func testOptionalSelf(y : Y) {
 
   // Sanity-checking to make sure that the above succeeding
   // isn't coincidental.
-  if let clone = y.cloneOrFail() { // expected-error {{optional present pattern cannot match values of type 'Y'}}
+  if let clone = y.cloneOrFail() { // expected-error {{initializer for conditional binding must have Optional type, not 'Y'}}
     clone.operationThatOnlyExistsOnY()
   }
 

@@ -19,7 +19,7 @@ if var x = foo() {
 
 use(x) // expected-error{{unresolved identifier 'x'}}
 
-if let x = nonOptional() { } // expected-error{{optional present pattern cannot match values of type 'Int'}}
+if let x = nonOptional() { } // expected-error{{initializer for conditional binding must have Optional type, not 'Int'}}
 
 class B {}
 class D : B {}
@@ -48,6 +48,11 @@ var opt: Int? = .None
 
 if let x = opt {}
 if var x = opt {}
+
+// <rdar://problem/20800015> Fix error message for invalid if-let
+let someInteger = 1
+if let y = someInteger {}  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+if case y? = someInteger {}  // expected-error {{'?' pattern cannot match values of type 'Int'}}
 
 // Test multiple clauses on "if let".
 if let x = opt, y = opt where x != y,
