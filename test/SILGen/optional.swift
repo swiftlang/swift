@@ -6,7 +6,7 @@ func testCall(f: (()->())?) {
 // CHECK:    sil hidden @{{.*}}testCall{{.*}}
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> ()>):
 // CHECK:      [[T1:%.*]] = select_enum %0
-// CHECK-NEXT: cond_br [[T1]], bb1, bb3
+// CHECK-NEXT: cond_br [[T1]], bb1, bb2
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
 
@@ -17,11 +17,11 @@ func testCall(f: (()->())?) {
 // CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
 //   .... then call it
 // CHECK-NEXT: apply [[FN1]]()
-// CHECK:      br bb2(
+// CHECK:      br bb3(
 //   (first nothing block)
-// CHECK:    bb3:
+// CHECK:    bb2:
 // CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
-// CHECK-NEXT: br bb2
+// CHECK-NEXT: br bb3
 
 func testAddrOnlyCallResult<T>(var f: (()->T)?) {
   var x = f?()
@@ -34,7 +34,7 @@ func testAddrOnlyCallResult<T>(var f: (()->T)?) {
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[X]]
 //   Check whether 'f' holds a value.
 // CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
-// CHECK-NEXT: cond_br [[T1]], bb1, bb3
+// CHECK-NEXT: cond_br [[T1]], bb1, bb2
 //   If so, pull out the value...
 // CHECK:    bb1:
 // CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[F]]#1
@@ -47,19 +47,17 @@ func testAddrOnlyCallResult<T>(var f: (()->T)?) {
 // CHECK-NEXT: apply [[T1]]([[TEMP]])
 //   ...and coerce to T?
 // CHECK-NEXT: inject_enum_addr [[X]]{{.*}}Some
-// CHECK-NEXT: br bb2
+// CHECK-NEXT: br bb3
+//   Nothing block.
+// CHECK:    bb2:
+// CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
+// CHECK-NEXT: br bb3
 //   Continuation block.
-// CHECK:    bb2
+// CHECK:    bb3
 // CHECK-NEXT: strong_release [[X]]#0
 // CHECK-NEXT: strong_release [[F]]#0
 // CHECK-NEXT: [[T0:%.*]] = tuple ()
 // CHECK-NEXT: return [[T0]] : $()
-
-//   Nothing block.
-// CHECK:    bb3:
-// CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
-// CHECK-NEXT: br bb2
-
 
 // <rdar://problem/15180622>
 
@@ -79,6 +77,30 @@ func tuple_bind(x: (Int, String)?) -> String? {
   // CHECK: [[NONNULL]]:
   // CHECK:   [[STRING:%.*]] = tuple_extract {{%.*}} : $(Int, String), 1
   // CHECK-NOT: release_value [[STRING]]
+}
+
+
+// CHECK-LABEL: sil hidden @_TF8optional15opt_to_impl_optFGSqSi_GSQSi_
+// CHECK-NEXT:  bb0(%0 : $Optional<Int>):
+// CHECK-NEXT:  debug_value %0 : $Optional<Int>  // let x
+// CHECK:   select_enum %0
+// CHECK-NEXT:  cond_br {{.*}}, bb1, bb2
+  
+// CHECK:  bb1:
+// CHECK-NEXT:  %6 = unchecked_enum_data %0 : $Optional<Int>, #Optional.Some!enumelt.1
+// CHECK-NEXT:  %7 = enum $ImplicitlyUnwrappedOptional<Int>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, %6 : $Int
+// CHECK-NEXT:  br bb3(%7 : $ImplicitlyUnwrappedOptional<Int>)
+  
+// CHECK:  bb2:
+// CHECK-NEXT:  %9 = enum $ImplicitlyUnwrappedOptional<Int>, #ImplicitlyUnwrappedOptional.None!enumelt
+// CHECK-NEXT:  br bb3(%9 : $ImplicitlyUnwrappedOptional<Int>)
+  
+// CHECK:  bb3(%11 : $ImplicitlyUnwrappedOptional<Int>):
+// CHECK-NEXT:  return %11 : $ImplicitlyUnwrappedOptional<Int>
+// CHECK-NEXT:}
+
+func opt_to_impl_opt(x: Int?) -> Int! {
+  return x
 }
 
 
