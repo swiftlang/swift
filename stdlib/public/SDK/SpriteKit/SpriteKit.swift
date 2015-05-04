@@ -22,7 +22,7 @@ extension SKNode {
     @objc(_swiftObjectForKeyedSubscript:) get {
        var nodes = [SKNode]()
        enumerateChildNodesWithName(name) { node, stop in
-         nodes.append(node)
+         if let n = node { nodes.append(n) }
        }
 
        return nodes
