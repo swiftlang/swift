@@ -2282,12 +2282,18 @@ static Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
     if (overridden->isObjC()) {
       return ObjCReason::DontDiagnose;
     }
+
+    // Overriding @nonobjc from an @objc class should not mark the
+    // override @objc unless it was explicit above.
+    if (overridden->getAttrs().hasAttribute<NonObjCAttr>())
+      return None;
   }
 
-  if (VD->getFormalAccess() != Accessibility::Private) {
-    // If this declaration is part of an @objc class, mark it implicitly
-    // @objc. However, if the declaration cannot be represented as @objc,
-    // don't complain.
+  if (!VD->getAttrs().hasAttribute<NonObjCAttr>() &&
+      VD->getFormalAccess() != Accessibility::Private) {
+    // If this declaration is part of an @objc class and is itself not
+    // @nonobjc, mark it implicitly @objc. However, if the declaration
+    // cannot be represented as @objc, don't complain.
     Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
     auto classContext = contextTy->getClassOrBoundGenericClass();
     if (classContext && classContext->isObjC())
@@ -2388,11 +2394,34 @@ static void checkBridgedFunctions(TypeChecker &TC) {
 
 /// Mark the given declaration as being Objective-C compatible (or
 /// not) as appropriate.
+///
+/// If the declaration has a @nonobjc attribute, diagnose an error
+/// using the given Reason, if present.
 void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
                        Optional<ObjCReason> isObjC,
                        Optional<ForeignErrorConvention> errorConvention) {
+  // By now, the caller will have handled the case where an implicit @objc
+  // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
+  // to add an @objc for whatever reason, diagnose an error.
+  if (isObjC) {
+    if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
+      ObjCReason Reason = *isObjC;
+
+      // FIXME: this is for cases where we don't want to diagnose a
+      // "X cannot be represented in Objective-C" error, but still
+      // complain if the user specifies @nonobjc.
+      if (Reason == ObjCReason::DontDiagnose)
+        Reason = ObjCReason::ExplicitlyObjC;
+
+      TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
+                  getObjCDiagnosticAttrKind(Reason));
+
+      attr->setInvalid();
+    }
+  }
+
   D->setIsObjC(isObjC.hasValue());
-  
+
   if (isObjC) {
     // Make sure we have the appropriate bridging operations.
     checkBridgedFunctions(TC);
@@ -4858,6 +4887,7 @@ public:
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(Mutating)
     UNINTERESTING_ATTR(NonMutating)
+    UNINTERESTING_ATTR(NonObjC)
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
@@ -5624,11 +5654,13 @@ public:
 
     DD->setType(FnTy);
 
+    // Do this before markAsObjC() to diagnose @nonobjc better
+    validateAttributes(TC, DD);
+
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
     markAsObjC(TC, DD, ObjCReason::ExplicitlyObjC);
 
-    validateAttributes(TC, DD);
     TC.checkDeclAttributes(DD);
   }
 };
@@ -7024,6 +7056,28 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
           D->getAttrs().removeAttribute(objcAttr);
         }
       }
+    }
+  }
+
+  if (auto nonObjcAttr = Attrs.getAttribute<NonObjCAttr>()) {
+    // Only methods, properties, subscripts and constructors can be NonObjC.
+    // The last three are handled automatically by generic attribute
+    // validation -- for the first one, we have to check FuncDecls
+    // ourselves.
+    Optional<Diag<>> error;
+
+    auto func = dyn_cast<FuncDecl>(D);
+    if (func &&
+        (isa<DestructorDecl>(func) ||
+         !isInClassOrProtocolContext(func) ||
+         (func->isAccessor() && !func->isGetterOrSetter()))) {
+      error = diag::invalid_nonobjc_decl;
+    }
+
+    if (error) {
+      TC.diagnose(D->getStartLoc(), *error);
+      const_cast<NonObjCAttr *>(nonObjcAttr)->setInvalid();
+      return;
     }
   }
 

@@ -157,6 +157,8 @@ class NotObjC {}
 
   func testSetBridging(a: Set<NSObject>) {}
 
+  @nonobjc func testNonObjC(_: Int) {}
+
   @IBAction func actionMethod(_: AnyObject) {}
 }
 
@@ -363,6 +365,8 @@ private class Private : A1 {}
   weak var weakCF: CFTypeRef?
   weak var weakCFString: CFStringRef?
 
+  @nonobjc var nonObjCVar: Int
+
   @IBOutlet weak var outlet: AnyObject!
   @IBOutlet var typedOutlet: Properties!
 
@@ -465,5 +469,14 @@ private class Private : A1 {}
 
   subscript (multi: Int, multi2: Int) -> () {
     return ()
+  }
+}
+
+// CHECK-LABEL: @interface Subscripts4
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class Subscripts3 {
+  @nonobjc subscript (i: Int) -> Subscripts4 {
+    return self
   }
 }

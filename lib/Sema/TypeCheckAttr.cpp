@@ -54,6 +54,7 @@ public:
   IGNORED_ATTR(NSCopying)
   IGNORED_ATTR(NoReturn)
   IGNORED_ATTR(ObjC)
+  IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(Optional)
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(ObjCBridged)
@@ -585,6 +586,7 @@ public:
     IGNORED_ATTR(Mutating)
     IGNORED_ATTR(NoEscape)
     IGNORED_ATTR(NonMutating)
+    IGNORED_ATTR(NonObjC)
     IGNORED_ATTR(NoReturn)
     IGNORED_ATTR(NSManaged) // checked early.
     IGNORED_ATTR(ObjC)

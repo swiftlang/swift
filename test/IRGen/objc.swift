@@ -24,6 +24,10 @@ import gizmo
 // CHECK: @_TMnVSC4Rect = linkonce_odr hidden constant
 // CHECK: @_TMdVSC4Rect = linkonce_odr hidden global
 
+// CHECK: @"\01L_selector_data(acquiesce)"
+// CHECK-NOT: @"\01L_selector_data(disharmonize)"
+// CHECK: @"\01L_selector_data(eviscerate)"
+
 struct id {
   var data : AnyObject
 }
@@ -47,6 +51,21 @@ class Test2 : Gizmo {
 // CHECK:    ret void
 
   dynamic func bar() {}
+}
+
+// Test @nonobjc.
+class Contrarian : Blammo {
+  func acquiesce() {}
+  @nonobjc func disharmonize() {}
+  @nonobjc func eviscerate() {}
+}
+
+class Octogenarian : Contrarian {
+  // Override of @nonobjc should be @nonobjc by default.
+  override func disharmonize() {}
+
+  // Override of @nonobjc can be @objc.
+  @objc override func eviscerate() {}
 }
 
 // CHECK:    define hidden %objc_object* @_TF4objc5test0{{.*}}(%objc_object*)

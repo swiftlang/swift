@@ -1958,7 +1958,7 @@ ERROR(sil_metatype_multiple_reprs,type_parsing,none,
       ())
 
 //------------------------------------------------------------------------------
-// @objc
+// @objc and @nonobjc
 //------------------------------------------------------------------------------
 
 ERROR(attr_used_without_required_module, sema_tcd, none,
@@ -1967,6 +1967,8 @@ ERROR(attr_used_without_required_module, sema_tcd, none,
 ERROR(invalid_objc_decl,sema_tcd,none,
       "only classes, protocols, methods, properties, and subscript "
       "declarations can be declared @objc", ())
+ERROR(invalid_nonobjc_decl,sema_tcd,none,
+      "only methods can be declared @nonobjc", ())
 ERROR(objc_in_generic_context,sema_objc,none,
       "%select{method|initializer|variable|subscript}0 in a "
       "%select{generic class|protocol extension}1 cannot be represented in "
@@ -2070,8 +2072,6 @@ ERROR(objc_invalid_on_failing_init,sema_objc,none,
       "%" OBJC_ATTR_SELECT "0 because 'nil' indicates failure to Objective-C",
       (unsigned))
 
-#undef OBJC_ATTR_SELECT
-
 ERROR(objc_override_method_selector_mismatch,sema_objc,none,
       "Objective-C method has a different selector from the "
       "method it overrides (%0 vs. %1)", (ObjCSelector, ObjCSelector))
@@ -2129,9 +2129,13 @@ ERROR(objc_optional_requirement_conflict,sema_objc,none,
       " in protocol %5",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, DeclName))
 
+ERROR(nonobjc_not_allowed,sema_objc,none,
+      "declaration is marked %" OBJC_ATTR_SELECT "0, and cannot be marked @nonobjc",
+      (unsigned))
+
 #undef OBJC_DIAG_SELECT_2
 #undef OBJC_DIAG_SELECT
-
+#undef OBJC_ATTR_SELECT
 
 //------------------------------------------------------------------------------
 // dynamic

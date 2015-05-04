@@ -342,9 +342,26 @@ Attributes for Objective-C Support
   - When applied to properties, directs the compiler to emit Objective-C methods
     ``-``\ *foo* and ``-set``\ *Foo*\ ``:``, which wrap the getter and setter
     for the property.
-  - *This attribute currently cannot be applied to protocols.*
+  - When applied to protocols, directs the compiler to emit Objective-C metadata
+    for this protocol. Objective-C protocols may contain optional methods.
+    Method definitions for an Objective-C protocol conformance are themselves
+    implicitly ``@objc``.
 
   This attribute is inherited (in all contexts).
+
+``@nonobjc``
+  - When applied to methods, properties, subscripts or constructors, override the
+    implicit inheritance of ``@objc``.
+  - Only valid if the declaration was implicitly ``@objc`` as a result of the
+    class or one of the class's superclasses being ``@obj`` -- not permitted on
+    protocol conformances.
+  - It is permitted to override a ``@nonobjc`` method with a method marked as
+    ``@objc``; overriding an ``@objc`` (or implicitly ``@objc``) method with a
+    ``@nonobjc`` method is not allowed.
+  - It is an error to combine ``@nonobjc`` with ``dynamic``, ``@IBOutlet`` or
+    ``@NSManaged``.
+
+  This attribute is inherited.
 
 ``@IBOutlet``
   Can only be applied to properties. This marks the property as being exposed

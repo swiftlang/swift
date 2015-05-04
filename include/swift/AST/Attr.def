@@ -154,6 +154,9 @@ SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
 DECL_ATTR(autoclosure, AutoClosure, OnParam, 28)
 SIMPLE_DECL_ATTR(noescape, NoEscape, OnParam, 29)
 
+SIMPLE_DECL_ATTR(nonobjc, NonObjC,
+                 OnFunc | OnVar | OnSubscript | OnConstructor, 30)
+
 // Non-serialized attributes.
 
 SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier | NotSerialized,
