@@ -439,7 +439,8 @@ private:
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
                            CompilerInvocation &Invocation,
-                           ArrayRef<const char *> Args) {
+                           ArrayRef<const char *> Args,
+                           int &ReturnValue) {
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
@@ -724,7 +725,8 @@ static bool performCompile(CompilerInstance &Instance,
     const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
                                                    opts.ImmediateArgv.end());
     Instance.setSILModule(std::move(SM));
-    RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
+    ReturnValue =
+      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
     return false;
   }
 
@@ -858,7 +860,8 @@ int frontend_main(ArrayRef<const char *>Args,
     return 1;
   }
 
-  bool HadError = performCompile(Instance, Invocation, Args) ||
+  int ReturnValue = 0;
+  bool HadError = performCompile(Instance, Invocation, Args, ReturnValue) ||
                   Instance.getASTContext().hadError();
 
   if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
@@ -873,5 +876,5 @@ int frontend_main(ArrayRef<const char *>Args,
     }
   }
 
-  return HadError;
+  return (HadError ? 1 : ReturnValue);
 }

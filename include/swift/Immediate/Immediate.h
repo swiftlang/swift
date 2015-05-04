@@ -51,8 +51,11 @@ namespace swift {
     bool RanREPLApplicationMain;
   };
 
-  void RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                      IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
+  /// Attempt to run the script identified by the given compiler instance.
+  ///
+  /// \param the result returned from main(), if execution succeeded
+  int RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
+                     IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
 
   void REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib);
   void REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib);

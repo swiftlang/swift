@@ -403,8 +403,8 @@ static bool IRGenImportedModules(CompilerInstance &CI,
   return hadError;
 }
 
-void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                           IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
+int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
+                          IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
@@ -417,13 +417,13 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   auto *Module = ModuleOwner.get();
 
   if (Context.hadError())
-    return;
+    return -1;
 
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
   if (IRGenImportedModules(CI, *Module, ImportedModules, InitFns,
                            IRGenOpts, SILOpts, /*IsREPL*/false))
-    return;
+    return -1;
 
   llvm::PassManagerBuilder PMBuilder;
   PMBuilder.OptLevel = 2;
@@ -432,7 +432,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   if (!loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPath)) {
     CI.getDiags().diagnose(SourceLoc(),
                            diag::error_immediate_mode_missing_stdlib);
-    return;
+    return -1;
   }
 
   // Build the ExecutionEngine.
@@ -452,7 +452,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   llvm::ExecutionEngine *EE = builder.create();
   if (!EE) {
     llvm::errs() << "Error loading JIT: " << ErrorMsg;
-    return;
+    return -1;
   }
 
   DEBUG(llvm::dbgs() << "Module to be executed:\n";
@@ -471,7 +471,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   EE->runStaticConstructorsDestructors(false);
   DEBUG(llvm::dbgs() << "Running main\n");
   llvm::Function *EntryFn = Module->getFunction("main");
-  EE->runFunctionAsMain(EntryFn, CmdLine, 0);
+  return EE->runFunctionAsMain(EntryFn, CmdLine, 0);
 }
 
 #if defined(__APPLE__)
