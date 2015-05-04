@@ -55,6 +55,9 @@ func testTrueFalse() {
 
   _ = TRUE // expected-error {{use of unresolved identifier 'TRUE'}}
   _ = FALSE // expected-error {{use of unresolved identifier 'FALSE'}}
+
+  _ = `true` // expected-error {{use of unresolved identifier 'true'}}
+  _ = `false` // expected-error {{use of unresolved identifier 'false'}}
 }
 
 func testCStrings() -> Bool {
