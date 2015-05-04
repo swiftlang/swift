@@ -250,7 +250,8 @@ withoutContext(TypeResolutionOptions options) {
 
 /// Describes the reason why are we trying to apply @objc to a declaration.
 ///
-/// Should only affect diagnostics.
+/// Should only affect diagnostics. If you change this enum, also change
+// the OBJC_ATTR_SELECT macro in DiagnosticsSema.def.
 enum class ObjCReason {
   DontDiagnose,
   ExplicitlyDynamic,
@@ -259,6 +260,12 @@ enum class ObjCReason {
   ExplicitlyNSManaged,
   MemberOfObjCProtocol
 };
+
+/// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to
+/// complain about the correct attribute during @objc inference.
+static inline unsigned getObjCDiagnosticAttrKind(ObjCReason Reason) {
+  return static_cast<unsigned>(Reason) - 1;
+}
 
 /// Flags that control protocol conformance checking.
 enum class ConformanceCheckFlags {

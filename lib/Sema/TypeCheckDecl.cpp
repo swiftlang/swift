@@ -2246,29 +2246,55 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   }
 }
 
-/// Returns true if \p VD should be exposed to Objective-C iff it is
-/// representable in Objective-C.
-static bool isImplicitlyObjC(const ValueDecl *VD, bool allowImplicit = false) {
-  if (VD->isInvalid())
-    return false;
-  if (!allowImplicit && VD->isImplicit())
-    return false;
+/// Figure out if a declaration should be exported to Objective C.
+static Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
+                                             bool allowImplicit = false){
+  ProtocolDecl *protocolContext =
+      dyn_cast<ProtocolDecl>(VD->getDeclContext());
+  bool isMemberOfObjCProtocol =
+      protocolContext && protocolContext->isObjC();
 
-  // If this declaration overrides an @objc declaration, it is
+  // explicitly declared @objc.
+  if (VD->getAttrs().hasAttribute<ObjCAttr>())
+    return ObjCReason::ExplicitlyObjC;
+  // dynamic, @IBOutlet and @NSManaged imply @objc.
+  else if (VD->getAttrs().hasAttribute<DynamicAttr>())
+    return ObjCReason::ExplicitlyDynamic;
+  else if (VD->getAttrs().hasAttribute<IBOutletAttr>())
+    return ObjCReason::ExplicitlyIBOutlet;
+  else if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+    return ObjCReason::ExplicitlyNSManaged;
+  // if this declaration is a member of an @objc protocol, it is
   // implicitly @objc.
+  else if (isMemberOfObjCProtocol)
+    return ObjCReason::MemberOfObjCProtocol;
+
+  if (VD->isInvalid())
+    return None;
+
+  if (!allowImplicit && VD->isImplicit())
+    return None;
+
+  // If this declaration overrides an @objc declaration, it is implicitly
+  // @objc. However, there is a subtlety with \p allowImplicit -- an
+  // implicit override of an @objc declaration is not implicitly @objc.
   if (auto overridden = VD->getOverriddenDecl()) {
-    if (overridden->isObjC())
-      return true;
+    if (overridden->isObjC()) {
+      return ObjCReason::DontDiagnose;
+    }
   }
 
-  if (VD->getFormalAccess() == Accessibility::Private)
-    return false;
+  if (VD->getFormalAccess() != Accessibility::Private) {
+    // If this declaration is part of an @objc class, mark it implicitly
+    // @objc. However, if the declaration cannot be represented as @objc,
+    // don't complain.
+    Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
+    auto classContext = contextTy->getClassOrBoundGenericClass();
+    if (classContext && classContext->isObjC())
+      return ObjCReason::DontDiagnose;
+  }
 
-  Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
-  auto classContext = contextTy->getClassOrBoundGenericClass();
-  if (!classContext)
-    return false;
-  return classContext->isObjC();
+  return None;
 }
 
 /// If we need to infer 'dynamic', do so now.
@@ -2360,11 +2386,12 @@ static void checkBridgedFunctions(TypeChecker &TC) {
   }
 }
 
-/// Mark the given declarations as being Objective-C compatible (or
+/// Mark the given declaration as being Objective-C compatible (or
 /// not) as appropriate.
-void swift::markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC,
-                       Optional<ForeignErrorConvention> errorConvention){
-  D->setIsObjC(isObjC);
+void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
+                       Optional<ObjCReason> isObjC,
+                       Optional<ForeignErrorConvention> errorConvention) {
+  D->setIsObjC(isObjC.hasValue());
   
   if (isObjC) {
     // Make sure we have the appropriate bridging operations.
@@ -3082,19 +3109,10 @@ public:
 
       // A subscript is ObjC-compatible if it's explicitly @objc, or a
       // member of an ObjC-compatible class or protocol.
-      ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(dc);
-      ObjCReason reason = ObjCReason::DontDiagnose;
-      if (SD->getAttrs().hasAttribute<ObjCAttr>())
-        reason = ObjCReason::ExplicitlyObjC;
-      else if (SD->getAttrs().hasAttribute<DynamicAttr>())
-        reason = ObjCReason::ExplicitlyDynamic;
-      else if (protocolContext && protocolContext->isObjC())
-        reason = ObjCReason::MemberOfObjCProtocol;
-      bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    isImplicitlyObjC(SD);
-      if (isObjC && !TC.isRepresentableInObjC(SD, reason))
-        isObjC = false;
-      
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(SD);
+
+      if (isObjC && !TC.isRepresentableInObjC(SD, *isObjC))
+        isObjC = None;
       markAsObjC(TC, SD, isObjC);
     }
 
@@ -4140,29 +4158,17 @@ public:
         }
       }
 
-      // A method is ObjC-compatible if:
-      // - it's explicitly @objc or dynamic,
-      // - it's a member of an ObjC-compatible class, or
-      // - it's an accessor for an ObjC property.
-      ProtocolDecl *protocolContext =
-          dyn_cast<ProtocolDecl>(FD->getDeclContext());
-      bool isMemberOfObjCProtocol =
-          protocolContext && protocolContext->isObjC();
-      ObjCReason reason = ObjCReason::DontDiagnose;
-      if (FD->getAttrs().hasAttribute<ObjCAttr>())
-        reason = ObjCReason::ExplicitlyObjC;
-      else if (FD->getAttrs().hasAttribute<DynamicAttr>())
-        reason = ObjCReason::ExplicitlyDynamic;
-      else if (isMemberOfObjCProtocol)
-        reason = ObjCReason::MemberOfObjCProtocol;
-      bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    isImplicitlyObjC(FD);
-      
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(FD);
+
+      ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(
+          FD->getDeclContext());
       if (protocolContext && FD->isAccessor()) {
         // Don't complain about accessors in protocols.  We will emit a
         // diagnostic about the property itself.
-        reason = ObjCReason::DontDiagnose;
+        if (isObjC)
+          isObjC = ObjCReason::DontDiagnose;
       }
+
       if (!isObjC && FD->isGetterOrSetter()) {
         // If the property decl is an instance property, its accessors will
         // be instance methods and the above condition will mark them ObjC.
@@ -4179,9 +4185,10 @@ public:
             validatePatternBindingDecl(TC, pat, i);
         }
 
-        isObjC = prop->isObjC() || prop->isDynamic() ||
-                 prop->getAttrs().hasAttribute<IBOutletAttr>();
-        
+        if (prop->isObjC() || prop->isDynamic() ||
+            prop->getAttrs().hasAttribute<IBOutletAttr>())
+          isObjC = ObjCReason::DontDiagnose;
+
         // If the property is dynamic, propagate to this accessor.
         if (prop->isDynamic() && !FD->isDynamic())
           FD->getAttrs().add(new (TC.Context) DynamicAttr(/*implicit*/ true));
@@ -4189,9 +4196,9 @@ public:
 
       Optional<ForeignErrorConvention> errorConvention;
       if (isObjC &&
-          (FD->isInvalid() || !TC.isRepresentableInObjC(FD, reason,
+          (FD->isInvalid() || !TC.isRepresentableInObjC(FD, *isObjC,
                                                         errorConvention)))
-        isObjC = false;
+        isObjC = None;
       markAsObjC(TC, FD, isObjC, errorConvention);
     }
     
@@ -5531,25 +5538,14 @@ public:
     // of an ObjC-compatible class.
     Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
     if (ContextTy) {
-      ProtocolDecl *protocolContext =
-          dyn_cast<ProtocolDecl>(CD->getDeclContext());
-      bool isMemberOfObjCProtocol =
-          protocolContext && protocolContext->isObjC();
-      ObjCReason reason = ObjCReason::DontDiagnose;
-      if (CD->getAttrs().hasAttribute<ObjCAttr>())
-        reason = ObjCReason::ExplicitlyObjC;
-      else if (CD->getAttrs().hasAttribute<DynamicAttr>())
-        reason = ObjCReason::ExplicitlyDynamic;
-      else if (isMemberOfObjCProtocol)
-        reason = ObjCReason::MemberOfObjCProtocol;
-      bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                    isImplicitlyObjC(CD, /*allowImplicit=*/true);
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(CD,
+          /*allowImplicit=*/true);
 
       Optional<ForeignErrorConvention> errorConvention;
       if (isObjC &&
           (CD->isInvalid() ||
-           !TC.isRepresentableInObjC(CD, reason, errorConvention)))
-        isObjC = false;
+           !TC.isRepresentableInObjC(CD, *isObjC, errorConvention)))
+        isObjC = None;
       markAsObjC(TC, CD, isObjC, errorConvention);
     }
 
@@ -5630,7 +5626,7 @@ public:
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
-    markAsObjC(TC, DD, true);
+    markAsObjC(TC, DD, ObjCReason::ExplicitlyObjC);
 
     validateAttributes(TC, DD);
     TC.checkDeclAttributes(DD);
@@ -5832,9 +5828,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (CD->hasSuperclass())
         superclassDecl = CD->getSuperclass()->getClassOrBoundGenericClass();
 
-      markAsObjC(*this, CD,
-                 (CD->getAttrs().hasAttribute<ObjCAttr>() ||
-                    (superclassDecl && superclassDecl->isObjC())));
+      Optional<ObjCReason> isObjC;
+      if (CD->getAttrs().hasAttribute<ObjCAttr>() ||
+          (superclassDecl && superclassDecl->isObjC()))
+        isObjC = ObjCReason::ExplicitlyObjC;
+      markAsObjC(*this, CD, isObjC);
 
       // Determine whether we require in-class initializers.
       if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
@@ -5891,7 +5889,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
-      bool isObjC = true;
+      Optional<ObjCReason> isObjC = ObjCReason::ExplicitlyObjC;
 
       for (auto inherited : proto->getInheritedProtocols(nullptr)) {
         if (!inherited->isObjC()) {
@@ -5900,7 +5898,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                    proto->getDeclaredType(), inherited->getDeclaredType());
           diagnose(inherited->getLoc(), diag::protocol_here,
                    inherited->getName());
-          isObjC = false;
+          isObjC = None;
         }
       }
 
@@ -5990,23 +5988,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (Type contextType = VD->getDeclContext()->getDeclaredTypeInContext()) {
         // If this is a property, check if it needs to be exposed to
         // Objective-C.
-        auto protocolContext = dyn_cast<ProtocolDecl>(VD->getDeclContext());
-        ObjCReason reason = ObjCReason::DontDiagnose;
-        if (VD->getAttrs().hasAttribute<ObjCAttr>())
-          reason = ObjCReason::ExplicitlyObjC;
-        else if (VD->getAttrs().hasAttribute<IBOutletAttr>())
-          reason = ObjCReason::ExplicitlyIBOutlet;
-        else if (VD->getAttrs().hasAttribute<NSManagedAttr>())
-          reason = ObjCReason::ExplicitlyNSManaged;
-        else if (VD->getAttrs().hasAttribute<DynamicAttr>())
-          reason = ObjCReason::ExplicitlyDynamic;
-        else if (protocolContext && protocolContext->isObjC())
-          reason = ObjCReason::MemberOfObjCProtocol;
+        Optional<ObjCReason> isObjC = shouldMarkAsObjC(VD);
 
-        bool isObjC = (reason != ObjCReason::DontDiagnose) ||
-                      isImplicitlyObjC(VD);
-        if (isObjC)
-          isObjC = isRepresentableInObjC(VD, reason);
+        if (isObjC && !isRepresentableInObjC(VD, *isObjC))
+          isObjC = None;
 
         markAsObjC(*this, VD, isObjC);
 

@@ -38,10 +38,13 @@ class VarDecl;
 
 class TypeChecker;
 
+enum class ObjCReason;
+
 // These are implemented in TypeCheckDecl.cpp.
 void makeFinal(ASTContext &ctx, ValueDecl *D);
 void makeDynamic(ASTContext &ctx, ValueDecl *D);
-void markAsObjC(TypeChecker &TC, ValueDecl *D, bool isObjC,
+void markAsObjC(TypeChecker &TC, ValueDecl *D,
+                Optional<ObjCReason> isObjC,
                 Optional<ForeignErrorConvention> errorConvention = None);
 Type configureImplicitSelf(TypeChecker &tc,
                            AbstractFunctionDecl *func,

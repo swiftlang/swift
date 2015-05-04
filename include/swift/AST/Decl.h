@@ -2267,7 +2267,8 @@ public:
   /// Returns true if the decl requires Objective-C interop.
   ///
   /// This can be true even if there is no 'objc' attribute on the declaration.
-  /// In that case it was inferred by the type checker.
+  /// In that case it was inferred by the type checker and set with a call to
+  /// markAsObjC().
   bool isObjC() const {
     return getAttrs().hasAttribute<ObjCAttr>();
   }

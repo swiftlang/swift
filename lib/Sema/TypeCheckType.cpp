@@ -2201,29 +2201,6 @@ static SourceRange getFunctionParamTypeSourceRange(const Pattern *P) {
   return {};
 }
 
-/// Return the %select discriminator used to complain about the correct
-/// attribute during @objc inference.
-static unsigned getObjCDiagnosticAttrKind(ObjCReason Reason) {
-  enum {
-    DiagnoseAsAtObjC = 0,
-    DiagnoseAsIBOutlet = 1,
-    DiagnoseAsNSManaged = 2,
-    DiagnoseAsDynamic = 3,
-  };
-  switch (Reason) {
-    case ObjCReason::ExplicitlyIBOutlet:
-      return DiagnoseAsIBOutlet;
-    case ObjCReason::ExplicitlyNSManaged:
-      return DiagnoseAsNSManaged;
-    case ObjCReason::ExplicitlyDynamic:
-      return DiagnoseAsDynamic;
-    case ObjCReason::ExplicitlyObjC:
-    case ObjCReason::MemberOfObjCProtocol:
-    case ObjCReason::DontDiagnose:
-      return DiagnoseAsAtObjC;
-  }
-}
-
 static bool isParamRepresentableInObjC(TypeChecker &TC,
                                        const DeclContext *DC,
                                        const Pattern *P) {

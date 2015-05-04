@@ -1995,7 +1995,8 @@ ERROR(objc_name_func_mismatch,sema_objc,none,
       "%select{| (%select{|including }4the error parameter)}5",
       (bool, unsigned, bool, unsigned, bool, bool))
 
-#define OBJC_ATTR_SELECT "select{@objc|@IBOutlet|@NSManaged|dynamic}"
+// If you change this, also change enum ObjCReason
+#define OBJC_ATTR_SELECT "select{dynamic|@objc|@IBOutlet|@NSManaged|@objc}"
 
 ERROR(objc_invalid_on_var,sema_objc,none,
       "property cannot be marked %" OBJC_ATTR_SELECT "0 "
