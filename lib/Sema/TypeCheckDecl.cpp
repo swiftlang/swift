@@ -6312,7 +6312,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   }
 
   // If we're extending a protocol, check the generic parameters.
-  if (isa<ProtocolType>(extendedType.getPointer())) {
+  if (auto protoType = dyn_cast<ProtocolType>(extendedType.getPointer())) {
     GenericSignature *sig = nullptr;
     extendedType = checkExtensionGenericParams(*this, ext,
                                                ext->getRefComponents(),
@@ -6325,6 +6325,16 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     ext->setGenericSignature(sig);
     ext->setExtendedType(extendedType);
+
+    // Speculatively ban extension of AnyObject; it won't be a
+    // protocol forever, and we don't want to allow code that we know
+    // we'll break later.
+    if (protoType->getDecl()->isSpecificProtocol(
+          KnownProtocolKind::AnyObject)) {
+      diagnose(ext, diag::extension_anyobject)
+        .highlight(
+          ext->getRefComponents().back().IdentType.getSourceRange());
+    }
     return;
   }
 

@@ -642,3 +642,5 @@ extension BadProto1 {
 protocol BadProto3 { }
 typealias BadProto4 = BadProto3
 extension BadProto4 { } // expected-error{{protocol 'BadProto3' cannot be extended via typealias 'BadProto4'}}{{11-20=BadProto3}}
+
+extension AnyObject { } // expected-error{{'AnyObject' protocol cannot be extended}}
