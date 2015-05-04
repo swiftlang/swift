@@ -477,38 +477,6 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture) {
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
     break;
   }
-  case CaptureKind::LocalFunction: {
-    // Local functions are captured by value.
-    assert(!type->is<LValueType>() && !type->is<InOutType>() &&
-           "capturing inout by value?!");
-    const TypeLowering &ti = gen.getTypeLowering(type);
-    SILValue value = new (gen.SGM.M) SILArgument(gen.F.begin(),
-                                                 ti.getLoweredType(),
-                                                 VD);
-    gen.LocalFunctions[SILDeclRef(VD)] = value;
-    gen.enterDestroyCleanup(value);
-    break;
-  }
-  case CaptureKind::GetterSetter: {
-    // Capture the setter and getter closures by value.
-    Type setTy = cast<AbstractStorageDecl>(VD)->getSetter()->getType();
-    SILType lSetTy = gen.getLoweredType(setTy);
-    SILValue value = new (gen.SGM.M) SILArgument(gen.F.begin(), lSetTy, VD);
-    gen.LocalFunctions[SILDeclRef(cast<AbstractStorageDecl>(VD)->getSetter(),
-                                  SILDeclRef::Kind::Func)] = value;
-    gen.enterDestroyCleanup(value);
-    SWIFT_FALLTHROUGH;
-  }
-  case CaptureKind::Getter: {
-    // Capture the getter closure by value.
-    Type getTy = cast<AbstractStorageDecl>(VD)->getGetter()->getType();
-    SILType lGetTy = gen.getLoweredType(getTy);
-    SILValue value = new (gen.SGM.M) SILArgument(gen.F.begin(), lGetTy, VD);
-    gen.LocalFunctions[SILDeclRef(cast<AbstractStorageDecl>(VD)->getGetter(),
-                                  SILDeclRef::Kind::Func)] = value;
-    gen.enterDestroyCleanup(value);
-    break;
-  }
   }
 }
 
@@ -519,8 +487,8 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  SmallVector<CapturedValue, 4> LocalCaptures;
-  TheClosure.getLocalCaptures(LocalCaptures);
+  ArrayRef<CapturedValue> LocalCaptures
+    = SGM.Types.getLoweredLocalCaptures(TheClosure);
   for (auto capture : LocalCaptures)
     emitCaptureArguments(*this, capture);
 }

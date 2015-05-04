@@ -363,12 +363,6 @@ public:
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
   
-  /// LocalFunctions - Entries in this map are generated when a local function
-  /// declaration that requires local context, such as a func closure, is
-  /// emitted. This map is then queried to produce the value for a DeclRefExpr
-  /// to a local constant.
-  llvm::DenseMap<SILDeclRef, SILValue> LocalFunctions;
-
   struct OpaqueValueState {
     SILValue value;
     bool isConsumable;
@@ -837,20 +831,13 @@ public:
   SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
                                 SILConstantInfo constantInfo);  
 
-  /// Returns a reference to a function value that dynamically invokes the 
-  
-  /// Returns a reference to a constant in local context. This will return a
-  /// closure object reference if the constant refers to a local func decl.
-  /// In rvalue contexts, emitFunctionRef should be used instead, which retains
-  /// a local constant and returns a ManagedValue with a cleanup.
-  SILValue emitUnmanagedFunctionRef(SILLocation loc, SILDeclRef constant);
   /// Returns a reference to a constant in local context. This will return a
   /// retained closure object reference if the constant refers to a local func
   /// decl.
   ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant);
   ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant,
                                SILConstantInfo constantInfo);
-
+  
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
   ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,
@@ -873,6 +860,9 @@ public:
                                          AccessSemantics semantics,
                                          Type propTy, SGFContext C);
 
+  void emitCaptures(SILLocation loc,
+                    AnyFunctionRef TheClosure,
+                    SmallVectorImpl<ManagedValue> &captures);
 
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,

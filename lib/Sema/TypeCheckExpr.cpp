@@ -755,14 +755,6 @@ namespace {
       }
 
       if (auto FD = dyn_cast<FuncDecl>(D)) {
-        // TODO: Local functions cannot be recursive, because SILGen
-        // cannot handle it yet.
-        if (CurDC == FD) {
-          TC.diagnose(DRE->getLoc(), 
-                      diag::unsupported_recursive_local_function);
-          return { false, DRE };
-        }
-
         // TODO: Local function references aren't implemented in
         // SILGen yet. However, if there are no local captures, it will work.
         // Keep track of these local function captures so we can check them

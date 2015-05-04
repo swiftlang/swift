@@ -2095,7 +2095,6 @@ FunctionType *
 GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
   auto params = getGenericParams();
   (void)params;
-  assert(args.size() == params.size());
   
   TypeSubstitutionMap subs
     = getGenericSignature()->getSubstitutionMap(args);

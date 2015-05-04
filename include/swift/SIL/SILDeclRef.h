@@ -41,6 +41,7 @@ namespace swift {
   enum class SILLinkage : unsigned char;
   class SILModule;
   class SILLocation;
+  class AnyFunctionRef;
 
 enum ForDefinition_t : bool {
   NotForDefinition = false,
@@ -170,6 +171,8 @@ struct SILDeclRef {
                         = ResilienceExpansion::Minimal,
                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
                       bool isForeign = false);
+  
+  static SILDeclRef forAnyFunctionRef(AnyFunctionRef fn);
 
   /// Produce a SIL constant for a default argument generator.
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
@@ -205,6 +208,8 @@ struct SILDeclRef {
   AbstractFunctionDecl *getAbstractFunctionDecl() const {
     return dyn_cast<AbstractFunctionDecl>(getDecl());
   }
+  
+  Optional<AnyFunctionRef> getAnyFunctionRef() const;
   
   SILLocation getAsRegularLocation() const;
 

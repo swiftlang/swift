@@ -127,8 +127,6 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
                                                SILConstantInfo constantInfo) {
   assert(constantInfo == getConstantInfo(constant));
 
-  assert(!LocalFunctions.count(constant) &&
-         "emitting ref to local constant without context?!");
   // Builtins must be fully applied at the point of reference.
   if (constant.hasDecl() &&
       isa<BuiltinUnit>(constant.getDecl()->getDeclContext())) {
@@ -213,17 +211,6 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                          methodTy, subs);
 }
 
-SILValue SILGenFunction::emitUnmanagedFunctionRef(SILLocation loc,
-                                               SILDeclRef constant) {
-  // If this is a reference to a local constant, grab it.
-  if (LocalFunctions.count(constant)) {
-    return LocalFunctions[constant];
-  }
-
-  // Otherwise, use a global FunctionRefInst.
-  return emitGlobalFunctionRef(loc, constant);
-}
-
 ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
                                              SILDeclRef constant) {
   return emitFunctionRef(loc, constant, getConstantInfo(constant));
@@ -232,15 +219,104 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
 ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
                                              SILDeclRef constant,
                                              SILConstantInfo constantInfo) {
-  // If this is a reference to a local constant, grab it.
-  if (LocalFunctions.count(constant)) {
-    SILValue v = LocalFunctions[constant];
-    return emitManagedRetain(loc, v);
+  // If the function has captures, apply them.
+  if (auto fn = constant.getAnyFunctionRef()) {
+    if (fn->getCaptureInfo().hasLocalCaptures()
+        || (fn->getAsDeclContext()->getParent()->isLocalContext()
+            && fn->getAsDeclContext()->isGenericContext())) {
+      return emitClosureValue(loc, constant, getForwardingSubstitutions(), *fn);
+    }
   }
 
   // Otherwise, use a global FunctionRefInst.
   SILValue c = emitGlobalFunctionRef(loc, constant, constantInfo);
   return ManagedValue::forUnmanaged(c);
+}
+
+void SILGenFunction::emitCaptures(SILLocation loc,
+                                  AnyFunctionRef TheClosure,
+                                  SmallVectorImpl<ManagedValue> &capturedArgs) {
+  for (auto capture : SGM.Types.getLoweredLocalCaptures(TheClosure)) {
+    auto *vd = capture.getDecl();
+
+    switch (SGM.Types.getDeclCaptureKind(capture)) {
+    case CaptureKind::None:
+      break;
+
+    case CaptureKind::Constant: {
+      // let declarations.
+      auto Entry = VarLocs[vd];
+
+      // Non-address-only constants are passed at +1.
+      auto &tl = getTypeLowering(vd->getType()->getReferenceStorageReferent());
+      SILValue Val = Entry.value;
+
+      if (!Val.getType().isAddress()) {
+        // Just retain a by-val let.
+        B.emitRetainValueOperation(loc, Val);
+      } else {
+        // If we have a mutable binding for a 'let', such as 'self' in an
+        // 'init' method, load it.
+        Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
+      }
+
+      // Use an RValue to explode Val if it is a tuple.
+      RValue RV(*this, loc, vd->getType()->getCanonicalType(),
+                ManagedValue::forUnmanaged(Val));
+
+      // If we're capturing an unowned pointer by value, we will have just
+      // loaded it into a normal retained class pointer, but we capture it as
+      // an unowned pointer.  Convert back now.
+      if (vd->getType()->is<ReferenceStorageType>()) {
+        auto type = getTypeLowering(vd->getType()).getLoweredType();
+        auto val = std::move(RV).forwardAsSingleStorageValue(*this, type,loc);
+        capturedArgs.push_back(emitManagedRValueWithCleanup(val));
+      } else {
+        std::move(RV).getAll(capturedArgs);
+      }
+      break;
+    }
+
+    case CaptureKind::StorageAddress: {
+      // No-escaping stored declarations are captured as the
+      // address of the value.
+      assert(VarLocs.count(vd) && "no location for captured var!");
+      VarLoc vl = VarLocs[vd];
+      assert(vl.value.getType().isAddress() && "no address for captured var!");
+      capturedArgs.push_back(ManagedValue::forLValue(vl.value));
+      break;
+    }
+
+    case CaptureKind::Box: {
+      // LValues are captured as both the box owning the value and the
+      // address of the value.
+      assert(VarLocs.count(vd) && "no location for captured var!");
+      VarLoc vl = VarLocs[vd];
+      assert(vl.value.getType().isAddress() && "no address for captured var!");
+
+      // If this is a boxed variable, we can use it directly.
+      if (vl.box) {
+        B.createStrongRetain(loc, vl.box);
+        capturedArgs.push_back(emitManagedRValueWithCleanup(vl.box));
+        capturedArgs.push_back(ManagedValue::forLValue(vl.value));
+      } else {
+        // Address only 'let' values are passed by box.  This isn't great, in
+        // that a variable captured by multiple closures will be boxed for each
+        // one.  This could be improved by doing an "isCaptured" analysis when
+        // emitting address-only let constants, and emit them into a alloc_box
+        // like a variable instead of into an alloc_stack.
+        AllocBoxInst *allocBox =
+          B.createAllocBox(loc, vl.value.getType().getObjectType());
+        auto boxAddress = SILValue(allocBox, 1);
+        B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
+        capturedArgs.push_back(emitManagedRValueWithCleanup(SILValue(allocBox, 0)));
+        capturedArgs.push_back(ManagedValue::forLValue(boxAddress));
+      }
+
+      break;
+    }
+    }
+  }
 }
 
 ManagedValue
@@ -281,113 +357,14 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                              AbstractionPattern(expectedType), expectedType);
   }
 
-  SmallVector<CapturedValue, 4> captures;
-  TheClosure.getLocalCaptures(captures);
-  SmallVector<SILValue, 4> capturedArgs;
-  for (auto capture : captures) {
-    auto *vd = capture.getDecl();
+  SmallVector<ManagedValue, 4> capturedArgs;
+  emitCaptures(loc, TheClosure, capturedArgs);
 
-    switch (SGM.Types.getDeclCaptureKind(capture)) {
-    case CaptureKind::None:
-      break;
-
-    case CaptureKind::Constant: {
-      // let declarations.
-      auto Entry = VarLocs[vd];
-
-      // Non-address-only constants are passed at +1.
-      auto &tl = getTypeLowering(vd->getType()->getReferenceStorageReferent());
-      SILValue Val = Entry.value;
-
-      if (!Val.getType().isAddress()) {
-        // Just retain a by-val let.
-        B.emitRetainValueOperation(loc, Val);
-      } else {
-        // If we have a mutable binding for a 'let', such as 'self' in an
-        // 'init' method, load it.
-        Val = emitLoad(loc, Val, tl, SGFContext(), IsNotTake).forward(*this);
-      }
-
-      // Use an RValue to explode Val if it is a tuple.
-      RValue RV(*this, loc, vd->getType()->getCanonicalType(),
-                ManagedValue::forUnmanaged(Val));
-
-      // If we're capturing an unowned pointer by value, we will have just
-      // loaded it into a normal retained class pointer, but we capture it as
-      // an unowned pointer.  Convert back now.
-      if (vd->getType()->is<ReferenceStorageType>()) {
-        auto type = getTypeLowering(vd->getType()).getLoweredType();
-        auto val = std::move(RV).forwardAsSingleStorageValue(*this, type,loc);
-        capturedArgs.push_back(val);
-      } else {
-        std::move(RV).forwardAll(*this, capturedArgs);
-      }
-      break;
-    }
-
-    case CaptureKind::StorageAddress: {
-      // No-escaping stored declarations are captured as the
-      // address of the value.
-      assert(VarLocs.count(vd) && "no location for captured var!");
-      VarLoc vl = VarLocs[vd];
-      assert(vl.value.getType().isAddress() && "no address for captured var!");
-      capturedArgs.push_back(vl.value);
-      break;
-    }
-
-    case CaptureKind::Box: {
-      // LValues are captured as both the box owning the value and the
-      // address of the value.
-      assert(VarLocs.count(vd) && "no location for captured var!");
-      VarLoc vl = VarLocs[vd];
-      assert(vl.value.getType().isAddress() && "no address for captured var!");
-
-      // If this is a boxed variable, we can use it directly.
-      if (vl.box) {
-        B.createStrongRetain(loc, vl.box);
-        capturedArgs.push_back(vl.box);
-        capturedArgs.push_back(vl.value);
-      } else {
-        // Address only 'let' values are passed by box.  This isn't great, in
-        // that a variable captured by multiple closures will be boxed for each
-        // one.  This could be improved by doing an "isCaptured" analysis when
-        // emitting address-only let constants, and emit them into a alloc_box
-        // like a variable instead of into an alloc_stack.
-        AllocBoxInst *allocBox =
-          B.createAllocBox(loc, vl.value.getType().getObjectType());
-        auto boxAddress = SILValue(allocBox, 1);
-        B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
-        capturedArgs.push_back(SILValue(allocBox, 0));
-        capturedArgs.push_back(boxAddress);
-      }
-
-      break;
-    }
-    case CaptureKind::LocalFunction: {
-      // SILValue is a constant such as a local func. Pass on the reference.
-      ManagedValue v = emitRValueForDecl(loc, vd, vd->getType(),
-                                         AccessSemantics::Ordinary);
-      capturedArgs.push_back(v.forward(*this));
-      break;
-    }
-    case CaptureKind::GetterSetter: {
-      // Pass the setter and getter closure references on.
-      auto *Setter = cast<AbstractStorageDecl>(vd)->getSetter();
-      ManagedValue v = emitFunctionRef(loc, SILDeclRef(Setter,
-                                                       SILDeclRef::Kind::Func));
-      capturedArgs.push_back(v.forward(*this));
-      SWIFT_FALLTHROUGH;
-    }
-    case CaptureKind::Getter: {
-      // Pass the getter closure reference on.
-      auto *Getter = cast<AbstractStorageDecl>(vd)->getGetter();
-      ManagedValue v = emitFunctionRef(loc, SILDeclRef(Getter,
-                                                       SILDeclRef::Kind::Func));
-      capturedArgs.push_back(v.forward(*this));
-      break;
-    }
-    }
-  }
+  // Currently all capture arguments are captured at +1.
+  // TODO: Ideally this would be +0.
+  SmallVector<SILValue, 4> forwardedArgs;
+  for (auto capture : capturedArgs)
+    forwardedArgs.push_back(capture.forward(*this));
 
   SILType closureTy =
     SILBuilder::getPartialApplyResultType(functionRef.getType(),
@@ -395,7 +372,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                           forwardSubs);
   auto toClosure =
     B.createPartialApply(loc, functionRef, functionTy,
-                         forwardSubs, capturedArgs, closureTy);
+                         forwardSubs, forwardedArgs, closureTy);
   auto result = emitManagedRValueWithCleanup(toClosure);
 
   return emitGeneralizedFunctionValue(loc, result,
@@ -626,22 +603,6 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     addSILArgument(ty, vd);
     break;
   }
-  case CaptureKind::LocalFunction:
-    // Forward the captured value.
-    addSILArgument(gen.getLoweredType(vd->getType()), vd);
-    break;
-  case CaptureKind::GetterSetter: {
-    // Forward the captured setter.
-    Type setTy = cast<AbstractStorageDecl>(vd)->getSetter()->getType();
-    addSILArgument(gen.getLoweredType(setTy), vd);
-    SWIFT_FALLTHROUGH;
-  }
-  case CaptureKind::Getter: {
-    // Forward the captured getter.
-    Type getTy = cast<AbstractStorageDecl>(vd)->getGetter()->getType();
-    addSILArgument(gen.getLoweredType(getTy), vd);
-    break;
-  }
   }
 }
 
@@ -718,8 +679,8 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
 
   // Forward captures.
   if (hasCaptures) {
-    SmallVector<CapturedValue, 4> LocalCaptures;
-    fd->getLocalCaptures(LocalCaptures);
+    ArrayRef<CapturedValue> LocalCaptures
+      = SGM.Types.getLoweredLocalCaptures(fd);
     for (auto capture : LocalCaptures)
       forwardCaptureArgs(*this, curriedArgs, capture);
   }

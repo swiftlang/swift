@@ -148,6 +148,31 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   isForeign = asForeign;
 }
 
+static SILDeclRef::Loc getLocForFunctionRef(AnyFunctionRef fn) {
+  if (auto afd = fn.getAbstractFunctionDecl()) {
+    return afd;
+  } else {
+    auto closure = fn.getAbstractClosureExpr();
+    assert(closure);
+    return closure;
+  }
+}
+
+SILDeclRef SILDeclRef::forAnyFunctionRef(AnyFunctionRef fn) {
+  return SILDeclRef(getLocForFunctionRef(fn));
+}
+
+Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
+  if (auto vd = loc.dyn_cast<ValueDecl*>()) {
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(vd)) {
+      return AnyFunctionRef(afd);
+    } else {
+      return None;
+    }
+  }
+  return AnyFunctionRef(loc.get<AbstractClosureExpr*>());
+}
+
 static SILLinkage getLinkageForLocalContext(DeclContext *dc) {
   while (!dc->isModuleScopeContext()) {
     // Local definitions in transparent contexts are forced public because

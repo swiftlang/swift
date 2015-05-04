@@ -288,8 +288,7 @@ func logical_local_get(x: Int) -> Int {
     }
   }
   // CHECK: [[GET_REF:%[0-9]+]] = function_ref [[PROP_GET_CLOSURE:@_TFF10properties17logical_local_get]]
-  // CHECK: [[GET_CLOSURE:%[0-9]+]] = partial_apply [[GET_REF]]({{.*}})
-  // CHECK: apply [[GET_CLOSURE]]()
+  // CHECK: apply [[GET_REF]](%0)
   return prop
 }
 // CHECK-: sil shared [[PROP_GET_CLOSURE]]
@@ -302,19 +301,15 @@ func logical_local_captured_get(x: Int) -> Int {
       return x
     }
   }
-  // CHECK: [[GET_REF:%[0-9]+]] = function_ref [[PROP_GET_CLOSURE:@_TFF10properties26logical_local_captured_get]]
-  // CHECK: [[GET_CLOSURE:%[0-9]+]] = partial_apply [[GET_REF]]({{.*}})
-
   func get_prop() -> Int {
     return prop
   }
-  // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TFF10properties26logical_local_captured_get
-  // CHECK: [[FUNC_CLOSURE:%[0-9]+]] = partial_apply [[FUNC_REF]]([[GET_CLOSURE]])
 
   return get_prop()
-  // CHECK: apply [[FUNC_CLOSURE]]()
+  // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TFF10properties26logical_local_captured_get
+  // CHECK: apply [[FUNC_REF]](%0)
 }
-// CHECK: sil shared [[PROP_GET_CLOSURE]]
+// CHECK: sil shared @_TFF10properties26logical_local_captured_get
 // CHECK: bb0(%{{[0-9]+}} : $Int):
 
 func inout_arg(inout x: Int) {}
@@ -598,18 +593,6 @@ func local_observing_property(arg: Int) {
 // CHECK: [[BOX:%[0-9]+]] = alloc_box $Int
 // CHECK: store [[ARG]] to [[BOX]]#1
 
-// Next form the didSet for the assignment.
-// CHECK: function_ref {{.*}}local_observing_property{{.*}}.didset
-// CHECK-NEXT: function_ref @_TFF10properties24local_observing_property
-
-// Next call the getter for the take int call.
-// CHECK: function_ref {{.*}}local_observing_property{{.*}}.getter
-// CHECK-NEXT: function_ref @_TFF10properties24local_observing_property
-
-// Next call the setter for the assignment.
-// CHECK: function_ref {{.*}}local_observing_property{{.*}}.setter
-// CHECK-NEXT: function_ref @_TFF10properties24local_observing_property
-
 
 
 
@@ -671,17 +654,18 @@ func propertyWithDidSetTakingOldValue() {
 
 // CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
 // CHECK-NEXT: sil {{.*}} @_TFF10properties32propertyWithDidSetTakingOldValue
-// CHECK-NEXT: bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*Int, %3 : $@callee_owned (Int) -> ()):
-// CHECK-NEXT:  debug_value %0 : $Int  // let newValue
-// CHECK-NEXT:  %5 = load %2 : $*Int                  // users: %6, %9
-// CHECK-NEXT:  debug_value %5 : $Int  // let tmp     // id: %6
-// CHECK-NEXT:  assign %0 to %2 : $*Int               // id: %7
-// CHECK-NEXT:  strong_retain %3 : $@callee_owned (Int) -> () // id: %8
-// CHECK-NEXT:  %9 = apply %3(%5) : $@callee_owned (Int) -> ()
-// CHECK-NEXT:  strong_release %3 : $@callee_owned (Int) -> () // id: %10
-// CHECK-NEXT:  strong_release %1 : $Builtin.NativeObject      // id: %11
-// CHECK-NEXT:  %12 = tuple ()                                  // user: %13
-// CHECK-NEXT:  return %12 : $()                                // id: %13
+// CHECK-NEXT: bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*Int):
+// CHECK-NEXT:  debug_value %0 : $Int
+// CHECK-NEXT:  %4 = load %2 : $*Int
+// CHECK-NEXT:  debug_value %4 : $Int
+// CHECK-NEXT:  assign %0 to %2 : $*Int
+// CHECK-NEXT:  strong_retain %1 : $Builtin.NativeObject
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  %8 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned Builtin.NativeObject, @inout Int) -> ()
+// CHECK-NEXT:  %9 = apply %8(%4, %1, %2) : $@convention(thin) (Int, @owned Builtin.NativeObject, @inout Int) -> ()
+// CHECK-NEXT:  strong_release %1 : $Builtin.NativeObject
+// CHECK-NEXT:  %11 = tuple ()
+// CHECK-NEXT:  return %11 : $()
 // CHECK-NEXT:}
 
 

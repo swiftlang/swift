@@ -96,25 +96,22 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       llvm_unreachable("inherited local variable?");
 
     case VarDecl::Computed:
-      return var->getSetter()
-        ? CaptureKind::GetterSetter : CaptureKind::Getter;
+      llvm_unreachable("computed captured property should have been lowered "
+                       "away");
 
     case VarDecl::StoredWithObservers:
     case VarDecl::Addressed:
     case VarDecl::AddressedWithTrivialAccessors:
     case VarDecl::AddressedWithObservers:
     case VarDecl::ComputedWithMutableAddress:
+      // Computed captures should have been lowered away.
+      assert(capture.isDirect()
+             && "computed captured property should have been lowered away");
 
       // If captured directly, the variable is captured by box or pointer.
-      if (capture.isDirect()) {
-        assert(var->hasStorage());
-        return capture.isNoEscape() ?
-          CaptureKind::StorageAddress : CaptureKind::Box;
-      }
-
-      // FIXME: do we need a different capture kind for addressed
-      // local vars?
-      return CaptureKind::GetterSetter;
+      assert(var->hasStorage());
+      return capture.isNoEscape() ?
+        CaptureKind::StorageAddress : CaptureKind::Box;
 
     case VarDecl::Stored:
       // If this is a non-address-only stored 'let' constant, we can capture it
@@ -136,7 +133,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       isa<AssociatedTypeDecl>(decl))
     return CaptureKind::None;
   
-  return CaptureKind::LocalFunction;
+  llvm_unreachable("function-like captures should have been lowered away");
 }
 
 enum class LoweredTypeKind {
@@ -1821,23 +1818,6 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
     case CaptureKind::None:
       break;
         
-    case CaptureKind::LocalFunction:
-      // Local functions are captured by value.
-      inputFields.push_back(TupleTypeElt(captureType));
-      break;
-    case CaptureKind::GetterSetter: {
-      // Capture the setter and getter closures.
-      Type setterTy = cast<AbstractStorageDecl>(VD)->getSetter()->getType();
-      inputFields.push_back(TupleTypeElt(setterTy));
-      SWIFT_FALLTHROUGH;
-    }
-    case CaptureKind::Getter: {
-      // Capture the getter closure.
-      Type getterTy = cast<AbstractStorageDecl>(VD)->getGetter()->getType();
-      inputFields.push_back(TupleTypeElt(getterTy));
-      break;
-    }
-
     case CaptureKind::StorageAddress:
       // No-escape stored decls are captured by their raw address.
       inputFields.push_back(TupleTypeElt(CanInOutType::get(captureType)));
@@ -1911,24 +1891,6 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
     case CaptureKind::None:
       break;
         
-    case CaptureKind::LocalFunction:
-      // Local functions are captured by value.
-      inputFields.push_back(TupleTypeElt(captureType));
-      break;
-    case CaptureKind::GetterSetter: {
-      // Capture the setter and getter closures.
-      Type setterTy = cast<AbstractStorageDecl>(vd)->getSetter()->getInterfaceType();
-      inputFields.push_back(TupleTypeElt(setterTy));
-      SWIFT_FALLTHROUGH;
-    }
-    case CaptureKind::Getter: {
-      // Capture the getter closure.
-      Type getterTy =
-        cast<AbstractStorageDecl>(vd)->getGetter()->getInterfaceType();
-
-      inputFields.push_back(TupleTypeElt(getterTy));
-      break;
-    }
     case CaptureKind::StorageAddress:
       // No-escape stored decls are captured by their raw address.
       inputFields.push_back(TupleTypeElt(CanInOutType::get(captureType)));
@@ -1991,7 +1953,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
-    SmallVector<CapturedValue, 4> captures;
+    ArrayRef<CapturedValue> captures;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       // TODO: Substitute out archetypes from the enclosing context with generic
       // parameters.
@@ -1999,7 +1961,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
       funcTy = cast<AnyFunctionType>(
                            getInterfaceTypeOutOfContext(funcTy, ACE->getParent()));
       if (!withCaptures) return funcTy;
-      ACE->getCaptureInfo().getLocalCaptures(captures);
+      captures = getLoweredLocalCaptures(ACE);
       return getFunctionInterfaceTypeWithCaptures(funcTy, captures, ACE);
     }
 
@@ -2011,7 +1973,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
                          getInterfaceTypeOutOfContext(funcTy, func->getParent()));
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     if (!withCaptures) return funcTy;
-    func->getLocalCaptures(captures);
+    captures = getLoweredLocalCaptures(func);
     return getFunctionInterfaceTypeWithCaptures(funcTy, captures, func);
   }
 
@@ -2119,11 +2081,11 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
-    SmallVector<CapturedValue, 4> captures;
+    ArrayRef<CapturedValue> captures;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       if (!withCaptures) return funcTy;
-      ACE->getCaptureInfo().getLocalCaptures(captures);
+      captures = getLoweredLocalCaptures(ACE);
       return getFunctionTypeWithCaptures(funcTy, captures, ACE);
     }
 
@@ -2131,7 +2093,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
     auto funcTy = cast<AnyFunctionType>(func->getType()->getCanonicalType());
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     if (!withCaptures) return funcTy;
-    func->getLocalCaptures(captures);
+    captures = getLoweredLocalCaptures(func);
     return getFunctionTypeWithCaptures(funcTy, captures, func);
   }
 
@@ -2272,4 +2234,95 @@ TypeConverter::getProtocolDispatchStrategy(ProtocolDecl *P) {
     return ProtocolDispatchStrategy::ObjC;
   
   return ProtocolDispatchStrategy::Swift;
+}
+
+/// If a capture references a local function, return a reference to that
+/// function.
+static Optional<AnyFunctionRef>
+getAnyFunctionRefFromCapture(CapturedValue capture) {
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(capture.getDecl()))
+    return AnyFunctionRef(afd);
+  return None;
+}
+
+ArrayRef<CapturedValue>
+TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
+  // First, bail out if there are no local captures at all.
+  if (!fn.getCaptureInfo().hasLocalCaptures())
+    return {};
+  
+  // See if we've cached the lowered capture list for this function.
+  auto found = LoweredCaptures.find(fn);
+  if (found != LoweredCaptures.end())
+    return found->second;
+  
+  // Recursively collect transitive captures from captured local functions.
+  llvm::DenseSet<AnyFunctionRef> visitedFunctions;
+  llvm::SetVector<CapturedValue> captures;
+  
+  std::function<void (AnyFunctionRef)> collectFunctionCaptures
+  = [&](AnyFunctionRef curFn) {
+    if (!visitedFunctions.insert(curFn).second)
+      return;
+  
+    SmallVector<CapturedValue, 4> localCaptures;
+    curFn.getCaptureInfo().getLocalCaptures(localCaptures);
+    for (auto capture : localCaptures) {
+      // If the capture is of another local function, grab its transitive
+      // captures instead.
+      if (auto capturedFn = getAnyFunctionRefFromCapture(capture)) {
+        collectFunctionCaptures(*capturedFn);
+        continue;
+      }
+      
+      // If the capture is of a computed property, grab the transitive captures
+      // of its accessors.
+      if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
+        switch (capturedVar->getStorageKind()) {
+        case VarDecl::StoredWithTrivialAccessors:
+          llvm_unreachable("stored local variable with trivial accessors?");
+
+        case VarDecl::InheritedWithObservers:
+          llvm_unreachable("inherited local variable?");
+
+        case VarDecl::StoredWithObservers:
+        case VarDecl::Addressed:
+        case VarDecl::AddressedWithTrivialAccessors:
+        case VarDecl::AddressedWithObservers:
+        case VarDecl::ComputedWithMutableAddress:
+          // Directly capture storage if we're supposed to.
+          if (capture.isDirect())
+            goto capture_value;
+            
+          // Otherwise, transitively capture the accessors.
+          SWIFT_FALLTHROUGH;
+          
+        case VarDecl::Computed: {
+          collectFunctionCaptures(capturedVar->getGetter());
+          if (auto setter = capturedVar->getSetter())
+            collectFunctionCaptures(setter);
+          continue;
+        }
+
+        case VarDecl::Stored:
+          // We can always capture the storage in these cases.
+          goto capture_value;
+        }
+      }
+      
+    capture_value:
+      // Collect non-function captures.
+      captures.insert(capture);
+    }
+  };
+  collectFunctionCaptures(fn);
+  
+  // Cache the uniqued set of transitive captures.
+  auto inserted = LoweredCaptures.insert({fn, {}});
+  assert(inserted.second && "already in map?!");
+  auto &cachedCaptures = inserted.first->second;
+  std::copy(captures.begin(), captures.end(),
+            std::back_inserter(cachedCaptures));
+  
+  return cachedCaptures;
 }

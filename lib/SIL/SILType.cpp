@@ -125,7 +125,7 @@ bool SILType::isAddressOnly(SILModule &M) const {
 }
 
 SILType SILType::substGenericArgs(SILModule &M,
-                                           ArrayRef<Substitution> Subs) const {
+                                  ArrayRef<Substitution> Subs) const {
   SILFunctionType *fnTy = getSwiftRValueType()->castTo<SILFunctionType>();
   if (Subs.empty()) {
     assert(!fnTy->isPolymorphic() && "function type without subs must not "

@@ -96,8 +96,8 @@ func foo(x: Int) -> Int {
   }
   return bar(1)
   // CHECK-LABEL: sil hidden  @_TF13sil_locations3foo
-  // CHECK: [[CLOSURE:%[0-9]+]] = function_ref {{.*}} line:[[@LINE-5]]:8
-  // CHECK: partial_apply [[CLOSURE:%[0-9]+]]
+  // CHECK: [[CLOSURE:%[0-9]+]] = function_ref {{.*}} line:[[@LINE-2]]:10
+  // CHECK: apply [[CLOSURE:%[0-9]+]]
 }
 
 class LocationClass {

@@ -1777,7 +1777,10 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
                                          destIndex);
 
-  auto fnRef = emitFunctionRef(loc, generator);
+  // TODO: Should apply the default arg generator's captures, but Sema doesn't
+  // track them.
+  
+  auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc,generator));
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
   auto substFnType = fnType->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
                                          defaultArgsOwner.getSubstitutions());
@@ -1906,7 +1909,12 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
     if (auto defaultArgOwner = element.dyn_cast<ConcreteDeclRef>()) {
       SILDeclRef generator
         = SILDeclRef::getDefaultArgGenerator(defaultArgOwner.getDecl(), i);
-      auto fnRef = gen.emitFunctionRef(E, generator);
+
+      // TODO: Should apply the default arg generator's captures, but Sema doesn't
+      // track them.
+
+      auto fnRef = ManagedValue::forUnmanaged(
+                                      gen.emitGlobalFunctionRef(E, generator));
       auto resultType = tupleType.getElementType(i);
       auto apply = gen.emitMonomorphicApply(E, fnRef, {}, resultType,
                                             generator.isTransparent(),

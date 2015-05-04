@@ -9,7 +9,7 @@ var zero: Int
 func generic_nondependent_context<T>(x: T, var y: Int) -> Int {
   func foo() -> Int { return y }
   // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures28generic_nondependent_context{{.*}} : $@convention(thin) <τ_0_0> (@owned Builtin.NativeObject, @inout Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[FOO_CLOSURE:%.*]] = partial_apply [[FOO]]<T>
+  // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>
   return foo()
 }
 
@@ -17,7 +17,7 @@ func generic_nondependent_context<T>(x: T, var y: Int) -> Int {
 func generic_dependent_context<T>(x: T, y: Int) -> T {
   func foo() -> T { return x }
   // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures25generic_dependent_context{{.*}} : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
-  // CHECK: [[FOO_CLOSURE:%.*]] = partial_apply [[FOO]]<T>
+  // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>
   return foo()
 }
 
@@ -87,14 +87,11 @@ func local_properties<T>(inout t: T) {
   }
 
   // CHECK: [[GETTER_REF:%[0-9]+]] = function_ref [[GETTER_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
-  // CHECK: [[GETTER:%[0-9]+]] = partial_apply [[GETTER_REF]]<T>([[TBOX]]#0, [[TBOX]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
-  // CHECK: [[SETTER_REF:%[0-9]+]] = function_ref [[SETTER_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
-  // CHECK: [[SETTER:%[0-9]+]] = partial_apply [[SETTER_REF]]<T>(%1#0, %1#1) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
-  
-  // CHECK: apply [[GETTER]]
+  // CHECK: apply [[GETTER_REF]]
   t = prop
 
-  // CHECK: apply [[SETTER]]
+  // CHECK: [[SETTER_REF:%[0-9]+]] = function_ref [[SETTER_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
+  // CHECK: apply [[SETTER_REF]]
   prop = t
 
   var prop2: T {
@@ -107,14 +104,11 @@ func local_properties<T>(inout t: T) {
   }
 
   // CHECK: [[GETTER2_REF:%[0-9]+]] = function_ref [[GETTER2_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
-  // CHECK: [[GETTER2:%[0-9]+]] = partial_apply [[GETTER2_REF]]<T>([[TBOX]]#0, [[TBOX]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @owned Builtin.NativeObject, @inout τ_0_0) -> ()
-  // CHECK: [[SETTER2_REF:%[0-9]+]] = function_ref [[SETTER2_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  // CHECK: [[SETTER2:%[0-9]+]] = partial_apply [[SETTER2_REF]]<T>()
-
-  // CHECK: apply [[GETTER2]]
+  // CHECK: apply [[GETTER2_REF]]
   t = prop2
 
-  // CHECK: apply [[SETTER2]]
+  // CHECK: [[SETTER2_REF:%[0-9]+]] = function_ref [[SETTER2_CLOSURE:@_TFF16generic_closures16local_properties.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  // CHECK: apply [[SETTER2_REF]]
   prop2 = t
 }
 

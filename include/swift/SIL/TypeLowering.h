@@ -415,12 +415,6 @@ enum class CaptureKind {
   StorageAddress,
   // A local value captures as a constant.
   Constant,
-  /// A local function captured by value.
-  LocalFunction,
-  /// A getter-only property.
-  Getter,
-  /// A settable property.
-  GetterSetter
 };
 
 
@@ -507,6 +501,8 @@ class TypeConverter {
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> DependentTypes;
   
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
+  
+  llvm::DenseMap<AnyFunctionRef, std::vector<CapturedValue>> LoweredCaptures;
   
   /// The set of recursive types we've already diagnosed.
   llvm::DenseSet<NominalTypeDecl *> RecursiveNominalTypes;
@@ -795,6 +791,10 @@ public:
   static SILLinkage getLinkageForProtocolConformance(
                                              const NormalProtocolConformance *C,
                                              ForDefinition_t definition);
+  
+  /// Get the capture list from a closure, with transitive function captures
+  /// flattened.
+  ArrayRef<CapturedValue> getLoweredLocalCaptures(AnyFunctionRef fn);
   
 private:
   Type getLoweredCBridgedType(Type t, const clang::Type *clangTy,

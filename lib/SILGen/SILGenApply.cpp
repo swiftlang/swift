@@ -63,6 +63,34 @@ SILGenFunction::getMethodDispatch(AbstractFunctionDecl *method) {
   return MethodDispatch::Static;
 }
 
+/// Collect the captures necessary to invoke a local function into an
+/// ArgumentSource.
+static std::pair<ArgumentSource, CanFunctionType>
+emitCapturesAsArgumentSource(SILGenFunction &gen,
+                             SILLocation loc,
+                             AnyFunctionRef fn) {
+  SmallVector<ManagedValue, 4> captures;
+  gen.emitCaptures(loc, fn, captures);
+  
+  // The capture array should match the explosion schema of the closure's
+  // first formal argument type.
+  auto info = gen.SGM.Types.getConstantInfo(SILDeclRef::forAnyFunctionRef(fn));
+  auto subs = gen.getForwardingSubstitutions();
+  auto origFormalTy = info.FormalInterfaceType;
+  CanFunctionType formalTy;
+  if (!subs.empty()) {
+    auto genericOrigFormalTy = cast<GenericFunctionType>(origFormalTy);
+    auto substTy = genericOrigFormalTy
+      ->substGenericArgs(gen.SGM.SwiftModule, subs)
+      ->getCanonicalType();
+    formalTy = cast<FunctionType>(substTy);
+  } else {
+    formalTy = cast<FunctionType>(origFormalTy);
+  }
+  RValue rv(captures, formalTy.getInput());
+  return {ArgumentSource(loc, std::move(rv)), formalTy};
+}
+
 /// Retrieve the type to use for a method found via dynamic lookup.
 static CanAnyFunctionType getDynamicMethodFormalType(SILGenModule &SGM,
                                                      SILValue proto,
@@ -788,6 +816,7 @@ public:
   /// The lvalue or rvalue representing the argument source of self.
   ArgumentSource SelfParam;
   Expr *SelfApplyExpr = nullptr;
+  Type SelfType;
   std::vector<ApplyExpr*> CallSites;
   Expr *SideEffect = nullptr;
 
@@ -824,6 +853,14 @@ public:
     assert(!SelfParam && "already set this!");
     SelfParam = std::move(theSelfParam);
     SelfApplyExpr = theSelfApplyExpr;
+    SelfType = theSelfApplyExpr->getType();
+    ++CallDepth;
+  }
+  void setSelfParam(ArgumentSource &&theSelfParam, Type selfType) {
+    assert(!SelfParam && "already set this!");
+    SelfParam = std::move(theSelfParam);
+    SelfApplyExpr = nullptr;
+    SelfType = selfType;
     ++CallDepth;
   }
 
@@ -1081,32 +1118,73 @@ public:
       return;
     }
 
-    // FIXME: Store context values for local funcs in a way that we can
-    // apply them directly as an added "call site" here.
     SILDeclRef constant(e->getDecl(),
                         SILDeclRef::ConstructAtBestResilienceExpansion,
-                         SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         SGF.SGM.requiresObjCDispatch(e->getDecl()));
+                        SILDeclRef::ConstructAtNaturalUncurryLevel,
+                        SGF.SGM.requiresObjCDispatch(e->getDecl()));
 
-    // Obtain a reference for a local closure.
-    if (SGF.LocalFunctions.count(constant)) {
-      ManagedValue localFn =
-        SGF.emitRValueForDecl(e, e->getDeclRef(), e->getType(),
-                              AccessSemantics::Ordinary);
-      auto type = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-      setCallee(Callee::forIndirect(localFn, type, type, false, e));
-
-    // Otherwise, stash the SILDeclRef.
-    } else {
-      setCallee(Callee::forDirect(SGF, constant, getSubstFnType(), e));
+    // Otherwise, we have a direct call.
+    CanFunctionType substFnType = getSubstFnType();
+    ArrayRef<Substitution> subs;
+    
+    // If the decl ref requires captures, emit the capture params.
+    // The capture params behave like a "self" parameter as the first curry
+    // level of the function implementation.
+    auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
+    if (afd) {
+      if (afd->getCaptureInfo().hasLocalCaptures()) {
+        assert(!e->getDeclRef().isSpecialized()
+               && "generic local fns not implemented");
+        
+        auto captures = emitCapturesAsArgumentSource(SGF, e, afd);
+        substFnType = captures.second;
+        setSelfParam(std::move(captures.first), captures.second.getInput());
+      }
+      
+      // Forward local substitutions to a local function.
+      if (afd->getParent()->isLocalContext()) {
+        subs = SGF.getForwardingSubstitutions();
+      }
     }
-
-    // If there are substitutions, add them.
+    
     if (e->getDeclRef().isSpecialized()) {
-      ApplyCallee->setSubstitutions(SGF, e, e->getDeclRef().getSubstitutions(),
-                               CallDepth);
+      assert(subs.empty() && "nested local generics not yet supported");
+      subs = e->getDeclRef().getSubstitutions();
     }
+    
+    setCallee(Callee::forDirect(SGF, constant, substFnType, e));
+  
+    // If there are substitutions, add them, always at depth 0.
+    if (!subs.empty())
+      ApplyCallee->setSubstitutions(SGF, e, subs, 0);
   }
+  
+  void visitAbstractClosureExpr(AbstractClosureExpr *e) {
+    // A directly-called closure can be emitted as a direct call instead of
+    // really producing a closure object.
+    SILDeclRef constant(e);
+    // Emit the closure function if we haven't yet.
+    if (!SGF.SGM.hasFunction(constant))
+      SGF.SGM.emitClosure(e);
+    
+    // If the closure requires captures, emit them.
+    // The capture params behave like a "self" parameter as the first curry
+    // level of the function implementation.
+    ArrayRef<Substitution> subs;
+    CanFunctionType substFnType = getSubstFnType();
+    if (e->getCaptureInfo().hasLocalCaptures()) {
+      auto captures = emitCapturesAsArgumentSource(SGF, e, e);
+      substFnType = captures.second;
+      setSelfParam(std::move(captures.first), captures.second.getInput());
+    }
+    subs = SGF.getForwardingSubstitutions();
+    
+    setCallee(Callee::forDirect(SGF, constant, substFnType, e));
+    // If there are substitutions, add them, always at depth 0.
+    if (!subs.empty())
+      ApplyCallee->setSubstitutions(SGF, e, subs, 0);
+  }
+  
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
     // FIXME: We might need to go through ObjC dispatch for references to
     // constructors imported from Clang (which won't have a direct entry point)
@@ -1118,7 +1196,7 @@ public:
     // If there are substitutions, add them.
     if (e->getDeclRef().isSpecialized())
       ApplyCallee->setSubstitutions(SGF, e, e->getDeclRef().getSubstitutions(),
-                               CallDepth);
+                                    CallDepth);
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
@@ -3271,7 +3349,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   // Apply 'self' if provided.
   if (apply.SelfParam)
     emission.addCallSite(RegularLocation(e), std::move(apply.SelfParam),
-                         apply.SelfApplyExpr->getType());
+                         apply.SelfType);
 
   // Apply arguments from call sites, innermost to outermost.
   for (auto site = apply.CallSites.rbegin(), end = apply.CallSites.rend();
@@ -3418,17 +3496,14 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
                                    bool isSuper,
                                    bool isDirectUse)
 {
-  // If the accessor is a local constant, use it.
-  // FIXME: Can local properties ever be generic?
-  if (gen.LocalFunctions.count(constant)) {
-    SILValue v = gen.LocalFunctions[constant];
-    auto formalType =
-      gen.SGM.Types.getConstantFormalTypeWithoutCaptures(constant);
-    return Callee::forIndirect(gen.emitManagedRetain(loc, v),
-                               formalType, formalType, false, loc);
-  }
-
   SILConstantInfo constantInfo = gen.getConstantInfo(constant);
+
+  // Collect captures if the accessor has them.
+  auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
+  if (accessorFn->getCaptureInfo().hasLocalCaptures()) {
+    assert(!selfValue && "local property has self param?!");
+    selfValue = emitCapturesAsArgumentSource(gen, loc, accessorFn).first;
+  }
 
   // Apply substitutions to the callee type.
   CanAnyFunctionType substAccessorType = constantInfo.FormalType;
