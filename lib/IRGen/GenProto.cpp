@@ -4483,51 +4483,58 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   return wtable;
 }
 
+/// Emit a protocol witness table for a conformance.
+llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
+                                        CanType srcType,
+                                        const TypeInfo &srcTI,
+                                        ProtocolDecl *proto,
+                                        const ProtocolInfo &protoI,
+                                        ProtocolConformance *conformance) {
+  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
+         && "protocol does not have witness tables?!");
+
+  // If the source type is an archetype and we don't have concrete conformance
+  // info, the conformance must be via one of the protocol requirements of the
+  // archetype. Look at what's locally bound.
+  if (!conformance) {
+    auto archetype = cast<ArchetypeType>(srcType);
+    return emitWitnessTableRef(IGF, archetype, proto);
+  }
+
+  // All other source types should be concrete enough that we have conformance
+  // info for them.
+  auto &conformanceI = protoI.getConformance(IGF.IGM, srcType,
+                                             srcTI, proto, *conformance);
+  return conformanceI.getTable(IGF);
+}
+
 /// Emit the witness table references required for the given type
 /// substitution.
 void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
                                  const Substitution &sub,
                                  SmallVectorImpl<llvm::Value*> &out) {
+  auto conformances = sub.getConformances();
+
   // We don't need to do anything if we have no protocols to conform to.
   auto archetypeProtos = sub.getArchetype()->getConformsTo();
+  assert(!conformances.size() || archetypeProtos.size() == conformances.size());
+
   if (archetypeProtos.empty()) return;
 
   // Look at the replacement type.
   CanType replType = sub.getReplacement()->getCanonicalType();
-
-  // If it's an archetype, we'll need to grab from the local context.
-  if (auto archetype = dyn_cast<ArchetypeType>(replType)) {
-    auto &archTI = getArchetypeInfo(IGF, archetype,
-                                    IGF.getTypeInfoForLowered(archetype));
-
-    for (auto proto : archetypeProtos) {
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-        continue;
-
-      ProtocolPath path(IGF.IGM, archTI.getStoredProtocols(), proto);
-      auto wtable = archTI.getWitnessTable(IGF, archetype,
-                                           path.getOriginIndex());
-      wtable = path.apply(IGF, wtable);
-      out.push_back(wtable);
-    }
-    return;
-  }
-
-  // Otherwise, we can construct the witnesses from the protocol
-  // conformances.
   auto &replTI = IGF.getTypeInfoForUnlowered(replType);
 
-  assert(archetypeProtos.size() == sub.getConformances().size());
   for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
     auto proto = archetypeProtos[j];
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
       continue;
 
-    auto &protoI = IGF.IGM.getProtocolInfo(proto);
-    auto &confI = protoI.getConformance(IGF.IGM, replType, replTI, proto,
-                                        *sub.getConformances()[j]);
+    auto conformance = conformances.size() ? conformances[j] : nullptr;
+    auto wtable = emitWitnessTableRef(IGF, replType, replTI, proto,
+                                      IGF.IGM.getProtocolInfo(proto),
+                                      conformance);
 
-    llvm::Value *wtable = confI.getTable(IGF);
     out.push_back(wtable);
   }
 }
@@ -4645,8 +4652,10 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
 
     // Nothing else to do if there aren't any protocols to witness.
     auto protocols = arch->getConformsTo();
-    if (protocols.empty())
-      continue;
+    auto conformances = sub.getConformances();
+    assert(!conformances.size() || protocols.size() == conformances.size());
+
+    if (protocols.empty()) continue;
 
     auto &argTI = IGF.getTypeInfoForUnlowered(argType);
 
@@ -4662,24 +4671,12 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       if (Fulfillments.count(FulfillmentKey(depTy, protocol)))
         continue;
 
-      // If the target is an archetype, go to the type info.
-      if (auto archetype = dyn_cast<ArchetypeType>(argType)) {
-        auto &archTI = getArchetypeInfo(IGF, archetype,
-                                        IGF.getTypeInfoForLowered(archetype));
-
-        ProtocolPath path(IGF.IGM, archTI.getStoredProtocols(), protocol);
-        auto wtable = archTI.getWitnessTable(IGF, archetype,
-                                             path.getOriginIndex());
-        wtable = path.apply(IGF, wtable);
-        out.add(wtable);
-        continue;
-      }
-
-      // Otherwise, go to the conformances.
-      auto &protoI = IGF.IGM.getProtocolInfo(protocol);
-      auto &confI = protoI.getConformance(IGF.IGM, argType, argTI, protocol,
-                                          *sub.getConformances()[i]);
-      llvm::Value *wtable = confI.getTable(IGF);
+      auto conformance = conformances.size() ? conformances[i] : nullptr;
+      auto wtable = emitWitnessTableRef(IGF,
+                                        argType, argTI,
+                                        protocol,
+                                        IGF.IGM.getProtocolInfo(protocol),
+                                        conformance);
       out.add(wtable);
     }
   }
@@ -4798,31 +4795,10 @@ static llvm::Value *getProtocolWitnessTable(IRGenFunction &IGF,
                                             const TypeInfo &srcTI,
                                             ProtocolEntry protoEntry,
                                             ProtocolConformance *conformance) {
-  auto proto = protoEntry.getProtocol();
-  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
-         && "protocol does not have witness tables?!");
-
-  // If the source type is an archetype and we don't have concrete conformance
-  // info, the conformance must be via one of the protocol requirements of the
-  // archetype. Look at what's locally bound.
-  if (auto archetype = dyn_cast<ArchetypeType>(srcType)) {
-    if (!conformance) {
-      auto &archTI = getArchetypeInfo(IGF, archetype, srcTI);
-      ProtocolPath path(IGF.IGM, archTI.getStoredProtocols(), proto);
-      llvm::Value *rootTable = archTI.getWitnessTable(IGF, archetype,
-                                                      path.getOriginIndex());
-      return path.apply(IGF, rootTable);
-    }
-  }
-
-  // All other source types should be concrete enough that we have conformance
-  // info for them.
-  assert(conformance && "no conformance for concrete type?!");
-  auto &protoI = protoEntry.getInfo();
-  const ConformanceInfo &conformanceI
-    = protoI.getConformance(IGF.IGM, srcType,
-                            srcTI, proto, *conformance);
-  return conformanceI.getTable(IGF);
+  return emitWitnessTableRef(IGF, srcType, srcTI,
+                             protoEntry.getProtocol(),
+                             protoEntry.getInfo(),
+                             conformance);
 }
 
 /// Emit protocol witness table pointers for the given protocol conformances,
@@ -5120,13 +5096,15 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
 
   // Find the witness table.
+  // FIXME conformance for concrete type
   auto &baseTI = IGF.getTypeInfoForUnlowered(baseTy);
-  llvm::Value *wtable = getProtocolWitnessTable(IGF, baseTy, baseTI,
-                      ProtocolEntry(fnProto, IGF.IGM.getProtocolInfo(fnProto)),
-                      conformance); // FIXME conformance for concrete type
+  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
+  llvm::Value *wtable = emitWitnessTableRef(IGF, baseTy, baseTI,
+                                            fnProto,
+                                            fnProtoInfo,
+                                            conformance);
 
   // Find the witness we're interested in.
-  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(fnProto);
   auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
   llvm::Value *witness = emitLoadOfOpaqueWitness(IGF, wtable, index);
   

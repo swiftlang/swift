@@ -36,6 +36,7 @@ namespace irgen {
   class CallEmission;
   class IRGenFunction;
   class IRGenModule;
+  class ProtocolInfo;
   class TypeInfo;
 
   /// Emit the metadata and witness table initialization for an allocated
@@ -216,6 +217,14 @@ namespace irgen {
   llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
                                    CanArchetypeType archetype,
                                    ProtocolDecl *protocol);
+
+  /// Emit a witness table reference.
+  llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
+                                   CanType srcType,
+                                   const TypeInfo &srcTI,
+                                   ProtocolDecl *proto,
+                                   const ProtocolInfo &protoI,
+                                   ProtocolConformance *conformance);
 
   /// Emit a dynamic metatype lookup for the given archetype.
   llvm::Value *emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
