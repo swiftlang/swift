@@ -1826,7 +1826,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
 
   // Bind the value, branching to the destination address if there's no
   // value there.
-  gen.emitBindOptional(e, optAddr.getUnmanagedValue(), e->getDepth());
+  gen.emitBindOptional(e, optAddr, e->getDepth());
 
   // Project out the payload on the success branch.  We can just use a
   // naked ValueComponent here; this is effectively a separate l-value.

@@ -11,10 +11,6 @@ func foo(y : A?) {
 //   Check whether the temporary holds a value.
 // CHECK:      [[T1:%.*]] = select_enum %0
 // CHECK-NEXT: cond_br [[T1]], [[IS_PRESENT:bb.*]], [[NOT_PRESENT:bb[0-9]+]]
-//   If not, destroy the temporary.
-// CHECK:    [[NOT_PRESENT]]:
-// CHECK-NEXT: release_value %0
-// CHECK-NEXT: br [[NOT_PRESENT:bb[0-9]+]]
 //   If so, pull the value out and check whether it's a B.
 // CHECK:    [[IS_PRESENT]]:
 // CHECK-NEXT: [[VAL:%.*]] = unchecked_enum_data %0 : $Optional<A>, #Optional.Some!enumelt.1
@@ -51,38 +47,22 @@ func bar(y : A????) {
 // Check for Some(...)
 // CHECK-NEXT: retain_value %0
 // CHECK:      [[T1:%.*]] = select_enum %0
-// CHECK-NEXT: cond_br [[T1]], [[P:bb.*]], [[NP:bb[0-9]+]]
-//   If not, finish the evaluation.
-// CHECK:    [[NP]]:
-// CHECK-NEXT: release_value %0
-// CHECK-NEXT: br [[NIL_DEPTH2:bb[0-9]+]]
+// CHECK-NEXT: cond_br [[T1]], [[P:bb.*]], [[NIL_DEPTH2:bb[0-9]+]]
 //   If so, drill down another level and check for Some(Some(...)).
 // CHECK:    [[P]]:
 // CHECK-NEXT: [[VALUE_OOOA:%.*]] = unchecked_enum_data %0
 // CHECK:      [[T1:%.*]] = select_enum [[VALUE_OOOA]]
-// CHECK-NEXT: cond_br [[T1]], [[PP:bb.*]], [[NPP:bb[0-9]+]]
-//   If not, finish the evaluation.
-// CHECK:    [[NPP]]:
-// CHECK-NEXT: release_value [[VALUE_OOOA]]
-// CHECK-NEXT: br [[NIL_DEPTH2]]
+// CHECK-NEXT: cond_br [[T1]], [[PP:bb.*]], [[NIL_DEPTH2:bb[0-9]+]]
 //   If so, drill down another level and check for Some(Some(Some(...))).
 // CHECK:    [[PP]]:
 // CHECK-NEXT: [[VALUE_OOA:%.*]] = unchecked_enum_data [[VALUE_OOOA]]
 // CHECK:      [[T1:%.*]] = select_enum [[VALUE_OOA]]
-// CHECK-NEXT: cond_br [[T1]], [[PPP:bb.*]], [[NPPP:bb[0-9]+]]
-//   If not, wrap up with Some(None).
-// CHECK:    [[NPPP]]:
-// CHECK-NEXT: release_value [[VALUE_OOA]]
-// CHECK-NEXT: br [[NIL_DEPTH1:bb[0-9]+]]
+// CHECK-NEXT: cond_br [[T1]], [[PPP:bb.*]], [[NIL_DEPTH1:bb[0-9]+]]
 //   If so, drill down another level and check for Some(Some(Some(Some(...)))).
 // CHECK:    [[PPP]]:
 // CHECK-NEXT: [[VALUE_OA:%.*]] = unchecked_enum_data [[VALUE_OOA]]
 // CHECK:      [[T1:%.*]] = select_enum [[VALUE_OA]]
-// CHECK-NEXT: cond_br [[T1]], [[PPPP:bb.*]], [[NPPPP:bb[0-9]+]]
-//   If not, wrap up with Some(Some(None)).
-// CHECK:    [[NPPPP]]:
-// CHECK-NEXT: release_value [[VALUE_OA]]
-// CHECK-NEXT: br [[NIL_DEPTH0:bb[0-9]+]]
+// CHECK-NEXT: cond_br [[T1]], [[PPPP:bb.*]], [[NIL_DEPTH0:bb[0-9]+]]
 //   If so, pull out the A and check whether it's a B.
 // CHECK:    [[PPPP]]:
 // CHECK-NEXT: [[VAL:%.*]] = unchecked_enum_data [[VALUE_OA]]
@@ -100,11 +80,7 @@ func bar(y : A????) {
 //   Switch out on the value in [[OB2]].
 // CHECK:    [[SWITCH_OB2]]([[VAL:%[0-9]+]] : $Optional<B>):
 // CHECK:      [[T1:%.*]] = select_enum [[VAL]]
-// CHECK-NEXT: cond_br [[T1]], [[IS_B2:bb.*]], [[NOT_B2:bb[0-9]+]]
-//   If it's not present, finish the evaluation.
-// CHECK:    [[NOT_B2]]:
-// CHECK-NEXT: release_value [[VAL]]
-// CHECK-NEXT: br [[NIL_DEPTH2]]
+// CHECK-NEXT: cond_br [[T1]], [[IS_B2:bb.*]], [[NIL_DEPTH2:bb[0-9]+]]
 //   If it's present, set OB := Some(x).
 // CHECK:    [[IS_B2]]:
 // CHECK-NEXT: [[VALUE_B:%.*]] = unchecked_enum_data [[VAL]]

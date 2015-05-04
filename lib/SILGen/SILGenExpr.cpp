@@ -2801,7 +2801,7 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
 }
 
 void SILGenFunction::emitBindOptional(SILLocation loc,
-                                      SILValue optionalAddrOrValue,
+                                      ManagedValue optionalAddrOrValue,
                                       unsigned depth) {
   assert(depth < BindOptionalFailureDests.size());
   auto failureDest = BindOptionalFailureDests[BindOptionalFailureDests.size()
@@ -2809,14 +2809,26 @@ void SILGenFunction::emitBindOptional(SILLocation loc,
 
   // Check whether the optional has a value.
   SILBasicBlock *hasValueBB = createBasicBlock();
-  SILValue hasValue = emitDoesOptionalHaveValue(loc, optionalAddrOrValue);
+  auto hasValue = emitDoesOptionalHaveValue(loc,optionalAddrOrValue.getValue());
 
+  // If there is a cleanup for the optional value being tested, we can disable
+  // it on the failure path.  We don't need to destroy it because we know that
+  // on that path it is nil.
+  if (optionalAddrOrValue.hasCleanup())
+    Cleanups.setCleanupState(optionalAddrOrValue.getCleanup(),
+                             CleanupState::Dormant);
+    
   // If not, thread out through a bunch of cleanups.
   SILBasicBlock *hasNoValueBB = Cleanups.emitBlockForCleanups(failureDest, loc);
   B.createCondBranch(loc, hasValue, hasValueBB, hasNoValueBB);
-
+  
   // If so, continue.
   B.emitBlock(hasValueBB);
+
+  // Reenable the cleanup for the optional on the normal path.
+  if (optionalAddrOrValue.hasCleanup())
+    Cleanups.setCleanupState(optionalAddrOrValue.getCleanup(),
+                             CleanupState::Active);
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
@@ -2837,7 +2849,7 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
 
   // Check to see whether the optional is present, if not, jump to the current
   // nil handler block.
-  SGF.emitBindOptional(E, optValue.getValue(), E->getDepth());
+  SGF.emitBindOptional(E, optValue, E->getDepth());
 
   // If we continued, get the value out as the result of the expression.
   auto resultValue = SGF.emitUncheckedGetOptionalValueFrom(E, optValue,
@@ -2870,9 +2882,6 @@ namespace {
 
 RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                                                   SGFContext C) {
-  // Allocate a temporary for the Optional<T> if we didn't get one
-  // from the context.  This needs to happen outside of the cleanups
-  // scope we're about to push.
   auto &optTL = SGF.getTypeLowering(E->getType());
 
   Initialization *optInit = C.getEmitInto();
@@ -2884,6 +2893,9 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   
   std::unique_ptr<TemporaryInitialization> optTemp;
   if (!usingProvidedContext && isByAddress) {
+    // Allocate the temporary for the Optional<T> if we didn't get one from the
+    // context.  This needs to happen outside of the cleanups scope we're about
+    // to push.
     optTemp = SGF.emitTemporary(E, optTL);
     optInit = optTemp.get();
   }

@@ -6,25 +6,22 @@ func testCall(f: (()->())?) {
 // CHECK:    sil hidden @{{.*}}testCall{{.*}}
 // CHECK:    bb0([[T0:%.*]] : $Optional<() -> ()>):
 // CHECK:      [[T1:%.*]] = select_enum %0
-// CHECK-NEXT: cond_br [[T1]], bb2, bb1
+// CHECK-NEXT: cond_br [[T1]], bb1, bb2
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
-// CHECK:    bb1:
-// CHECK-NEXT: release_value %0
-// CHECK:      br bb3
 
-// CHECK: bb2:
+// CHECK: bb1:
 // CHECK-NEXT: [[FN0:%.*]] = unchecked_enum_data %0 : $Optional<() -> ()>, #Optional.Some!enumelt.1
 //   ...unnecessarily reabstract back to () -> ()...
 // CHECK:      [[T0:%.*]] = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@owned @callee_owned (@out (), @in ()) -> ()) -> ()
 // CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
 //   .... then call it
 // CHECK-NEXT: apply [[FN1]]()
-// CHECK:      br bb4(
+// CHECK:      br bb3(
 //   (first nothing block)
-// CHECK:    bb3:
+// CHECK:    bb2:
 // CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
-// CHECK-NEXT: br bb4
+// CHECK-NEXT: br bb3
 
 func testAddrOnlyCallResult<T>(var f: (()->T)?) {
   var x = f?()
