@@ -258,7 +258,8 @@ enum class ObjCReason {
   ExplicitlyObjC,
   ExplicitlyIBOutlet,
   ExplicitlyNSManaged,
-  MemberOfObjCProtocol
+  MemberOfObjCProtocol,
+  ImplicitlyObjC
 };
 
 /// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to

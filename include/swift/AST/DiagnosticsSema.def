@@ -1998,16 +1998,16 @@ ERROR(objc_name_func_mismatch,sema_objc,none,
       (bool, unsigned, bool, unsigned, bool, bool))
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{dynamic|@objc|@IBOutlet|@NSManaged|@objc}"
+#define OBJC_ATTR_SELECT "select{marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc}"
 
 ERROR(objc_invalid_on_var,sema_objc,none,
-      "property cannot be marked %" OBJC_ATTR_SELECT "0 "
+      "property cannot be %" OBJC_ATTR_SELECT "0 "
       "because its type cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_subscript_key_type,sema_objc,none,
-      "subscript cannot be marked %" OBJC_ATTR_SELECT "0 because its key "
+      "subscript cannot be %" OBJC_ATTR_SELECT "0 because its key "
       "type %1 is neither an integer nor an object", (unsigned, Type))
 ERROR(objc_invalid_on_subscript,sema_objc,none,
-      "subscript cannot be marked %" OBJC_ATTR_SELECT "0 because its type "
+      "subscript cannot be %" OBJC_ATTR_SELECT "0 because its type "
       "cannot be represented in Objective-C", (unsigned))
 ERROR(objc_convention_invalid,sema_objc,none,
       "@convention(%0) type is not representable in Objective-C", (StringRef))
@@ -2038,37 +2038,37 @@ NOTE(objc_inferring_on_objc_protocol_member,sema_objc,none,
      "an '@objc' protocol", ())
 
 ERROR(objc_invalid_on_func_curried,sema_objc,none,
-      "method cannot be marked %" OBJC_ATTR_SELECT "0 because curried functions "
+      "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "
       "cannot be represented in Objective-C", (unsigned))
 ERROR(objc_observing_accessor,sema_objc, none,
       "observing accessors are not allowed to be marked @objc", ())
 ERROR(objc_invalid_on_func_variadic,sema_objc,none,
-      "method cannot be marked %" OBJC_ATTR_SELECT "0 because it has a variadic "
+      "method cannot be %" OBJC_ATTR_SELECT "0 because it has a variadic "
       "parameter", (unsigned))
 ERROR(objc_invalid_on_func_param_type,sema_objc,none,
-      "method cannot be marked %" OBJC_ATTR_SELECT "1 because the type of the "
+      "method cannot be %" OBJC_ATTR_SELECT "1 because the type of the "
       "parameter %0 cannot be represented in Objective-C", (unsigned, unsigned))
 ERROR(objc_invalid_on_func_single_param_type,sema_objc,none,
-      "method cannot be marked %" OBJC_ATTR_SELECT "0 because the type of the "
+      "method cannot be %" OBJC_ATTR_SELECT "0 because the type of the "
       "parameter cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_on_func_result_type,sema_objc,none,
-      "method cannot be marked %" OBJC_ATTR_SELECT "0 because its result type "
+      "method cannot be %" OBJC_ATTR_SELECT "0 because its result type "
       "cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_on_foreign_class,sema_objc,none,
-      "method cannot be marked %" OBJC_ATTR_SELECT "0 because Core Foundation "
+      "method cannot be %" OBJC_ATTR_SELECT "0 because Core Foundation "
       "types are not classes in Objective-C", (unsigned))
 ERROR(objc_invalid_on_throwing_optional_result,sema_objc,none,
-      "throwing method cannot be marked %" OBJC_ATTR_SELECT "0 because "
+      "throwing method cannot be %" OBJC_ATTR_SELECT "0 because "
       "it returns a value of optional type %1; 'nil' indicates failure to "
       "Objective-C",
       (unsigned, Type))
 ERROR(objc_invalid_on_throwing_result,sema_objc,none,
-      "throwing method cannot be marked %" OBJC_ATTR_SELECT "0 because "
+      "throwing method cannot be %" OBJC_ATTR_SELECT "0 because "
       "it returns a value of type %1; return 'Void' or a type that bridges "
       "to an Objective-C class",
       (unsigned, Type))
 ERROR(objc_invalid_on_failing_init,sema_objc,none,
-      "a failable and throwing initializer cannot be marked "
+      "a failable and throwing initializer cannot be "
       "%" OBJC_ATTR_SELECT "0 because 'nil' indicates failure to Objective-C",
       (unsigned))
 
@@ -2130,7 +2130,7 @@ ERROR(objc_optional_requirement_conflict,sema_objc,none,
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, DeclName))
 
 ERROR(nonobjc_not_allowed,sema_objc,none,
-      "declaration is marked %" OBJC_ATTR_SELECT "0, and cannot be marked @nonobjc",
+      "declaration is %" OBJC_ATTR_SELECT "0, and cannot be marked @nonobjc",
       (unsigned))
 
 #undef OBJC_DIAG_SELECT_2

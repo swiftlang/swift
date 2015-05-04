@@ -2219,7 +2219,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                            superclassCtor->isBodyThrowing());
   if (superclassCtor->isObjC()) {
     auto errorConvention = superclassCtor->getForeignErrorConvention();
-    markAsObjC(tc, ctor, ObjCReason::ExplicitlyObjC, errorConvention);
+    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
 
     // Inherit the @objc name from the superclass initializer, if it
     // has one.

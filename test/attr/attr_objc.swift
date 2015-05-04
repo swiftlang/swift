@@ -218,30 +218,30 @@ protocol subject_containerProtocol1 {
 @objc
 protocol subject_containerObjCProtocol1 {
   func func_Curried1()()
-  // expected-error@-1 {{method cannot be marked @objc because curried functions cannot be represented in Objective-C}}
+  // expected-error@-1 {{method cannot be a member of an @objc protocol because curried functions cannot be represented in Objective-C}}
   // expected-note@-2 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
   func func_FunctionReturn1() -> PlainStruct
-  // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // expected-error@-1 {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
   func func_FunctionParam1(a: PlainStruct)
-  // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1 {{method cannot be a member of an @objc protocol because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
   func func_Variadic(AnyObject...)
-  // expected-error @-1{{method cannot be marked @objc because it has a variadic parameter}}
+  // expected-error @-1{{method cannot be a member of an @objc protocol because it has a variadic parameter}}
   // expected-note @-2{{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
   subscript(a: PlainStruct) -> Int { get }
-  // expected-error@-1 {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-error@-1 {{subscript cannot be a member of an @objc protocol because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
   var varNonObjC1: PlainStruct { get }
-  // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-error@-1 {{property cannot be a member of an @objc protocol because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 }

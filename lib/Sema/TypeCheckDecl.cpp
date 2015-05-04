@@ -2411,7 +2411,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       // "X cannot be represented in Objective-C" error, but still
       // complain if the user specifies @nonobjc.
       if (Reason == ObjCReason::DoNotDiagnose)
-        Reason = ObjCReason::ExplicitlyObjC;
+        Reason = ObjCReason::ImplicitlyObjC;
 
       TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
                   getObjCDiagnosticAttrKind(Reason));
@@ -5659,7 +5659,7 @@ public:
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
-    markAsObjC(TC, DD, ObjCReason::ExplicitlyObjC);
+    markAsObjC(TC, DD, ObjCReason::ImplicitlyObjC);
 
     TC.checkDeclAttributes(DD);
   }
@@ -5863,7 +5863,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       Optional<ObjCReason> isObjC;
       if (CD->getAttrs().hasAttribute<ObjCAttr>() ||
           (superclassDecl && superclassDecl->isObjC()))
-        isObjC = ObjCReason::ExplicitlyObjC;
+        isObjC = ObjCReason::ImplicitlyObjC;
       markAsObjC(*this, CD, isObjC);
 
       // Determine whether we require in-class initializers.
@@ -5921,7 +5921,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
-      Optional<ObjCReason> isObjC = ObjCReason::ExplicitlyObjC;
+      Optional<ObjCReason> isObjC = ObjCReason::ImplicitlyObjC;
 
       for (auto inherited : proto->getInheritedProtocols(nullptr)) {
         if (!inherited->isObjC()) {
