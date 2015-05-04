@@ -478,9 +478,6 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   setModuleFlags(IGM);
 
-  DEBUG(llvm::dbgs() << "module before passes:\n";
-        IGM.Module.dump());
-
   // Bail out if there are any errors.
   if (M->Ctx.hadError()) return nullptr;
 
@@ -494,14 +491,23 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 static void ThreadEntryPoint(IRGenModuleDispatcher *dispatcher,
                              llvm::sys::Mutex *DiagMutex, int ThreadIdx) {
   while (IRGenModule *IGM = dispatcher->fetchFromQueue()) {
-    DEBUG(dbgs() << "thread " << ThreadIdx << ": fetched\n");
+    DEBUG(
+      DiagMutex->lock();
+      dbgs() << "thread " << ThreadIdx << ": fetched " << IGM->OutputFilename <<
+          "\n";
+      DiagMutex->unlock();
+    );
     embedBitcode(IGM->getModule(), IGM->Opts);
     performLLVM(IGM->Opts, IGM->Context.Diags, DiagMutex, IGM->getModule(),
                 IGM->TargetMachine, IGM->OutputFilename);
     if (IGM->Context.Diags.hadAnyError())
       return;
   }
-  DEBUG(dbgs() << "thread " << ThreadIdx << ": done\n");
+  DEBUG(
+    DiagMutex->lock();
+    dbgs() << "thread " << ThreadIdx << ": done\n";
+    DiagMutex->unlock();
+  );
 }
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output files.
