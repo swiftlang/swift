@@ -105,7 +105,6 @@ switch y {
   case nil:  println("y is nil")
   case .Some(nil): println("y is .Some(nil)")
   case .Some(let v): println("y is .Some(\(v))")
-  default: println("Broken")
 }
 // CHECK: y is .Some(nil)
 
@@ -113,7 +112,6 @@ switch z {
   case nil:  println("z is nil")
   case .Some(nil): println("z is .Some(nil)")
   case .Some(let v): println("z is .Some(\(v))")
-  default: println("Broken")
 }
 // CHECK: z is nil
 
