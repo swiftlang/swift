@@ -879,9 +879,21 @@ namespace {
 
 /// A class to walk the AST to build the type refinement context hierarchy.
 class TypeRefinementContextBuilder : private ASTWalker {
-  std::vector<TypeRefinementContext *> ContextStack;
+
+  struct ContextInfo {
+    TypeRefinementContext *TRC;
+
+    /// The node whose end marks the end of the refinement context.
+    /// If the builder sees this node in a post-visitor, it will pop
+    /// the context from the stack. This node can be null (ParentTy()),
+    /// indicating that custom logic elsewhere will handle removing
+    /// the context when needed.
+    ParentTy ScopeNode;
+  };
+
+  std::vector<ContextInfo> ContextStack;
   ASTContext &AC;
-  
+
   /// A mapping from abstract storage declarations with accessors to
   /// to the type refinement contexts for those declarations. We refer to
   /// this map to determine the appopriate parent TRC to use when
@@ -890,35 +902,65 @@ class TypeRefinementContextBuilder : private ASTWalker {
       StorageContexts;
 
   TypeRefinementContext *getCurrentTRC() {
-    assert(ContextStack.size() > 0);
-    return ContextStack[ContextStack.size() - 1];
+    return ContextStack.back().TRC;
   }
-  
+
+  void pushContext(TypeRefinementContext *TRC, ParentTy PopAfterNode) {
+    ContextInfo Info;
+    Info.TRC = TRC;
+    Info.ScopeNode = PopAfterNode;
+    ContextStack.push_back(Info);
+  }
+
 public:
   TypeRefinementContextBuilder(TypeRefinementContext *TRC, ASTContext &AC)
       : AC(AC) {
     assert(TRC);
-    ContextStack.push_back(TRC);
+    pushContext(TRC, ParentTy());
   }
 
-  void build(Decl *D) { D->walk(*this); }
-  void build(Stmt *S) { S->walk(*this); }
-  void build(Expr *E) { E->walk(*this); }
+  void build(Decl *D) {
+    unsigned StackHeight = ContextStack.size();
+    D->walk(*this);
+    assert(ContextStack.size() == StackHeight);
+    (void)StackHeight;
+  }
+
+  void build(Stmt *S) {
+    unsigned StackHeight = ContextStack.size();
+    S->walk(*this);
+    assert(ContextStack.size() == StackHeight);
+    (void)StackHeight;
+  }
+
+  void build(Expr *E) {
+    unsigned StackHeight = ContextStack.size();
+    E->walk(*this);
+    assert(ContextStack.size() == StackHeight);
+    (void)StackHeight;
+  }
 
 private:
   virtual bool walkToDeclPre(Decl *D) override {
-    TypeRefinementContext *DeclTRC = getContextForWalkOfDecl(D);
-    ContextStack.push_back(DeclTRC);
+    TypeRefinementContext *DeclTRC = getNewContextForWalkOfDecl(D);
+
+    if (DeclTRC) {
+      pushContext(DeclTRC, D);
+    }
+
     return true;
   }
-  
+
   virtual bool walkToDeclPost(Decl *D) override {
-    assert(ContextStack.size() > 0);
-    ContextStack.pop_back();
+    if (ContextStack.back().ScopeNode.getAsDecl() == D) {
+      ContextStack.pop_back();
+    }
     return true;
   }
-  
-  TypeRefinementContext *getContextForWalkOfDecl(Decl *D) {
+
+  /// Returns a new context to be introduced for the declaration, or nullptr
+  /// if no new context should be introduced.
+  TypeRefinementContext *getNewContextForWalkOfDecl(Decl *D) {
     if (auto FD = dyn_cast<FuncDecl>(D)) {
       if (FD->isAccessor()) {
         // Use TRC of the storage rather the current TRC when walking this
@@ -930,14 +972,11 @@ private:
       }
     }
     
-    TypeRefinementContext *NewTRC = nullptr;
     if (declarationIntroducesNewContext(D)) {
-      NewTRC = buildDeclarationRefinementContext(D);
-    } else {
-      NewTRC = getCurrentTRC();
+      return buildDeclarationRefinementContext(D);
     }
     
-    return NewTRC;
+    return nullptr;
   }
 
   /// Builds the type refinement hierarchy for the body of the function.
@@ -1025,12 +1064,25 @@ private:
   }
 
   virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    auto IS = dyn_cast<IfStmt>(S);
-    if (!IS)
-      return std::make_pair(true, S);
+    if (auto *IS = dyn_cast<IfStmt>(S)) {
+      buildIfStmtRefinementContext(IS);
+      return std::make_pair(false, S);
+    }
 
-    buildIfStmtRefinementContext(IS);
-    return std::make_pair(false, S);
+    if (auto *RS = dyn_cast<RequireStmt>(S)) {
+      buildRequireStmtRefinementContext(RS);
+      return std::make_pair(false, S);
+    }
+
+    return std::make_pair(true, S);
+  }
+
+  virtual Stmt *walkToStmtPost(Stmt *S) override {
+    if (ContextStack.back().ScopeNode.getAsStmt() == S) {
+      ContextStack.pop_back();
+    }
+
+    return S;
   }
 
   /// Builds the type refinement hierarchy for the IfStmt if the guard
@@ -1059,6 +1111,43 @@ private:
       // support "<") we should create a TRC for the Else branch.
       build(IS->getElseStmt());
     }
+  }
+
+  /// Builds the type refinement hierarchy for the RequireStmt and pushes
+  /// the fallthrough context onto the context stack so that subsequent
+  /// AST elements in the same scope are analyzed in the context of the
+  /// fallthrough TRC.
+  void buildRequireStmtRefinementContext(RequireStmt *RS) {
+    // Require statements fall through if all of the
+    // guard conditions are true, so we refine the range after the require
+    // until the end of the enclosing block.
+    // if ... {
+    //   require available(...) else { return } <-- Refined range starts here
+    //   ...
+    // } <-- Refined range ends here
+    //
+    // This is slightly tricky because, unlike our other control constructs,
+    // the refined region is not lexically contained inside the construct
+    // introducing the refinement context.
+    Optional<VersionRange> RefinedRange =
+        buildStmtConditionRefinementContext(RS->getCond());
+
+    if (Stmt *Body = RS->getBody()) {
+      build(Body);
+    }
+
+    BraceStmt *ParentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
+    assert(ParentBrace && "Expected parent of RequireStmt to be BraceStmt");
+    if (!RefinedRange.hasValue())
+      return;
+
+    // Create a new context for the fallthrough.
+
+    auto *FallthroughTRC =
+          TypeRefinementContext::createForRequireStmtFallthrough(AC, RS,
+              ParentBrace, getCurrentTRC(), RefinedRange.getValue());
+
+    pushContext(FallthroughTRC, ParentBrace);
   }
 
   /// Validate the availability query, emitting diagnostics if necessary.
@@ -1173,7 +1262,7 @@ private:
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
           AC, QueryExpr, LastElement, getCurrentTRC(), Range);
 
-      ContextStack.push_back(TRC);
+      pushContext(TRC, ParentTy());
       NestedCount++;
     }
 
@@ -1241,7 +1330,14 @@ private:
     
     return std::make_pair(false, E);
   }
-  
+
+  virtual Expr *walkToExprPost(Expr *E) override {
+    if (ContextStack.back().ScopeNode.getAsExpr() == E) {
+      ContextStack.pop_back();
+    }
+
+    return E;
+  }
 };
   
 }

@@ -80,6 +80,19 @@ TypeRefinementContext::createForConditionFollowingQuery(ASTContext &Ctx,
   return new (Ctx) TypeRefinementContext(Ctx, QE, Parent, Range, Versions);
 }
 
+TypeRefinementContext *
+TypeRefinementContext::createForRequireStmtFallthrough(ASTContext &Ctx,
+                                  RequireStmt *RS,
+                                  BraceStmt *ContainingBraceStmt,
+                                  TypeRefinementContext *Parent,
+                                  const VersionRange &Versions) {
+  assert(RS);
+  assert(ContainingBraceStmt);
+  assert(Parent);
+  SourceRange Range(RS->getEndLoc(), ContainingBraceStmt->getEndLoc());
+  return new (Ctx) TypeRefinementContext(Ctx, RS, Parent, Range, Versions);
+}
+
 // Only allow allocation of TypeRefinementContext using the allocator in
 // ASTContext.
 void *TypeRefinementContext::operator new(size_t Bytes, ASTContext &C,
@@ -127,6 +140,9 @@ SourceLoc TypeRefinementContext::getIntroductionLoc() const {
 
   case Reason::ConditionFollowingAvailabilityQuery:
     return cast<AvailabilityQueryExpr>(Node.get<Expr *>())->getLoc();
+
+  case Reason::RequireStmtFallthrough:
+    return cast<RequireStmt>(Node.get<Stmt *>())->getRequireLoc();
 
   case Reason::Root:
     return SourceLoc();
@@ -179,6 +195,10 @@ TypeRefinementContext::Reason TypeRefinementContext::getReason() const {
       // refinement contexts for Else branches.
       return Reason::IfStmtThenBranch;
     }
+
+    if (isa<RequireStmt>(S)) {
+      return Reason::RequireStmtFallthrough;
+    }
   } else if (Node.is<SourceFile *>()) {
     return Reason::Root;
   }
@@ -198,5 +218,8 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
 
   case Reason::ConditionFollowingAvailabilityQuery:
     return "condition_following_availability";
+
+  case Reason::RequireStmtFallthrough:
+    return "require_fallthrough";
   }
 }

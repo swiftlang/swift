@@ -27,8 +27,10 @@
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
+  class BraceStmt;
   class Decl;
   class IfStmt;
+  class RequireStmt;
   class SourceFile;
   class Stmt;
   class AvailabilityQueryExpr;
@@ -66,7 +68,11 @@ public:
     /// if #available(...),
     ///    let x = expr() {
     ///  }
-    ConditionFollowingAvailabilityQuery
+    ConditionFollowingAvailabilityQuery,
+
+    /// The context was introduced for the fallthrough flow of a require
+    /// statement.
+    RequireStmtFallthrough,
   };
 
   using IntroNode = llvm::PointerUnion4<SourceFile *, Decl *, Stmt *, Expr *>;
@@ -110,7 +116,14 @@ public:
                                    const StmtConditionElement &LastElement,
                                    TypeRefinementContext *Parent,
                                    const VersionRange &Versions);
-  
+
+  /// Create a refinement context for the fallthrough of a RequireStmt.
+  static TypeRefinementContext *
+  createForRequireStmtFallthrough(ASTContext &Ctx, RequireStmt *RS,
+                                  BraceStmt *ContainingBraceStmt,
+                                  TypeRefinementContext *Parent,
+                                  const VersionRange &Versions);
+
   /// Returns the reason this context was introduced.
   Reason getReason() const;
   

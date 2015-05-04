@@ -1047,6 +1047,38 @@ if let _ = injectToOptional(5) where #available(OSX 10.10, *), // expected-note 
    let _ = injectToOptional(6) where #available(OSX 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
 }
 
+
+// Tests for the require control construct.
+
+func useRequireAvailable() {
+  // Require  fallthrough should refine context
+  require #available(OSX 10.10, *) else { // expected-note {{enclosing scope here}}
+    let _ = globalFuncAvailableOn10_10() // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
+        // expected-note@-1 {{guard with version check}}
+        // expected-note@-2 {{add @availability attribute to enclosing global function}}
+    return
+  }
+
+  let _ = globalFuncAvailableOn10_10()
+
+  let _ = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
+        // expected-note@-1 {{guard with version check}}
+        // expected-note@-2 {{add @availability attribute to enclosing global function}}
+
+  if #available(OSX 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+  }
+
+  if globalFuncAvailableOn10_10() > 0 {
+    require #available(OSX 10.11, *),
+            let x = injectToOptional(globalFuncAvailableOn10_11()) else { return }
+  }
+
+  let _ = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
+        // expected-note@-1 {{guard with version check}}
+        // expected-note@-2 {{add @availability attribute to enclosing global function}}
+
+}
+
 // Tests for Fix-It replacement text
 // The whitespace in the replacement text is particularly important here -- it reflects the level
 // of indentation for the added if #available() or @availability attribute. Note that, for the moment, we hard
