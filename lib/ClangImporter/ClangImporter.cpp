@@ -243,6 +243,9 @@ ClangImporter::create(ASTContext &ctx,
 
       // Request new APIs from SceneKit.
       "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=1",
+
+      // Request new APIs from SpriteKit.
+      "-DSWIFT_SDK_OVERLAY2_SPRITEKIT_EPOCH=1",
     };
     invocationArgStrs.insert(invocationArgStrs.end(), extraArgs.begin(),
                              extraArgs.end());
