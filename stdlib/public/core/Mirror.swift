@@ -739,3 +739,9 @@ extension String {
     debugPrint(subject, &self)
   }
 }
+
+extension Mirror : CustomReflectable {
+  public func customMirror() -> Mirror {
+    return Mirror(self, children: [])
+  }
+}
