@@ -1719,7 +1719,7 @@ ERROR(fallthrough_into_case_with_var_binding,sema_tcs,none,
 ERROR(cannot_infer_type_for_pattern,sema_tcp,none,
       "type annotation missing in pattern", ())
 ERROR(refutable_pattern_requires_initializer,sema_tcd,none,
-      "refutable pattern requires an initializer value to match against", ())
+      "pattern matching requires an initializer value to match against", ())
 ERROR(invalid_pattern,sema_tcd,none,
       "invalid pattern", ())
 WARNING(var_pattern_didnt_bind_variables, sema_tcp,none,

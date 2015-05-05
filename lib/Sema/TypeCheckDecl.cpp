@@ -1349,17 +1349,6 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   binding->setPattern(entryNumber, pattern);
 
-  // If the pattern is refutable, then it must have an initializer associated
-  // with it.
-  if (pattern->isRefutablePattern() && !binding->getInit(entryNumber)) {
-    tc.diagnose(pattern->getStartLoc(),
-                diag::refutable_pattern_requires_initializer)
-      .highlight(pattern->getSourceRange());
-    // Install one to make later invariant checking work better.
-    auto init = new (tc.Context) ErrorExpr(pattern->getSourceRange());
-    binding->setInit(entryNumber, init);
-  }
-  
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
