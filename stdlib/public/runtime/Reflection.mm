@@ -607,10 +607,10 @@ extern "C"
 intptr_t swift_ObjCMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
-#if REFLECT_OBJC_IVARS
   auto isa = (Class)type;
   
-  unsigned count;
+  unsigned count = 0;
+#if REFLECT_OBJC_IVARS
   // Don't reflect ivars of classes that lie about their layout.
   if (objcClassLiesAboutLayout(isa)) {
     count = 0;
@@ -620,6 +620,9 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
     Ivar *ivars = class_copyIvarList(isa, &count);
     free(ivars);
   }
+#else
+  // ObjC makes no guarantees about the state of ivars, so we can't safely
+  // introspect them in the general case.
   
   // The superobject counts as a child.
   if (_swift_getSuperclass((const ClassMetadata*) isa))
@@ -627,11 +630,6 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   
   swift_release(owner);
   return count;
-#else
-  // ObjC makes no guarantees about the state of ivars, so we can't safely
-  // introspect them in the general case.
-  swift_release(owner);
-  return 0;
 #endif
 }
 #if SWIFT_OBJC_INTEROP
@@ -645,7 +643,6 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
                                              HeapObject *owner,
                                              const OpaqueValue *value,
                                              const Metadata *type) {
-#if REFLECT_OBJC_IVARS
   id object = *reinterpret_cast<const id *>(value);
   auto isa = (Class)type;
   
@@ -661,6 +658,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
     --i;
   }
   
+#if REFLECT_OBJC_IVARS
   // Copying the ivar list just to free it is lame, but we have
   // no room to save it.
   unsigned count;

@@ -441,13 +441,9 @@ mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
     expectEqual("a", first(a.children)!.label)
     if let t = expectNotEmpty(a.superclassMirror()) {
       expectTrue(t.subjectType == NSTask.self)
-      // FIXME: There's a bug in legacy mirrors that prevents this
-      // part of the test from working
-      /*
       if let o = expectNotEmpty(t.superclassMirror()) {
-        expectTrue(t.subjectType == NSObject.self)
+        expectTrue(o.subjectType == NSObject.self)
       }
-      */
     }
   }
 }
