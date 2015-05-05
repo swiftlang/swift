@@ -3,8 +3,10 @@
 class A {}
 class B : A {}
 
-
-// CHECK-LABEL: sil hidden @_TF4main3foo
+func foo(y : A?) {
+  var x = (y as? B)
+}
+// CHECK-DAG: sil hidden @_TF4main3foo
 // CHECK:      [[X:%.*]] = alloc_box $Optional<B> // var x
 //   Check whether the temporary holds a value.
 // CHECK:      [[T1:%.*]] = select_enum %0
@@ -27,19 +29,19 @@ class B : A {}
 //   Finish the present path.
 // CHECK:    [[CONT]]:
 // CHECK-NEXT: br [[CONT2:bb[0-9]+]]
-//   Finish.
-// CHECK:    [[CONT2]]:
-// CHECK-NEXT: strong_release [[X]]#0
-// CHECK-NEXT: release_value %0
 //   Finish the not-present path.
 // CHECK:    [[NOT_PRESENT]]:
 // CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
 // CHECK-NEXT: br [[CONT2]]
-func foo(y : A?) {
-  var x = (y as? B)
-}
+//   Finish.
+// CHECK:    [[CONT2]]:
+// CHECK-NEXT: strong_release [[X]]#0
+// CHECK-NEXT: release_value %0
 
-// CHECK-LABEL: sil hidden @_TF4main3bar
+func bar(y : A????) {
+  var x = (y as? B??)
+}
+// CHECK-DAG: sil hidden @_TF4main3bar
 // CHECK:      [[X:%.*]] = alloc_box $Optional<Optional<Optional<B>>> // var x
 
 // Check for Some(...)
@@ -77,83 +79,45 @@ func foo(y : A?) {
 // CHECK-NEXT: br [[SWITCH_OB2]](
 //   Switch out on the value in [[OB2]].
 // CHECK:    [[SWITCH_OB2]]([[VAL:%[0-9]+]] : $Optional<B>):
-// CHECK:      br [[DONE_DEPTH0:bb[0-9]+]]
-// CHECK:    [[DONE_DEPTH0]](
+// CHECK:      [[T1:%.*]] = select_enum [[VAL]]
+// CHECK-NEXT: cond_br [[T1]], [[IS_B2:bb.*]], [[NIL_DEPTH2:bb[0-9]+]]
+//   If it's present, set OB := Some(x).
+// CHECK:    [[IS_B2]]:
+// CHECK-NEXT: [[VALUE_B:%.*]] = unchecked_enum_data [[VAL]]
+// CHECK-NEXT: enum $Optional<B>, #Optional.Some!enumelt.1, [[VALUE_B]]
+// CHECK-NEXT: br [[DONE_DEPTH0:bb[0-9]+]](
+//   On various failure paths, set OB := nil.
+// CHECK:    [[NIL_DEPTH0]]:
+// CHECK-NEXT: enum $Optional<B>, #Optional.None!enumelt
+// CHECK-NEXT: br [[DONE_DEPTH0]]
+//   Set OOB := Some(OB).
+// CHECK:    [[DONE_DEPTH0]]
 // CHECK-NEXT: enum $Optional<Optional<B>>, #Optional.Some!enumelt.1,
 // CHECK-NEXT: br [[DONE_DEPTH1:bb[0-9]+]]
-//   Set X := Some(OOB).
-// CHECK:    [[DONE_DEPTH1]]
-// CHECK-NEXT: enum $Optional<Optional<Optional<B>>>, #Optional.Some!enumelt.1,
-// CHECK: br [[DONE_DEPTH2:bb[0-9]+]]
-// CHECK:    [[DONE_DEPTH2]]
-// CHECK-NEXT: strong_release [[X]]#0
-// CHECK-NEXT: release_value %0
-// CHECK:      return
 //   On various failure paths, set OOB := nil.
 // CHECK:    [[NIL_DEPTH1]]:
 // CHECK-NEXT: enum $Optional<Optional<B>>, #Optional.None!enumelt
 // CHECK-NEXT: br [[DONE_DEPTH1]]
+//   Set X := Some(OOB).
+// CHECK:    [[DONE_DEPTH1]]
+// CHECK-NEXT: enum $Optional<Optional<Optional<B>>>, #Optional.Some!enumelt.1,
+// CHECK: br [[DONE_DEPTH2:bb[0-9]+]]
 //   On various failure paths, set X := nil.
 // CHECK:    [[NIL_DEPTH2]]:
 // CHECK-NEXT: inject_enum_addr [[X]]{{.*}}None
 // CHECK-NEXT: br [[DONE_DEPTH2]]
 //   Done.
-func bar(y : A????) {
-  var x = (y as? B??)
-}
+// CHECK:    [[DONE_DEPTH2]]
+// CHECK-NEXT: strong_release [[X]]#0
+// CHECK-NEXT: release_value %0
 
-// CHECK-LABEL: sil hidden @_TF4main3baz
+func baz(y : AnyObject?) {
+  var x = (y as? B)
+}
+// CHECK-DAG: sil hidden @_TF4main3baz
 // CHECK:      [[X:%.*]] = alloc_box $Optional<B>  // var x
 // CHECK-NEXT: retain_value %0
 // CHECK:      [[T1:%.*]] = select_enum %0
 // CHECK: [[VAL:%.*]] = unchecked_enum_data %0
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[X]]#1 : $*Optional<B>, #Optional.Some
 // CHECK-NEXT: checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
-func baz(y : AnyObject?) {
-  var x = (y as? B)
-}
-
-
-// <rdar://problem/17013042> T! <-> T? conversions should not produce a diamond
-
-// CHECK-LABEL: sil hidden @_TF4main18opt_to_opt_trivialFGSqSi_GSQSi_
-// CHECK-NEXT:  bb0(%0 : $Optional<Int>):
-// CHECK-NEXT:  debug_value %0 : $Optional<Int>  // let x
-// CHECK-NEXT:  %2 = unchecked_trivial_bit_cast %0 : $Optional<Int> to $ImplicitlyUnwrappedOptional<Int>
-// CHECK-NEXT:  return %2 : $ImplicitlyUnwrappedOptional<Int>
-// CHECK-NEXT:}
-func opt_to_opt_trivial(x: Int?) -> Int! {
-  return x
-}
-
-// CHECK-LABEL: sil hidden @_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__
-// CHECK-NEXT:  bb0(%0 : $ImplicitlyUnwrappedOptional<C>):
-// CHECK-NEXT:  debug_value %0 : $ImplicitlyUnwrappedOptional<C>  // let x
-// CHECK-NEXT:  %2 = unchecked_ref_bit_cast %0 : $ImplicitlyUnwrappedOptional<C> to $Optional<C>
-// CHECK-NEXT:  return %2 : $Optional<C>
-// CHECK-NEXT:}
-func opt_to_opt_reference(x : C!) -> C? { return x }
-
-// CHECK-LABEL: sil hidden @_TF4main22opt_to_opt_addressOnlyU__FGSQQ__GSqQ__
-// CHECK-NEXT:  bb0(%0 : $*Optional<T>, %1 : $*ImplicitlyUnwrappedOptional<T>):
-// CHECK-NEXT:  debug_value_addr %1 : $*ImplicitlyUnwrappedOptional<T>  // let x
-// CHECK-NEXT:  %3 = unchecked_addr_cast %0 : $*Optional<T> to $*ImplicitlyUnwrappedOptional<T>
-// CHECK-NEXT:  copy_addr [take] %1 to [initialization] %3
-func opt_to_opt_addressOnly<T>(x : T!) -> T? { return x }
-
-class C {}
-
-public struct TestAddressOnlyStruct<T>  {
-  func f(a : T?) {}
-  
-  // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCallU__fGS0_Q__FGSQQ__T_
-  // CHECK-NEXT: bb0(%0 : $*ImplicitlyUnwrappedOptional<T>, %1 : $TestAddressOnlyStruct<T>):
-  // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
-  // CHECK: [[TMPCAST:%.*]] = unchecked_addr_cast [[TMPBUF]]#1
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPCAST]]
-  // CHECK-NEXT: apply {{.*}}<T>([[TMPBUF]]#1, %1)
-  func testCall(a : T!) {
-    f(a)
-  }
-}
-
