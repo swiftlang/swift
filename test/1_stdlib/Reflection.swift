@@ -425,11 +425,15 @@ class SubScene : SKScene {
 // CHECK-LABEL: SKScene subclass:
 // CHECK-NEXT: {{.*}}SubScene
 // CHECK-NEXT:   super: <SKScene>
-// CHECK-NEXT:   foo: 12131415
-// CHECK-NEXT:   bar: boom
-// CHECK-NEXT:   bas: {{.*}}Pear
-// CHECK-NEXT:     fst: 219
-// CHECK-NEXT:     snd: 3 elements
+// CHECK-NEXT:     ▿ SKEffectNode: <SKScene> name:'(null)' frame:
+// CHECK-NEXT:       ▿ SKNode: <SKScene> name:'(null)' frame:
+// CHECK-NEXT:         ▿ NSResponder: <SKScene> name:'(null)' frame:
+// CHECK-NEXT:           - NSObject: <SKScene> name:'(null)' frame:
+// CHECK-NEXT:   - foo: 12131415
+// CHECK-NEXT:   - bar: boom
+// CHECK-NEXT:   ▿ bas: {{.*}}Pear
+// CHECK-NEXT:     - fst: 219
+// CHECK-NEXT:     ▿ snd: 3 elements
 // CHECK-NEXT:       [0]: boom
 // CHECK-NEXT:         Some: boom
 // CHECK-NEXT:       [1]: 123

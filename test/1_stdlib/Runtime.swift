@@ -1537,7 +1537,8 @@ Reflection.test("Unmanaged/not-nil") {
   let expected =
     "▿ Swift.Unmanaged<ObjectiveC.CFURL>\n" +
     "  ▿ Some: Swift.Unmanaged<ObjectiveC.CFURL>\n" +
-    "    - _value: http://llvm.org/ #0\n"
+    "    ▿ _value: http://llvm.org/ #0\n" +
+    "      - NSObject: http://llvm.org/\n"
 
   expectEqual(expected, output)
 
