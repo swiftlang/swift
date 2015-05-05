@@ -1569,6 +1569,9 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeComputed(VD->getLoc(), Get, Set, nullptr, VD->getLoc());
 
+  TC.validateDecl(Get);
+  TC.validateDecl(Set);
+
   // We've added some members to our containing class/extension, add them to
   // the members list.
   addMemberToContextIfNeeded(Get, VD->getDeclContext());
@@ -1840,7 +1843,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     var->makeComputed(var->getLoc(), getter, setter, nullptr,
                       var->getLoc());
     var->setIsBeingTypeChecked(false);
-    TC.computeAccessibility(setter);
+
+    TC.validateDecl(getter);
+    TC.validateDecl(setter);
 
     addMemberToContextIfNeeded(getter, var->getDeclContext());
     addMemberToContextIfNeeded(setter, var->getDeclContext());

@@ -8,3 +8,7 @@ class OtherManagedObject : NSManagedObject {
 func getMyManagedObject() -> MyManagedObject {
   return MyManagedObject()
 }
+
+extension MyManagedObject {
+  @NSManaged var anotherManaged: String
+}
