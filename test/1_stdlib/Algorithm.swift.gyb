@@ -874,7 +874,7 @@ struct ElementsEqualTest {
   }
 }
 
-let elementsEqualTests = [
+let elementsEqualTests: [ElementsEqualTest] = [
   ElementsEqualTest(true, [], [], [], []),
 
   ElementsEqualTest(false, [ 1 ], [], [], []),
@@ -1351,7 +1351,7 @@ struct ReverseTest {
   }
 }
 
-let reverseTests = [
+let reverseTests: [ReverseTest] = [
   ReverseTest([], []),
   ReverseTest([ 1 ], [ 1 ]),
   ReverseTest([ 2, 1 ], [ 1, 2 ]),
@@ -1389,7 +1389,7 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsBidirectional,BidirectionalReve
 
     // Check BidirectionalReverseView CollectionType conformance.
     checkBidirectionalCollection(
-      test.expected.map { OpaqueValue($0) },
+      test.expected.map { OpaqueValue($0) } as [OpaqueValue<Int>],
       result,
       { $0.value == $1.value },
       test.loc.withCurrentLoc())
@@ -1410,7 +1410,7 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsRandomAccess,RandomAccessRevers
 
     // Check RandomAccessReverseView CollectionType conformance.
     checkRandomAccessCollection(
-      test.expected.map { OpaqueValue($0) },
+      test.expected.map { OpaqueValue($0) } as [OpaqueValue<Int>],
       result,
       { $0.value == $1.value },
       test.loc.withCurrentLoc())
@@ -1826,7 +1826,8 @@ struct FlatMapTest {
 func flatMapTransformation(x: Int) -> [Int32] {
   let repetitions = x / 10
   let identity = x % 10
-  return (1..<(repetitions+1)).map { $0 * 10 + identity }
+  let range = (1..<(repetitions+1))
+  return range.map { Int32($0 * 10 + identity) }
 }
 
 let flatMapTests = [
@@ -2280,7 +2281,7 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/DefaultImplementation") {
     }
 
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       SourceLocStack().withCurrentLoc())
@@ -2297,7 +2298,7 @@ struct MinimalCollectionWithCustomGenerator : CollectionType {
   func generate() -> MinimalGenerator<OpaqueValue<Int>> {
     ++MinimalCollectionWithCustomGenerator.timesGenerateWasCalled
     return MinimalGenerator<OpaqueValue<Int>>(
-      Array(1..<_count+1)._prext_map { OpaqueValue($0) }
+      Array(1..<_count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>]
     )
   }
 
@@ -2342,7 +2343,7 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
     }
 
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       resiliencyChecks: .none,
@@ -2407,7 +2408,7 @@ SequenceTypeAlgorithms.test("subscript(range:)/DefaultImplementation") {
 
     // FIXME: improve checkForwardCollection to check the SubSlice type.
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       SourceLocStack().withCurrentLoc())
@@ -2490,7 +2491,7 @@ SequenceTypeAlgorithms.test("subscript(range:)/CustomImplementation") {
 
     // FIXME: improve checkForwardCollection to check the SubSlice type.
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       SourceLocStack().withCurrentLoc())
@@ -2732,7 +2733,7 @@ SequenceTypeAlgorithms.test("CollectionType.count()/${Implementation}Implementat
     }
 
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) },
+      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       SourceLocStack().withCurrentLoc())
@@ -3004,7 +3005,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
     forAllPermutations(1) {
       permutations.append($0)
     }
-    expectEqualSequence([ [ 0 ] ], permutations, { $0 == $1 })
+    expectEqualSequence([ [ 0 ] ] as [[Int]], permutations, { $0 == $1 })
   }
 
   if true {
@@ -3016,7 +3017,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
       [
         [ 0, 1 ],
         [ 1, 0 ]
-      ],
+      ] as [[Int]],
       permutations,
       { $0 == $1 })
   }
@@ -3034,7 +3035,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
         [ 1, 2, 0 ],
         [ 2, 0, 1 ],
         [ 2, 1, 0 ],
-      ],
+      ] as [[Int]],
       permutations,
       { $0 == $1 })
   }
@@ -3052,7 +3053,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
         [ 20, 30, 10 ],
         [ 30, 10, 20 ],
         [ 30, 20, 10 ],
-      ],
+      ] as [[Int]],
       permutations,
       { $0 == $1 })
   }
