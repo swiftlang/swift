@@ -12,7 +12,6 @@ class AnotherClass : AProtocol {
   func f() -> String { return "B" }
 }
 
-
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq_F12generic_args9aFunction{{.*}}",{{.*}} elements: ![[PROTOS:[0-9]+]]
 // CHECK-DAG: ![[PROTOS]] = !{![[INHERIT:.*]]}
 // CHECK-DAG: ![[INHERIT]] = !DIDerivedType(tag: DW_TAG_inheritance,{{.*}} baseType: ![[PROTOCOL:"[^"]+"]]
@@ -42,3 +41,9 @@ struct Wrapper<T: AProtocol> {
     return local
   }
 }
+
+// CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "f", {{.*}}, line: [[@LINE+1]], type: !"_TtFQq_F12generic_args5applyU___FTQ_1fFQ_Q0__Q0_Qq0_F12generic_args5applyU___FTQ_1fFQ_Q0__Q0_")
+func apply<T, U> (x: T, f: (T)->(U)) -> U {
+  return f(x)
+}
+
