@@ -6,7 +6,7 @@ import Swift
 
 protocol Foo: class { }
 
-// CHECK-LABEL: define void @store_weak({ %swift.weak, i8** }* noalias sret, i128) {
+// CHECK-LABEL: define void @store_weak({ %swift.weak, i8** }* noalias sret, i128) {{.*}} {
 // CHECK:       entry:
 // CHECK:         [[INSTANCE_BITS:%.*]] = trunc i128 %1 to i64
 // CHECK:         [[INSTANCE:%.*]] = inttoptr i64 [[INSTANCE_BITS]] to %objc_object*
@@ -16,7 +16,7 @@ protocol Foo: class { }
 // CHECK:         [[WTABLE_SLOT:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
 // CHECK:         store i8** [[WTABLE]], i8*** [[WTABLE_SLOT]], align 8
 // CHECK:         [[INSTANCE_SLOT:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-// CHECK:         call void @swift_unknownWeakAssign(%swift.weak* [[INSTANCE_SLOT]], %objc_object* [[INSTANCE]]) #0
+// CHECK:         call void @swift_unknownWeakAssign(%swift.weak* [[INSTANCE_SLOT]], %objc_object* [[INSTANCE]]) {{#[0-9]+}}
 // CHECK:         ret void
 // CHECK:       }
 sil @store_weak : $@convention(thin) (@out @sil_weak Foo?, @owned Foo?) -> () {

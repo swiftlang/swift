@@ -16,7 +16,7 @@ import Empty
 
 import gizmo
 
-// CHECK-LABEL: define hidden i64 @_TFC12clang_inline16CallStaticInline10ReturnZerofS0_FT_VSs5Int64(%C12clang_inline16CallStaticInline*) {
+// CHECK-LABEL: define hidden i64 @_TFC12clang_inline16CallStaticInline10ReturnZerofS0_FT_VSs5Int64(%C12clang_inline16CallStaticInline*) {{.*}} {
 class CallStaticInline {
   func ReturnZero() -> Int64 { return Int64(zero()) }
 }
@@ -24,7 +24,7 @@ class CallStaticInline {
 // CHECK-LABEL: define internal i32 @zero()
 // CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
 
-// CHECK-LABEL: define hidden i64 @_TFC12clang_inline17CallStaticInline210ReturnZerofS0_FT_VSs5Int64(%C12clang_inline17CallStaticInline2*) {
+// CHECK-LABEL: define hidden i64 @_TFC12clang_inline17CallStaticInline210ReturnZerofS0_FT_VSs5Int64(%C12clang_inline17CallStaticInline2*) {{.*}} {
 class CallStaticInline2 {
   func ReturnZero() -> Int64 { return Int64(wrappedZero()) }
 }
@@ -32,7 +32,7 @@ class CallStaticInline2 {
 // CHECK-LABEL: define internal i32 @wrappedZero()
 // CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
 
-// CHECK-LABEL: define hidden i32 @_TF12clang_inline10testExternFT_VSs5Int32() {
+// CHECK-LABEL: define hidden i32 @_TF12clang_inline10testExternFT_VSs5Int32() {{.*}} {
 func testExtern() -> CInt {
   return wrappedGetInt()
 }
@@ -48,14 +48,14 @@ func testAlwaysInline() -> CInt {
   return alwaysInlineNumber()
 }
 
-// CHECK-LABEL: define hidden i32 @_TF12clang_inline20testInlineRedeclaredFT_VSs5Int32() {
+// CHECK-LABEL: define hidden i32 @_TF12clang_inline20testInlineRedeclaredFT_VSs5Int32() {{.*}} {
 func testInlineRedeclared() -> CInt {
   return zeroRedeclared()
 }
 
 // CHECK-LABEL: define internal i32 @zeroRedeclared() #{{[0-9]+}} {
 
-// CHECK-LABEL: define hidden i32 @_TF12clang_inline27testInlineRedeclaredWrappedFT_VSs5Int32() {
+// CHECK-LABEL: define hidden i32 @_TF12clang_inline27testInlineRedeclaredWrappedFT_VSs5Int32() {{.*}} {
 func testInlineRedeclaredWrapped() -> CInt {
   return wrappedZeroRedeclared()
 }
@@ -68,6 +68,6 @@ func testInlineRedeclaredWrapped() -> CInt {
 // CHECK:         [[GET_INT_ATTR:#[0-9]+]]
 
 // CHECK: attributes [[INLINEHINT_SSP_UWTABLE]] = { inlinehint ssp {{.*}}}
-// CHECK: attributes [[SSP]] = { ssp }
+// CHECK: attributes [[SSP]] = { ssp {{.*}} }
 // CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp 
 // CHECK: attributes [[GET_INT_ATTR]] = {

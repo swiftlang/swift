@@ -16,7 +16,7 @@ import gizmo
 // CHECK: [[NSSTRING:%CSo8NSString]] = type opaque
 // CHECK: [[NSVIEW:%CSo6NSView]] = type opaque
 
-// CHECK: define hidden void @_TF12objc_structs8getFrame{{.*}}([[NSRECT]]* noalias sret, [[GIZMO]]*) {
+// CHECK: define hidden void @_TF12objc_structs8getFrame{{.*}}([[NSRECT]]* noalias sret, [[GIZMO]]*) {{.*}} {
 func getFrame(g: Gizmo) -> NSRect {
   // CHECK: load i8*, i8** @"\01L_selector(frame)"
   // CHECK: call void bitcast (void ()* @objc_msgSend_stret to void ([[NSRECT]]*, [[OPAQUE0:.*]]*, i8*)*)([[NSRECT]]* noalias sret {{.*}}, [[OPAQUE0:.*]]* {{.*}}, i8* {{.*}})
@@ -24,7 +24,7 @@ func getFrame(g: Gizmo) -> NSRect {
 }
 // CHECK: }
 
-// CHECK: define hidden void @_TF12objc_structs8setFrame{{.*}}(%CSo5Gizmo*, double, double, double, double) {
+// CHECK: define hidden void @_TF12objc_structs8setFrame{{.*}}(%CSo5Gizmo*, double, double, double, double) {{.*}} {
 func setFrame(g: Gizmo, frame: NSRect) {
   // CHECK: load i8*, i8** @"\01L_selector(setFrame:)"
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE0:.*]]*, i8*, [[NSRECT]]*)*)([[OPAQUE0:.*]]* {{.*}}, i8* {{.*}}, [[NSRECT]]* byval align 8 {{.*}})
@@ -39,7 +39,7 @@ func makeRect(a: Double, b: Double, c: Double, d: Double) -> NSRect {
 }
 // CHECK: }
 
-// CHECK: define hidden [[stringLayout:[^@]*]] @_TF12objc_structs14stringFromRect{{.*}}(double, double, double, double) {
+// CHECK: define hidden [[stringLayout:[^@]*]] @_TF12objc_structs14stringFromRect{{.*}}(double, double, double, double) {{.*}} {
 func stringFromRect(r: NSRect) -> String {
   // CHECK: call [[OPAQUE0:.*]]* @NSStringFromRect([[NSRECT]]* byval align 8 {{.*}})
   return NSStringFromRect(r)

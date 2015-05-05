@@ -9,7 +9,7 @@ protocol DefCon {
 }
 
 
-// CHECK-LABEL: define void @defcon(%swift.opaque* noalias sret, %swift.type*, %swift.type* %T, i8** %T.DefCon) {
+// CHECK-LABEL: define void @defcon(%swift.opaque* noalias sret, %swift.type*, %swift.type* %T, i8** %T.DefCon) {{.*}} {
 sil @defcon : $@convention(thin) <T: DefCon> (@out T, @thick T.Type) -> () {
 entry(%0: $*T, %1: $@thick T.Type):
 

@@ -550,6 +550,7 @@ void IRGenModule::emitRuntimeRegistration() {
                                            llvm::GlobalValue::PrivateLinkage,
                                            "runtime_registration",
                                            getModule());
+  RegistrationFunction->setAttributes(constructInitialAttributes());
   
   // Insert a call into the entry function.
   {
@@ -827,6 +828,7 @@ void IRGenModule::emitVTableStubs() {
       stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
                                     llvm::GlobalValue::LinkOnceODRLinkage,
                                     "_swift_dead_method_stub");
+      stub->setAttributes(constructInitialAttributes());
       Module.getFunctionList().push_back(stub);
       stub->setVisibility(llvm::GlobalValue::HiddenVisibility);
       stub->setCallingConv(RuntimeCC);
@@ -905,6 +907,7 @@ void IRGenModule::emitTypeVerifier() {
                                              llvm::GlobalValue::PrivateLinkage,
                                              "type_verifier",
                                              getModule());
+  VerifierFunction->setAttributes(constructInitialAttributes());
   
   // Insert a call into the entry function.
   {
@@ -1160,8 +1163,13 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   }
   fn->setVisibility(getVisibility());
   fn->setCallingConv(cc);
-  if (!attrs.isEmpty())
-    fn->setAttributes(attrs);
+
+  auto initialAttrs = IGM.constructInitialAttributes();
+  // Merge initialAttrs with attrs.
+  auto updatedAttrs = attrs.addAttributes(IGM.getLLVMContext(),
+                        llvm::AttributeSet::FunctionIndex, initialAttrs);
+  if (!updatedAttrs.isEmpty())
+    fn->setAttributes(updatedAttrs);
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.

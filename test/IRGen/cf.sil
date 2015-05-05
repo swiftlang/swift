@@ -28,7 +28,7 @@ bb0(%0 : $CCRefrigerator):
   return %3 : $()
 }
 
-// CHECK:    define void @call_generic([[REFRIGERATOR]]*) {
+// CHECK:    define void @call_generic([[REFRIGERATOR]]*) {{.*}} {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
 // CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @_TMaCSo14CCRefrigerator()
 // CHECK-NEXT: call void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T1]])

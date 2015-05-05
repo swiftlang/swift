@@ -5,7 +5,7 @@ import Swift
 
 // Make sure we emit two traps.
 
-// CHECK-LABEL: define {{.*}} @test_cond_fail({{.*}}) {
+// CHECK-LABEL: define {{.*}} @test_cond_fail({{.*}}) {{.*}} {
 // CHECK:  call void @llvm.trap()
 // CHECK:  call void @llvm.trap()
 // CHECK: }

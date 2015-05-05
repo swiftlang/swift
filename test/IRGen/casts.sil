@@ -16,7 +16,7 @@ class B: A {}
 sil_vtable A {}
 sil_vtable B {}
 
-// CHECK-LABEL: define %C5casts1B* @unchecked_addr_cast(%C5casts1A**) {
+// CHECK-LABEL: define %C5casts1B* @unchecked_addr_cast(%C5casts1A**) {{.*}} {
 // CHECK:         bitcast %C5casts1A** %0 to %C5casts1B**
 sil @unchecked_addr_cast : $(@in A) -> B {
 entry(%a : $*A):
@@ -29,7 +29,7 @@ protocol CP: class {}
 protocol CP2: class {}
 @objc protocol OP: class {}
 
-// CHECK-LABEL: define i8* @ref_to_raw_pointer_existential(%objc_object*, i8**) {
+// CHECK-LABEL: define i8* @ref_to_raw_pointer_existential(%objc_object*, i8**) {{.*}} {
 // CHECK:         [[CAST:%.*]] = bitcast %objc_object* %0 to i8*
 // CHECK:         ret i8* [[CAST]]
 sil @ref_to_raw_pointer_existential : $@convention(thin) (@owned CP) -> Builtin.RawPointer {
@@ -38,7 +38,7 @@ entry(%p : $CP):
   return %r : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define %objc_object* @raw_pointer_to_ref_existential(i8*) {
+// CHECK-LABEL: define %objc_object* @raw_pointer_to_ref_existential(i8*) {{.*}} {
 // CHECK:         [[CAST:%.*]] = bitcast i8* %0 to %objc_object*
 // CHECK:         ret %objc_object* [[CAST]]
 sil @raw_pointer_to_ref_existential : $@convention(thin) (@owned Builtin.RawPointer) -> AnyObject {
@@ -55,7 +55,7 @@ entry(%n : $Builtin.NativeObject):
 
 // CHECK-LABEL: define { %objc_object*, i8** } @u_cast_to_class_existential(%objc_object*)
 // CHECK:         call i8** @dynamic_cast_existential_1_unconditional(%swift.type* {{%.*}}, %swift.protocol* @_TMp5casts2CP)
-// CHECK-LABEL: define private i8** @dynamic_cast_existential_1_unconditional(%swift.type*, %swift.protocol*) {
+// CHECK-LABEL: define private i8** @dynamic_cast_existential_1_unconditional(%swift.type*, %swift.protocol*) {{.*}} {
 // CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %0, %swift.protocol* %1)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
@@ -136,7 +136,7 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define { %swift.type*, i8** } @c_cast_to_existential_metatype(%swift.type*) {
+// CHECK-LABEL: define { %swift.type*, i8** } @c_cast_to_existential_metatype(%swift.type*) {{.*}} {
 // CHECK:         call i8** @dynamic_cast_existential_1_conditional(%swift.type* %0, %swift.protocol* @_TMp5casts2CP)
 sil @c_cast_to_existential_metatype : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick CP.Type {
 entry(%a : $@thick Any.Type):
@@ -203,7 +203,7 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define %objc_object* @checked_upcast(%C5casts1A*) {
+// CHECK-LABEL: define %objc_object* @checked_upcast(%C5casts1A*) {{.*}} {
 // -- Don't need to check conformance of an object to AnyObject.
 // CHECK-NOT:     call %objc_object* @swift_dynamicCastObjCProtocolConditional
 // CHECK:         phi %objc_object*

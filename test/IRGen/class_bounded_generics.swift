@@ -110,7 +110,7 @@ class ConcreteClass : ClassBoundBinary, NotClassBound {
   func notClassBoundBinaryMethod(x: ConcreteClass) {}
 }
 
-// CHECK-LABEL: define hidden %C22class_bounded_generics13ConcreteClass* @_TF22class_bounded_generics28call_class_bounded_archetype{{.*}}(%C22class_bounded_generics13ConcreteClass*) {
+// CHECK-LABEL: define hidden %C22class_bounded_generics13ConcreteClass* @_TF22class_bounded_generics28call_class_bounded_archetype{{.*}}(%C22class_bounded_generics13ConcreteClass*) {{.*}} {
 func call_class_bounded_archetype(x: ConcreteClass) -> ConcreteClass {
   return class_bounded_archetype(x)
   // CHECK: [[IN:%.*]] = bitcast %C22class_bounded_generics13ConcreteClass* {{%.*}} to %objc_object*
@@ -124,7 +124,7 @@ func not_class_bounded_archetype<T : NotClassBound>(x: T) -> T {
   return x
 }
 
-// CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics44class_bounded_archetype_to_not_class_bounded{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound, i8** %T.NotClassBound) {
+// CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics44class_bounded_archetype_to_not_class_bounded{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound, i8** %T.NotClassBound) {{.*}} {
 func class_bounded_archetype_to_not_class_bounded
 <T:protocol<ClassBound, NotClassBound>>(x:T) -> T {
   // CHECK: alloca %objc_object*, align 8
@@ -141,7 +141,7 @@ func class_and_not_class_bounded_archetype_methods
 }
 */
 
-// CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics21class_bounded_erasure{{.*}}(%C22class_bounded_generics13ConcreteClass*) {
+// CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics21class_bounded_erasure{{.*}}(%C22class_bounded_generics13ConcreteClass*) {{.*}} {
 func class_bounded_erasure(x: ConcreteClass) -> ClassBound {
   return x
   // CHECK: [[INSTANCE_OPAQUE:%.*]] = bitcast %C22class_bounded_generics13ConcreteClass* [[INSTANCE:%.*]] to %objc_object*
@@ -150,7 +150,7 @@ func class_bounded_erasure(x: ConcreteClass) -> ClassBound {
   // CHECK: ret { %objc_object*, i8** } [[T1]]
 }
 
-// CHECK-LABEL: define hidden void @_TF22class_bounded_generics29class_bounded_protocol_method{{.*}}(%objc_object*, i8**) {
+// CHECK-LABEL: define hidden void @_TF22class_bounded_generics29class_bounded_protocol_method{{.*}}(%objc_object*, i8**) {{.*}} {
 func class_bounded_protocol_method(x: ClassBound) {
   x.classBoundMethod()
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_TABLE:%.*]], align 8
@@ -191,23 +191,23 @@ func class_bounded_protocol_cast(x: ClassBound) -> ConcreteClass {
   // CHECK: ret %C22class_bounded_generics13ConcreteClass* [[OUT]]
 }
 
-// CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics35class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**, i8**) {
+// CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics35class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**, i8**) {{.*}} {
 func class_bounded_protocol_conversion_1(x: protocol<ClassBound, ClassBound2>)
 -> ClassBound {
   return x
 }
-// CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics35class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**, i8**) {
+// CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics35class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**, i8**) {{.*}} {
 func class_bounded_protocol_conversion_2(x: protocol<ClassBound, ClassBound2>)
 -> ClassBound2 {
   return x
 }
 
-// CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**) {
+// CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**) {{.*}} {
 func objc_class_bounded_protocol_conversion_1
 (x:protocol<ClassBound, ObjCClassBound>) -> ClassBound {
   return x
 }
-// CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**) {
+// CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**) {{.*}} {
 func objc_class_bounded_protocol_conversion_2
 (x:protocol<ClassBound, ObjCClassBound>) -> ObjCClassBound {
   return x

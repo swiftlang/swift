@@ -16,7 +16,7 @@ import gizmo
 // CHECK: [[GIZMO:%CSo5Gizmo]] = type
 
 class Hoozit : Gizmo {
-  // CHECK: define hidden void @_TFC10objc_super6Hoozit4frobfS0_FT_T_([[HOOZIT]]*) {
+  // CHECK: define hidden void @_TFC10objc_super6Hoozit4frobfS0_FT_T_([[HOOZIT]]*) {{.*}} {
   override func frob() {
     // CHECK: [[T0:%.*]] = call [[TYPE]]* @_TMaC10objc_super6Hoozit()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
@@ -27,7 +27,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden void @_TZFC10objc_super6Hoozit5runcefMS0_FT_T_([[TYPE]]*) {
+  // CHECK: define hidden void @_TZFC10objc_super6Hoozit5runcefMS0_FT_T_([[TYPE]]*) {{.*}} {
   override class func runce() {
     // CHECK: store [[CLASS]]* @"OBJC_METACLASS_$__TtC10objc_super6Hoozit", [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(runce)"
@@ -36,7 +36,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden void @_TFC10objc_super6Hoozit5framefS0_FT_VSC6NSRect(%VSC6NSRect* noalias sret, %C10objc_super6Hoozit*) {
+  // CHECK: define hidden void @_TFC10objc_super6Hoozit5framefS0_FT_VSC6NSRect(%VSC6NSRect* noalias sret, %C10objc_super6Hoozit*) {{.*}} {
   override func frame() -> NSRect {
     // CHECK: [[T0:%.*]] = call [[TYPE]]* @_TMaC10objc_super6Hoozit()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
@@ -47,7 +47,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden [[HOOZIT]]* @_TFC10objc_super6HoozitcfMS0_FT1xSi_S0_(i64, %C10objc_super6Hoozit*) {
+  // CHECK: define hidden [[HOOZIT]]* @_TFC10objc_super6HoozitcfMS0_FT1xSi_S0_(i64, %C10objc_super6Hoozit*) {{.*}} {
   init(x:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(init)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*)*)([[SUPER]]* {{.*}}, i8* {{.*}})
@@ -57,7 +57,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden [[HOOZIT]]* @_TFC10objc_super6HoozitcfMS0_FT1ySi_S0_(i64, %C10objc_super6Hoozit*) {
+  // CHECK: define hidden [[HOOZIT]]* @_TFC10objc_super6HoozitcfMS0_FT1ySi_S0_(i64, %C10objc_super6Hoozit*) {{.*}} {
   init(y:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(initWithBellsOn:)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*, i64)*)([[SUPER]]* {{.*}}, i8* {{.*}}, i64 {{.*}})

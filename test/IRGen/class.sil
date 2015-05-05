@@ -64,7 +64,7 @@ sil_vtable C {}
 // \ CHECK: }
 
 // Destroying destructor
-// CHECK: define [[REF]]* @_TFC5class1Cd([[C_CLASS]]*) {
+// CHECK: define [[REF]]* @_TFC5class1Cd([[C_CLASS]]*) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[OBJ_PTR:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* %0 to [[REF]]*
 // CHECK-NEXT: ret [[REF]]* [[OBJ_PTR]]
@@ -147,7 +147,7 @@ bb0(%0 : $@thick C.Type):
   return %1 : $C
 }
 
-// CHECK-LABEL: define %C5class1C* @autorelease(%C5class1C*) {
+// CHECK-LABEL: define %C5class1C* @autorelease(%C5class1C*) {{.*}} {
 // CHECK:         %1 = bitcast %C5class1C* %0 to %objc_object*
 // CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
 // CHECK:         ret %C5class1C* %0
@@ -157,7 +157,7 @@ entry(%c : $C):
   return %c : $C
 }
 
-// CHECK-LABEL: define i64 @autorelease_optional(i64) {
+// CHECK-LABEL: define i64 @autorelease_optional(i64) {{.*}} {
 // CHECK:         %1 = inttoptr i64 %0 to %objc_object*
 // CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
 // CHECK:         ret i64 %0

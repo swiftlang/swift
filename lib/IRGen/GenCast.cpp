@@ -316,6 +316,7 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   auto fnTy = llvm::FunctionType::get(returnTy, argTys, /*vararg*/ false);
   auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
                                    llvm::Twine(name), IGM.getModule());
+  fn->setAttributes(IGM.constructInitialAttributes());
   
   auto IGF = IRGenFunction(IGM, fn);
   Explosion args = IGF.collectParameters();

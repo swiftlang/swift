@@ -44,7 +44,7 @@ func witnessOffsetAfterAssociatedType<T: B>(x: T) {
   x.foo()
 }
 
-// CHECK-LABEL: define hidden void @_TF34witness_table_objc_associated_type36witnessOffsetAfterAssociatedTypeObjCUS_1C_US_1O__FQ_T_(%swift.opaque*, %swift.type* %T, i8** %T.C, %swift.type* %T.OO) {
+// CHECK-LABEL: define hidden void @_TF34witness_table_objc_associated_type36witnessOffsetAfterAssociatedTypeObjCUS_1C_US_1O__FQ_T_(%swift.opaque*, %swift.type* %T, i8** %T.C, %swift.type* %T.OO) {{.*}} {
 func witnessOffsetAfterAssociatedTypeObjC<T: C>(x: T) {
   // CHECK:         [[FOO_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.C, i32 1
   // CHECK:         [[FOO_OPAQUE:%.*]] = load {{.*}} [[FOO_ADDR]]

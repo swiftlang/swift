@@ -9,7 +9,7 @@ import Swift
 class C {}
 sil_vtable C {}
 
-// CHECK-i386-LABEL: define i32 @bitcast_trivial(%C7bitcast1C*) {
+// CHECK-i386-LABEL: define i32 @bitcast_trivial(%C7bitcast1C*) {{.*}} {
 // CHECK-i386:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 4
 // CHECK-i386:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
 // CHECK-i386:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Si*
@@ -18,7 +18,7 @@ sil_vtable C {}
 // CHECK-i386:         ret i32 [[VALUE]]
 // CHECK-i386:       }
 
-// CHECK-x86_64-LABEL: define i64 @bitcast_trivial(%C7bitcast1C*) {
+// CHECK-x86_64-LABEL: define i64 @bitcast_trivial(%C7bitcast1C*) {{.*}} {
 // CHECK-x86_64:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 8
 // CHECK-x86_64:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
 // CHECK-x86_64:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Si*
@@ -33,7 +33,7 @@ entry(%c : $C):
 }
 
 
-// CHECK-x86_64-LABEL: define { i64, i1 } @bitcast_trivial_optional(i64, i1) {
+// CHECK-x86_64-LABEL: define { i64, i1 } @bitcast_trivial_optional(i64, i1) {{.*}} {
 // CHECK-x86_64-NEXT:  entry:
 // CHECK-x86_64-NEXT:   %2 = insertvalue { i64, i1 } undef, i64 %0, 0
 // CHECK-x86_64-NEXT:   %3 = insertvalue { i64, i1 } %2, i1 %1, 1
@@ -45,7 +45,7 @@ entry(%c : $Optional<Int>):
   return %i : $ImplicitlyUnwrappedOptional<Int>
 }
 
-// CHECK-i386-LABEL: define i32 @bitcast_ref(%C7bitcast1C*) {
+// CHECK-i386-LABEL: define i32 @bitcast_ref(%C7bitcast1C*) {{.*}} {
 // CHECK-i386:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 4
 // CHECK-i386:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
 // CHECK-i386:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq.16*
@@ -54,7 +54,7 @@ entry(%c : $Optional<Int>):
 // CHECK-i386:         ret i32 [[VALUE]]
 // CHECK-i386:       }
 
-// CHECK-x86_64-LABEL: define i64 @bitcast_ref(%C7bitcast1C*) {
+// CHECK-x86_64-LABEL: define i64 @bitcast_ref(%C7bitcast1C*) {{.*}} {
 // CHECK-x86_64:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 8
 // CHECK-x86_64:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
 // CHECK-x86_64:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq.16*
@@ -68,12 +68,12 @@ entry(%c : $C):
   return %o : $Optional<C>
 }
 
-// CHECK-i386-LABEL:  define hidden i32 @bitcast_ref_optional(i32) {
+// CHECK-i386-LABEL:  define hidden i32 @bitcast_ref_optional(i32) {{.*}} {
 // CHECK-i386-NEXT: entry:
 // CHECK-i386-NEXT: ret i32 %0
 // CHECK-i386-NEXT: }
 
-// CHECK-x86_64-LABEL:  define hidden i64 @bitcast_ref_optional(i64) {
+// CHECK-x86_64-LABEL:  define hidden i64 @bitcast_ref_optional(i64) {{.*}} {
 // CHECK-x86_64-NEXT: entry:
 // CHECK-x86_64-NEXT: ret i64 %0
 // CHECK-x86_64-NEXT: }

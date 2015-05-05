@@ -40,39 +40,39 @@ func imported_enum_inject_d() -> NSRuncingOptions {
   return .QuinceDiced
 }
 
-// CHECK: define hidden i32 @_TF12objc_ns_enum30imported_enum_inject_radixed_aFT_OSC16NSRadixedOptions() {
+// CHECK: define hidden i32 @_TF12objc_ns_enum30imported_enum_inject_radixed_aFT_OSC16NSRadixedOptions() {{.*}} {
 // -- octal 0755
 // CHECK:   ret i32 493
 func imported_enum_inject_radixed_a() -> NSRadixedOptions {
   return .Octal
 }
 
-// CHECK: define hidden i32 @_TF12objc_ns_enum30imported_enum_inject_radixed_bFT_OSC16NSRadixedOptions() {
+// CHECK: define hidden i32 @_TF12objc_ns_enum30imported_enum_inject_radixed_bFT_OSC16NSRadixedOptions() {{.*}} {
 // -- hex 0xFFFF
 // CHECK:   ret i32 65535
 func imported_enum_inject_radixed_b() -> NSRadixedOptions {
   return .Hex
 }
 
-// CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_aFT_OSC17NSNegativeOptions() {
+// CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_aFT_OSC17NSNegativeOptions() {{.*}} {
 // CHECK:   ret i32 -1
 func imported_enum_inject_negative_a() -> NSNegativeOptions {
   return .Foo
 }
 
-// CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_bFT_OSC17NSNegativeOptions() {
+// CHECK: define hidden i32 @_TF12objc_ns_enum31imported_enum_inject_negative_bFT_OSC17NSNegativeOptions() {{.*}} {
 // CHECK:   ret i32 -2147483648
 func imported_enum_inject_negative_b() -> NSNegativeOptions {
   return .Bar
 }
 
-// CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_aFT_OSC25NSNegativeUnsignedOptions() {
+// CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_aFT_OSC25NSNegativeUnsignedOptions() {{.*}} {
 // CHECK:   ret i32 -1
 func imported_enum_inject_negative_unsigned_a() -> NSNegativeUnsignedOptions {
   return .Foo
 }
 
-// CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_bFT_OSC25NSNegativeUnsignedOptions() {
+// CHECK: define hidden i32 @_TF12objc_ns_enum40imported_enum_inject_negative_unsigned_bFT_OSC25NSNegativeUnsignedOptions() {{.*}} {
 // CHECK:   ret i32 -2147483648
 func imported_enum_inject_negative_unsigned_b() -> NSNegativeUnsignedOptions {
   return .Bar

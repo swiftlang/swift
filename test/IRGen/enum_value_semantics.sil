@@ -139,7 +139,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:   ret i32 [[RES]]
 
 // -- SinglePayloadNontrivial destroyBuffer
-// CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics23SinglePayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
+// CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics23SinglePayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics23SinglePayloadNontrivial*
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics23SinglePayloadNontrivial* [[ADDR]] to i64*
@@ -177,7 +177,7 @@ enum MultiPayloadNontrivial {
 }
 
 // -- MultiPayloadNontrivial destroyBuffer
-// CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics22MultiPayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
+// CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics22MultiPayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics22MultiPayloadNontrivial*
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics22MultiPayloadNontrivial* [[ADDR]] to i128*
@@ -214,7 +214,7 @@ enum MultiPayloadNontrivialSpareBits {
 }
 
 // -- MultiPayloadNontrivialSpareBits destroyBuffer
-// CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics31MultiPayloadNontrivialSpareBits(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {
+// CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics31MultiPayloadNontrivialSpareBits(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics31MultiPayloadNontrivialSpareBits*
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics31MultiPayloadNontrivialSpareBits* [[ADDR]] to i128*

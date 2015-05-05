@@ -51,9 +51,9 @@ extension A {
 // CHECK-NOT: g8
 // CHECK-NOT: g9
 
-// CHECK: define i32 @main(i32, i8**) {
+// CHECK: define i32 @main(i32, i8**) {{.*}} {
 // CHECK:      store  i64 {{.*}}, i64* getelementptr inbounds ([[INT]], [[INT]]* @_Tv7globals2g0Si, i32 0, i32 0), align 8
 
 // FIXME: give these initializers a real mangled name
-// CHECK: define internal void @globalinit_{{.*}}func0() {
+// CHECK: define internal void @globalinit_{{.*}}func0() {{.*}} {
 // CHECK:      store i64 5, i64* getelementptr inbounds (%Si, %Si* @_TZvV7globals1A3fooSi, i32 0, i32 0), align 8

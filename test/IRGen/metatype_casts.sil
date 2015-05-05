@@ -43,7 +43,7 @@ end:
 class SomeClass {}
 sil_vtable SomeClass {}
 
-// CHECK-LABEL: define %objc_object* @metatype_object_conversion(%objc_class*) {
+// CHECK-LABEL: define %objc_object* @metatype_object_conversion(%objc_class*) {{.*}} {
 // CHECK:         %1 = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* %1
 // CHECK:       }
@@ -55,7 +55,7 @@ entry(%m : $@objc_metatype SomeClass.Type):
 
 protocol SomeClassProtocol : class {}
 
-// CHECK-LABEL: define %objc_object* @existential_metatype_object_conversion(%objc_class*, i8**) {
+// CHECK-LABEL: define %objc_object* @existential_metatype_object_conversion(%objc_class*, i8**) {{.*}} {
 // CHECK:         [[T0:%.*]] = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* [[T0]]
 // CHECK:       }

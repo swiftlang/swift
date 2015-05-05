@@ -87,7 +87,7 @@ public func innerIfConfig() {
 }
 
 
-// CHECK-LABEL: define void @_TF11local_types8callTestFT_T_() {
+// CHECK-LABEL: define void @_TF11local_types8callTestFT_T_() {{.*}} {
 public func callTest() {
   // CHECK: call %swift.type* @_TMaMVF18local_types_helper4testFT_T_L_1S()
   test()

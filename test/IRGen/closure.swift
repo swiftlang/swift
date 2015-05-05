@@ -22,14 +22,14 @@ func b<T : Ordinable>(var #seq: T) -> (Int) -> Int {
 }
 
 // -- partial_apply stub
-// CHECK: define internal i64 @_TPA_[[CLOSURE1]](i64, %swift.refcounted*) {
+// CHECK: define internal i64 @_TPA_[[CLOSURE1]](i64, %swift.refcounted*) {{.*}} {
 // CHECK: }
 
 // -- Closure entry point
-// CHECK: define linkonce_odr hidden i64 @[[CLOSURE2:_TFF7closure1bUS_9Ordinable__FT3seqQ__FSiSiU_FSiSi]](i64, %swift.refcounted*, %swift.opaque*, %swift.type* %T, i8** %T.Ordinable) {
+// CHECK: define linkonce_odr hidden i64 @[[CLOSURE2:_TFF7closure1bUS_9Ordinable__FT3seqQ__FSiSiU_FSiSi]](i64, %swift.refcounted*, %swift.opaque*, %swift.type* %T, i8** %T.Ordinable) {{.*}} {
 
 // -- partial_apply stub
-// CHECK: define internal i64 @_TPA_[[CLOSURE2]](i64, %swift.refcounted*) {
+// CHECK: define internal i64 @_TPA_[[CLOSURE2]](i64, %swift.refcounted*) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[CONTEXT:%.*]] = bitcast %swift.refcounted* %1 to <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>*
 // CHECK:   [[BINDINGSADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>, <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 1

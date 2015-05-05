@@ -36,7 +36,7 @@ import gizmo
 // CHECK:   i8* {{.*}} [[NSRECT_BLOCK_SIGNATURE]]
 // CHECK: }
 
-// CHECK-LABEL: define i8* @project_block_storage({ %objc_block, i8* }*) {
+// CHECK-LABEL: define i8* @project_block_storage({ %objc_block, i8* }*) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %0, i32 0, i32 1
 // CHECK-NEXT:    %2 = load i8*, i8** %1, align 8
@@ -49,7 +49,7 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
   return %p : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define fp128 @overaligned_project_block_storage({ %objc_block, fp128 }*) {
+// CHECK-LABEL: define fp128 @overaligned_project_block_storage({ %objc_block, fp128 }*) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, fp128 }, { %objc_block, fp128 }* %0, i32 0, i32 1
 // CHECK-NEXT:    %2 = load fp128, fp128* %1, align 16
@@ -62,7 +62,7 @@ entry(%0 : $*@block_storage Builtin.FPIEEE128):
   return %p : $Builtin.FPIEEE128
 }
 
-// CHECK-LABEL: define %objc_block* @init_block_header_trivial({ %objc_block, i8* }*) {
+// CHECK-LABEL: define %objc_block* @init_block_header_trivial({ %objc_block, i8* }*) {{.*}} {
 // CHECK:         %1 = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %0, i32 0, i32 0
 // CHECK:         store %objc_block {
 // CHECK:           %objc_class* [[BLOCK_ISA]]
@@ -81,7 +81,7 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
   return %b : $@convention(block) () -> ()
 }
 
-// CHECK-LABEL: define void @invoke_trivial(void (...)*) {
+// CHECK-LABEL: define void @invoke_trivial(void (...)*) {{.*}} {
 // CHECK:         %1 = bitcast void (...)* %0 to { %objc_block, i8* }*
 // CHECK:         %2 = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %1, i32 0, i32 1
 sil @invoke_trivial : $@convention(c) (@inout @block_storage Builtin.RawPointer) -> () {
@@ -99,14 +99,14 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
 
 sil @invoke_trivial_block_param : $@convention(c) (@inout @block_storage Builtin.RawPointer, @convention(block) (Int) -> Int) -> ()
 
-// CHECK-LABEL: define i64 @invoke_trivial_with_arg(void (...)*, i64) {
+// CHECK-LABEL: define i64 @invoke_trivial_with_arg(void (...)*, i64) {{.*}} {
 // CHECK:         ret i64 %1
 sil @invoke_trivial_with_arg : $@convention(c) (@inout @block_storage Builtin.RawPointer, Int) -> Int {
 entry(%0 : $*@block_storage Builtin.RawPointer, %1 : $Int):
   return %1 : $Int
 }
 
-// CHECK-LABEL: define %objc_block* @init_block_header_nontrivial({ %objc_block, %swift.refcounted* }*) {
+// CHECK-LABEL: define %objc_block* @init_block_header_nontrivial({ %objc_block, %swift.refcounted* }*) {{.*}} {
 // CHECK:         store %objc_block {
 // CHECK:           %objc_class* [[BLOCK_ISA]]
 // --                  0x4200_0000 -- HAS_SIGNATURE, HAS_COPY_DISPOSE
@@ -127,7 +127,7 @@ entry(%0 : $*@block_storage Builtin.NativeObject):
 // CHECK-NEXT:    %2 = getelementptr inbounds { %objc_block, %swift.refcounted* }, { %objc_block, %swift.refcounted* }* %0, i32 0, i32 1
 // CHECK-NEXT:    %3 = getelementptr inbounds { %objc_block, %swift.refcounted* }, { %objc_block, %swift.refcounted* }* %1, i32 0, i32 1
 // CHECK-NEXT:    %4 = load %swift.refcounted*, %swift.refcounted** %3, align 8
-// CHECK-NEXT:    call void @swift_retain_noresult(%swift.refcounted* %4) #0
+// CHECK-NEXT:    call void @swift_retain_noresult(%swift.refcounted* %4) {{#[0-9]+}}
 // CHECK-NEXT:    store %swift.refcounted* %4, %swift.refcounted** %2, align 8
 // CHECK-NEXT:    ret void
 
@@ -135,12 +135,12 @@ entry(%0 : $*@block_storage Builtin.NativeObject):
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, %swift.refcounted* }, { %objc_block, %swift.refcounted* }* %0, i32 0, i32 1
 // CHECK-NEXT:    %toDestroy = load %swift.refcounted*, %swift.refcounted** %1, align 8
-// CHECK-NEXT:    call void @swift_release(%swift.refcounted* %toDestroy) #0
+// CHECK-NEXT:    call void @swift_release(%swift.refcounted* %toDestroy) {{#[0-9]+}}
 // CHECK-NEXT:    ret void
 
 sil public_external @invoke_nontrivial : $@convention(c) (@inout @block_storage Builtin.NativeObject) -> ()
 
-// CHECK-LABEL: define %objc_block* @init_block_header_stret({ %objc_block, i8* }*) {
+// CHECK-LABEL: define %objc_block* @init_block_header_stret({ %objc_block, i8* }*) {{.*}} {
 // CHECK:         store %objc_block {
 // CHECK:           %objc_class* [[BLOCK_ISA]]
 // --                  0x6000_0000 -- HAS_STRET, HAS_SIGNATURE

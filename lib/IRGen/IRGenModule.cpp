@@ -43,6 +43,7 @@
 #include "Linking.h"
 
 #include <initializer_list>
+#include <sstream>
 
 using namespace swift;
 using namespace irgen;
@@ -450,6 +451,38 @@ llvm::AttributeSet IRGenModule::getAllocAttrs() {
                                llvm::Attribute::NoUnwind);
   }
   return AllocAttrs;
+}
+
+/// Construct initial attributes from options.
+llvm::AttributeSet IRGenModule::constructInitialAttributes() {
+  llvm::AttributeSet attrsUpdated;
+  // Add DisableFPElim. 
+  if (!Opts.DisableFPElim) {
+    attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
+                     llvm::AttributeSet::FunctionIndex,
+                     "no-frame-pointer-elim", "false");
+  }
+
+  // Add target-cpu and target-features if they are non-null.
+  auto *Clang = static_cast<ClangImporter *>(Context.getClangModuleLoader());
+  clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
+
+  std::string &CPU = ClangOpts.CPU;
+  if (CPU != "")
+    attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
+                     llvm::AttributeSet::FunctionIndex, "target-cpu", CPU);
+
+  std::vector<std::string> &Features = ClangOpts.Features;
+  if (!Features.empty()) {
+    std::stringstream S;
+    std::copy(Features.begin(), Features.end(),
+              std::ostream_iterator<std::string>(S, ","));
+    // The drop_back gets rid of the trailing space.
+    attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
+                     llvm::AttributeSet::FunctionIndex, "target-features",
+                     StringRef(S.str()).drop_back(1));
+  }
+  return attrsUpdated;
 }
 
 llvm::Constant *IRGenModule::getSize(Size size) {

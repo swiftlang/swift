@@ -1788,6 +1788,7 @@ namespace {
                                      llvm::Twine("get_field_types_")
                                        + type->getName().str(),
                                      IGM.getModule());
+    fn->setAttributes(IGM.constructInitialAttributes());
     
     // Emit the body of the field type accessor later. We need to access
     // the type metadata for the fields, which could lead to infinite recursion
@@ -2279,6 +2280,7 @@ namespace {
                                            llvm::GlobalValue::PrivateLinkage,
                                            "create_generic_metadata",
                                            &IGM.Module);
+      f->setAttributes(IGM.constructInitialAttributes());
       
       IRGenFunction IGF(IGM, f);
       if (IGM.DebugInfo)

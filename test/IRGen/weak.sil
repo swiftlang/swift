@@ -41,7 +41,7 @@ bb0(%0 : $*A, %1 : $Optional<C>):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define void @test_weak_load_store([[A]]*, i64) {
+// CHECK:    define void @test_weak_load_store([[A]]*, i64) {{.*}} {
 // CHECK:      [[X:%.*]] = getelementptr inbounds [[A]], [[A]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = call [[C]]* bitcast ([[REF]]* ([[WEAK]]*)* @swift_weakLoadStrong to [[C]]* ([[WEAK]]*)*)([[WEAK]]* [[X]])
 // CHECK-NEXT: %3 = ptrtoint  %C4weak1C* %2 to i64

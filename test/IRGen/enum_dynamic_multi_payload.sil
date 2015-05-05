@@ -32,7 +32,7 @@ entry(%e : $Either<C, C>):
 }
 
 // -- Handle case where all of the payloads become empty.
-// CHECK-LABEL: define void @empty_instance(i1) {
+// CHECK-LABEL: define void @empty_instance(i1) {{.*}} {
 sil @empty_instance : $@convention(thin) (Either<(), ()>) -> () {
 // CHECK-NEXT: entry:
 entry(%e : $Either<(), ()>):
@@ -81,7 +81,7 @@ next(%z : $Builtin.Int8):
   return undef : $()
 }
 
-// CHECK-LABEL: define void @empty_instance2(i2) {
+// CHECK-LABEL: define void @empty_instance2(i2) {{.*}} {
 sil @empty_instance2 : $@convention(thin) (EitherOr<(), ()>) -> () {
 // CHECK-NEXT: entry:
 entry(%e : $EitherOr<(), ()>):
@@ -419,7 +419,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   return undef : $()
 }
 
-// CHECK: define private %swift.type* [[CREATE_GENERIC_METADATA]](%swift.type_pattern*, i8**) {
+// CHECK: define private %swift.type* [[CREATE_GENERIC_METADATA]](%swift.type_pattern*, i8**) {{.*}} {
 // CHECK:   [[BUF:%.*]] = alloca [2 x %swift.type*]
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
 // CHECK:   [[BUF0:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 0

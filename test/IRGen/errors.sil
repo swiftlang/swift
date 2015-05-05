@@ -10,7 +10,7 @@ entry:
   unreachable
 }
 
-// CHECK: define void @throws(%swift.refcounted*, %swift.error**) {
+// CHECK: define void @throws(%swift.refcounted*, %swift.error**) {{.*}} {
 sil @throws : $@convention(thin) () -> @error _ErrorType {
   // CHECK: [[T0:%.*]] = call %swift.error* @create_error()
   %0 = function_ref @create_error : $@convention(thin) () -> @owned _ErrorType
@@ -23,7 +23,7 @@ sil @throws : $@convention(thin) () -> @error _ErrorType {
   throw %1 : $_ErrorType
 }
 
-// CHECK: define void @doesnt_throw(%swift.refcounted*, %swift.error**) {
+// CHECK: define void @doesnt_throw(%swift.refcounted*, %swift.error**) {{.*}} {
 sil @doesnt_throw : $@convention(thin) () -> @error _ErrorType {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.

@@ -12,7 +12,7 @@ import ObjectiveC
 
 @objc protocol OP {}
 
-// CHECK-LABEL: define %CSo8Protocol* @protocol_conversion() {
+// CHECK-LABEL: define %CSo8Protocol* @protocol_conversion() {{.*}} {
 // CHECK:         %0 = load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP24objc_protocol_conversion2OP_", align 8
 // CHECK:         %1 = bitcast i8* %0 to %CSo8Protocol*
 // CHECK:         ret %CSo8Protocol* %1

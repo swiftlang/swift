@@ -107,7 +107,7 @@ struct Stringly {
   var size : Builtin.Int64
 }
 
-// CHECK-LABEL: define { i64, i21 } @concrete_instances(i64, i21) {
+// CHECK-LABEL: define { i64, i21 } @concrete_instances(i64, i21) {{.*}} {
 // CHECK: entry:
 // CHECK:   %2 = insertvalue { i64, i21 } undef, i64 %0, 0
 // CHECK:   %3 = insertvalue { i64, i21 } %2, i21 %1, 1
@@ -168,7 +168,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   return %v : $()
 }
 
-// CHECK: define linkonce_odr hidden void @_TwXXV15generic_structs13SingleDynamic([24 x i8]* %buffer, %swift.type* %Self) {
+// CHECK: define linkonce_odr hidden void @_TwXXV15generic_structs13SingleDynamic([24 x i8]* %buffer, %swift.type* %Self) {{.*}} {
 // CHECK:   [[T0:%.*]] = load i8*, i8** %1, align 8
 // CHECK:   %T = bitcast i8* [[T0]] to %swift.type*
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_pattern* %0, i8** %1)

@@ -754,7 +754,12 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
                            "_TPAo", &IGM.Module);
-  fwd->setAttributes(attrs);
+
+  auto initialAttrs = IGM.constructInitialAttributes();
+  // Merge initialAttrs with attrs.
+  auto updatedAttrs = attrs.addAttributes(IGM.getLLVMContext(),
+                        llvm::AttributeSet::FunctionIndex, initialAttrs);
+  fwd->setAttributes(updatedAttrs);
   
   IRGenFunction subIGF(IGM, fwd);
   

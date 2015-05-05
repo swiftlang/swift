@@ -81,7 +81,7 @@ struct BigStructWithNativeObjects {
 
   func drawInRect(#dirty: NSRect) {
   }
-  // CHECK: define internal void @_TToFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {
+  // CHECK: define internal void @_TToFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[FOO]]*
   // CHECK:   call void @_TFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* [[CAST]])
   // CHECK: }
@@ -90,14 +90,14 @@ struct BigStructWithNativeObjects {
     return NSRect(origin: NSPoint(x: 0, y: 0), 
                   size: NSSize(width: 0, height: 0))
   }
-  // CHECK: define internal void @_TToFC17objc_class_export3Foo6boundsfS0_FT_VSC6NSRect([[NSRECT]]* noalias sret, [[OPAQUE4:%.*]]*, i8*) unnamed_addr {
+  // CHECK: define internal void @_TToFC17objc_class_export3Foo6boundsfS0_FT_VSC6NSRect([[NSRECT]]* noalias sret, [[OPAQUE4:%.*]]*, i8*) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE4]]* %1 to [[FOO]]*
   // CHECK:   call void @_TFC17objc_class_export3Foo6boundsfS0_FT_VSC6NSRect([[NSRECT]]* noalias sret {{.*}}, [[FOO]]* [[CAST]])
 
   func convertRectToBacking(#r: NSRect) -> NSRect {
     return r;
   }
-  // CHECK: define internal void @_TToFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {
+  // CHECK: define internal void @_TToFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*
   // CHECK:   call void @_TFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias sret {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* [[CAST]])
 

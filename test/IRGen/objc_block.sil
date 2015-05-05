@@ -16,7 +16,7 @@ entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):
   %y = apply %b(%x) : $@convention(block) Foo -> Foo
   return %y : $Foo
 }
-// CHECK-LABEL: define %C10objc_block3Foo* @call_block(%objc_block*, %C10objc_block3Foo*) {
+// CHECK-LABEL: define %C10objc_block3Foo* @call_block(%objc_block*, %C10objc_block3Foo*) {{.*}} {
 // CHECK:       entry:
 // CHECK:         %2 = getelementptr inbounds %objc_block, %objc_block* %0, i32 0, i32 3
 // CHECK:         %3 = load i8*, i8** %2

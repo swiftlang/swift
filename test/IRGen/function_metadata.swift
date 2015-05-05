@@ -4,7 +4,7 @@ func arch<F>(f: F) {}
 
 // CHECK: define hidden void @_TF17function_metadata9test_archFT_T_()
 func test_arch() {
-  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata1([[WORD:i(64|32)]] 1, i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMdT_, i32 0, i32 1) to i8*), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMdT_, i32 0, i32 1)) #1
+  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata1([[WORD:i(64|32)]] 1, i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMdT_, i32 0, i32 1) to i8*), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMdT_, i32 0, i32 1)) {{#[0-9]+}}
   arch( {() -> () in } )
 
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata1([[WORD]] 1, i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMdSi, i32 0, i32 1) to i8*), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMdT_, i32 0, i32 1))
@@ -31,6 +31,6 @@ func test_arch() {
   // CHECK: store i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMdVSs4Int8, i32 0, i32 1) to i8*)
   // CHECK: getelementptr inbounds [6 x i8*], [6 x i8*]* %function-arguments, i32 0, i32 5
   // CHECK: store %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMdT_, i32 0, i32 1)
-  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata(i8** %2) #1
+  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata(i8** %2) {{#[0-9]+}}
   arch({(inout x: Int, y: Double, z: String, w: Int8) -> () in })
 }

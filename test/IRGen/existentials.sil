@@ -33,7 +33,7 @@ bb0(%0 : $*protocol<>, %1 : $*protocol<>):
   return %3 : $()
 }
 
-// CHECK-DAG:   define void @take_opaque_existential([[ANY:%"protocol<>"]]* noalias sret, %"protocol<>"*) {
+// CHECK-DAG:   define void @take_opaque_existential([[ANY:%"protocol<>"]]* noalias sret, %"protocol<>"*) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%1]], i32 0, i32 1
 // CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%0]], i32 0, i32 1
@@ -53,7 +53,7 @@ bb0(%0 : $*protocol<>, %1 : $*protocol<>):
 @objc protocol OP {}
 @objc protocol OP2: OP {}
 
-// CHECK-DAG: define %objc_object* @init_existential_objc_to_objc(%objc_object*) {
+// CHECK-DAG: define %objc_object* @init_existential_objc_to_objc(%objc_object*) {{.*}} {
 // CHECK:       ret %objc_object* %0
 sil @init_existential_objc_to_objc : $@convention(thin) (@owned OP2) -> @owned OP {
 entry(%o : $OP2):
@@ -63,7 +63,7 @@ entry(%o : $OP2):
 
 protocol CP: class {}
 
-// CHECK-DAG: define { %objc_object*, i8** } @class_existential_unowned(%objc_object*, i8**) {
+// CHECK-DAG: define { %objc_object*, i8** } @class_existential_unowned(%objc_object*, i8**) {{.*}} {
 sil @class_existential_unowned : $@convention(thin) (@owned CP) -> @owned CP {
 entry(%s : $CP):
   %u = ref_to_unowned %s : $CP to $@sil_unowned CP

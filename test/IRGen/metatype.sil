@@ -73,9 +73,9 @@ entry:
   return %m : $@objc_metatype T.Type
 }
 
-// CHECK-LABEL: define %objc_class* @existential_objc_metatype(%objc_object*) {
+// CHECK-LABEL: define %objc_class* @existential_objc_metatype(%objc_object*) {{.*}} {
 // CHECK: entry:
-// CHECK-NEXT: [[METATYPE:%.*]] = call %objc_class* @object_getClass(%objc_object* %0) #1
+// CHECK-NEXT: [[METATYPE:%.*]] = call %objc_class* @object_getClass(%objc_object* %0) {{#[0-9]+}}
 // CHECK-NEXT: ret %objc_class* [[METATYPE]]
 // CHECK-NEXT: }
 sil @existential_objc_metatype : $@convention(thin) (AnyObject) -> (@objc_metatype AnyObject.Type) {

@@ -312,12 +312,12 @@ entry(%c : $RootGeneric<Int32>):
 }
  */
 
-// CHECK: define private %swift.type* [[CREATE_ROOTGENERIC]](%swift.type_pattern*, i8**) {
+// CHECK: define private %swift.type* [[CREATE_ROOTGENERIC]](%swift.type_pattern*, i8**) {{.*}} {
 // -- initialize the dependent field offsets
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* null, i64 3, i64* {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
-// CHECK: define private %swift.type* [[CREATE_GENERICINHERITSGENERIC]](%swift.type_pattern*, i8**) {
+// CHECK: define private %swift.type* [[CREATE_GENERICINHERITSGENERIC]](%swift.type_pattern*, i8**) {{.*}} {
 //   Bind the generic parameters.
 // CHECK:   [[T0:%.*]] = load i8*, i8** %1
 // CHECK:   %A = bitcast i8* [[T0]] to %swift.type*

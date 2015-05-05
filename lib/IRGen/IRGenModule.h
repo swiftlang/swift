@@ -578,6 +578,8 @@ public:
   void addLinkLibrary(const LinkLibrary &linkLib);
   void finalize();
 
+  llvm::AttributeSet constructInitialAttributes();
+
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
   void emitStructDecl(StructDecl *D);

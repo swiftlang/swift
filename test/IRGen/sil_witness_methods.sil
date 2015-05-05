@@ -113,7 +113,7 @@ entry(%z : $*Z, %x : $@thick Bar<T, U, V>.Type):
   return %m : $@thick Bar<T, U, V>.Type
 }
 
-// CHECK-LABEL: define void @call_concrete_witness() {
+// CHECK-LABEL: define void @call_concrete_witness() {{.*}} {
 // CHECK:         call %swift.type* @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo* {{.*}}, %swift.type* getelementptr inbounds ({{.*}} @_TMdV19sil_witness_methods3Foo {{.*}}))
 sil @call_concrete_witness : $(Foo) -> () {
 entry(%x : $Foo):
@@ -125,7 +125,7 @@ entry(%x : $Foo):
   return undef : $()
 }
 
-// CHECK-LABEL: define void @call_concrete_static_witness() {
+// CHECK-LABEL: define void @call_concrete_static_witness() {{.*}} {
 // CHECK:         call %swift.type* @concrete_type_concrete_static_method_witness(%swift.type* getelementptr inbounds ({{.*}} @_TMdV19sil_witness_methods3Foo {{.*}}), %swift.type* getelementptr inbounds ({{.*}} @_TMdV19sil_witness_methods3Foo {{.*}}))
 sil @call_concrete_static_witness : $() -> () {
 entry:

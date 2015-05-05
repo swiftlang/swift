@@ -3194,7 +3194,12 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
                            llvm::StringRef(thunkName), &IGM.Module);
-  fwd->setAttributes(outAttrs);
+
+  auto initialAttrs = IGM.constructInitialAttributes();
+  // Merge initialAttrs with outAttrs.
+  auto updatedAttrs = outAttrs.addAttributes(IGM.getLLVMContext(),
+                        llvm::AttributeSet::FunctionIndex, initialAttrs);
+  fwd->setAttributes(updatedAttrs);
 
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)
@@ -3697,6 +3702,7 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
   auto func = llvm::Function::Create(copyTy, llvm::GlobalValue::InternalLinkage,
                                      "block_copy_helper",
                                      IGM.getModule());
+  func->setAttributes(IGM.constructInitialAttributes());
   IRGenFunction IGF(IGM, func);
   
   // Copy the captures from the source to the destination.
@@ -3731,6 +3737,7 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
                                      llvm::GlobalValue::InternalLinkage,
                                      "block_destroy_helper",
                                      IGM.getModule());
+  func->setAttributes(IGM.constructInitialAttributes());
   IRGenFunction IGF(IGM, func);
   
   // Destroy the captures.

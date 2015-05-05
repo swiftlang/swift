@@ -177,6 +177,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     llvm::Function::Create(IGM.DeallocatingDtorTy,
                            llvm::Function::PrivateLinkage,
                            "objectdestroy", &IGM.Module);
+  fn->setAttributes(IGM.constructInitialAttributes());
 
   IRGenFunction IGF(IGM, fn);
   if (IGM.DebugInfo)
@@ -220,6 +221,7 @@ llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
     llvm::Function::Create(IGM.DeallocatingDtorTy,
                            llvm::Function::PrivateLinkage,
                            "objectsize", &IGM.Module);
+  fn->setAttributes(IGM.constructInitialAttributes());
 
   IRGenFunction IGF(IGM, fn);
   if (IGM.DebugInfo)

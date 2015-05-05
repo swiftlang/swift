@@ -28,7 +28,7 @@ bb0(%0 : $@sil_unowned C):
   %3 = tuple ()
   %4 = return %3 : $()
 }
-// CHECK:    define void @test_weak_rr_class([[C]]*) {
+// CHECK:    define void @test_weak_rr_class([[C]]*) {{.*}} {
 // CHECK:      call void bitcast (void ([[REF]]*)* @swift_weakRetain to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_weakRelease to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: ret void
@@ -40,7 +40,7 @@ bb0(%0 : $@sil_unowned P):
   %3 = tuple ()
   %4 = return %3 : $()
 }
-// CHECK:    define void @test_weak_rr_proto([[UNKNOWN]]*, i8**) {
+// CHECK:    define void @test_weak_rr_proto([[UNKNOWN]]*, i8**) {{.*}} {
 // CHECK:      call void bitcast (void ([[REF]]*)* @swift_unknownWeakRetain to void ([[UNKNOWN]]*)*)([[UNKNOWN]]* %0)
 // CHECK:      call void bitcast (void ([[REF]]*)* @swift_unknownWeakRelease to void ([[UNKNOWN]]*)*)([[UNKNOWN]]* %0)
 // CHECK-NEXT: ret void

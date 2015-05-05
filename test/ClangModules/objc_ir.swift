@@ -85,7 +85,7 @@ func almostSubscriptable(#as1: AlmostSubscriptable, #a: A) {
   as1.objectForKeyedSubscript(a)
 }
 
-// CHECK: define hidden void @_TF7objc_ir13protocolTypesFT1aCSo7NSMince1bPSo9NSRuncing__T_(%CSo7NSMince*, %objc_object*) {
+// CHECK: define hidden void @_TF7objc_ir13protocolTypesFT1aCSo7NSMince1bPSo9NSRuncing__T_(%CSo7NSMince*, %objc_object*) {{.*}} {
 func protocolTypes(#a: NSMince, #b: NSRuncing) {
   // - (void)eatWith:(id <NSRuncing>)runcer;
   a.eatWith(b)
@@ -93,7 +93,7 @@ func protocolTypes(#a: NSMince, #b: NSRuncing) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE:%.*]]*, i8*, i8*)*)([[OPAQUE:%.*]]* {{%.*}}, i8* [[SEL]], i8* {{%.*}})
 }
 
-// CHECK-LABEL: define hidden void @_TF7objc_ir6getsetFT1pPSo8FooProto__T_(%objc_object*) {
+// CHECK-LABEL: define hidden void @_TF7objc_ir6getsetFT1pPSo8FooProto__T_(%objc_object*) {{.*}} {
 func getset(#p: FooProto) {
   // CHECK: load i8*, i8** @"\01L_selector(bar)"
   // CHECK: load i8*, i8** @"\01L_selector(setBar:)"
@@ -101,7 +101,7 @@ func getset(#p: FooProto) {
   p.bar = prop
 }
 
-// CHECK-LABEL: define hidden void @_TF7objc_ir17pointerPropertiesFCSo14PointerWrapperT_(%CSo14PointerWrapper*) {
+// CHECK-LABEL: define hidden void @_TF7objc_ir17pointerPropertiesFCSo14PointerWrapperT_(%CSo14PointerWrapper*) {{.*}} {
 func pointerProperties(obj: PointerWrapper) {
   // CHECK: load i8*, i8** @"\01L_selector(setVoidPtr:)"
   // CHECK: load i8*, i8** @"\01L_selector(setIntPtr:)"

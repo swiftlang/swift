@@ -22,19 +22,19 @@ sil @foo : $@convention(thin) (@owned C?) -> @autoreleased C? {
 bb0(%0 : $C?):
   autorelease_return %0 : $C?
 }
-// x86_64:    define i64 @foo(i64) {
+// x86_64:    define i64 @foo(i64) {{.*}} {
 // x86_64:      [[T0:%.*]] = tail call i64 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i64 (i64)*)(i64 %0)
 // x86_64-NEXT: ret i64 [[T0]]
 
-// i386:     define i32 @foo(i32) {
+// i386:     define i32 @foo(i32) {{.*}} {
 // i386:       [[T0:%.*]] = tail call i32 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i32 (i32)*)(i32 %0)
 // i386-NEXT:  ret i32 [[T0]]
 
-// arm64:    define i64 @foo(i64) {
+// arm64:    define i64 @foo(i64) {{.*}} {
 // arm64:      [[T0:%.*]] = tail call i64 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i64 (i64)*)(i64 %0)
 // arm64-NEXT: ret i64 [[T0]]
 
-// armv7:    define i32 @foo(i32) {
+// armv7:    define i32 @foo(i32) {{.*}} {
 // armv7:      [[T0:%.*]] = tail call i32 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i32 (i32)*)(i32 %0)
 // armv7-NEXT: ret i32 [[T0]]
 

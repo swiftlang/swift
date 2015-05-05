@@ -50,7 +50,7 @@ struct SomeWeak {
 // CHECK:         @_TwtTV21array_value_witnesses8SomeWeak
 
 // CHECK-LABEL: define linkonce_odr hidden void @_TwXxV21array_value_witnesses8SomeWeak
-// CHECK:         (%swift.opaque* [[ARRAY_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {
+// CHECK:         (%swift.opaque* [[ARRAY_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {{.*}} {
 // CHECK:         [[BEGIN:%.*]] = bitcast %swift.opaque* [[ARRAY_PTR]] to [[SOMEWEAK:%V21array_value_witnesses8SomeWeak]]*
 // CHECK:         br label %iter
 // CHECK:       iter:
@@ -68,7 +68,7 @@ struct SomeWeak {
 // CHECK:         ret
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwCcV21array_value_witnesses8SomeWeak
-// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {
+// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {{.*}} {
 // CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
 // CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*
 // CHECK:         br label %iter
@@ -90,7 +90,7 @@ struct SomeWeak {
 // CHECK:         ret
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwTtV21array_value_witnesses8SomeWeak
-// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {
+// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {{.*}} {
 // CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
 // CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*
 // CHECK:         br label %iter
@@ -112,7 +112,7 @@ struct SomeWeak {
 // CHECK:         ret
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwtTV21array_value_witnesses8SomeWeak
-// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {
+// CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %Self) {{.*}} {
 // CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
 // CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*
 // CHECK:         [[DEST_END:%.*]] = getelementptr inbounds [[SOMEWEAK]], [[SOMEWEAK]]* [[DEST_BEGIN]], [[WORD]] [[COUNT]]
