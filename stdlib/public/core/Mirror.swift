@@ -457,7 +457,8 @@ extension MirrorType {
   internal final func _superMirror() -> MirrorType? {
     if self.count > 0 {
       let childMirror = self[0].1
-      if childMirror.dynamicType == _ClassSuperMirror.self {
+      let t = childMirror.dynamicType
+      if t == _ClassSuperMirror.self || t == _ObjCSuperMirror.self {
         return childMirror
       }
     }

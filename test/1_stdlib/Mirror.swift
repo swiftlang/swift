@@ -271,6 +271,7 @@ mirrors.test("class/Plain/Plain") {
     if let aChild = expectNotEmpty(first(a.children)) {
       expectEqual("a", aChild.label)
       expectEqual(1, aChild.value as? Int)
+      expectEmpty(a.superclassMirror())
     }
   }
 }
@@ -340,6 +341,114 @@ mirrors.test("class/CustomizedSuper/Synthesized") {
     expectTrue(a.subjectType == A.self)
     expectEqual("a", first(a.children)!.label)
     expectEmpty(a.superclassMirror())
+  }
+}
+
+import Foundation
+
+//===--- ObjC Base Classes ------------------------------------------------===//
+
+mirrors.test("class/ObjCPlain/Plain") {
+  class A : NSObject { var a: Int = 1 }
+  class B : A { var b: UInt = 42 }
+
+  let b = Mirror(reflecting: B())
+  expectTrue(b.subjectType == B.self)
+  
+  if let bChild = expectNotEmpty(first(b.children)) {
+    expectEqual("b", bChild.label)
+    expectEqual(42, bChild.value as? UInt)
+  }
+  if let a = expectNotEmpty(b.superclassMirror()) {
+    expectTrue(a.subjectType == A.self)
+    if let aChild = expectNotEmpty(first(a.children)) {
+      expectEqual("a", aChild.label)
+      expectEqual(1, aChild.value as? Int)
+      if let o = expectNotEmpty(a.superclassMirror()) {
+        expectEqual("NSObject", String(reflecting: o.subjectType))
+      }
+    }
+  }
+}
+
+mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Implicit") {
+  class A : NSObject { var a: Int = 1 }
+
+  class B : A, CustomReflectable {
+    var b: UInt = 42
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "bee": b ])
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectTrue(b.subjectType == B.self)
+  if let a = expectNotEmpty(b.superclassMirror()) {
+    expectTrue(a.subjectType == A.self)
+    expectEqual("a", first(a.children)?.label)
+    if let o = expectNotEmpty(a.superclassMirror()) {
+      expectTrue(o.subjectType == NSObject.self)
+    }
+  }
+}
+
+mirrors.test("class/ObjCUncustomizedSuper/Synthesized/Explicit") {
+  class A : NSObject { var a: Int = 1 }
+
+  class B : A, CustomReflectable {
+    var b: UInt = 42
+    func customMirror() -> Mirror {
+      return Mirror(
+        self, children: [ "bee": b ], ancestorRepresentation: .Generated)
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectTrue(b.subjectType == B.self)
+  if let a = expectNotEmpty(b.superclassMirror()) {
+    expectTrue(a.subjectType == A.self)
+    expectEqual("a", first(a.children)!.label)
+    if let o = expectNotEmpty(a.superclassMirror()) {
+      expectTrue(o.subjectType == NSObject.self)
+    }
+  }
+}
+
+mirrors.test("class/ObjCCustomizedSuper/Synthesized") {
+  class A : NSTask, CustomReflectable {
+    var a: Int = 1
+    func customMirror() -> Mirror {
+      return Mirror(self, children: [ "aye": a ])
+    }
+  }
+
+  class B : A {
+    var b: UInt = 42
+    // This is an unusual case: when writing override on a
+    // customMirror implementation you would typically want to pass
+    // ancestorRepresentation: .Customized(super.customMirror) or, in
+    // rare cases, ancestorRepresentation: .Suppressed.  However, it
+    // has an expected behavior, which we test here.
+    override func customMirror() -> Mirror {
+      return Mirror(self, children: [ "bee": b ])
+    }
+  }
+
+  let b = Mirror(reflecting: B())
+  expectTrue(b.subjectType == B.self)
+  if let a = expectNotEmpty(b.superclassMirror()) {
+    expectTrue(a.subjectType == A.self)
+    expectEqual("a", first(a.children)!.label)
+    if let t = expectNotEmpty(a.superclassMirror()) {
+      expectTrue(t.subjectType == NSTask.self)
+      // FIXME: There's a bug in legacy mirrors that prevents this
+      // part of the test from working
+      /*
+      if let o = expectNotEmpty(t.superclassMirror()) {
+        expectTrue(t.subjectType == NSObject.self)
+      }
+      */
+    }
   }
 }
 
