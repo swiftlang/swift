@@ -92,7 +92,7 @@ public:
   
   /// The value stored in a Builtin.once predicate to indicate that an
   /// initialization has already happened, if known.
-  Optional<long> OnceDonePredicateValue = None;
+  Optional<int64_t> OnceDonePredicateValue = None;
 };
 
 }
