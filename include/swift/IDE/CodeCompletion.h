@@ -25,6 +25,8 @@
 namespace swift {
 class CodeCompletionCallbacksFactory;
 class Decl;
+class DeclContext;
+class Module;
 
 namespace ide {
 
@@ -576,6 +578,16 @@ public:
 CodeCompletionCallbacksFactory *
 makeCodeCompletionCallbacksFactory(CodeCompletionContext &CompletionContext,
                                    CodeCompletionConsumer &Consumer);
+
+/// Lookup the top-level code completions from \p module and store them in
+/// \p targetSink.
+///
+/// Results are looked up as if in \p currDeclContext, which may be null.
+void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
+                                           const Module *module,
+                                           ArrayRef<std::string> accessPath,
+                                           bool needLeadingDot,
+                                           const DeclContext *currDeclContext);
 
 } // namespace ide
 } // namespace swift

@@ -2938,9 +2938,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
                              const CodeCompletionCacheImpl::Key &K,
                              const Module *TheModule) {
       auto V = Cache.getResultSinkFor(K);
-      CompletionLookup Lookup(V->Sink, SwiftContext, &SF);
-      Lookup.getVisibleDeclsOfModule(TheModule, K.AccessPath,
-                                     K.ResultsHaveLeadingDot);
+      lookupCodeCompletionResultsFromModule(V->Sink, TheModule, K.AccessPath,
+                                            K.ResultsHaveLeadingDot, &SF);
       Cache.storeResults(K, V);
       return V;
     };
@@ -3074,3 +3073,10 @@ swift::ide::makeCodeCompletionCallbacksFactory(
   return new CodeCompletionCallbacksFactoryImpl(CompletionContext, Consumer);
 }
 
+void swift::ide::lookupCodeCompletionResultsFromModule(
+    CodeCompletionResultSink &targetSink, const Module *module,
+    ArrayRef<std::string> accessPath, bool needLeadingDot,
+    const DeclContext *currDeclContext) {
+  CompletionLookup Lookup(targetSink, module->getASTContext(), currDeclContext);
+  Lookup.getVisibleDeclsOfModule(module, accessPath, needLeadingDot);
+}
