@@ -1149,7 +1149,12 @@ public:
   /// Try to fold a destroy_addr operation into the previous instructions, or
   /// generate an explicit one if that fails.  If this inserts a new
   /// instruction, it returns it, otherwise it returns null.
-  DestroyAddrInst *emitDestroyAddrAndFold(SILLocation Loc, SILValue Operand);
+  DestroyAddrInst *emitDestroyAddrAndFold(SILLocation Loc, SILValue Operand) {
+    auto U = emitDestroyAddr(Loc, Operand);
+    if (U.isNull() || !U.is<DestroyAddrInst *>())
+      return nullptr;
+    return U.get<DestroyAddrInst *>();
+  }
 
   /// Perform a strong_release instruction at the current location, attempting
   /// to fold it locally into nearby retain instructions or emitting an explicit
@@ -1201,6 +1206,13 @@ public:
   /// destroyed.
   PointerUnion<StrongRetainInst *, StrongReleaseInst *>
   emitStrongRelease(SILLocation Loc, SILValue Operand);
+
+  /// Emit a destroy_addr instruction at \p Loc attempting to fold the
+  /// destroy_addr locally into a copy_addr instruction. Returns a pointer union
+  /// initialized with the folded copy_addr if the destroy_addr was folded into
+  /// a copy_addr. Otherwise, returns the newly inserted destroy_addr.
+  PointerUnion<CopyAddrInst *, DestroyAddrInst *>
+  emitDestroyAddr(SILLocation Loc, SILValue Operand);
 
   /// Convenience function for calling emitRetain on the type lowering
   /// for the non-address value.

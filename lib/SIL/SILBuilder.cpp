@@ -89,11 +89,8 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   return NewBB;
 }
 
-/// emitDestroyAddr - Try to fold a destroy_addr operation into the previous
-/// instructions, or generate an explicit one if that fails.  If this inserts a
-/// new instruction, it returns it, otherwise it returns null.
-DestroyAddrInst *SILBuilder::emitDestroyAddrAndFold(SILLocation Loc,
-                                                    SILValue Operand) {
+PointerUnion<CopyAddrInst *, DestroyAddrInst *>
+SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
   // Check to see if the instruction immediately before the insertion point is a
   // copy_addr from the specified operand.  If so, we can fold this into the
   // copy_addr as a take.
@@ -104,7 +101,7 @@ DestroyAddrInst *SILBuilder::emitDestroyAddrAndFold(SILLocation Loc,
     if (auto CA = dyn_cast<CopyAddrInst>(Inst)) {
       if (CA->getSrc() == Operand && !CA->isTakeOfSrc()) {
         CA->setIsTakeOfSrc(IsTake);
-        return nullptr;
+        return CA;
       }
     }
 
