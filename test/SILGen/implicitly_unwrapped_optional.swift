@@ -8,7 +8,7 @@ func foo(var f f: (()->())!) {
 // CHECK-NEXT: [[F:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<() -> ()>
 // CHECK-NEXT: store [[T0]] to [[F]]#1
 // CHECK:      [[T1:%.*]] = select_enum_addr [[F]]#1
-// CHECK-NEXT: cond_br [[T1]], bb1, bb2
+// CHECK-NEXT: cond_br [[T1]], bb1, bb3
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
 // CHECK:    bb1:
@@ -19,11 +19,11 @@ func foo(var f f: (()->())!) {
 // CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
 //   .... then call it
 // CHECK-NEXT: apply [[FN1]]()
-// CHECK:      br bb3
+// CHECK:      br bb2
 //   (first nothing block)
-// CHECK:    bb2:
+// CHECK:    bb3:
 // CHECK-NEXT: enum $Optional<()>, #Optional.None!enumelt
-// CHECK-NEXT: br bb3
+// CHECK-NEXT: br bb2
 //   The rest of this is tested in optional.swift
 
 func wrap<T>(x x: T) -> T! { return x }
