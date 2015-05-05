@@ -7,8 +7,7 @@
 // CHECK:   [[TOKEN_ADDR:%.*]] = global_addr @globalinit_[[T]]_token0 : $*Builtin.Word
 // CHECK:   [[TOKEN_PTR:%.*]] = address_to_pointer [[TOKEN_ADDR]] : $*Builtin.Word to $Builtin.RawPointer
 // CHECK:   [[INIT_FUNC:%.*]] = function_ref @globalinit_[[T]]_func0 : $@convention(thin) () -> ()
-// CHECK:   [[INIT_FUNC_THICK:%.*]] = thin_to_thick_function [[INIT_FUNC]] : $@convention(thin) () -> () to $@callee_owned () -> ()
-// CHECK:   builtin "once"([[TOKEN_PTR]] : $Builtin.RawPointer, [[INIT_FUNC_THICK]] : $@callee_owned () -> ()) : $()
+// CHECK:   builtin "once"([[TOKEN_PTR]] : $Builtin.RawPointer, [[INIT_FUNC]] : $@convention(thin) () -> ()) : $()
 // CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @_Tv12lazy_globals1xSi : $*Int
 // CHECK:   [[GLOBAL_PTR:%.*]] = address_to_pointer [[GLOBAL_ADDR]] : $*Int to $Builtin.RawPointer
 // CHECK:   return [[GLOBAL_PTR]] : $Builtin.RawPointer

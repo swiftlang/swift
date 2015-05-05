@@ -777,11 +777,10 @@ FUNCTION(ConformsToProtocol,
          ATTRS(NoUnwind, ReadNone))
 
 // void swift_once(swift_once_t *predicate,
-//                 void (*function_code)(RefCounted*),
-//                 RefCounted *context);
+//                 void (*function_code)(RefCounted*));
 FUNCTION(Once, swift_once, RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(OnceTy->getPointerTo(), Int8PtrTy, RefCountedPtrTy),
+         ARGS(OnceTy->getPointerTo(), Int8PtrTy),
          ATTRS())
 
 // void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,

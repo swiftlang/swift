@@ -25,7 +25,6 @@ bb0:
 // CHECK-NEXT: global_addr @globalinit_token0
 // CHECK-NEXT: address_to_pointer
 // CHECK: function_ref @globalinit_func0 : $@convention(thin) () -> ()
-// CHECK-NEXT: thin_to_thick_function
 // CHECK-NEXT: global_addr @_Tv2ch1xSi : $*Int32
 // CHECK-NEXT: address_to_pointer
 // CHECK-NEXT: return
@@ -34,8 +33,7 @@ bb0:
   %1 = global_addr @globalinit_token0 : $*Builtin.Word
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@convention(thin) () -> ()
-  %4 = thin_to_thick_function %3 : $@convention(thin) () -> () to $@callee_owned () -> ()
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %4 : $@callee_owned () -> ()) : $()
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
   %6 = global_addr @_Tv2ch1xSi : $*Int32
   %7 = address_to_pointer %6 : $*Int32 to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer

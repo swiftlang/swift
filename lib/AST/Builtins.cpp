@@ -956,11 +956,14 @@ static ValueDecl *getUnreachableOperation(ASTContext &Context,
 
 static ValueDecl *getOnceOperation(ASTContext &Context,
                                    Identifier Id) {
-  // (RawPointer, () -> ()) -> ()
+  // (RawPointer, @convention(thin) () -> ()) -> ()
   
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
-  auto BlockTy = FunctionType::get(VoidTy, VoidTy);
+  auto Thin = FunctionType::ExtInfo(FunctionTypeRepresentation::Thin,
+                                    /*noreturn*/ false, /*throws*/ false);
+  
+  auto BlockTy = FunctionType::get(VoidTy, VoidTy, Thin);
   
   TupleTypeElt InFields[] = {HandleTy, BlockTy};
   auto OutTy = VoidTy;

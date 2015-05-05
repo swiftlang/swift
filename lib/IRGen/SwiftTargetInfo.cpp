@@ -126,8 +126,14 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
   const llvm::Triple &triple = IGM.Context.LangOpts.Target;
   auto pointerSize = IGM.DataLayout.getPointerSizeInBits();
 
-  /// Prepare generic target information.
+  // Prepare generic target information.
   SwiftTargetInfo target(triple.getObjectFormat(), pointerSize);
+  
+  // On Apple platforms, we implement "once" using dispatch_once, which exposes
+  // -1 as ABI for the "done" value.
+  if (triple.isOSDarwin())
+    target.OnceDonePredicateValue = -1L;
+  // TODO: Do we know this for Linux?
   
   switch (triple.getArch()) {
   case llvm::Triple::x86_64:

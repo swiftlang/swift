@@ -18,6 +18,7 @@
 #ifndef __SWIFT_IRGEN_TARGET_INFO_H__
 #define __SWIFT_IRGEN_TARGET_INFO_H__
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "llvm/ADT/Triple.h"
 #include "IRGen.h"
@@ -88,6 +89,10 @@ public:
   bool ObjCUseFP2Ret = false;
   bool ObjCUseNullForEmptyVTable = false;
   bool ObjCUseISAMask = false;
+  
+  /// The value stored in a Builtin.once predicate to indicate that an
+  /// initialization has already happened, if known.
+  Optional<long> OnceDonePredicateValue = None;
 };
 
 }

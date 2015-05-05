@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -366,10 +366,17 @@ func testCondFail(b: Bool, c: Bool) {
   // CHECK: unreachable
 }
 
-// CHECK-LABEL: define hidden void @_TF8builtins8testOnce{{.*}}(i8*, i8*, %swift.refcounted*) {
-// CHECK:         [[PRED_PTR:%.*]] = bitcast i8* %0 to i64*
-// CHECK:         call void @swift_once(i64* [[PRED_PTR]], i8* %1, %swift.refcounted* %2)
-func testOnce(p: Builtin.RawPointer, f: () -> ()) {
+// CHECK-LABEL: define hidden void @_TF8builtins8testOnce{{.*}}(i8*, i8*) {
+// CHECK:         [[PRED_PTR:%.*]] = bitcast i8* %0 to [[WORD:i64|i32]]*
+// CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
+// CHECK-objc:    [[NOT_DONE:%.*]] = icmp ne [[WORD]] [[PRED]], -1
+// CHECK-objc:    br i1 [[NOT_DONE]], label %[[NOT_DONE:.*]], label %[[DONE:.*]]
+// CHECK-objc:  [[NOT_DONE]]:
+// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1)
+// CHECK-objc:    br label %[[DONE]]
+// CHECK-objc:  [[DONE]]:
+
+func testOnce(p: Builtin.RawPointer, f: @convention(thin) () -> ()) {
   Builtin.once(p, f)
 }
 

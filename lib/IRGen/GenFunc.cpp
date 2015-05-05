@@ -2076,16 +2076,40 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
 
   if (Builtin.ID == BuiltinValueKind::Once) {
-    // The input type is statically (Builtin.RawPointer, () -> ()).
-    llvm::Value *Pred = args.claimNext();
+    // The input type is statically (Builtin.RawPointer, @convention(thin) () -> ()).
+    llvm::Value *PredPtr = args.claimNext();
     // Cast the predicate to a OnceTy pointer.
-    Pred = IGF.Builder.CreateBitCast(Pred, IGF.IGM.OnceTy->getPointerTo());
+    PredPtr = IGF.Builder.CreateBitCast(PredPtr, IGF.IGM.OnceTy->getPointerTo());
     llvm::Value *FnCode = args.claimNext();
-    llvm::Value *FnContext = args.claimNext();
     
+    // If we know the platform runtime's "done" value, emit the check inline.
+    llvm::BasicBlock *notDoneBB, *doneBB;
+    
+    if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
+      auto PredValue = IGF.Builder.CreateLoad(PredPtr,
+                                              IGF.IGM.getPointerAlignment());
+      auto ExpectedPredValue = llvm::ConstantInt::getSigned(IGF.IGM.OnceTy,
+                                                            *ExpectedPred);
+      auto NotDone = IGF.Builder.CreateICmpNE(PredValue, ExpectedPredValue);
+      
+      notDoneBB = IGF.createBasicBlock("once_not_done");
+      doneBB = IGF.createBasicBlock("once_done");
+      
+      IGF.Builder.CreateCondBr(NotDone, notDoneBB, doneBB);
+      IGF.Builder.emitBlock(notDoneBB);
+    }
+    
+    // Emit the runtime "once" call.
     auto call
-      = IGF.Builder.CreateCall3(IGF.IGM.getOnceFn(), Pred, FnCode, FnContext);
+      = IGF.Builder.CreateCall2(IGF.IGM.getOnceFn(), PredPtr, FnCode);
     call->setCallingConv(IGF.IGM.RuntimeCC);
+    
+    // If we emitted the "done" check inline, join the branches.
+    if (IGF.IGM.TargetInfo.OnceDonePredicateValue) {
+      IGF.Builder.CreateBr(doneBB);
+      IGF.Builder.emitBlock(doneBB);
+    }
+    
     // No return value.
     return;
   }

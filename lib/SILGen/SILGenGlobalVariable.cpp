@@ -263,15 +263,8 @@ static void emitOnceCall(SILGenFunction &gen, VarDecl *global,
   onceTokenAddr = gen.B.createAddressToPointer(global, onceTokenAddr,
                                                rawPointerSILTy);
 
-  // Emit a reference to the function to execute once, then thicken
-  // that reference as Builtin.once expects.
+  // Emit a reference to the function to execute.
   SILValue onceFuncRef = gen.B.createFunctionRef(global, onceFunc);
-  auto onceFuncThickTy
-    = adjustFunctionType(onceFunc->getLoweredFunctionType(),
-                         SILFunctionType::Representation::Thick);
-  auto onceFuncThickSILTy = SILType::getPrimitiveObjectType(onceFuncThickTy);
-  onceFuncRef = gen.B.createThinToThickFunction(global, onceFuncRef,
-                                                onceFuncThickSILTy);
 
   // Call Builtin.once.
   SILValue onceArgs[] = {onceTokenAddr, onceFuncRef};

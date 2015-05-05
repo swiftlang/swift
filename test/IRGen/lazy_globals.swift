@@ -17,19 +17,19 @@
 
 // CHECK: define hidden i8* @_TF12lazy_globalsau1xSi() {
 // CHECK: entry:
-// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*), %swift.refcounted* null)
+// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*))
 // CHECK:   ret i8* bitcast (%Si* @_Tv12lazy_globals1xSi to i8*)
 // CHECK: }
 
 // CHECK: define hidden i8* @_TF12lazy_globalsau1ySi() {
 // CHECK: entry:
-// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*), %swift.refcounted* null)
+// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*))
 // CHECK:   ret i8* bitcast (%Si* @_Tv12lazy_globals1ySi to i8*)
 // CHECK: }
 
 // CHECK: define hidden i8* @_TF12lazy_globalsau1zSi() {
 // CHECK: entry:
-// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*), %swift.refcounted* null)
+// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*))
 // CHECK:   ret i8* bitcast (%Si* @_Tv12lazy_globals1zSi to i8*)
 // CHECK: }
 var (x, y, z) = (1, 2, 3)

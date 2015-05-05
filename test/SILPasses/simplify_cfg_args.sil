@@ -23,8 +23,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
   %10 = global_addr @globalinit_token11 : $*Builtin.Word // user: %11
   %11 = address_to_pointer %10 : $*Builtin.Word to $Builtin.RawPointer // user: %14
   %12 = function_ref @globalinit_func11 : $@convention(thin) () -> () // users: %26, %13
-  %13 = thin_to_thick_function %12 : $@convention(thin) () -> () to $@callee_owned () -> () // user: %14
-  %14 = builtin "once"(%11 : $Builtin.RawPointer, %13 : $@callee_owned () -> ()) : $()
+  %14 = builtin "once"(%11 : $Builtin.RawPointer, %12 : $@convention(thin) () -> ()) : $()
   %15 = alloc_stack $Int32                        // users: %38, %40, %41
   %16 = struct_element_addr %15#1 : $*Int32, #Int32.value // users: %28, %17
   %17 = load %16 : $*Builtin.Int32                // user: %20
@@ -37,8 +36,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
 bb1:                                              // Preds: bb0
   %24 = global_addr @globalinit_token11 : $*Builtin.Word // user: %25
   %25 = address_to_pointer %24 : $*Builtin.Word to $Builtin.RawPointer // user: %27
-  %26 = thin_to_thick_function %12 : $@convention(thin) () -> () to $@callee_owned () -> () // user: %27
-  %27 = builtin "once"(%25 : $Builtin.RawPointer, %26 : $@callee_owned () -> ()) : $()
+  %27 = builtin "once"(%25 : $Builtin.RawPointer, %12 : $@convention(thin) () -> ()) : $()
   %28 = load %16 : $*Builtin.Int32                // user: %30
 // CHECK: [[VAR_21:%[0-9]+]] = builtin "and_Int32"
   %30 = builtin "or_Int32"(%22 : $Builtin.Int32, %28 : $Builtin.Int32) : $Builtin.Int32 // user: %31
