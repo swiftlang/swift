@@ -1013,17 +1013,33 @@ public func NSLog(format: String, _ args: CVarArgType...) {
 // have CGRectEdge type.  This is not correct for Swift (as there is no
 // implicit conversion to NSRectEdge).
 
+@availability(*, unavailable, renamed="NSRectEdge.MinX")
 public var NSMinXEdge: NSRectEdge {
-  return NSRectEdge(CGRectEdge.MinXEdge.rawValue)
+  fatalError("unavailable property can't be accessed")
 }
+@availability(*, unavailable, renamed="NSRectEdge.MinY")
 public var NSMinYEdge: NSRectEdge {
-  return NSRectEdge(CGRectEdge.MinYEdge.rawValue)
+  fatalError("unavailable property can't be accessed")
 }
+@availability(*, unavailable, renamed="NSRectEdge.MaxX")
 public var NSMaxXEdge: NSRectEdge {
-  return NSRectEdge(CGRectEdge.MaxXEdge.rawValue)
+  fatalError("unavailable property can't be accessed")
 }
+@availability(*, unavailable, renamed="NSRectEdge.MaxY")
 public var NSMaxYEdge: NSRectEdge {
-  return NSRectEdge(CGRectEdge.MaxYEdge.rawValue)
+  fatalError("unavailable property can't be accessed")
+}
+
+extension NSRectEdge {
+  public init(rectEdge: CGRectEdge) {
+    self = NSRectEdge(rawValue: UInt(rectEdge.rawValue))!
+  }
+}
+
+extension CGRectEdge {
+  public init(rectEdge: NSRectEdge) {
+    self = CGRectEdge(rawValue: UInt32(rectEdge.rawValue))!
+  }
 }
 
 #endif

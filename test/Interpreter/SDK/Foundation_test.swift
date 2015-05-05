@@ -193,34 +193,23 @@ FoundationTestSuite.test("rdar://17584531") {
   expectEqual("Optional(255)", String(dict2["id"]))
 }
 
-func staticAssertType<T>(_: T.Type, inout _ value: T) {}
-
 #if os(OSX)
 FoundationTestSuite.test("NSRectEdge/constants") {
   // Check that the following constants have the correct type and value.
   //
   // It is valid to hardcode the value in the test.  The way they are currently
   // defined in the SDK makes them ABI for Objective-C code.
-  if true {
-    var x = NSMinXEdge
-    staticAssertType(NSRectEdge.self, &x)
-    expectEqual(0, NSMinXEdge)
-  }
-  if true {
-    var x = NSMinYEdge
-    staticAssertType(NSRectEdge.self, &x)
-    expectEqual(1, NSMinYEdge)
-  }
-  if true {
-    var x = NSMaxXEdge
-    staticAssertType(NSRectEdge.self, &x)
-    expectEqual(2, NSMaxXEdge)
-  }
-  if true {
-    var x = NSMaxYEdge
-    staticAssertType(NSRectEdge.self, &x)
-    expectEqual(3, NSMaxYEdge)
-  }
+  expectEqual(0, CGRectEdge(rectEdge: NSRectEdge.MinX).rawValue)
+  expectEqual(0, NSRectEdge(rectEdge: CGRectEdge.MinXEdge).rawValue)
+
+  expectEqual(1, CGRectEdge(rectEdge: NSRectEdge.MinY).rawValue)
+  expectEqual(1, NSRectEdge(rectEdge: CGRectEdge.MinYEdge).rawValue)
+
+  expectEqual(2, CGRectEdge(rectEdge: NSRectEdge.MaxX).rawValue)
+  expectEqual(2, NSRectEdge(rectEdge: CGRectEdge.MaxXEdge).rawValue)
+
+  expectEqual(3, CGRectEdge(rectEdge: NSRectEdge.MaxY).rawValue)
+  expectEqual(3, NSRectEdge(rectEdge: CGRectEdge.MaxYEdge).rawValue)
 }
 #endif
 
