@@ -578,20 +578,10 @@ void CodeCompletionCache::getResults(
     std::function<ValueRefCntPtr(CodeCompletionCache &, Key, const Module *)>
         FillCacheCallback) {
   // FIXME(thread-safety): lock the whole AST context.  We might load a module.
-  auto &TheCache = Impl->TheCache;
-  llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
+  llvm::Optional<ValueRefCntPtr> V = get(K);
   if (!V.hasValue()) {
-    // No cached results found.  Fill the cache.
+    // No cached results found. Fill the cache.
     V = FillCacheCallback(*this, K, TheModule);
-  } else {
-    llvm::sys::fs::file_status ModuleStatus;
-    if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus) ||
-        V.getValue()->ModuleModificationTime !=
-            ModuleStatus.getLastModificationTime()) {
-      // Cache is stale.  Update the cache.
-      TheCache.remove(K);
-      V = FillCacheCallback(*this, K, TheModule);
-    }
   }
   assert(V.hasValue());
   auto &SourceSink = V.getValue()->Sink;
@@ -637,16 +627,29 @@ void CodeCompletionCache::getResults(
   }
 }
 
-CodeCompletionCache::ValueRefCntPtr
-CodeCompletionCache::getResultSinkFor(const Key &K) {
+CodeCompletionCache::ValueRefCntPtr CodeCompletionCache::createValue() {
+  return ValueRefCntPtr(new Value);
+}
+
+Optional<CodeCompletionCache::ValueRefCntPtr>
+CodeCompletionCache::get(const Key &K) {
   auto &TheCache = Impl->TheCache;
-  TheCache.remove(K);
-  auto V = ValueRefCntPtr(new Value);
-  TheCache.set(K, V);
+  llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
+  if (V) {
+    // Check whether V is up to date.
+    llvm::sys::fs::file_status ModuleStatus;
+    if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus) ||
+        V.getValue()->ModuleModificationTime !=
+            ModuleStatus.getLastModificationTime()) {
+      // Cache is stale.
+      V = None;
+      TheCache.remove(K);
+    }
+  }
   return V;
 }
 
-void CodeCompletionCache::storeResults(const Key &K, ValueRefCntPtr V) {
+void CodeCompletionCache::set(const Key &K, ValueRefCntPtr V) {
   {
     assert(!K.ModuleFilename.empty());
 
@@ -657,11 +660,7 @@ void CodeCompletionCache::storeResults(const Key &K, ValueRefCntPtr V) {
       V->ModuleModificationTime = ModuleStatus.getLastModificationTime();
     }
   }
-
-  // Remove the cache entry and add it back to refresh the cost value.
-  auto &TheCache = Impl->TheCache;
-  TheCache.remove(K);
-  TheCache.set(K, V);
+  Impl->TheCache.set(K, V);
 }
 
 CodeCompletionCache::CodeCompletionCache()
@@ -2905,10 +2904,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     auto FillCacheCallback = [&SwiftContext, &SF](
         CodeCompletionCache &Cache, const CodeCompletionCache::Key &K,
         const Module *TheModule) {
-      auto V = Cache.getResultSinkFor(K);
+      auto V = Cache.createValue();
       lookupCodeCompletionResultsFromModule(V->Sink, TheModule, K.AccessPath,
                                             K.ResultsHaveLeadingDot, &SF);
-      Cache.storeResults(K, V);
+      Cache.set(K, V);
       return V;
     };
 

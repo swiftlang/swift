@@ -554,9 +554,9 @@ public:
              std::function<ValueRefCntPtr(CodeCompletionCache &, Key,
                                           const Module *)> FillCacheCallback);
 
-  ValueRefCntPtr getResultSinkFor(const Key &K);
-
-  void storeResults(const Key &K, ValueRefCntPtr V);
+  ValueRefCntPtr createValue();
+  Optional<ValueRefCntPtr> get(const Key &K);
+  void set(const Key &K, ValueRefCntPtr V);
 };
 
 class CodeCompletionContext {
