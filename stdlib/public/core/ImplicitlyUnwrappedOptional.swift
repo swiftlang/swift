@@ -71,9 +71,7 @@ public enum ImplicitlyUnwrappedOptional<T>
     if let value = self {
       return reflect(value)
     } else {
-      return _OptionalMirror(self)
-      //      return _OptionalMirror<T>(.None)
-
+      return _OptionalMirror<T>(.None)
     }
   }
 }
