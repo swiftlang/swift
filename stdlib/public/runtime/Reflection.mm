@@ -540,7 +540,9 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
 }
   
 // -- Mirror witnesses for ObjC classes.
-  
+
+#if SWIFT_OBJC_INTEROP  
+
 extern "C" const FullMetadata<Metadata> _TMdSb; // Bool
 extern "C" const FullMetadata<Metadata> _TMdSi; // Int
 extern "C" const FullMetadata<Metadata> _TMdSu; // UInt
@@ -632,7 +634,7 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   return count;
 #endif
 }
-#if SWIFT_OBJC_INTEROP
+
 static Mirror ObjC_getMirrorForSuperclass(Class sup,
                                           HeapObject *owner,
                                           const OpaqueValue *value,
