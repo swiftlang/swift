@@ -23,10 +23,10 @@ func f<T: Q where T.Assoc1 == T.Assoc2>(x: T) {}
 func g<T where T: Q, T.Assoc1 == T.Assoc2>(x: T) {}
 func h<T: P, U where T.Assoc == U>(x: T) {}
 func i<T: P where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2>(x: T) {}
-func j<T: C>() {}
-func k<T where T: C>() {}
-func l<T: C where T: P>() {}
-func m<T: P where T.Assoc: C>() {}
+func j<T: C>(_: T) {}
+func k<T where T: C>(_: T) {}
+func l<T: C where T: P>(_: T) {}
+func m<T: P where T.Assoc: C>(_: T) {}
 
 struct Foo<V> {
   func z() {}
@@ -40,10 +40,10 @@ struct Foo<V> {
   func g<T where T: Q, T.Assoc1 == T.Assoc2>(x: T) {}
   func h<T: P, U where T.Assoc == U>(x: T) {}
   func i<T: P where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2>(x: T) {}
-  func j<T: C>() {}
-  func k<T where T: C>() {}
-  func l<T: C where T: P>() {}
-  func m<T: P where T.Assoc: C>() {}
+  func j<T: C>(_: T) {}
+  func k<T where T: C>(_: T) {}
+  func l<T: C where T: P>(_: T) {}
+  func m<T: P where T.Assoc: C>(_: T) {}
 }
 
 // Test that we handle interface type lowering when accessing a dependent

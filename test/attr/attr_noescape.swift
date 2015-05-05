@@ -176,16 +176,16 @@ protocol P2 : P1 {
   typealias Element
 }
 
-func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> ()) {}
+func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> (), _: T) {}
 
-func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> ()) {}
+func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> (), _: T) {}
 
 struct S : P2 {
   typealias Element = Int
   func each(@noescape transform: Int -> ()) {
-    overloadedEach(self, transform) // expected-error {{invalid use of non-escaping function in escaping context 'O.Element -> ()'}}
+    overloadedEach(self, transform, 1) // expected-error {{invalid use of non-escaping function in escaping context 'O.Element -> ()'}}
       // expected-error@-1 {{invalid use of non-escaping function in escaping context 'P.Element -> ()'}}
-      // expected-error@-2 {{cannot find an overload for 'overloadedEach' that accepts an argument list of type '(S, @noescape Int -> ())'}}
+      // expected-error@-2 {{cannot find an overload for 'overloadedEach' that accepts an argument list of type '(S, @noescape Int -> (), Int)'}}
   }
 }
 

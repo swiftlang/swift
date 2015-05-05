@@ -292,11 +292,11 @@ func nonTypeSameType<T where T == Wibble>(_: T) {} // expected-error{{use of und
 func nonTypeSameType2<T where Wibble == T>(_: T) {} // expected-error{{use of undeclared type 'Wibble'}}
 func sameTypeEq<T where T = T>(_: T) {} // expected-error{{use '==' for same-type requirements rather than '='}} {{27-28===}}
 
-func badTypeConformance1<T where Int : EqualComparable>() {} // expected-error{{type 'Int' in conformance requirement does not refer to a generic parameter or associated type}}
+func badTypeConformance1<T where Int : EqualComparable>(_: T) {} // expected-error{{type 'Int' in conformance requirement does not refer to a generic parameter or associated type}}
 
-func badTypeConformance2<T where T.Blarg : EqualComparable>() { } // expected-error{{'Blarg' is not a member type of 'T'}}
+func badTypeConformance2<T where T.Blarg : EqualComparable>(_: T) { } // expected-error{{'Blarg' is not a member type of 'T'}}
 
-func badSameType<T, U : GeneratesAnElement, V 
+func badSameType<T, U : GeneratesAnElement, V // expected-error{{There is no way to infer the generic parameter 'V' if it is not used in function signature}}
                  where T == U.Element, 
                           U.Element == V // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
-                 >() {} 
+                 >(_: T) {} 

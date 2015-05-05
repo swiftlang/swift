@@ -83,7 +83,7 @@ func destroy_obj(x: Builtin.RawPointer) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins11destroy_gen
-func destroy_gen<T>(x: Builtin.RawPointer) {
+func destroy_gen<T>(x: Builtin.RawPointer, _: T) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*T
   // CHECK: destroy_addr [[ADDR]]
   return Builtin.destroy(T.self, x)
@@ -347,7 +347,7 @@ struct S {}
 protocol P {}
 
 // CHECK-LABEL: sil hidden @_TF8builtins10canBeClass
-func canBeClass<T>() {
+func canBeClass<T>(_: T) {
   // CHECK: integer_literal $Builtin.Int8, 1
   Builtin.canBeClass(O.self)
   // CHECK: integer_literal $Builtin.Int8, 1
@@ -374,7 +374,7 @@ func canBeClass<T>() {
 // FIXME: "T.Type.self" does not parse as an expression
 
 // CHECK-LABEL: sil hidden @_TF8builtins18canBeClassMetatype
-func canBeClassMetatype<T>() {
+func canBeClassMetatype<T>(_: T) {
   // CHECK: integer_literal $Builtin.Int8, 1
   typealias OT = O.Type
   Builtin.canBeClass(OT.self)
