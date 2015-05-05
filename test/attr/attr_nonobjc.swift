@@ -19,7 +19,7 @@ import Foundation
 
   // This is not allowed, though
   func defeatEnemy(s: String) -> Bool { // expected-error {{method 'defeatEnemy' with Objective-C selector 'defeatEnemy:' conflicts with previous declaration with the same Objective-C selector}}
-    return (count(s) > 0)
+    return s != ""
   }
 
   @nonobjc subscript(index: Int) -> Int {
