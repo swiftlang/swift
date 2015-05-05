@@ -427,7 +427,7 @@ class SubScene : SKScene {
 // CHECK-NEXT:   super: <SKScene>
 // CHECK-NEXT:     ▿ SKEffectNode: <SKScene> name:'(null)' frame:
 // CHECK-NEXT:       ▿ SKNode: <SKScene> name:'(null)' frame:
-// CHECK-NEXT:         ▿ NSResponder: <SKScene> name:'(null)' frame:
+// CHECK-NEXT:         ▿ {{(NS|UI)}}Responder: <SKScene> name:'(null)' frame:
 // CHECK-NEXT:           - NSObject: <SKScene> name:'(null)' frame:
 // CHECK-NEXT:   - foo: 12131415
 // CHECK-NEXT:   - bar: boom
