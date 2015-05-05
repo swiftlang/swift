@@ -1559,18 +1559,19 @@ namespace {
     OrderDeclarations(SourceManager &srcMgr) : SrcMgr(srcMgr) { }
 
     bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
-      SourceFile *lhsSF = lhs->getDeclContext()->getParentSourceFile();
-      SourceFile *rhsSF = rhs->getDeclContext()->getParentSourceFile();
-
-      // If one has a source file and the other does not, prefer the one with
-      // a source file.
-      if (static_cast<bool>(lhsSF) != static_cast<bool>(rhsSF)) {
-        return lhsSF ? true : false;
+      // If the declarations come from different modules, order based on the
+      // module.
+      Module *lhsModule = lhs->getDeclContext()->getParentModule();
+      Module *rhsModule = rhs->getDeclContext()->getParentModule();
+      if (lhsModule != rhsModule) {
+        return lhsModule->Name.str() < rhsModule->Name.str();
       }
 
       // If the two declarations are in the same source file, order based on
       // location within that source file.
-      if (lhsSF && lhsSF == rhsSF) {
+      SourceFile *lhsSF = lhs->getDeclContext()->getParentSourceFile();
+      SourceFile *rhsSF = rhs->getDeclContext()->getParentSourceFile();
+      if (lhsSF == rhsSF) {
         // If only one location is valid, the valid location comes first.
         if (lhs->getLoc().isValid() != rhs->getLoc().isValid()) {
           return lhs->getLoc().isValid();
@@ -1578,14 +1579,6 @@ namespace {
 
         // Prefer the declaration that comes first in the source file.
         return SrcMgr.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
-      }
-
-      // If the declarations come from different modules, order based on the
-      // module.
-      Module *lhsModule = lhs->getDeclContext()->getParentModule();
-      Module *rhsModule = rhs->getDeclContext()->getParentModule();
-      if (lhsModule != rhsModule) {
-        return lhsModule->Name.str() < rhsModule->Name.str();
       }
 
       // The declarations are in different source files (or unknown source
@@ -1608,19 +1601,17 @@ namespace {
       : SrcMgr(srcMgr), SF(sf) { }
 
     bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
-      // Start first by looking at the source files in which each resides.
-      SourceFile *lhsSF = lhs->getDeclContext()->getParentSourceFile();
-      SourceFile *rhsSF = rhs->getDeclContext()->getParentSourceFile();
-
-      // If one has a source file and the other does not, prefer the one with
-      // a source file.
-      if (static_cast<bool>(lhsSF) != static_cast<bool>(rhsSF)) {
-        return lhsSF ? true : false;
-      }
+      // Check whether the declarations are in a class.
+      bool lhsInClass = isa<ClassDecl>(lhs->getDeclContext());
+      bool rhsInClass = isa<ClassDecl>(rhs->getDeclContext());
+      if (lhsInClass != rhsInClass)
+        return lhsInClass;
 
       // If the two declarations are in different source files, and one of those
       // source files is the source file we're biasing toward, prefer that
       // declaration.
+      SourceFile *lhsSF = lhs->getDeclContext()->getParentSourceFile();
+      SourceFile *rhsSF = rhs->getDeclContext()->getParentSourceFile();
       if (lhsSF != rhsSF) {
         if (lhsSF == &SF) return true;
         if (rhsSF == &SF) return false;
@@ -1913,11 +1904,9 @@ static bool shouldAssociateConflictWithSourceFile(
     // Skip methods in the class itself; we want to only diagnose
     // those if there is a conflict within that file.
     if (isa<ClassDecl>(method->getDeclContext())) {
-      if (method->getParentSourceFile() == &sf) {
+      if (method->getParentSourceFile() == &sf)
         anyClassMethodsInSourceFile = true;
-        anyInSourceFile = true;
-        continue;
-      }
+      continue;
     }
 
     if (method->getParentSourceFile() == &sf)
@@ -1953,8 +1942,6 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
                          return false;
                        }
 
-                       std::sort(decls.begin(), decls.end(),
-                                 OrderDeclarations(SourceMgr));
                        return true;
                      });
 
