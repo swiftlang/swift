@@ -453,12 +453,19 @@ extension Mirror.DisplayStyle {
   }
 }
 
+internal func _isClassSuperMirror(t: Any.Type) -> Bool {
+#if  _runtime(_ObjC)
+  return t == _ClassSuperMirror.self || t == _ObjCSuperMirror.self
+#else
+  return t == _ClassSuperMirror.self
+#endif
+}
+
 extension MirrorType {
   internal final func _superMirror() -> MirrorType? {
     if self.count > 0 {
       let childMirror = self[0].1
-      let t = childMirror.dynamicType
-      if t == _ClassSuperMirror.self || t == _ObjCSuperMirror.self {
+      if _isClassSuperMirror(childMirror.dynamicType) {
         return childMirror
       }
     }
