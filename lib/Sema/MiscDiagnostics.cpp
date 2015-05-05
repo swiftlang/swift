@@ -791,13 +791,26 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
   case Accessibility::Public:   fixItString = "public ";   break;
   }
 
+  DeclAttributes &attrs = VD->getAttrs();
   DeclAttribute *attr;
   if (isForSetter) {
-    attr = VD->getAttrs().getAttribute<SetterAccessibilityAttr>();
+    attr = attrs.getAttribute<SetterAccessibilityAttr>();
     cast<AbstractStorageDecl>(VD)->overwriteSetterAccessibility(desiredAccess);
   } else {
-    attr = VD->getAttrs().getAttribute<AccessibilityAttr>();
+    attr = attrs.getAttribute<AccessibilityAttr>();
     VD->overwriteAccessibility(desiredAccess);
+
+    if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD)) {
+      if (auto *getter = ASD->getGetter())
+        getter->overwriteAccessibility(desiredAccess);
+
+      if (auto *setterAttr = attrs.getAttribute<SetterAccessibilityAttr>()) {
+        if (setterAttr->getAccess() > desiredAccess)
+          fixItAccessibility(diag, VD, desiredAccess, true);
+      } else {
+        ASD->overwriteSetterAccessibility(desiredAccess);
+      }
+    }
   }
 
   if (isForSetter && VD->getFormalAccess() == desiredAccess) {

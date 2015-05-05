@@ -1215,6 +1215,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                               attr->getAccess(),
                               D->getDescriptiveKind(),
                               extAttr->getAccess());
+      swift::fixItAccessibility(diag, cast<ValueDecl>(D), extAttr->getAccess());
       return;
     }
   }
