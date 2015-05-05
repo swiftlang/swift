@@ -15,9 +15,13 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/ThreadSafeRefCounted.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/TimeValue.h"
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -510,15 +514,49 @@ struct CodeCompletionResultSink {
 
 struct CodeCompletionCacheImpl;
 
-/// \brief Per-module code completion result cache.
+/// \brief In-memory per-module code completion result cache.
 ///
 /// These results persist between multiple code completion requests and can be
 /// used with different ASTContexts.
-struct CodeCompletionCache {
+class CodeCompletionCache {
   std::unique_ptr<CodeCompletionCacheImpl> Impl;
+
+public:
+  /// \brief Cache key.
+  struct Key {
+    std::string ModuleFilename;
+    std::string ModuleName;
+    std::vector<std::string> AccessPath;
+    bool ResultsHaveLeadingDot;
+    bool ForTestableLookup;
+
+    friend bool operator==(const Key &LHS, const Key &RHS) {
+      return LHS.ModuleFilename == RHS.ModuleFilename &&
+             LHS.ModuleName == RHS.ModuleName &&
+             LHS.AccessPath == RHS.AccessPath &&
+             LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
+             LHS.ForTestableLookup == RHS.ForTestableLookup;
+    }
+  };
+
+  struct Value : public ThreadSafeRefCountedBase<Value> {
+    llvm::sys::TimeValue ModuleModificationTime;
+    CodeCompletionResultSink Sink;
+  };
+  using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
 
   CodeCompletionCache();
   ~CodeCompletionCache();
+
+  void
+  getResults(const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
+             const Module *TheModule,
+             std::function<ValueRefCntPtr(CodeCompletionCache &, Key,
+                                          const Module *)> FillCacheCallback);
+
+  ValueRefCntPtr getResultSinkFor(const Key &K);
+
+  void storeResults(const Key &K, ValueRefCntPtr V);
 };
 
 class CodeCompletionContext {

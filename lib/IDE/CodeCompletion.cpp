@@ -14,7 +14,6 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Basic/Cache.h"
 #include "swift/Basic/Fallthrough.h"
-#include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/LazyResolver.h"
@@ -36,7 +35,6 @@
 #include "clang/Basic/Module.h"
 #include "clang/Index/USRGeneration.h"
 #include <algorithm>
-#include <functional>
 #include <string>
 
 using namespace swift;
@@ -527,46 +525,14 @@ void CodeCompletionResultBuilder::finishResult() {
 
 namespace swift {
 namespace ide {
-
 struct CodeCompletionCacheImpl {
-  /// \brief Cache key.
-  struct Key {
-    std::string ModuleFilename;
-    std::string ModuleName;
-    std::vector<std::string> AccessPath;
-    bool ResultsHaveLeadingDot;
-    bool ForTestableLookup;
-
-    friend bool operator==(const Key &LHS, const Key &RHS) {
-      return LHS.ModuleFilename == RHS.ModuleFilename &&
-             LHS.ModuleName == RHS.ModuleName &&
-             LHS.AccessPath == RHS.AccessPath &&
-             LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
-             LHS.ForTestableLookup == RHS.ForTestableLookup;
-    }
-  };
-
-  struct Value : public ThreadSafeRefCountedBase<Value> {
-    llvm::sys::TimeValue ModuleModificationTime;
-    CodeCompletionResultSink Sink;
-  };
-  using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
-
+  using Key = CodeCompletionCache::Key;
+  using Value = CodeCompletionCache::Value;
+  using ValueRefCntPtr = CodeCompletionCache::ValueRefCntPtr;
   sys::Cache<Key, ValueRefCntPtr> TheCache{"swift.libIDE.CodeCompletionCache"};
-
-  void getResults(
-      const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
-      const Module *TheModule,
-      std::function<ValueRefCntPtr(CodeCompletionCacheImpl &, Key,
-                         const Module *)> FillCacheCallback);
-
-  ValueRefCntPtr getResultSinkFor(const Key &K);
-
-  void storeResults(const Key &K, ValueRefCntPtr V);
 };
-
-} // namespace ide
-} // namespace swift
+} // end namespace ide
+} // end namespace swift
 
 namespace llvm {
 template<>
@@ -606,12 +572,13 @@ struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
 } // namespace sys
 } // namespace swift
 
-void CodeCompletionCacheImpl::getResults(
+void CodeCompletionCache::getResults(
     const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
     const Module *TheModule,
-    std::function<ValueRefCntPtr(
-        CodeCompletionCacheImpl &, Key, const Module *)> FillCacheCallback) {
+    std::function<ValueRefCntPtr(CodeCompletionCache &, Key, const Module *)>
+        FillCacheCallback) {
   // FIXME(thread-safety): lock the whole AST context.  We might load a module.
+  auto &TheCache = Impl->TheCache;
   llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
   if (!V.hasValue()) {
     // No cached results found.  Fill the cache.
@@ -670,15 +637,16 @@ void CodeCompletionCacheImpl::getResults(
   }
 }
 
-CodeCompletionCacheImpl::ValueRefCntPtr
-CodeCompletionCacheImpl::getResultSinkFor(const Key &K) {
+CodeCompletionCache::ValueRefCntPtr
+CodeCompletionCache::getResultSinkFor(const Key &K) {
+  auto &TheCache = Impl->TheCache;
   TheCache.remove(K);
   auto V = ValueRefCntPtr(new Value);
   TheCache.set(K, V);
   return V;
 }
 
-void CodeCompletionCacheImpl::storeResults(const Key &K, ValueRefCntPtr V) {
+void CodeCompletionCache::storeResults(const Key &K, ValueRefCntPtr V) {
   {
     assert(!K.ModuleFilename.empty());
 
@@ -691,6 +659,7 @@ void CodeCompletionCacheImpl::storeResults(const Key &K, ValueRefCntPtr V) {
   }
 
   // Remove the cache entry and add it back to refresh the cost value.
+  auto &TheCache = Impl->TheCache;
   TheCache.remove(K);
   TheCache.set(K, V);
 }
@@ -2933,10 +2902,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     // @testable imports.
     const SourceFile &SF = P.SF;
 
-    auto FillCacheCallback =
-        [&SwiftContext, &SF](CodeCompletionCacheImpl &Cache,
-                             const CodeCompletionCacheImpl::Key &K,
-                             const Module *TheModule) {
+    auto FillCacheCallback = [&SwiftContext, &SF](
+        CodeCompletionCache &Cache, const CodeCompletionCache::Key &K,
+        const Module *TheModule) {
       auto V = Cache.getResultSinkFor(K);
       lookupCodeCompletionResultsFromModule(V->Sink, TheModule, K.AccessPath,
                                             K.ResultsHaveLeadingDot, &SF);
@@ -2946,7 +2914,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     auto &Request = Lookup.RequestedCachedResults.getValue();
 
-    llvm::DenseSet<CodeCompletionCacheImpl::Key> ImportsSeen;
+    llvm::DenseSet<CodeCompletionCache::Key> ImportsSeen;
     auto handleImport = [&](Module::ImportedModule Import) {
       Module *TheModule = Import.second;
       Module::AccessPathTy Path = Import.first;
@@ -2969,19 +2937,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       // ModuleFilename can be empty if something strange happened during
       // module loading, for example, the module file is corrupted.
       if (!ModuleFilename.empty()) {
-        CodeCompletionCacheImpl::Key K{ModuleFilename,
-                                       TheModule->Name.str(),
-                                       AccessPath,
-                                       Request.NeedLeadingDot,
-                                       SF.hasTestableImport(TheModule)};
+        CodeCompletionCache::Key K{ModuleFilename, TheModule->Name.str(),
+                                   AccessPath, Request.NeedLeadingDot,
+                                   SF.hasTestableImport(TheModule)};
         std::pair<decltype(ImportsSeen)::iterator, bool>
         Result = ImportsSeen.insert(K);
         if (!Result.second)
           return; // already handled.
 
-        CompletionContext.Cache.Impl->getResults(
-            K, CompletionContext.getResultSink(), Request.OnlyTypes,
-            TheModule, FillCacheCallback);
+        CompletionContext.Cache.getResults(K, CompletionContext.getResultSink(),
+                                           Request.OnlyTypes, TheModule,
+                                           FillCacheCallback);
       }
     };
 
