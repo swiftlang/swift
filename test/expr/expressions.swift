@@ -6,6 +6,8 @@
 
 // Comment.  With unicode characters: ¡ç®åz¥!
 
+func markUsed<T>(t: T) {}
+
 // Various function types.
 var func1 : () -> ()    // No input, no output.
 var func2 : (Int) -> Int
@@ -217,7 +219,7 @@ func test_as_2() {
 
 func test_lambda() {
   // A simple closure.
-  var a = { (value: Int) -> () in print(value+1) }
+  var a = { (value: Int) -> () in markUsed(value+1) }
 
   // A recursive lambda.
   // FIXME: This should definitely be accepted.
@@ -306,7 +308,7 @@ var negative_int32: Int32 = -1
 
 // <rdar://problem/11287167>
 var tupleelemvar = 1
-print((tupleelemvar, tupleelemvar).1)
+markUsed((tupleelemvar, tupleelemvar).1)
 
 func int_literals() {
   // Fits exactly in 64-bits - rdar://11297273

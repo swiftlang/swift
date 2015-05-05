@@ -4,6 +4,8 @@ class MyClass {
   func foo() { }
 }
 
+func markUsed<T>(t: T) {}
+
 func marker_1() {}
 func marker_2() {}
 func marker_3() {}
@@ -152,11 +154,11 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops1
 func for_loops1(var x: Int, c: Bool) {
   for i in 1..<100 {
-    println(i)
+    markUsed(i)
   }
   
   for ; x < 40;  {
-   println(x)
+   markUsed(x)
    ++x
   }
   
@@ -243,7 +245,7 @@ func test_break(i : Int) {
   switch i {
   case (let x) where x != 17: 
     if x == 42 { break } 
-    print(x)
+    markUsed(x)
   default:
     break
   }

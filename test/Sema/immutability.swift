@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+func markUsed<T>(t: T) {}
+
 let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}}
   get {
     return 42
@@ -84,11 +86,11 @@ func let_decls() {
   a = 17   // expected-error {{cannot assign}}
 
   let (b,c) = (4, "hello")
-  print(b); print(c)
+  markUsed(b); markUsed(c)
   b = 17   // expected-error {{cannot assign}}
 
   let d = (4, "hello")
-  print(d.0); print(d.1)
+  markUsed(d.0); markUsed(d.1)
   d.0 = 17   // expected-error {{cannot assign}}
 
   
@@ -166,7 +168,7 @@ struct SomeStruct {
 
 }
 
-print(SomeStruct.type_let)   // ok
+markUsed(SomeStruct.type_let)   // ok
 SomeStruct.type_let = 17     // expected-error {{cannot assign to the result of this expression}}
 
 struct TestMutableStruct {
@@ -277,17 +279,17 @@ struct MutatingGet : NonMutatingGet { // expected-error {{type 'MutatingGet' doe
 
 func test_properties() {
   let rvalue = TestMutableStruct()
-  print(rvalue.nonmutating_property) // ok
-  print(rvalue.mutating_property)    // expected-error {{immutable value of type 'TestMutableStruct' only has mutating members named 'mutating_property'}}
-  print(rvalue.weird_property)       // expected-error {{immutable value of type 'TestMutableStruct' only has mutating members named 'weird_property'}}
+  markUsed(rvalue.nonmutating_property) // ok
+  markUsed(rvalue.mutating_property)    // expected-error {{immutable value of type 'TestMutableStruct' only has mutating members named 'mutating_property'}}
+  markUsed(rvalue.weird_property)       // expected-error {{immutable value of type 'TestMutableStruct' only has mutating members named 'weird_property'}}
   rvalue.nonmutating_property = 1    // ok
   rvalue.mutating_property = 1       // expected-error {{immutable value of type 'TestMutableStruct' only has mutating members named 'mutating_property'}}
   rvalue.weird_property = 1          // expected-error {{mmutable value of type 'TestMutableStruct' only has mutating members named 'weird_property'}}
 
  var lvalue = TestMutableStruct()
- print(lvalue.mutating_property)    // ok
- print(lvalue.nonmutating_property) // ok
- print(lvalue.weird_property) // ok
+ markUsed(lvalue.mutating_property)    // ok
+ markUsed(lvalue.nonmutating_property) // ok
+ markUsed(lvalue.weird_property) // ok
  lvalue.mutating_property = 1       // ok
  lvalue.nonmutating_property = 1    // ok
  lvalue.weird_property = 1    // ok

@@ -89,15 +89,16 @@ func labeledArgumentAndTrailingClosure() {
 }
 
 // rdar://problem/17965209
+func rdar17965209_f<T>(t: T) {}
 func rdar17965209(x x: Int = 0, _ handler: (y: Int) -> ()) {}
 func rdar17965209_test() {
   rdar17965209() {
     (y) -> () in
-    print(1)
+    rdar17965209_f(1)
   }
 
   rdar17965209(x: 5) {
     (y) -> () in
-    print(1)
+    rdar17965209_f(1)
   }
 }

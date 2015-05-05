@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+func markUsed<T>(t: T) {}
+
 struct X { }
 var _x: X
 
@@ -571,7 +573,7 @@ var selfRefTopLevelSetter: Int {
     return 42
   }
   set {
-    print(selfRefTopLevelSetter) // no-warning
+    markUsed(selfRefTopLevelSetter) // no-warning
     selfRefTopLevelSetter = newValue // expected-warning {{attempting to modify 'selfRefTopLevelSetter' within its own setter}}
   }
 }
@@ -594,7 +596,7 @@ class SelfRefProperties {
       return 42
     }
     set {
-      print(setter) // no-warning
+      markUsed(setter) // no-warning
       var unused = setter + setter
       setter = newValue // expected-warning {{attempting to modify 'setter' within its own setter}}
       // expected-note@-1 {{access 'self' explicitly to silence this warning}} {{7-7=self.}}
@@ -626,7 +628,7 @@ func selfRefLocal() {
       return 42
     }
     set {
-      print(setter) // no-warning
+      markUsed(setter) // no-warning
       setter = newValue // expected-warning {{attempting to modify 'setter' within its own setter}}
     }
   }
@@ -636,28 +638,30 @@ func selfRefLocal() {
 struct WillSetDidSetProperties {
   var a: Int {
     willSet {
-      print("almost")
+      markUsed("almost")
     }
     didSet {
-      print("here")
+      markUsed("here")
     }
   }
 
   var b: Int {
     willSet {
-      print("look: \(b) and \(newValue)")
+      markUsed(b)
+      markUsed(newValue)
     }
   }
 
   var c: Int {
     willSet(newC) {
-      print("look: \(c) and \(newC)")
+      markUsed(c)
+      markUsed(newC)
     }
   }
 
   var d: Int {
     didSet {
-      print("woot")
+      markUsed("woot")
     }
     get { // expected-error {{didSet variable may not also have a get specifier}}
       return 4
@@ -666,7 +670,7 @@ struct WillSetDidSetProperties {
 
   var e: Int {
     willSet {
-      print("woot")
+      markUsed("woot")
     }
     set { // expected-error {{willSet variable may not also have a set specifier}}
       return 4
@@ -691,19 +695,19 @@ struct WillSetDidSetProperties {
   // Disambiguate trailing closures.
   var disambiguate1: Int = 42 {   // simple initializer, simple label
     didSet {
-      print("eek")
+      markUsed("eek")
     }
   }
 
   var disambiguate2: Int = 42 {    // simple initializer, complex label
     willSet(v) {
-      print("eek")
+      markUsed("eek")
     }
   }
 
   var disambiguate3: Int = takeTrailingClosure {} {  // Trailing closure case.
     willSet(v) {
-      print("eek")
+      markUsed("eek")
     }
   }
 
@@ -723,22 +727,24 @@ struct WillSetDidSetProperties {
 
   var inferred1 = 42 {
     willSet {
-      print("almost")
+      markUsed("almost")
     }
     didSet {
-      print("here")
+      markUsed("here")
     }
   }
 
   var inferred2 = 40 {
     willSet {
-      print("look: \(b) and \(newValue)")
+      markUsed(b)
+      markUsed(newValue)
     }
   }
 
   var inferred3 = 50 {
     willSet(newC) {
-      print("look: \(c) and \(newC)")
+      markUsed(c)
+      markUsed(newC)
     }
   }
 }
@@ -856,7 +862,8 @@ class MutableInWillSetInClosureClass {
 // <rdar://problem/16191398> add an 'oldValue' to didSet so you can implement "didChange" properties
 var didSetPropertyTakingOldValue : Int = 0 {
   didSet(oldValue) {
-    println("from \(oldValue) to \(didSetPropertyTakingOldValue)\n")
+    markUsed(oldValue)
+    markUsed(didSetPropertyTakingOldValue)
   }
 }
 
@@ -910,7 +917,7 @@ class Derived16375910 : Base16375910 {
   override init() {}
   override var x : Int { // expected-error {{cannot observe read-only property 'x'; it can't change}}
     willSet {
-      print(newValue)
+      markUsed(newValue)
     }
   }
 }
@@ -919,7 +926,7 @@ class Derived16375910 : Base16375910 {
 class Derived16382967 : Base16375910 {
   override var y : Int {
     willSet {
-      print(newValue)
+      markUsed(newValue)
     }
   }
 }
