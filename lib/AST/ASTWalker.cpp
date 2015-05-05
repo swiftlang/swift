@@ -1127,6 +1127,13 @@ Pattern *Traversal::visitTypedPattern(TypedPattern *P) {
 }
 
 Pattern *Traversal::visitIsPattern(IsPattern *P) {
+  if (auto sub = P->getSubPattern()) {
+    if (Pattern *newSub = doIt(sub)) {
+      P->setSubPattern(newSub);
+    } else {
+      return nullptr;
+    }
+  }
   return P;
 }
 

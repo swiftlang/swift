@@ -512,8 +512,11 @@ public:
   
   SourceLoc getLoc() const { return IsLoc; }
   SourceRange getSourceRange() const {
-    return {SubPattern ? SubPattern->getSourceRange().Start : IsLoc,
-            CastType.getSourceRange().End};
+    SourceLoc beginLoc =
+      SubPattern ? SubPattern->getSourceRange().Start : IsLoc;
+    SourceLoc endLoc =
+      (isImplicit() ? beginLoc : CastType.getSourceRange().End);
+    return { beginLoc, endLoc };
   }
   
   TypeLoc &getCastTypeLoc() { return CastType; }
