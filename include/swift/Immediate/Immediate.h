@@ -53,7 +53,7 @@ namespace swift {
 
   /// Attempt to run the script identified by the given compiler instance.
   ///
-  /// \param the result returned from main(), if execution succeeded
+  /// \return the result returned from main(), if execution succeeded
   int RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                      IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
 
