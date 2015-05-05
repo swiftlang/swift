@@ -89,6 +89,160 @@ public protocol MyRawOptionSetType : _MyRawOptionSetType, BitwiseOperationsType,
 // Real content starts here
 //===----------------------------------------------------------------------===//
 
+protocol SetAlgebraBaseType {
+  typealias Basis
+  func subtract(other: Self) -> Self
+  func isSubsetOf(other: Self) -> Bool
+  func isDisjointWith(other: Self) -> Bool
+  func isSupersetOf(other: Self) -> Bool
+  func isSupersetOf<
+    S : SequenceType where S.Generator.Element == Basis
+  >(other: S) -> Bool
+}
+
+protocol SetAlgebraType : Equatable, SetAlgebraBaseType {
+  
+  init()
+  func contains(member: Basis) -> Bool
+  func union(other: Self) -> Self
+  func intersect(other: Self) -> Self
+  func exclusiveOr(other: Self) -> Self
+
+  var isEmpty: Bool { get }
+}
+
+extension SetAlgebraType {
+  final func isSubsetOf(other: Self) -> Bool {
+    return self.intersect(other) == self
+  }
+  
+  final func isSupersetOf(other: Self) -> Bool {
+    return other.isSubsetOf(self)
+  }
+
+  final func isDisjointWith(other: Self) -> Bool {
+    return self.intersect(other).isEmpty
+  }
+  
+  final func isSupersetOf<
+    S : SequenceType where S.Generator.Element == Basis
+  >(other: S) -> Bool {
+    return !other._prext_contains { !self.contains($0) }
+  }
+
+  final func subtract(other: Self) -> Self {
+    return self.intersect(self.exclusiveOr(other))
+  }
+}
+
+extension SetAlgebraType where Self : CollectionType {
+  final func isStrictSupersetOf(other: Self) -> Bool {
+    return count(self) > count(other) && self.isSupersetOf(other)
+  }
+
+  final func isStrictSubsetOf(other: Self) -> Bool {
+    return other.isStrictSupersetOf(self)
+  }
+}
+
+protocol MutableSetAlgebraBaseType {
+  typealias Basis
+  init()
+  init<S : SequenceType where S.Generator.Element == Basis>(_ sequence: S)
+
+  mutating func subtractInPlace(other: Self)
+  
+  mutating func unionInPlace<
+    S : SequenceType where S.Generator.Element == Basis
+  >(sequence: S)
+  
+  mutating func subtractInPlace<
+    S : SequenceType where S.Generator.Element == Basis
+  >(sequence: S)
+
+  mutating func exclusiveOrInPlace<
+    S : SequenceType where S.Generator.Element == Basis
+  >(sequence: S)
+}
+
+protocol MutableSetAlgebraType : SetAlgebraType, MutableSetAlgebraBaseType {
+  mutating func insert(member: Basis)
+  mutating func remove(member: Basis) -> Basis?
+  mutating func unionInPlace(other: Self)
+  mutating func intersectInPlace(other: Self)
+  mutating func exclusiveOrInPlace(other: Self)
+}
+
+extension MutableSetAlgebraType {
+  init<S : SequenceType where S.Generator.Element == Basis>(_ sequence: S) {
+    self.init()
+    for e in sequence { insert(e) }
+  }
+  
+  final mutating func subtractInPlace(other: Self) {
+    self.intersectInPlace(self.exclusiveOr(other))
+  }
+  
+  final mutating func unionInPlace<
+    S : SequenceType where S.Generator.Element == Basis
+  >(sequence: S) {
+    for x in sequence { insert(x) }
+  }
+  
+  final mutating func subtractInPlace<
+    S : SequenceType where S.Generator.Element == Basis
+  >(sequence: S) {
+    for x in sequence { remove(x) }
+  }
+  
+  final mutating func exclusiveOrInPlace<
+    S : SequenceType where S.Generator.Element == Basis
+  >(sequence: S) {
+    for x in sequence {
+      if let _ = self.remove(x) {
+      } else {
+        self.insert(x)
+      }
+    }
+  }
+}
+
+extension Set : MutableSetAlgebraType {
+  typealias Basis = Element
+}
+
+/*
+extension MutableSetAlgebraType {
+  init<S : SequenceType where S.Generator.Element == T>(_ sequence: S) {
+    self.init()
+    for e in sequence { insert(e) }
+  }
+  
+  func isSubsetOf<
+    S : SequenceType where S.Generator.Element == T
+  >(sequence: S) -> Bool
+
+  func union(other: Self) -> Self
+  func intersect(other: Self) -> Self
+  func exclusiveOr(other: Self) -> Self
+
+  func isDisjointWith<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Bool
+  func isStrictSubsetOf<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Bool
+  func isStrictSubsetOf(other: Self) -> Bool
+  func isStrictSupersetOf<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Bool
+  func union<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Set<T>
+
+  func subtract<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Set<T>
+  func intersect<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Set<T>
+  func exclusiveOr<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Set<T>
+  
+  mutating func unionInPlace<S : SequenceType where S.Generator.Element == T>(sequence: S)
+  mutating func subtractInPlace<S : SequenceType where S.Generator.Element == T>(sequence: S)
+  mutating func intersectInPlace<S : SequenceType where S.Generator.Element == T>(sequence: S)
+  mutating func exclusiveOrInPlace<S : SequenceType where S.Generator.Element == T>(sequence: S)
+}
+*/
+
 /// Elements of this set can be instances of any enumeration with Int
 /// as its raw-value type.
 public struct OptionSet<
