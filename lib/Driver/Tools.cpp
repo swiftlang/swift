@@ -341,6 +341,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     if (auto arg = Args.getLastArg(options::OPT_target_cpu))
       arg->render(Args, Arguments);
 
+    Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
+
     // Pass through any subsystem flags.
     Args.AddAllArgs(Arguments, options::OPT_Xllvm);
     Args.AddAllArgs(Arguments, options::OPT_Xcc);
