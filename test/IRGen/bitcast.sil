@@ -48,8 +48,8 @@ entry(%c : $Optional<Int>):
 // CHECK-i386-LABEL: define i32 @bitcast_ref(%C7bitcast1C*) {
 // CHECK-i386:         [[BUF:%.*]] = alloca %C7bitcast1C*, align 4
 // CHECK-i386:         store %C7bitcast1C* %0, %C7bitcast1C** [[BUF]]
-// CHECK-i386:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq*
-// CHECK-i386:         [[VALUE_BUF:%.*]] = bitcast %Sq* [[OUT_BUF]] to i32*
+// CHECK-i386:         [[OUT_BUF:%.*]] = bitcast %C7bitcast1C** [[BUF]] to %Sq.16*
+// CHECK-i386:         [[VALUE_BUF:%.*]] = bitcast %Sq.16* [[OUT_BUF]] to i32*
 // CHECK-i386:         [[VALUE:%.*]] = load i32, i32* [[VALUE_BUF]], align 4
 // CHECK-i386:         ret i32 [[VALUE]]
 // CHECK-i386:       }
