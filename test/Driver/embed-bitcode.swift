@@ -38,3 +38,13 @@
 // CHECK-SINGLE: -c
 // CHECK-SINGLE: -embed-bitcode
 // CHECK-SINGLE: -disable-llvm-optzns
+
+// RUN: %target-swiftc_driver -embed-bitcode -c -parse-as-library -emit-module -force-single-frontend-invocation %s -parse-stdlib -module-name Swift 2>&1 -### | FileCheck %s -check-prefix=CHECK-LIB
+// CHECK-LIB: -frontend
+// CHECK-LIB: -emit-bc
+// CHECK-LIB: -parse-stdlib
+// CHECK-LIB: -frontend
+// CHECK-LIB: -c
+// CHECK-LIB: -parse-stdlib
+// CHECK-LIB: -embed-bitcode
+// CHECK-LIB: -disable-llvm-optzns
