@@ -1878,6 +1878,16 @@ NSStringAPIs.test("copy construction") {
   expectEqual(expected, y as String)
 }
 
+NSStringAPIs.test("stringByApplyingTransform(_:reverse:)") {
+  let veryKewl = "tre\u{300}s k\u{fc}hl"
+  if #available(OSX 10.11, iOS 9.0, *) {
+    expectEqual(
+      "tres kuhl",
+      veryKewl.stringByApplyingTransform(
+        NSStringTransformStripDiacritics, reverse: false))
+  }
+}
+
 var CStringTests = TestSuite("CStringTests")
 
 func getNullCString() -> UnsafeMutablePointer<CChar> {
