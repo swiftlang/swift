@@ -368,7 +368,7 @@ func testCondFail(b: Bool, c: Bool) {
 
 // CHECK-LABEL: define hidden void @_TF8builtins8testOnce{{.*}}(i8*, i8*) {
 // CHECK:         [[PRED_PTR:%.*]] = bitcast i8* %0 to [[WORD:i64|i32]]*
-// CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
+// CHECK-objc:    [[PRED:%.*]] = load atomic {{.*}} [[WORD]]* [[PRED_PTR]] acquire
 // CHECK-objc:    [[NOT_DONE:%.*]] = icmp ne [[WORD]] [[PRED]], -1
 // CHECK-objc:    br i1 [[NOT_DONE]], label %[[NOT_DONE:.*]], label %[[DONE:.*]]
 // CHECK-objc:  [[NOT_DONE]]:
