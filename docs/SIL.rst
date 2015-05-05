@@ -3494,7 +3494,7 @@ unchecked_ref_bit_cast
 
   sil-instruction ::= 'unchecked_ref_bit_cast' sil-operand 'to' sil-type
 
-  %1 = unchecked_trivial_bit_cast %0 : $Optional<Builtin.NativeObject> to $Builtin.NativeObject
+  %1 = unchecked_ref_bit_cast %0 : $Optional<Builtin.NativeObject> to $Builtin.NativeObject
   // %0 must be an object.
   // %1 must be an object that is trivial iff %0 is trivial and is non-trivial iff %0 is non-trivial.
 
