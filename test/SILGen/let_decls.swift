@@ -46,10 +46,13 @@ func test2() {
 // CHECK:  return %0 : $Int
 
 // Verify that we can close over let decls of tuple type.
+struct RegularStruct {
+  var a: Int
+}
 func testTupleLetCapture() {
-  let t = ("foo", 42)
+  let t = (RegularStruct(a: 41), 42)
 
-  takeClosure( { count(t.0.unicodeScalars) })
+  takeClosure( { t.0.a })
 }
 
 
