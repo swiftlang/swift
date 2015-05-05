@@ -163,7 +163,7 @@ class ValueLike : NSObject {
     super.init()
   }
 
-  override func isEqual(_ rhs: AnyObject?) -> Bool {
+  override func isEqual(rhs: AnyObject?) -> Bool {
     if let rhs2 = rhs as? ValueLike {
       return x == rhs2.x
     }
@@ -250,4 +250,14 @@ if native.respondsToSelector(".cxx_destruct") {
   println("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
 }
 
-
+class D : NSObject {}
+println(D.self) // CHECK-NEXT: D
+println(_getSuperclass(D.self) == NSObject.self) // CHECK-NEXT: true
+println(_getSuperclass(_getSuperclass(D.self)!) == nil) // CHECK-NEXT: true
+class E : NSString {}
+println(  // CHECK-NEXT: true
+  _getSuperclass(E.self) == NSString.self)
+println( // CHECK-NEXT: true
+  _getSuperclass(_getSuperclass(E.self)!) == NSObject.self)
+println( // CHECK-NEXT: true
+  _getSuperclass(_getSuperclass(_getSuperclass(E.self)!)!) == nil)

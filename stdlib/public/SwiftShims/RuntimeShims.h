@@ -86,12 +86,12 @@ const char *_swift_stdlib_strtod_clocale(const char *nptr, double *outResult);
 /// overflow.
 const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
 
-struct ClassMetadata;
+struct Metadata;
   
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
-const struct ClassMetadata *_swift_getSuperclass_nonNull(
-  const struct ClassMetadata *);
+const struct Metadata *_swift_getSuperclass_nonNull(
+  const struct Metadata *);
   
 void _swift_stdlib_flockfile_stdout(void);
 void _swift_stdlib_funlockfile_stdout(void);
