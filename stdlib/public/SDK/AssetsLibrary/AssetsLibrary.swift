@@ -16,6 +16,7 @@
 // ALAssetsLibrary.h
 //===----------------------------------------------------------------------===//
 extension ALAssetsLibrary { 
+  @nonobjc
   public func enumerateGroupsWithTypes(var types: UInt32, 
       usingBlock enumerationBlock: ALAssetsLibraryGroupsEnumerationResultsBlock!,
       failureBlock: ALAssetsLibraryAccessFailureBlock!) {
