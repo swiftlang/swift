@@ -586,45 +586,7 @@ void CodeCompletionCache::getResults(
   assert(V.hasValue());
   auto &SourceSink = V.getValue()->Sink;
 
-  // We will be adding foreign results (from another sink) into TargetSink.
-  // TargetSink should have an owning pointer to the allocator that keeps the
-  // results alive.
-  TargetSink.ForeignAllocators.push_back(SourceSink.Allocator);
-
-  if (OnlyTypes) {
-    std::copy_if(SourceSink.Results.begin(), SourceSink.Results.end(),
-                 std::back_inserter(TargetSink.Results),
-                 [](CodeCompletionResult *R) -> bool {
-      if (R->getKind() != CodeCompletionResult::Declaration)
-        return false;
-      switch(R->getAssociatedDeclKind()) {
-      case CodeCompletionDeclKind::Class:
-      case CodeCompletionDeclKind::Struct:
-      case CodeCompletionDeclKind::Enum:
-      case CodeCompletionDeclKind::Protocol:
-      case CodeCompletionDeclKind::TypeAlias:
-      case CodeCompletionDeclKind::GenericTypeParam:
-        return true;
-      case CodeCompletionDeclKind::EnumElement:
-      case CodeCompletionDeclKind::Constructor:
-      case CodeCompletionDeclKind::Destructor:
-      case CodeCompletionDeclKind::Subscript:
-      case CodeCompletionDeclKind::StaticMethod:
-      case CodeCompletionDeclKind::InstanceMethod:
-      case CodeCompletionDeclKind::OperatorFunction:
-      case CodeCompletionDeclKind::FreeFunction:
-      case CodeCompletionDeclKind::StaticVar:
-      case CodeCompletionDeclKind::InstanceVar:
-      case CodeCompletionDeclKind::LocalVar:
-      case CodeCompletionDeclKind::GlobalVar:
-        return false;
-      }
-    });
-  } else {
-    TargetSink.Results.insert(TargetSink.Results.end(),
-                              SourceSink.Results.begin(),
-                              SourceSink.Results.end());
-  }
+  copyCodeCompletionResults(TargetSink, SourceSink, OnlyTypes);
 }
 
 CodeCompletionCache::ValueRefCntPtr CodeCompletionCache::createValue() {
@@ -3044,4 +3006,47 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
     const DeclContext *currDeclContext) {
   CompletionLookup Lookup(targetSink, module->getASTContext(), currDeclContext);
   Lookup.getVisibleDeclsOfModule(module, accessPath, needLeadingDot);
+}
+
+void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink, CodeCompletionResultSink &sourceSink, bool onlyTypes) {
+
+  // We will be adding foreign results (from another sink) into TargetSink.
+  // TargetSink should have an owning pointer to the allocator that keeps the
+  // results alive.
+  targetSink.ForeignAllocators.push_back(sourceSink.Allocator);
+
+  if (onlyTypes) {
+    std::copy_if(sourceSink.Results.begin(), sourceSink.Results.end(),
+                 std::back_inserter(targetSink.Results),
+                 [](CodeCompletionResult *R) -> bool {
+      if (R->getKind() != CodeCompletionResult::Declaration)
+        return false;
+      switch(R->getAssociatedDeclKind()) {
+      case CodeCompletionDeclKind::Class:
+      case CodeCompletionDeclKind::Struct:
+      case CodeCompletionDeclKind::Enum:
+      case CodeCompletionDeclKind::Protocol:
+      case CodeCompletionDeclKind::TypeAlias:
+      case CodeCompletionDeclKind::GenericTypeParam:
+        return true;
+      case CodeCompletionDeclKind::EnumElement:
+      case CodeCompletionDeclKind::Constructor:
+      case CodeCompletionDeclKind::Destructor:
+      case CodeCompletionDeclKind::Subscript:
+      case CodeCompletionDeclKind::StaticMethod:
+      case CodeCompletionDeclKind::InstanceMethod:
+      case CodeCompletionDeclKind::OperatorFunction:
+      case CodeCompletionDeclKind::FreeFunction:
+      case CodeCompletionDeclKind::StaticVar:
+      case CodeCompletionDeclKind::InstanceVar:
+      case CodeCompletionDeclKind::LocalVar:
+      case CodeCompletionDeclKind::GlobalVar:
+        return false;
+      }
+    });
+  } else {
+    targetSink.Results.insert(targetSink.Results.end(),
+                              sourceSink.Results.begin(),
+                              sourceSink.Results.end());
+  }
 }

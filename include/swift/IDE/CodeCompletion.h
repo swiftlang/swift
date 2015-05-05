@@ -627,6 +627,10 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
                                            bool needLeadingDot,
                                            const DeclContext *currDeclContext);
 
+/// Copy code completion results from \p sourceSink to \p targetSink, possibly
+/// restricting by \p onlyTypes.
+void copyCodeCompletionResults(CodeCompletionResultSink &targetSink, CodeCompletionResultSink &sourceSink, bool onlyTypes);
+
 } // namespace ide
 } // namespace swift
 
