@@ -128,14 +128,6 @@ class A : Classy {}
 class B : A {}
 class C : B {}
 
-func == (t0: Any.Type, t1: Any.Type) -> Bool {
-  return unsafeBitCast(t0, Int.self) == unsafeBitCast(t1, Int.self)
-}
-
-func != (t0: Any.Type, t1: Any.Type) -> Bool {
-  return !(t0 == t1)
-}
-
 tests.test("_getSuperclass") {
   expectEmpty(_getSuperclass(A.self))
   expectEmpty(_getSuperclass(Classy.self))
