@@ -2436,7 +2436,8 @@ namespace {
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
       // Dig out the type of the base, which will be the result
       // type of this expression.
-      Type baseTy = simplifyType(expr->getType())->getRValueType();
+      Type resultTy = simplifyType(expr->getType());
+      Type baseTy = resultTy->getRValueType();
       auto &tc = cs.getTypeChecker();
 
       // Find the selected member.
@@ -2479,6 +2480,7 @@ namespace {
         ApplyExpr *apply = new (tc.Context) CallExpr(result, arg, 
                                                      /*Implicit=*/false);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
+        result = coerceToType(result, resultTy, cs.getConstraintLocator(expr));
       }
 
       return result;
