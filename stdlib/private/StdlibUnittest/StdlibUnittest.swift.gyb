@@ -468,7 +468,7 @@ func _stdlib_getline() -> String? {
   while true {
     let c = getchar()
     if c == EOF {
-      if result.count == 0 {
+      if result.isEmpty {
         return nil
       }
       return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
