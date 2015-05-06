@@ -33,7 +33,7 @@ extension CollectionType {
 // last
 //===----------------------------------------------------------------------===//
 
-extension CollectionType where Self.Index : BidirectionalIndexType {
+extension CollectionType where Index : BidirectionalIndexType {
   final public var _prext_last: Generator.Element? {
     return _prext_isEmpty ? nil : self[endIndex.predecessor()]
   }
@@ -43,7 +43,7 @@ extension CollectionType where Self.Index : BidirectionalIndexType {
 // find()
 //===----------------------------------------------------------------------===//
 
-extension CollectionType where Self.${GElement} : Equatable {
+extension CollectionType where ${GElement} : Equatable {
   /// Returns the first index where `value` appears in `self` or `nil` if
   /// `value` is not found.
   ///
@@ -127,7 +127,7 @@ orderingRequirementForComparable = """\
 }%
 
 extension MutableCollectionType
-  where Self.Index : RandomAccessIndexType, Self.${GElement} : Comparable {
+  where Index : RandomAccessIndexType, ${GElement} : Comparable {
 
 ${partitionDocComment}
   ///
@@ -137,7 +137,7 @@ ${orderingRequirementForComparable}
   }
 }
 
-extension MutableCollectionType where Self.Index : RandomAccessIndexType {
+extension MutableCollectionType where Index : RandomAccessIndexType {
 
 ${partitionDocComment}
   ///

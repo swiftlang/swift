@@ -55,7 +55,7 @@ else:
   orderingRequirement = ""
 }%
 
-extension SequenceType ${"" if preds else "where Self.Generator.Element : Comparable"} {
+extension SequenceType ${"" if preds else "where Generator.Element : Comparable"} {
 
   /// Returns the minimum element in `self` or `nil` if the sequence is empty.
   ///
@@ -110,7 +110,7 @@ extension SequenceType ${"" if preds else "where Self.Generator.Element : Compar
 % # an Equatable requirement.
 % for preds in [ True, False ]:
 
-extension SequenceType ${"" if preds else "where Self.Generator.Element : Equatable"} {
+extension SequenceType ${"" if preds else "where Generator.Element : Equatable"} {
 
 %{
 if preds:
@@ -159,7 +159,7 @@ else:
 % # an Equatable requirement.
 % for preds in [ True, False ]:
 
-extension SequenceType ${"" if preds else "where Self.Generator.Element : Equatable"} {
+extension SequenceType ${"" if preds else "where Generator.Element : Equatable"} {
 
 %{
 if preds:
@@ -215,7 +215,7 @@ else:
 % # Comparable requirement.
 % for preds in [ True, False ]:
 
-extension SequenceType ${"" if preds else "where Self.Generator.Element : Comparable"} {
+extension SequenceType ${"" if preds else "where Generator.Element : Comparable"} {
 
 %{
 if preds:
@@ -277,7 +277,7 @@ else:
 // contains()
 //===----------------------------------------------------------------------===//
 
-extension SequenceType where Self.Generator.Element : Equatable {
+extension SequenceType where Generator.Element : Equatable {
   /// Return `true` iff `x` is in `self`.
   final public func _prext_contains(element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
@@ -348,7 +348,7 @@ extension SequenceType {
   }
 }
 
-extension CollectionType where Self.Index : BidirectionalIndexType {
+extension CollectionType where Index : BidirectionalIndexType {
   /// Return a lazy `CollectionType` containing the elements of `self`
   /// in reverse order.
   final public func _prext_reverse() -> BidirectionalReverseView<Self> {
@@ -356,7 +356,7 @@ extension CollectionType where Self.Index : BidirectionalIndexType {
   }
 }
 
-extension CollectionType where Self.Index : RandomAccessIndexType {
+extension CollectionType where Index : RandomAccessIndexType {
   /// Return a lazy `CollectionType` containing the elements of `self`
   /// in reverse order.
   final public func _prext_reverse() -> RandomAccessReverseView<Self> {
