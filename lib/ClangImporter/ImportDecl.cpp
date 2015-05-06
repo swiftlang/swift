@@ -1734,6 +1734,162 @@ namespace {
       return CD;
     }
 
+    NominalTypeDecl *importAsOptionSetType(DeclContext *dc,
+                                           Identifier name,
+                                           const clang::EnumDecl *decl) {
+      ASTContext &cxt = Impl.SwiftContext;
+      
+      // Compute the underlying type.
+      auto underlyingType = Impl.importType(decl->getIntegerType(),
+                                            ImportTypeKind::Enum,
+                                            isInSystemModule(dc));
+      if (!underlyingType)
+        return nullptr;
+
+      auto Loc = Impl.importSourceLoc(decl->getLocation());
+
+      // Create a struct with the underlying type as a field.
+      auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
+        Loc, name, Loc, None, nullptr, dc);
+      structDecl->computeType();
+
+      // Note that this is a raw option set type.
+      structDecl->getAttrs().add(
+        new (Impl.SwiftContext) SynthesizedProtocolAttr(
+                                  KnownProtocolKind::_OptionSetType));
+
+      
+      // Create a field to store the underlying value.
+      auto varName = Impl.SwiftContext.Id_rawValue;
+      auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                 /*IsLet*/ true,
+                                                 SourceLoc(), varName,
+                                                 underlyingType,
+                                                 structDecl);
+      var->setImplicit();
+      var->setAccessibility(Accessibility::Public);
+      var->setSetterAccessibility(Accessibility::Private);
+
+      // Create a pattern binding to describe the variable.
+      Pattern *varPattern = createTypedNamedPattern(var);
+
+      auto patternBinding =
+          PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
+                                     StaticSpellingKind::None, SourceLoc(),
+                                     varPattern, nullptr, structDecl);
+      
+      // Create the init(rawValue:) constructor.
+      Decl *varDecl = var;
+      auto labeledValueConstructor = createValueConstructor(
+                                structDecl, varDecl,
+                                /*wantCtorParamNames=*/true,
+                                /*wantBody=*/!Impl.hasFinishedTypeChecking());
+
+      // Build an OptionSetType conformance for the type.
+      ProtocolDecl *protocols[]
+        = {cxt.getProtocol(KnownProtocolKind::_OptionSetType)};
+      structDecl->setProtocols(Impl.SwiftContext.AllocateCopy(protocols));
+
+      structDecl->addMember(labeledValueConstructor);
+      structDecl->addMember(patternBinding);
+      structDecl->addMember(var);
+      computeEnumCommonWordPrefix(decl, name);
+      return structDecl;
+    }
+    
+    NominalTypeDecl *importAsRawOptionSet(DeclContext *dc,
+                                          Identifier name,
+                                          const clang::EnumDecl *decl) {
+      ASTContext &cxt = Impl.SwiftContext;
+      
+      // Compute the underlying type.
+      auto underlyingType = Impl.importType(decl->getIntegerType(),
+                                            ImportTypeKind::Enum,
+                                            isInSystemModule(dc));
+      if (!underlyingType)
+        return nullptr;
+
+      auto Loc = Impl.importSourceLoc(decl->getLocation());
+
+      // Create a struct with the underlying type as a field.
+      auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
+        Loc, name, Loc, None, nullptr, dc);
+      structDecl->computeType();
+
+      // Note that this is a raw option set type.
+      structDecl->getAttrs().add(
+        new (Impl.SwiftContext) SynthesizedProtocolAttr(
+                                  KnownProtocolKind::RawOptionSetType));
+      
+      // Create a field to store the underlying value.
+      auto varName = Impl.SwiftContext.Id_rawValue;
+      auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
+                                                 /*IsLet*/ true,
+                                                 SourceLoc(), varName,
+                                                 underlyingType,
+                                                 structDecl);
+      var->setImplicit();
+      var->setAccessibility(Accessibility::Public);
+      var->setSetterAccessibility(Accessibility::Private);
+
+      // Create a pattern binding to describe the variable.
+      Pattern *varPattern = createTypedNamedPattern(var);
+
+      auto patternBinding =
+          PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
+                                     StaticSpellingKind::None, SourceLoc(),
+                                     varPattern, nullptr, structDecl);
+      
+      // Create a default initializer to get the value with no options set.
+      auto defaultConstructor = makeOptionSetDefaultConstructor(Impl,
+                                                                structDecl,
+                                                                var);
+      
+      // Create a constructor to initialize that value from a value of the
+      // underlying type. We need both an unlabeled conversion form and
+      // a labeled form to satisfy RawRepresentable's requirements.
+      Decl *varDecl = var;
+      auto valueConstructor = createValueConstructor(
+                                structDecl, varDecl,
+                                /*wantCtorParamNames=*/false,
+                                /*wantBody=*/!Impl.hasFinishedTypeChecking());
+      auto labeledValueConstructor = createValueConstructor(
+                                structDecl, varDecl,
+                                /*wantCtorParamNames=*/true,
+                                /*wantBody=*/!Impl.hasFinishedTypeChecking());
+
+      // Build a RawOptionSetType conformance for the type.
+      ProtocolDecl *protocols[]
+        = {cxt.getProtocol(KnownProtocolKind::RawOptionSetType)};
+      structDecl->setProtocols(
+          Impl.SwiftContext.AllocateCopy(protocols));
+
+      // Add delayed implicit members to the type.
+      auto &Impl = this->Impl;
+      DelayedDecl delayedMembers[] = {
+        [=, &Impl](SmallVectorImpl<Decl *> &NewDecls) {
+          makeOptionSetAllZerosProperty(Impl, structDecl, NewDecls);
+          NewDecls.push_back(makeNilLiteralConformance(Impl, structDecl,
+                                                       var));
+          auto rawGetter = makeRawValueTrivialGetter(Impl, structDecl, var);
+          NewDecls.push_back(rawGetter);
+          var->addTrivialAccessors(rawGetter, nullptr, nullptr);
+        }
+      };
+      
+      structDecl->setDelayedMemberDecls(
+          Impl.SwiftContext.AllocateCopy(delayedMembers));
+      
+      // Set the members of the struct.
+      structDecl->addMember(defaultConstructor);
+      structDecl->addMember(valueConstructor);
+      structDecl->addMember(labeledValueConstructor);
+      structDecl->addMember(patternBinding);
+      structDecl->addMember(var);
+      computeEnumCommonWordPrefix(decl, name);
+      return structDecl;
+    }
+
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
       decl = decl->getDefinition();
       if (!decl) {
@@ -1913,93 +2069,13 @@ namespace {
       }
           
       case EnumKind::Options: {
-        // Compute the underlying type.
-        auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Enum,
-                                              isInSystemModule(dc));
-        if (!underlyingType)
+        if (Impl.SwiftContext.LangOpts.ImportNSOptionsAsOptionSetType)
+          result = importAsOptionSetType(dc, name, decl);
+        else
+          result = importAsRawOptionSet(dc, name, decl);
+        if (!result)
           return nullptr;
-
-        auto Loc = Impl.importSourceLoc(decl->getLocation());
-
-        // Create a struct with the underlying type as a field.
-        auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
-          Loc, name, Loc, None, nullptr, dc);
-        structDecl->computeType();
-
-        // Note that this is a raw option set type.
-        structDecl->getAttrs().add(
-          new (Impl.SwiftContext) SynthesizedProtocolAttr(
-                                    KnownProtocolKind::RawOptionSetType));
         
-        // Create a field to store the underlying value.
-        auto varName = Impl.SwiftContext.Id_rawValue;
-        auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                   /*IsLet*/ true,
-                                                   SourceLoc(), varName,
-                                                   underlyingType,
-                                                   structDecl);
-        var->setImplicit();
-        var->setAccessibility(Accessibility::Public);
-        var->setSetterAccessibility(Accessibility::Private);
-
-        // Create a pattern binding to describe the variable.
-        Pattern *varPattern = createTypedNamedPattern(var);
-
-        auto patternBinding =
-            PatternBindingDecl::create(Impl.SwiftContext, SourceLoc(),
-                                       StaticSpellingKind::None, SourceLoc(),
-                                       varPattern, nullptr, structDecl);
-        
-        // Create a default initializer to get the value with no options set.
-        auto defaultConstructor = makeOptionSetDefaultConstructor(Impl,
-                                                                  structDecl,
-                                                                  var);
-        
-        // Create a constructor to initialize that value from a value of the
-        // underlying type. We need both an unlabeled conversion form and
-        // a labeled form to satisfy RawRepresentable's requirements.
-        Decl *varDecl = var;
-        auto valueConstructor = createValueConstructor(
-                                  structDecl, varDecl,
-                                  /*wantCtorParamNames=*/false,
-                                  /*wantBody=*/!Impl.hasFinishedTypeChecking());
-        auto labeledValueConstructor = createValueConstructor(
-                                  structDecl, varDecl,
-                                  /*wantCtorParamNames=*/true,
-                                  /*wantBody=*/!Impl.hasFinishedTypeChecking());
-
-        // Build a RawOptionSetType conformance for the type.
-        ProtocolDecl *protocols[]
-          = {cxt.getProtocol(KnownProtocolKind::RawOptionSetType)};
-        structDecl->setProtocols(
-            Impl.SwiftContext.AllocateCopy(protocols));
-
-        // Add delayed implicit members to the type.
-        auto &Impl = this->Impl;
-        DelayedDecl delayedMembers[] = {
-          [=, &Impl](SmallVectorImpl<Decl *> &NewDecls) {
-            makeOptionSetAllZerosProperty(Impl, structDecl, NewDecls);
-            NewDecls.push_back(makeNilLiteralConformance(Impl, structDecl,
-                                                         var));
-            auto rawGetter = makeRawValueTrivialGetter(Impl, structDecl, var);
-            NewDecls.push_back(rawGetter);
-            var->addTrivialAccessors(rawGetter, nullptr, nullptr);
-          }
-        };
-        
-        structDecl->setDelayedMemberDecls(
-            Impl.SwiftContext.AllocateCopy(delayedMembers));
-        
-        // Set the members of the struct.
-        structDecl->addMember(defaultConstructor);
-        structDecl->addMember(valueConstructor);
-        structDecl->addMember(labeledValueConstructor);
-        structDecl->addMember(patternBinding);
-        structDecl->addMember(var);
-        result = structDecl;
-        computeEnumCommonWordPrefix(decl, name);
-
         break;
       }
       }
