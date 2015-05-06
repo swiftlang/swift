@@ -309,7 +309,7 @@ func StaticProtocolFunc() {
   var a: StaticP = StaticS1()
   a.f() // expected-error{{'StaticP' does not have a member named 'f'}}
 }
-func StaticProtocolGenericFunc<t : StaticP>() {
+func StaticProtocolGenericFunc<t : StaticP>(_: t) {
   t.f()
 }
 

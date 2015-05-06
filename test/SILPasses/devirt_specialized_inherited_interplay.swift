@@ -47,13 +47,10 @@
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
-// Check that B4.doSomething cannot be completely devirtualized
-// CHECK-NEXT: upcast
-// CHECK-NEXT: class_method
-// CHECK-NEXT: strong_retain
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @unknown8 :
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
-// CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
@@ -152,8 +149,7 @@ class B3<E>: B2<Array<E>> {
 }
 
 class B4<F>: B3<Array<Array<Int>>> {
-  // Free generic arguments -> cannot be devirtualized.
-  override func doSomething<X,Y,Z>() {
+  override func doSomething() {
     unknown8()
   }
 }

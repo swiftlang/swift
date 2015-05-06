@@ -1921,6 +1921,8 @@ ERROR(convention_with_deprecated_representation_attribute,attribute_parsing,none
       (StringRef))
 ERROR(unsupported_convention,type_parsing,none,
       "convention '%0' not supported", (StringRef))
+ERROR(unreferenced_generic_parameter,type_parsing,none,
+      "generic parameter '%0' is not used in function signature", (StringRef))
 WARNING(deprecated_convention_attribute,type_parsing,none,
         "'@%0' attribute is deprecated; '@convention(%1)' should be used "
         "instead", (StringRef, StringRef))

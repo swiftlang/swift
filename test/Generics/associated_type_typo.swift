@@ -18,7 +18,7 @@ protocol P4 { }
 func typoAssoc1<T : P1>(x: T.assoc) { } 
 
 // expected-error@+1{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{40-45=Assoc}}{{51-56=Assoc}}
-func typoAssoc2<T : P1, U : P1 where T.assoc == U.assoc>() { } 
+func typoAssoc2<T : P1, U : P1 where T.assoc == U.assoc>() { } // expected-error {{generic parameter 'U' is not used in function signature}} 
 
 // expected-error@+2{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{27-32=Assoc}}{{50-55=Assoc}}
 func typoAssoc3<T : P2, U : P2 where 
@@ -27,11 +27,15 @@ func typoAssoc3<T : P2, U : P2 where
 
 // expected-error@+2{{'T' does not have a member type named 'Assocp2'; did you mean 'AssocP2'?}}{{32-39=AssocP2}}
 // expected-error@+1{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{40-45=Assoc}}
-func typoAssoc4<T : P2 where T.Assocp2.assoc : P3>() { }
+func typoAssoc4<T : P2 where T.Assocp2.assoc : P3>(_: T) { }
 
-// CHECK-GENERIC-LABEL: .typoAssoc4()@
+
+// CHECK-GENERIC-LABEL: .typoAssoc4@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   T : P2 [explicit
-// CHECK-NEXT:   T[.P2].AssocP2 == T.AssocP2 [protocol
+// CHECK-NEXT:   T[.P2].AssocP2 witness marker
+// CHECK-NEXT:   T[.P2].AssocP2 : P1 [protocol
+// CHECK-NEXT:   T[.P2].AssocP2[.P1].Assoc witness marker
 // CHECK-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
+// CHECK-NEXT:   T[.P2].AssocP2.assoc == T[.P2].AssocP2[.P1].Assoc [protocol
 // CHECK-NEXT: Generic signature
