@@ -2088,8 +2088,6 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
       auto PredValue = IGF.Builder.CreateLoad(PredPtr,
                                               IGF.IGM.getPointerAlignment());
-      PredValue->setAtomic(llvm::AtomicOrdering::Acquire);
-      
       auto ExpectedPredValue = llvm::ConstantInt::getSigned(IGF.IGM.OnceTy,
                                                             *ExpectedPred);
       auto NotDone = IGF.Builder.CreateICmpNE(PredValue, ExpectedPredValue);
