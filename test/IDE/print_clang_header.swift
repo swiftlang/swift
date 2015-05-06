@@ -1,5 +1,5 @@
 // RUN: echo '#include "header.h"' > %t.m
-// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/header.h --cc-args -fsyntax-only %t.m -I %S/Inputs > %t.txt
+// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/header.h --cc-args -Xclang -triple -Xclang %target-triple -fsyntax-only %t.m -I %S/Inputs > %t.txt
 // RUN: FileCheck -input-file=%t.txt %s
 
 // CHECK: func doSomethingInHead(arg: Int32)
