@@ -132,6 +132,9 @@ namespace swift {
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
+    
+    /// Mangle declarations using their interface types.
+    bool EnableInterfaceTypeMangling = false;
 
     /// The target we are building for.
     ///

@@ -181,6 +181,9 @@ def enable_dynamic_value_type_layout :
 def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
   HelpText<"Enable experimental 'switch' pattern matching features">;
 
+def enable_interface_type_mangling : Flag<["-"], "enable-interface-type-mangling">,
+  HelpText<"Mangle declarations using interface types">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
