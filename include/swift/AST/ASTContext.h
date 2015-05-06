@@ -218,6 +218,10 @@ public:
 
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
+  
+  /// Cache for generic mangling signatures.
+  llvm::DenseMap<std::pair<GenericSignature*, Module*>,
+                 CanGenericSignature> ManglingSignatures;
 
 private:
   /// \brief The current generation number, which reflects the number of

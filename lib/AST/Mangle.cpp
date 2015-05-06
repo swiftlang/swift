@@ -556,13 +556,25 @@ void Mangler::mangleDeclTypeForDebugger(const ValueDecl *decl) {
 void Mangler::mangleDeclType(const ValueDecl *decl,
                              ResilienceExpansion explosion,
                              unsigned uncurryLevel) {
-  Type type = decl->hasType() ? decl->getType()
-                              : ErrorType::get(decl->getASTContext());
+  Type type;
+  
+  // TODO: Use the interface type if enabled.
+  if (decl->getASTContext().LangOpts.EnableInterfaceTypeMangling)
+    type = decl->hasType() ? decl->getInterfaceType()
+                           : ErrorType::get(decl->getASTContext());
+  else
+    type = decl->hasType() ? decl->getType()
+                           : ErrorType::get(decl->getASTContext());
   mangleType(type->getCanonicalType(), explosion, uncurryLevel);
 }
 
 void Mangler::mangleGenericSignature(const GenericSignature *sig,
                                      ResilienceExpansion expansion) {
+  // TODO: For staging purposes, only canonicalize the signature when interface
+  // type mangling is enabled. We ought to do this all the type.
+  if (sig->getASTContext().LangOpts.EnableInterfaceTypeMangling)
+    sig = sig->getCanonicalManglingSignature(*DeclCtx->getParentModule());
+  
   // Mangle the number of parameters.
   unsigned depth = 0;
   unsigned count = 0;
@@ -1080,7 +1092,11 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
   }
     
   case TypeKind::GenericFunction: {
-    llvm_unreachable("cannot mangle generic function types yet");
+    auto genFunc = cast<GenericFunctionType>(tybase);
+    Buffer << 'u';
+    mangleGenericSignature(genFunc->getGenericSignature(), explosion);
+    mangleFunctionType(genFunc, explosion, uncurryLevel);
+    return;
   }
 
   case TypeKind::GenericTypeParam: {

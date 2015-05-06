@@ -1402,8 +1402,11 @@ namespace {
   };
 }
 
-template<typename F>
-void ArchetypeBuilder::enumerateRequirements(F f) {
+void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
+                     void (RequirementKind kind,
+                           PotentialArchetype *archetype,
+                           llvm::PointerUnion<Type, PotentialArchetype *> type,
+                           RequirementSource source)> f) {
   // Local function to visit a potential archetype, enumerating its
   // requirements.
   auto visitPA = [&](PotentialArchetype *archetype) {
@@ -1611,8 +1614,14 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
 }
 
 bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
-                                           bool adoptArchetypes) {
+                                           bool adoptArchetypes,
+                                           bool treatRequirementsAsExplicit) {
   if (!sig) return false;
+  
+  RequirementSource::Kind sourceKind = treatRequirementsAsExplicit
+    ? RequirementSource::Explicit
+    : RequirementSource::OuterScope;
+  
   for (auto param : sig->getGenericParams()) {
     if (addGenericParameter(param))
       return true;
@@ -1630,15 +1639,14 @@ bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
           auto *pa = Impl->PotentialArchetypes[key];
           assert(pa == pa->getRepresentative() && "Not the representative");
           pa->ArchetypeOrConcreteType = NestedType::forConcreteType(archetype);
-          pa->SameTypeSource = RequirementSource(RequirementSource::OuterScope,
-                                                 SourceLoc());
+          pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
         }
       }
 
     }
   }
 
-  RequirementSource source(RequirementSource::OuterScope, SourceLoc());
+  RequirementSource source(sourceKind, SourceLoc());
   for (auto &reqt : sig->getRequirements()) {
     addRequirement(reqt, source);
   }

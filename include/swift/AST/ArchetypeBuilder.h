@@ -25,6 +25,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <functional>
@@ -155,14 +156,6 @@ private:
   template<typename F>
   void visitPotentialArchetypes(F f);
 
-  /// Enumerate the requirements that describe the signature of this
-  /// archetype builder.
-  ///
-  /// \param f A function object that will be passed each requirement
-  /// and requirement source.
-  template<typename F>
-  void enumerateRequirements(F f);
-
 public:
   ArchetypeBuilder(Module &mod, DiagnosticEngine &diags);
 
@@ -205,6 +198,18 @@ public:
   /// Retrieve the lazy resolver, if there is one.
   LazyResolver *getLazyResolver() const { return Resolver; }
 
+  /// Enumerate the requirements that describe the signature of this
+  /// archetype builder.
+  ///
+  /// \param f A function object that will be passed each requirement
+  /// and requirement source.
+  void enumerateRequirements(llvm::function_ref<
+                      void (RequirementKind kind,
+                            PotentialArchetype *archetype,
+                            llvm::PointerUnion<Type, PotentialArchetype *> type,
+                            RequirementSource source)> f);
+  
+
 private:
   PotentialArchetype *addGenericParameter(GenericTypeParamType *GenericParam,
                                           ProtocolDecl *RootProtocol,
@@ -235,8 +240,13 @@ public:
   
   /// \brief Add all of a generic signature's parameters and requirements.
   ///
+  /// FIXME: Requirements from the generic signature are treated as coming from
+  /// an outer scope in order to avoid disturbing the AllDependentTypes.
+  /// Setting \c treatRequirementsAsExplicit to true disables this behavior.
+  ///
   /// \returns true if an error occurred, false otherwise.
-  bool addGenericSignature(GenericSignature *sig, bool adoptArchetypes);
+  bool addGenericSignature(GenericSignature *sig, bool adoptArchetypes,
+                           bool treatRequirementsAsExplicit = false);
 
   /// Infer requirements from the given type, recursively.
   ///

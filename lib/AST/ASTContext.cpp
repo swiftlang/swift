@@ -3200,7 +3200,8 @@ CanGenericSignature GenericSignature::getCanonical(
                               reqt.getFirstType()->getCanonicalType(),
                               reqt.getSecondType().getCanonicalTypeOrNull()));
   }
-  return CanGenericSignature(get(canonicalParams, canonicalRequirements));
+  auto canSig = get(canonicalParams, canonicalRequirements);
+  return CanGenericSignature(canSig);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,

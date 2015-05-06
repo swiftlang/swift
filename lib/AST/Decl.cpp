@@ -1777,22 +1777,26 @@ GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
 {
   bool isCanonical = true;
   
+  ASTContext *C = nullptr;
   auto paramsBuffer = getGenericParamsBuffer();
   for (unsigned i = 0; i < NumGenericParams; ++i) {
     paramsBuffer[i] = params[i];
+    C = &params[i]->getASTContext();
     isCanonical &= params[i]->isCanonical();
   }
   
   auto reqtsBuffer = getRequirementsBuffer();
   for (unsigned i = 0; i < NumRequirements; ++i) {
     reqtsBuffer[i] = requirements[i];
+    C = &requirements[i].getFirstType()->getASTContext();
     isCanonical &= requirements[i].getFirstType()->isCanonical();
     isCanonical &= !requirements[i].getSecondType()
                     || requirements[i].getSecondType()->isCanonical();
   }
   
-  if (isCanonical)
-    CanonicalSignatureOrASTContext = (ASTContext *)nullptr;
+  if (isCanonical) {
+    CanonicalSignatureOrASTContext = C;
+  }
 }
 
 ArrayRef<GenericTypeParamType *> 
