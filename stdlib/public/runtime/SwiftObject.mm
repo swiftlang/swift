@@ -208,8 +208,6 @@ static NSString *_getClassDescription(Class cls) {
 
 
 @implementation SwiftObject
-+ (void)load {}
-+ (void)initialize {}
 
 + (instancetype)allocWithZone:(struct _NSZone *)zone {
   assert(zone == nullptr);
