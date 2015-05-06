@@ -12,4 +12,13 @@ doSomething()
 // CHECK-NOT: return
 doSomething2()
 
+// CHECK: sil public_external [fragile] [noinline] @{{.*}}callDoSomething3{{.*}}
+
 // CHECK: sil @unknown
+
+// CHECK: sil [fragile] [noinline] [_semantics "stdlib_binary_only"] @{{.*}}doSomething3{{.*}}
+// CHECK-NOT: return
+
+// CHECK: sil {{.*}} @_TFVSs1ACfMS_FT_S_
+
+callDoSomething3()
