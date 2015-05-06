@@ -204,6 +204,10 @@ def enable_simd_import : Flag<["-"],
   "enable-simd-import">,
   HelpText<"Enable importing C vector types as SIMD types">;
 
+def import_ns_options_as_option_set_type : Flag<["-"],
+  "import-ns-options-as-option-set-type">,
+  HelpText<"Enable importing NS_OPTIONS types using OptionSetType protocol">;
+
 def enable_character_literals : Flag<["-"], "enable-character-literals">,
   HelpText<"Enable legacy character literals">;
 

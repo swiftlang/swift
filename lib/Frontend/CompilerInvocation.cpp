@@ -632,6 +632,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableInterfaceTypeMangling |= Args.hasArg(OPT_enable_interface_type_mangling);
 
+  Opts.ImportNSOptionsAsOptionSetType |=
+    Args.hasArg(OPT_import_ns_options_as_option_set_type);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   
