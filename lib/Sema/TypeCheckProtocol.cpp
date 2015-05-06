@@ -3015,6 +3015,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
       }
     }
 
+    TC.validateDecl(assocType);
     Type defaultType = assocType->getDefaultDefinitionLoc().getType().subst(
                          DC->getParentModule(),
                          substitutions,
