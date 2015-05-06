@@ -2908,7 +2908,7 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
 
   /// Prepare the lookup table to make it ready for lookups.
-  void prepareLookupTable();
+  void prepareLookupTable(bool ignoreNewExtensions);
 
   /// Note that we have added a member into the iterable declaration context,
   /// so that it can also be added to the lookup table (if needed).
@@ -3087,7 +3087,11 @@ public:
   /// protocols to which the nominal type conforms. Furthermore, the resulting
   /// set of declarations has not been filtered for visibility, nor have
   /// overridden declarations been removed.
-  ArrayRef<ValueDecl *> lookupDirect(DeclName name);
+  ///
+  /// \param ignoreNewExtensions Whether to avoid loading any new extension.
+  /// Used by the module loader to break recursion.
+  ArrayRef<ValueDecl *> lookupDirect(DeclName name,
+                                     bool ignoreNewExtensions = false);
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).

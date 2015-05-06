@@ -79,6 +79,10 @@ public protocol PairLike {
   func getSecond() -> SecondType
 }
 
+public extension PairLike where FirstType : Cacheable {
+  final func cacheFirst() { }
+}
+
 public protocol ClassProto : class {}
 
 @objc public protocol ObjCProtoWithOptional {

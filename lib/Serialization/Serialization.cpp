@@ -1284,7 +1284,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     auto nominal = cast<NominalTypeDecl>(DC);
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addIdentifierRef(nominal->getName()));
+                                        addIdentifierRef(nominal->getName()),
+                                        false);
     break;
   }
 
@@ -1407,7 +1408,9 @@ void Serializer::writeCrossReference(const Decl *D) {
   if (auto type = dyn_cast<TypeDecl>(D)) {
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addIdentifierRef(type->getName()));
+                                        addIdentifierRef(type->getName()),
+                                        isa<ProtocolDecl>(
+                                          type->getDeclContext()));
     return;
   }
 

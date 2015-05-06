@@ -1028,8 +1028,9 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     IdentifierID IID;
     TypeID TID = 0;
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
+    bool onlyInNominal = false;
     if (isType)
-      XRefTypePathPieceLayout::readRecord(scratch, IID);
+      XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
     else
       XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
 
@@ -1109,10 +1110,11 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
       Identifier memberName;
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
+      bool onlyInNominal = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
         memberName = getIdentifier(IID);
         isType = true;
         break;
@@ -1152,7 +1154,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         return nullptr;
       }
 
-      auto members = nominal->lookupDirect(memberName);
+      auto members = nominal->lookupDirect(memberName, onlyInNominal);
       values.append(members.begin(), members.end());
       filterValues(getType(TID), M, genericSig, isType, ctorInit, values);
       break;

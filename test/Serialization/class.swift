@@ -8,6 +8,9 @@
 // CHECK-NOT: UnknownCode
 // CHECK-STRUCT: non-class type 'A' cannot conform to class protocol 'ClassProto'
 
+// Make sure we can "merge" def_class.
+// RUN: %target-swift-frontend -emit-module -o %t-merged.swiftmodule %t/def_class.swiftmodule -module-name def_class
+
 import def_class
 
 var a : Empty

@@ -975,7 +975,7 @@ void ExtensionDecl::addedMember(Decl *member) {
   }
 }
 
-void NominalTypeDecl::prepareLookupTable() {
+void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   // If we haven't allocated the lookup table yet, do so now.
   if (!LookupTable.getPointer()) {
     auto &ctx = getASTContext();
@@ -992,8 +992,10 @@ void NominalTypeDecl::prepareLookupTable() {
     LookupTable.getPointer()->addMembers(getMembers());
   }
 
-  // Update the lookup table to introduce members from extensions.
-  LookupTable.getPointer()->updateLookupTable(this);
+  if (!ignoreNewExtensions) {
+    // Update the lookup table to introduce members from extensions.
+    LookupTable.getPointer()->updateLookupTable(this);
+  }
 }
 
 void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
@@ -1005,14 +1007,18 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
   LookupTable.getPointer()->addMember(member);
 }
 
-ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name) {
+ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name,
+                                                    bool ignoreNewExtensions) {
   // Make sure we have the complete list of members (in this nominal and in all
   // extensions).
-  for (auto E : getExtensions())
-    (void)E->getMembers();
+  if (!ignoreNewExtensions) {
+    for (auto E : getExtensions())
+      (void)E->getMembers();
+  }
+
   (void)getMembers();
 
-  prepareLookupTable();
+  prepareLookupTable(ignoreNewExtensions);
 
   // Look for the declarations with this name.
   auto known = LookupTable.getPointer()->find(name);
