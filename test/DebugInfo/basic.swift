@@ -46,10 +46,11 @@ func foo(var a: Int64, var _ b: Int64) -> Int64 {
        // CHECK-NOSIL: [[MUL]] = !DILocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {
-       // CHECK-DAG: [[PARENT:[0-9]+]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-1]], column: 13)
+       // CHECK-DAG: ![[PARENT:[0-9]+]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-1]], column: 13)
        var c: Int64 = 42
+       // CHECK-DAG: ![[CONDITION:[0-9]+]] = distinct !DILexicalBlock(scope: ![[PARENT]], {{.*}}, line: [[@LINE+1]],
        if a == 0 {
-         // CHECK-DAG: !DILexicalBlock(scope: ![[PARENT]],{{.*}} line: [[@LINE-1]], column: 18)
+         // CHECK-DAG: !DILexicalBlock(scope: ![[CONDITION]], {{.*}}, line: [[@LINE-1]], column: 18)
          // What about a nested scope?
          return 0
        }

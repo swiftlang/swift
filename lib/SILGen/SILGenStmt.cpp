@@ -330,7 +330,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
   // the CondFalseBB.
   {
     // Enter a scope for any bound pattern variables.
-    Scope trueScope(SGF.Cleanups, S);
+    LexicalScope trueScope(SGF.Cleanups, SGF, S);
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S);
     
