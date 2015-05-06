@@ -37,10 +37,15 @@ for (expected, source) in samples {
       _lazyConcatenate(source),
       SourceLocStack().withCurrentLoc())
   }
+
+  // These bindings exist as a temporary workaround for <rdar://problem/20789500>
+  let revA = ContiguousArray(lazy(expected).reverse())
+  let revB = _lazyConcatenate(source).reverse()
+
   ConcatenateTests.test("reverse-\(source)") {
     checkBidirectionalCollection(
-      ContiguousArray(lazy(expected).reverse()),
-      _lazyConcatenate(source).reverse(),
+      revA,
+      revB,
       SourceLocStack().withCurrentLoc())
   }
   ConcatenateTests.test("sequence-\(source)") {

@@ -198,3 +198,21 @@ var signedArea: Float {
 
 println(signedArea)
 // CHECK: 0.0
+
+struct D {
+  var year: Int
+  var month: Int
+  var day: Int
+  init(year: Int, month: Int, day: Int) {
+    self.year = year
+    self.month = month
+    self.day = day
+  }
+  init?(s: String) {
+    return nil
+  }
+}
+let components = D(year:1776, month:7, day:4)
+let date = String(components.year) + "-" + String(components.month) + "-" + String(components.day)
+println(date)
+// CHECK: 1776-7-4

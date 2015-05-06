@@ -73,6 +73,7 @@ namespace {
     LinkedTypeInfo() {
       haveIntLiteral = false;
       haveFloatLiteral = false;
+      haveStringLiteral = false;
     }
   };
 
@@ -157,6 +158,15 @@ namespace {
       if (auto favoredType = CS.getFavoredType(expr)) {
         LTI.collectedTypes.insert(favoredType);
         return {false, expr};
+      }
+      
+      // In the case of a function application, we would have already captured
+      // the return type during constraint generation, so there's no use in
+      // looking any further.
+      if (isa<ApplyExpr>(expr) &&
+          !(isa<BinaryExpr>(expr) || isa<PrefixUnaryExpr>(expr) ||
+            isa<PostfixUnaryExpr>(expr))) {
+        return { false, expr };
       }
       
       return { true, expr };
@@ -521,6 +531,35 @@ namespace {
     return nOperands;
   }
   
+  /// Return a pair, containing the total parameter count of a function, coupled
+  /// with the number of non-default parameters.
+  std::pair<size_t, size_t> getParamCount(ValueDecl *VD) {
+  
+    auto fty = VD->getType()->getAs<AnyFunctionType>();
+    
+    assert(fty && "attempting to count parameters of a non-function type");
+    
+    auto t = fty->getInput();
+    size_t nOperands = getOperandCount(t);
+    size_t nNoDefault = 0;
+    
+    if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+      for (auto pattern : AFD->getBodyParamPatterns()) {
+        
+        if (auto tuplePattern = dyn_cast<TuplePattern>(pattern)) {
+          for (auto elt : tuplePattern->getElements()) {
+            if (elt.getDefaultArgKind() == DefaultArgumentKind::None)
+              nNoDefault++;
+          }
+        }
+      }
+    } else {
+      nNoDefault = nOperands;
+    }
+    
+    return { nOperands, nNoDefault };
+  }
+  
   /// Favor unary operator constraints where we have exact matches
   /// for the operand and contextual type.
   void favorMatchingUnaryOperators(ApplyExpr *expr,
@@ -566,10 +605,10 @@ namespace {
       bool haveMultipleApplicableOverloads = false;
       
       for (auto VD : ODR->getDecls()) {
-        if (auto fnTy = VD->getType()->getAs<AnyFunctionType>()) {
-          size_t nParams = getOperandCount(fnTy->getInput());
+        if (VD->getType()->getAs<AnyFunctionType>()) {
+          auto nParams = getParamCount(VD);
           
-          if (nArgs == nParams) {
+          if (nArgs == nParams.first) {
             if (haveMultipleApplicableOverloads) {
               return;
             } else {
@@ -587,7 +626,10 @@ namespace {
         if (!fnTy)
           return false;
         
-        return nArgs == getOperandCount(fnTy->getInput());
+        auto paramCount = getParamCount(value);
+        
+        return nArgs == paramCount.first ||
+               nArgs == paramCount.second;
       };
       
       favorCallOverloads(expr, CS, isFavoredDecl);
@@ -1865,9 +1907,15 @@ namespace {
         }
       } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
         outputTy = TE->getType()->getAs<MetatypeType>()->getInstanceType();
+        NominalTypeDecl *NTD = nullptr;
         
         if (auto nominalType = outputTy->getAs<NominalType>()) {
-          auto NTD = nominalType->getDecl();
+          NTD = nominalType->getDecl();
+        } else if (auto bgT = outputTy->getAs<BoundGenericType>()) {
+          NTD = bgT->getDecl();
+        }
+        
+        if (NTD) {
           if (!(isa<ClassDecl>(NTD) || isa<StructDecl>(NTD)) ||
               hasFailableInits(NTD, &CS)) {
             outputTy = Type();
@@ -1875,6 +1923,7 @@ namespace {
         } else {
           outputTy = Type();
         }
+        
       } else if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
         if (auto FD = dyn_cast<FuncDecl>(OSR->getDecls()[0])) {
 
