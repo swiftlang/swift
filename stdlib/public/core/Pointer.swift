@@ -52,7 +52,7 @@ func _convertMutableArrayToPointerArgument<
 
   // Call reserve to force contiguous storage.
   a.reserveCapacity(0)
-  _debugPrecondition(a._baseAddressIfContiguous != nil || a.count == 0)
+  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
 
   return (a._owner, ToPointer(a._baseAddressIfContiguous._rawValue))
 }
