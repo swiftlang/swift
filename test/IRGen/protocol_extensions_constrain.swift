@@ -37,4 +37,4 @@ let s = C2()
 
 s.bar
 
-// CHECK: i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @_TWPV29protocol_extensions_constrain2C3S_2P3S_, i32 0, i32 0)
+// CHECK: call {{.*}} @_TWPV29protocol_extensions_constrain2C3S_2P3S_
