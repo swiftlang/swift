@@ -506,6 +506,8 @@ ruleVar = Rule("a") // expected-error {{cannot invoke initializer for type 'Rule
 class C {
   var x: C?
   init(other: C?) { x = other }
+
+  func method() {}
 }
 
 var c = C(3) // expected-error {{cannot invoke initializer for type 'C' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(other: C?)'}}
@@ -587,8 +589,21 @@ func test() {
   (&x).method()  // expected-error {{cannot invoke 'method' with no arguments}}
 }
 
-// Unused l-value
-_ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
+
+// Unused results.
+func unusedExpressionResults() {
+  // Unused l-value
+  _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
+
+
+  // <rdar://problem/20749592> Conditional Optional binding hides compiler error
+  let optionalc:C? = nil
+  optionalc?.method()  // ok
+  optionalc?.method  // expected-error {{expression resolves to an unused function}}
+}
+
+
+
 
 //===----------------------------------------------------------------------===//
 // Collection Literals
