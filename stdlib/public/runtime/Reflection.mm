@@ -645,7 +645,9 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
                                              HeapObject *owner,
                                              const OpaqueValue *value,
                                              const Metadata *type) {
+#if REFLECT_OBJC_IVARS
   id object = *reinterpret_cast<const id *>(value);
+#endif
   auto isa = (Class)type;
   
   // If there's a superclass, it becomes the first child.

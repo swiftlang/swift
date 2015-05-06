@@ -51,6 +51,18 @@ struct IsTriviallyConstructible {
 #endif
 };
 
+template<typename T>
+struct IsTriviallyDestructible {
+#if _LIBCPP_VERSION
+  // libc++ implements it.
+  static const bool value = std::is_trivially_destructible<T>::value;
+#elif __has_feature(is_trivially_destructible)
+  static const bool value = __is_trivially_destructible(T);
+#else
+#  error "Not implemented"
+#endif
+};
+
 } // namespace swift
 
 #ifdef SWIFT_DEFINED_HAS_FEATURE

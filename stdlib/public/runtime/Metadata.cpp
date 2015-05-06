@@ -284,7 +284,7 @@ namespace {
 }
 
 /// The uniquing structure for ObjC class-wrapper metadata.
-static MetadataCache<ObjCClassCacheEntry> ObjCClassWrappers;
+static Lazy<MetadataCache<ObjCClassCacheEntry>> ObjCClassWrappers;
 
 const Metadata *
 swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
@@ -298,10 +298,11 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 
   const size_t numGenericArgs = 1;
   const void *args[] = { theClass };
-  auto entry = ObjCClassWrappers.findOrAdd(args, numGenericArgs,
+  auto &Wrappers = ObjCClassWrappers.get();
+  auto entry = Wrappers.findOrAdd(args, numGenericArgs,
     [&]() -> ObjCClassCacheEntry* {
       // Create a new entry for the cache.
-      auto entry = ObjCClassCacheEntry::allocate(ObjCClassWrappers.getAllocator(),
+      auto entry = ObjCClassCacheEntry::allocate(Wrappers.getAllocator(),
                                                  args, numGenericArgs, 0);
 
       auto metadata = entry->getData();
@@ -348,7 +349,7 @@ namespace {
 }
 
 /// The uniquing structure for function type metadata.
-static MetadataCache<FunctionCacheEntry> FunctionTypes;
+static Lazy<MetadataCache<FunctionCacheEntry>> FunctionTypes;
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
@@ -434,11 +435,13 @@ swift::swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]) {
     numArguments +
   // and 1 result type
     1;
-  auto entry = FunctionTypes.findOrAdd(flagsArgsAndResult, numKeyArguments,
+  auto &Types = FunctionTypes.get();
+  
+  auto entry = Types.findOrAdd(flagsArgsAndResult, numKeyArguments,
     [&]() -> FunctionCacheEntry* {
       // Create a new entry for the cache.
       auto entry = FunctionCacheEntry::allocate(
-        FunctionTypes.getAllocator(),
+        Types.getAllocator(),
         flagsArgsAndResult,
         numKeyArguments,
         numArguments * sizeof(FunctionTypeMetadata::Argument));
@@ -497,7 +500,7 @@ namespace {
 }
 
 /// The uniquing structure for tuple type metadata.
-static MetadataCache<TupleCacheEntry> TupleTypes;
+static Lazy<MetadataCache<TupleCacheEntry>> TupleTypes;
 
 /// Given a metatype pointer, produce the value-witness table for it.
 /// This is equivalent to metatype->ValueWitnesses but more efficient.
@@ -967,7 +970,8 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   // FIXME: include labels when uniquing!
   auto genericArgs = (const void * const *) elements;
-  auto entry = TupleTypes.findOrAdd(genericArgs, numElements,
+  auto &Types = TupleTypes.get();
+  auto entry = Types.findOrAdd(genericArgs, numElements,
     [&]() -> TupleCacheEntry* {
       // Create a new entry for the cache.
 
@@ -975,7 +979,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
       // Allocate the tuple cache entry, which includes space for both the
       // metadata and a value-witness table.
-      auto entry = TupleCacheEntry::allocate(TupleTypes.getAllocator(),
+      auto entry = TupleCacheEntry::allocate(Types.getAllocator(),
                                              genericArgs, numElements,
                                              numElements * sizeof(Element));
 
@@ -1615,7 +1619,7 @@ namespace {
 }
 
 /// The uniquing structure for metatype type metadata.
-static MetadataCache<MetatypeCacheEntry> MetatypeTypes;
+static Lazy<MetadataCache<MetatypeCacheEntry>> MetatypeTypes;
 
 /// \brief Find the appropriate value witness table for the given type.
 static const ValueWitnessTable *
@@ -1631,10 +1635,11 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
   const size_t numGenericArgs = 1;
   const void *args[] = { instanceMetadata };
-  auto entry = MetatypeTypes.findOrAdd(args, numGenericArgs,
+  auto &Types = MetatypeTypes.get();
+  auto entry = Types.findOrAdd(args, numGenericArgs,
     [&]() -> MetatypeCacheEntry* {
       // Create a new entry for the cache.
-      auto entry = MetatypeCacheEntry::allocate(MetatypeTypes.getAllocator(),
+      auto entry = MetatypeCacheEntry::allocate(Types.getAllocator(),
                                                 args, numGenericArgs, 0);
 
       auto metadata = entry->getData();
@@ -1673,8 +1678,14 @@ namespace {
   };
 }
 
+struct ExistentialMetatypeState {
+  MetadataCache<ExistentialMetatypeCacheEntry> Types;
+  llvm::DenseMap<unsigned, const ExtraInhabitantsValueWitnessTable*>
+    ValueWitnessTables;
+};
+
 /// The uniquing structure for existential metatype type metadata.
-static MetadataCache<ExistentialMetatypeCacheEntry> ExistentialMetatypeTypes;
+static Lazy<ExistentialMetatypeState> ExistentialMetatypes;
 
 static const ExtraInhabitantsValueWitnessTable
 ExistentialMetatypeValueWitnesses_1 =
@@ -1683,13 +1694,11 @@ static const ExtraInhabitantsValueWitnessTable
 ExistentialMetatypeValueWitnesses_2 =
   ValueWitnessTableForBox<ExistentialMetatypeBox<2>>::table;
 
-static llvm::DenseMap<unsigned, const ExtraInhabitantsValueWitnessTable*>
-  ExistentialMetatypeValueWitnessTables;
-
 /// Instantiate a value witness table for an existential metatype
 /// container with the given number of witness table pointers.
 static const ExtraInhabitantsValueWitnessTable *
-getExistentialMetatypeValueWitnesses(unsigned numWitnessTables) {
+getExistentialMetatypeValueWitnesses(ExistentialMetatypeState &EM,
+                                     unsigned numWitnessTables) {
   if (numWitnessTables == 0)
     return &getUnmanagedPointerPointerValueWitnesses();
   if (numWitnessTables == 1)
@@ -1700,8 +1709,8 @@ getExistentialMetatypeValueWitnesses(unsigned numWitnessTables) {
   static_assert(3 * sizeof(void*) >= sizeof(ValueBuffer),
                 "not handling all possible inline-storage class existentials!");
 
-  auto found = ExistentialMetatypeValueWitnessTables.find(numWitnessTables);
-  if (found != ExistentialMetatypeValueWitnessTables.end())
+  auto found = EM.ValueWitnessTables.find(numWitnessTables);
+  if (found != EM.ValueWitnessTables.end())
     return found->second;
 
   using Box = NonFixedExistentialMetatypeBox;
@@ -1726,7 +1735,7 @@ getExistentialMetatypeValueWitnesses(unsigned numWitnessTables) {
   vwt->extraInhabitantFlags = ExtraInhabitantFlags()
     .withNumExtraInhabitants(Witnesses::numExtraInhabitants);
 
-  ExistentialMetatypeValueWitnessTables.insert({numWitnessTables, vwt});
+  EM.ValueWitnessTables.insert({numWitnessTables, vwt});
 
   return vwt;
 }
@@ -1737,13 +1746,13 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
   // Search the cache.
   const size_t numGenericArgs = 1;
   const void *args[] = { instanceMetadata };
-  auto entry = ExistentialMetatypeTypes.findOrAdd(args, numGenericArgs,
+  auto &EM = ExistentialMetatypes.get();
+  auto entry = EM.Types.findOrAdd(args, numGenericArgs,
     [&]() -> ExistentialMetatypeCacheEntry* {
       // Create a new entry for the cache.
       auto entry =
-        ExistentialMetatypeCacheEntry::allocate(
-                                        ExistentialMetatypeTypes.getAllocator(),
-                                        args, numGenericArgs, 0);
+        ExistentialMetatypeCacheEntry::allocate(EM.Types.getAllocator(),
+                                                args, numGenericArgs, 0);
 
       ExistentialTypeFlags flags;
       if (instanceMetadata->getKind() == MetadataKind::Existential) {
@@ -1756,7 +1765,7 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
       auto metadata = entry->getData();
       metadata->setKind(MetadataKind::ExistentialMetatype);
       metadata->ValueWitnesses =
-        getExistentialMetatypeValueWitnesses(flags.getNumWitnessTables());
+        getExistentialMetatypeValueWitnesses(EM, flags.getNumWitnessTables());
       metadata->InstanceType = instanceMetadata;
       metadata->Flags = flags;
 
@@ -1792,21 +1801,26 @@ namespace {
   };
 }
 
+struct ExistentialTypeState {
+  MetadataCache<ExistentialCacheEntry> Types;
+  llvm::DenseMap<unsigned, const ValueWitnessTable*> OpaqueValueWitnessTables;
+  llvm::DenseMap<unsigned, const ExtraInhabitantsValueWitnessTable*>
+    ClassValueWitnessTables;
+};
+
 /// The uniquing structure for existential type metadata.
-static MetadataCache<ExistentialCacheEntry> ExistentialTypes;
+static Lazy<ExistentialTypeState> Existentials;
 
 static const ValueWitnessTable OpaqueExistentialValueWitnesses_0 =
   ValueWitnessTableForBox<OpaqueExistentialBox<0>>::table;
 static const ValueWitnessTable OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
 
-static llvm::DenseMap<unsigned, const ValueWitnessTable*>
-  OpaqueExistentialValueWitnessTables;
-
 /// Instantiate a value witness table for an opaque existential container with
 /// the given number of witness table pointers.
 static const ValueWitnessTable *
-getOpaqueExistentialValueWitnesses(unsigned numWitnessTables) {
+getOpaqueExistentialValueWitnesses(ExistentialTypeState &E,
+                                   unsigned numWitnessTables) {
   // We pre-allocate a couple of important cases.
   if (numWitnessTables == 0)
     return &OpaqueExistentialValueWitnesses_0;
@@ -1815,8 +1829,8 @@ getOpaqueExistentialValueWitnesses(unsigned numWitnessTables) {
 
   // FIXME: make thread-safe
 
-  auto found = OpaqueExistentialValueWitnessTables.find(numWitnessTables);
-  if (found != OpaqueExistentialValueWitnessTables.end())
+  auto found = E.OpaqueValueWitnessTables.find(numWitnessTables);
+  if (found != E.OpaqueValueWitnessTables.end())
     return found->second;
 
   using Box = NonFixedOpaqueExistentialBox;
@@ -1838,7 +1852,7 @@ getOpaqueExistentialValueWitnesses(unsigned numWitnessTables) {
     .withExtraInhabitants(false);
   vwt->stride = Box::Container::getStride(numWitnessTables);
 
-  OpaqueExistentialValueWitnessTables.insert({numWitnessTables, vwt});
+  E.OpaqueValueWitnessTables.insert({numWitnessTables, vwt});
 
   return vwt;
 }
@@ -1848,13 +1862,11 @@ static const ExtraInhabitantsValueWitnessTable ClassExistentialValueWitnesses_1 
 static const ExtraInhabitantsValueWitnessTable ClassExistentialValueWitnesses_2 =
   ValueWitnessTableForBox<ClassExistentialBox<2>>::table;
 
-static llvm::DenseMap<unsigned, const ExtraInhabitantsValueWitnessTable*>
-  ClassExistentialValueWitnessTables;
-
 /// Instantiate a value witness table for a class-constrained existential
 /// container with the given number of witness table pointers.
 static const ExtraInhabitantsValueWitnessTable *
-getClassExistentialValueWitnesses(unsigned numWitnessTables) {
+getClassExistentialValueWitnesses(ExistentialTypeState &E,
+                                  unsigned numWitnessTables) {
   if (numWitnessTables == 0) {
 #if SWIFT_OBJC_INTEROP
     return &_TWVBO;
@@ -1870,8 +1882,8 @@ getClassExistentialValueWitnesses(unsigned numWitnessTables) {
   static_assert(3 * sizeof(void*) >= sizeof(ValueBuffer),
                 "not handling all possible inline-storage class existentials!");
 
-  auto found = ClassExistentialValueWitnessTables.find(numWitnessTables);
-  if (found != ClassExistentialValueWitnessTables.end())
+  auto found = E.ClassValueWitnessTables.find(numWitnessTables);
+  if (found != E.ClassValueWitnessTables.end())
     return found->second;
 
   using Box = NonFixedClassExistentialBox;
@@ -1896,7 +1908,7 @@ getClassExistentialValueWitnesses(unsigned numWitnessTables) {
   vwt->extraInhabitantFlags = ExtraInhabitantFlags()
     .withNumExtraInhabitants(Witnesses::numExtraInhabitants);
 
-  ClassExistentialValueWitnessTables.insert({numWitnessTables, vwt});
+  E.ClassValueWitnessTables.insert({numWitnessTables, vwt});
 
   return vwt;
 }
@@ -1904,7 +1916,8 @@ getClassExistentialValueWitnesses(unsigned numWitnessTables) {
 /// Get the value witness table for an existential type, first trying to use a
 /// shared specialized table for common cases.
 static const ValueWitnessTable *
-getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
+getExistentialValueWitnesses(ExistentialTypeState &E,
+                             ProtocolClassConstraint classConstraint,
                              unsigned numWitnessTables,
                              SpecialProtocol special) {
   // Use special representation for special protocols.
@@ -1926,9 +1939,9 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
   
   switch (classConstraint) {
   case ProtocolClassConstraint::Class:
-    return getClassExistentialValueWitnesses(numWitnessTables);
+    return getClassExistentialValueWitnesses(E, numWitnessTables);
   case ProtocolClassConstraint::Any:
-    return getOpaqueExistentialValueWitnesses(numWitnessTables);
+    return getOpaqueExistentialValueWitnesses(E, numWitnessTables);
   }
 }
 
@@ -2106,10 +2119,11 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
 
   auto protocolArgs = reinterpret_cast<const void * const *>(protocols);
 
-  auto entry = ExistentialTypes.findOrAdd(protocolArgs, numProtocols,
+  auto &E = Existentials.get();
+  auto entry = E.Types.findOrAdd(protocolArgs, numProtocols,
     [&]() -> ExistentialCacheEntry* {
       // Create a new entry for the cache.
-      auto entry = ExistentialCacheEntry::allocate(ExistentialTypes.getAllocator(),
+      auto entry = ExistentialCacheEntry::allocate(E.Types.getAllocator(),
                              protocolArgs, numProtocols,
                              sizeof(const ProtocolDescriptor *) * numProtocols);
       auto metadata = entry->getData();
@@ -2121,7 +2135,8 @@ swift::swift_getExistentialTypeMetadata(size_t numProtocols,
         special = protocols[0]->Flags.getSpecialProtocol();
       
       metadata->setKind(MetadataKind::Existential);
-      metadata->ValueWitnesses = getExistentialValueWitnesses(classConstraint,
+      metadata->ValueWitnesses = getExistentialValueWitnesses(E,
+                                                              classConstraint,
                                                               numWitnessTables,
                                                               special);
       metadata->Flags = ExistentialTypeFlags()
@@ -2199,8 +2214,18 @@ struct llvm::DenseMapInfo<GlobalString> {
 
 // We use a DenseMap over what are essentially StringRefs instead of a
 // StringMap because we don't need to actually copy the string.
-static pthread_mutex_t ForeignTypesLock = PTHREAD_MUTEX_INITIALIZER;
-static llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> ForeignTypes;
+namespace {
+struct ForeignTypeState {
+  pthread_mutex_t Lock;
+  llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> Types;
+  
+  ForeignTypeState() {
+    pthread_mutex_init(&Lock, nullptr);
+  }
+};
+}
+
+static Lazy<ForeignTypeState> ForeignTypes;
 
 const ForeignTypeMetadata *
 swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
@@ -2210,9 +2235,10 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   }
 
   // Okay, insert a new row.
-  pthread_mutex_lock(&ForeignTypesLock);
-  auto insertResult = ForeignTypes.insert({GlobalString(nonUnique->getName()),
-                                           nonUnique});
+  auto &Foreign = ForeignTypes.get();
+  pthread_mutex_lock(&Foreign.Lock);
+  auto insertResult = Foreign.Types.insert({GlobalString(nonUnique->getName()),
+                                            nonUnique});
   auto uniqueMetadata = insertResult.first->second;
 
   // If the insertion created a new entry, set up the metadata we were
@@ -2228,7 +2254,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   // it will be possible for code to fast-path through this function
   // too soon.
   nonUnique->setCachedUniqueMetadata(uniqueMetadata);
-  pthread_mutex_unlock(&ForeignTypesLock);
+  pthread_mutex_unlock(&Foreign.Lock);
   return uniqueMetadata;
 }
 

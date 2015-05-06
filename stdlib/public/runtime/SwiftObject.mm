@@ -31,6 +31,7 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "Private.h"
+#include "Lazy.h"
 #include "Debug.h"
 #include <dlfcn.h>
 #include <stdio.h>
@@ -76,7 +77,9 @@ static uintptr_t computeISAMask() {
   return ~uintptr_t(0);
 }
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 uintptr_t swift::swift_isaMask = computeISAMask();
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #endif
 
 const ClassMetadata *swift::_swift_getClass(const void *object) {
@@ -469,13 +472,22 @@ namespace {
 // The ObjC runtime will hold a point into the UnownedRefEntry,
 // so we require pointers to objects to be stable across rehashes.
 // DenseMap doesn't guarantee that, but std::unordered_map does.
-static std::unordered_map<const void*, UnownedRefEntry> UnownedRefs;
-static std::mutex UnownedRefsMutex;
+
+namespace {
+struct UnownedTable {
+  std::unordered_map<const void*, UnownedRefEntry> Refs;
+  std::mutex Mutex;
+};
+}
+
+static Lazy<UnownedTable> UnownedRefs;
 
 static void objc_rootRetainUnowned(id object) {
-  std::lock_guard<std::mutex> lock(UnownedRefsMutex);
-  auto it = UnownedRefs.find((const void*) object);
-  assert(it != UnownedRefs.end());
+  auto &Unowned = UnownedRefs.get();
+
+  std::lock_guard<std::mutex> lock(Unowned.Mutex);
+  auto it = Unowned.Refs.find((const void*) object);
+  assert(it != Unowned.Refs.end());
   assert(it->second.Count > 0);
 
   // Do an unbalanced retain.
@@ -486,8 +498,10 @@ static void objc_rootRetainUnowned(id object) {
 }
 
 static void objc_rootWeakRetain(id object) {
-  std::lock_guard<std::mutex> lock(UnownedRefsMutex);
-  auto ins = UnownedRefs.insert({ (const void*) object, UnownedRefEntry() });
+  auto &Unowned = UnownedRefs.get();
+
+  std::lock_guard<std::mutex> lock(Unowned.Mutex);
+  auto ins = Unowned.Refs.insert({ (const void*) object, UnownedRefEntry() });
   if (!ins.second) {
     ins.first->second.Count++;
   } else {
@@ -497,13 +511,15 @@ static void objc_rootWeakRetain(id object) {
 }
 
 static void objc_rootWeakRelease(id object) {
-  std::lock_guard<std::mutex> lock(UnownedRefsMutex);
-  auto it = UnownedRefs.find((const void*) object);
-  assert(it != UnownedRefs.end());
+  auto &Unowned = UnownedRefs.get();
+
+  std::lock_guard<std::mutex> lock(Unowned.Mutex);
+  auto it = Unowned.Refs.find((const void*) object);
+  assert(it != Unowned.Refs.end());
   assert(it->second.Count > 0);
   if (--it->second.Count == 0) {
     objc_destroyWeak(&it->second.Value);
-    UnownedRefs.erase(it);
+    Unowned.Refs.erase(it);
   }
 }
 #endif
@@ -550,11 +566,13 @@ static bool usesNativeSwiftReferenceCounting_allocated(const void *object) {
 }
 
 static bool usesNativeSwiftReferenceCounting_unowned(const void *object) {
+  auto &Unowned = UnownedRefs.get();
+
   // If an unknown object is unowned-referenced, it may in fact be implemented
   // using an ObjC weak reference, which will eagerly deallocate the object
   // when strongly released. We have to check first whether the object is in
   // the side table before dereferencing the pointer.
-  if (UnownedRefs.count(object))
+  if (Unowned.Refs.count(object))
     return false;
   // For a natively unowned reference, even after all strong references have
   // been released, there's enough of a husk left behind to determine its

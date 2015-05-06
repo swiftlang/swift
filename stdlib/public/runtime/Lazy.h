@@ -18,12 +18,15 @@
 #else
 #include <mutex>
 #endif
+#include "swift/Basic/type_traits.h"
 
 namespace swift {
 
-/// A template for lazily-constructed, zero-initialized global objects.
+/// A template for lazily-constructed, zero-initialized, leaked-on-exit
+/// global objects.
 template <class T> class Lazy {
-  T Value;
+  typename std::aligned_storage<sizeof(T), alignof(T)>::type Value;
+  
 #ifdef __APPLE__
   dispatch_once_t OnceToken;
 #else
@@ -31,27 +34,40 @@ template <class T> class Lazy {
 #endif
 
 public:
-  T &get() {
-#ifdef __APPLE__
-    dispatch_once_f(&OnceToken, this, lazyInitCallback);
-#else
-    std::call_once(OnceToken, lazyInitCallback, this);
-#endif
-    return Value;
-  }
+  T &get();
   
   /// Get the value, assuming it must have already been initialized by this
   /// point.
   T &unsafeGetAlreadyInitialized() {
-    return Value;
+    return *reinterpret_cast<T*>(&Value);
   }
+  
+  Lazy() = default;
 
 private:
   static void lazyInitCallback(void *Argument) {
     auto self = reinterpret_cast<Lazy *>(Argument);
-    ::new (&self->Value) T();
+    ::new (&self->unsafeGetAlreadyInitialized()) T();
   }
+  
+  Lazy(const Lazy &) = delete;
+  Lazy &operator=(const Lazy &) = delete;
 };
+
+template<typename T>
+inline T& Lazy<T>::get() {
+  static_assert(IsTriviallyConstructible<Lazy<T>>::value,
+                "Lazy must be trivially default constructible");
+  static_assert(IsTriviallyDestructible<Lazy<T>>::value,
+                "Lazy must be trivially destructible");
+
+#ifdef __APPLE__
+  dispatch_once_f(&OnceToken, this, lazyInitCallback);
+#else
+  std::call_once(OnceToken, lazyInitCallback, this);
+#endif
+  return unsafeGetAlreadyInitialized();
+}
 
 } // namespace swift
 

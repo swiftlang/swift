@@ -46,5 +46,18 @@
 #endif
 #endif
 
+// We try to avoid global constructors in the runtime as much as possible.
+// These macros delimit allowed global ctors.
+#if __clang__
+# define SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wglobal-constructors\"")
+# define SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END \
+    _Pragma("clang diagnostic pop")
+#else
+# define SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
+# define SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
+#endif
+
 #endif // SWIFT_RUNTIME_CONFIG_H
 

@@ -26,6 +26,7 @@
 #include "Debug.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
+#include "Lazy.h"
 #include "Private.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "stddef.h"
@@ -402,21 +403,6 @@ static bool _fail(OpaqueValue *srcValue, const Metadata *srcType,
     srcType->vw_destroy(srcValue);
   return false;
 }
-
-static size_t
-_setupClassMask() {
-  void *handle = dlopen(nullptr, RTLD_LAZY);
-  assert(handle);
-  void *symbol = dlsym(handle, "objc_debug_isa_class_mask");
-  if (symbol) {
-    return *(uintptr_t *)symbol;
-  }
-  return ~(size_t)0;
-}
-
-size_t swift::swift_classMask = _setupClassMask();
-uint8_t swift::swift_classShift = 0;
-
 
 /// Dynamically cast a class metatype to a Swift class metatype.
 static const ClassMetadata *
@@ -2140,25 +2126,34 @@ namespace {
 }
 
 // Conformance Cache.
-static ConcurrentMap<size_t, ConformanceCacheEntry> ConformanceCache;
+
+struct ConformanceState {
+  ConcurrentMap<size_t, ConformanceCacheEntry> Cache;
+  std::deque<ConformanceSection> SectionsToScan;
+  pthread_mutex_t SectionsToScanLock;
+  
+  ConformanceState() {
+    pthread_mutex_init(&SectionsToScanLock, nullptr);
+  }
+};
+
+static Lazy<ConformanceState> Conformances;
+
 // This variable is used to signal when a cache was generated and
 // it is correct to avoid a new scan.
-unsigned ConformanceCacheGeneration = 0;
-
-// Conformance sections pending a scan.
-// TODO: This could easily be a lock-free FIFO.
-static pthread_mutex_t SectionsToScanLock = PTHREAD_MUTEX_INITIALIZER;
-static std::deque<ConformanceSection> SectionsToScan;
+static unsigned ConformanceCacheGeneration = 0;
 
 void
 swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
                                           const ProtocolConformanceRecord *end){
-  pthread_mutex_lock(&SectionsToScanLock);
+  auto &C = Conformances.get();
+  
+  pthread_mutex_lock(&C.SectionsToScanLock);
   // Increase the generation to invalidate cached negative lookups.
   ++ProtocolConformanceGeneration;
   
-  SectionsToScan.push_back(ConformanceSection{begin, end});
-  pthread_mutex_unlock(&SectionsToScanLock);
+  C.SectionsToScan.push_back(ConformanceSection{begin, end});
+  pthread_mutex_unlock(&C.SectionsToScanLock);
 }
 
 static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
@@ -2259,6 +2254,8 @@ static
 std::pair<const WitnessTable *, bool>
 searchInConformanceCache(const Metadata *type,
                          const ProtocolDescriptor *protocol){
+  auto &C = Conformances.get();
+
 recur_inside_cache_lock:
 
   // See if we have a cached conformance. Try the specific type first.
@@ -2266,7 +2263,7 @@ recur_inside_cache_lock:
   // Hash and lookup the type-protocol pair in the cache.
   size_t hash = hashTypeProtocolPair(type, protocol);
   ConcurrentList<ConformanceCacheEntry> &Bucket =
-    ConformanceCache.findOrAllocateNode(hash);
+    C.Cache.findOrAllocateNode(hash);
 
   // Check if the type-protocol entry exists in the cache entry that we found.
   for (auto &Entry : Bucket) {
@@ -2289,7 +2286,7 @@ recur_inside_cache_lock:
     // Hash and lookup the type-protocol pair in the cache.
     size_t hash = hashTypeProtocolPair(generic, protocol);
     ConcurrentList<ConformanceCacheEntry> &Bucket =
-      ConformanceCache.findOrAllocateNode(hash);
+      C.Cache.findOrAllocateNode(hash);
 
     for (auto &Entry : Bucket) {
       if (!Entry.matches(generic, protocol)) continue;
@@ -2318,7 +2315,9 @@ recur_inside_cache_lock:
 const WitnessTable *
 swift::swift_conformsToProtocol(const Metadata *type,
                                 const ProtocolDescriptor *protocol) {
-  // Install callbacks for tracking when a new dylib is loaded so we can 
+  auto &C = Conformances.get();
+  
+  // Install callbacks for tracking when a new dylib is loaded so we can
   // scan it.
   installCallbacksToInspectDylib();
   auto origType = type;
@@ -2336,15 +2335,15 @@ recur:
   unsigned failedGeneration = ConformanceCacheGeneration;
 
   // If we didn't have an up-to-date cache entry, scan the conformance records.
-  pthread_mutex_lock(&SectionsToScanLock);
+  pthread_mutex_lock(&C.SectionsToScanLock);
 
   // If we have no new information to pull in (and nobody else pulled in
   // new information while we waited on the lock), we're done.
-  if (SectionsToScan.empty()) {
+  if (C.SectionsToScan.empty()) {
     if (failedGeneration != ConformanceCacheGeneration) {
       // Someone else pulled in new conformances while we were waiting.
       // Start over with our newly-populated cache.
-      pthread_mutex_unlock(&SectionsToScanLock);
+      pthread_mutex_unlock(&C.SectionsToScanLock);
       type = origType;
       goto recur;
     }
@@ -2353,16 +2352,16 @@ recur:
     // Hash and lookup the type-protocol pair in the cache.
     size_t hash = hashTypeProtocolPair(type, protocol);
     ConcurrentList<ConformanceCacheEntry> &Bucket =
-      ConformanceCache.findOrAllocateNode(hash);
+      C.Cache.findOrAllocateNode(hash);
     Bucket.push_front(ConformanceCacheEntry::createFailure(
         type, protocol, ProtocolConformanceGeneration));
-    pthread_mutex_unlock(&SectionsToScanLock);
+    pthread_mutex_unlock(&C.SectionsToScanLock);
     return nullptr;
   }
 
-  while (!SectionsToScan.empty()) {
-    auto section = SectionsToScan.front();
-    SectionsToScan.pop_front();
+  while (!C.SectionsToScan.empty()) {
+    auto section = C.SectionsToScan.front();
+    C.SectionsToScan.pop_front();
 
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
@@ -2373,7 +2372,7 @@ recur:
         // Hash and lookup the type-protocol pair in the cache.
         size_t hash = hashTypeProtocolPair(metadata, P);
         ConcurrentList<ConformanceCacheEntry> &Bucket =
-          ConformanceCache.findOrAllocateNode(hash);
+          C.Cache.findOrAllocateNode(hash);
 
         auto witness = record.getWitnessTable(metadata);
         if (witness)
@@ -2399,7 +2398,7 @@ recur:
         // Hash and lookup the type-protocol pair in the cache.
         size_t hash = hashTypeProtocolPair(R, P);
         ConcurrentList<ConformanceCacheEntry> &Bucket =
-          ConformanceCache.findOrAllocateNode(hash);
+          C.Cache.findOrAllocateNode(hash);
           Bucket.push_front(ConformanceCacheEntry::createSuccess(
               R, P, record.getStaticWitnessTable()));
       }
@@ -2407,7 +2406,7 @@ recur:
   }
   ++ConformanceCacheGeneration;
 
-  pthread_mutex_unlock(&SectionsToScanLock);
+  pthread_mutex_unlock(&C.SectionsToScanLock);
   // Start over with our newly-populated cache.
   type = origType;
   goto recur;

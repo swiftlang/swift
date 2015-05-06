@@ -2290,11 +2290,6 @@ extern "C" const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(size_t numProtocols,
                                  const ProtocolDescriptor **protocols);
 
-// Mask and left shift for reading the isa directly from Swift objects when
-// we know that dynamic subclassing (CoreData, KVO, etc) doesn't happen.
-extern "C" size_t swift_classMask;
-extern "C" uint8_t swift_classShift;
-
 /// \brief Perform a checked dynamic cast of a value to a target type.
 ///
 /// \param dest A buffer into which to write the destination value.
