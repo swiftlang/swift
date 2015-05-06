@@ -479,12 +479,12 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     }
     pushStructureNode(SN, S);
     
-  } else if (auto *RS = dyn_cast<RequireStmt>(S)) {
+  } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
     SyntaxStructureNode SN;
-    SN.Kind = SyntaxStructureKind::RequireStatement;
+    SN.Kind = SyntaxStructureKind::GuardStatement;
     SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
-    if (!RS->getCond().empty()) {
-      auto Conds = RS->getCond();
+    if (!GS->getCond().empty()) {
+      auto Conds = GS->getCond();
       SourceRange ElemRange = SourceRange(Conds.front().getSourceRange().Start,
                                           Conds.back().getSourceRange().End);
       SN.Elements.emplace_back(SyntaxStructureElementKind::ConditionExpr,

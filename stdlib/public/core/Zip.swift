@@ -48,12 +48,12 @@ public struct ZipGenerator2<
       return nil
     }
 
-    require let e0 = _baseStreams.0.next() else {
+    guard let e0 = _baseStreams.0.next() else {
       _reachedEnd = true
       return nil
     }
 
-    require let e1 = _baseStreams.1.next() else {
+    guard let e1 = _baseStreams.1.next() else {
       _reachedEnd = true
       return nil
     }

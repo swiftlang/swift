@@ -34,7 +34,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_return:
   case tok::kw_defer:
   case tok::kw_if:
-  case tok::kw_require:
+  case tok::kw_guard:
   case tok::kw_while:
   case tok::kw_do:
   case tok::kw_repeat:
@@ -196,6 +196,7 @@ static void diagnoseDiscardedClosure(Parser &P, ASTNode &Result) {
 ///     ';'
 ///     stmt-assign
 ///     stmt-if
+///     stmt-guard
 ///     stmt-for-c-style
 ///     stmt-for-each
 ///     stmt-switch
@@ -498,9 +499,9 @@ ParserResult<Stmt> Parser::parseStmt() {
     return parseStmtDefer();
   case tok::kw_if:
     return parseStmtIf(LabelInfo);
-  case tok::kw_require:
+  case tok::kw_guard:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
-    return parseStmtRequire();
+    return parseStmtGuard();
   case tok::pound_if:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtIfConfig();
@@ -1134,11 +1135,11 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
                                    ElseLoc, ElseBody.getPtrOrNull()));
 }
 
-///   stmt-require:
-///     'require' condition 'else' stmt-brace
+///   stmt-guard:
+///     'guard' condition 'else' stmt-brace
 ///
-ParserResult<Stmt> Parser::parseStmtRequire() {
-  SourceLoc RequireLoc = consumeToken(tok::kw_require);
+ParserResult<Stmt> Parser::parseStmtGuard() {
+  SourceLoc GuardLoc = consumeToken(tok::kw_guard);
   
   ParserStatus Status;
   StmtCondition Condition;
@@ -1146,13 +1147,13 @@ ParserResult<Stmt> Parser::parseStmtRequire() {
   
   if (Tok.is(tok::l_brace)) {
     SourceLoc LBraceLoc = Tok.getLoc();
-    diagnose(RequireLoc, diag::missing_condition_after_require)
-      .highlight(SourceRange(RequireLoc, LBraceLoc));
+    diagnose(GuardLoc, diag::missing_condition_after_guard)
+      .highlight(SourceRange(GuardLoc, LBraceLoc));
     SmallVector<StmtConditionElement, 1> ConditionElems;
     ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
     Condition = Context.AllocateCopy(ConditionElems);
   } else {
-    Status |= parseStmtCondition(Condition, diag::expected_condition_require);
+    Status |= parseStmtCondition(Condition, diag::expected_condition_guard);
     if (Status.isError() || Status.hasCodeCompletion()) {
       // FIXME: better recovery
       return makeParserResult<Stmt>(Status, nullptr);
@@ -1161,7 +1162,7 @@ ParserResult<Stmt> Parser::parseStmtRequire() {
 
   // Parse the 'else'.  If it is missing, and if the following token isn't a {
   // then the parser is hopelessly lost - just give up instead of spewing.
-  if (parseToken(tok::kw_else, diag::expected_else_after_require) &&
+  if (parseToken(tok::kw_else, diag::expected_else_after_guard) &&
       Tok.isNot(tok::l_brace))
     return makeParserResult<Stmt>(Status, nullptr);
 
@@ -1176,16 +1177,16 @@ ParserResult<Stmt> Parser::parseStmtRequire() {
   RestoreCurVars(DisabledVars, Vars);
 
   llvm::SaveAndRestore<decltype(DisabledVarReason)>
-  RestoreReason(DisabledVarReason, diag::bound_var_require_body);
+  RestoreReason(DisabledVarReason, diag::bound_var_guard_body);
 
-  Body = parseBraceItemList(diag::expected_lbrace_after_require);
+  Body = parseBraceItemList(diag::expected_lbrace_after_guard);
   if (Body.isNull())
     return nullptr; // FIXME: better recovery
   
   Status |= Body;
   
   return makeParserResult(Status,
-              new (Context) RequireStmt(RequireLoc, Condition, Body.get()));
+              new (Context) GuardStmt(GuardLoc, Condition, Body.get()));
 }
 
 

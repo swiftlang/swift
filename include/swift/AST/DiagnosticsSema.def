@@ -1655,8 +1655,8 @@ WARNING(if_always_true,sema_tcd,none,
 WARNING(while_always_true,sema_tcd,none,
         "'while' condition is always true", ())
 
-WARNING(require_always_succeeds,sema_tcd,none,
-        "'require' condition is always true, body is unreachable", ())
+WARNING(guard_always_succeeds,sema_tcd,none,
+        "'guard' condition is always true, body is unreachable", ())
 
 
 ERROR(expression_unused_function,sema_tcs,none,

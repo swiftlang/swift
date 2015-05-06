@@ -391,18 +391,18 @@ public:
     return IS;
   }
   
-  Stmt *visitRequireStmt(RequireStmt *RS) {
-    StmtCondition C = RS->getCond();
-    if (TC.typeCheckStmtCondition(C, DC, diag::require_always_succeeds))
+  Stmt *visitGuardStmt(GuardStmt *GS) {
+    StmtCondition C = GS->getCond();
+    if (TC.typeCheckStmtCondition(C, DC, diag::guard_always_succeeds))
       return 0;
-    RS->setCond(C);
+    GS->setCond(C);
     
-    AddLabeledStmt ifNest(*this, RS);
+    AddLabeledStmt ifNest(*this, GS);
     
-    Stmt *S = RS->getBody();
+    Stmt *S = GS->getBody();
     if (typeCheckStmt(S)) return 0;
-    RS->setBody(S);
-    return RS;
+    GS->setBody(S);
+    return GS;
   }
 
   Stmt *visitIfConfigStmt(IfConfigStmt *ICS) {

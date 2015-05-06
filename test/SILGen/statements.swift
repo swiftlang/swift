@@ -524,7 +524,7 @@ func testRequireExprPattern(a : Int) {
 
   // CHECK: function_ref static Swift.~= infix <A : Swift.Equatable>(A, A) -> Swift.Bool
   // CHECK: cond_br {{.*}}, bb1, bb2
-  require case 4 = a else { marker_2(); return }
+  guard case 4 = a else { marker_2(); return }
 
   // Fall through case comes first.
 
@@ -554,7 +554,7 @@ func testRequireOptional1(a : Int?) -> Int {
   // CHECK: bb1(%3 : $Int):
   // CHECK-NEXT:   debug_value %3 : $Int  // let t
   // CHECK-NEXT:   return %3 : $Int
-  require let t = a else { abort() }
+  guard let t = a else { abort() }
 
   // CHECK:  bb2:
   // CHECK-NEXT:    // function_ref statements.abort () -> ()
@@ -570,7 +570,7 @@ func testRequireOptional1(a : Int?) -> Int {
 // CHECK-NEXT:   retain_value %0 : $Optional<String>
 // CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb1, default bb2
 func testRequireOptional2(a : String?) -> String {
-  require let t = a else { abort() }
+  guard let t = a else { abort() }
 
   // CHECK:  bb1(%4 : $String):
   // CHECK-NEXT:   debug_value %4 : $String  // let t
@@ -601,7 +601,7 @@ func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
   // CHECK-NEXT:   dealloc_stack %4#0
   // CHECK-NEXT:   dealloc_stack %3#0
   // CHECK-NEXT:   br bb3
-  require let t = a else { abort() }
+  guard let t = a else { abort() }
 
   // CHECK:    bb2:
   // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4#1 : $*MyOpt<T>, #MyOpt.Some!enumelt.1
@@ -629,14 +629,14 @@ func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
 protocol MyProtocol {}
 func testCleanupEmission<T>(x: T) {
   // SILGen shouldn't crash/verify abort on this example.
-  require let x2 = x as? MyProtocol else { return }
+  guard let x2 = x as? MyProtocol else { return }
 }
 
 
 // CHECK-LABEL: sil hidden @_TF10statements15test_is_patternFCS_9BaseClassT_
 func test_is_pattern(y : BaseClass) {
   // checked_cast_br %0 : $BaseClass to $DerivedClass
-  require case is DerivedClass = y else { marker_1(); return }
+  guard case is DerivedClass = y else { marker_1(); return }
 
   marker_2()
 }
@@ -644,7 +644,7 @@ func test_is_pattern(y : BaseClass) {
 // CHECK-LABEL: sil hidden @_TF10statements15test_as_patternFCS_9BaseClassCS_12DerivedClass
 func test_as_pattern(y : BaseClass) -> DerivedClass {
   // checked_cast_br %0 : $BaseClass to $DerivedClass
-  require case let result as DerivedClass = y else {  }
+  guard case let result as DerivedClass = y else {  }
   // CHECK: bb{{.*}}({{.*}} : $DerivedClass):
 
 
@@ -661,7 +661,7 @@ func let_else_tuple_binding(a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>  // let a
   // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.Some!enumelt.1: bb1, default bb2
 
-  require let (x, y) = a else { }
+  guard let (x, y) = a else { }
   return x
 
   // CHECK: bb1(%3 : $(Int, Int)):

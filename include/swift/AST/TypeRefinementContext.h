@@ -30,7 +30,7 @@ namespace swift {
   class BraceStmt;
   class Decl;
   class IfStmt;
-  class RequireStmt;
+  class GuardStmt;
   class SourceFile;
   class Stmt;
   class AvailabilityQueryExpr;
@@ -70,9 +70,9 @@ public:
     ///  }
     ConditionFollowingAvailabilityQuery,
 
-    /// The context was introduced for the fallthrough flow of a require
+    /// The context was introduced for the fallthrough flow of a guard
     /// statement.
-    RequireStmtFallthrough,
+    GuardStmtFallthrough,
   };
 
   using IntroNode = llvm::PointerUnion4<SourceFile *, Decl *, Stmt *, Expr *>;
@@ -117,9 +117,9 @@ public:
                                    TypeRefinementContext *Parent,
                                    const VersionRange &Versions);
 
-  /// Create a refinement context for the fallthrough of a RequireStmt.
+  /// Create a refinement context for the fallthrough of a GuardStmt.
   static TypeRefinementContext *
-  createForRequireStmtFallthrough(ASTContext &Ctx, RequireStmt *RS,
+  createForGuardStmtFallthrough(ASTContext &Ctx, GuardStmt *RS,
                                   BraceStmt *ContainingBraceStmt,
                                   TypeRefinementContext *Parent,
                                   const VersionRange &Versions);

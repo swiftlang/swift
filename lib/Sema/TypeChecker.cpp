@@ -1069,8 +1069,8 @@ private:
       return std::make_pair(false, S);
     }
 
-    if (auto *RS = dyn_cast<RequireStmt>(S)) {
-      buildRequireStmtRefinementContext(RS);
+    if (auto *RS = dyn_cast<GuardStmt>(S)) {
+      buildGuardStmtRefinementContext(RS);
       return std::make_pair(false, S);
     }
 
@@ -1113,16 +1113,16 @@ private:
     }
   }
 
-  /// Builds the type refinement hierarchy for the RequireStmt and pushes
+  /// Builds the type refinement hierarchy for the GuardStmt and pushes
   /// the fallthrough context onto the context stack so that subsequent
   /// AST elements in the same scope are analyzed in the context of the
   /// fallthrough TRC.
-  void buildRequireStmtRefinementContext(RequireStmt *RS) {
-    // Require statements fall through if all of the
+  void buildGuardStmtRefinementContext(GuardStmt *GS) {
+    // 'guard' statements fall through if all of the
     // guard conditions are true, so we refine the range after the require
     // until the end of the enclosing block.
     // if ... {
-    //   require available(...) else { return } <-- Refined range starts here
+    //   guard available(...) else { return } <-- Refined range starts here
     //   ...
     // } <-- Refined range ends here
     //
@@ -1130,21 +1130,21 @@ private:
     // the refined region is not lexically contained inside the construct
     // introducing the refinement context.
     Optional<VersionRange> RefinedRange =
-        buildStmtConditionRefinementContext(RS->getCond());
+        buildStmtConditionRefinementContext(GS->getCond());
 
-    if (Stmt *Body = RS->getBody()) {
+    if (Stmt *Body = GS->getBody()) {
       build(Body);
     }
 
     BraceStmt *ParentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
-    assert(ParentBrace && "Expected parent of RequireStmt to be BraceStmt");
+    assert(ParentBrace && "Expected parent of GuardStmt to be BraceStmt");
     if (!RefinedRange.hasValue())
       return;
 
     // Create a new context for the fallthrough.
 
     auto *FallthroughTRC =
-          TypeRefinementContext::createForRequireStmtFallthrough(AC, RS,
+          TypeRefinementContext::createForGuardStmtFallthrough(AC, GS,
               ParentBrace, getCurrentTRC(), RefinedRange.getValue());
 
     pushContext(FallthroughTRC, ParentBrace);

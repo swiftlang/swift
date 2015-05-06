@@ -88,9 +88,9 @@ static void diagnoseUnreachable(const SILInstruction *I,
       return;
     }
 
-    if (auto *Require = L.getAsASTNode<RequireStmt>()) {
-      diagnose(Context, Require->getBody()->getEndLoc(),
-               diag::require_body_must_not_fallthrough);
+    if (auto *Guard = L.getAsASTNode<GuardStmt>()) {
+      diagnose(Context, Guard->getBody()->getEndLoc(),
+               diag::guard_body_must_not_fallthrough);
       return;
     }
   }

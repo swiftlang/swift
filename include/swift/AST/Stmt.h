@@ -560,29 +560,29 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::If; }
 };
 
-/// RequireStmt - require statement.  Evaluate a condition and if it fails, run
+/// GuardStmt - 'guard' statement.  Evaluate a condition and if it fails, run
 /// its body.  The body is always guaranteed to exit the current scope (or
 /// abort), it never falls through.
 ///
-class RequireStmt : public LabeledConditionalStmt {
-  SourceLoc RequireLoc;
+class GuardStmt : public LabeledConditionalStmt {
+  SourceLoc GuardLoc;
   Stmt *Body;
   
 public:
-  RequireStmt(SourceLoc RequireLoc, StmtCondition Cond,
-             Stmt *Body, Optional<bool> implicit = None)
-  : LabeledConditionalStmt(StmtKind::Require,
-                           getDefaultImplicitFlag(implicit, RequireLoc),
+  GuardStmt(SourceLoc GuardLoc, StmtCondition Cond,
+            Stmt *Body, Optional<bool> implicit = None)
+  : LabeledConditionalStmt(StmtKind::Guard,
+                           getDefaultImplicitFlag(implicit, GuardLoc),
                            LabeledStmtInfo(), Cond),
-    RequireLoc(RequireLoc), Body(Body) {}
+    GuardLoc(GuardLoc), Body(Body) {}
   
-  RequireStmt(SourceLoc RequireLoc, Expr *Cond, Stmt *Body,
-             Optional<bool> implicit, ASTContext &Ctx);
+  GuardStmt(SourceLoc GuardLoc, Expr *Cond, Stmt *Body,
+            Optional<bool> implicit, ASTContext &Ctx);
   
-  SourceLoc getRequireLoc() const { return RequireLoc; }
+  SourceLoc getGuardLoc() const { return GuardLoc; }
   
   SourceLoc getStartLoc() const {
-    return getLabelLocOrKeywordLoc(RequireLoc);
+    return getLabelLocOrKeywordLoc(GuardLoc);
   }
   SourceLoc getEndLoc() const {
     return Body->getEndLoc();
@@ -592,7 +592,7 @@ public:
   void setBody(Stmt *s) { Body = s; }
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Stmt *S) { return S->getKind() ==StmtKind::Require;}
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Guard; }
 };
 
   

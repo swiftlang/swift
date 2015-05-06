@@ -1854,8 +1854,8 @@ void PrintAST::visitIfStmt(IfStmt *stmt) {
     visit(elseStmt);
   }
 }
-void PrintAST::visitRequireStmt(RequireStmt *stmt) {
-  Printer << "require ";
+void PrintAST::visitGuardStmt(GuardStmt *stmt) {
+  Printer << "guard ";
   // FIXME: print condition
   Printer << " ";
   visit(stmt->getBody());

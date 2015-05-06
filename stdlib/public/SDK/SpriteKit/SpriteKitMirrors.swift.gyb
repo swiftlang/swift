@@ -34,7 +34,7 @@ ${MirrorDecl} {
   var quickLookObject: QuickLookObject? {
       // this code comes straight from the quicklooks
       
-      require let data = (_value as AnyObject)._copyImageData?() else { return nil }
+      guard let data = (_value as AnyObject)._copyImageData?() else { return nil }
       // we could send a Raw, but I don't want to make a copy of the
       // bytes for no good reason make an NSImage out of them and
       // send that

@@ -154,8 +154,7 @@ public struct Mirror {
 
     // Walk up the chain of mirrors/classes until we find staticSubclass
     while let superclass: AnyClass? = _getSuperclass(cls) {
-      require let superclassMirror = clsMirror._superMirror()
-        else { break }
+      guard let superclassMirror = clsMirror._superMirror() else { break }
       
       if superclass == targetSuperclass { return superclassMirror }
       

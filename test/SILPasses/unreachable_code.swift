@@ -318,14 +318,14 @@ class r20097963MyClass {
 func die() { die() }
 
 func testRequire(a : Int) {
-  require case 4 = a else {  }  // expected-error {{require body may not fall through}}
+  guard case 4 = a else {  }  // expected-error {{'guard' body may not fall through}}
 
-  require case 4 = a else { return }  // ok
-  require case 4 = a else { die() }  // ok
-  require case 4 = a else { fatalError("baaad") }  // ok
+  guard case 4 = a else { return }  // ok
+  guard case 4 = a else { die() }  // ok
+  guard case 4 = a else { fatalError("baaad") }  // ok
 
   for i in 0...100 {
-    require case 4 = a else { continue } // ok
+    guard case 4 = a else { continue } // ok
   }
 }
 

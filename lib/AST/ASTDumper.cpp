@@ -1096,8 +1096,8 @@ public:
     OS << ')';
   }
   
-  void visitRequireStmt(RequireStmt *S) {
-    OS.indent(Indent) << "(require_stmt\n";
+  void visitGuardStmt(GuardStmt *S) {
+    OS.indent(Indent) << "(guard_stmt\n";
     for (auto elt : S->getCond())
       printRec(elt);
     OS << '\n';

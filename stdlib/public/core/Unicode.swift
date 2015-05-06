@@ -656,7 +656,7 @@ public struct UTF32 : UnicodeCodecType {
   static func _decode<
     G : GeneratorType where G.Element == CodeUnit
   >(inout input: G) -> UnicodeDecodingResult {
-    require let x = input.next() else { return .EmptyInput }
+    guard let x = input.next() else { return .EmptyInput }
     if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
       return .Result(UnicodeScalar(x))
     } else {

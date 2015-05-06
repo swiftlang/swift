@@ -184,8 +184,8 @@ ERROR(return_from_noreturn,sil_analysis,none,
       "return from a 'noreturn' function", ())
 ERROR(non_exhaustive_switch,sil_analysis,none, 
       "switch must be exhaustive, consider adding a default clause", ())
-ERROR(require_body_must_not_fallthrough,sil_analysis,none,
-      "require body may not fall through", ())
+ERROR(guard_body_must_not_fallthrough,sil_analysis,none,
+      "'guard' body may not fall through", ())
 WARNING(unreachable_code,sil_analysis,none, "will never be executed", ())
 NOTE(unreachable_code_branch,sil_analysis,none,
      "condition always evaluates to %select{false|true}0", (bool))

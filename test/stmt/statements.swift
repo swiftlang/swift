@@ -354,24 +354,24 @@ class SomeTestClass {
 func test_require(x : Int, y : Int??, cond : Bool) {
   
   // These are all ok.
-  require let a = y else {}
+  guard let a = y else {}
   markUsed(a)
-  require let b = y where cond else {}
-  require case let c = x where cond else {}
-  require case let Optional.Some(d) = y else {}
-  require x != 4, case _ = x else { }
+  guard let b = y where cond else {}
+  guard case let c = x where cond else {}
+  guard case let Optional.Some(d) = y else {}
+  guard x != 4, case _ = x else { }
 
 
-  require let e where cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
-  require case let f? : Int? where cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
+  guard let e where cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
+  guard case let f? : Int? where cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
 
-  require let g = y else {
-    markUsed(g)  // expected-error {{variable declared in 'require' condition is not usable in its body}}
+  guard let g = y else {
+    markUsed(g)  // expected-error {{variable declared in 'guard' condition is not usable in its body}}
   }
 
-  require let h = y where cond {}  // expected-error {{expected 'else' after 'require' condition}}
+  guard let h = y where cond {}  // expected-error {{expected 'else' after 'guard' condition}}
 
 
-  require case _ = x else {}  // expected-warning {{'require' condition is always true, body is unreachable}}
+  guard case _ = x else {}  // expected-warning {{'guard' condition is always true, body is unreachable}}
 }
 

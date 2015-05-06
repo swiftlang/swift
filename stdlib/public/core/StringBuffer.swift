@@ -91,7 +91,7 @@ public struct _StringBuffer {
   ) -> (_StringBuffer?, hadError: Bool) {
     // Determine how many UTF-16 code units we'll need
     var inputStream = input.generate()
-    require let (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream,
+    guard let (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream,
         repairIllFormedSequences: repairIllFormedSequences) else {
       return (.None, true)
     }

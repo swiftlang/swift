@@ -178,7 +178,7 @@ bool LabeledStmt::isPossibleContinueTarget() const {
   // Sema has diagnostics with hard-coded expectations about what
   // statements return false from this method.
   case StmtKind::If:
-  case StmtKind::Require:
+  case StmtKind::Guard:
   case StmtKind::Switch:
     return false;
 
@@ -203,7 +203,7 @@ bool LabeledStmt::requiresLabelOnJump() const {
   case StmtKind::If:
   case StmtKind::Do:
   case StmtKind::DoCatch:
-  case StmtKind::Require: // Require doesn't allow labels, so no break/continue.
+  case StmtKind::Guard: // Guard doesn't allow labels, so no break/continue.
     return true;
 
   case StmtKind::RepeatWhile:
@@ -311,9 +311,9 @@ IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
            implicit) {
 }
 
-RequireStmt::RequireStmt(SourceLoc RequireLoc, Expr *Cond, Stmt *Body,
-                       Optional<bool> implicit, ASTContext &Ctx)
-  : RequireStmt(RequireLoc, exprToCond(Cond, Ctx), Body, implicit) {
+GuardStmt::GuardStmt(SourceLoc GuardLoc, Expr *Cond, Stmt *Body,
+                     Optional<bool> implicit, ASTContext &Ctx)
+  : GuardStmt(GuardLoc, exprToCond(Cond, Ctx), Body, implicit) {
     
 }
   

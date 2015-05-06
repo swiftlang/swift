@@ -167,8 +167,8 @@ public:
       return transformBraceStmt(llvm::cast<BraceStmt>(S));
     case StmtKind::If:
       return transformIfStmt(llvm::cast<IfStmt>(S));
-    case StmtKind::Require:
-      return transformRequireStmt(llvm::cast<RequireStmt>(S));
+    case StmtKind::Guard:
+      return transformGuardStmt(llvm::cast<GuardStmt>(S));
     case StmtKind::While: {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
         return transformWhileStmt(llvm::cast<WhileStmt>(S));
@@ -212,10 +212,10 @@ public:
     return IS;
   }
   
-  RequireStmt *transformRequireStmt(RequireStmt *US) {
-    if (Stmt *BS = US->getBody())
-      US->setBody(transformStmt(BS));
-    return US;
+  GuardStmt *transformGuardStmt(GuardStmt *GS) {
+    if (Stmt *BS = GS->getBody())
+      GS->setBody(transformStmt(BS));
+    return GS;
   }
 
   WhileStmt *transformWhileStmt(WhileStmt *WS) {

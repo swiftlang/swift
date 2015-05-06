@@ -1048,11 +1048,11 @@ if let _ = injectToOptional(5) where #available(OSX 10.10, *), // expected-note 
 }
 
 
-// Tests for the require control construct.
+// Tests for the guard control construct.
 
-func useRequireAvailable() {
-  // Require  fallthrough should refine context
-  require #available(OSX 10.10, *) else { // expected-note {{enclosing scope here}}
+func useGuardAvailable() {
+  // Guard fallthrough should refine context
+  guard #available(OSX 10.10, *) else { // expected-note {{enclosing scope here}}
     let _ = globalFuncAvailableOn10_10() // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
         // expected-note@-1 {{guard with version check}}
         // expected-note@-2 {{add @availability attribute to enclosing global function}}
@@ -1069,7 +1069,7 @@ func useRequireAvailable() {
   }
 
   if globalFuncAvailableOn10_10() > 0 {
-    require #available(OSX 10.11, *),
+    guard #available(OSX 10.11, *),
             let x = injectToOptional(globalFuncAvailableOn10_11()) else { return }
   }
 

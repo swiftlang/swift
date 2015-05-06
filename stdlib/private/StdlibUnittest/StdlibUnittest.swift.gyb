@@ -75,7 +75,7 @@ public struct SourceLocStack {
 }
 
 func _printStackTrace(stackTrace: SourceLocStack?) {
-  require let s = stackTrace else { return }
+  guard let s = stackTrace else { return }
   println("stacktrace:")
   for i in 0..<s.locs.count {
     let loc = s.locs[s.locs.count - i - 1]

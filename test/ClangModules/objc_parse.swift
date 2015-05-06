@@ -297,9 +297,9 @@ func customAccessors(hive: Hive, bee: B) {
   markUsed(hive.isMakingHoney()) // expected-error{{'Hive' does not have a member named 'isMakingHoney'}}
   hive.setMakingHoney(true) // expected-error{{'Hive' does not have a member named 'setMakingHoney'}}
 
-  hive.guard.description // okay
-  hive.guard.description! // no-warning
-  hive.guard = bee // no-warning
+  hive.`guard`.description // okay
+  hive.`guard`.description! // no-warning
+  hive.`guard` = bee // no-warning
 }
 
 // instancetype/Dynamic Self invocation.

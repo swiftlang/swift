@@ -81,8 +81,8 @@ TypeRefinementContext::createForConditionFollowingQuery(ASTContext &Ctx,
 }
 
 TypeRefinementContext *
-TypeRefinementContext::createForRequireStmtFallthrough(ASTContext &Ctx,
-                                  RequireStmt *RS,
+TypeRefinementContext::createForGuardStmtFallthrough(ASTContext &Ctx,
+                                  GuardStmt *RS,
                                   BraceStmt *ContainingBraceStmt,
                                   TypeRefinementContext *Parent,
                                   const VersionRange &Versions) {
@@ -141,8 +141,8 @@ SourceLoc TypeRefinementContext::getIntroductionLoc() const {
   case Reason::ConditionFollowingAvailabilityQuery:
     return cast<AvailabilityQueryExpr>(Node.get<Expr *>())->getLoc();
 
-  case Reason::RequireStmtFallthrough:
-    return cast<RequireStmt>(Node.get<Stmt *>())->getRequireLoc();
+  case Reason::GuardStmtFallthrough:
+    return cast<GuardStmt>(Node.get<Stmt *>())->getGuardLoc();
 
   case Reason::Root:
     return SourceLoc();
@@ -196,8 +196,8 @@ TypeRefinementContext::Reason TypeRefinementContext::getReason() const {
       return Reason::IfStmtThenBranch;
     }
 
-    if (isa<RequireStmt>(S)) {
-      return Reason::RequireStmtFallthrough;
+    if (isa<GuardStmt>(S)) {
+      return Reason::GuardStmtFallthrough;
     }
   } else if (Node.is<SourceFile *>()) {
     return Reason::Root;
@@ -219,7 +219,7 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
   case Reason::ConditionFollowingAvailabilityQuery:
     return "condition_following_availability";
 
-  case Reason::RequireStmtFallthrough:
-    return "require_fallthrough";
+  case Reason::GuardStmtFallthrough:
+    return "guard_fallthrough";
   }
 }

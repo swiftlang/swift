@@ -3811,7 +3811,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
   if (WhereLoc.isValid() || ElseLoc.isValid()) {
     diagnose(VarLoc, diag::let_else_rename)
-      .fixItInsert(VarLoc, "require case ");
+      .fixItInsert(VarLoc, "guard case ");
   }
   
   // NOTE: At this point, the DoAtScopeExit object is destroyed and the PBD

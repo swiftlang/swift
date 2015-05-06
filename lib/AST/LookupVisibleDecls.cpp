@@ -714,7 +714,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     if (S->getElseStmt())
       visit(S->getElseStmt());
   }
-  void visitRequireStmt(RequireStmt *S) {
+  void visitGuardStmt(GuardStmt *S) {
     checkStmtCondition(S->getCond());
     visit(S->getBody());
   }
