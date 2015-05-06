@@ -7,6 +7,7 @@ func f3(Int...) -> Int { }
 class A { }
 class B : A { 
   func iAmAB() {}
+  func createB() -> B { return B() }
 }
 
 func f4() -> B { }
@@ -52,6 +53,11 @@ func forgotOptionalBang(a: A, obj: AnyObject) {
 
   var a = A(), b = B()
   b = a as? B  // expected-error{{value of optional type 'B?' not unwrapped; did you mean to use '!' or '?'?}}{{7-7=(}}{{14-14=)!}}
+
+  // rdar://problem/20377684 -- take care that the '!' doesn't fall into an
+  // optional evaluation context
+  let bo: B? = b
+  let b2: B = bo?.createB() // expected-error{{value of optional type 'B?' not unwrapped; did you mean to use '!' or '?'?}}{{15-15=(}}{{28-28=)!}}
 }
 
 func forgotAnyObjectBang(obj: AnyObject) {

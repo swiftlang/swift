@@ -5905,7 +5905,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         auto diag = TC.diagnose(affected->getLoc(),
                                 diag::missing_unwrap_optional, type);
         bool parensNeeded = (getInfixData(DC, affected).getPrecedence() <
-                             IntrinsicPrecedences::PostfixUnaryExpr);
+                                IntrinsicPrecedences::PostfixUnaryExpr) ||
+                            isa<OptionalEvaluationExpr>(affected);
         if (parensNeeded) {
           diag.fixItInsert(affected->getStartLoc(), "(")
               .fixItInsertAfter(affected->getEndLoc(), ")!");
