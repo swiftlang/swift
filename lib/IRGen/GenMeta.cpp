@@ -4463,6 +4463,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::_BuiltinStringLiteralConvertible:
   case KnownProtocolKind::_BuiltinUTF16StringLiteralConvertible:
   case KnownProtocolKind::_BuiltinUnicodeScalarLiteralConvertible:
+  case KnownProtocolKind::_OptionSetType:
     return SpecialProtocol::None;
   }
 }
