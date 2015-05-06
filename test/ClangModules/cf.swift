@@ -97,3 +97,25 @@ func testBannedImported(object: CCOpaqueTypeRef) {
   CCRetain(object) // expected-error {{'CCRetain' is unavailable: Core Foundation objects are automatically memory managed}}
   CCRelease(object) // expected-error {{'CCRelease' is unavailable: Core Foundation objects are automatically memory managed}}
 }
+
+func testOutParametersGood() {
+  var fridge: CCRefrigerator?
+  CCRefrigeratorCreateIndirect(&fridge)
+
+  var power: CCPowerSupply?
+  CCRefrigeratorGetPowerSupplyIndirect(fridge!, &power)
+
+  var item: Unmanaged<CCItem>?
+  CCRefrigeratorGetItemUnaudited(fridge!, 0, &item)
+}
+
+func testOutParametersBad() {
+  var fridge: CCRefrigerator?
+  CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot invoke}} expected-note {{'(UnsafeMutablePointer<CCRefrigerator?>)'}}
+
+  var power: CCPowerSupply?
+  CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot invoke}} expected-note {{'(CCRefrigerator!, AutoreleasingUnsafeMutablePointer<CCPowerSupply?>)'}}
+
+  var item: CCItem?
+  CCRefrigeratorGetItemUnaudited(0, 0, item) // expected-error {{cannot invoke}} expected-note {{'(CCRefrigerator!, UInt32, UnsafeMutablePointer<Unmanaged<CCItem>?>)'}}
+}

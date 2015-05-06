@@ -128,7 +128,19 @@ enum class ImportTypeKind {
   /// among other things, and enables the conversion of bridged types.
   /// Parameters are always considered CF-audited.
   Parameter,
-  
+
+  /// \brief Import the type of a parameter declared with
+  /// \c CF_RETURNS_RETAINED.
+  ///
+  /// This ensures that the parameter is not marked as Unmanaged.
+  CFRetainedOutParameter,
+
+  /// \brief Import the type of a parameter declared with
+  /// \c CF_RETURNS_NON_RETAINED.
+  ///
+  /// This ensures that the parameter is not marked as Unmanaged.
+  CFUnretainedOutParameter,
+
   /// \brief Import the type pointed to by a pointer or reference.
   ///
   /// This provides special treatment for pointer-to-ObjC-pointer

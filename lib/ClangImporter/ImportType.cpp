@@ -894,6 +894,54 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   if (Type result = maybeImportNSErrorPointer())
     return result;
 
+  auto maybeImportCFOutParameter = [&]() -> Type {
+    if (importKind != ImportTypeKind::CFRetainedOutParameter &&
+        importKind != ImportTypeKind::CFUnretainedOutParameter) {
+      return Type();
+    }
+
+    PointerTypeKind PTK;
+    auto elementType = importedType->getAnyPointerElementType(PTK);
+    if (!elementType || PTK != PTK_UnsafeMutablePointer)
+      return Type();
+
+    OptionalTypeKind OTK;
+    auto insideOptionalType = elementType->getAnyOptionalObjectType(OTK);
+    if (!insideOptionalType)
+      insideOptionalType = elementType;
+
+    auto boundGenericTy = insideOptionalType->getAs<BoundGenericType>();
+    if (!boundGenericTy)
+      return Type();
+
+    auto boundGenericBase = boundGenericTy->getDecl();
+    if (boundGenericBase->getName().str() != "Unmanaged" ||
+        boundGenericBase->getModuleContext() != impl.getStdlibModule()) {
+      return Type();
+    }
+
+    assert(boundGenericTy->getGenericArgs().size() == 1 &&
+           "signature of Unmanaged has changed");
+
+    auto resultTy = boundGenericTy->getGenericArgs().front();
+    if (OTK != OTK_None)
+      resultTy = OptionalType::get(OTK, resultTy);
+
+    StringRef pointerName;
+    if (importKind == ImportTypeKind::CFRetainedOutParameter)
+      pointerName = "UnsafeMutablePointer";
+    else
+      pointerName = "AutoreleasingUnsafeMutablePointer";
+
+    resultTy = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
+                                                    pointerName,
+                                                    resultTy);
+    return resultTy;
+  };
+  if (Type outParamTy = maybeImportCFOutParameter()) {
+    importedType = outParamTy;
+  }
+
   // Turn block pointer types back into normal function types in any
   // context where bridging is possible, unless the block has a typedef.
   if (hint == ImportHint::Block && canBridgeTypes(importKind) &&
@@ -1197,8 +1245,14 @@ Type ClangImporter::Implementation::importFunctionType(
                              knownFn->getParamTypeInfo(index));
     }
 
+    ImportTypeKind importKind = ImportTypeKind::Parameter;
+    if (param->hasAttr<clang::CFReturnsRetainedAttr>())
+      importKind = ImportTypeKind::CFRetainedOutParameter;
+    else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
+      importKind = ImportTypeKind::CFUnretainedOutParameter;
+
     // Import the parameter type into Swift.
-    Type swiftParamTy = importType(paramTy, ImportTypeKind::Parameter,
+    Type swiftParamTy = importType(paramTy, importKind,
                                    isFromSystemModule, OptionalityOfParam);
     if (!swiftParamTy)
       return Type();
@@ -1680,9 +1734,13 @@ Type ClangImporter::Implementation::importMethodType(
                                 isFromSystemModule,
                                 optionalityOfParam);
     } else {
-      swiftParamTy = importType(paramTy,
-                                ImportTypeKind::Parameter,
-                                isFromSystemModule,
+      ImportTypeKind importKind = ImportTypeKind::Parameter;
+      if (param->hasAttr<clang::CFReturnsRetainedAttr>())
+        importKind = ImportTypeKind::CFRetainedOutParameter;
+      else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
+        importKind = ImportTypeKind::CFUnretainedOutParameter;
+      
+      swiftParamTy = importType(paramTy, importKind, isFromSystemModule,
                                 optionalityOfParam);
     }
     if (!swiftParamTy)
