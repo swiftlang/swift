@@ -183,7 +183,7 @@ var c2f2: C2<[Float]>? = b as! C3
 var f: Float -> Float = { $0 as Float }
 var f2: B -> Bool = { $0 is D }
 
-func metatype_casts<T, U>(b: B.Type, t:T.Type, u: U.Type) {
+func metatype_casts<T, U>(b: B.Type) {
   let x1 = b is D.Type
   let x2 = T.self is U.Type
   let x3 = T.self.dynamicType is U.Type.Type

@@ -51,7 +51,7 @@ func zim() {}
 @transparent
 func zang()() {}
 @transparent
-func zung<T>(_: T) {}
+func zung<T>() {}
 @transparent // expected-error{{@transparent cannot be applied to stored properties}}
 var zippity : Int
 func zoom(x: @transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}}

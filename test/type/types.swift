@@ -47,7 +47,7 @@ var bad_io : (Int) -> (inout Int, Int)  // expected-error {{'inout' is only vali
 func bad_io2(a: (inout Int, Int)) {}    // expected-error {{'inout' is only valid in parameter lists}}
 
 // <rdar://problem/15588967> Array type sugar default construction syntax doesn't work
-func test_array_construct<T>(_: T) {
+func test_array_construct<T>() {
   var a = [T]()   // 'T' is a local name
   var b = [Int]()  // 'Int is a global name'
   var c = [UnsafeMutablePointer<Int>]()  // UnsafeMutablePointer<Int> is a specialized name.
@@ -59,7 +59,7 @@ func test_array_construct<T>(_: T) {
 }
 
 // <rdar://problem/15295763> default constructing an optional fails to typecheck
-func test_optional_construct<T>(_: T) {
+func test_optional_construct<T>() {
   var a = T?()    // Local name.
   var b = Int?()  // Global name
   var c = (Int?)() // Parenthesized name.

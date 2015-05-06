@@ -68,10 +68,10 @@ func goodTest2b(a: Swift.Int, withInt b: Swift.Int) {}
 
 func goodTest3() -> Swift.Int {}
 
-func goodTest4<T : diag_values_of_module_type_foo.SomeProtocol>(_: T) {}
+func goodTest4<T : diag_values_of_module_type_foo.SomeProtocol>() {}
 
 func goodTest5<T : diag_values_of_module_type_foo.SomeProtocol
-               where T.Foo == Swift.Int>(_: T) {}
+               where T.Foo == Swift.Int>() {}
 
 //===--- Disallowed uses of module names.
 

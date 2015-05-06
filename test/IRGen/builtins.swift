@@ -203,8 +203,8 @@ func sizeof_alignof_test() {
 
 }
 
-// CHECK: define hidden void @_TF8builtins27generic_sizeof_alignof_testU__FQ_T_(
-func generic_sizeof_alignof_test<T>(_: T) {
+// CHECK: define hidden void @_TF8builtins27generic_sizeof_alignof_testU__FT_T_(
+func generic_sizeof_alignof_test<T>() {
   // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 17
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
@@ -219,8 +219,8 @@ func generic_sizeof_alignof_test<T>(_: T) {
   var a = Builtin.alignof(T.self)
 }
 
-// CHECK: define hidden void @_TF8builtins21generic_strideof_testU__FQ_T_(
-func generic_strideof_test<T>(_: T) {
+// CHECK: define hidden void @_TF8builtins21generic_strideof_testU__FT_T_(
+func generic_strideof_test<T>() {
   // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 19
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
@@ -228,8 +228,8 @@ func generic_strideof_test<T>(_: T) {
   var s = Builtin.strideof(T.self)
 }
 
-// CHECK: define hidden void @_TF8builtins29generic_strideof_nonzero_testU__FQ_T_(
-func generic_strideof_nonzero_test<T>(_: T) {
+// CHECK: define hidden void @_TF8builtins29generic_strideof_nonzero_testU__FT_T_(
+func generic_strideof_nonzero_test<T>() {
   // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 19
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
@@ -388,7 +388,7 @@ struct S {}
 protocol P {}
 
 // CHECK-LABEL: define hidden void @_TF8builtins10canBeClass
-func canBeClass<T>(f: (Builtin.Int8) -> (), _: T) {
+func canBeClass<T>(f: (Builtin.Int8) -> ()) {
   // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(O.self))
   // CHECK: call void {{%.*}}(i8 1
@@ -427,10 +427,10 @@ func destroyNonPODArray(array: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.destroyArray(C.self, array, count)
 }
 
-// CHECK-LABEL: define hidden void @_TF8builtins15destroyGenArrayU__FTBp5countBwQ__T_(i8*, i64, %swift.opaque*, %swift.type* %T)
+// CHECK-LABEL: define hidden void @_TF8builtins15destroyGenArray{{.*}}(i8*, i64, %swift.type* %T)
 // CHECK-NOT:   loop:
 // CHECK:         call void %destroyArray
-func destroyGenArray<T>(array: Builtin.RawPointer, count: Builtin.Word, _: T) {
+func destroyGenArray<T>(array: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.destroyArray(T.self, array, count)
 }
 
@@ -482,14 +482,14 @@ func copyNonPODArray(dest: Builtin.RawPointer, src: Builtin.RawPointer, count: B
   Builtin.takeArrayBackToFront(W.self, dest, src, count)
 }
 
-// CHECK-LABEL: define hidden void @_TF8builtins12copyGenArray{{.*}}(i8*, i8*, i64, %swift.opaque*, %swift.type* %T) {{.*}} {
+// CHECK-LABEL: define hidden void @_TF8builtins12copyGenArray{{.*}}(i8*, i8*, i64, %swift.type* %T)
 // CHECK-NOT:   loop:
 // CHECK:         call %swift.opaque* %initializeArrayWithCopy
 // CHECK-NOT:   loop:
 // CHECK:         call %swift.opaque* %initializeArrayWithTakeFrontToBack
 // CHECK-NOT:   loop:
 // CHECK:         call %swift.opaque* %initializeArrayWithTakeBackToFront
-func copyGenArray<T>(dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word, _: T) {
+func copyGenArray<T>(dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.copyArray(T.self, dest, src, count)
   Builtin.takeArrayFrontToBack(T.self, dest, src, count)
   Builtin.takeArrayBackToFront(T.self, dest, src, count)

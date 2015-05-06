@@ -134,10 +134,10 @@ protocol HasAssocType {
   typealias Assoc
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling4fooAUS_12HasAssocType_U__FQ_T_ : $@convention(thin) <T where T : HasAssocType> (@in T) -> ()
-func fooA<T: HasAssocType>(_: T) {}
-// CHECK-LABEL: sil hidden @_TF8mangling4fooBUS_12HasAssocType_US_9AssocReqt__FQ_T_ : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in T) -> ()
-func fooB<T: HasAssocType where T.Assoc: AssocReqt>(_: T) {}
+// CHECK-LABEL: sil hidden @_TF8mangling4fooAUS_12HasAssocType_U__FT_T_ : $@convention(thin) <T where T : HasAssocType> () -> ()
+func fooA<T: HasAssocType>() {}
+// CHECK-LABEL: sil hidden @_TF8mangling4fooBUS_12HasAssocType_US_9AssocReqt__FT_T_ : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> () -> ()
+func fooB<T: HasAssocType where T.Assoc: AssocReqt>() {}
 
 // CHECK-LABEL: sil hidden @_TZF8manglingoi2qqFTSiSi_T_
 func ??(x: Int, y: Int) {}

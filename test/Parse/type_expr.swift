@@ -104,7 +104,7 @@ func genQualifiedType() {
   let badMetaTy = Gen<Foo>.Bar.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
 }
 
-func archetype<T: Zim>(_: T) {
+func archetype<T: Zim>() {
   let ty = T.self
   let cons = T()
   // TODO let prop = T.prop
@@ -115,7 +115,7 @@ func archetype<T: Zim>(_: T) {
   let badMetaTy = T.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
 }
 
-func assocType<T: Zim where T.Zang: Zim>(_: T) {
+func assocType<T: Zim where T.Zang: Zim>() {
   let ty = T.Zang.self
   let cons = T.Zang()
   // TODO let prop = T.Zang.prop

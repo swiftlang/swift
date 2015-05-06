@@ -43,7 +43,7 @@ func downcast_archetype<T : B>(b: B) -> T {
 }
 
 // CHECK-LABEL: sil hidden @_TF5casts12is_archetype
-func is_archetype<T : B>(b: B, _: T) -> Bool {
+func is_archetype<T : B>(b: B) -> Bool {
   // CHECK: checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   // CHECK: [[YES]]({{%.*}}):
   // CHECK:   integer_literal {{.*}} -1

@@ -20,13 +20,13 @@ func recover_missing_parameter_tuple_1a // expected-error {{expected '(' in argu
 {
 }
 
-func recover_missing_parameter_tuple_2<T> { // expected-error {{expected '(' in argument list of function declaration}} expected-error {{There is no way to infer the generic parameter 'T' if it is not used in function signature}}
+func recover_missing_parameter_tuple_2<T> { // expected-error {{expected '(' in argument list of function declaration}}
 }
 
 func recover_missing_parameter_tuple_3 -> Int { // expected-error {{expected '(' in argument list of function declaration}}
 }
 
-func recover_missing_parameter_tuple_4<T> -> Int { // expected-error {{expected '(' in argument list of function declaration}} expected-error {{There is no way to infer the generic parameter 'T' if it is not used in function signature}}
+func recover_missing_parameter_tuple_4<T> -> Int { // expected-error {{expected '(' in argument list of function declaration}}
 }
 
 //===--- Check that we recover when the function return type is missing.

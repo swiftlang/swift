@@ -17,7 +17,7 @@ func opaque_archetype_to_opaque_archetype
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts36opaque_archetype_is_opaque_archetype{{.*}}
 func opaque_archetype_is_opaque_archetype
-<T:NotClassBound, U>(t:T, u:U.Type) -> Bool {
+<T:NotClassBound, U>(t:T) -> Bool {
   return t is U
   // CHECK:   checked_cast_addr_br take_always T in [[VAL:%.*]]#1 : $*T to U in [[DEST:%.*]]#1 : $*U, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   // CHECK: [[YES]]:
@@ -47,7 +47,7 @@ func opaque_archetype_to_class_archetype
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts35opaque_archetype_is_class_archetype{{.*}}
 func opaque_archetype_is_class_archetype
-<T:NotClassBound, U:ClassBound> (t:T, u:U.Type) -> Bool {
+<T:NotClassBound, U:ClassBound> (t:T) -> Bool {
   return t is U
   // CHECK: copy_addr {{.*}} : $*T
   // CHECK: checked_cast_addr_br take_always T in [[VAL:%.*]] : {{.*}} to U
@@ -63,7 +63,7 @@ func class_archetype_to_class_archetype
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts34class_archetype_is_class_archetype{{.*}}
 func class_archetype_is_class_archetype
-<T:ClassBound, U:ClassBound>(t:T, u:U.Type) -> Bool {
+<T:ClassBound, U:ClassBound>(t:T) -> Bool {
   return t is U
   // CHECK: checked_cast_br [[VAL:%.*]] : {{.*}} to $U
 }
@@ -130,7 +130,7 @@ func opaque_existential_to_opaque_archetype
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts38opaque_existential_is_opaque_archetype{{.*}}
 func opaque_existential_is_opaque_archetype
-<T:NotClassBound>(p:NotClassBound, _: T) -> Bool {
+<T:NotClassBound>(p:NotClassBound) -> Bool {
   return p is T
   // CHECK:   checked_cast_addr_br take_always NotClassBound in [[CONTAINER:%.*]] : {{.*}} to T in
 }
@@ -146,7 +146,7 @@ func opaque_existential_to_class_archetype
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts37opaque_existential_is_class_archetype{{.*}}
 func opaque_existential_is_class_archetype
-<T:ClassBound>(p:NotClassBound, _: T) -> Bool {
+<T:ClassBound>(p:NotClassBound) -> Bool {
   return p is T
   // CHECK: checked_cast_addr_br take_always NotClassBound in {{%.*}} : $*NotClassBound to T in
 }
@@ -161,7 +161,7 @@ func class_existential_to_class_archetype
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts36class_existential_is_class_archetype{{.*}}
 func class_existential_is_class_archetype
-<T:ClassBound>(p:ClassBound, _: T) -> Bool {
+<T:ClassBound>(p:ClassBound) -> Bool {
   return p is T
   // CHECK: checked_cast_br {{%.*}} to $T
 }

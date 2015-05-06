@@ -271,7 +271,7 @@ class ConcreteContext2 {
   class subject_inConcreteContext {}
 }
 
-func genericContext1<T>(_: T) {
+func genericContext1<T>() {
   @objc
   class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
 
