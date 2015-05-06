@@ -2467,11 +2467,29 @@ bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 /// trailing closure.
 bool hasTrailingClosure(const ConstraintLocatorBuilder &locator);
 
-/// Compute an argument or parameter type into an array of tuple type elements.
+/// A call argument or parameter.
+struct LLVM_LIBRARY_VISIBILITY CallArgParam {
+  /// The type of the argument or parameter. For a variadic parameter,
+  /// this is the element type.
+  Type Ty;
+
+  // The label associated with the argument or parameter, if any.
+  Identifier Label;
+
+  /// Whether the parameter has a default argument. Not valid for parameters.
+  bool HasDefaultArgument = false;
+
+  /// Whether the parameter is variadic. Not valid for parameters.
+  bool Variadic = false;
+
+  /// Whether the argument or parameter has a label.
+  bool hasLabel() const { return !Label.empty(); }
+};
+
+/// Compute an argument or parameter type into an array of \c CallArgParams.
 ///
 /// \param type The type to decompose.
-/// \param scalar A \c TupleTypeElt to be used for scratch space for scalars.
-ArrayRef<TupleTypeElt> decomposeArgParamType(Type type, TupleTypeElt &scalar);
+SmallVector<CallArgParam, 4> decomposeArgParamType(Type type);
 
 /// Describes the arguments to which a parameter binds.
 /// FIXME: This is an awful data structure. We want the equivalent of a
@@ -2514,8 +2532,8 @@ public:
 /// Match the call arguments (as described by the given argument type) to
 /// the parameters (as described by the given parameter type).
 ///
-/// \param argTuple The elements in the argument tuple.
-/// \param paramTuple The elements in the parameter tuple.
+/// \param argTuple The arguments.
+/// \param paramTuple The parameters.
 /// \param hasTrailingClosure Whether the last argument is a trailing closure.
 /// \param allowFixes Whether to allow fixes when matching arguments.
 ///
@@ -2525,8 +2543,8 @@ public:
 /// \param parameterBindings Will be populated with the arguments that are
 /// bound to each of the parameters.
 /// \returns true if the call arguments could not be matched to the parameters.
-bool matchCallArguments(ArrayRef<TupleTypeElt> argTuple,
-                        ArrayRef<TupleTypeElt> paramTuple,
+bool matchCallArguments(ArrayRef<CallArgParam> argTuple,
+                        ArrayRef<CallArgParam> paramTuple,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,

@@ -82,37 +82,54 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
-ArrayRef<TupleTypeElt> constraints::decomposeArgParamType(Type type,
-                                                          TupleTypeElt &scalar){
+SmallVector<CallArgParam, 4> constraints::decomposeArgParamType(Type type) {
+  SmallVector<CallArgParam, 4> result;
   switch (type->getKind()) {
   case TypeKind::Tuple:
-    return cast<TupleType>(type.getPointer())->getElements();
+    for (const auto &elt : cast<TupleType>(type.getPointer())->getElements()) {
+      CallArgParam argParam;
+      argParam.Ty = elt.isVararg() ? elt.getVarargBaseTy() : elt.getType();
+      argParam.Label = elt.getName();
+      argParam.HasDefaultArgument
+        = elt.getDefaultArgKind() != DefaultArgumentKind::None;
+      argParam.Variadic = elt.isVararg();
+      result.push_back(argParam);
+    }
+    break;
 
-  case TypeKind::Paren:
-    scalar = cast<ParenType>(type.getPointer())->getUnderlyingType();
-    return scalar;
-
-  default:
-    scalar = type;
-    return scalar;
+  case TypeKind::Paren: {
+    CallArgParam argParam;
+    argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
+    result.push_back(argParam);
+    break;
   }
+
+  default: {
+    CallArgParam argParam;
+    argParam.Ty = type;
+    result.push_back(argParam);
+    break;
+  }
+  }
+
+  return result;
 }
 
 bool constraints::matchCallArguments(
-       ArrayRef<TupleTypeElt> argTuple,
-       ArrayRef<TupleTypeElt> paramTuple,
+       ArrayRef<CallArgParam> args,
+       ArrayRef<CallArgParam> params,
        bool hasTrailingClosure,
        bool allowFixes,
        MatchCallArgumentListener &listener,
        SmallVectorImpl<ParamBinding> &parameterBindings) {
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
-  unsigned paramIdx, numParams = paramTuple.size();
+  unsigned paramIdx, numParams = params.size();
   parameterBindings.clear();
   parameterBindings.resize(numParams);
 
   // Keep track of which arguments we have claimed from the argument tuple.
-  unsigned nextArgIdx = 0, numArgs = argTuple.size();
+  unsigned nextArgIdx = 0, numArgs = args.size();
   SmallVector<bool, 4> claimedArgs(numArgs, false);
   SmallVector<Identifier, 4> actualArgNames;
   unsigned numClaimedArgs = 0;
@@ -133,18 +150,17 @@ bool constraints::matchCallArguments(
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argNumber] = expectedName;
-    } else if (argTuple[argNumber].getName() != expectedName &&
-               !ignoreNameClash) {
+    } else if (args[argNumber].Label != expectedName && !ignoreNameClash) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
       // Figure out previous argument names from the parameter bindings.
       for (unsigned i = 0; i != numParams; ++i) {
-        const auto &param = paramTuple[i];
+        const auto &param = params[i];
         bool firstArg = true;
 
         for (auto argIdx : parameterBindings[i]) {
-          actualArgNames[argIdx] = firstArg ? param.getName() : Identifier();
+          actualArgNames[argIdx] = firstArg ? param.Label : Identifier();
           firstArg = false;
         }
       }
@@ -181,7 +197,7 @@ bool constraints::matchCallArguments(
       // Nothing to claim.
       if (nextArgIdx == numArgs ||
           claimedArgs[nextArgIdx] ||
-          (argTuple[nextArgIdx].hasName() && !ignoreNameMismatch))
+          (args[nextArgIdx].hasLabel() && !ignoreNameMismatch))
         return None;
 
       return claim(name, nextArgIdx);
@@ -189,8 +205,7 @@ bool constraints::matchCallArguments(
 
     // If the name matches, claim this argument.
     if (nextArgIdx != numArgs &&
-        (ignoreNameMismatch ||
-         argTuple[nextArgIdx].getName() == name)) {
+        (ignoreNameMismatch || args[nextArgIdx].Label == name)) {
       return claim(name, nextArgIdx);
     }
 
@@ -199,7 +214,7 @@ bool constraints::matchCallArguments(
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       // Skip arguments where the name doesn't match.
-      if (argTuple[i].getName() != name)
+      if (args[i].Label != name)
         continue;
 
       // Skip claimed arguments.
@@ -239,7 +254,7 @@ bool constraints::matchCallArguments(
     }
 
     // Missing a keyword argument name.
-    if (nextArgIdx != numArgs && !argTuple[nextArgIdx].hasName()) {
+    if (nextArgIdx != numArgs && !args[nextArgIdx].hasLabel()) {
       // Claim the next argument.
       return claim(name, nextArgIdx);
     }
@@ -252,12 +267,12 @@ bool constraints::matchCallArguments(
   // the list.
   bool haveUnfulfilledParams = false;
   auto bindNextParameter = [&](bool ignoreNameMismatch) {
-    const auto &param = paramTuple[paramIdx];
+    const auto &param = params[paramIdx];
 
     // Handle variadic parameters.
-    if (param.isVararg()) {
+    if (param.Variadic) {
       // Claim the next argument with the name of this parameter.
-      auto claimed = claimNextNamed(param.getName(), ignoreNameMismatch);
+      auto claimed = claimNextNamed(param.Label, ignoreNameMismatch);
 
       // If there was no such argument, leave the argument unf
       if (!claimed) {
@@ -278,7 +293,7 @@ bool constraints::matchCallArguments(
     }
 
     // Try to claim an argument for this parameter.
-    if (auto claimed = claimNextNamed(param.getName(), ignoreNameMismatch)) {
+    if (auto claimed = claimNextNamed(param.Label, ignoreNameMismatch)) {
       parameterBindings[paramIdx].push_back(*claimed);
       skipClaimedArgs();
       return;
@@ -316,7 +331,7 @@ bool constraints::matchCallArguments(
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
     for (nextArgIdx = 0; skipClaimedArgs(), nextArgIdx != numArgs;
          ++nextArgIdx) {
-      if (argTuple[nextArgIdx].hasName())
+      if (args[nextArgIdx].hasLabel())
         unclaimedNamedArgs.push_back(nextArgIdx);
     }
 
@@ -326,7 +341,7 @@ bool constraints::matchCallArguments(
       bool hasUnfulfilledUnnamedParams = false;
       for (paramIdx = 0; paramIdx != numParams; ++paramIdx ) {
         if (parameterBindings[paramIdx].empty()) {
-          if (paramTuple[paramIdx].hasName())
+          if (params[paramIdx].hasLabel())
             unfulfilledNamedParams.push_back(paramIdx);
           else
             hasUnfulfilledUnnamedParams = true;
@@ -338,14 +353,14 @@ bool constraints::matchCallArguments(
         // FIXME: There is undoubtedly a good dynamic-programming algorithm
         // to find the best assignment here.
         for (auto argIdx : unclaimedNamedArgs) {
-          auto argName = argTuple[argIdx].getName();
+          auto argName = args[argIdx].Label;
 
           // Find the closest matching unfulfilled named parameter.
           unsigned bestScore = 0;
           unsigned best = 0;
           for (unsigned i = 0, n = unfulfilledNamedParams.size(); i != n; ++i) {
             unsigned param = unfulfilledNamedParams[i];
-            auto paramName = paramTuple[param].getName();
+            auto paramName = params[param].Label;
 
             if (auto score = scoreParamAndArgNameTypo(paramName.str(),
                                                       argName.str(),
@@ -415,14 +430,14 @@ bool constraints::matchCallArguments(
       if (!parameterBindings[paramIdx].empty())
         continue;
 
-      const auto &param = paramTuple[paramIdx];
+      const auto &param = params[paramIdx];
 
       // Variadic parameters can be unfulfilled.
-      if (param.isVararg())
+      if (param.Variadic)
         continue;
 
       // Parameters with defaults can be unfilfilled.
-      if (param.getDefaultArgKind() != DefaultArgumentKind::None)
+      if (param.HasDefaultArgument)
         continue;
 
       listener.missingArgument(paramIdx);
@@ -458,9 +473,8 @@ bool constraints::matchCallArguments(
       // those parameters up to (and including) the previously-bound parameter
       // are either variadic or have a default argument.
       for (unsigned i = paramIdx; i != prevParamIdx + 1; ++i) {
-        const auto &param = paramTuple[i];
-        if (param.isVararg() ||
-            param.getDefaultArgKind() != DefaultArgumentKind::None)
+        const auto &param = params[i];
+        if (param.Variadic || param.HasDefaultArgument)
           continue;
 
         unsigned prevArgIdx = parameterBindings[prevParamIdx].front();
@@ -541,19 +555,16 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
     }
   };
 
-  // Extract the argument tuple fields.
-  TupleTypeElt argScalar;
-  ArrayRef<TupleTypeElt> argTuple = decomposeArgParamType(argType, argScalar);
+  // Extract the arguments.
+  auto args = decomposeArgParamType(argType);
 
-  // Extract the parameter tuple fields.
-  TupleTypeElt paramScalar;
-  ArrayRef<TupleTypeElt> paramTuple = decomposeArgParamType(paramType,
-                                                            paramScalar);
+  // Extract the parameters.
+  auto params = decomposeArgParamType(paramType);
 
   // Match up the call arguments to the parameters.
   Listener listener(cs, argType, paramType, locator);
   SmallVector<ParamBinding, 4> parameterBindings;
-  if (constraints::matchCallArguments(argTuple, paramTuple,
+  if (constraints::matchCallArguments(args, params,
                                       hasTrailingClosure(locator),
                                       cs.shouldAttemptFixes(), listener,
                                       parameterBindings))
@@ -620,8 +631,8 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   
   // Pre-scan operator arguments for nil literals.
   if (subKind == TypeMatchKind::OperatorArgumentConversion) {
-    for (auto arg : argTuple) {
-      if (isNilLiteral(arg.getType())) {
+    for (auto arg : args) {
+      if (isNilLiteral(arg.Ty)) {
         haveNilArgument = true;
         break;
       }
@@ -635,16 +646,15 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
       continue;
 
     // Determine the parameter type.
-    const auto &param = paramTuple[paramIdx];
-    auto paramTy = param.isVararg() ? param.getVarargBaseTy()
-                                    : param.getType();
+    const auto &param = params[paramIdx];
+    auto paramTy = param.Ty;
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
-      auto argTy = argTuple[argIdx].getType();
+      auto argTy = args[argIdx].Ty;
 
       if (haveNilArgument && !allowOptionalConversion(argTy)) {
         subflags |= ConstraintSystem::TMF_ApplyingOperatorWithNil;
