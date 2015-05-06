@@ -85,7 +85,7 @@ public typealias DebugPrintable = CustomDebugStringConvertible
 public typealias Printable = CustomStringConvertible
 
 //===----------------------------------------------------------------------===//
-// `print`
+// Default (ad-hoc) printing
 //===----------------------------------------------------------------------===//
 
 /// Do our best to print a value that can not be printed directly,
