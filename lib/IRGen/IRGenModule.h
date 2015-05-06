@@ -531,7 +531,8 @@ public:
   llvm::Constant *getObjCEmptyCachePtr();
   llvm::Constant *getObjCEmptyVTablePtr();
   llvm::Value *getObjCRetainAutoreleasedReturnValueMarker();
-  ClassDecl *getSwiftRootClass();
+  ClassDecl *getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass);
+  ClassDecl *getObjCRuntimeBaseClass(Identifier name);
   llvm::Module *getModule() const;
   llvm::Module *releaseModule();
   llvm::AttributeSet getAllocAttrs();
@@ -542,8 +543,8 @@ private:
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
   llvm::Constant *ObjCISAMaskPtr = nullptr;
   Optional<llvm::Value*> ObjCRetainAutoreleasedReturnValueMarker;
-  ClassDecl *SwiftRootClass = nullptr;
-  llvm::AttributeSet AllocAttrs;  
+  llvm::DenseMap<Identifier, ClassDecl*> SwiftRootClasses;
+  llvm::AttributeSet AllocAttrs;
 
 #define FUNCTION_ID(Id)             \
 public:                             \

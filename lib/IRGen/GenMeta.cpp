@@ -2574,10 +2574,11 @@ namespace {
         }
 
         // We have to do getAddrOfObjCClass ourselves here because
-        // getSwiftRootClass needs to be ObjC-mangled but isn't
+        // the ObjC runtime base needs to be ObjC-mangled but isn't
         // actually imported from a clang module.
-        addWord(IGM.getAddrOfObjCClass(IGM.getSwiftRootClass(),
-                                       NotForDefinition));
+        addWord(IGM.getAddrOfObjCClass(
+                               IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
+                               NotForDefinition));
         return;
       }
 
@@ -2817,7 +2818,8 @@ namespace {
           emitClassHeapMetadataRef(IGF, superclass->getCanonicalType(),
                                    MetadataValueType::ObjCClass);
       } else if (IGM.ObjCInterop) {
-        superMetadata = emitObjCHeapMetadataRef(IGF, IGM.getSwiftRootClass());
+        superMetadata = emitObjCHeapMetadataRef(IGF,
+                               IGM.getObjCRuntimeBaseForSwiftRootClass(Target));
       } else {
         superMetadata
           = llvm::ConstantPointerNull::get(IGF.IGM.ObjCClassPtrTy);

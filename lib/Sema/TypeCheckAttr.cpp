@@ -62,6 +62,7 @@ public:
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
+  IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(Inline)
   IGNORED_ATTR(Effects)
@@ -625,6 +626,8 @@ public:
   void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
 
   void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
+  void visitSwiftNativeObjCRuntimeBaseAttr(
+                                         SwiftNativeObjCRuntimeBaseAttr *attr);
 
   void checkOperatorAttribute(DeclAttribute *attr);
 
@@ -840,6 +843,25 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
     TC.diagnose(attr->getLocation(),
                 diag::no_objc_tagged_pointer_not_class_protocol);
     attr->setInvalid();    
+  }
+}
+
+void AttributeChecker::visitSwiftNativeObjCRuntimeBaseAttr(
+                                         SwiftNativeObjCRuntimeBaseAttr *attr) {
+  // Only root classes can have the attribute.
+  auto theClass = dyn_cast<ClassDecl>(D);
+  if (!theClass) {
+    TC.diagnose(attr->getLocation(),
+                diag::swift_native_objc_runtime_base_not_on_root_class);
+    attr->setInvalid();
+    return;
+  }
+  
+  if (theClass->hasSuperclass()) {
+    TC.diagnose(attr->getLocation(),
+                diag::swift_native_objc_runtime_base_not_on_root_class);
+    attr->setInvalid();
+    return;
   }
 }
 

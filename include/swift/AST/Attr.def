@@ -224,6 +224,9 @@ SIMPLE_DECL_ATTR(rethrows, Rethrows,
 
 DECL_ATTR(warn_unused_result, WarnUnusedResult, OnFunc | OnConstructor, 58)
 
+DECL_ATTR(_swift_native_objc_runtime_base, SwiftNativeObjCRuntimeBase,
+          OnClass | UserInaccessible, 59)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

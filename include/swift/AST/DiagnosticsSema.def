@@ -538,6 +538,9 @@ ERROR(ibaction_nonobject_argument,sema_tcd,none,
 ERROR(no_objc_tagged_pointer_not_class_protocol,sema_tcd,none,
       "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
       ())
+ERROR(swift_native_objc_runtime_base_not_on_root_class,sema_tcd,none,
+      "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
+      "to root classes", ())
 ERROR(access_control_in_protocol,sema_tcd,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 ERROR(access_control_setter,sema_tcd,none,

@@ -4892,6 +4892,7 @@ public:
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
+    UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(AutoClosure)

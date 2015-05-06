@@ -281,6 +281,13 @@ void DeclAttribute::print(ASTPrinter &Printer,
   case DAK_SetterAccessibility:
     Printer << getAttrName() << "(set)";
     break;
+    
+  case DAK_SwiftNativeObjCRuntimeBase: {
+    auto *attr = cast<SwiftNativeObjCRuntimeBaseAttr>(this);
+    Printer << "@_swift_native_objc_runtime_base("
+            << attr->BaseClassName.str() << ")";
+    break;
+  }
 
   case DAK_RawDocComment:
     // Not printed.
@@ -353,6 +360,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "asmname";
   case DAK_Alignment:
     return "_alignment";
+  case DAK_SwiftNativeObjCRuntimeBase:
+    return "_swift_native_objc_runtime_base";
   case DAK_Semantics:
     return "_semantics";
   case DAK_Availability:

@@ -407,15 +407,24 @@ func _rawPointerToString(value: Builtin.RawPointer) -> String {
 }
 
 #if _runtime(_ObjC)
-// These classes are derived from `_SwiftNativeNSXXXBase` (through runtime magic),
+// At runtime, these classes are derived from `_SwiftNativeNSXXXBase`,
 // which are derived from `NSXXX`.
 //
-// This allows us to subclass an Objective-C class and use the fast Swift
+// The @swift_native_objc_runtime_base attribute
+// allows us to subclass an Objective-C class and still use the fast Swift
 // memory allocator.
-@objc class _SwiftNativeNSArray {}
-@objc class _SwiftNativeNSDictionary {}
-@objc class _SwiftNativeNSSet {}
-@objc class _SwiftNativeNSEnumerator {}
+
+@objc @_swift_native_objc_runtime_base(_SwiftNativeNSArrayBase)
+class _SwiftNativeNSArray {}
+
+@objc @_swift_native_objc_runtime_base(_SwiftNativeNSDictionaryBase)
+class _SwiftNativeNSDictionary {}
+
+@objc @_swift_native_objc_runtime_base(_SwiftNativeNSSetBase)
+class _SwiftNativeNSSet {}
+
+@objc @_swift_native_objc_runtime_base(_SwiftNativeNSEnumeratorBase)
+class _SwiftNativeNSEnumerator {}
 
 //===----------------------------------------------------------------------===//
 // Support for reliable testing of the return-autoreleased optimization

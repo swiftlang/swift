@@ -62,24 +62,6 @@ using namespace swift;
 @end
 
 @implementation _SwiftNativeNS${Class}Base
-+ (void)load {
-  // Poke this class into the superclass chain for _SwiftNativeNS${Class}
-  auto subclassName = "_SwiftNativeNS${Class}";
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
-  // Compute the mangled name of the subclass
-  char subclassMangledName[64];
-  snprintf(
-    subclassMangledName, sizeof(subclassMangledName),
-    "_TtCSs%d%s",
-    (int)strlen(subclassName), subclassName);
-
-  auto subclass = objc_getClass(subclassMangledName);
-  auto selfClass = [_SwiftNativeNS${Class}Base class];
-  class_setSuperclass(subclass, selfClass);
-#pragma clang diagnostic pop
-}
 
 - (id)retain {
   auto SELF = reinterpret_cast<HeapObject *>(self);

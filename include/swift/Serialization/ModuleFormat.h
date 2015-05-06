@@ -1196,6 +1196,12 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCFixed<31> // alignment
   >;
+  
+  using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
+    SwiftNativeObjCRuntimeBase_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    IdentifierIDField // name
+  >;
 
   using SemanticsDeclAttrLayout = BCRecordLayout<
     Semantics_DECL_ATTR,

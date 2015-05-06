@@ -1821,6 +1821,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                        isImplicit);
         break;
       }
+      
+      case decls_block::SwiftNativeObjCRuntimeBase_DECL_ATTR: {
+        bool isImplicit;
+        IdentifierID nameID;
+        serialization::decls_block::SwiftNativeObjCRuntimeBaseDeclAttrLayout
+          ::readRecord(scratch, isImplicit, nameID);
+        
+        auto name = getIdentifier(nameID);
+        Attr = new (ctx) SwiftNativeObjCRuntimeBaseAttr(name, SourceLoc(),
+                                                        SourceRange(),
+                                                        isImplicit);
+        break;
+      }
 
       case decls_block::Semantics_DECL_ATTR: {
         bool isImplicit;

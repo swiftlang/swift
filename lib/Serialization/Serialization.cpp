@@ -1547,6 +1547,19 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
   
+  case DAK_SwiftNativeObjCRuntimeBase: {
+    auto *theBase = cast<SwiftNativeObjCRuntimeBaseAttr>(DA);
+    auto abbrCode
+      = DeclTypeAbbrCodes[SwiftNativeObjCRuntimeBaseDeclAttrLayout::Code];
+    auto nameID = addIdentifierRef(theBase->BaseClassName);
+    
+    SwiftNativeObjCRuntimeBaseDeclAttrLayout::emitRecord(Out, ScratchRecord,
+                                                     abbrCode,
+                                                     theBase->isImplicit(),
+                                                     nameID);
+    return;
+  }
+  
   case DAK_Semantics: {
     auto *theAttr = cast<SemanticsAttr>(DA);
     auto abbrCode = DeclTypeAbbrCodes[SemanticsDeclAttrLayout::Code];

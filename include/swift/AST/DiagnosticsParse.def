@@ -1025,6 +1025,9 @@ ERROR(attr_expected_string_literal,attribute_parsing,none,
 ERROR(alignment_must_be_positive_integer,attribute_parsing,none,
       "alignment value must be a positive integer literal", ())
 
+ERROR(swift_native_objc_runtime_base_must_be_identifier,attribute_parsing,none,
+      "@_swift_native_objc_runtime_base class name must be an identifier", ())
+
 ERROR(attr_interpolated_string,attribute_parsing,none,
 "%0 cannot be an interpolated string literal", (StringRef))
 

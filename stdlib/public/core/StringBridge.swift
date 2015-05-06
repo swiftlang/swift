@@ -184,12 +184,13 @@ extension String {
   }
 }
 
-/// This class is derived from `_SwiftNativeNSStringBase` (through
-/// runtime magic), which is derived from `NSString`.
-///
-/// This allows us to subclass an Objective-C class and use the fast Swift
-/// memory allocator.
-@objc
+// At runtime, this class is derived from `_SwiftNativeNSStringBase`,
+// which is derived from `NSString`.
+//
+// The @_swift_native_objc_runtime_base attribute
+// This allows us to subclass an Objective-C class and use the fast Swift
+// memory allocator.
+@objc @_swift_native_objc_runtime_base(_SwiftNativeNSStringBase)
 public class _SwiftNativeNSString {}
 
 @objc

@@ -640,6 +640,32 @@ public:
   }
 };
 
+/// Defines the @_swift_native_objc_runtime_base attribute.
+///
+/// This attribute indicates a class that should be treated semantically
+/// as a native Swift root class, but which inherits a specific Objective-C
+/// class at runtime. For most classes this is the runtime's "SwiftObject"
+/// root class. The compiler does not need to know about the class; it's the
+/// build system's responsibility to link against the ObjC code that implements
+/// the root class, and the ObjC implementation's responsibility to ensure
+/// instances begin with a Swift-refcounting-compatible object header and
+/// override all the necessary NSObject refcounting methods.
+class SwiftNativeObjCRuntimeBaseAttr : public DeclAttribute {
+public:
+  SwiftNativeObjCRuntimeBaseAttr(Identifier BaseClassName,
+                                 SourceLoc AtLoc, SourceRange Range,
+                                 bool Implicit)
+    : DeclAttribute(DAK_SwiftNativeObjCRuntimeBase, AtLoc, Range, Implicit),
+      BaseClassName(BaseClassName) {}
+  
+  // The base class's name.
+  const Identifier BaseClassName;
+  
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_SwiftNativeObjCRuntimeBase;
+  }
+};
+
 /// Determine the result of comparing an availability attribute to a specific
 /// minimum platform version.
 enum class MinVersionComparison {

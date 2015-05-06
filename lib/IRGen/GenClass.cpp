@@ -199,7 +199,12 @@ namespace {
       // which will be visible in the Objective-C type system.
       if (Root->hasClangNode()) return Root;
 
-      return IGM.getSwiftRootClass();
+      // FIXME: If the root class specifies its own runtime ObjC base class,
+      // assume that that base class ultimately inherits NSObject.
+      if (Root->getAttrs().hasAttribute<SwiftNativeObjCRuntimeBaseAttr>())
+        return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_NSObject);
+      
+      return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_SwiftObject);
     }
 
     const FieldEntry &getFieldEntry(VarDecl *field) const {
@@ -1810,14 +1815,14 @@ const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
                            D, refcount);
 }
 
-/// Lazily declare the Swift root-class, SwiftObject.
-ClassDecl *IRGenModule::getSwiftRootClass() {
-  if (SwiftRootClass) return SwiftRootClass;
-
-  auto name = Context.getIdentifier("SwiftObject");
+/// Lazily declare a fake-looking class to represent an ObjC runtime base class.
+ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name) {
+  auto found = SwiftRootClasses.find(name);
+  if (found != SwiftRootClasses.end())
+    return found->second;
 
   // Make a really fake-looking class.
-  SwiftRootClass = new (Context) ClassDecl(SourceLoc(), name, SourceLoc(),
+  auto SwiftRootClass = new (Context) ClassDecl(SourceLoc(), name, SourceLoc(),
                                            MutableArrayRef<TypeLoc>(),
                                            /*generics*/ nullptr,
                                            Context.TheBuiltinModule);
@@ -1827,7 +1832,26 @@ ClassDecl *IRGenModule::getSwiftRootClass() {
                                                          /*implicit=*/true));
   SwiftRootClass->setImplicit();
   SwiftRootClass->setAccessibility(Accessibility::Public);
+  
+  SwiftRootClasses.insert({name, SwiftRootClass});
   return SwiftRootClass;
+}
+
+/// Lazily declare the ObjC runtime base class for a Swift root class.
+ClassDecl *
+IRGenModule::getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass) {
+  assert(!theClass->hasSuperclass() && "must pass a root class");
+  
+  Identifier name;
+  // If the class declares its own ObjC runtime base, use it.
+  if (auto baseAttr = theClass->getAttrs()
+        .getAttribute<SwiftNativeObjCRuntimeBaseAttr>()) {
+    name = baseAttr->BaseClassName;
+  } else {
+    // Otherwise, use the standard SwiftObject class.
+    name = Context.Id_SwiftObject;
+  }
+  return getObjCRuntimeBaseClass(name);
 }
 
 ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
