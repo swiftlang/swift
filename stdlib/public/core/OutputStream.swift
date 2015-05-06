@@ -135,8 +135,8 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
 }
 
 @inline(never)
-public func _print_unlocked<T, TargetStream : OutputStreamType>(
-    value: T, inout _ target: TargetStream
+internal func _print_unlocked<T, TargetStream : OutputStreamType>(
+  value: T, inout _ target: TargetStream
 ) {
   if case let streamableObject as Streamable = value {
     streamableObject.writeTo(&target)
@@ -166,7 +166,7 @@ public func _print_unlocked<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 @inline(never)
 public func print<T, TargetStream : OutputStreamType>(
-    value: T, inout _ target: TargetStream
+  value: T, inout _ target: TargetStream
 ) {
   target._lock()
   _print_unlocked(value, &target)
