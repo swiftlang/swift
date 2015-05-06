@@ -1339,43 +1339,24 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(ScalarToTupleExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying ScalarToTupleExpr", E);
-
-      TupleType *TT = E->getType()->getAs<TupleType>();
-      if (!TT) {
-        Out << "Unexpected types in ScalarToTupleExpr\n";
-        abort();
-      }
-
-      // Verify that the result tuple element that the scalar is placed into
-      // matches the scalar's type.
-      auto SubExprTy = E->getSubExpr()->getType();
-
-      // It has to line up with the type of the resultant tuple element...
-      // unless it is initializing the varargs list, in which case it needs to
-      // match up with the element of the array slice.
-      auto EltTy = TT->getElementType(E->getScalarField());
-      if (TT->getElement(E->getScalarField()).isVararg())
-        SubExprTy = E->getVarargsArrayType();
-
-      if (!SubExprTy->isEqual(EltTy)) {
-        Out << "Type mismatch in ScalarToTupleExpr\n";
-        abort();
-      }
-
-      verifyCheckedBase(E);
-    }
-
     void verifyChecked(TupleShuffleExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying TupleShuffleExpr", E);
 
       TupleType *TT = E->getType()->getAs<TupleType>();
       TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();
-      if (!TT || !SubTT) {
+      if (!TT || (!SubTT && !E->isSourceScalar())) {
         Out << "Unexpected types in TupleShuffleExpr\n";
         abort();
       }
+      auto getSubElementType = [&](unsigned i) {
+        if (E->isSourceScalar()) {
+          assert(i == 0);
+          return E->getSubExpr()->getType();
+        } else {
+          return SubTT->getElementType(i);
+        }
+      };
+
       unsigned varargsStartIndex = 0;
       Type varargsType;
       unsigned callerDefaultArgIndex = 0;
@@ -1396,7 +1377,7 @@ struct ASTNodeBase {};
           }
           continue;
         }
-        if (!TT->getElementType(i)->isEqual(SubTT->getElementType(subElem))) {
+        if (!TT->getElementType(i)->isEqual(getSubElementType(subElem))) {
           Out << "Type mismatch in TupleShuffleExpr\n";
           abort();
         }
@@ -1405,7 +1386,7 @@ struct ASTNodeBase {};
         unsigned i = varargsStartIndex, e = E->getElementMapping().size();
         for (; i != e; ++i) {
           unsigned subElem = E->getElementMapping()[i];
-          if (!SubTT->getElementType(subElem)->isEqual(varargsType)) {
+          if (!getSubElementType(subElem)->isEqual(varargsType)) {
             Out << "Vararg type mismatch in TupleShuffleExpr\n";
             abort();
           }

@@ -49,7 +49,7 @@ namespace {
       return true;
     }
     
-    ArrayRef<InitializationPtr>
+    MutableArrayRef<InitializationPtr>
     getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                   SmallVectorImpl<InitializationPtr> &buf,
                                   SILLocation Loc) override {
@@ -68,68 +68,32 @@ namespace {
   };
 } // end anonymous namespace
 
-namespace {
-  /// An Initialization of a tuple pattern, such as "var (a,b)".
-  class TupleInitialization : public Initialization {
-  public:
-    /// The sub-Initializations aggregated by this tuple initialization.
-    /// The TupleInitialization object takes ownership of Initializations pushed
-    /// here.
-    SmallVector<InitializationPtr, 4> subInitializations;
-    
-    TupleInitialization() {}
-    
-    SILValue getAddressOrNull() const override {
-      if (subInitializations.size() == 1)
-        return subInitializations[0]->getAddressOrNull();
-      else
-        return SILValue();
-    }
-    
-    bool canSplitIntoSubelementAddresses() const override {
-      return true;
-    }
-    
-    ArrayRef<InitializationPtr>
-    getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                                  SmallVectorImpl<InitializationPtr> &buf,
-                                  SILLocation Loc) override {
-      return subInitializations;
-    }
-    
-    void finishInitialization(SILGenFunction &gen) override {
-      for (auto &sub : subInitializations)
-        sub->finishInitialization(gen);
-    }
-    
-    void copyOrInitValueInto(ManagedValue valueMV, bool isInit, SILLocation loc,
-                             SILGenFunction &SGF) override {
-      // A scalar value is being copied into the tuple, break it into elements
-      // and assign/init each element in turn.
-      SILValue value = valueMV.forward(SGF);
-      auto sourceType = cast<TupleType>(valueMV.getSwiftType());
-      auto sourceSILType = value.getType();
-      for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
-        SILType fieldTy = sourceSILType.getTupleElementType(i);
-        auto &fieldTL = SGF.getTypeLowering(fieldTy);
+void TupleInitialization::copyOrInitValueInto(ManagedValue valueMV,
+                                              bool isInit, SILLocation loc,
+                                              SILGenFunction &SGF) {
+  // A scalar value is being copied into the tuple, break it into elements
+  // and assign/init each element in turn.
+  SILValue value = valueMV.forward(SGF);
+  auto sourceType = cast<TupleType>(valueMV.getSwiftType());
+  auto sourceSILType = value.getType();
+  for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
+    SILType fieldTy = sourceSILType.getTupleElementType(i);
+    auto &fieldTL = SGF.getTypeLowering(fieldTy);
         
-        SILValue member;
-        if (value.getType().isAddress()) {
-          member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
-          if (!fieldTL.isAddressOnly())
-            member = SGF.B.createLoad(loc, member);
-        } else {
-          member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
-        }
-        
-        auto elt = SGF.emitManagedRValueWithCleanup(member, fieldTL);
-        
-        subInitializations[i]->copyOrInitValueInto(elt, isInit, loc, SGF);
-      }
+    SILValue member;
+    if (value.getType().isAddress()) {
+      member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
+      if (!fieldTL.isAddressOnly())
+        member = SGF.B.createLoad(loc, member);
+    } else {
+      member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
     }
-  };
-} // end anonymous namespace
-
+        
+    auto elt = SGF.emitManagedRValueWithCleanup(member, fieldTL);
+        
+    SubInitializations[i]->copyOrInitValueInto(elt, isInit, loc, SGF);
+  }
+}
 
 namespace {
   class CleanupClosureConstant : public Cleanup {
@@ -151,7 +115,8 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   SGM.emitFunction(fd);
 }
 
-ArrayRef<InitializationPtr> SingleBufferInitialization::
+MutableArrayRef<InitializationPtr>
+SingleBufferInitialization::
 getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                               SmallVectorImpl<InitializationPtr> &buf,
                               SILLocation Loc) {
@@ -413,7 +378,7 @@ public:
     return hasAddress();
   }
   
-  ArrayRef<InitializationPtr>
+  MutableArrayRef<InitializationPtr>
   getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                 SmallVectorImpl<InitializationPtr> &buf,
                                 SILLocation Loc) override {
@@ -818,7 +783,7 @@ struct InitializationForPattern
   InitializationPtr visitTuplePattern(TuplePattern *P) {
     TupleInitialization *init = new TupleInitialization();
     for (auto &elt : P->getElements())
-      init->subInitializations.push_back(visit(elt.getPattern()));
+      init->SubInitializations.push_back(visit(elt.getPattern()));
     return InitializationPtr(init);
   }
 

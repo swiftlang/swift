@@ -89,12 +89,12 @@ public:
   /// is given to this vector.
   /// \param Loc The location with which the single initialization should be
   ///        associated.
-  virtual ArrayRef<InitializationPtr>
+  virtual MutableArrayRef<InitializationPtr>
   getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                 SmallVectorImpl<InitializationPtr> &buf,
                                 SILLocation Loc) {
-    assert(0&&"Must implement if canSplitIntoSubelementAddresses returns true");
-    abort();
+    llvm_unreachable("Must implement if canSplitIntoSubelementAddresses"
+                     "returns true");
   }
   
   /// Perform post-initialization bookkeeping for this initialization.
@@ -136,7 +136,7 @@ public:
     return true;
   }
   
-  ArrayRef<InitializationPtr>
+  MutableArrayRef<InitializationPtr>
   getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                 SmallVectorImpl<InitializationPtr> &buf,
                                 SILLocation Loc) override;
@@ -194,6 +194,44 @@ public:
   ManagedValue getManagedAddress() const  {
     return ManagedValue(getAddress(), getInitializedCleanup());
   }
+};
+
+/// An initialization which accumulates several other initializations
+/// into a tuple.
+class TupleInitialization : public Initialization {
+public:
+  /// The sub-Initializations aggregated by this tuple initialization.
+  /// The TupleInitialization object takes ownership of Initializations pushed
+  /// here.
+  SmallVector<InitializationPtr, 4> SubInitializations;
+    
+  TupleInitialization() {}
+    
+  SILValue getAddressOrNull() const override {
+    if (SubInitializations.size() == 1)
+      return SubInitializations[0]->getAddressOrNull();
+    else
+      return SILValue();
+  }
+    
+  bool canSplitIntoSubelementAddresses() const override {
+    return true;
+  }
+    
+  MutableArrayRef<InitializationPtr>
+  getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
+                                SmallVectorImpl<InitializationPtr> &buf,
+                                SILLocation Loc) override {
+    return SubInitializations;
+  }
+    
+  void finishInitialization(SILGenFunction &gen) override {
+    for (auto &sub : SubInitializations)
+      sub->finishInitialization(gen);
+  }
+    
+  void copyOrInitValueInto(ManagedValue valueMV, bool isInit, SILLocation loc,
+                           SILGenFunction &SGF) override;
 };
 
 } // end namespace Lowering

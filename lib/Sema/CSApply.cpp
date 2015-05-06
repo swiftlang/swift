@@ -3859,7 +3859,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
   auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
-  auto shuffle = new (tc.Context) TupleShuffleExpr(expr, mapping, 
+  auto shuffle = new (tc.Context) TupleShuffleExpr(expr, mapping,
+                                               TupleShuffleExpr::SourceIsTuple,
                                                    defaultArgsOwner,
                                                    callerDefaultArgsCopy,
                                                    toSugarType);
@@ -3937,18 +3938,18 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   }
 
   // Compute the elements of the resulting tuple.
-  SmallVector<ScalarToTupleExpr::Element, 4> elements;
+  SmallVector<int, 4> elements;
+  SmallVector<Expr*, 4> callerDefaultArgs;
   ConcreteDeclRef defaultArgsOwner = nullptr;
   i = 0;
   for (auto &field : toTuple->getElements()) {
-    // Use a null entry to indicate that this is the scalar field.
-    if (i == toScalarIdx) {
-      elements.push_back(ScalarToTupleExpr::Element());
-      ++i;
-      continue;
+    if (field.isVararg()) {
+      elements.push_back(TupleShuffleExpr::FirstVariadic);
     }
 
-    if (field.isVararg()) {
+    // If this is the scalar field, act like we're shuffling the 0th element.
+    if (i == toScalarIdx) {
+      elements.push_back(0);
       ++i;
       continue;
     }
@@ -3972,10 +3973,11 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                           defaultArgsOwner, i).first) {
       // Record the caller-side default argument expression.
       // FIXME: Do we need to record what this was synthesized from?
-      elements.push_back(defArg);
+      elements.push_back(TupleShuffleExpr::CallerDefaultInitialize);
+      callerDefaultArgs.push_back(defArg);
     } else {
       // Record the owner of the default argument.
-      elements.push_back(defaultArgsOwner);
+      elements.push_back(TupleShuffleExpr::DefaultInitialize);
     }
 
     ++i;
@@ -3984,9 +3986,12 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   Type destSugarTy = hasInit? toTuple
                             : TupleType::get(sugarFields, tc.Context);
 
-  return new (tc.Context) ScalarToTupleExpr(expr, destSugarTy,
-                                            tc.Context.AllocateCopy(elements),
-                                            arrayType);
+  return new (tc.Context) TupleShuffleExpr(expr,
+                                           tc.Context.AllocateCopy(elements),
+                                           TupleShuffleExpr::SourceIsScalar,
+                                           defaultArgsOwner,
+                                    tc.Context.AllocateCopy(callerDefaultArgs),
+                                           destSugarTy);
 }
 
 /// Collect the conformances for all the protocols of an existential type.
@@ -4238,7 +4243,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  argTuple? argTuple->getNumElements() : 1);
   SmallVector<Expr*, 4> fromTupleExpr(argTuple? argTuple->getNumElements() : 1);
-  SmallVector<ScalarToTupleExpr::Element, 4> scalarToTupleElements;
   SmallVector<Expr *, 2> callerDefaultArgs;
   ConcreteDeclRef defaultArgsOwner = nullptr;
   Type sliceType = nullptr;
@@ -4275,7 +4279,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
         if (argType->isEqual(paramBaseType)) {
           fromTupleExprFields[argIdx] = TupleTypeElt(argType,
                                                      getArgLabel(argIdx));
-          scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
           fromTupleExpr[argIdx] = arg;
           continue;
         }
@@ -4298,7 +4301,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
         fromTupleExpr[argIdx] = convertedArg;
         fromTupleExprFields[argIdx] = TupleTypeElt(convertedArg->getType(),
                                                    getArgLabel(argIdx));
-        scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
       }
 
       continue;
@@ -4339,10 +4341,8 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
       if (defArg) {
         callerDefaultArgs.push_back(defArg);
         sources.push_back(TupleShuffleExpr::CallerDefaultInitialize);
-        scalarToTupleElements.push_back(defArg);
       } else {
         sources.push_back(TupleShuffleExpr::DefaultInitialize);
-        scalarToTupleElements.push_back(defaultArgsOwner);
       }
       continue;
     }
@@ -4359,7 +4359,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     if (argIdx != paramIdx || getArgLabel(argIdx) != param.Label) {
       anythingShuffled = true;
     }
-    scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
 
     // If the types exactly match, this is easy.
     auto paramType = param.Ty;
@@ -4428,21 +4427,18 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     }
   }
 
-  // If we came from a scalar, create a scalar-to-tuple conversion.
-  if (!argTuple && isa<TupleType>(paramType.getPointer())) {
-    auto elements = tc.Context.AllocateCopy(scalarToTupleElements);
-    return new (tc.Context) ScalarToTupleExpr(arg, paramType, elements,
-                                              sliceType);
-  }
-
   // If we don't have to shuffle anything, we're done.
   if (arg->getType()->isEqual(paramType))
     return arg;
+
+  // If we came from a scalar, create a scalar-to-tuple conversion.
+  auto isSourceScalar = TupleShuffleExpr::SourceIsScalar_t(argTuple == nullptr);
 
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
   auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
   auto shuffle = new (tc.Context) TupleShuffleExpr(arg, mapping,
+                                                   isSourceScalar,
                                                    defaultArgsOwner,
                                                    callerDefaultArgsCopy,
                                                    paramType);

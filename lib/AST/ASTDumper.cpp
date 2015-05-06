@@ -1623,7 +1623,9 @@ public:
     OS << ')';
   }
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    printCommon(E, "tuple_shuffle_expr") << " elements=[";
+    printCommon(E, "tuple_shuffle_expr");
+    if (E->isSourceScalar()) OS << " sourceIsScalar";
+    OS << " elements=[";
     for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
       if (i) OS << ", ";
       OS << E->getElementMapping()[i];
@@ -1682,13 +1684,6 @@ public:
   }
   void visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E) {
     printCommon(E, "archetype_to_super_expr") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
-  void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
-    printCommon(E, "scalar_to_tuple_expr");
-    OS << " field=" << E->getScalarField();
-    OS << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

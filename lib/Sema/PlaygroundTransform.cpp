@@ -330,29 +330,32 @@ public:
     }
   }
   
-  DeclRefExpr *digForInoutDeclRef(Expr *E) {
-    if (ScalarToTupleExpr *STE = llvm::dyn_cast<ScalarToTupleExpr>(E)) {
-      if (InOutExpr *IOE = llvm::dyn_cast<InOutExpr>(STE->getSubExpr())) {
-        return llvm::dyn_cast<DeclRefExpr>(IOE->getSubExpr());
-      }
-    } else if (TupleExpr *TE = llvm::dyn_cast<TupleExpr>(E)) {
-      DeclRefExpr *DRE = nullptr;
-      for (Expr *Element : TE->getElements()) {
-        if (InOutExpr *IOE = llvm::dyn_cast<InOutExpr>(Element)) {
-          if (DeclRefExpr *NDRE =
-              llvm::dyn_cast<DeclRefExpr>(IOE->getSubExpr())) {
-            if (DRE) {
-              return nullptr;
-            }
-            else {
-              DRE = NDRE;
-            }
-          }
+  static DeclRefExpr *digForInoutDeclRef(Expr *E) {
+    if (auto inout = dyn_cast<InOutExpr>(E)) {
+      return dyn_cast<DeclRefExpr>(
+                   inout->getSubExpr()->getSemanticsProvidingExpr());
+
+    // Drill through tuple shuffles, ignoring non-default-argument inouts.
+    } else if (auto shuffle = dyn_cast<TupleShuffleExpr>(E)) {
+      return digForInoutDeclRef(shuffle->getSubExpr());
+
+    // Try to find a unique inout argument in a tuple.
+    } else if (auto tuple = dyn_cast<TupleExpr>(E)) {
+      DeclRefExpr *uniqueRef = nullptr;
+      for (Expr *elt : tuple->getElements()) {
+        if (auto ref = digForInoutDeclRef(elt)) {
+          // If we already have a reference, it's not unique.
+          if (uniqueRef) return nullptr;
+          uniqueRef = ref;
         }
       }
-      return DRE;
+      return uniqueRef;
+
+    // Look through parens.
+    } else {
+      auto subExpr = E->getSemanticsProvidingExpr();
+      return (E == subExpr ? nullptr : digForInoutDeclRef(subExpr));
     }
-    return nullptr;
   }
 
   BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {

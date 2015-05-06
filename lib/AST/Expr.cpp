@@ -354,7 +354,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::MetatypeErasure:
   case ExprKind::DerivedToBase:
   case ExprKind::ArchetypeToSuper:
-  case ExprKind::ScalarToTuple:
   case ExprKind::InjectIntoOptional:
   case ExprKind::UnavailableToOptional:
   case ExprKind::ClassMetatypeToObject:
@@ -754,14 +753,6 @@ UnresolvedSelectorExpr *UnresolvedSelectorExpr::create(ASTContext &C,
                                * sizeof(ComponentLoc),
                          alignof(UnresolvedSelectorExpr));
   return ::new (buf) UnresolvedSelectorExpr(subExpr, dotLoc, name, components);
-}
-
-unsigned ScalarToTupleExpr::getScalarField() const {
-  unsigned result = std::find(Elements.begin(), Elements.end(), Element())
-                      - Elements.begin();
-  assert(result != Elements.size()
-         && "Tuple elements are missing the scalar 'hole'");
-  return result;
 }
 
 TypeExpr::TypeExpr(TypeLoc TyLoc)

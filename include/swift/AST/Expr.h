@@ -264,6 +264,15 @@ class alignas(8) Expr {
   enum { NumBindOptionalExprBits = NumExprBits + 16 };
   static_assert(NumBindOptionalExprBits <= 32, "fits in an unsigned");
 
+  enum { NumImplicitConversionExprBits = NumExprBits };
+
+  class TupleShuffleExprBitfields {
+    friend class TupleShuffleExpr;
+    unsigned : NumImplicitConversionExprBits;
+    unsigned IsSourceScalar : 1;
+  };
+  enum { NumTupleShuffleExprBits = NumImplicitConversionExprBits + 1 };
+
   enum { NumCheckedCastKindBits = 4 };
   class CheckedCastExprBitfields {
     friend class CheckedCastExpr;
@@ -303,6 +312,7 @@ protected:
     BindOptionalExprBitfields BindOptionalExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
+    TupleShuffleExprBitfields TupleShuffleExprBits;
   };
 
 private:
@@ -2251,8 +2261,11 @@ public:
 };
 
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
-/// tuple type.  The expression's type is known to be a tuple type and the
-/// subexpression is known to have a tuple type as well.
+/// tuple type.  The expression's type is known to be a tuple type.
+///
+/// If hasScalarSource() is true, the subexpression should be treated
+/// as if it were implicitly injected into a single-element tuple
+/// type.  Otherwise, the subexpression is known to have a tuple type.
 class TupleShuffleExpr : public ImplicitConversionExpr {
 public:
   enum : int {
@@ -2268,6 +2281,12 @@ public:
     /// formulation.
     CallerDefaultInitialize = -3
   };
+
+  enum SourceIsScalar_t : bool {
+    SourceIsTuple = false,
+    SourceIsScalar = true
+  };
+
 private:
   /// This contains an entry for each element in the Expr type.  Each element
   /// specifies which index from the SubExpr that the destination element gets.
@@ -2286,15 +2305,24 @@ private:
 
 public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
+                   SourceIsScalar_t isSourceScalar,
                    ConcreteDeclRef defaultArgsOwner,
                    MutableArrayRef<Expr *> CallerDefaultArgs, Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
       ElementMapping(elementMapping), VarargsArrayTy(),
       DefaultArgsOwner(defaultArgsOwner), CallerDefaultArgs(CallerDefaultArgs)
   {
+    TupleShuffleExprBits.IsSourceScalar = isSourceScalar;
   }
 
   ArrayRef<int> getElementMapping() const { return ElementMapping; }
+
+  /// Is the source expression scalar?
+  ///
+  /// This doesn't necessarily mean it's not a tuple; it just means
+  /// that it should be treated as if it were an element of a
+  /// single-element tuple for the purposes of interpreting behavior.
+  bool isSourceScalar() const { return TupleShuffleExprBits.IsSourceScalar; }
 
   /// Set the varargs array type to use.
   void setVarargsArrayType(Type T) { VarargsArrayTy = T; }
@@ -2572,46 +2600,6 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ArchetypeToSuper;
-  }
-};
-
-/// ScalarToTupleExpr - Convert a scalar to tuple type.
-class ScalarToTupleExpr : public ImplicitConversionExpr {
-public:
-  /// Describes an element of the destination tuple, which can be the
-  /// caller-side default argument expression, the declaration from which the
-  /// callee-side default argument should be produced, or null to indicate the
-  /// 'hole' where the scalar expression should be placed.
-  typedef llvm::PointerUnion<Expr *, ConcreteDeclRef> Element;
-
-private:
-  /// If we're doing a varargs shuffle, this is the array type to build.
-  Type VarargsArrayTy;
-
-  /// The elements of the destination tuple.
-  MutableArrayRef<Element> Elements;
-
-public:
-  ScalarToTupleExpr(Expr *subExpr, Type type,
-                    MutableArrayRef<Element> elements,
-                    Type VarargsArrayTy = nullptr)
-    : ImplicitConversionExpr(ExprKind::ScalarToTuple, subExpr, type),
-      VarargsArrayTy(VarargsArrayTy), Elements(elements) {}
-
-  /// Retrieve the index of the scalar field within the destination tuple.
-  unsigned getScalarField() const;
-
-  /// Retrieve the array type for the variadic part of the tuple.
-  Type getVarargsArrayType() { return VarargsArrayTy; }
-
-  /// Retrieve the elements of the destination tuple.
-  MutableArrayRef<Element> getElements() { return Elements; }
-  ArrayRef<Element> getElements() const { return Elements; }
-
-  Element getElement(unsigned i) const { return Elements[i]; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ScalarToTuple;
   }
 };
 

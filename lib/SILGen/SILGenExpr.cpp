@@ -194,7 +194,6 @@ namespace {
     RValue visitIsExpr(IsExpr *E, SGFContext C);
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
-    RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
     RValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
@@ -1790,20 +1789,74 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                    generator.isTransparent(), None, None, C);
 }
 
+static void emitTupleShuffleExprInto(RValueEmitter &emitter,
+                                     TupleShuffleExpr *E,
+                                     Initialization *outerTupleInit) {
+  CanTupleType outerTuple = cast<TupleType>(E->getType()->getCanonicalType());
+  auto outerFields = outerTuple->getElements();
+
+  // Decompose the initialization.
+  SmallVector<InitializationPtr, 4> outerInitsBuffer;
+  auto outerInits =
+    outerTupleInit->getSubInitializationsForTuple(emitter.SGF, outerTuple,
+                                                  outerInitsBuffer,
+                                                  RegularLocation(E));
+  assert(outerInits.size() == outerFields.size() &&
+         "initialization size does not match tuple size?!");
+
+  // Map outer initializations into a tuple of inner initializations:
+  //   - fill out the initialization elements with null
+  TupleInitialization innerTupleInit;
+  if (E->isSourceScalar()) {
+    innerTupleInit.SubInitializations.push_back(nullptr);
+  } else {
+    CanTupleType innerTuple =
+      cast<TupleType>(E->getSubExpr()->getType()->getCanonicalType());
+    innerTupleInit.SubInitializations.resize(innerTuple->getNumElements());
+  }
+
+  // Map all the outer initializations to their appropriate targets.
+  for (unsigned outerIndex = 0; outerIndex != outerInits.size(); outerIndex++) {
+    auto innerMapping = E->getElementMapping()[outerIndex];
+    assert(innerMapping >= 0 &&
+           "non-argument tuple shuffle with default arguments or variadics?");
+    innerTupleInit.SubInitializations[innerMapping] =
+      std::move(outerInits[outerIndex]);
+  }
+
+#ifndef NDEBUG
+  for (auto &innerInit : innerTupleInit.SubInitializations) {
+    assert(innerInit != nullptr && "didn't map all inner elements");
+  }
+#endif
+
+  // Emit the sub-expression into the tuple initialization we just built.
+  if (E->isSourceScalar()) {
+    emitter.SGF.emitExprInto(E->getSubExpr(),
+                             innerTupleInit.SubInitializations[0].get());
+  } else {
+    emitter.SGF.emitExprInto(E->getSubExpr(), &innerTupleInit);
+  }
+}
+
 RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
                                             SGFContext C) {
-  /* TODO:
   // If we're emitting into an initialization, we can try shuffling the
   // elements of the initialization.
   if (Initialization *I = C.getEmitInto()) {
-    emitTupleShuffleExprInto(*this, E, I);
-    return RValue();
+    if (I->canSplitIntoSubelementAddresses()) {
+      emitTupleShuffleExprInto(*this, E, I);
+      return RValue();
+    }
   }
-   */
 
   // Emit the sub-expression tuple and destructure it into elements.
   SmallVector<RValue, 4> elements;
-  visit(E->getSubExpr()).extractElements(elements);
+  if (E->isSourceScalar()) {
+    elements.push_back(visit(E->getSubExpr()));
+  } else {
+    visit(E->getSubExpr()).extractElements(elements);
+  }
   
   // Prepare a new tuple to hold the shuffled result.
   RValue result(E->getType()->getCanonicalType());
@@ -1852,131 +1905,6 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     break;
   }
   
-  return result;
-}
-
-static void emitScalarToTupleExprInto(SILGenFunction &gen,
-                                      ScalarToTupleExpr *E,
-                                      Initialization *I) {
-  auto tupleType = cast<TupleType>(E->getType()->getCanonicalType());
-  auto outerFields = tupleType->getElements();
-  unsigned scalarField = E->getScalarField();
-  bool isScalarFieldVariadic = outerFields[scalarField].isVararg();
-
-  // Decompose the initialization.
-  SmallVector<InitializationPtr, 4> subInitializationBuf;
-  auto subInitializations = I->getSubInitializationsForTuple(gen, tupleType,
-                                                          subInitializationBuf,
-                                                          RegularLocation(E));
-  assert(subInitializations.size() == outerFields.size() &&
-         "initialization size does not match tuple size?!");
-  
-  // If the scalar field isn't variadic, emit it into the destination field of
-  // the tuple.
-  Initialization *scalarInit = subInitializations[E->getScalarField()].get();
-  if (!isScalarFieldVariadic) {
-    gen.emitExprInto(E->getSubExpr(), scalarInit);
-  } else {
-    // Otherwise, create the vararg and store it to the vararg field.
-    ManagedValue scalar = gen.emitRValueAsSingleValue(E->getSubExpr());
-    ManagedValue varargs = emitVarargs(gen, E, E->getSubExpr()->getType(),
-                                       scalar, E->getVarargsArrayType());
-    varargs.forwardInto(gen, E, scalarInit->getAddress());
-    scalarInit->finishInitialization(gen);
-  }
-  
-  // Emit the non-scalar fields.
-  for (unsigned i = 0, e = outerFields.size(); i != e; ++i) {
-    if (i == E->getScalarField())
-      continue;
-
-    // Fill the vararg field with an empty array.
-    if (outerFields[i].isVararg()) {
-      assert(i == e - 1 && "vararg isn't last?!");
-      ManagedValue varargs = emitVarargs(gen, E,
-                                         outerFields[i].getVarargBaseTy(),
-                                         {}, E->getVarargsArrayType());
-      varargs.forwardInto(gen, E, subInitializations[i]->getAddress());
-      subInitializations[i]->finishInitialization(gen);
-      continue;
-    }
-
-    const auto &element = E->getElement(i);
-    // If this element comes from a default argument generator, emit a call to
-    // that generator in-place.
-    assert(outerFields[i].hasInit() &&
-           "no default initializer in non-scalar field of scalar-to-tuple?!");
-    if (auto defaultArgOwner = element.dyn_cast<ConcreteDeclRef>()) {
-      SILDeclRef generator
-        = SILDeclRef::getDefaultArgGenerator(defaultArgOwner.getDecl(), i);
-
-      // TODO: Should apply the default arg generator's captures, but Sema doesn't
-      // track them.
-
-      auto fnRef = ManagedValue::forUnmanaged(
-                                      gen.emitGlobalFunctionRef(E, generator));
-      auto resultType = tupleType.getElementType(i);
-      auto apply = gen.emitMonomorphicApply(E, fnRef, {}, resultType,
-                                            generator.isTransparent(),
-                                            None, None);
-      apply.forwardInto(gen, E,
-                        subInitializations[i].get()->getAddressOrNull());
-      subInitializations[i]->finishInitialization(gen);
-      continue;
-    }
-
-    // We have an caller-side default argument. Emit it in-place.
-    Expr *defArg = element.get<Expr *>();
-    gen.emitExprInto(defArg, subInitializations[i].get());
-  }
-}
-
-RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
-                                             SGFContext C) {
-  // If we're emitting into an Initialization, we can decompose the
-  // initialization.
-  if (Initialization *I = C.getEmitInto()) {
-    if (I->canSplitIntoSubelementAddresses()) {
-      emitScalarToTupleExprInto(SGF, E, I);
-      return RValue();
-    }
-  }
-
-  // Emit the scalar member.
-  RValue scalar = SGF.emitRValue(E->getSubExpr());
-
-  // Prepare a tuple rvalue to house the result.
-  RValue result(E->getType()->getCanonicalType());
-  
-  // Create a tuple from the scalar along with any default values or varargs.
-  auto outerFields = E->getType()->castTo<TupleType>()->getElements();
-  for (unsigned i = 0, e = outerFields.size(); i != e; ++i) {
-    // Handle the variadic argument. If we didn't emit the scalar field yet,
-    // it goes into the variadic array; otherwise, the variadic array is empty.
-    assert(!outerFields[i].isVararg() &&
-           "Only argument tuples can have default initializers & varargs");
-    if (outerFields[i].isVararg()) {
-      assert(i == e - 1 && "vararg isn't last?!");
-      ManagedValue varargs;
-      if (!scalar.isUsed())
-        varargs = emitVarargs(SGF, E, outerFields[i].getVarargBaseTy(),
-                              std::move(scalar).getAsSingleValue(SGF, E),
-                              E->getVarargsArrayType());
-      else
-        varargs = emitVarargs(SGF, E, outerFields[i].getVarargBaseTy(),
-                              {}, E->getVarargsArrayType());
-      result.addElement(RValue(SGF, E,
-                               outerFields[i].getType()->getCanonicalType(),
-                               varargs));
-      break;
-    }
-
-    // A null element indicates that this is the position of the scalar. Add
-    // the scalar here.
-    assert(E->getElement(i).isNull() && "Unknown scalar to tuple conversion");
-    result.addElement(std::move(scalar));
-  }
-
   return result;
 }
 
