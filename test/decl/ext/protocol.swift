@@ -551,7 +551,7 @@ extension PConstrained1 {
   final func pc1() -> Int { return 0 }
 }
 
-extension PConstrained1 where Self.AssocTypePC1 : PInherit2 {
+extension PConstrained1 where AssocTypePC1 : PInherit2 {
   final func pc1() -> Bool { return true }
 }
 
@@ -614,6 +614,8 @@ func testSConstrained3(sc3a: SConstrained3a, sc3b: SConstrained3b) {
   s = sc3b.pc2()
   var b: Bool = sc3b.pc2()
 }
+
+extension PConstrained3 where AssocTypePC2 : PInherit1 { }
 
 // ----------------------------------------------------------------------------
 // Semantic restrictions

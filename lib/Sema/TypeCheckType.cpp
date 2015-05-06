@@ -726,6 +726,38 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           }
         }
 
+        // If the lookup occurs from within a trailing 'where' clause of
+        // a constrained extension, also look for associated types.
+        if (!comp->isBound() &&
+            genericParams && genericParams->hasTrailingWhereClause() &&
+            isa<ExtensionDecl>(DC) && comp->getIdLoc().isValid() &&
+            TC.Context.SourceMgr.rangeContainsTokenLoc(
+              genericParams->getTrailingWhereClauseSourceRange(),
+              comp->getIdLoc())) {
+          auto nominal = DC->isNominalTypeOrNominalTypeExtensionContext();
+          SmallVector<ValueDecl *, 4> decls;
+          if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
+                                  comp->getIdentifier(),
+                                  NL_QualifiedDefault|NL_ProtocolMembers,
+                                  &TC,
+                                  decls)) {
+            for (const auto decl : decls) {
+              // FIXME: Better ambiguity handling.
+              if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+                bool unboundGenerics
+                  = options.contains(TR_AllowUnboundGenerics);
+                Type type = resolveTypeDecl(TC, assocType, comp->getIdLoc(),
+                                            DC, None, unboundGenerics, true,
+                                            resolver);
+                comp->setValue(type);
+                if (type->is<ErrorType>())
+                  return type;
+                break;
+              }
+            }
+          }
+        }
+
         if (!DC->isCascadingContextForLookup(/*excludeFunctions*/true))
           lookupOptions |= TR_KnownNonCascadingDependency;
       }

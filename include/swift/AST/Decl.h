@@ -1036,6 +1036,11 @@ public:
     AsWrittenString = Str;
   }
 
+  SourceRange getSourceRange() const {
+    return SourceRange(Types[0].getSourceRange().Start,
+                       Types[1].getSourceRange().End);
+  }
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -1297,8 +1302,7 @@ public:
       return SourceRange();
 
     return SourceRange(TrailingWhereLoc,
-                       Requirements.back().getSecondTypeLoc().getSourceRange()
-                         .End);
+                       Requirements.back().getSourceRange().End);
   }
 
   /// Retrieve the depth of this generic parameter list.
