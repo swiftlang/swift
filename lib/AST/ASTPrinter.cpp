@@ -1424,7 +1424,31 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
       return;
     }
   }
+  auto ContainsFunc = [&] (DeclAttrKind Kind) {
+    return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
+      begin(), Options.ExcludeAttrList.end(), Kind);
+  };
+
+  auto RemoveFunc = [&] (DeclAttrKind Kind) {
+    Options.ExcludeAttrList.erase(std::find(Options.ExcludeAttrList.begin(),
+                                            Options.ExcludeAttrList.end(), Kind));
+  };
+
+  // Since we have already printed @noescape and @autoclosure, we exclude them
+  // when printing the type.
+  auto hasNoEscape = ContainsFunc(DAK_NoEscape);
+  auto hasAutoClosure = ContainsFunc(DAK_AutoClosure);
+  if (!hasNoEscape)
+    Options.ExcludeAttrList.push_back(DAK_NoEscape);
+  if (!hasAutoClosure)
+    Options.ExcludeAttrList.push_back(DAK_AutoClosure);
   printTypeLoc(TheTypeLoc);
+
+  // After printing the type, we need to restore what the option used to be.
+  if (!hasNoEscape)
+    RemoveFunc(DAK_NoEscape);
+  if (!hasAutoClosure)
+    RemoveFunc(DAK_AutoClosure);
 }
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
@@ -2447,9 +2471,14 @@ public:
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
     if(Options.SkipAttributes)
       return;
-    if (info.isAutoClosure())
+    auto IsAttrExcluded = [&](DeclAttrKind Kind) {
+      return Options.ExcludeAttrList.end() != std::find(Options.ExcludeAttrList.
+        begin(), Options.ExcludeAttrList.end(), Kind);
+    };
+    if (info.isAutoClosure() && !IsAttrExcluded(DAK_AutoClosure))
       Printer << "@autoclosure ";
-    else if (info.isNoEscape())    // autoclosure implies noescape.
+    else if (info.isNoEscape() && !IsAttrExcluded(DAK_NoEscape))
+      // autoclosure implies noescape.
       Printer << "@noescape ";
     
     if (Options.PrintFunctionRepresentationAttrs) {

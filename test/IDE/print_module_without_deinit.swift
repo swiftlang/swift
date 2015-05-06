@@ -5,6 +5,7 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=false -module-to-print=print_module_without_deinit -I %t -source-filename=%s | FileCheck -check-prefix=NOSKIP1 %s
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | FileCheck -check-prefix=INIT1 %s
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | FileCheck -check-prefix=INIT2 %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | FileCheck -check-prefix=ATTR1 %s
 
 // SKIP1: class PropertyOwnership {
 // NOSKIP1: class PropertyOwnership {
@@ -33,4 +34,12 @@ public class ImplicitOptionalInitContainer {
   public init!() {
     return nil
   }
+}
+
+// ATTR1: class AttributeContainer1 {
+public class AttributeContainer1 {
+  // ATTR1: func m1(@autoclosure a: () -> Int)
+  public func m1(@autoclosure a : ()->Int) {}
+  // ATTR1: func m2(@noescape a: () -> Int)
+  public func m2(@noescape a : ()->Int) {}
 }
