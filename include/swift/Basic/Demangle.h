@@ -29,6 +29,7 @@ namespace Demangle {
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
   bool DisplayTypeOfIVarFieldOffset = true;
+  bool DisplayDebuggerGeneratedModule = true;
 
   DemangleOptions() {}
 };

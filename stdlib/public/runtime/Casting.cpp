@@ -89,8 +89,13 @@ static void _buildNameForMetadata(const Metadata *type,
 static void _buildNominalTypeName(const NominalTypeDescriptor *ntd,
                                   const Metadata *type,
                                   std::string &result) {
+  auto options = Demangle::DemangleOptions();
+  options.DisplayDebuggerGeneratedModule = false;
+
   // Demangle the basic type name.
-  result += Demangle::demangleTypeAsString(ntd->Name, strlen(ntd->Name));
+  result += Demangle::demangleTypeAsString(ntd->Name,
+                                           strlen(ntd->Name),
+                                           options);
   
   // If generic, demangle the type parameters.
   if (ntd->GenericParams.NumPrimaryParams > 0) {
@@ -120,13 +125,18 @@ static const char *_getProtocolName(const ProtocolDescriptor *protocol) {
 
 static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
                                       std::string &result) {
+  auto options = Demangle::DemangleOptions();
+  options.DisplayDebuggerGeneratedModule = false;
+
   // If there's only one protocol, the existential type name is the protocol
   // name.
   auto descriptors = protocols->getProtocols();
   
   if (protocols->NumProtocols == 1) {
     auto name = _getProtocolName(descriptors[0]);
-    result += Demangle::demangleTypeAsString(name, strlen(name));
+    result += Demangle::demangleTypeAsString(name,
+                                             strlen(name),
+                                             options);
     return;
   }
   
@@ -135,7 +145,9 @@ static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
     if (i > 0)
       result += ", ";
     auto name = _getProtocolName(descriptors[i]);
-    result += Demangle::demangleTypeAsString(name, strlen(name));
+    result += Demangle::demangleTypeAsString(name,
+                                             strlen(name),
+                                             options);
   }
   result += ">";
 }
@@ -190,6 +202,9 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
 static void _buildNameForMetadata(const Metadata *type,
                            TypeSyntaxLevel level,
                            std::string &result) {
+  auto options = Demangle::DemangleOptions();
+  options.DisplayDebuggerGeneratedModule = false;
+                             
   switch (type->getKind()) {
   case MetadataKind::Class: {
     auto classType = static_cast<const ClassMetadata *>(type);
@@ -223,7 +238,7 @@ static void _buildNameForMetadata(const Metadata *type,
     auto foreign = static_cast<const ForeignClassMetadata *>(type);
     const char *name = foreign->getName();
     size_t len = strlen(name);
-    result += Demangle::demangleTypeAsString(name, len);
+    result += Demangle::demangleTypeAsString(name, len, options);
     return;
   }
   case MetadataKind::Existential: {

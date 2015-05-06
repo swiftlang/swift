@@ -647,6 +647,7 @@ Runtime.test("demangleName") {
   expectEqual("Swift.Double", _stdlib_demangleName("_TtSd"))
   expectEqual("x.a : x.Foo<x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>, x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>>",
       _stdlib_demangleName("_Tv1x1aGCS_3FooGS0_GS0_SiSi_GS0_SiSi__GS0_GS0_SiSi_GS0_SiSi___"))
+  expectEqual("Foobar", _stdlib_demangleName("_TtC13__lldb_expr_46Foobar"))
 }
 
 Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {

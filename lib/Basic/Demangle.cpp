@@ -2178,6 +2178,11 @@ private:
     return (node->getKind() == Node::Kind::Module &&
             node->getText() == STDLIB_NAME);
   }
+  
+  static bool isDebuggerGeneratedModule(NodePointer node) {
+      return (node->getKind() == Node::Kind::Module &&
+              0 == node->getText().find(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX));
+    }
 
   static bool isIdentifier(NodePointer node, StringRef desired) {
     return (node->getKind() == Node::Kind::Identifier &&
@@ -2474,8 +2479,12 @@ private:
 
   void printContext(NodePointer context) {
     // TODO: parenthesize local contexts?
-    print(context, /*asContext*/ true);
-    Printer << '.';
+    if (Options.DisplayDebuggerGeneratedModule ||
+       !isDebuggerGeneratedModule(context))
+    {
+      print(context, /*asContext*/ true);
+      Printer << '.';
+    }
   }
 
   void print(NodePointer pointer, bool asContext = false, bool suppressType = false);

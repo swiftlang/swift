@@ -1201,8 +1201,12 @@ extern "C" void swift_stdlib_getDemangledTypeName(OpaqueValue *value,
 extern "C" void swift_stdlib_demangleName(const char *mangledName,
                                           size_t mangledNameLength,
                                           String *demangledName) {
+  auto options = Demangle::DemangleOptions();
+  options.DisplayDebuggerGeneratedModule = false;
   auto result =
-      Demangle::demangleSymbolAsString(mangledName, mangledNameLength);
+      Demangle::demangleSymbolAsString(mangledName,
+                                       mangledNameLength,
+                                       options);
   new (demangledName) String(result.data(), result.size());
 }
 
