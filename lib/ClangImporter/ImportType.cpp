@@ -772,6 +772,8 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Result:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
+  case ImportTypeKind::CFRetainedOutParameter:
+  case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyAccessor:
   case ImportTypeKind::BridgedValue:
@@ -794,6 +796,8 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
+  case ImportTypeKind::CFRetainedOutParameter:
+  case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyAccessor:
     return true;
