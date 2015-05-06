@@ -77,6 +77,11 @@ public prefix func ~ <T : _RawOptionSetType>(a: T) -> T {
   return T(rawValue: ~a.rawValue)
 }
 
+/// Protocol for C-like option sets.
+public protocol _OptionSetType {
+  // TODO: implementation, API review
+}
+
 /// Protocol for `NS_OPTIONS` imported from Objective-C
 public protocol RawOptionSetType : _RawOptionSetType, BitwiseOperationsType,
     NilLiteralConvertible {

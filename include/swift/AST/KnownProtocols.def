@@ -46,6 +46,7 @@ PROTOCOL(Equatable)
 PROTOCOL(Hashable)
 PROTOCOL(Comparable)
 PROTOCOL(_ErrorType)
+PROTOCOL(_OptionSetType)
 
 PROTOCOL(_ObjectiveCBridgeable)
 PROTOCOL(_DestructorSafeContainer)
