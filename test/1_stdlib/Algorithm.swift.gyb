@@ -265,7 +265,7 @@ Algorithm.test("sorted/strings")
     sorted([ "apple", "Banana", "cherry" ]))
 
   let s = sorted(["apple", "Banana", "cherry"]) {
-    count($0) > count($1)
+    $0.count() > $1.count()
   }
   expectEqual([ "Banana", "cherry", "apple" ], s)
 }
@@ -1540,7 +1540,7 @@ SequenceTypeAlgorithms.test("filter/RangeReplaceableCollectionType/${CollectionT
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "filter() should be eager and should only call its predicate once per element"
       }
-      expectGE(2 * count(result), result.${'capacity' if CollectionKind == 'StdlibArray' else 'reservedCapacity'}) {
+      expectGE(2 * result.count(), result.${'capacity' if CollectionKind == 'StdlibArray' else 'reservedCapacity'}) {
         "filter() should not reserve capacity (it does not know how much the predicate will filter out)"
       }
     }
@@ -1738,7 +1738,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
-      expectGE(2 * count(result), result.capacity) {
+      expectGE(2 * result.count(), result.capacity) {
         "flatMap() should not reserve capacity"
       }
     }
@@ -1815,7 +1815,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "flatMap() should be eager and should only call its predicate once per element"
       }
-      expectGE(2 * count(result), result.capacity) {
+      expectGE(2 * result.count(), result.capacity) {
         "flatMap() should not reserve capacity"
       }
     }
@@ -2536,7 +2536,7 @@ struct MinimalCollectionWith${Implementation}Count : CollectionType {
 
   static var timesCountWasCalled: Int = 0
 
-  func _prext_count() -> Int32 {
+  func count() -> Int32 {
     ++MinimalCollectionWithCustomCount.timesCountWasCalled
     return Int32(_count)
   }
@@ -2547,7 +2547,7 @@ struct MinimalCollectionWith${Implementation}Count : CollectionType {
 % end
 
 func callGenericCount<C : CollectionType>(collection: C) -> C.Index.Distance {
-  return collection._prext_count()
+  return collection.count()
 }
 
 % for Implementation in [ 'Default', 'Custom' ]:
@@ -2561,7 +2561,7 @@ SequenceTypeAlgorithms.test("CollectionType.count()/${Implementation}Implementat
 %   if Implementation == 'Custom':
       MinimalCollectionWithCustomCount.timesCountWasCalled = 0
 %   end
-      var result = collection._prext_count()
+      var result = collection.count()
       expectType(Int32.self, &result)
       expectEqual(Int32(count), result)
 %   if Implementation == 'Custom':

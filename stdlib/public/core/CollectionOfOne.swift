@@ -80,7 +80,7 @@ public struct CollectionOfOne<T> : CollectionType {
   }
 
   /// Return the number of elements (always one).
-  public func _prext_count() -> Int {
+  public func count() -> Int {
     return 1
   }
 

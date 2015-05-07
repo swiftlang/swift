@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Returns the minimum element in `elements`.  Requires:
-/// `elements` is non-empty. O(count(elements))
+/// `elements` is non-empty. O(elements.count())
 @availability(*, unavailable, message="call the 'minElement()' method on the sequence")
 public func minElement<
      R : SequenceType
@@ -21,7 +21,7 @@ public func minElement<
 }
 
 /// Returns the maximum element in `elements`.  Requires:
-/// `elements` is non-empty. O(count(elements))
+/// `elements` is non-empty. O(elements.count())
 @availability(*, unavailable, message="call the 'maxElement()' method on the sequence")
 public func maxElement<
      R : SequenceType
@@ -33,7 +33,7 @@ public func maxElement<
 /// Returns the first index where `value` appears in `domain` or `nil` if
 /// `value` is not found.
 ///
-/// - complexity: O(`count(domain)`)
+/// - complexity: O(`domain.count()`)
 @availability(*, unavailable, message="call the 'indexOf()' method on the collection")
 public func find<
   C: CollectionType where C.Generator.Element : Equatable

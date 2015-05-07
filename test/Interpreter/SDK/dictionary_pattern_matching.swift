@@ -28,7 +28,7 @@ func stateFromPlistLame(plist: Dictionary<String, AnyObject>) -> State? {
 func stateFromPlistCool(plist: Dictionary<String, AnyObject>) -> State? {
   switch (plist["name"], plist["population"], plist["abbrev"]) {
   case let (name as String, pop as Int, abbr as String)
-  where count(abbr) == 2:
+  where abbr.count() == 2:
     return State(name: name,
                  population: pop,
                  abbrev: abbr)
@@ -128,7 +128,7 @@ struct StatMirror: MirrorType {
 func statisticFromPlist(plist: Dictionary<String, AnyObject>) -> Statistic? {
   switch (plist["kind"], plist["name"], plist["population"], plist["abbrev"]) {
   case let ("state" as String, name as String, population as Int, abbrev as String)
-  where count(abbrev) == 2:
+  where abbrev.count() == 2:
     return Statistic.ForState(State(name: name,
                                     population: population,
                                     abbrev: abbrev))

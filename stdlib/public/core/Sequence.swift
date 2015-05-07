@@ -135,7 +135,7 @@ public func _copyToNativeArrayBuffer<Args>(args: Args)
 
 /// Return an underestimate of the number of elements in the given
 /// sequence, without consuming the sequence.  For Sequences that are
-/// actually Collections, this will return count(x)
+/// actually Collections, this will return x.count()
 @availability(*, unavailable, message="call the 'underestimateCount()' method on the sequence")
 public func underestimateCount<T : SequenceType>(x: T) -> Int {
   return x.underestimateCount()

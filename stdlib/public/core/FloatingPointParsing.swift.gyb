@@ -65,7 +65,7 @@ extension ${Self} {
 
     let (result, n) = text.withCString(parseNTBS)
 
-    if n == 0 || n != count(u16)
+    if n == 0 || n != u16.count()
       || u16.contains({ $0 > 127 || _isspace_clocale($0) }) {
       return nil
     }

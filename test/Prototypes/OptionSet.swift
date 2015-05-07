@@ -137,7 +137,7 @@ extension SetAlgebraType {
 
 extension SetAlgebraType where Self : CollectionType {
   final func isStrictSupersetOf(other: Self) -> Bool {
-    return count(self) > count(other) && self.isSupersetOf(other)
+    return self.count() > other.count() && self.isSupersetOf(other)
   }
 
   final func isStrictSubsetOf(other: Self) -> Bool {

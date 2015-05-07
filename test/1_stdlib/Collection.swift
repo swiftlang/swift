@@ -161,9 +161,9 @@ func testCount() {
   // CHECK: testing count
   println("testing count")
   // CHECK-NEXT: random access: 4
-  println("random access: \(count(array))")
+  println("random access: \(array.count())")
   // CHECK-NEXT: bidirectional: 5
-  println("bidirectional: \(count(dict))")
+  println("bidirectional: \(dict.count())")
 }
 testCount()
 

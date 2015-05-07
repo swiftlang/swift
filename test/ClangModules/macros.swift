@@ -67,12 +67,12 @@ func testCStrings() -> Bool {
 
 func testObjCString() -> Int {
   let str: String = OBJC_STRING
-  return count(str)
+  return str.count()
 }
 
 func testCFString() -> Int {
   let str: String = CF_STRING
-  return count(str)
+  return str.count()
 }
 
 func testInvalidIntegerLiterals() {

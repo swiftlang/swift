@@ -91,7 +91,7 @@ protocol _ArrayType
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`count(self)`).
+  /// - complexity: O(`self.count()`).
   ///
   /// Requires: `atIndex` <= `count`
   mutating func insert(newElement: Self.Generator.Element, atIndex i: Int)

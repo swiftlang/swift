@@ -1045,8 +1045,8 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
   let t = ArrayTestSuite.test("\(testPrefix)/Infrastructure")
   (evilBoundsCheck ? t.crashOutputMatches(evilBoundsError) : t).code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
-    let count0 = count(evil)
-    let count1 = count(evil)
+    let count0 = evil.count()
+    let count1 = evil.count()
     expectNotEqual(count0, count1)
     if step > 0 {
       expectLE(count0, count1)

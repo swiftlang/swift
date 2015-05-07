@@ -971,7 +971,7 @@ extension NSEnumerator : SequenceType {
 extension NSRange {
   public init(_ x: Range<Int>) {
     location = x.startIndex
-    length = count(x)
+    length = x.count()
   }
 
   public func toRange() -> Range<Int>? {

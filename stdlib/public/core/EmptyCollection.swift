@@ -72,7 +72,7 @@ public struct EmptyCollection<T> : CollectionType {
   }
 
   /// Return the number of elements (always zero).
-  public func _prext_count() -> Int {
+  public func count() -> Int {
     return 0
   }
 }

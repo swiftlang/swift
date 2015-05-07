@@ -41,7 +41,7 @@ internal func _parseUnsignedAsciiAsUIntMax(
 
   _precondition(radix > 1, "Radix must be greater than 1")
   _precondition(
-    radix <= numericCast(10 + count(lower)),
+    radix <= numericCast(10 + lower.count()),
     "Radix exceeds what can be expressed using the English alphabet")
 
   let uRadix = UIntMax(bitPattern: IntMax(radix))

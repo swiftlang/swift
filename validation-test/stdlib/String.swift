@@ -1041,7 +1041,7 @@ StringTests.test("indexConversion") {
   var matches: [String] = []
   
   re.enumerateMatchesInString(
-    s, options: NSMatchingOptions(), range: NSRange(0..<count(s.utf16))
+    s, options: NSMatchingOptions(), range: NSRange(0..<s.utf16.count())
   ) {
     result, flags, stop
   in

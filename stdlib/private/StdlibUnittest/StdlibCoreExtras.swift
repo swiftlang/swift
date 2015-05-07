@@ -79,7 +79,7 @@ public func createTemporaryFile(
   var fileName = fileNamePrefix + "XXXXXX" + fileNameSuffix
 #endif
   let fd = _stdlib_mkstemps(
-    &fileName, CInt(count(fileNameSuffix.utf8)))
+    &fileName, CInt(fileNameSuffix.utf8.count()))
   if fd < 0 {
     fatalError("mkstemps() returned an error")
   }
