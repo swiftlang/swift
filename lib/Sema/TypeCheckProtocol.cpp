@@ -1930,12 +1930,12 @@ ConformanceChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   } else {
     // Variable/function/subscript requirements.
     auto metaType = MetatypeType::get(Adoptee);
-    auto candidates = TC.lookupMember(metaType, req->getFullName(), DC);
+    auto candidates = TC.lookupMember(DC, metaType, req->getFullName());
 
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
     if (candidates.empty() && ignoringNames) {
-      candidates = TC.lookupMember(metaType, req->getName(), DC);
+      candidates = TC.lookupMember(DC, metaType, req->getName());
       *ignoringNames = true;
     }
 

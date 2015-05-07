@@ -29,16 +29,15 @@ void LookupResult::filter(const std::function<bool(ValueDecl *)> &pred) {
                 Results.end());
 }
 
-LookupResult TypeChecker::lookupMember(Type type, DeclName name,
-                                       DeclContext *dc,
-                                       bool isKnownPrivate,
-                                       bool allowDynamicLookup) {
+LookupResult TypeChecker::lookupMember(DeclContext *dc,
+                                       Type type, DeclName name,
+                                       NameLookupOptions options) {
   LookupResult result;
-  unsigned options = NL_QualifiedDefault;
-  if (isKnownPrivate)
-    options |= NL_KnownNonCascadingDependency;
-  if (allowDynamicLookup)
-    options |= NL_DynamicLookup;
+  unsigned subOptions = NL_QualifiedDefault;
+  if (options.contains(NameLookupFlags::KnownPrivate))
+    subOptions |= NL_KnownNonCascadingDependency;
+  if (options.contains(NameLookupFlags::DynamicLookup))
+    subOptions |= NL_DynamicLookup;
 
   // Dig out the type that we'll actually be looking into, and determine
   // whether it is a nominal type.
@@ -57,7 +56,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
   bool considerProtocolMembers
     = nominalLookupType && !isa<ProtocolDecl>(nominalLookupType);
   if (considerProtocolMembers)
-    options |= NL_ProtocolMembers;
+    subOptions |= NL_ProtocolMembers;
 
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
@@ -83,7 +82,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
   };
 
   // Look for the member.
-  dc->lookupQualified(type, name, options, this, result.Results);
+  dc->lookupQualified(type, name, subOptions, this, result.Results);
   handleProtocolMembers();
 
   if (result.empty()) {
@@ -99,7 +98,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
     this->forceExternalDeclMembers(nominalLookupType);
 
     ConformanceCheckOptions conformanceOptions;
-    if (isKnownPrivate)
+    if (options.contains(NameLookupFlags::KnownPrivate))
       conformanceOptions |= ConformanceCheckFlags::InExpression;
 
     for (auto member : protocolMembers) {
@@ -117,7 +116,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
     // Perform the lookup again.
     // FIXME: This is only because forceExternalDeclMembers() might do something
     // interesting.
-    dc->lookupQualified(type, name, options, this, result.Results);
+    dc->lookupQualified(type, name, subOptions, this, result.Results);
     handleProtocolMembers();
   }
 
@@ -221,6 +220,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
 
 LookupResult TypeChecker::lookupConstructors(Type type, DeclContext *dc,
                                              bool isKnownPrivate) {
-  return lookupMember(type, Context.Id_init, dc, isKnownPrivate,
-                      /*allowDynamicLookup=*/false);
+  NameLookupOptions options = NameLookupFlags::ProtocolMembers;
+  if (isKnownPrivate)
+    options |= NameLookupFlags::KnownPrivate;
+  return lookupMember(dc, type, Context.Id_init, options);
 }

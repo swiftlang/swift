@@ -115,6 +115,29 @@ public:
   }
 };
 
+/// Flags that can be used to control name lookup.
+enum class NameLookupFlags {
+  /// Whether we know that this lookup is always a private dependency.
+  KnownPrivate = 0x01,
+  /// Whether name lookup should be able to find protocol members.
+  ProtocolMembers = 0x02,
+  /// Whether to perform 'dynamic' name lookup that finds @objc
+  /// members of any class or protocol.
+  DynamicLookup = 0x04,
+};
+
+/// A set of options that control name lookup.
+typedef OptionSet<NameLookupFlags> NameLookupOptions;
+
+inline NameLookupOptions operator|(NameLookupFlags flag1,
+                                   NameLookupFlags flag2) {
+  return NameLookupOptions(flag1) | flag2;
+}
+
+/// Default options for member name lookup.
+const NameLookupOptions defaultMemberLookupOptions
+  = NameLookupFlags::DynamicLookup | NameLookupFlags::ProtocolMembers;
+
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
 enum class Comparison {
@@ -1163,9 +1186,9 @@ public:
   /// \param allowDynamicLookup Whether to allow dynamic lookup.
   ///
   /// \returns The result of name lookup.
-  LookupResult lookupMember(Type type, DeclName name, DeclContext *dc,
-                            bool isKnownPrivate = false,
-                            bool allowDynamicLookup = true);
+  LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
+                            NameLookupOptions options
+                              = defaultMemberLookupOptions);
 
   /// \brief Look up a member type within the given type.
   ///

@@ -81,7 +81,7 @@ namespace swift {
   };
 
 /// Constants used to customize name lookup.
-enum NameLookupOptions {
+enum ASTNameLookupFlags {
   /// Visit supertypes (such as superclasses or inherited protocols)
   /// and their extensions as well as the current extension.
   NL_VisitSupertypes = 0x01,

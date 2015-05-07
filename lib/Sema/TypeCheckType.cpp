@@ -124,8 +124,10 @@ static Type getObjectiveCClassType(TypeChecker &TC,
   if (!module)
     return nullptr;
 
-  if (auto result = TC.lookupMember(ModuleType::get(module), TypeName,
-                                    dc, /*knownPrivate=*/true)) {
+  NameLookupOptions lookupOptions
+    = defaultMemberLookupOptions | NameLookupFlags::KnownPrivate;
+  if (auto result = TC.lookupMember(dc, ModuleType::get(module), TypeName,
+                                    lookupOptions)) {
     for (auto decl : result) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         cache = nominal->getDeclaredType();

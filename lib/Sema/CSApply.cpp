@@ -6520,8 +6520,11 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
   // Look for the builtin name. If we don't have it, we need to call the
   // general name via the witness table.
-  auto witnesses = tc.lookupMember(type->getRValueType(), builtinName, cs.DC,
-                                   isa<AbstractFunctionDecl>(cs.DC));
+  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+  if (isa<AbstractFunctionDecl>(cs.DC))
+    lookupOptions |= NameLookupFlags::KnownPrivate;
+  auto witnesses = tc.lookupMember(cs.DC, type->getRValueType(), builtinName,
+                                   lookupOptions);
   if (!witnesses) {
     auto protocolType = protocol->getType()->
                         getAs<MetatypeType>()->getInstanceType();
@@ -6536,8 +6539,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     } else {
       // If the expression is already typed to the protocol, lookup the protocol
       // method directly.
-      witnesses = tc.lookupMember(type->getRValueType(), generalName, cs.DC,
-                                  isa<AbstractFunctionDecl>(cs.DC));
+      witnesses = tc.lookupMember(cs.DC, type->getRValueType(), generalName,
+                                  lookupOptions);
       if (!witnesses) {
         tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
         return nullptr;
@@ -6563,8 +6566,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
     // At this point, we must have a type with the builtin member.
     type = expr->getType();
-    witnesses = tc.lookupMember(type->getRValueType(), builtinName, cs.DC,
-                                isa<AbstractFunctionDecl>(cs.DC));
+    witnesses = tc.lookupMember(cs.DC, type->getRValueType(), builtinName,
+                                lookupOptions);
     if (!witnesses) {
       tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
       return nullptr;

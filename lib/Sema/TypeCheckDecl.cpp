@@ -4555,10 +4555,11 @@ public:
     DeclName name = decl->getFullName();
 
   retry:
-    LookupResult members = TC.lookupMember(superclassMetaTy, name,
-                                           decl->getDeclContext(),
-                                           /*isKnownPrivate=*/false,
-                                           /*allowDynamicLookup=*/false);
+    NameLookupOptions lookupOptions
+      = defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
+    LookupResult members = TC.lookupMember(decl->getDeclContext(),
+                                           superclassMetaTy, name,
+                                           lookupOptions);
 
     typedef std::tuple<ValueDecl *, bool, Type> MatchType;
     SmallVector<MatchType, 2> matches;
