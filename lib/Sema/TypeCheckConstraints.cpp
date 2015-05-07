@@ -1296,18 +1296,21 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       Type generatorType;
       Type elementType;
       
-      auto member = cs.TC.lookupMemberType(expr->getType()->getRValueType(),
+      NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
+      if (isa<AbstractFunctionDecl>(cs.DC))
+        lookupOptions |= NameLookupFlags::KnownPrivate;
+      auto member = cs.TC.lookupMemberType(cs.DC,
+                                           expr->getType()->getRValueType(),
                                            tc.Context.Id_Generator,
-                                           cs.DC,
-                                           isa<AbstractFunctionDecl>(cs.DC));
+                                           lookupOptions);
       
       if (member) {
         generatorType = member.front().second;
         
-        member = cs.TC.lookupMemberType(generatorType,
+        member = cs.TC.lookupMemberType(cs.DC,
+                                        generatorType,
                                         tc.Context.Id_Element,
-                                        cs.DC,
-                                        isa<AbstractFunctionDecl>(cs.DC));
+                                        lookupOptions);
         
         if (member)
           elementType = member.front().second;

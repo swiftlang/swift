@@ -159,7 +159,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // Check whether the name can be found in the superclass.
   // FIXME: The archetype builder could do this, too.
   if (auto superclassTy = basePA->getSuperclass()) {
-    if (auto lookup = TC.lookupMemberType(superclassTy, name, DC)) {
+    if (auto lookup = TC.lookupMemberType(DC, superclassTy, name)) {
       if (lookup.isAmbiguous()) {
         TC.diagnoseAmbiguousMemberType(baseTy, baseRange, name, nameLoc,
                                        lookup);

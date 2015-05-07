@@ -142,6 +142,10 @@ const NameLookupOptions defaultMemberLookupOptions
 const NameLookupOptions defaultConstructorLookupOptions
   = NameLookupFlags::ProtocolMembers;
 
+/// Default options for member type lookup.
+const NameLookupOptions defaultMemberTypeLookupOptions
+  = NameLookupFlags::ProtocolMembers;
+
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
 enum class Comparison {
@@ -1197,19 +1201,16 @@ public:
   /// This routine looks for member types with the given name within the
   /// given type. 
   ///
+  /// \param dc The context that needs the member.
   /// \param type The type in which we will look for a member type.
   /// \param name The name of the member to look for.
-  /// \param dc The context that needs the member.
-  /// \param isKnownPrivate If true, this lookup is counted as a private
-  /// dependency.
-  /// \param allowProtocolMembers If true, allow lookup to find members of
-  /// protocols and protocol extensions.
+  /// \param options Options that control name lookup.
   ///
   /// \returns The result of name lookup.
-  LookupTypeResult lookupMemberType(Type type, Identifier name,
-                                    DeclContext *dc,
-                                    bool isKnownPrivate = false,
-                                    bool allowProtocolMembers = true);
+  LookupTypeResult lookupMemberType(DeclContext *dc, Type type,
+                                    Identifier name,
+                                    NameLookupOptions options
+                                      = defaultMemberTypeLookupOptions);
 
   /// \brief Look up the constructors of the given type.
   ///

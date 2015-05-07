@@ -78,8 +78,9 @@ static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
                           StringRef name) {
   if (cached.isNull()) {
     Module *stdlib = TC.Context.getStdlibModule();
-    LookupTypeResult lookup = TC.lookupMemberType(ModuleType::get(stdlib),
-                                            TC.Context.getIdentifier(name), dc);
+    LookupTypeResult lookup = TC.lookupMemberType(dc, ModuleType::get(stdlib),
+                                                  TC.Context.getIdentifier(
+                                                    name));
     if (lookup)
       cached = lookup.back().second;
   }
@@ -813,8 +814,13 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           // Expressions cannot affect a function's signature.
           isKnownNonCascading = isa<AbstractFunctionDecl>(DC);
         }
-        auto memberTypes = TC.lookupMemberType(parentTy, comp->getIdentifier(),
-                                               DC, isKnownNonCascading);
+        
+        NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+        if (isKnownNonCascading)
+          lookupOptions |= NameLookupFlags::KnownPrivate;
+        auto memberTypes = TC.lookupMemberType(DC, parentTy,
+                                               comp->getIdentifier(),
+                                               lookupOptions);
 
         // Name lookup was ambiguous. Complain.
         // FIXME: Could try to apply generic arguments first, and see whether
@@ -873,7 +879,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       // Lookup into a module.
       auto module = parent.get<Module *>();
       LookupTypeResult foundModuleTypes =
-        TC.lookupMemberType(ModuleType::get(module), comp->getIdentifier(), DC);
+        TC.lookupMemberType(DC, ModuleType::get(module), comp->getIdentifier());
 
       // If lookup was ambiguous, complain.
       if (foundModuleTypes.isAmbiguous()) {
@@ -2144,7 +2150,7 @@ Type TypeChecker::getSuperClassOf(Type type) {
 
 Type TypeChecker::resolveMemberType(DeclContext *dc, Type type,
                                     Identifier name) {
-  LookupTypeResult memberTypes = lookupMemberType(type, name, dc);
+  LookupTypeResult memberTypes = lookupMemberType(dc, type, name);
   if (!memberTypes)
     return Type();
 

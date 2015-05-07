@@ -123,10 +123,9 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   return result;
 }
 
-LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
-                                               DeclContext *dc,
-                                               bool isKnownPrivate,
-                                               bool allowProtocolMembers) {
+LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
+                                               Type type, Identifier name,
+                                               NameLookupOptions options) {
   LookupTypeResult result;
 
   // Look through an inout type.
@@ -142,13 +141,13 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
          
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  unsigned options = NL_QualifiedDefault;
-  if (isKnownPrivate)
-    options |= NL_KnownNonCascadingDependency;
-  if (allowProtocolMembers)
-    options |= NL_ProtocolMembers;    
+  unsigned subOptions = NL_QualifiedDefault;
+  if (options.contains(NameLookupFlags::KnownPrivate))
+    subOptions |= NL_KnownNonCascadingDependency;
+  if (options.contains(NameLookupFlags::ProtocolMembers))
+    subOptions |= NL_ProtocolMembers;    
 
-  if (!dc->lookupQualified(type, name, options, this, decls))
+  if (!dc->lookupQualified(type, name, subOptions, this, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
@@ -186,9 +185,9 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
   if (result.Results.empty()) {
     // We couldn't find any normal declarations. Let's try inferring
     // associated types.
-    ConformanceCheckOptions options;
-    if (isKnownPrivate)
-      options |= ConformanceCheckFlags::InExpression;
+    ConformanceCheckOptions conformanceOptions;
+    if (options.contains(NameLookupFlags::KnownPrivate))
+      conformanceOptions |= ConformanceCheckFlags::InExpression;
 
     for (AssociatedTypeDecl *assocType : inferredAssociatedTypes) {
       // If the type does not actually conform to the protocol, skip this
@@ -198,7 +197,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
       // particular witness.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
       ProtocolConformance *conformance = nullptr;
-      if (!conformsToProtocol(type, protocol, dc, options, &conformance) ||
+      if (!conformsToProtocol(type, protocol, dc, conformanceOptions,
+                              &conformance) ||
           !conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;

@@ -2416,8 +2416,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   auto metaType = MetatypeType::get(Adoptee);
 
   // Look for a member type with the same name as the associated type.
-  auto candidates = TC.lookupMemberType(metaType, assocType->getName(), DC,
-                                        false, false);
+  auto candidates = TC.lookupMemberType(DC, metaType, assocType->getName(),
+                                        None);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {

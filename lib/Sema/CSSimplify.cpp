@@ -2948,8 +2948,11 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       return SolutionKind::Error;
     }
 
-    auto lookup = TC.lookupMemberType(baseObjTy, name.getBaseName(), DC,
-                                      isa<AbstractFunctionDecl>(DC));
+    NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
+    if (isa<AbstractFunctionDecl>(DC))
+      lookupOptions |= NameLookupFlags::KnownPrivate;
+    auto lookup = TC.lookupMemberType(DC, baseObjTy, name.getBaseName(),
+                                      lookupOptions);
     if (!lookup) {
       // FIXME: Customize diagnostic to mention types.
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
