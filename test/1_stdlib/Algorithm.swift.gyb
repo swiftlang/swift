@@ -126,19 +126,6 @@ Algorithm.test("startsWith") {
   }
 }
 
-Algorithm.test("enumerate") {
-  // FIXME(prext): remove these tests together with the enumerate() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-
-  var result = [String]()
-  for (i, s) in enumerate( "You will never retrieve the necronomicon!"._split(" ") ) {
-    result.append("\(i) \(s)")
-  }
-  expectEqual(
-    [ "0 You", "1 will", "2 never", "3 retrieve", "4 the", "5 necronomicon!" ],
-    result)
-}
-
 Algorithm.test("equal") {
   // FIXME(prext): remove these tests together with the equal() function when
   // protocol extensions land.  These tests have been migrated to the new API.
@@ -610,7 +597,7 @@ SequenceTypeAlgorithms.test("enumerate") {
   for test in enumerateTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
       test.sequence._prext_map { OpaqueValue($0) })
-    var result = s._prext_enumerate()
+    var result = s.enumerate()
     expectType(
       EnumerateSequence<MinimalSequence<OpaqueValue<Int>>>.self,
       &result)
@@ -680,7 +667,7 @@ let minMaxElementTests = [
 SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") {
   for test in minMaxElementTests {
     let s = MinimalSequence<MinimalComparableValue>(
-      test.sequence._prext_enumerate()._prext_map {
+      test.sequence.enumerate()._prext_map {
         MinimalComparableValue($1, identity: $0)
       })
     var maybeResult = s._prext_${algorithmKind}Element()
@@ -707,7 +694,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") 
 SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
   for test in minMaxElementTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence._prext_enumerate()._prext_map {
+      test.sequence.enumerate()._prext_map {
         OpaqueValue($1, identity: $0)
       })
     var timesClosureWasCalled = 0

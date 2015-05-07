@@ -27,13 +27,15 @@ extension SequenceType {
   /// *n*s are consecutive `Int`s starting at zero, and *x*s are
   /// the elements of `base`:
   ///
-  ///     > for (n, c) in enumerate("Swift") { println("\(n): '\(c)'" ) }
+  ///     > for (n, c) in enumerate("Swift".characters) {
+  ///         println("\(n): '\(c)'")
+  ///       }
   ///     0: 'S'
   ///     1: 'w'
   ///     2: 'i'
   ///     3: 'f'
   ///     4: 't'
-  final public func _prext_enumerate() -> EnumerateSequence<Self> {
+  final public func enumerate() -> EnumerateSequence<Self> {
     return EnumerateSequence(self)
   }
 }

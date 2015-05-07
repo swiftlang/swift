@@ -1800,8 +1800,8 @@ where
   // comparison later.
   let source = _UnitTestArray<A.Generator.Element>(makeCollection())
 
-  for (ix, i) in enumerate(indices(source)) {
-    for (jx_, j) in enumerate(i..<source.endIndex) {
+  for (ix, i) in source._prext_indices.enumerate() {
+    for (jx_, j) in (i..<source.endIndex).enumerate() {
       let jx = jx_ + ix
       
       let oldCount = jx - ix
@@ -1828,7 +1828,7 @@ where
             &a, "\(actualCount) != expected count \(expectedCount)")
         }
         
-        for (kx, k) in enumerate(indices(a)) {
+        for (kx, k) in a._prext_indices.enumerate() {
           let expectedValue = kx < ix ? nth(source, kx)
           : kx < jx + growth ? nth(newValues, kx - ix)
           : nth(source, kx - growth)

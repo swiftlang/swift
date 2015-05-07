@@ -260,11 +260,11 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
 ///     2: 'i'
 ///     3: 'f'
 ///     4: 't'
+@availability(*, unavailable, message="call the 'enumerate()' method on the sequence")
 public func enumerate<Seq : SequenceType>(
   base: Seq
 ) -> EnumerateSequence<Seq> {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return base._prext_enumerate()
+  return base.enumerate()
 }
 
 /// Return `true` iff `a1` and `a2` contain the same elements in the
