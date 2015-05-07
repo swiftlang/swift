@@ -60,7 +60,7 @@ extension _CollectionDefaultsType {
   /// `self`, **nondestructively**.
   ///
   /// - complexity: O(N)
-  final public func _prext_underestimateCount() -> Int {
+  final public func underestimateCount() -> Int {
     return numericCast(_prext_count())
   }
 

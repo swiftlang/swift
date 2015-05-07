@@ -153,7 +153,7 @@ internal class _${Kind}Box<S : ${Kind}Type>
     return _GeneratorBox(x)
   }
   override func _underestimateCount() -> Int {
-    return Swift.underestimateCount(_base)
+    return _base.underestimateCount()
   }
   override func _initializeTo(ptr: UnsafeMutablePointer<Void>) {
     _base~>(_InitializeTo(), UnsafeMutablePointer(ptr))
@@ -215,7 +215,7 @@ public struct AnySequence<T> : SequenceType {
 
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
 extension Any${Kind} {
-  public func _prext_underestimateCount() -> Int {
+  public func underestimateCount() -> Int {
     return _box._underestimateCount()
   }
 }

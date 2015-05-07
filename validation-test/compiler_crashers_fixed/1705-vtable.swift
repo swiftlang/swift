@@ -23,7 +23,7 @@ class a {
 }
 }
 typealias F = .Element>() {
-println(seq: A) -> {
+zzzz(seq: A) -> {
 }
 let v: B, B
 }

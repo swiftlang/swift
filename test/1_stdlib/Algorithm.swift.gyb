@@ -1937,7 +1937,7 @@ SequenceTypeAlgorithms.test("zip") {
 //===----------------------------------------------------------------------===//
 
 func callGenericUnderestimatedCount<S : SequenceType>(s: S) -> Int {
-  return s._prext_underestimateCount()
+  return s.underestimateCount()
 }
 
 struct SequenceWithDefaultUnderestimateCount : SequenceType {
@@ -1968,7 +1968,7 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
     ).generate()
   }
 
-  func _prext_underestimateCount() -> Int {
+  func underestimateCount() -> Int {
     return _underestimatedCount
   }
 
@@ -2050,7 +2050,7 @@ struct CollectionWithCustomUnderestimateCount : CollectionType {
     return OpaqueValue(0xffff)
   }
 
-  func _prext_underestimateCount() -> Int {
+  func underestimateCount() -> Int {
     return _underestimatedCount
   }
 

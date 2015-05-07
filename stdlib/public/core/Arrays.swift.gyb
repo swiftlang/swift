@@ -1000,7 +1000,7 @@ where S.Generator.Element == T
 >(inout lhs: ${Self}<T>, rhs: S) {
   let oldCount = lhs.count
   let capacity = lhs.capacity
-  let newCount = oldCount + underestimateCount(rhs)
+  let newCount = oldCount + rhs.underestimateCount()
 
   if newCount > capacity {
     lhs.reserveCapacity(

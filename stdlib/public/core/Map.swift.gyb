@@ -55,8 +55,8 @@ public struct MapSequenceView<Base : SequenceType, T> : SequenceType {
       _base: _base.generate(), _transform: _transform)
   }
 
-  public func _prext_underestimateCount() -> Int {
-    return underestimateCount(_base)
+  public func underestimateCount() -> Int {
+    return _base.underestimateCount()
   }
 
   var _base: Base
@@ -119,8 +119,8 @@ public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
     return MapSequenceGenerator(_base: _base.generate(), _transform: _transform)
   }
 
-  public func _prext_underestimateCount() -> Int {
-    return underestimateCount(_base)
+  public func underestimateCount() -> Int {
+    return _base.underestimateCount()
   }
 
   var _base: Base

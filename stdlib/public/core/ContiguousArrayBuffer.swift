@@ -546,7 +546,7 @@ public func ~> <
   source: S, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<S.Generator.Element>
 {
-  let initialCapacity = source._prext_underestimateCount()
+  let initialCapacity = source.underestimateCount()
   var result = _ContiguousArrayBuffer<S.Generator.Element>(
     count: initialCapacity, minimumCapacity: initialCapacity)
 

@@ -32,7 +32,7 @@ public func scan<
   S : SequenceType, U
 >(seq: S, _ initial: U, _ combine: (U, S.Generator.Element) -> U) -> _UnitTestArray<U> {
   var result = _UnitTestArray<U>()
-  result.reserveCapacity(underestimateCount(seq))
+  result.reserveCapacity(seq.underestimateCount())
   var runningResult = initial
   for element in seq {
     runningResult = combine(runningResult, element)

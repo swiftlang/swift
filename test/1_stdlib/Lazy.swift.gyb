@@ -44,7 +44,7 @@ LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
     underestimatedCount: .Value(42))
   var lazySeq = lazy(s)
   expectType(LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &lazySeq)
-  expectEqual(42, underestimateCount(lazySeq))
+  expectEqual(42, lazySeq.underestimateCount())
 }
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
@@ -59,7 +59,7 @@ LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
       Minimal${traversal}Collection<OpaqueValue<Int>>
     >.self,
     &lazySeq)
-  expectEqual(42, underestimateCount(lazySeq))
+  expectEqual(42, lazySeq.underestimateCount())
 }
 
 %end
@@ -81,7 +81,7 @@ LazyTestSuite.test("MapSequenceView<Sequence>/underestimateCount") {
       >
     >.self,
     &lazyMap)
-  expectEqual(42, underestimateCount(lazyMap))
+  expectEqual(42, lazyMap.underestimateCount())
 }
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
@@ -99,7 +99,7 @@ LazyTestSuite.test("MapCollectionView<${traversal}Collection>/underestimateCount
       >
     >.self,
     &lazyMap)
-  expectEqual(42, underestimateCount(lazyMap))
+  expectEqual(42, lazyMap.underestimateCount())
 }
 
 %end

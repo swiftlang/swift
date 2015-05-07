@@ -176,12 +176,12 @@ func testUnderestimateCount() {
   // CHECK: testing underestimateCount
   println("testing underestimateCount")
   // CHECK-NEXT: random access: 4
-  println("random access: \(underestimateCount(array))")
+  println("random access: \(array.underestimateCount())")
   // CHECK-NEXT: bidirectional: 5
-  println("bidirectional: \(underestimateCount(dict))")
+  println("bidirectional: \(dict.underestimateCount())")
   // CHECK-NEXT: SequenceType only: 0
   let s = SequenceOnly(base: array)
-  println("SequenceType only: \(underestimateCount(s))")
+  println("SequenceType only: \(s.underestimateCount())")
 }
 testUnderestimateCount()
 

@@ -287,7 +287,7 @@ extension String.CharacterView : ExtensibleCollectionType {
       S : SequenceType
       where S.Generator.Element == Character
   >(newElements: S) {
-    reserveCapacity(_core.count + underestimateCount(newElements))
+    reserveCapacity(_core.count + newElements.underestimateCount())
     for c in newElements {
       self.append(c)
     }

@@ -32,8 +32,8 @@ public struct LazySequence<S : SequenceType> : SequenceType {
     return Array(_base)
   }
 
-  public func _prext_underestimateCount() -> Int {
-    return underestimateCount(_base)
+  public func underestimateCount() -> Int {
+    return _base.underestimateCount()
   }
 
   var _base: S

@@ -55,7 +55,7 @@ extension _SequenceDefaultsType {
   /// `self`, **nondestructively**.
   ///
   /// - complexity: O(N)
-  final public func _prext_underestimateCount() -> Int {
+  final public func underestimateCount() -> Int {
     return 0
   }
 
@@ -89,7 +89,7 @@ public protocol _Sequence_Type
   /// `self`, **nondestructively**.
   ///
   /// - complexity: O(N)
-  func _prext_underestimateCount() -> Int
+  func underestimateCount() -> Int
 
   func _customContainsEquatableElement(
     element: Generator.Element
@@ -136,9 +136,9 @@ public func _copyToNativeArrayBuffer<Args>(args: Args)
 /// Return an underestimate of the number of elements in the given
 /// sequence, without consuming the sequence.  For Sequences that are
 /// actually Collections, this will return count(x)
+@availability(*, unavailable, message="call the 'underestimateCount()' method on the sequence")
 public func underestimateCount<T : SequenceType>(x: T) -> Int {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return x._prext_underestimateCount()
+  return x.underestimateCount()
 }
 
 public struct _InitializeTo {}

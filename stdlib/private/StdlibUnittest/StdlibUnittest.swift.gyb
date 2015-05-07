@@ -1476,7 +1476,7 @@ public func checkSequence<
     resiliencyChecks: resiliencyChecks,
     stackTrace.withCurrentLoc())
   expectGE(
-    expectedCount, underestimateCount(sequence),
+    expectedCount, sequence.underestimateCount(),
     stackTrace: stackTrace.withCurrentLoc(),
     collectMoreInfo: collectMoreInfo)
 }
@@ -2252,7 +2252,7 @@ public struct MinimalSequence<T> : SequenceType {
     return MinimalGenerator(_sharedState)
   }
 
-  public func _prext_underestimateCount() -> Int {
+  public func underestimateCount() -> Int {
     return max(0, self._sharedState.underestimatedCount - self._sharedState.i)
   }
 
@@ -2445,7 +2445,7 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 %     end
   }
 
-  public func _prext_underestimateCount() -> Int {
+  public func underestimateCount() -> Int {
     return underestimatedCount
   }
 
@@ -2499,7 +2499,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
     return MinimalGenerator(elements)
   }
 
-  public func _prext_underestimateCount() -> Int {
+  public func underestimateCount() -> Int {
     return underestimatedCount
   }
 
