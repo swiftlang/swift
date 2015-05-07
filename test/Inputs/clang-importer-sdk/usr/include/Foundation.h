@@ -89,6 +89,10 @@ __attribute__((availability(macosx,introduced=10.9)))
 - (void)makeObjectsPerformSelector:(SEL)aSelector withObject:(id)anObject;
 @end
 
+@interface NSArray (Extras)
+@property NSString *nsstringProperty2;
+@end
+
 @interface NSCoder : NSObject
 @end
 

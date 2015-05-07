@@ -1977,6 +1977,14 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
 
     // Diagnose the conflict.
     anyConflicts = true;
+
+    // If the first method has a valid source location but the first conflicting
+    // declaration does not, swap them so the primary diagnostic has a useful
+    // source location.
+    if (methods[1]->getLoc().isInvalid() && methods[0]->getLoc().isValid()) {
+      std::swap(methods[0], methods[1]);
+    }
+
     auto originalMethod = methods.front();
     auto conflictingMethods = methods.slice(1);
 

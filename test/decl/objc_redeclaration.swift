@@ -1,4 +1,6 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -module-name ZZZ %s -verify
+
+import Foundation
 
 // REQUIRES: objc_interop
 
@@ -52,4 +54,8 @@ extension Redecl1 {
 extension Redecl1 {
   @objc func setWibble(other: Int) { } // expected-error{{method 'setWibble' with Objective-C selector 'setWibble:' conflicts with setter for 'other' with the same Objective-C selector}}
   @objc func wibble() -> Int { return 0 } // expected-error{{method 'wibble()' with Objective-C selector 'wibble' conflicts with getter for 'other' with the same Objective-C selector}}
+}
+
+extension NSArray {
+  func nsstringProperty2() -> Int { return 0 } // expected-error{{method 'nsstringProperty2()' with Objective-C selector 'nsstringProperty2' conflicts with getter for 'nsstringProperty2' with the same Objective-C selector}}
 }
