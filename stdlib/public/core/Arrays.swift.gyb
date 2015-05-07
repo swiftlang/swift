@@ -493,12 +493,6 @@ extension ${Self} : _ArrayType {
     return _getCapacity()
   }
 
-  /// The first element, or `nil` if the array is empty
-  public var first: Element? {
-    // FIXME(prext): remove this function when protocol extensions land.
-    return self._prext_first
-  }
-
   /// The last element, or `nil` if the array is empty
   public var last: Element? {
     // FIXME(prext): remove this function when protocol extensions land.

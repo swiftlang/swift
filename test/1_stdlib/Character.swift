@@ -260,7 +260,7 @@ UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap") {
 }
 
 UnicodeScalarTests.test("UInt32(_: UnicodeScalar),UInt64(_: UnicodeScalar)") {
-  for us in map(baseScalars, { first($0.unicodeScalars)! }) {
+  for us in map(baseScalars, { $0.unicodeScalars.first! }) {
     expectEqual(us.value, UInt32(us))
     expectEqual(UInt64(us.value), UInt64(us))
   }

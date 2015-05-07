@@ -204,9 +204,9 @@ public func isEmpty<C: CollectionType>(x: C) -> Bool {
 }
 
 /// Returns the first element of `x`, or `nil` if `x` is empty.
+@availability(*, unavailable, message="access the 'first' property on the collection")
 public func first<C: CollectionType>(x: C) -> C.Generator.Element? {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return x._prext_first
+  return x.first
 }
 
 /// Returns the last element of `x`, or `nil` if `x` is empty.

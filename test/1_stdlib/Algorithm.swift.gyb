@@ -2462,14 +2462,14 @@ SequenceTypeAlgorithms.test("isEmpty/DefaultImplementation/${dispatch}") {
 SequenceTypeAlgorithms.test("first") {
   if true {
     let s = MinimalForwardCollection<OpaqueValue<Int>>([])
-    expectEmpty(s._prext_first)
+    expectEmpty(s.first)
   }
   if true {
     let s = MinimalForwardCollection<OpaqueValue<Int>>([
       OpaqueValue<Int>(1, identity: 10),
       OpaqueValue<Int>(2, identity: 20)
     ])
-    if let result = s._prext_first {
+    if let result = s.first {
       expectEqual(1, result.value)
       expectEqual(10, result.identity)
     } else {
@@ -3050,7 +3050,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 
         // Check that we didn't lose any values.
 %       if slice:
-        expectEqual(0xfffe, s._prext_first!.identity)
+        expectEqual(0xfffe, s.first!.identity)
         expectEqual(0xffff, s._prext_last!.identity)
         var identities = s._prext_map { $0.identity }
         identities.removeLast()

@@ -24,7 +24,7 @@ GElement = "Generator.Element"
 
 extension CollectionType {
   /// Returns the first element of `self`, or `nil` if `self` is empty.
-  final public var _prext_first: Generator.Element? {
+  final public var first: Generator.Element? {
     return isEmpty ? nil : self[startIndex]
   }
 }
