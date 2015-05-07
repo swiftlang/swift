@@ -175,7 +175,7 @@ internal func _replaceRange<
 public func removeAtIndex<
   C: RangeReplaceableCollectionType
 >(inout x: C, _ index: C.Index) -> C.Generator.Element {
-  _precondition(!isEmpty(x), "can't remove from an empty collection")
+  _precondition(!x.isEmpty, "can't remove from an empty collection")
   let result: C.Generator.Element = x[index]
   _replaceRange(&x, index...index, with: EmptyCollection())
   return result
@@ -228,7 +228,7 @@ public func removeLast<
 >(
   inout x: C
 ) -> C.Generator.Element {
-  _precondition(!isEmpty(x), "can't removeLast from an empty collection")
+  _precondition(!x.isEmpty, "can't removeLast from an empty collection")
   return removeAtIndex(&x, x.endIndex.predecessor())
 }
 

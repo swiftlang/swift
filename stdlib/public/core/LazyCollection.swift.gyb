@@ -47,12 +47,6 @@ public struct ${Self}<S : CollectionType ${whereClause}> : CollectionType {
     return _base.endIndex
   }
 
-  /// True if and only if the collection is empty
-  public
-  var isEmpty: Bool {
-    return startIndex == endIndex
-  }
-
   /// The first element, or `nil` if `self` is empty
   public var first: S.Generator.Element? {
     return Swift.first(self)

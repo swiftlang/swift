@@ -3408,7 +3408,7 @@ func getMockSetWithCustomCount(#count: Int)
 }
 
 func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
-  return collection._prext_isEmpty
+  return collection.isEmpty
 }
 
 SetTestSuite.test("isEmpty") {
@@ -3423,7 +3423,7 @@ SetTestSuite.test("isEmpty/ImplementationIsCustomized") {
   if true {
     var d = getMockSetWithCustomCount(count: 0)
     MockSetWithCustomCount.timesCountWasCalled = 0
-    expectTrue(d._prext_isEmpty)
+    expectTrue(d.isEmpty)
     expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
   }
   if true {
@@ -3436,7 +3436,7 @@ SetTestSuite.test("isEmpty/ImplementationIsCustomized") {
   if true {
     var d = getMockSetWithCustomCount(count: 4)
     MockSetWithCustomCount.timesCountWasCalled = 0
-    expectFalse(d._prext_isEmpty)
+    expectFalse(d.isEmpty)
     expectEqual(1, MockSetWithCustomCount.timesCountWasCalled)
   }
   if true {

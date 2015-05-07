@@ -619,11 +619,6 @@ public struct Set<T : Hashable> :
     }
   }
 
-  /// `true` if the set is empty.
-  public var isEmpty: Bool {
-    return _prext_isEmpty
-  }
-
   public var hashValue: Int {
     // FIXME: <rdar://problem/18915294> Cache Set<T> hashValue
     var result: Int = _mixInt(0)
@@ -650,7 +645,7 @@ public struct Set<T : Hashable> :
   //
 
   /// `true` if the set is empty.
-  public var _prext_isEmpty: Bool {
+  public var isEmpty: Bool {
     return count == 0
   }
 }
@@ -1157,11 +1152,6 @@ public struct Dictionary<Key : Hashable, Value> :
   // API itself.
   //
 
-  /// True iff `count == 0`
-  public var isEmpty: Bool {
-    return _prext_isEmpty
-  }
-
   /// A collection containing just the keys of `self`
   ///
   /// Keys appear in the same order as they occur as the `.0` member
@@ -1186,7 +1176,7 @@ public struct Dictionary<Key : Hashable, Value> :
   //
 
   /// True iff `count == 0`
-  public var _prext_isEmpty: Bool {
+  public var isEmpty: Bool {
     return count == 0
   }
 

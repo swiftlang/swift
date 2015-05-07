@@ -25,7 +25,7 @@ GElement = "Generator.Element"
 extension CollectionType {
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   final public var _prext_first: Generator.Element? {
-    return _prext_isEmpty ? nil : self[startIndex]
+    return isEmpty ? nil : self[startIndex]
   }
 }
 
@@ -35,7 +35,7 @@ extension CollectionType {
 
 extension CollectionType where Index : BidirectionalIndexType {
   final public var _prext_last: Generator.Element? {
-    return _prext_isEmpty ? nil : self[endIndex.predecessor()]
+    return isEmpty ? nil : self[endIndex.predecessor()]
   }
 }
 

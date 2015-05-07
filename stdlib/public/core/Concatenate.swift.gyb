@@ -148,7 +148,7 @@ struct ${Index}<
       ++outer
     }
     for ; outer != data.endIndex ; ++outer {
-      if !isEmpty(data[outer]) {
+      if !data[outer].isEmpty {
         return ${Index}(data, outer, data[outer].startIndex)
       }
     }

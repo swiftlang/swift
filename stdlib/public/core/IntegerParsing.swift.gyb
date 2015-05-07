@@ -33,7 +33,7 @@ UIntMax = 'UInt%s' % int_max_bits
 internal func _parseUnsignedAsciiAsUIntMax(
   u16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
 ) -> UIntMax? {
-  if isEmpty(u16) { return nil }
+  if u16.isEmpty { return nil }
 
   let digit = _ascii16("0")..._ascii16("9")
   let lower = _ascii16("a")..._ascii16("z")
@@ -72,7 +72,7 @@ internal func _parseUnsignedAsciiAsUIntMax(
 internal func _parseAsciiAsUIntMax(
   u16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
 ) -> UIntMax? {
-  if isEmpty(u16) { return nil }
+  if u16.isEmpty { return nil }
   let c = first(u16)
   if _fastPath(c != _ascii16("-")) {
     let unsignedText
@@ -95,7 +95,7 @@ internal func _parseAsciiAsIntMax(
 ) -> IntMax? {
   _sanityCheck(maximum >= 0, "maximum should be non-negative")
 
-  if isEmpty(u16) { return nil }
+  if u16.isEmpty { return nil }
 
   // Drop any leading "-"
   let negative = first(u16) == _ascii16("-")

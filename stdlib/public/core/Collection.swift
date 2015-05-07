@@ -52,7 +52,7 @@ public protocol _CollectionDefaultsType
 
 extension _CollectionDefaultsType {
   /// Returns `true` iff `self` is empty.
-  final public var _prext_isEmpty: Bool {
+  final public var isEmpty: Bool {
     return startIndex == endIndex
   }
 
@@ -151,7 +151,7 @@ public protocol CollectionType
   subscript(_prext_bounds: Range<Index>) -> _prext_SubSlice { get }
 
   /// Returns `true` iff `self` is empty.
-  var _prext_isEmpty: Bool { get }
+  var isEmpty: Bool { get }
 
   /// Return the number of elements.
   ///
@@ -198,9 +198,9 @@ public func ~> <T : CollectionType, R>(
 }
 
 /// Returns `true` iff `x` is empty.
+@availability(*, unavailable, message="access the 'isEmpty' property on the collection")
 public func isEmpty<C: CollectionType>(x: C) -> Bool {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return x._prext_isEmpty
+  return x.isEmpty
 }
 
 /// Returns the first element of `x`, or `nil` if `x` is empty.

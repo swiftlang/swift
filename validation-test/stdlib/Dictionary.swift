@@ -3451,14 +3451,14 @@ DictionaryDerivedAPIs.test("isEmpty") {
 }
 
 func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
-  return collection._prext_isEmpty
+  return collection.isEmpty
 }
 
 DictionaryDerivedAPIs.test("isEmpty/ImplementationIsCustomized") {
   if true {
     var d = getMockDictionaryWithCustomCount(count: 0)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
-    expectTrue(d._prext_isEmpty)
+    expectTrue(d.isEmpty)
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
   if true {
@@ -3471,7 +3471,7 @@ DictionaryDerivedAPIs.test("isEmpty/ImplementationIsCustomized") {
   if true {
     var d = getMockDictionaryWithCustomCount(count: 4)
     MockDictionaryWithCustomCount.timesCountWasCalled = 0
-    expectFalse(d._prext_isEmpty)
+    expectFalse(d.isEmpty)
     expectEqual(1, MockDictionaryWithCustomCount.timesCountWasCalled)
   }
   if true {

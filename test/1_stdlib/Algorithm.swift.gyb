@@ -2377,11 +2377,11 @@ struct MinimalCollectionWithDefaultIsEmpty : CollectionType {
 func callStaticIsEmpty(
   collection: MinimalCollectionWithDefaultIsEmpty
 ) -> Bool {
-  return collection._prext_isEmpty
+  return collection.isEmpty
 }
 
 func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
-  return collection._prext_isEmpty
+  return collection.isEmpty
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -2422,7 +2422,7 @@ struct MinimalCollectionWithCustomIsEmpty : CollectionType {
     return OpaqueValue(i.position + 1)
   }
 
-  var _prext_isEmpty: Bool {
+  var isEmpty: Bool {
     ++MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled
     return _count == 0
   }
@@ -2433,7 +2433,7 @@ struct MinimalCollectionWithCustomIsEmpty : CollectionType {
 func callStaticIsEmpty(
   collection: MinimalCollectionWithCustomIsEmpty
 ) -> Bool {
-  return collection._prext_isEmpty
+  return collection.isEmpty
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
