@@ -199,6 +199,47 @@ extern "C" void swift_release(HeapObject *object);
 /// ObjC compatibility. Never call this.
 extern "C" size_t swift_retainCount(HeapObject *object);
 
+/// Is this pointer a non-null unique reference to an object
+/// that uses Swift reference counting?
+extern "C" bool swift_isUniquelyReferencedNonObjC(const void *);
+
+/// Is this non-null pointer a unique reference to an object
+/// that uses Swift reference counting?
+extern "C" bool swift_isUniquelyReferencedNonObjC_nonNull(const void *);
+
+/// Is this non-null pointer a reference to an object that uses Swift
+/// reference counting and is either uniquely referenced or pinned?
+extern "C" bool swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(const void *);
+
+/// Is this non-null BridgeObject a unique reference to an object
+/// that uses Swift reference counting?
+extern "C" bool swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
+  uintptr_t bits);
+
+/// Is this non-null BridgeObject a unique or pinned reference to an
+/// object that uses Swift reference counting?
+extern "C" bool swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
+  uintptr_t bits);
+
+/// Is this native Swift pointer a non-null unique reference to
+/// an object?
+extern "C" bool swift_isUniquelyReferenced_native(const struct HeapObject *);
+
+/// Is this native Swift pointer a non-null unique or pinned reference
+/// to an object?
+extern "C" bool swift_isUniquelyReferencedOrPinned_native(
+  const struct HeapObject *);
+
+/// Is this non-null native Swift pointer a unique reference to
+/// an object?
+extern "C" bool swift_isUniquelyReferenced_nonNull_native(
+  const struct HeapObject *);
+
+/// Does this non-null native Swift pointer refer to an object that
+/// is either uniquely referenced or pinned?
+extern "C" bool swift_isUniquelyReferencedOrPinned_nonNull_native(
+  const struct HeapObject *);
+
 /// Deallocate the given memory; it was returned by swift_allocObject
 /// but is otherwise in an unknown state.
 ///

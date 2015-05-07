@@ -1064,9 +1064,7 @@ bool swift::_swift_usesNativeSwiftReferenceCounting_nonNull(
 #endif 
 }
 
-// Given a non-nil non-@objc object reference, return true iff the
-// object has a strong reference count of 1.
-bool swift::_swift_isUniquelyReferenced_nonNull_native(
+bool swift::swift_isUniquelyReferenced_nonNull_native(
   const HeapObject* object
 ) {
   assert(object != nullptr);
@@ -1075,41 +1073,33 @@ bool swift::_swift_isUniquelyReferenced_nonNull_native(
   return object->refCount.isUniquelyReferenced();
 }
 
-// Given a non-@objc object reference, return true iff the
-// object is non-nil and has a strong reference count of 1.
-bool swift::_swift_isUniquelyReferenced_native(
-  const HeapObject* object
-) {
+bool swift::swift_isUniquelyReferenced_native(const HeapObject* object) {
   return object != nullptr
-    && _swift_isUniquelyReferenced_nonNull_native(object);
+    && swift::swift_isUniquelyReferenced_nonNull_native(object);
 }
 
-// Given a non-nil object reference, return true iff the object is a
-// native swift object with strong reference count of 1.
-bool swift::_swift_isUniquelyReferencedNonObjC_nonNull(
-  const void* object
-) {
+bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
   assert(object != nullptr);
   return
 #if SWIFT_OBJC_INTEROP
-    swift::_swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
+    _swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
 #endif 
-    _swift_isUniquelyReferenced_nonNull_native((HeapObject*)object);
+    swift_isUniquelyReferenced_nonNull_native((HeapObject*)object);
 }
 
 // Given an object reference, return true iff it is non-nil and refers
 // to a native swift object with strong reference count of 1.
-bool swift::_swift_isUniquelyReferencedNonObjC(
+bool swift::swift_isUniquelyReferencedNonObjC(
   const void* object
 ) {
   return object != nullptr
-    && _swift_isUniquelyReferencedNonObjC_nonNull(object);
+    && swift_isUniquelyReferencedNonObjC_nonNull(object);
 }
 
 /// Return true if the given bits of a Builtin.BridgeObject refer to a
 /// native swift object whose strong reference count is 1.
-bool swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-  __swift_uintptr_t bits
+bool swift::swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
+  uintptr_t bits
 ) {
   auto bridgeObject = (void*)bits;
   
@@ -1123,17 +1113,17 @@ bool swift::_swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
   // object is going to be a negligible cost for a possible big win.
 #if SWIFT_OBJC_INTEROP
   return !isNonNative_unTagged_bridgeObject(bridgeObject)
-    ? _swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object)
-    : _swift_isUniquelyReferencedNonObjC_nonNull(object);
+    ? swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object)
+    : swift_isUniquelyReferencedNonObjC_nonNull(object);
 #else
-  return _swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object);
+  return swift_isUniquelyReferenced_nonNull_native((const HeapObject *)object);
 #endif
 }
 
 /// Return true if the given bits of a Builtin.BridgeObject refer to a
 /// native swift object whose strong reference count is 1.
-bool swift::_swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
-  __swift_uintptr_t bits
+bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
+  uintptr_t bits
 ) {
   auto bridgeObject = (void*)bits;
 
@@ -1147,9 +1137,9 @@ bool swift::_swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
   // object is going to be a negligible cost for a possible big win.
 #if SWIFT_OBJC_INTEROP
   if (isNonNative_unTagged_bridgeObject(bridgeObject))
-    return _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(object);
+    return swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(object);
 #endif
-  return _swift_isUniquelyReferencedOrPinned_nonNull_native(
+  return swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                    (const HeapObject *)object);
 }
 
@@ -1157,31 +1147,31 @@ bool swift::_swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
 /// Given a non-nil object reference, return true if the object is a
 /// native swift object and either its strong reference count is 1 or
 /// its pinned flag is set.
-bool swift::_swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
+bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
                                                           const void *object) {
   assert(object != nullptr);
   return
 #if SWIFT_OBJC_INTEROP
-    swift::_swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
+    _swift_usesNativeSwiftReferenceCounting_nonNull(object) &&
 #endif 
-    _swift_isUniquelyReferencedOrPinned_nonNull_native(
+    swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     (const HeapObject*)object);
 }
 
 // Given a non-@objc object reference, return true iff the
 // object is non-nil and either has a strong reference count of 1
 // or is pinned.
-bool swift::_swift_isUniquelyReferencedOrPinned_native(
+bool swift::swift_isUniquelyReferencedOrPinned_native(
   const HeapObject* object
 ) {
   return object != nullptr
-    && _swift_isUniquelyReferencedOrPinned_nonNull_native(object);
+    && swift_isUniquelyReferencedOrPinned_nonNull_native(object);
 }
 
 /// Given a non-nil native swift object reference, return true if
 /// either the object has a strong reference count of 1 or its
 /// pinned flag is set.
-bool swift::_swift_isUniquelyReferencedOrPinned_nonNull_native(
+bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     const HeapObject* object) {
   SWIFT_ISUNIQUELYREFERENCEDORPINNED();
   assert(object != nullptr);

@@ -27,45 +27,6 @@ namespace swift { extern "C" {
 #define bool _Bool
 #endif
 
-/// Is this pointer a non-null unique reference to an object
-/// that uses Swift reference counting?
-bool _swift_isUniquelyReferencedNonObjC(const void *);
-
-/// Is this non-null pointer a unique reference to an object
-/// that uses Swift reference counting?
-bool _swift_isUniquelyReferencedNonObjC_nonNull(const void *);
-
-/// Is this non-null pointer a reference to an object that uses Swift
-/// reference counting and is either uniquely referenced or pinned?
-bool _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(const void *);
-
-/// Is this non-null BridgeObject a unique reference to an object
-/// that uses Swift reference counting?
-bool _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-  __swift_uintptr_t bits);
-
-/// Is this non-null BridgeObject a unique or pinned reference to an
-/// object that uses Swift reference counting?
-bool _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
-  __swift_uintptr_t bits);
-
-/// Is this native Swift pointer a non-null unique reference to
-/// an object?
-bool _swift_isUniquelyReferenced_native(const struct HeapObject *);
-
-/// Is this native Swift pointer a non-null unique or pinned reference
-/// to an object?
-bool _swift_isUniquelyReferencedOrPinned_native(const struct HeapObject *);
-
-/// Is this non-null native Swift pointer a unique reference to
-/// an object?
-bool _swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
-
-/// Does this non-null native Swift pointer refer to an object that
-/// is either uniquely referenced or pinned?
-bool _swift_isUniquelyReferencedOrPinned_nonNull_native(
-                                                const struct HeapObject *);
-
 bool _swift_usesNativeSwiftReferenceCounting_nonNull(const void *);
 bool _swift_usesNativeSwiftReferenceCounting_class(const void *);
 

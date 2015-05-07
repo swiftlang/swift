@@ -31,7 +31,6 @@ using namespace swift;
 static bool isKnownToNotDecrementRefCount(FunctionRefInst *FRI) {
    return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
      .Case("swift_keepAlive", true)
-     .StartsWith("_swift_isUniquelyReferenced", true)
      .Default(false);
 }
 
@@ -167,13 +166,7 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
 }
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
-  if (isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User))
-    return true;
-  if (auto *AI = dyn_cast<ApplyInst>(User))
-    if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-        return FRI->getReferencedFunction()->getName().startswith(
-          "_swift_isUniquelyReferenced");
-  return false;
+  return isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User);
 }
 
 //===----------------------------------------------------------------------===//
