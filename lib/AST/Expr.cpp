@@ -311,7 +311,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::AutoClosure:
     return false;
 
-  case ExprKind::Module:
   case ExprKind::DynamicType:
     return true;
 

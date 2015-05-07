@@ -339,7 +339,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
     DeclContext(DeclContextKind::Module, nullptr) {
   ctx.addDestructorCleanup(*this);
   setImplicit();
-  setType(MetatypeType::get(ModuleType::get(this)));
+  setType(ModuleType::get(this));
   setAccessibility(Accessibility::Public);
 }
 

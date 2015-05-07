@@ -2868,8 +2868,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Expr *visitModuleExpr(ModuleExpr *expr) { return expr; }
-
     Expr *visitInOutExpr(InOutExpr *expr) {
       auto lvTy = expr->getSubExpr()->getType()->castTo<LValueType>();
 

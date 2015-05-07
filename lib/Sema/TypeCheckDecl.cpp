@@ -5728,8 +5728,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
   validateAccessibility(D);
 
-  // Validate the context. We don't do this for generic parameters, because
-  // those are validated as part of their context.
+  // Validate the context. We don't do this for generic parameters,
+  // because those are validated as part of their context.
   if (D->getKind() != DeclKind::GenericTypeParam) {
     auto dc = D->getDeclContext();
     if (auto nominal = dyn_cast<NominalTypeDecl>(dc))

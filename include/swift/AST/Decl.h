@@ -673,6 +673,8 @@ protected:
   }
   friend class ClangImporter;
 
+  DeclContext *getDeclContextForModule() const;
+
 public:
   DeclKind getKind() const { return DeclKind(DeclBits.Kind); }
 
@@ -697,7 +699,10 @@ public:
   bool isUserAccessible() const;
 
   DeclContext *getDeclContext() const {
-    return Context.dyn_cast<DeclContext *>();
+    if (auto dc = Context.dyn_cast<DeclContext *>())
+      return dc;
+
+    return getDeclContextForModule();
   }
   void setDeclContext(DeclContext *DC);
 

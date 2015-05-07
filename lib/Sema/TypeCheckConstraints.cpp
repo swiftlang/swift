@@ -302,8 +302,10 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   if (!Lookup.Results.empty() &&
       Lookup.Results[0].Kind == UnqualifiedLookupResult::ModuleName) {
     assert(Lookup.Results.size() == 1 && "module names should be unique");
-    ModuleType *MT = ModuleType::get(Lookup.Results[0].getNamedModule());
-    return new (TC.Context) ModuleExpr(Loc, MT);
+    auto module = Lookup.Results[0].getNamedModule();
+    return new (TC.Context) DeclRefExpr(module, Loc, /*Implicit=*/false,
+                                        AccessSemantics::Ordinary,
+                                        module->getDeclaredType());
   }
 
   bool AllDeclRefs = true;
@@ -999,8 +1001,9 @@ public:
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
     
     // Preserve module expr type data to prevent further lookups.
-    if (isa<ModuleExpr>(expr))
-      return { false, expr };
+    if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
+      if (isa<ModuleDecl>(declRef->getDecl()))
+        return { false, expr };
     
     expr->setType(nullptr);
     

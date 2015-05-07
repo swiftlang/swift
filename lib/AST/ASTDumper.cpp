@@ -1618,9 +1618,6 @@ public:
     }
     OS << ')';
   }
-  void visitModuleExpr(ModuleExpr *E) {
-    printCommon(E, "module_expr") << ')';
-  }
   void visitTupleElementExpr(TupleElementExpr *E) {
     printCommon(E, "tuple_element_expr")
       << " field #" << E->getFieldNumber() << '\n';

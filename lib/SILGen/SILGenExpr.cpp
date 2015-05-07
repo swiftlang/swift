@@ -198,7 +198,6 @@ namespace {
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
     RValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
                                          SGFContext C);
-    RValue visitModuleExpr(ModuleExpr *E, SGFContext C);
     RValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
     RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
@@ -315,7 +314,14 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   
   if (!ncRefType) ncRefType = decl->getType();
   CanType refType = ncRefType->getCanonicalType();
-  
+
+  // If this is a reference to a module, produce an undef value. The
+  // module value should never actually be used.
+  if (isa<ModuleDecl>(decl)) {
+    return ManagedValue::forUnmanaged(
+             SILUndef::get(getLoweredLoadableType(ncRefType), SGM.M));
+  }
+
   // If this is a reference to a type, produce a metatype.
   if (isa<TypeDecl>(decl)) {
     assert(decl->getType()->is<MetatypeType>() &&
@@ -1850,13 +1856,6 @@ RValue RValueEmitter::visitDynamicSubscriptExpr(
   return SGF.emitDynamicSubscriptExpr(E, C);
 }
 
-
-RValue RValueEmitter::visitModuleExpr(ModuleExpr *E, SGFContext C) {
-  // Produce an undef value. The module value should never actually be used.
-  SILValue module = SILUndef::get(SGF.getLoweredLoadableType(E->getType()),
-                                  SGF.SGM.M);
-  return RValue(SGF, E, ManagedValue::forUnmanaged(module));
-}
 
 RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
                                             SGFContext C) {

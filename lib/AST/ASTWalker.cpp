@@ -393,8 +393,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
   
-  Expr *visitModuleExpr(ModuleExpr *E) { return E; }
-
   Expr *visitApplyExpr(ApplyExpr *E) {
     if (E->getFn()) {
       Expr *E2 = doIt(E->getFn());

@@ -115,10 +115,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
     DiagnoseWalker(TypeChecker &TC) : TC(TC) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // Diagnose module values that don't appear as part of a qualification.
-      if (auto *ME = dyn_cast<ModuleExpr>(E))
-        checkUseOfModuleExpr(ME);
-
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
       auto Base = E;
@@ -127,8 +123,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
 
       if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
         // Verify metatype uses.
-        if (isa<TypeDecl>(DRE->getDecl()))
-          checkUseOfMetaTypeName(Base);
+        if (isa<TypeDecl>(DRE->getDecl())) {
+          if (isa<ModuleDecl>(DRE->getDecl()))
+            checkUseOfModule(DRE);
+          else
+            checkUseOfMetaTypeName(Base);
+        }
 
         // Verify noescape parameter uses.
         checkNoEscapeParameterUse(DRE, nullptr);
@@ -182,7 +182,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
       return { true, E };
     }
 
-    void checkUseOfModuleExpr(ModuleExpr *E) {
+    void checkUseOfModule(DeclRefExpr *E) {
       // Allow module values as a part of:
       // - ignored base expressions;
       // - expressions that failed to type check.

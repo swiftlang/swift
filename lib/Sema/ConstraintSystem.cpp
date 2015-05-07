@@ -877,8 +877,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
 
-    // If it's a type reference, we're done.
-    if (isTypeReference)
+    // If it's a type reference or it's a module type, we're done.
+    if (isTypeReference || type->is<ModuleType>())
       return { type, type };
 
     // If it's a value reference, refer to the metatype.

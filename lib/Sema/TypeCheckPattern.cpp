@@ -105,17 +105,6 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     return false;
   }
   
-  bool visitModuleExpr(ModuleExpr *me) {
-    assert(components.empty() && "decl ref should be root element of expr");
-    
-    // Add the declared module.
-    auto module = me->getType()->getAs<ModuleType>()->getModule();
-    components.push_back(
-      new (C) SimpleIdentTypeRepr(me->getLoc(), module->getName()));
-    components.back()->setValue(module);
-    return true;
-  }
-  
   bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
     assert(components.empty() && "decl ref should be root element of expr");
     // Track the AST location of the component.

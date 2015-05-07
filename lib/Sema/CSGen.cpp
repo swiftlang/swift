@@ -1841,11 +1841,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Type visitModuleExpr(ModuleExpr *expr) {
-      // Module expressions always have a fixed type.
-      return expr->getType();
-    }
-
     Type visitInOutExpr(InOutExpr *expr) {
       // The address-of operator produces an explicit inout T from an lvalue T.
       // We model this with the constraint

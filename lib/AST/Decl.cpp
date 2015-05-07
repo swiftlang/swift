@@ -273,6 +273,13 @@ DeclContext *Decl::getInnermostDeclContext() {
 
 }
 
+DeclContext *Decl::getDeclContextForModule() const {
+  if (auto module = dyn_cast<ModuleDecl>(this))
+    return const_cast<ModuleDecl *>(module);
+
+  return nullptr;
+}
+
 void Decl::setDeclContext(DeclContext *DC) { 
   Context = DC;
 }
@@ -1722,6 +1729,9 @@ Type TypeDecl::getDeclaredType() const {
       return type;
 
     return type->castTo<MetatypeType>()->getInstanceType();
+  }
+  if (auto module = dyn_cast<ModuleDecl>(this)) {
+    return ModuleType::get(const_cast<ModuleDecl *>(module));
   }
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }

@@ -1869,24 +1869,6 @@ public:
   }
 };
 
-/// ModuleExpr - Reference a module by name.  The module being referenced is
-/// captured in the type of the expression, which is always a ModuleType.
-class ModuleExpr : public Expr {
-  SourceLoc Loc;
-  
-public:
-  ModuleExpr(SourceLoc Loc, Type Ty)
-    : Expr(ExprKind::Module, /*Implicit=*/false, Ty), Loc(Loc) {}
-  
-  SourceRange getSourceRange() const { return SourceRange(Loc, Loc); }
-  SourceLoc getLoc() const { return Loc; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Module;
-  }
-};
-
-
 /// TupleElementExpr - Refer to an element of a tuple,
 /// e.g. "(1,field:2).field".
 class TupleElementExpr : public Expr {
