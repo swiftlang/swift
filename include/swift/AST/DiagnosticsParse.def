@@ -164,7 +164,7 @@ ERROR(disallowed_var_multiple_getset,decl_parsing,none,
 ERROR(expected_condition_where,decl_parsing,PointsToFirstBadToken,
       "expected condition after 'where'", ())
 ERROR(let_else_rename,decl_parsing,PointsToFirstBadToken,
-      "let/else has been resyntaxed to 'require'", ())
+      "let/else has been resyntaxed to 'guard'", ())
 
 ERROR(disallowed_type,decl_parsing,none,
       "type not allowed here", ())
