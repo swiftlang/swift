@@ -244,7 +244,7 @@ else:
 }%
 
   ${comment}
-  final public func _prext_lexicographicalCompare<
+  final public func lexicographicalCompare<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}

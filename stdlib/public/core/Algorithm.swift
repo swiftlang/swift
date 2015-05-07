@@ -297,14 +297,14 @@ public func equal<
 
 /// Return true iff a1 precedes a2 in a lexicographical ("dictionary")
 /// ordering, using "<" as the comparison between elements.
+@availability(*, unavailable, message="call the 'lexicographicalCompare()' method on the sequence")
 public func lexicographicalCompare<
     S1 : SequenceType, S2 : SequenceType
   where
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Comparable>(
   a1: S1, _ a2: S2) -> Bool {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return a1._prext_lexicographicalCompare(a2)
+  return a1.lexicographicalCompare(a2)
 }
 
 /// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
@@ -313,6 +313,7 @@ public func lexicographicalCompare<
 /// Requires: `isOrderedBefore` is a
 /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
 /// over the elements of `a1` and `a2`.
+@availability(*, unavailable, message="call the 'lexicographicalCompare()' method on the sequence")
 public func lexicographicalCompare<
     S1 : SequenceType, S2 : SequenceType
   where
@@ -322,8 +323,7 @@ public func lexicographicalCompare<
   @noescape isOrderedBefore less: (S1.Generator.Element, S1.Generator.Element)
   -> Bool
 ) -> Bool {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return a1._prext_lexicographicalCompare(a2, isOrderedBefore: less)
+  return a1.lexicographicalCompare(a2, isOrderedBefore: less)
 }
 
 /// Return `true` iff an element in `seq` satisfies `predicate`.

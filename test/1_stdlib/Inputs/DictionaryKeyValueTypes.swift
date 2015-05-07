@@ -45,7 +45,7 @@ func equalsUnordered<T : Comparable>(
   lhs: Array<(T, T)>, _ rhs: Array<(T, T)>
 ) -> Bool {
   func comparePair(lhs: (T, T), _ rhs: (T, T)) -> Bool {
-    return lexicographicalCompare([ lhs.0, lhs.1 ], [ rhs.0, rhs.1 ])
+    return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
   }
   return sorted(lhs, comparePair).elementsEqual(sorted(rhs, comparePair)) {
     (lhs: (T, T), rhs: (T, T)) -> Bool in
@@ -771,9 +771,9 @@ func < (
   lhs: ExpectedArrayElement,
   rhs: ExpectedArrayElement
 ) -> Bool {
-  return lexicographicalCompare(
-    [ lhs.value, Int(bitPattern: lhs.valueIdentity) ],
-    [ rhs.value, Int(bitPattern: rhs.valueIdentity) ])
+  let lhsElements = [ lhs.value, Int(bitPattern: lhs.valueIdentity) ]
+  let rhsElements = [ rhs.value, Int(bitPattern: rhs.valueIdentity) ]
+  return lhsElements.lexicographicalCompare(rhsElements)
 }
 
 func _equalsWithoutElementIdentity(
@@ -906,9 +906,9 @@ func < (
   lhs: ExpectedSetElement,
   rhs: ExpectedSetElement
 ) -> Bool {
-  return lexicographicalCompare(
-    [ lhs.value, Int(bitPattern: lhs.valueIdentity) ],
-    [ rhs.value, Int(bitPattern: rhs.valueIdentity) ])
+  let lhsElements = [ lhs.value, Int(bitPattern: lhs.valueIdentity) ]
+  let rhsElements = [ rhs.value, Int(bitPattern: rhs.valueIdentity) ]
+  return lhsElements.lexicographicalCompare(rhsElements)
 }
 
 func _makeExpectedSetContents(
@@ -1128,11 +1128,15 @@ func < (
   lhs: ExpectedDictionaryElement,
   rhs: ExpectedDictionaryElement
 ) -> Bool {
-  return lexicographicalCompare(
-    [ lhs.key, lhs.value, Int(bitPattern: lhs.keyIdentity),
-      Int(bitPattern: lhs.valueIdentity) ],
-    [ rhs.key, rhs.value, Int(bitPattern: rhs.keyIdentity),
-      Int(bitPattern: rhs.valueIdentity) ])
+  let lhsElements = [
+    lhs.key, lhs.value, Int(bitPattern: lhs.keyIdentity),
+    Int(bitPattern: lhs.valueIdentity)
+  ]
+  let rhsElements = [
+    rhs.key, rhs.value, Int(bitPattern: rhs.keyIdentity),
+    Int(bitPattern: rhs.valueIdentity)
+  ]
+  return lhsElements.lexicographicalCompare(rhsElements)
 }
 
 func _equalsUnorderedWithoutElementIdentity(

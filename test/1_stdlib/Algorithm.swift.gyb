@@ -405,10 +405,6 @@ Algorithm.test("invalidOrderings") {
     _insertionSort(&a, indices(a), &pred)
   }
   */
-  withInvalidOrderings {
-    let predicate: (Int,Int)->Bool = $0
-    let result = lexicographicalCompare(randomArray(), randomArray(), isOrderedBefore: predicate)
-  }
 }
 
 // The routine is based on http://www.cs.dartmouth.edu/~doug/mdmspe.pdf
@@ -951,7 +947,7 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/WhereElementIsComparable") {
         test.other.map { MinimalComparableValue($0) })
       expectEqual(
         test.expected.isLT(),
-        s._prext_lexicographicalCompare(other),
+        s.lexicographicalCompare(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.expectedLeftoverSequence, s._prext_map { $0.value },
@@ -969,7 +965,7 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/WhereElementIsComparable") {
         test.other.map { MinimalComparableValue($0) })
       expectEqual(
         test.expected.isLT(),
-        s._prext_lexicographicalCompare(other),
+        s.lexicographicalCompare(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.sequence, s._prext_map { $0.value },
@@ -990,7 +986,7 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
         test.other.map { OpaqueValue($0) })
       expectEqual(
         test.expected.isLT(),
-        s._prext_lexicographicalCompare(other) { $0.value < $1.value },
+        s.lexicographicalCompare(other) { $0.value < $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.expectedLeftoverSequence, s._prext_map { $0.value },
@@ -1008,7 +1004,7 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
         test.other.map { OpaqueValue($0) })
       expectEqual(
         test.expected.isLT(),
-        s._prext_lexicographicalCompare(other) { $0.value < $1.value },
+        s.lexicographicalCompare(other) { $0.value < $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.sequence, s._prext_map { $0.value },

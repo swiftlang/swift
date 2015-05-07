@@ -1986,8 +1986,7 @@ func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
 }
 
 func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
-  return lexicographicalCompare(
-    [ lhs.first, lhs.second ],
+  return [ lhs.first, lhs.second ].lexicographicalCompare(
     [ rhs.first, rhs.second ])
 }
 
