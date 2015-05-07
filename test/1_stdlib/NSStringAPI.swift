@@ -405,7 +405,7 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
     let expectedBytes: [UInt8] = [
       0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86
     ]
-    expectTrue(equal(expectedBytes, bytes))
+    expectEqualSequence(expectedBytes, bytes)
   }
 }
 
@@ -534,7 +534,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
         options: NSStringEncodingConversionOptions(0),
         range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
-    expectTrue(equal(expectedStr, buffer))
+    expectEqualSequence(expectedStr, buffer)
     expectEqual(11, usedLength)
     expectEqual(remainingRange.startIndex, advance(startIndex, 8))
     expectEqual(remainingRange.endIndex, endIndex)
@@ -555,7 +555,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
         options: NSStringEncodingConversionOptions(0),
         range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
-    expectTrue(equal(expectedStr, buffer))
+    expectEqualSequence(expectedStr, buffer)
     expectEqual(4, usedLength)
     expectEqual(remainingRange.startIndex, advance(startIndex, 4))
     expectEqual(remainingRange.endIndex, endIndex)
@@ -575,7 +575,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
         options: NSStringEncodingConversionOptions(0),
         range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
-    expectTrue(equal(expectedStr, buffer))
+    expectEqualSequence(expectedStr, buffer)
     expectEqual(19, usedLength)
     expectEqual(remainingRange.startIndex, endIndex)
     expectEqual(remainingRange.endIndex, endIndex)
@@ -595,7 +595,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
         options: NSStringEncodingConversionOptions(0),
         range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
-    expectTrue(equal(expectedStr, buffer))
+    expectEqualSequence(expectedStr, buffer)
     expectEqual(4, usedLength)
     expectEqual(remainingRange.startIndex, advance(startIndex, 4))
     expectEqual(remainingRange.endIndex, endIndex)
@@ -625,7 +625,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
     let result = s.getCString(&buffer, maxLength: 100,
       encoding: NSUTF8StringEncoding)
     expectTrue(result)
-    expectTrue(equal(expectedStr, buffer))
+    expectEqualSequence(expectedStr, buffer)
   }
   if true {
     // Limit buffer size with 'maxLength'.
@@ -674,7 +674,7 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
     let result = s.getFileSystemRepresentation(
       &buffer, maxLength: bufferLength)
     expectTrue(result)
-    expectTrue(equal(expectedStr, buffer))
+    expectEqualSequence(expectedStr, buffer)
   }
   if true {
     // Limit buffer size with 'maxLength'.

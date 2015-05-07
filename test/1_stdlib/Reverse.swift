@@ -30,7 +30,7 @@ let eager: Array = reverse(lazy(2..<8).map { $0 * 3 })
 
 // Make sure it has the right contents
 // CHECK-NEXT: true
-println(equal(eager, r))
+println(eager.elementsEqual(r))
 
 let raboof = reduce(lazy("foobar").reverse(), "") {
   (s: String, c: Character) in s + String(c)

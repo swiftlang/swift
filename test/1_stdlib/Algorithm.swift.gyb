@@ -94,29 +94,6 @@ let startsWithTests = [
   StartsWithTest(false, [ 1, 2, 10 ], [ 1, 2, 3, 4, 10 ], [], [ 4, 10 ]),
 ]
 
-Algorithm.test("equal") {
-  // FIXME(prext): remove these tests together with the equal() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-
-  var _0_4 = [0, 1, 2, 3]
-  expectFalse(equal(_0_4, 0..<3))
-  expectTrue(equal(_0_4, 0..<4))
-  expectFalse(equal(_0_4, 0..<5))
-  expectFalse(equal(_0_4, 1..<4))
-}
-
-Algorithm.test("equal/predicate") {
-  func compare(lhs: (Int, Int), _ rhs: (Int, Int)) -> Bool {
-    return lhs.0 == rhs.0 && lhs.1 == rhs.1
-  }
-
-  var _0_4 = [(0, 10), (1, 11), (2, 12), (3, 13)]
-  expectFalse(equal(_0_4, [(0, 10), (1, 11), (2, 12)], compare))
-  expectTrue(equal(_0_4, [(0, 10), (1, 11), (2, 12), (3, 13)], compare))
-  expectFalse(equal(_0_4, [(0, 10), (1, 11), (2, 12), (3, 13), (4, 14)], compare))
-  expectFalse(equal(_0_4, [(1, 11), (2, 12), (3, 13)], compare))
-}
-
 Algorithm.test("contains") {
   // FIXME(prext): remove these tests together with the contains() function when
   // protocol extensions land.  These tests have been migrated to the new API.
@@ -828,7 +805,7 @@ SequenceTypeAlgorithms.test("elementsEqual/WhereElementIsEquatable") {
         test.other.map { MinimalEquatableValue($0) })
       expectEqual(
         test.expected,
-        s._prext_elementsEqual(other),
+        s.elementsEqual(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.expectedLeftoverSequence, s._prext_map { $0.value },
@@ -846,7 +823,7 @@ SequenceTypeAlgorithms.test("elementsEqual/WhereElementIsEquatable") {
         test.other.map { MinimalEquatableValue($0) })
       expectEqual(
         test.expected,
-        s._prext_elementsEqual(other),
+        s.elementsEqual(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.sequence, s._prext_map { $0.value },
@@ -867,7 +844,7 @@ SequenceTypeAlgorithms.test("elementsEqual/Predicate") {
         test.other.map { OpaqueValue($0) })
       expectEqual(
         test.expected,
-        s._prext_elementsEqual(other) { $0.value == $1.value },
+        s.elementsEqual(other) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.expectedLeftoverSequence, s._prext_map { $0.value },
@@ -885,7 +862,7 @@ SequenceTypeAlgorithms.test("elementsEqual/Predicate") {
         test.other.map { OpaqueValue($0) })
       expectEqual(
         test.expected,
-        s._prext_elementsEqual(other) { $0.value == $1.value },
+        s.elementsEqual(other) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.sequence, s._prext_map { $0.value },

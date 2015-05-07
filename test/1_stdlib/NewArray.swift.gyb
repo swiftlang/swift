@@ -101,7 +101,7 @@ func checkEqual<
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Equatable
 >(a1: S1, _ a2: S2, _ expected: Bool) {
-  if equal(a1, a2) != expected {
+  if a1.elementsEqual(a2) != expected {
     let un = expected ? "un" : ""
     println("unexpectedly \(un)equal sequences!")
   }

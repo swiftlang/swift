@@ -47,14 +47,14 @@ func equalsUnordered<T : Comparable>(
   func comparePair(lhs: (T, T), _ rhs: (T, T)) -> Bool {
     return lexicographicalCompare([ lhs.0, lhs.1 ], [ rhs.0, rhs.1 ])
   }
-  return equal(sorted(lhs, comparePair), sorted(rhs, comparePair)) {
+  return sorted(lhs, comparePair).elementsEqual(sorted(rhs, comparePair)) {
     (lhs: (T, T), rhs: (T, T)) -> Bool in
     lhs.0 == rhs.0 && lhs.1 == rhs.1
   }
 }
 
 func equalsUnordered<T : Comparable>(lhs: [T], _ rhs: [T]) -> Bool {
-  return equal(sorted(lhs), sorted(rhs))
+  return sorted(lhs).elementsEqual(sorted(rhs))
 }
 
 var _keyCount = _stdlib_AtomicInt(0)
@@ -785,7 +785,7 @@ func _equalsWithoutElementIdentity(
     return list.map { ExpectedArrayElement(value: $0.value) }
   }
 
-  return equal(stripIdentity(lhs), stripIdentity(rhs))
+  return stripIdentity(lhs).elementsEqual(stripIdentity(rhs))
 }
 
 func _makeExpectedArrayContents(

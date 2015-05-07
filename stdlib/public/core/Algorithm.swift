@@ -269,6 +269,7 @@ public func enumerate<Seq : SequenceType>(
 
 /// Return `true` iff `a1` and `a2` contain the same elements in the
 /// same order.
+@availability(*, unavailable, message="call the 'equal()' method on the sequence")
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
@@ -276,12 +277,13 @@ public func equal<
     S1.Generator.Element : Equatable
 >(a1: S1, _ a2: S2) -> Bool {
   // FIXME(prext): remove this function when protocol extensions land.
-  return a1._prext_elementsEqual(a2)
+  return a1.elementsEqual(a2)
 }
 
 /// Return true iff `a1` and `a2` contain equivalent elements, using
 /// `isEquivalent` as the equivalence test.  Requires: `isEquivalent`
 /// is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)
+@availability(*, unavailable, message="call the 'equal()' method on the sequence")
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
@@ -290,7 +292,7 @@ public func equal<
   @noescape _ isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
   -> Bool {
   // FIXME(prext): remove this function when protocol extensions land.
-  return a1._prext_elementsEqual(a2, isEquivalent: isEquivalent)
+  return a1.elementsEqual(a2, isEquivalent: isEquivalent)
 }
 
 /// Return true iff a1 precedes a2 in a lexicographical ("dictionary")

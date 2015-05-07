@@ -177,7 +177,7 @@ else:
 }%
 
   ${comment}
-  final public func _prext_elementsEqual<
+  final public func elementsEqual<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}

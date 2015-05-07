@@ -1892,7 +1892,7 @@ public func expectEqualSequence<
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
 ) {
-  if !equal(expected, actual, sameValue) {
+  if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
@@ -2079,7 +2079,7 @@ public func expectEqualUnicodeScalars(
   collectMoreInfo: (()->String)? = nil
 ) {
   let actualUnicodeScalars = _UnitTestArray(lazy(actual.unicodeScalars).map { $0.value })
-  if !equal(expected, actualUnicodeScalars) {
+  if !expected.elementsEqual(actualUnicodeScalars) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
