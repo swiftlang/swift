@@ -94,38 +94,6 @@ let startsWithTests = [
   StartsWithTest(false, [ 1, 2, 10 ], [ 1, 2, 3, 4, 10 ], [], [ 4, 10 ]),
 ]
 
-// FIXME(prext): remove this function.
-func checkStartsWith(
-  expected: Bool, _ sequence: [Int], _ prefix: [Int],
-  _ stackTrace: SourceLocStack
-) {
-  expectEqual(expected, startsWith(sequence, prefix), stackTrace: stackTrace)
-  expectEqual(
-    expected, startsWith(sequence, prefix, (==)),
-    stackTrace: stackTrace)
-  expectEqual(
-    expected, startsWith(sequence.map { $0 * 2 }, prefix) { $0 / 2 == $1 },
-    stackTrace: stackTrace)
-
-  // Test using different types for the sequence and prefix.
-  expectEqual(
-    expected, startsWith(ContiguousArray(sequence), prefix),
-    stackTrace: stackTrace)
-  expectEqual(
-    expected, startsWith(ContiguousArray(sequence), prefix, (==)),
-    stackTrace: stackTrace)
-}
-
-Algorithm.test("startsWith") {
-  // FIXME(prext): remove these tests together with the startsWith() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-
-  for test in startsWithTests {
-    checkStartsWith(
-      test.expected, test.sequence, test.prefix, test.loc.withCurrentLoc())
-  }
-}
-
 Algorithm.test("equal") {
   // FIXME(prext): remove these tests together with the equal() function when
   // protocol extensions land.  These tests have been migrated to the new API.
@@ -718,7 +686,7 @@ SequenceTypeAlgorithms.test("startsWith/WhereElementIsEquatable") {
         test.prefix.map { MinimalEquatableValue($0) })
       expectEqual(
         test.expected,
-        s._prext_startsWith(prefix),
+        s.startsWith(prefix),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.expectedLeftoverSequence, s._prext_map { $0.value },
@@ -736,7 +704,7 @@ SequenceTypeAlgorithms.test("startsWith/WhereElementIsEquatable") {
         test.prefix.map { MinimalEquatableValue($0) })
       expectEqual(
         test.expected,
-        s._prext_startsWith(prefix),
+        s.startsWith(prefix),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.sequence, s._prext_map { $0.value },
@@ -757,7 +725,7 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
         map(test.prefix) { OpaqueValue($0) })
       expectEqual(
         test.expected,
-        s._prext_startsWith(prefix) { $0.value == $1.value },
+        s.startsWith(prefix) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.expectedLeftoverSequence, s._prext_map { $0.value },
@@ -773,7 +741,7 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
         map(test.prefix) { OpaqueValue($0) })
       expectEqual(
         test.expected,
-        s._prext_startsWith(prefix) { $0.value / 2 == $1.value },
+        s.startsWith(prefix) { $0.value / 2 == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.expectedLeftoverSequence, s._prext_map { $0.value / 2 },
@@ -791,7 +759,7 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
         map(test.prefix) { OpaqueValue($0) })
       expectEqual(
         test.expected,
-        s._prext_startsWith(prefix) { $0.value == $1.value },
+        s.startsWith(prefix) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
         test.sequence, s._prext_map { $0.value },

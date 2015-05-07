@@ -148,6 +148,7 @@ public func split<S: Sliceable, R:BooleanType>(
 }
 
 /// Return true iff the the initial elements of `s` are equal to `prefix`.
+@availability(*, unavailable, message="call the 'startsWith()' method on the sequence")
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
   where
@@ -155,14 +156,14 @@ public func startsWith<
     S0.Generator.Element : Equatable
 >(s: S0, _ prefix: S1) -> Bool
 {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return s._prext_startsWith(prefix)
+  return s.startsWith(prefix)
 }
 
 /// Return true iff `s` begins with elements equivalent to those of
 /// `prefix`, using `isEquivalent` as the equivalence test.
 ///
 /// Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)
+@availability(*, unavailable, message="call the 'startsWith()' method on the sequence")
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
   where
@@ -171,8 +172,7 @@ public func startsWith<
   @noescape _ isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
   -> Bool
 {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return s._prext_startsWith(prefix, isEquivalent: isEquivalent)
+  return s.startsWith(prefix, isEquivalent: isEquivalent)
 }
 
 /// The `GeneratorType` for `EnumerateSequence`.  `EnumerateGenerator`

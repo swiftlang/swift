@@ -128,7 +128,7 @@ else:
   /// Return true if `other` is empty."""
 }%
   ${comment}
-  final public func _prext_startsWith<
+  final public func startsWith<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
