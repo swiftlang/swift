@@ -894,28 +894,31 @@ void ElementUseCollector::collectClassSelfUses() {
 
 /// isSuperInitUse - If this "upcast" is part of a call to super.init, return
 /// the Apply instruction for the call, otherwise return null.
-static ApplyInst *isSuperInitUse(UpcastInst *Inst) {
+static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
 
   // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
   // that came from a call to super.init.
   for (auto UI : Inst->getUses()) {
+    auto *inst = UI->getUser();
     // If this used by another upcast instruction, recursively handle it, we may
     // have a multiple upcast chain.
-    if (auto *UCIU = dyn_cast<UpcastInst>(UI->getUser()))
+    if (auto *UCIU = dyn_cast<UpcastInst>(inst))
       if (auto *subAI = isSuperInitUse(UCIU))
         return subAI;
-    
-    auto *AI = dyn_cast<ApplyInst>(UI->getUser());
-    if (!AI) continue;
 
-    auto *LocExpr = AI->getLoc().getAsASTNode<ApplyExpr>();
+    // The call to super.init has to either be an apply or a try_apply.
+    if (!isa<ApplyInst>(inst) && !isa<TryApplyInst>(inst))
+      continue;
+
+    auto *LocExpr = inst->getLoc().getAsASTNode<ApplyExpr>();
     if (!LocExpr) {
       // If we're reading a .sil file, treat a call to "superinit" as a
       // super.init call as a hack to allow us to write testcases.
-      if (AI->getLoc().is<SILFileLocation>())
+      auto *AI = dyn_cast<ApplyInst>(inst);
+      if (AI && inst->getLoc().is<SILFileLocation>())
         if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
           if (FRI->getReferencedFunction()->getName() == "superinit")
-            return AI;
+            return inst;
       continue;
     }
 
@@ -930,7 +933,7 @@ static ApplyInst *isSuperInitUse(UpcastInst *Inst) {
       continue;
 
     if (LocExpr->getArg()->isSuperExpr())
-      return AI;
+      return inst;
 
     // Instead of super_ref_expr, we can also get this for inherited delegating
     // initializers:
@@ -941,7 +944,7 @@ static ApplyInst *isSuperInitUse(UpcastInst *Inst) {
       if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr()))
         if (DRE->getDecl()->isImplicit() &&
             DRE->getDecl()->getName().str() == "self")
-          return AI;
+          return inst;
   }
 
   return nullptr;
@@ -1070,7 +1073,8 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // If this is an ApplyInst, check to see if this is part of a self.init
     // call in a delegating initializer.
     DIUseKind Kind = DIUseKind::Load;
-    if (isa<ApplyInst>(User) && isSelfInitUse(cast<ApplyInst>(User)))
+    if ((isa<ApplyInst>(User) || isa<TryApplyInst>(User)) &&
+        isSelfInitUse(User))
       Kind = DIUseKind::SelfInit;
 
     // If this is a ValueMetatypeInst, check to see if it's part of a
@@ -1152,7 +1156,8 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         
         // If this is an ApplyInst, check to see if this is part of a self.init
         // call in a delegating initializer.
-        if (isa<ApplyInst>(User) && isSelfInitUse(cast<ApplyInst>(User)))
+        if ((isa<ApplyInst>(User) || isa<TryApplyInst>(User)) &&
+            isSelfInitUse(User))
           Kind = DIUseKind::SelfInit;
 
         // If this is a ValueMetatypeInst, check to see if it's part of a

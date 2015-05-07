@@ -1101,3 +1101,25 @@ func testReassignment() {
   c = 32  // expected-error {{immutable value 'c' may only be initialized once}}
 }
 
+
+// super and self.init should work in the presence of error handling constructs.
+// <rdar://problem/20850517> throwing initializers that call super.init trigger DI errors about not having called super.init
+class BaseClassEH {
+  required init() throws {}
+
+  convenience init(a : Int) throws {
+    try self.init()
+  }
+}
+
+class DerivedClassEH : BaseClassEH {
+  required init() throws {
+    try super.init()
+  }
+  convenience init(a : Int) throws {
+    try self.init()
+  }
+}
+
+
+
