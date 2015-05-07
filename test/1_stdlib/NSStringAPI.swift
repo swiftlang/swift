@@ -1583,6 +1583,32 @@ NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
   }
 }
 
+NSStringAPIs.test("stringByApplyingTransform(_:reverse:)") {
+  if #available(OSX 10.11, iOS 9.0, *) {
+    if true {
+      let source = "tre\u{300}s k\u{fc}hl"
+      expectEqual(
+        "tres kuhl",
+        source.stringByApplyingTransform(
+          NSStringTransformStripDiacritics, reverse: false))
+    }
+    if true {
+      let source = "hiragana"
+      expectEqual(
+        "ひらがな",
+        source.stringByApplyingTransform(
+          NSStringTransformLatinToHiragana, reverse: false))
+    }
+    if true {
+      let source = "ひらがな"
+      expectEqual(
+        "hiragana",
+        source.stringByApplyingTransform(
+          NSStringTransformLatinToHiragana, reverse: true))
+    }
+  }
+}
+
 struct ComparisonTest {
   let expectedUnicodeCollation: ExpectedComparisonResult
   let lhs: String
