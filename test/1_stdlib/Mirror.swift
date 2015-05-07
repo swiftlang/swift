@@ -144,7 +144,7 @@ mirrors.test("Legacy") {
     (label: "[2]", value: 3)
   ]
   expectFalse(
-    contains(zip(x0, m.children)) {
+    zip(x0, m.children).contains {
       $0.0.label != $0.1.label || $0.0.value as! Int != $0.1.value as! Int
     })
 

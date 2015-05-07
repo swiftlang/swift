@@ -94,17 +94,6 @@ let startsWithTests = [
   StartsWithTest(false, [ 1, 2, 10 ], [ 1, 2, 3, 4, 10 ], [], [ 4, 10 ]),
 ]
 
-Algorithm.test("contains") {
-  // FIXME(prext): remove these tests together with the contains() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-
-  let _0_4 = [0, 1, 2, 3]
-  expectFalse(contains(_0_4, 7))
-  expectTrue(contains(_0_4, 2))
-  expectFalse(contains(_0_4, { $0 - 10 > 0  }))
-  expectTrue(contains(_0_4, { $0 % 3 == 0 }))
-}
-
 Algorithm.test("min,max") {
   expectEqual(2, min(3, 2))
   expectEqual(3, min(3, 7, 5))
@@ -1058,13 +1047,13 @@ func callStaticContains(
   sequence: MinimalSequence<MinimalEquatableValue>,
   _ element: MinimalEquatableValue
 ) -> Bool {
-  return sequence._prext_contains(element)
+  return sequence.contains(element)
 }
 
 func callGenericContains<
   S : SequenceType where S.Generator.Element : Equatable
 >(sequence: S, _ element: S.Generator.Element) -> Bool {
-  return sequence._prext_contains(element)
+  return sequence.contains(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -1117,7 +1106,7 @@ struct SequenceWithCustomContainsMethod : SequenceType {
 func callStaticContains(
   sequence: SequenceWithCustomContainsMethod,
   _ element: MinimalEquatableValue) -> Bool {
-  return sequence._prext_contains(element)
+  return sequence.contains(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -1140,7 +1129,7 @@ func callStaticContains(
   set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Bool {
-  return set._prext_contains(element)
+  return set.contains(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -1185,7 +1174,7 @@ SequenceTypeAlgorithms.test("contains/Predicate") {
       test.sequence.map { OpaqueValue($0) })
     expectEqual(
       test.expected != nil,
-      s._prext_contains { $0.value == test.element },
+      s.contains { $0.value == test.element },
       stackTrace: test.loc.withCurrentLoc())
     expectEqual(
       test.expectedLeftoverSequence, s._prext_map { $0.value },

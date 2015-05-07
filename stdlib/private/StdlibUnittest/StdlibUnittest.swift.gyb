@@ -821,7 +821,7 @@ public func runAllTests() {
 #endif
 
   let _isChildProcess: Bool =
-    contains(Process.arguments, "--stdlib-unittest-run-child")
+    Process.arguments.contains("--stdlib-unittest-run-child")
 
   if _isChildProcess {
     _childProcess()
@@ -1164,7 +1164,7 @@ public enum TestRunPredicate : CustomStringConvertible {
     case OSXMinorRange(let major, let minorRange, _):
       switch _getRunningOSVersion() {
       case .OSX(major, let runningMinor, _):
-        return contains(minorRange, runningMinor)
+        return minorRange.contains(runningMinor)
       default:
         return false
       }
@@ -1180,7 +1180,7 @@ public enum TestRunPredicate : CustomStringConvertible {
     case OSXBugFixRange(let major, let minor, let bugFixRange, _):
       switch _getRunningOSVersion() {
       case .OSX(major, minor, let runningBugFix):
-        return contains(bugFixRange, runningBugFix)
+        return bugFixRange.contains(runningBugFix)
       default:
         return false
       }
@@ -1212,7 +1212,7 @@ public enum TestRunPredicate : CustomStringConvertible {
     case iOSMinorRange(let major, let minorRange, _):
       switch _getRunningOSVersion() {
       case .iOS(major, let runningMinor, _):
-        return contains(minorRange, runningMinor)
+        return minorRange.contains(runningMinor)
       default:
         return false
       }
@@ -1228,7 +1228,7 @@ public enum TestRunPredicate : CustomStringConvertible {
     case iOSBugFixRange(let major, let minor, let bugFixRange, _):
       switch _getRunningOSVersion() {
       case .iOS(major, minor, let runningBugFix):
-        return contains(bugFixRange, runningBugFix)
+        return bugFixRange.contains(runningBugFix)
       default:
         return false
       }
@@ -2095,7 +2095,7 @@ public func expectPrinted<T>(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   let actual = String(object)
-  if !contains(patterns, actual) {
+  if !patterns.contains(actual) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     println("expected: any of \(patterns.debugDescription)")
@@ -2116,7 +2116,7 @@ public func expectDebugPrinted<T>(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   let actual = String(reflecting: object)
-  if !contains(patterns, actual) {
+  if !patterns.contains(actual) {
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     println("expected: any of \(patterns.debugDescription)")

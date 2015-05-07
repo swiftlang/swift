@@ -127,7 +127,7 @@ extension SetAlgebraType {
   final func isSupersetOf<
     S : SequenceType where S.Generator.Element == Basis
   >(other: S) -> Bool {
-    return !other._prext_contains { !self.contains($0) }
+    return !other.contains { !self.contains($0) }
   }
 
   final func subtract(other: Self) -> Self {

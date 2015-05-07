@@ -281,7 +281,7 @@ else:
 
 extension SequenceType where Generator.Element : Equatable {
   /// Return `true` iff `x` is in `self`.
-  final public func _prext_contains(element: ${GElement}) -> Bool {
+  final public func contains(element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
     }
@@ -297,7 +297,7 @@ extension SequenceType where Generator.Element : Equatable {
 
 extension SequenceType {
   /// Return `true` iff an element in `self` satisfies `predicate`.
-  final public func _prext_contains(
+  final public func contains(
     @noescape predicate: (${GElement}) -> Bool
   ) -> Bool {
     for e in self {

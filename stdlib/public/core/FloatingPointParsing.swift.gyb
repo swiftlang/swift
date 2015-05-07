@@ -31,7 +31,7 @@ cFuncSuffix2 = {32: 'f', 64: 'd', 80: 'ld'}
 /// Return true iff isspace(u) would return nonzero when the current
 /// locale is the C locale.
 internal func _isspace_clocale(u: UTF16.CodeUnit) -> Bool {
-  return contains("\t\n\u{b}\u{c}\r ".utf16, u)
+  return "\t\n\u{b}\u{c}\r ".utf16.contains(u)
 }
 
 % for bits in allFloatBits:
@@ -66,7 +66,7 @@ extension ${Self} {
     let (result, n) = text.withCString(parseNTBS)
 
     if n == 0 || n != count(u16)
-      || contains(u16, { $0 > 127 || _isspace_clocale($0) }) {
+      || u16.contains({ $0 > 127 || _isspace_clocale($0) }) {
       return nil
     }
     self = result

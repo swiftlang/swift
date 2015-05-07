@@ -67,7 +67,7 @@ NSStringAPIs.test("Encodings") {
   expectNotEqual(0, availableEncodings.count)
 
   let defaultCStringEncoding = String.defaultCStringEncoding()
-  expectTrue(contains(availableEncodings, defaultCStringEncoding))
+  expectTrue(availableEncodings.contains(defaultCStringEncoding))
 
   expectNotEqual("", String.localizedNameOfStringEncoding(NSUTF8StringEncoding))
 }
@@ -498,7 +498,7 @@ NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
 
 NSStringAPIs.test("fastestEncoding") {
   let availableEncodings: [NSStringEncoding] = String.availableStringEncodings()
-  expectTrue(contains(availableEncodings, "abc".fastestEncoding))
+  expectTrue(availableEncodings.contains("abc".fastestEncoding))
 }
 
 NSStringAPIs.test("fileSystemRepresentation()") {
@@ -1124,7 +1124,7 @@ NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
 
 NSStringAPIs.test("smallestEncoding") {
   let availableEncodings: [NSStringEncoding] = String.availableStringEncodings()
-  expectTrue(contains(availableEncodings, "abc".smallestEncoding))
+  expectTrue(availableEncodings.contains("abc".smallestEncoding))
 }
 
 func getHomeDir() -> String {

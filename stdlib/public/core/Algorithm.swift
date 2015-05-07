@@ -327,19 +327,19 @@ public func lexicographicalCompare<
 }
 
 /// Return `true` iff an element in `seq` satisfies `predicate`.
+@availability(*, unavailable, message="call the 'contains()' method on the sequence")
 public func contains<
   S : SequenceType, L : BooleanType
 >(seq: S, @noescape _ predicate: (S.Generator.Element) -> L) -> Bool {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return seq._prext_contains({ predicate($0).boolValue })
+  return seq.contains({ predicate($0).boolValue })
 }
 
 /// Return `true` iff `x` is in `seq`.
+@availability(*, unavailable, message="call the 'contains()' method on the sequence")
 public func contains<
   S : SequenceType where S.Generator.Element : Equatable
 >(seq: S, _ x: S.Generator.Element) -> Bool {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return seq._prext_contains(x)
+  return seq.contains(x)
 }
 
 /// Return the result of repeatedly calling `combine` with an
