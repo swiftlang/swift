@@ -307,6 +307,18 @@ IRGenModule::~IRGenModule() {
   delete ABITypes;
 }
 
+// Explicitly listing these constants is an unfortunate compromise for
+// making the database file much more compact.
+//
+// They have to be non-local because otherwise we'll get warnings when
+// a particular x-macro expansion doesn't use one.
+namespace RuntimeConstants {
+  const auto ReadNone = llvm::Attribute::ReadNone;
+  const auto ReadOnly = llvm::Attribute::ReadOnly;
+  const auto NoUnwind = llvm::Attribute::NoUnwind;
+  const auto C_CC = llvm::CallingConv::C;
+}
+
 static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
                       llvm::Constant *&cache,
                       char const *name,
@@ -349,20 +361,6 @@ static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
   }
 
   return cache;
-}
-
-
-// Explicitly listing these constants is an unfortunate compromise for
-// making the database file much more compact.
-//
-// They have to be non-local because otherwise we'll get warnings when
-// a particular x-macro expansion doesn't use one.
-namespace RuntimeConstants {
-  const auto ReadNone = llvm::Attribute::ReadNone;
-  const auto ReadOnly = llvm::Attribute::ReadOnly;
-  const auto NoReturn = llvm::Attribute::NoReturn;
-  const auto NoUnwind = llvm::Attribute::NoUnwind;
-  const auto C_CC = llvm::CallingConv::C;
 }
 
 #define RETURNS(...) { __VA_ARGS__ }
