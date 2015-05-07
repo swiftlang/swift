@@ -54,3 +54,15 @@ func six() {
   } catch _ {
   }
 }
+
+func seven_helper() throws -> Int { throw MSV.Baz }
+
+struct seven {
+  var x: Int {
+    do {
+      return try seven_helper()
+    } catch {
+      return 0
+    }
+  }
+}

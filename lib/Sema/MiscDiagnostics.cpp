@@ -353,10 +353,6 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
           }
         }
 
-      } else if (auto *PE = dyn_cast<IdentityExpr>(E)) {
-        // Look through ParenExprs because a function argument of a single
-        // rvalue will have a LoadExpr /outside/ the ParenExpr.
-        return { true, PE->getSubExpr() };
       }
 
       return { true, E };
