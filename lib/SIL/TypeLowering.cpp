@@ -1787,8 +1787,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
   // Capture generic parameters from the enclosing context.
   GenericParamList *genericParams
     = getEffectiveGenericParamsForContext(parentContext);
-
-  if (captures.empty()) {
+  
+  if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
     if (!genericParams)
       return adjustFunctionType(funcType,
                                 FunctionType::Representation::Thin);
@@ -1807,6 +1807,9 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
   SmallVector<TupleTypeElt, 8> inputFields;
 
+  // Note that the list of lowered local captures may be empty even if
+  // CaptureInfo::hasLocalCaptures() returned true. This is the case if e.g.
+  // a local function calls another local function which has no captures itself.
   for (auto capture : captures) {
     auto VD = capture.getDecl();
     // A capture of a 'var' or 'inout' variable is done with the underlying
@@ -1862,8 +1865,8 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   // Capture generic parameters from the enclosing context.
   CanGenericSignature genericSig
     = getEffectiveGenericSignatureForContext(context);
-  
-  if (captures.empty()) {
+
+  if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
     if (!genericSig)
       return adjustFunctionType(funcType,
                                 FunctionType::Representation::Thin);
@@ -1880,6 +1883,9 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 
   SmallVector<TupleTypeElt, 8> inputFields;
 
+  // Note that the list of lowered local captures may be empty even if
+  // CaptureInfo::hasLocalCaptures() returned true. This is the case if e.g.
+  // a local function calls another local function which has no captures itself.
   for (auto capture : captures) {
     // A capture of a 'var' or 'inout' variable is done with the underlying
     // object type.
