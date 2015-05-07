@@ -6,8 +6,8 @@ enum MyError : _ErrorType {
   case WithObj(Obj)
 }
 
-func simple(placeholder : Int) throws -> () {
-  // CHECK: define {{.*}}void @_TF6Errors6simpleFzSiT_(i64, %swift.refcounted*, %swift.error**)
+func simple(placeholder: Int64) throws -> () {
+  // CHECK: define {{.*}}void @_TF6Errors6simpleFzVSs5Int64T_(i64, %swift.refcounted*, %swift.error**)
   // CHECK: call void @llvm.dbg.declare
   // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[ERROR:[0-9]+]], metadata ![[DEREF:[0-9]+]])
   // CHECK: ![[ERROR]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "$error", arg: 2, {{.*}} type: !"_TtPSs10_ErrorType_", flags: DIFlagArtificial)
