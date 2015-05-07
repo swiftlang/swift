@@ -33,10 +33,9 @@ public class _AnyGeneratorBase {}
 /// also instances of an `AnyGenerator` subclass.
 ///
 /// - seealso:
-///
-///     struct AnySequence<S : SequenceType>
-///     func anyGenerator<G : GeneratorType>(base: G) -> AnyGenerator<G.Element>
-///     func anyGenerator<T>(body: ()->T?) -> AnyGenerator<T>
+///   - `struct AnySequence<S : SequenceType>`
+///   - `func anyGenerator<G : GeneratorType>(base: G) -> AnyGenerator<G.Element>`
+///   - `func anyGenerator<T>(body: ()->T?) -> AnyGenerator<T>`
 public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
