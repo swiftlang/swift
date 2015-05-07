@@ -739,7 +739,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   // Look for a module with the given name.
   if (Name.isSimpleName(M.getName())) {
-    Results.push_back(Result::getModuleName(&M));
+    Results.push_back(Result::getModuleMember(&M));
     return;
   }
 
@@ -749,7 +749,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   if (desiredModule) {
     forAllVisibleModules(DC, [&](const Module::ImportedModule &import) -> bool {
       if (import.second == desiredModule) {
-        Results.push_back(Result::getModuleName(import.second));
+        Results.push_back(Result::getModuleMember(import.second));
         return false;
       }
       return true;
@@ -758,7 +758,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 }
 
 TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
-  if (Results.size() != 1 || !Results.back().hasValueDecl())
+  if (Results.size() != 1)
     return nullptr;
   return dyn_cast<TypeDecl>(Results.back().getValueDecl());
 }

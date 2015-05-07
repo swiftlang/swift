@@ -1330,24 +1330,22 @@ public:
           UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()),
                                    &REPLInputFile, nullptr);
           for (auto result : lookup.Results) {
-            if (result.hasValueDecl()) {
-              printOrDumpDecl(result.getValueDecl(), doPrint);
+            printOrDumpDecl(result.getValueDecl(), doPrint);
               
-              if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
-                if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-                  TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
-                    ->getNominalOrBoundGenericNominal();
-                  if (origTypeDecl) {
-                    printOrDumpDecl(origTypeDecl, doPrint);
-                    typeDecl = origTypeDecl;
-                  }
+            if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
+              if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+                TypeDecl *origTypeDecl = typeAliasDecl->getUnderlyingType()
+                  ->getNominalOrBoundGenericNominal();
+                if (origTypeDecl) {
+                  printOrDumpDecl(origTypeDecl, doPrint);
+                  typeDecl = origTypeDecl;
                 }
+              }
 
-                // Print extensions.
-                if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
-                  for (auto extension : nominal->getExtensions()) {
-                    printOrDumpDecl(extension, doPrint);
-                  }
+              // Print extensions.
+              if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
+                for (auto extension : nominal->getExtensions()) {
+                  printOrDumpDecl(extension, doPrint);
                 }
               }
             }

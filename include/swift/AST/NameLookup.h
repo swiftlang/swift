@@ -38,10 +38,7 @@ namespace swift {
 struct UnqualifiedLookupResult {
 private:
   ValueDecl *Base;
-  union {
-    ValueDecl *Value;
-    Module *NamedModule;
-  };
+  ValueDecl *Value;
 
 public:
   /// Kind - The kind of reference.
@@ -77,25 +74,11 @@ public:
     /// MetaArchetypeMember - "x" refers to a member of the metatype of an
     /// archetype type, which is referred to by BaseDecl. The base is evaluated
     /// and ignored.
-    MetaArchetypeMember,
-
-    /// ModuleName - "x" refers to a module, either the current
-    /// module or an imported module.
-    ModuleName
+    MetaArchetypeMember
   } Kind;
 
-  bool hasValueDecl() const {
-    return Kind != ModuleName;
-  }
-
   ValueDecl *getValueDecl() const {
-    assert(hasValueDecl());
     return Value;
-  }
-
-  Module *getNamedModule() const {
-    assert(Kind == ModuleName);
-    return NamedModule;
   }
 
   ValueDecl *getBaseDecl() const {
@@ -169,14 +152,6 @@ public:
     R.Base = base;
     R.Value = value;
     R.Kind = MetaArchetypeMember;
-    return R;
-  }
-
-  static UnqualifiedLookupResult getModuleName(Module *m) {
-    UnqualifiedLookupResult R;
-    R.Base = nullptr;
-    R.NamedModule = m;
-    R.Kind = ModuleName;
     return R;
   }
 };

@@ -299,22 +299,10 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
 
-  if (!Lookup.Results.empty() &&
-      Lookup.Results[0].Kind == UnqualifiedLookupResult::ModuleName) {
-    assert(Lookup.Results.size() == 1 && "module names should be unique");
-    auto module = Lookup.Results[0].getNamedModule();
-    return new (TC.Context) DeclRefExpr(module, Loc, /*Implicit=*/false,
-                                        AccessSemantics::Ordinary,
-                                        module->getDeclaredType());
-  }
-
   bool AllDeclRefs = true;
   SmallVector<ValueDecl*, 4> ResultValues;
   for (auto Result : Lookup.Results) {
     switch (Result.Kind) {
-      case UnqualifiedLookupResult::ModuleName:
-        llvm_unreachable("handled above");
-
       case UnqualifiedLookupResult::MemberProperty:
       case UnqualifiedLookupResult::MemberFunction:
       case UnqualifiedLookupResult::MetatypeMember:
@@ -353,6 +341,14 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   if (!UDRE->isSpecialized() &&
       ResultValues.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
       isa<TypeDecl>(ResultValues[0])) {
+    // FIXME: This is odd.
+    if (isa<ModuleDecl>(ResultValues[0])) {
+      return new (TC.Context) DeclRefExpr(ResultValues[0], Loc,
+                                          /*implicit=*/false,
+                                          AccessSemantics::Ordinary,
+                                          ResultValues[0]->getType());
+    }
+
     return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]));
   }
   
@@ -410,7 +406,6 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
         break;
       case UnqualifiedLookupResult::ModuleMember:
       case UnqualifiedLookupResult::LocalDecl:
-      case UnqualifiedLookupResult::ModuleName:
         AllMemberRefs = false;
         break;
       case UnqualifiedLookupResult::MetaArchetypeMember:
@@ -1627,8 +1622,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   
   SmallVector<ValueDecl*, 4> choices;
   for (auto &result : matchLookup.Results) {
-    if (!result.hasValueDecl())
-      continue;
     choices.push_back(result.getValueDecl());
   }
   

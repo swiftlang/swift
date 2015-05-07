@@ -265,7 +265,9 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
   if (Module *Mod = getBoundModule()) {
     Printer.printModuleRef(Mod, getIdentifier());
   } else if (Type Ty = getBoundType()) {
-    if (auto NTD = Ty->getAnyNominal())
+    if (auto ModuleTy = dyn_cast<ModuleType>(Ty.getPointer()))
+      Printer.printModuleRef(ModuleTy->getModule(), getIdentifier());
+    else if (auto NTD = Ty->getAnyNominal())
       Printer.printTypeRef(NTD, getIdentifier());
     else
       Printer << getIdentifier().str();

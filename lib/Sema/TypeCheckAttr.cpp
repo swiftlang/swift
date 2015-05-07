@@ -1071,8 +1071,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
                                /*NonCascading=*/true, SourceLoc(),
                                /*IsType=*/false);
   for (const auto &result : lookupMain.Results) {
-    if (result.hasValueDecl())
-      TC.validateDecl(result.getValueDecl());
+    TC.validateDecl(result.getValueDecl());
   }
   auto Foundation = TC.Context.getLoadedModule(C.getIdentifier("Foundation"));
   if (Foundation) {
@@ -1080,8 +1079,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
                                    Foundation, nullptr, /*NonCascading=*/true,
                                    SourceLoc(), /*IsType=*/false);
     for (const auto &result : lookupString.Results) {
-      if (result.hasValueDecl())
-        TC.validateDecl(result.getValueDecl());
+      TC.validateDecl(result.getValueDecl());
     }
   }
 }

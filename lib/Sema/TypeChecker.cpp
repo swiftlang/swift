@@ -793,8 +793,14 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
                                               Identifier name,
                                               SourceLoc nameLoc,
                                               LookupTypeResult &lookup) {
-  diagnose(nameLoc, diag::ambiguous_member_type, name, baseTy)
-    .highlight(baseRange);
+  if (auto moduleTy = baseTy->getAs<ModuleType>()) {
+    diagnose(nameLoc, diag::ambiguous_module_type, name,
+             moduleTy->getModule()->getName())
+      .highlight(baseRange);
+  } else {
+    diagnose(nameLoc, diag::ambiguous_member_type, name, baseTy)
+      .highlight(baseRange);
+  }
   for (const auto &member : lookup) {
     diagnose(member.first, diag::found_candidate_type,
              member.second);

@@ -1923,7 +1923,6 @@ ConformanceChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
 
     if (lookup.isSuccess()) {
       for (auto candidate : lookup.Results) {
-        assert(candidate.hasValueDecl());
         witnesses.push_back(candidate.getValueDecl());
       }
     }

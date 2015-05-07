@@ -228,8 +228,13 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl())
       return passReference(VD, IdT->getIdLoc());
-    if (TypeDecl *TyD = getTypeDecl(IdT->getBoundType()))
+    if (TypeDecl *TyD = getTypeDecl(IdT->getBoundType())) {
+      if (ModuleDecl *ModD = dyn_cast<ModuleDecl>(TyD))
+        return passReference(ModD, std::make_pair(IdT->getIdentifier(),
+                                                  IdT->getIdLoc()));
+
       return passReference(TyD, IdT->getIdLoc());
+    }
     if (auto Mod = IdT->getBoundModule())
       return passReference(Mod, std::make_pair(IdT->getIdentifier(),
                                                IdT->getIdLoc()));
@@ -367,6 +372,9 @@ TypeDecl *SemaAnnotator::getTypeDecl(Type Ty) {
 
   if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
     return NAT->getDecl();
+  if (ModuleType *MT = dyn_cast<ModuleType>(Ty.getPointer()))
+    return MT->getModule();
+
   return Ty->getAnyNominal();
 }
 

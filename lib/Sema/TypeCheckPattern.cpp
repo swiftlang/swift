@@ -38,8 +38,6 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
   // See if there is any enum element in there.
   EnumElementDecl *foundElement = nullptr;
   for (auto result : lookup.Results) {
-    if (!result.hasValueDecl())
-      continue;
     auto *oe = dyn_cast<EnumElementDecl>(result.getValueDecl());
     if (!oe)
       continue;

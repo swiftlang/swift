@@ -763,11 +763,6 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
                                                         SourceFile::Parsed);
   UnqualifiedLookup DeclLookup(Name, &P.SF, nullptr);
   assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
-  if (DeclLookup.Results.back().Kind == UnqualifiedLookupResult::ModuleName) {
-    Module *Mod = DeclLookup.Results.back().getNamedModule();
-    return Mod;
-  }
-  assert(DeclLookup.Results.back().hasValueDecl());
   ValueDecl *VD = DeclLookup.Results.back().getValueDecl();
   return VD;
 }

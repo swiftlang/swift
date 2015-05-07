@@ -563,9 +563,14 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
   // Lookup into a type.
   if (auto parentType = parentComponents.back()->getBoundType()) {
-    tc.diagnose(comp->getIdLoc(), diag::invalid_member_type,
-                comp->getIdentifier(), parentType)
-      .highlight(parentRange);
+    if (auto moduleType = parentType->getAs<ModuleType>()) {
+      tc.diagnose(comp->getIdLoc(), diag::no_module_type,
+                  comp->getIdentifier(), moduleType->getModule()->getName());
+    } else {
+      tc.diagnose(comp->getIdLoc(), diag::invalid_member_type,
+                  comp->getIdentifier(), parentType)
+        .highlight(parentRange);
+    }
 
     return true;
   }
@@ -594,23 +599,9 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                             comp->getIdLoc(), /*TypeLookup*/true);
 
   // Process the names we found.
-  llvm::PointerUnion<Type, Module *> current;
+  Type current;
   bool isAmbiguous = false;
   for (const auto &result : Globals.Results) {
-    // If we found a module, record it.
-    if (result.Kind == UnqualifiedLookupResult::ModuleName) {
-      // If we already found a name of some sort, it's ambiguous.
-      if (!current.isNull()) {
-        isAmbiguous = true;
-        break;
-      }
-
-      // Save this result.
-      current = result.getNamedModule();
-      comp->setValue(result.getNamedModule());
-      continue;
-    }
-
     // Ignore non-type declarations.
     auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl());
     if (!typeDecl)
@@ -642,7 +633,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     }
 
     // Otherwise, check for an ambiguity.
-    if (current.is<Module *>() || !current.get<Type>()->isEqual(type)) {
+    if (!current->isEqual(type)) {
       isAmbiguous = true;
       break;
     }
@@ -659,10 +650,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                   comp->getIdentifier())
         .highlight(comp->getIdLoc());
       for (auto Result : Globals.Results) {
-        if (Globals.Results[0].hasValueDecl())
-          TC.diagnose(Result.getValueDecl(), diag::found_candidate);
-        else
-          TC.diagnose(comp->getIdLoc(), diag::found_candidate);
+        TC.diagnose(Result.getValueDecl(), diag::found_candidate);
       }
     }
     Type ty = ErrorType::get(TC.Context);
@@ -685,12 +673,12 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   }
 }
 
-static llvm::PointerUnion<Type, Module *>
-resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
-                          ArrayRef<ComponentIdentTypeRepr *> components,
-                          TypeResolutionOptions options,
-                          bool diagnoseErrors,
-                          GenericTypeResolver *resolver) {
+static Type resolveIdentTypeComponent(
+              TypeChecker &TC, DeclContext *DC,
+              ArrayRef<ComponentIdentTypeRepr *> components,
+              TypeResolutionOptions options,
+              bool diagnoseErrors,
+              GenericTypeResolver *resolver) {
   auto &comp = components.back();
   if (!comp->isBound()) {
     auto parentComps = components.slice(0, components.size()-1);
@@ -770,141 +758,77 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                           diagnoseErrors, resolver);
       }
     } else {
-      llvm::PointerUnion<Type, Module *>
-        parent = resolveIdentTypeComponent(TC, DC, parentComps, options,
-                                           diagnoseErrors, resolver);
-      // If the last resolved component is a type, perform member type lookup.
-      if (parent.is<Type>()) {
-        // FIXME: Want the end of the back range.
-        SourceRange parentRange(parentComps.front()->getIdLoc(),
-                                parentComps.back()->getIdLoc());
+      // Perform member type lookup.
+      Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
+                                                diagnoseErrors, resolver);
+      if (parentTy->is<ErrorType>())
+        return parentTy;
 
-        auto parentTy = parent.get<Type>();
-        if (parentTy->is<ErrorType>())
-          return parent.get<Type>();
+      // FIXME: Want the end of the back range.
+      SourceRange parentRange(parentComps.front()->getIdLoc(),
+                              parentComps.back()->getIdLoc());
+
+      
+      // If the parent is a dependent type, the member is a dependent member.
+      if (parentTy->is<DependentMemberType>() ||
+          parentTy->is<GenericTypeParamType>()) {
         
-        // If the parent is a dependent type, the member is a dependent member.
-        if (parentTy->is<DependentMemberType>() ||
-            parentTy->is<GenericTypeParamType>()) {
-          
-          // Try to resolve the dependent member type to a specific associated
-          // type.
-          Type memberType = resolver->resolveDependentMemberType(parentTy, DC,
-                                                                 parentRange,
-                                                                 comp);
-          assert(memberType && "Received null dependent member type");
+        // Try to resolve the dependent member type to a specific associated
+        // type.
+        Type memberType = resolver->resolveDependentMemberType(parentTy, DC,
+                                                               parentRange,
+                                                               comp);
+        assert(memberType && "Received null dependent member type");
 
-          if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {
-            // FIXME: Highlight generic arguments and introduce a Fix-It to
-            // remove them.
-            if (diagnoseErrors)
-              TC.diagnose(comp->getIdLoc(), diag::not_a_generic_type, memberType);
-
-            // Drop the arguments.
-          }
-
-          comp->setValue(memberType);
-          return memberType;
-        }
-        
-        // Look for member types with the given name.
-        bool isKnownNonCascading =
-            options.contains(TR_KnownNonCascadingDependency);
-        if (!isKnownNonCascading && options.contains(TR_InExpression)) {
-          // Expressions cannot affect a function's signature.
-          isKnownNonCascading = isa<AbstractFunctionDecl>(DC);
-        }
-        
-        NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-        if (isKnownNonCascading)
-          lookupOptions |= NameLookupFlags::KnownPrivate;
-        auto memberTypes = TC.lookupMemberType(DC, parentTy,
-                                               comp->getIdentifier(),
-                                               lookupOptions);
-
-        // Name lookup was ambiguous. Complain.
-        // FIXME: Could try to apply generic arguments first, and see whether
-        // that resolves things. But do we really want that to succeed?
-        if (memberTypes.size() > 1) {
+        if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {
+          // FIXME: Highlight generic arguments and introduce a Fix-It to
+          // remove them.
           if (diagnoseErrors)
-            TC.diagnoseAmbiguousMemberType(parent.get<Type>(),
-                                           parentRange,
-                                           comp->getIdentifier(),
-                                           comp->getIdLoc(),
-                                           memberTypes);
-          Type ty = ErrorType::get(TC.Context);
-          comp->setValue(ty);
-          return ty;
+            TC.diagnose(comp->getIdLoc(), diag::not_a_generic_type, memberType);
+
+          // Drop the arguments.
         }
-
-        // If we didn't find anything, complain.
-        bool isGenericSignature = options.contains(TR_GenericSignature);
-        bool recovered = false;
-        if (!memberTypes) {
-          // If we're not allowed to complain or we couldn't fix the
-          // source, bail out.
-          if (!diagnoseErrors || 
-              diagnoseUnknownType(TC, DC, components, isGenericSignature,
-                                  resolver)) {
-            Type ty = ErrorType::get(TC.Context);
-            comp->setValue(ty);
-            return ty;
-          }
-
-          recovered = true;
-        }
-
-        if (parentTy->isExistentialType()) {
-          TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
-                      comp->getIdentifier());
-          Type ty = ErrorType::get(TC.Context);
-          comp->setValue(ty);
-          return ty;
-        }
-
-        auto memberType = recovered? comp->getBoundType() 
-                                   : memberTypes.back().second;
-
-        // If there are generic arguments, apply them now.
-        if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
-          memberType = applyGenericTypeReprArgs(TC, memberType,
-                                                genComp->getIdLoc(),
-                                                DC, genComp->getGenericArgs(),
-                                                isGenericSignature, resolver);
 
         comp->setValue(memberType);
         return memberType;
       }
+      
+      // Look for member types with the given name.
+      bool isKnownNonCascading =
+          options.contains(TR_KnownNonCascadingDependency);
+      if (!isKnownNonCascading && options.contains(TR_InExpression)) {
+        // Expressions cannot affect a function's signature.
+        isKnownNonCascading = isa<AbstractFunctionDecl>(DC);
+      }
+      
+      NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+      if (isKnownNonCascading)
+        lookupOptions |= NameLookupFlags::KnownPrivate;
+      auto memberTypes = TC.lookupMemberType(DC, parentTy,
+                                             comp->getIdentifier(),
+                                             lookupOptions);
 
-      // Lookup into a module.
-      auto module = parent.get<Module *>();
-      LookupTypeResult foundModuleTypes =
-        TC.lookupMemberType(DC, ModuleType::get(module), comp->getIdentifier());
-
-      // If lookup was ambiguous, complain.
-      if (foundModuleTypes.isAmbiguous()) {
-        if (diagnoseErrors) {
-          TC.diagnose(comp->getIdLoc(), diag::ambiguous_module_type,
-                      comp->getIdentifier(), module->getName());
-          for (auto foundType : foundModuleTypes) {
-            // Only consider type declarations.
-            auto typeDecl = foundType.first;
-            if (!typeDecl)
-              continue;
-
-            TC.diagnose(typeDecl, diag::found_candidate_type,
-                        typeDecl->getDeclaredType());
-          }
-        }
+      // Name lookup was ambiguous. Complain.
+      // FIXME: Could try to apply generic arguments first, and see whether
+      // that resolves things. But do we really want that to succeed?
+      if (memberTypes.size() > 1) {
+        if (diagnoseErrors)
+          TC.diagnoseAmbiguousMemberType(parentTy,
+                                         parentRange,
+                                         comp->getIdentifier(),
+                                         comp->getIdLoc(),
+                                         memberTypes);
         Type ty = ErrorType::get(TC.Context);
         comp->setValue(ty);
         return ty;
       }
 
-      // If we didn't find a type, complain.
+      // If we didn't find anything, complain.
       bool isGenericSignature = options.contains(TR_GenericSignature);
       bool recovered = false;
-      if (!foundModuleTypes) {
+      if (!memberTypes) {
+        // If we're not allowed to complain or we couldn't fix the
+        // source, bail out.
         if (!diagnoseErrors || 
             diagnoseUnknownType(TC, DC, components, isGenericSignature,
                                 resolver)) {
@@ -916,25 +840,34 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         recovered = true;
       }
 
-      Type foundType = recovered? comp->getBoundType()
-                                : foundModuleTypes[0].second;
-
-      // If there are generic arguments, apply them now.
-      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-        foundType = applyGenericTypeReprArgs(TC, foundType, genComp->getIdLoc(),
-                                             DC, genComp->getGenericArgs(),
-                                             isGenericSignature, resolver);
+      if (parentTy->isExistentialType()) {
+        TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
+                    comp->getIdentifier());
+        Type ty = ErrorType::get(TC.Context);
+        comp->setValue(ty);
+        return ty;
       }
 
-      comp->setValue(foundType);
+      auto memberType = recovered? comp->getBoundType() 
+                                 : memberTypes.back().second;
+
+      // If there are generic arguments, apply them now.
+      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
+        memberType = applyGenericTypeReprArgs(TC, memberType,
+                                              genComp->getIdLoc(),
+                                              DC, genComp->getGenericArgs(),
+                                              isGenericSignature, resolver);
+
+      comp->setValue(memberType);
+      return memberType;
     }
   }
 
   assert(comp->isBound());
   if (Type ty = comp->getBoundType())
     return ty;
-  if (Module *mod = comp->getBoundModule())
-    return mod;
+  if (ModuleDecl *mod = comp->getBoundModule())
+    return mod->getDeclaredType();
 
   ValueDecl *VD = comp->getBoundDecl();
   auto typeDecl = dyn_cast<TypeDecl>(VD);
@@ -1058,15 +991,15 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
   auto ComponentRange = IdType->getComponentRange();
   auto Components = llvm::makeArrayRef(ComponentRange.begin(),
                                        ComponentRange.end());
-  llvm::PointerUnion<Type, Module *>
-    result = resolveIdentTypeComponent(*this, DC, Components, options, 
-                                       diagnoseErrors, resolver);
-  if (auto mod = result.dyn_cast<Module*>()) {
+  Type result = resolveIdentTypeComponent(*this, DC, Components, options, 
+                                          diagnoseErrors, resolver);
+  if (auto moduleTy = result->getAs<ModuleType>()) {
     if (diagnoseErrors) {
+      auto moduleName = moduleTy->getModule()->getName();
       diagnose(Components.back()->getIdLoc(),
-               diag::use_undeclared_type, mod->getName());
+               diag::use_undeclared_type, moduleName);
       diagnose(Components.back()->getIdLoc(),
-               diag::note_module_as_type, mod->getName());
+               diag::note_module_as_type, moduleName);
     }
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);
@@ -1075,14 +1008,14 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
 
   // Check the availability of the type. Skip checking for SIL.
   if (!(options & TR_SILType) && !(options & TR_AllowUnavailable) &&
-      diagnoseAvailability(result.get<Type>(), IdType,
+      diagnoseAvailability(result, IdType,
                            Components.back()->getIdLoc(), DC, *this)) {
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);
     return ty;
   }
   
-  return result.get<Type>();
+  return result;
 }
 
 bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,

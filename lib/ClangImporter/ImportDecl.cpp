@@ -551,9 +551,6 @@ getOperatorRef(ASTContext &C, Identifier name) {
   
   SmallVector<ValueDecl *, 4> found;
   for (auto &result : lookup.Results) {
-    if (!result.hasValueDecl())
-      continue;
-    
     if (!isa<FuncDecl>(result.getValueDecl()))
       continue;
     
