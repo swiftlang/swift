@@ -22,6 +22,66 @@
 using namespace swift;
 
 namespace {
+
+enum ShouldRecurse_t : bool {
+  ShouldNotRecurse = false, ShouldRecurse = true
+};
+
+/// A CRTP ASTWalker implementation that looks for interesting
+/// nodes for error handling.
+template <class Impl>
+class ErrorHandlingWalker : public ASTWalker {
+  Impl &asImpl() { return *static_cast<Impl*>(this); }
+public:
+  bool walkToDeclPre(Decl *D) override {
+    // Skip the implementations of all local declarations... except
+    // PBD.  We should really just have a PatternBindingStmt.
+    return isa<PatternBindingDecl>(D);
+  }
+
+  std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    ShouldRecurse_t recurse = ShouldRecurse;
+    if (isa<ErrorExpr>(E)) {
+      asImpl().flagInvalidCode();
+    } else if (auto closure = dyn_cast<ClosureExpr>(E)) {
+      recurse = asImpl().checkClosure(closure);
+    } else if (auto autoclosure = dyn_cast<AutoClosureExpr>(E)) {
+      recurse = asImpl().checkAutoClosure(autoclosure);
+    } else if (auto tryExpr = dyn_cast<TryExpr>(E)) {
+      recurse = asImpl().checkTry(tryExpr);
+    } else if (auto forceTryExpr = dyn_cast<ForceTryExpr>(E)) {
+      recurse = asImpl().checkForceTry(forceTryExpr);
+    } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
+      recurse = asImpl().checkApply(apply);
+    } else if (auto thr = dyn_cast<ThrowExpr>(E)) {
+      recurse = asImpl().checkThrow(thr);
+    }
+    return {bool(recurse), E};
+  }
+
+  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
+    ShouldRecurse_t recurse = ShouldRecurse;
+    if (auto doCatch = dyn_cast<DoCatchStmt>(S)) {
+      recurse = asImpl().checkDoCatch(doCatch);
+    } else {
+      assert(!isa<CatchStmt>(S));
+    }
+    return {bool(recurse), S};
+  }
+
+  ShouldRecurse_t checkDoCatch(DoCatchStmt *S) {
+    if (S->isSyntacticallyExhaustive()) {
+      asImpl().checkExhaustiveDoBody(S);
+    } else {
+      asImpl().checkNonExhaustiveDoBody(S);
+    }
+    for (auto clause : S->getCatches()) {
+      asImpl().checkCatch(clause);
+    }
+    return ShouldNotRecurse;
+  }
+};
+
 /// An error-handling context.
 class Context {
 public:
@@ -240,7 +300,9 @@ public:
 };
 
 /// A class to walk over a local context and validate the correct of 
-class CheckErrorCoverage : public ASTWalker {
+class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
+  friend class ErrorHandlingWalker<CheckErrorCoverage>;
+
   TypeChecker &TC;
 
   Context CurContext;
@@ -313,115 +375,59 @@ public:
     : TC(tc), CurContext(initialContext) {}
 
 private:
-  bool walkToDeclPre(Decl *D) override {
-    // Skip the implementations of all local declarations... except
-    // PBD.  We should really just have a PatternBindingStmt.
-    return isa<PatternBindingDecl>(D);
-  }
-
-  std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
-    // Remember if we saw an error.
-    if (isa<ErrorExpr>(E)) {
-      flagInvalidCode();
-      return {false, E};
-    }
-
-    // Check explicit closures.
-    if (auto closure = dyn_cast<ClosureExpr>(E)) {
-      checkClosureBody(closure);
-      return {false, E};
-    }
-
-    // Check autoclosures.
-    //
-    // TODO: when passing an autoclosure to a rethrows function,
-    // we should diagnose as if the autoclosure didn't exist.
-    if (auto autoclosure = dyn_cast<AutoClosureExpr>(E)) {
-      checkAutoClosureBody(autoclosure);
-      return {false, E};
-    }
-
-    // Handle 'try' differently.
-    if (auto tryExpr = dyn_cast<TryExpr>(E)) {
-      checkTry(tryExpr);
-      return {false, E};
-    }
-    if (auto forceTryExpr = dyn_cast<ForceTryExpr>(E)) {
-      checkForceTry(forceTryExpr);
-      return {false, E};
-    }
-
-
-    // To preserve source order of diagnostics, check the validity
-    // of throwing operations before checking their sub-expressions.
-    if (auto apply = dyn_cast<ApplyExpr>(E)) {
-      checkApply(apply);
-    } else if (auto thr = dyn_cast<ThrowExpr>(E)) {
-      checkThrow(thr);
-    }
-
-    return {true, E};
-  }
-
-  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
-    if (auto doCatch = dyn_cast<DoCatchStmt>(S)) {
-      checkDoCatch(doCatch);
-      return {false, S};
-    }
-
-    assert(!isa<CatchStmt>(S));
-
-    return {true, S};
-  }
-
-  void checkClosureBody(ClosureExpr *E) {
+  ShouldRecurse_t checkClosure(ClosureExpr *E) {
     ContextScope scope(*this);
     CurContext = Context::forClosure(E);
     scope.makeIndependentContext();
     E->getBody()->walk(*this);
+    return ShouldNotRecurse;
   }
 
-  void checkAutoClosureBody(AutoClosureExpr *E) {
+  ShouldRecurse_t checkAutoClosure(AutoClosureExpr *E) {
     ContextScope scope(*this);
     CurContext = Context::forClosure(E);
     E->getBody()->walk(*this);
     scope.preserveInfoFromAutoclosureBody();
+    return ShouldNotRecurse;
   }
 
-  void checkDoCatch(DoCatchStmt *S) {
-    // Handle the 'do' clause.
-    {
-      ContextScope scope(*this);
-      assert(!IsInTry && "do/catch within try?");
-      scope.makeIndependentContext();
+  void checkExhaustiveDoBody(DoCatchStmt *S) {
+    ContextScope scope(*this);
+    assert(!IsInTry && "do/catch within try?");
+    scope.makeIndependentContext();
 
-      // If the catches are exhaustive, then the 'do' clause
-      // is in a handled context.
-      if (S->isSyntacticallyExhaustive()) {
-        CurContext = Context::getHandled();
+    // This is a handled context.
+    CurContext = Context::getHandled();
 
-      // Otherwise, if the enclosing context isn't handled,
-      // use a specialized diagnostic about non-exhaustive catches.
-      } else if (!CurContext.isHandled()) {
-        CurContext = Context::forNonExhaustiveCatch(S);
-      }
+    S->getBody()->walk(*this);
 
-      S->getBody()->walk(*this);
+    // Warn if nothing threw within the body.
+    if (!HasAnyThrowSite) {
+      TC.diagnose(S->getCatches().front()->getCatchLoc(),
+                  diag::no_throw_in_do_with_catch);
+    }
+  }
 
-      // Warn if nothing threw within the body.
-      if (!HasAnyThrowSite) {
-        TC.diagnose(S->getCatches().front()->getCatchLoc(),
-                    diag::no_throw_in_do_with_catch);
-      }
+  void checkNonExhaustiveDoBody(DoCatchStmt *S) {
+    ContextScope scope(*this);
+    assert(!IsInTry && "do/catch within try?");
+    scope.makeIndependentContext();
 
-      if (!S->isSyntacticallyExhaustive()) {
-        scope.preserveInfoFromNonExhaustiveCatch();
-      }
+    // If the enclosing context isn't handled, use a specialized
+    // diagnostic about non-exhaustive catches.
+    if (!CurContext.isHandled()) {
+      CurContext = Context::forNonExhaustiveCatch(S);
     }
 
-    for (auto clause : S->getCatches()) {
-      checkCatch(clause);
+    S->getBody()->walk(*this);
+
+    // Warn if nothing threw within the body.
+    if (!HasAnyThrowSite) {
+      TC.diagnose(S->getCatches().front()->getCatchLoc(),
+                  diag::no_throw_in_do_with_catch);
     }
+
+    scope.preserveInfoFromNonExhaustiveCatch();
   }
 
   void checkCatch(CatchStmt *S) {
@@ -442,22 +448,26 @@ private:
     S->getBody()->walk(*this);
   }
 
-  void checkApply(ApplyExpr *E) {
+  ShouldRecurse_t checkApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
     auto type = E->getFn()->getType();
-    if (!type) return flagInvalidCode();
-    auto fnType = type->getAs<FunctionType>();
-    if (!fnType) return flagInvalidCode();
-    if (!fnType->throws()) return;
+    auto fnType = type ? type->getAs<FunctionType>() : nullptr;
+    if (!fnType) {
+      flagInvalidCode();
+      return ShouldRecurse;
+    }
+    if (!fnType->throws()) return ShouldRecurse;
 
     // TODO: filter out non-throwing calls to rethrows here.
 
     checkThrowSite(E, /*requiresTry*/ true);
+    return ShouldRecurse;
   }
 
-  void checkThrow(ThrowExpr *E) {
+  ShouldRecurse_t checkThrow(ThrowExpr *E) {
     checkThrowSite(E, /*requiresTry*/ false);
+    return ShouldRecurse;
   }
 
   void checkThrowSite(Expr *E, bool requiresTry) {
@@ -473,7 +483,7 @@ private:
     }
   }
 
-  void checkTry(TryExpr *E) {
+  ShouldRecurse_t checkTry(TryExpr *E) {
     // Walk the operand.
     ContextScope scope(*this);
     IsInTry = true;
@@ -492,9 +502,10 @@ private:
     }
 
     scope.preserveInfoFromTryOperand();
+    return ShouldNotRecurse;
   }
 
-  void checkForceTry(ForceTryExpr *E) {
+  ShouldRecurse_t checkForceTry(ForceTryExpr *E) {
     // Walk the operand.  'try!' handles errors.
     ContextScope scope(*this);
     CurContext = Context::getHandled();
@@ -507,6 +518,7 @@ private:
     if (!HasTryThrowSite) {
       TC.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
+    return ShouldNotRecurse;
   }
 };
 
