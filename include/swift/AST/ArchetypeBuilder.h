@@ -545,7 +545,7 @@ public:
   /// constraint.
   bool isConcreteType() const {
     if (Representative != this)
-      return Representative->isPrimary();
+      return Representative->isConcreteType();
 
     return ArchetypeOrConcreteType.isConcreteType();
   }

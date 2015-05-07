@@ -573,7 +573,9 @@ void Mangler::mangleGenericSignature(const GenericSignature *sig,
   // TODO: For staging purposes, only canonicalize the signature when interface
   // type mangling is enabled. We ought to do this all the type.
   if (sig->getASTContext().LangOpts.EnableInterfaceTypeMangling)
-    sig = sig->getCanonicalManglingSignature(*DeclCtx->getParentModule());
+    // FIXME: Is module important?
+    sig = sig->getCanonicalManglingSignature(
+                                       *sig->getASTContext().getStdlibModule());
   
   // Mangle the number of parameters.
   unsigned depth = 0;

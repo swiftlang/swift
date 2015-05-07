@@ -1008,7 +1008,7 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
   
   SmallVector<CanType, 2> depTypes;
   llvm::DenseMap<CanType, DependentConstraints> constraints;
-  SmallVector<Requirement, 2> sameTypes;
+  llvm::DenseMap<CanType, SmallVector<CanType, 2>> sameTypes;
   
   builder.enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
@@ -1039,11 +1039,12 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
     }
     
     switch (kind) {
-    case RequirementKind::WitnessMarker:
+    case RequirementKind::WitnessMarker: {
       // Introduce the dependent type into the constraint set, to ensure we
       // have a record for every dependent type.
       depTypes.push_back(depTy);
       return;
+    }
       
     case RequirementKind::Conformance: {
       assert(std::find(depTypes.begin(), depTypes.end(),
@@ -1066,7 +1067,16 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
     }
     
     case RequirementKind::SameType:
-      llvm_unreachable("todo");
+      // Collect the same-type constraints by their representative.
+      CanType repTy;
+      if (auto concreteTy = type.dyn_cast<Type>())
+        repTy = concreteTy->getCanonicalType();
+      else
+        repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()
+          ->getDependentType(builder, false)->getCanonicalType();
+      
+      sameTypes[repTy].push_back(depTy);
+      return;
     }
   });
   
@@ -1074,6 +1084,7 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
   llvm::array_pod_sort(depTypes.begin(), depTypes.end(), compareDependentTypes);
   
   // Build a new set of minimized requirements.
+  // Emit the conformance constraints.
   SmallVector<Requirement, 4> minimalRequirements;
   for (auto depTy : depTypes) {
     minimalRequirements.push_back(Requirement(RequirementKind::WitnessMarker,
@@ -1094,7 +1105,35 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
     }
   }
   
-  // TODO: same type constraints
+  // Collect the same type constraints.
+  using SameTypeSet = std::pair<CanType, SmallVector<CanType, 2>>;
+  SmallVector<SameTypeSet, 2> sameTypeSets;
+  
+  for (auto &group : sameTypes) {
+    // Sort the types in the set.
+    auto types = std::move(group.second);
+    types.push_back(group.first);
+    llvm::array_pod_sort(types.begin(), types.end(), compareDependentTypes);
+    
+    // Collect them again, keyed by the greatest type in the set (which will be
+    // the concrete type, if one).
+    auto keyType = types.pop_back_val();
+    sameTypeSets.push_back({keyType, std::move(types)});
+  }
+  
+  // Sort the same-type sets by their RHS.
+  std::sort(sameTypeSets.begin(), sameTypeSets.end(),
+            [](const SameTypeSet &a, const SameTypeSet &b) {
+              return compareDependentTypes(&a.first, &b.first);
+            });
+  
+  // Emit the same-type constraints.
+  for (auto &set : sameTypeSets) {
+    for (auto lhs : set.second) {
+      minimalRequirements.push_back(Requirement(RequirementKind::SameType,
+                                                lhs, set.first));
+    }
+  }
   
   // Build the minimized signature.
   auto manglingSig = GenericSignature::get(getGenericParams(),

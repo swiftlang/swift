@@ -521,7 +521,7 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
 
     return DependentMemberType::get(parentType, getName(), builder.Context);
   }
-
+  
   assert(getGenericParam() && "Not a generic parameter?");
   return getGenericParam();
 }
