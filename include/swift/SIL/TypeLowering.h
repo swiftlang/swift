@@ -696,11 +696,9 @@ public:
   
   /// Get a function type curried with its capture context.
   CanAnyFunctionType getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
-                                               ArrayRef<CapturedValue> captures,
                                                  AnyFunctionRef closure);
   CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
                                               CanAnyFunctionType funcType,
-                                              ArrayRef<CapturedValue> captures,
                                               AnyFunctionRef closure);
 
   /// Describes what we're trying to compute a bridged type for.
