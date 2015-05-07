@@ -1396,6 +1396,23 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
 
     DidEmitDebugInfoForArg.set(N);
   }
+
+  // Emit the artificial error result argument.
+  auto FnTy = CurSILFn->getLoweredFunctionType();
+  if (FnTy->hasErrorResult()) {
+    auto ErrorInfo = FnTy->getErrorResult();
+    auto ErrorResultSlot = getErrorResultSlot(ErrorInfo.getSILType());
+    DebugTypeInfo DTI(ErrorInfo.getType(),
+                      ErrorResultSlot->getType(),
+                      IGM.getPointerSize(),
+                      IGM.getPointerAlignment(),
+                      nullptr);
+    StringRef Name("$error");
+    IGM.DebugInfo->emitArgVariableDeclaration(
+      Builder, emitShadowCopy(ErrorResultSlot.getAddress(), Name), DTI,
+      getDebugScope(), Name, N+1, IndirectValue, ArtificialValue);
+  }
+
 }
 
 
