@@ -31,7 +31,7 @@ enum Wacky<A, B> {
 // CHECK: [[DEST]]:
 // CHECK:   [[ORIG_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM]] : $*Wacky<T, A>, #Wacky.Bar
 // CHECK:   [[ORIG:%.*]] = load [[ORIG_ADDR]]
-// CHECK:   [[REABSTRACT:%.*]] = function_ref @_TTRG0_R_XFo_iV18switch_abstraction1A_iq__XFo_dS0__iq__
+// CHECK:   [[REABSTRACT:%.*]] = function_ref @_TTRGrXFo_iV18switch_abstraction1A_iq__XFo_dS0__iq__
 // CHECK:   [[SUBST:%.*]] = partial_apply [[REABSTRACT]]<T>([[ORIG]])
 func enum_addr_only_to_loadable_with_reabstraction<T>(#x: Wacky<T, A>, #a: A)
   -> T

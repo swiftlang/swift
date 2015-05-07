@@ -580,19 +580,38 @@ void Mangler::mangleGenericSignature(const GenericSignature *sig,
   // Mangle the number of parameters.
   unsigned depth = 0;
   unsigned count = 0;
+  
+  // Since it's unlikely (but not impossible) to have zero generic parameters
+  // at a depth, encode indexes starting from 1, and use a special mangling
+  // for zero.
+  auto mangleGenericParamCount = [&](unsigned count) {
+    if (count == 0)
+      Buffer << 'z';
+    else
+      Buffer << Index(count - 1);
+  };
+  
+  // As a special case, mangle nothing if there's a single generic parameter
+  // at depth 0.
+  if (sig->getGenericParams().size() == 1
+      && sig->getGenericParams()[0]->getDepth() == 0)
+    goto mangle_requirements;
+  
   for (auto param : sig->getGenericParams()) {
     if (param->getDepth() != depth) {
       assert(param->getDepth() > depth && "generic params not ordered");
       while (depth++ < param->getDepth()) {
-        Buffer << Index(count);
+        mangleGenericParamCount(count);
         count = 0;
       }
     }
     assert(param->getIndex() == count && "generic params not ordered");
     ++count;
   }
-  Buffer << Index(count);
-  Buffer << 'R';
+  mangleGenericParamCount(count);
+
+mangle_requirements:
+  bool didMangleRequirement = false;
   // Mangle the requirements.
   for (auto &reqt : sig->getRequirements()) {
     switch (reqt.getKind()) {
@@ -600,20 +619,45 @@ void Mangler::mangleGenericSignature(const GenericSignature *sig,
       // TODO: Do we need to mangle this?
       break;
         
-    case RequirementKind::Conformance:
-      Buffer << 'P';
+    case RequirementKind::Conformance: {
+      if (!didMangleRequirement) {
+        Buffer << 'R';
+        didMangleRequirement = true;
+      }
+      SmallVector<ProtocolDecl *, 2> protocols;
+      if (reqt.getSecondType()->isExistentialType(protocols)
+          && protocols.size() == 1) {
+        // Protocol constraints are the common case, so mangle them more
+        // efficiently.
+        // TODO: Once we stabilize on generic mangling signatures, we could
+        // golf this a little more by assuming the first type is a dependent
+        // type.
+        mangleType(reqt.getFirstType()->getCanonicalType(), expansion, 0);
+        mangleProtocolName(protocols[0]);
+        break;
+      }
+      Buffer << 'd';
       mangleType(reqt.getFirstType()->getCanonicalType(), expansion, 0);
       mangleType(reqt.getSecondType()->getCanonicalType(), expansion, 0);
       break;
+    }
 
     case RequirementKind::SameType:
-      Buffer << 'E';
+      if (!didMangleRequirement) {
+        Buffer << 'R';
+        didMangleRequirement = true;
+      }
+      Buffer << 'z';
       mangleType(reqt.getFirstType()->getCanonicalType(), expansion, 0);
       mangleType(reqt.getSecondType()->getCanonicalType(), expansion, 0);
       break;
     }
   }
-  Buffer << '_';
+  // Special mangling for no requirements.
+  if (!didMangleRequirement)
+    Buffer << 'r';
+  else
+    Buffer << '_';
 }
 
 static void mangleMetatypeRepresentation(raw_ostream &Buffer,
@@ -1118,7 +1162,8 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
 
     auto memTy = cast<DependentMemberType>(tybase);
     mangleType(memTy->getBase(), explosion, 0);
-    mangleIdentifier(memTy->getName());
+    mangleProtocolName(memTy->getAssocType()->getProtocol());
+    mangleIdentifier(memTy->getAssocType()->getName());
     return;
   }
 

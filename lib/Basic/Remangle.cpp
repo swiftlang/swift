@@ -1245,11 +1245,34 @@ void Remangler::mangleEntityGenericType(Node *node, EntityContext &ctx) {
 
 void Remangler::mangleDependentGenericSignature(Node *node) {
   auto i = node->begin(), e = node->end();
+  
+  // If there's only one generic param, mangle nothing.
+  if (node->getNumChildren() >= 1
+      && node->getChild(0)->getKind() == Node::Kind::DependentGenericParamCount
+      && node->getChild(0)->getIndex() == 1
+      && (node->getNumChildren() == 1
+          || node->getChild(1)->getKind() != Node::Kind::DependentGenericParamCount))
+  {
+    ++i;
+    goto mangle_requirements;
+  }
+  
+  // Remangle generic params.
   for (; i != e &&
          i->get()->getKind() == Node::Kind::DependentGenericParamCount; ++i) {
     auto count = i->get();
-    mangleIndex(count->getIndex());
+    if (count->getIndex() > 0)
+      mangleIndex(count->getIndex() - 1);
+    else
+      Out << 'z';
   }
+  
+mangle_requirements:
+  if (i == e) { // no generic requirements
+    Out << 'r';
+    return;
+  }
+  
   Out << 'R';
   mangleNodes(i, e); // generic requirements
   Out << '_';
@@ -1260,12 +1283,22 @@ void Remangler::mangleDependentGenericParamCount(Node *node) {
 }
 
 void Remangler::mangleDependentGenericConformanceRequirement(Node *node) {
-  Out << 'P';
+  // If the constraint represents a protocol, use the shorter mangling.
+  if (node->getNumChildren() == 2
+      && node->getChild(1)->getKind() == Node::Kind::Type
+      && node->getChild(1)->getNumChildren() == 1
+      && node->getChild(1)->getChild(0)->getKind() == Node::Kind::Protocol) {
+    mangle(node->getChild(0).get());
+    mangleProtocolWithoutPrefix(node->getChild(1)->getChild(0).get());
+    return;
+  }
+
+  Out << 'd';
   mangleChildNodes(node); // type, type
 }
 
 void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
-  Out << 'E';
+  Out << 'z';
   mangleChildNodes(node); // type, type
 }
 
@@ -1375,8 +1408,9 @@ void Remangler::mangleAssociatedTypeRef(Node *node) {
 
 void Remangler::mangleDependentMemberType(Node *node) {
   Out << 'q';
-  mangleSingleChildNode(node); // type
-  mangleIdentifier(node->getText(), OperatorKind::NotOperator);
+  mangleChildNode(node, 0); // base type
+  mangleProtocolWithoutPrefix(node->getChild(1).get()); // protocol
+  mangleIdentifier(node->getText(), OperatorKind::NotOperator); // assoc type name
 }
 
 void Remangler::mangleDependentGenericParamType(Node *node) {

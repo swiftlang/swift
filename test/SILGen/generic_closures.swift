@@ -48,7 +48,7 @@ class NestedGeneric<U> {
   }
 
   // CHECK-LABEL: sil hidden @_TFC16generic_closures13NestedGeneric20nested_reabstraction{{.*}}
-  //   CHECK:       [[REABSTRACT:%.*]] = function_ref @_TTRG0_0_R_XFo__dT__XFo_iT__iT__
+  //   CHECK:       [[REABSTRACT:%.*]] = function_ref @_TTRG__rXFo__dT__XFo_iT__iT__
   //   CHECK:       partial_apply [[REABSTRACT]]<U, T>
   func nested_reabstraction<T>(x: T) -> Optionable<() -> ()> {
     return .Some({})

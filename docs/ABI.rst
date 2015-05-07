@@ -938,8 +938,8 @@ Types
   type ::= 'q' index                         // dependent generic parameter
                                              //   with depth = 0, idx = N
   type ::= 'qd' index index                  // dependent generic parameter
-                                             //   with depth = M, idx = N
-  type ::= 'q' type identifier               // member of dependent type
+                                             //   with depth = M+1, idx = N
+  type ::= 'q' type protocol identifier      // associated type
 
 ``<type>`` never begins or ends with a number.
 ``<type>`` never begins with an underscore.
@@ -1016,12 +1016,21 @@ the conformance.
 
 ::
 
-  generic-signature ::= index* 'R' requirement* '_'
-  requirement ::= 'P' type type     // protocol or superclass requirement
-  requirement ::= 'E' type type     // same-type requirement
+  generic-signature ::= (generic-param-count+)? 'R' requirement* '_'
+  generic-signature ::= (generic-param-count+)? 'r' // no requirements
+  generic-param-count ::= 'z'       // zero parameters
+  generic-param-count ::= index     // N+1 parameters
+  requirement ::= type protocol     // protocol requirement
+  requirement ::= 'd' type type     // 'd'erived class requirement
+  requirement ::= 'z' type type     // 'z'ame-type requirement
 
 A generic signature begins by describing the number of generic parameters at
-each depth of the signature, followed by the requirements.
+each depth of the signature, followed by the requirements. As a special case,
+no ``generic-param-count`` values indicates a single generic parameter at
+the outermost depth::
+
+  urFq_q_                           // <T_0_0> T_0_0 -> T_0_0
+  u_0_rFq_qd_0_                     // <T_0_0><T_1_0, T_1_1> T_0_0 -> T_1_1
 
 Value Witnesses
 ~~~~~~~~~~~~~~~

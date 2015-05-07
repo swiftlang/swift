@@ -1395,10 +1395,13 @@ private:
     if (c != 'd' && c != '_' && !isdigit(c)) {
       NodePointer baseType = demangleType();
       if (!baseType) return nullptr;
+      NodePointer protocol = demangleProtocolName();
+      if (!protocol) return nullptr;
       NodePointer depTy = demangleIdentifier(Node::Kind::DependentMemberType);
       if (!depTy) return nullptr;
       
       depTy->addChild(baseType);
+      depTy->addChild(protocol);
       return depTy;
     }
     
@@ -1427,16 +1430,32 @@ private:
   NodePointer demangleGenericSignature() {
     auto sig = NodeFactory::create(Node::Kind::DependentGenericSignature);
     // First read in the parameter counts at each depth.
-    while (!Mangled.nextIf('R')) {
-      Node::IndexType count;
-      if (!demangleIndex(count))
+    Node::IndexType count = ~(Node::IndexType)0;
+    while (Mangled.peek() != 'R' && Mangled.peek() != 'r') {
+      if (Mangled.nextIf('z')) {
+        count = 0;
+      } else if (demangleIndex(count)) {
+        count += 1;
+      } else {
         return nullptr;
+      }
       auto countNode =
           NodeFactory::create(Node::Kind::DependentGenericParamCount, count);
       sig->addChild(countNode);
     }
     
-    // Next read in the generic requirements.
+    // No mangled parameters means we have exactly one.
+    if (count == ~(Node::IndexType)0)
+      sig->addChild(
+                NodeFactory::create(Node::Kind::DependentGenericParamCount, 1));
+    
+    // Next read in the generic requirements, if any.
+    if (Mangled.nextIf('r'))
+      return sig;
+    
+    if (!Mangled.nextIf('R'))
+      return nullptr;
+    
     while (!Mangled.nextIf('_')) {
       NodePointer reqt = demangleGenericRequirement();
       if (!reqt) return nullptr;
@@ -1454,13 +1473,14 @@ private:
       return NodeFactory::create(Node::Kind::MetatypeRepresentation, "@thick");
 
     if (Mangled.nextIf('o'))
-      return NodeFactory::create(Node::Kind::MetatypeRepresentation, "@objc_metatype");
+      return NodeFactory::create(Node::Kind::MetatypeRepresentation,
+                                 "@objc_metatype");
 
     unreachable("Unhandled metatype representation");
   }
   
   NodePointer demangleGenericRequirement() {
-    if (Mangled.nextIf('P')) {
+    if (Mangled.nextIf('d')) {
       NodePointer type = demangleType();
       if (!type) return nullptr;
       NodePointer requirement = demangleType();
@@ -1471,7 +1491,7 @@ private:
       reqt->addChild(requirement);
       return reqt;
     }
-    if (Mangled.nextIf('E')) {
+    if (Mangled.nextIf('z')) {
       NodePointer first = demangleType();
       if (!first) return nullptr;
       NodePointer second = demangleType();
@@ -1482,7 +1502,17 @@ private:
       reqt->addChild(second);
       return reqt;
     }
-    return nullptr;
+    // Any other introducer indicates a protocol constraint.
+    NodePointer first = demangleType();
+    if (!first) return nullptr;
+    NodePointer protocol = demangleProtocolName();
+    if (!protocol) return nullptr;
+    
+    auto reqt = NodeFactory::create(
+                            Node::Kind::DependentGenericConformanceRequirement);
+    reqt->addChild(first);
+    reqt->addChild(protocol);
+    return reqt;
   }
   
   NodePointer demangleArchetypeType() {

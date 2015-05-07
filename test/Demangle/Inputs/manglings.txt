@@ -51,11 +51,14 @@ _TtU___FQ_U____FQ1_T_ ---> <A, B>(A) -> <C, D, E>(E) -> ()
 _TtU___FQ_U____FQd__T_ ---> <A, B>(A) -> <C, D, E>(A) -> ()
 _TtU___FQ_U____FQd_0_T_ ---> <A, B>(A) -> <C, D, E>(B) -> ()
 _TtU___FQ_U____FQd_0_T__ASD_foo ---> <A, B>(A) -> <C, D, E>(B) -> () with unmangled suffix "_ASD_foo"
-_Ttu0_R_Fq_q_ ---> <T_0_0> (T_0_0) -> T_0_0
-_Ttu0_0_R_Fq_qd__ ---> <T_0_0, T_1_0> (T_0_0) -> T_1_0
-_Ttu1_R_Fq_q0_ ---> <T_0_0, T_0_1> (T_0_0) -> T_0_1
-_Ttu0_RPq_PSs8Runcible__Fq_qq_5Mince ---> <T_0_0 where T_0_0: Swift.Runcible> (T_0_0) -> T_0_0.Mince
-_Ttu0_RPq_PSs8Runcible_Eqq_5Minceq__Fq_q_ ---> <T_0_0 where T_0_0: Swift.Runcible, T_0_0.Mince == T_0_0> (T_0_0) -> T_0_0
+_TturFq_q_ ---> <T_0_0> (T_0_0) -> T_0_0
+_TtuzrFT_T_ ---> <> () -> ()
+_Ttu__rFq_qd__ ---> <T_0_0, T_1_0> (T_0_0) -> T_1_0
+_Ttu_z_rFq_qd0__ ---> <T_0_0, T_2_0> (T_0_0) -> T_2_0
+_Ttu0_rFq_q0_ ---> <T_0_0, T_0_1> (T_0_0) -> T_0_1
+_TtuRq_Ss8Runcible_Fq_qq_S_5Mince ---> <T_0_0 where T_0_0: Swift.Runcible> (T_0_0) -> T_0_0.Mince
+_TtuRdq_CSs22AbstractRuncingFactory_Fq_q_ ---> <T_0_0 where T_0_0: Swift.AbstractRuncingFactory> (T_0_0) -> T_0_0
+_TtuRq_Ss8Runciblezqq_S_5Minceq__Fq_q_ ---> <T_0_0 where T_0_0: Swift.Runcible, T_0_0.Mince == T_0_0> (T_0_0) -> T_0_0
 _Tv3foo3barSi ---> foo.bar : Swift.Int
 _TF3fooau3barSi ---> foo.bar.unsafeMutableAddressor : Swift.Int
 _TF3foolu3barSi ---> foo.bar.unsafeAddressor : Swift.Int
@@ -150,7 +153,7 @@ _TtaC9typealias5DWARF9DIEOffset ---> typealias.DWARF.DIEOffset
 _TtaSs3Int ---> Swift.Int
 _TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.UnicodeScalar) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.UnicodeScalar) -> (@out Swift.Bool)
 _TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.Int) -> (@unowned Swift.Int?) to @callee_owned (@in Swift.Int) -> (@out Swift.Int?)
-_TTRG0_R_XFo_iV18switch_abstraction1A_iq__XFo_dS0__iq__ ---> reabstraction thunk helper <T_0_0> from @callee_owned (@in switch_abstraction.A) -> (@out T_0_0) to @callee_owned (@unowned switch_abstraction.A) -> (@out T_0_0)
+_TTRGrXFo_iV18switch_abstraction1A_iq__XFo_dS0__iq__ ---> reabstraction thunk helper <T_0_0> from @callee_owned (@in switch_abstraction.A) -> (@out T_0_0) to @callee_owned (@unowned switch_abstraction.A) -> (@out T_0_0)
 _TFCF5types1gFT1bSb_T_L0_10Collection3zimfS0_FT_T_ ---> types.(g (b : Swift.Bool) -> ()).(Collection #2).zim (types.(g (b : Swift.Bool) -> ()).(Collection #2))() -> ()
 _TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> capture_promotion.(test_capture_promotion () -> () -> Swift.Int).(closure #1) with unmangled suffix "_promote0"
 _TFIVSs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> Swift._Process.(variable initialization expression)._arguments : [Swift.String] with unmangled suffix "U_FT_GSaSS_"
