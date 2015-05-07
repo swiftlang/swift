@@ -6,7 +6,7 @@
 @objc class ObjCClass {
       @IBAction func click(_: AnyObject?) -> () {}
 }
-// DW_LANG_Swift = 0xa000 [FIXME: this number will change!]
+
 // CHECK-DAG: ![[TY1:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "SwiftClass",{{.*}} line: [[@LINE+1]],{{.*}} runtimeLang: DW_LANG_Swift
 class SwiftClass {
       @objc func objcmethod() -> () {}
@@ -15,7 +15,7 @@ class SwiftClass {
       func f(someBlock: @convention(block) (Int) -> Int) {
       }
 }
-
+x
 // FIXME: This is currently elided, but should reappear eventually as
 // an artificial variable.
 // DISABLED: [ DW_TAG_variable ] [OBJC_METACLASS_$__TtC10attributes9ObjCClass]
