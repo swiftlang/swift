@@ -239,8 +239,9 @@ swift::classifyDynamicCast(Module *M,
               target.getStructOrBoundGenericStruct() ||
               isa<TupleType>(target) ||
               isa<SILFunctionType>(target) ||
-              isa<FunctionType>(target)) &&
-             "Target should be an enum, struct, tuple or function type");
+              isa<FunctionType>(target) ||
+              isa<MetatypeType>(target)) &&
+             "Target should be an enum, struct, tuple, metatype or function type");
       return DynamicCastFeasibility::WillFail;
     }
 
