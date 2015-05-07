@@ -72,7 +72,7 @@ extension _CollectionDefaultsType {
     return distance(startIndex, endIndex)
   }
 
-  /// Customization point for `SequenceType._prext_indexOf()`.
+  /// Customization point for `SequenceType.indexOf()`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.
@@ -159,7 +159,7 @@ public protocol CollectionType
   /// O(N) otherwise.
   func _prext_count() -> Index.Distance
 
-  /// Customization point for `SequenceType._prext_indexOf()`.
+  /// Customization point for `SequenceType.indexOf()`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.

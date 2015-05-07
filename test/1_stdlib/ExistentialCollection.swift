@@ -128,7 +128,7 @@ tests.test("ForwardCollection") {
   let a1 = ContiguousArray(fc0)
   expectEqual(a0, a1)
   for e in a0 {
-    let i = find(fc0, e)
+    let i = fc0.indexOf(e)
     expectNotEmpty(i)
     expectEqual(e, fc0[i!])
   }
@@ -156,7 +156,7 @@ tests.test("BidirectionalCollection") {
   let a1 = ContiguousArray(lazy(bc0).reverse())
   expectEqual(a0, a1)
   for e in a0 {
-    let i = find(bc0, e)
+    let i = bc0.indexOf(e)
     expectNotEmpty(i)
     expectEqual(e, bc0[i!])
   }
@@ -191,7 +191,7 @@ tests.test("RandomAccessCollection") {
   let a1 = ContiguousArray(lazy(rc0).reverse())
   expectEqual(a0, a1)
   for e in a0 {
-    let i = find(rc0, e)
+    let i = rc0.indexOf(e)
     expectNotEmpty(i)
     expectEqual(e, rc0[i!])
   }

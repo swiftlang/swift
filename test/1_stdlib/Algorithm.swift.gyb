@@ -2600,13 +2600,13 @@ func callStaticFind(
   collection: MinimalForwardCollection<MinimalEquatableValue>,
   _ element: MinimalEquatableValue
 ) -> MinimalForwardCollection<MinimalEquatableValue>.Index? {
-  return collection._prext_indexOf(element)
+  return collection.indexOf(element)
 }
 
 func callGenericFind<
   C : CollectionType where C.Generator.Element : Equatable
 >(collection: C, _ element: C.Generator.Element) -> C.Index? {
-  return collection._prext_indexOf(element)
+  return collection.indexOf(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -2677,7 +2677,7 @@ func callStaticFind(
   sequence: CollectionWithCustomFindMethod,
   _ element: MinimalEquatableValue
 ) -> CollectionWithCustomFindMethod.Index? {
-  return sequence._prext_indexOf(element)
+  return sequence.indexOf(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -2703,14 +2703,14 @@ SequenceTypeAlgorithms.test("find/WhereElementIsEquatable/CustomImplementation/$
 func callGenericFind_<
   C : CollectionType where C.Generator.Element : Equatable
 >(collection: C, _ element: C.Generator.Element) -> C.Index? {
-  return collection._prext_indexOf(element)
+  return collection.indexOf(element)
 }
 
 func callStaticFind_(
   set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Set<MinimalHashableValue>.Index? {
-  return set._prext_indexOf(element)
+  return set.indexOf(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -2758,7 +2758,7 @@ SequenceTypeAlgorithms.test("find/Predicate") {
       test.sequence.map { MinimalEquatableValue($0) })
     let closureLifetimeTracker = LifetimeTracked(0)
     expectEqual(1, LifetimeTracked.instances)
-    let result = s._prext_indexOf {
+    let result = s.indexOf {
       (candidate) in
       _blackHole(closureLifetimeTracker)
       return candidate.value == test.element

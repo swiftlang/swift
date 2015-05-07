@@ -34,11 +34,12 @@ public func maxElement<
 /// `value` is not found.
 ///
 /// - complexity: O(`count(domain)`)
+@availability(*, unavailable, message="call the 'indexOf()' method on the collection")
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, _ value: C.Generator.Element) -> C.Index? {
   // FIXME(prext): remove this function when protocol extensions land.
-  return domain._prext_indexOf(value)
+  return domain.indexOf(value)
 }
 
 /// Return the lesser of `x` and `y`
