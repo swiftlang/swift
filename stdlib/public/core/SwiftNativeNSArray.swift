@@ -52,14 +52,14 @@ class _SwiftNativeNSArrayWithContiguousStorage
 // Implement the APIs required by NSArray 
 extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   @objc internal var count: Int {
-    return withUnsafeBufferOfObjects { $0.count() }
+    return withUnsafeBufferOfObjects { $0.count }
   }
 
   @objc internal final func objectAtIndex(index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
-        _isValidArraySubscript(index, objects.count()),
+        _isValidArraySubscript(index, objects.count),
         "Array index out of range")
       return objects[index]
     }
@@ -71,12 +71,12 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
-        _isValidArrayIndex(range.location, objects.count()),
+        _isValidArrayIndex(range.location, objects.count),
         "Array index out of range")
 
       _precondition(
         _isValidArrayIndex(
-          range.location + range.length, objects.count()),
+          range.location + range.length, objects.count),
         "Array index out of range")
 
       // These objects are "returned" at +0, so treat them as values to
@@ -105,7 +105,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
         AutoreleasingUnsafeMutablePointer<AnyObject?>.self)
       enumerationState.state = 1
       state.memory = enumerationState
-      return objects.count()
+      return objects.count
     }
   }
 
@@ -215,7 +215,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     }
 
     // Check if elements are bridged verbatim.
-    return _nativeStorage._withVerbatimBridgedUnsafeBuffer { $0.count() }
+    return _nativeStorage._withVerbatimBridgedUnsafeBuffer { $0.count }
       ?? _nativeStorage._getNonVerbatimBridgedCount()
   }
 }

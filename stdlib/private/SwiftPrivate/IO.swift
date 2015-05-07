@@ -104,7 +104,7 @@ public struct _FDOutputStream : OutputStreamType {
     utf8.withUnsafeBufferPointer {
       (utf8) -> () in
       var writtenBytes = 0
-      let bufferSize = utf8.count() - 1
+      let bufferSize = utf8.count - 1
       while writtenBytes != bufferSize {
         let result = SwiftShims.write(
           self.fd, UnsafePointer(utf8.baseAddress + Int(writtenBytes)),

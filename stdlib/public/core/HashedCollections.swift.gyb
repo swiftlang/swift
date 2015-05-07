@@ -394,10 +394,17 @@ public struct Set<T : Hashable> :
 
   /// Remove a member from the set and return it. Requires: `count > 0`.
   public mutating func removeFirst() -> T {
-    _precondition(!isEmpty, "can't removeFirst from an empty Set")
+    _precondition(count > 0, "can't removeFirst from an empty Set")
     let member = first!
     remove(member)
     return member
+  }
+
+  /// The number of members in the set.
+  ///
+  /// - complexity: O(1)
+  public var count: Int {
+    return _variantStorage.count
   }
 
   //
@@ -463,7 +470,7 @@ public struct Set<T : Hashable> :
   /// The first element obtained when iterating, or `nil` if `self` is
   /// empty.  Equivalent to `self.generate().next()`
   public var first: T? {
-    return !isEmpty ? self[startIndex] : .None
+    return count > 0 ? self[startIndex] : .None
   }
 
   /// Returns true if the set is a subset of a finite sequence as a `Set`.
@@ -581,7 +588,7 @@ public struct Set<T : Hashable> :
     // The result can only have fewer or the same number of elements.
     // If no elements were removed, don't perform a reassignment
     // as this may cause an unnecessary uniquing COW.
-    if result.count() != count() {
+    if result.count != count {
       self = result
     }
   }
@@ -639,14 +646,7 @@ public struct Set<T : Hashable> :
 
   /// `true` if the set is empty.
   public var isEmpty: Bool {
-    return count() == 0
-  }
-
-  /// The number of members in the set.
-  ///
-  /// - complexity: O(1)
-  public func count() -> Int {
-    return _variantStorage.count
+    return count == 0
   }
 }
 
@@ -661,7 +661,7 @@ internal func _compareSets<T>(lhs: Set<T>, _ rhs: Set<T>)
       return (false, false)
     }
   }
-  return (true, lhs.count() == rhs.count())
+  return (true, lhs.count == rhs.count)
 }
 
 public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
@@ -785,7 +785,7 @@ public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>)
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
-  var builder = _SetBuilder<BaseValue>(count: source.count())
+  var builder = _SetBuilder<BaseValue>(count: source.count)
   for member in source {
     builder.add(member: unsafeBitCast(member, BaseValue.self))
   }
@@ -804,7 +804,7 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
   _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
 
-  var result = Set<ObjCValue>(minimumCapacity: source.count())
+  var result = Set<ObjCValue>(minimumCapacity: source.count)
   let valueBridgesDirectly =
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
     _isBridgedVerbatimToObjectiveC(ObjCValue.self)
@@ -862,7 +862,7 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
-  var result = Set<DerivedValue>(minimumCapacity: source.count())
+  var result = Set<DerivedValue>(minimumCapacity: source.count)
   for member in source {
     if let derivedMember = member as? DerivedValue {
       result.insert(derivedMember)
@@ -904,7 +904,7 @@ public func _setBridgeFromObjectiveCConditional<
     _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
       _isBridgedVerbatimToObjectiveC(ObjCValue.self)
 
-  var result = Set<SwiftValue>(minimumCapacity: source.count())
+  var result = Set<SwiftValue>(minimumCapacity: source.count)
   for value in source {
     // Downcast the value.
     var resultValue: SwiftValue
@@ -1114,6 +1114,13 @@ public struct Dictionary<Key : Hashable, Value> :
     _variantStorage.removeAll(keepCapacity: keepCapacity)
   }
 
+  /// The number of entries in the dictionary.
+  ///
+  /// - complexity: O(1)
+  public var count: Int {
+    return _variantStorage.count
+  }
+
   //
   // `SequenceType` conformance
   //
@@ -1170,15 +1177,9 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// True iff `count == 0`
   public var isEmpty: Bool {
-    return count() == 0
+    return count == 0
   }
 
-  /// The number of entries in the dictionary.
-  ///
-  /// - complexity: O(1)
-  public func count() -> Int {
-    return _variantStorage.count
-  }
 }
 
 public func == <Key : Equatable, Value : Equatable>(
@@ -1265,7 +1266,7 @@ public func != <Key : Equatable, Value : Equatable>(
 
 extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
   internal func _makeDescription(isDebug isDebug: Bool) -> String {
-    if isEmpty {
+    if count == 0 {
       return "[:]"
     }
 
@@ -1337,7 +1338,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
   _sanityCheck(_isClassOrObjCExistential(DerivedKey.self))
   _sanityCheck(_isClassOrObjCExistential(DerivedValue.self))
 
-  var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count())
+  var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
   for (k, v) in source {
     result[unsafeBitCast(k, BaseKey.self)] = unsafeBitCast(v, BaseValue.self)
   }
@@ -1362,7 +1363,7 @@ public func _dictionaryBridgeToObjectiveC<
     _isClassOrObjCExistential(ObjCKey.self) ||
     _isClassOrObjCExistential(ObjCValue.self))
 
-  var result = Dictionary<ObjCKey, ObjCValue>(minimumCapacity: source.count())
+  var result = Dictionary<ObjCKey, ObjCValue>(minimumCapacity: source.count)
   let keyBridgesDirectly =
     _isBridgedVerbatimToObjectiveC(SwiftKey.self) ==
       _isBridgedVerbatimToObjectiveC(ObjCKey.self)
@@ -3725,7 +3726,7 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : MirrorType {
 
   internal var objectIdentifier: ObjectIdentifier? { return nil }
 
-  internal var count: Int { return _mirror.count() }
+  internal var count: Int { return _mirror.count }
 
   internal subscript(i: Int) -> (String, MirrorType) {
     _precondition(i >= 0 && i < count, "MirrorType access out of bounds")

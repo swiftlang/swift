@@ -72,7 +72,7 @@ func nsEncode<CodeUnit>(
   inout _ buffer: [CodeUnit],
   inout _ used: Int
 ) {
-  _precondition(buffer.count() >= 4, "buffer is not large enough")
+  _precondition(buffer.count >= 4, "buffer is not large enough")
 
   let s = NSString(
     bytes: &c,
@@ -81,7 +81,7 @@ func nsEncode<CodeUnit>(
 
   s.getBytes(
     &buffer,
-    maxLength: buffer.count(),
+    maxLength: buffer.count,
     usedLength: &used,
     encoding: encoding,
     options: NSStringEncodingConversionOptions(0),

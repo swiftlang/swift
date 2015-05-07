@@ -119,7 +119,7 @@ class NonContiguousNSString : NSString {
   }
 
   @objc override var length: Int {
-    return _value.count()
+    return _value.count
   }
 
   @objc override func characterAtIndex(index: Int) -> unichar {

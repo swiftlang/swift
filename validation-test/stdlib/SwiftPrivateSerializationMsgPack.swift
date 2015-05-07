@@ -1614,7 +1614,7 @@ MsgPackTestSuite.test("Deserialize/Extension/fixext1") {
   // The input is too short.
   if true {
     let data: [UInt8] = [ 0xd4, 0x42 ]
-    for length in 0..<data.count() {
+    for length in 0..<data.count {
       var d = MsgPackDecoder(Array(data[0..<length]))
       expectEmpty(d.readExtended())
       expectEqual(0, d.consumedCount)
@@ -1653,7 +1653,7 @@ MsgPackTestSuite.test("Deserialize/Extension/fixext2") {
   // The input is too short.
   if true {
     let data: [UInt8] = [ 0xd5, 0x42, 0x00 ]
-    for length in 0..<data.count() {
+    for length in 0..<data.count {
       var d = MsgPackDecoder(Array(data[0..<length]))
       expectEmpty(d.readExtended())
       expectEqual(0, d.consumedCount)
@@ -1692,7 +1692,7 @@ MsgPackTestSuite.test("Deserialize/Extension/fixext4") {
   // The input is too short.
   if true {
     let data: [UInt8] = [ 0xd6, 0x42, 0x00, 0x00, 0x00 ]
-    for length in 0..<data.count() {
+    for length in 0..<data.count {
       var d = MsgPackDecoder(Array(data[0..<length]))
       expectEmpty(d.readExtended())
       expectEqual(0, d.consumedCount)
@@ -1734,7 +1734,7 @@ MsgPackTestSuite.test("Deserialize/Extension/fixext8") {
       0xd7, 0x42,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
     ]
-    for length in 0..<data.count() {
+    for length in 0..<data.count {
       var d = MsgPackDecoder(Array(data[0..<length]))
       expectEmpty(d.readExtended())
       expectEqual(0, d.consumedCount)
@@ -1777,7 +1777,7 @@ MsgPackTestSuite.test("Deserialize/Extension/fixext16") {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
     ]
-    for length in 0..<data.count() {
+    for length in 0..<data.count {
       var d = MsgPackDecoder(Array(data[0..<length]))
       expectEmpty(d.readExtended())
       expectEqual(0, d.consumedCount)

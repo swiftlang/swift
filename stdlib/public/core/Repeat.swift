@@ -22,7 +22,7 @@ public struct Repeat<T> : CollectionType {
   /// Construct an instance that contains `count` elements having the
   /// value `repeatedValue`.
   public init(count: Int, repeatedValue: T) {
-    self._count = count
+    self.count = count
     self.repeatedValue = repeatedValue
   }
   
@@ -32,10 +32,10 @@ public struct Repeat<T> : CollectionType {
     return 0
   }
 
-  /// Always equal to `count()`, which is one greater than the index of
+  /// Always equal to `count`, which is one greater than the index of
   /// the last element in a non-empty instance.
   public var endIndex: Index {
-    return _count
+    return count
   }
 
   /// Return a *generator* over the elements of this *sequence*.
@@ -50,12 +50,12 @@ public struct Repeat<T> : CollectionType {
   /// Requires: `position` is a valid position in `self` and
   /// `position != endIndex`.
   public subscript(position: Int) -> T {
-    _precondition(position >= 0 && position < _count, "Index out of range")
+    _precondition(position >= 0 && position < count, "Index out of range")
     return repeatedValue
   }
 
   /// The number of elements in this collection.
-  internal var _count: Int
+  public var count: Int
 
   /// The value of every element in this collection.
   public let repeatedValue: T

@@ -359,9 +359,9 @@ func makeQSortKiller(len: Int) -> [Int] {
   func Compare(x: Int, y : Int) -> Bool {
     if keys[x] == nil && keys[y] == nil {
       if (x == candidate) {
-        keys[x] = keys.count()
+        keys[x] = keys.count
       } else {
-        keys[y] = keys.count()
+        keys[y] = keys.count
       }
     }
     if keys[x] == nil {
