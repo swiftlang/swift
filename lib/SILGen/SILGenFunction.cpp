@@ -80,13 +80,13 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
     return nominal->getName();
   }
   if (auto tl = dyn_cast<TopLevelCodeDecl>(dc)) {
-    return tl->getModuleContext()->Name;
+    return tl->getModuleContext()->getName();
   }
   if (auto fu = dyn_cast<FileUnit>(dc)) {
-    return fu->getParentModule()->Name;
+    return fu->getParentModule()->getName();
   }
   if (auto m = dyn_cast<Module>(dc)) {
-    return m->Name;
+    return m->getName();
   }
   if (auto e = dyn_cast<ExtensionDecl>(dc)) {
     assert(e->getExtendedType()->getAnyNominal() && "extension for nonnominal");

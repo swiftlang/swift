@@ -2105,7 +2105,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
 
     SmallVector<Module::ImportedModule, 16> scratch;
     M->forAllVisibleModules({}, [&](const Module::ImportedModule &next) {
-      llvm::outs() << next.second->Name;
+      llvm::outs() << next.second->getName();
       if (isClangModule(next.second))
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
@@ -2113,7 +2113,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       scratch.clear();
       next.second->getImportedModules(scratch, Module::ImportFilter::Public);
       for (auto &import : scratch) {
-        llvm::outs() << "\t" << import.second->Name;
+        llvm::outs() << "\t" << import.second->getName();
         for (auto accessPathPiece : import.first) {
           llvm::outs() << "." << accessPathPiece.first;
         }

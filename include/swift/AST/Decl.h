@@ -71,7 +71,7 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
-  class Module;
+  class ModuleDecl;
   class NameAliasType;
   class EnumCaseDecl;
   class EnumElementDecl;
@@ -191,6 +191,7 @@ enum class DescriptiveDeclKind : uint8_t {
   WillSet,
   DidSet,
   EnumElement,
+  Module,
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -636,14 +637,15 @@ protected:
   friend class MemberLookupTable;
 
 private:
-  DeclContext *Context;
+  llvm::PointerUnion<DeclContext *, ASTContext *> Context;
 
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
 
 protected:
 
-  Decl(DeclKind kind, DeclContext *DC) : OpaqueBits(0), Context(DC) {
+  Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
+    : OpaqueBits(0), Context(context) {
     DeclBits.Kind = unsigned(kind);
     DeclBits.Invalid = false;
     DeclBits.Implicit = false;
@@ -694,7 +696,9 @@ public:
   /// for instance, self.
   bool isUserAccessible() const;
 
-  DeclContext *getDeclContext() const { return Context; }
+  DeclContext *getDeclContext() const {
+    return Context.dyn_cast<DeclContext *>();
+  }
   void setDeclContext(DeclContext *DC);
 
   /// Retrieve the innermost declaration context corresponding to this
@@ -703,12 +707,14 @@ public:
   DeclContext *getInnermostDeclContext();
 
   /// \brief Retrieve the module in which this declaration resides.
-  Module *getModuleContext() const;
+  ModuleDecl *getModuleContext() const;
 
   /// getASTContext - Return the ASTContext that this decl lives in.
   ASTContext &getASTContext() const {
-    assert(Context && "Decl doesn't have an assigned context");
-    return Context->getASTContext();
+    if (auto dc = Context.dyn_cast<DeclContext *>())
+      return dc->getASTContext();
+
+    return *Context.get<ASTContext *>();
   }
 
   const DeclAttributes &getAttrs() const {
@@ -836,7 +842,7 @@ public:
   bool isPrivateStdlibDecl(bool whitelistProtocols=true) const;
 
   /// Whether this declaration is weak-imported.
-  bool isWeakImported(Module *fromModule) const;
+  bool isWeakImported(ModuleDecl *fromModule) const;
 
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
@@ -1504,7 +1510,7 @@ private:
   unsigned NumPathElements;
 
   /// The resolved module.
-  Module *Mod = nullptr;
+  ModuleDecl *Mod = nullptr;
   /// The resolved decls if this is a decl import.
   ArrayRef<ValueDecl *> Decls;
 
@@ -1562,8 +1568,8 @@ public:
     return getAttrs().hasAttribute<ExportedAttr>();
   }
 
-  Module *getModule() const { return Mod; }
-  void setModule(Module *M) { Mod = M; }
+  ModuleDecl *getModule() const { return Mod; }
+  void setModule(ModuleDecl *M) { Mod = M; }
 
   ArrayRef<ValueDecl *> getDecls() const { return Decls; }
   void setDecls(ArrayRef<ValueDecl *> Ds) { Decls = Ds; }
@@ -2111,8 +2117,10 @@ class ValueDecl : public Decl {
   llvm::PointerIntPair<Type, 2, OptionalEnum<Accessibility>> TypeAndAccess;
 
 protected:
-  ValueDecl(DeclKind K, DeclContext *DC, DeclName name, SourceLoc NameLoc)
-    : Decl(K, DC), Name(name), NameLoc(NameLoc) {
+  ValueDecl(DeclKind K,
+            llvm::PointerUnion<DeclContext *, ASTContext *> context,
+            DeclName name, SourceLoc NameLoc)
+    : Decl(K, context), Name(name), NameLoc(NameLoc) {
     ValueDeclBits.AlreadyInLookupTable = false;
     ValueDeclBits.CheckedRedeclaration = false;
   }
@@ -2324,8 +2332,7 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&
            D->getKind() <= DeclKind::Last_ValueDecl;
-  }
-  
+  }  
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -2333,9 +2340,10 @@ class TypeDecl : public ValueDecl {
   MutableArrayRef<TypeLoc> Inherited;
 
 protected:
-  TypeDecl(DeclKind K, DeclContext *DC, Identifier name, SourceLoc NameLoc,
+  TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
+           Identifier name, SourceLoc NameLoc,
            MutableArrayRef<TypeLoc> inherited) :
-    ValueDecl(K, DC, name, NameLoc), Inherited(inherited)
+    ValueDecl(K, context, name, NameLoc), Inherited(inherited)
   {
     TypeDeclBits.CheckedInheritanceClause = false;
     TypeDeclBits.ProtocolsSet = false;
@@ -2774,7 +2782,7 @@ public:
   /// TODO: This is what getCanonicalSignature() ought to do, but currently
   /// cannot due to implementation dependencies on 'getAllDependentTypes'
   /// order matching 'getAllArchetypes' order of a generic param list.
-  CanGenericSignature getCanonicalManglingSignature(Module &M) const;
+  CanGenericSignature getCanonicalManglingSignature(ModuleDecl &M) const;
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -3109,7 +3117,7 @@ public:
   ///
   /// \returns true if any conformances were found. 
   bool lookupConformance(
-         Module *module, ProtocolDecl *protocol,
+         ModuleDecl *module, ProtocolDecl *protocol,
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
 
   /// Retrieve all of the protocols that this nominal type conforms to.

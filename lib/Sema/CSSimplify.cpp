@@ -1725,7 +1725,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         auto isProtocolClassType = [&](Type t) -> bool {
           if (auto classDecl = t->getClassOrBoundGenericClass())
             if (classDecl->getName() == getASTContext().Id_Protocol
-                && classDecl->getModuleContext()->Name
+                && classDecl->getModuleContext()->getName()
                     == getASTContext().Id_ObjectiveC)
               return true;
           return false;

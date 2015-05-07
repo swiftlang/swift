@@ -2545,7 +2545,7 @@ namespace {
 
       // HACK: Special-case badly-typed constants in <Security/SecItem.h>.
       if (name.str().startswith("kSec") &&
-          dc->getParentModule()->Name.str().equals("Security")) {
+          dc->getParentModule()->getName().str().equals("Security")) {
         auto typedefTy = decl->getType()->getAs<clang::TypedefType>();
         if (typedefTy && typedefTy->getDecl()->getName() == "CFTypeRef") {
           auto &clangSrcMgr = Impl.getClangASTContext().getSourceManager();
@@ -4923,7 +4923,7 @@ namespace {
       // Add inferred attributes.
 #define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)        \
       if (name.str().equals(#ClassName) &&                              \
-          result->getParentModule()->Name.str().equals(#ModuleName)) {  \
+          result->getParentModule()->getName().str().equals(#ModuleName)) {  \
         using namespace inferred_attributes;                            \
         addInferredAttributes(result, AttributeSet);                    \
       }

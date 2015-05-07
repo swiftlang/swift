@@ -998,7 +998,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
-  if (file->getParentModule()->Name.str() != Name)
+  if (file->getParentModule()->getName().str() != Name)
     return error(Status::NameMismatch);
 
   ASTContext &ctx = getContext();
@@ -1057,7 +1057,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     if (!module) {
       // If we're missing the module we're shadowing, treat that specially.
       if (modulePath.size() == 1 &&
-          modulePath.front() == file->getParentModule()->Name) {
+          modulePath.front() == file->getParentModule()->getName()) {
         return error(Status::MissingShadowedModule);
       }
 
@@ -1083,7 +1083,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   }
 
   if (Bits.HasUnderlyingModule)
-    (void)getModule(FileContext->getParentModule()->Name);
+    (void)getModule(FileContext->getParentModule()->getName());
 
   if (Bits.HasEntryPoint) {
     FileContext->getParentModule()->registerEntryPointFile(FileContext,

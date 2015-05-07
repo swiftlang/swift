@@ -93,7 +93,7 @@ public:
     : Buffer(buffer), DWARFMangling(DWARFMangling), UsePunycode(usePunycode) {}
   void mangleContextOf(const ValueDecl *decl, BindGenerics shouldBind);
   void mangleContext(const DeclContext *ctx, BindGenerics shouldBind);
-  void mangleModule(const Module *module);
+  void mangleModule(const ModuleDecl *module);
   void mangleDeclName(const ValueDecl *decl);
   void mangleDeclType(const ValueDecl *decl, ResilienceExpansion expansion,
                       unsigned uncurryingLevel);

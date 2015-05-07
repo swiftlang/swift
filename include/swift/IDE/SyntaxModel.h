@@ -20,7 +20,7 @@
 
 namespace swift {
   class Decl;
-  class Module;
+  class ModuleDecl;
   class SourceFile;
 
 namespace ide {

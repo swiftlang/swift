@@ -374,7 +374,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
     auto SubModule = performIRGeneration(IRGenOpts, import, SILMod.get(),
-                                         import->Name.str(),
+                                         import->getName().str(),
                                          llvm::getGlobalContext());
 
     if (CI.getASTContext().hadError()) {
@@ -394,7 +394,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     // FIXME: This is an ugly hack; need to figure out how this should
     // actually work.
     SmallVector<char, 20> NameBuf;
-    StringRef InitFnName = (import->Name.str() + ".init").toStringRef(NameBuf);
+    StringRef InitFnName = (import->getName().str() + ".init").toStringRef(NameBuf);
     llvm::Function *InitFn = Module.getFunction(InitFnName);
     if (InitFn)
       InitFns.push_back(InitFn);
@@ -412,7 +412,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto ModuleOwner = performIRGeneration(
-      IRGenOpts, swiftModule, CI.getSILModule(), swiftModule->Name.str(),
+      IRGenOpts, swiftModule, CI.getSILModule(), swiftModule->getName().str(),
       llvm::getGlobalContext());
   auto *Module = ModuleOwner.get();
 
@@ -442,7 +442,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   std::string CPU;
   std::vector<std::string> Features;
   std::tie(TargetOpt, CPU, Features)
-    = getIRTargetOptions(IRGenOpts, swiftModule->Ctx);
+    = getIRTargetOptions(IRGenOpts, swiftModule->getASTContext());
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);
   builder.setMCPU(CPU);

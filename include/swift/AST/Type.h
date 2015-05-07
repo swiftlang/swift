@@ -34,7 +34,7 @@ class CanType;
 class EnumDecl;
 class GenericSignature;
 class LazyResolver;
-class Module;
+class ModuleDecl;
 class NominalTypeDecl;
 class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
@@ -165,7 +165,7 @@ public:
   /// \param options Options that affect the substitutions.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(Module *module, TypeSubstitutionMap &substitutions,
+  Type subst(ModuleDecl *module, TypeSubstitutionMap &substitutions,
              SubstOptions options) const;
 
   bool isPrivateStdlibType() const;

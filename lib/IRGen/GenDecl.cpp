@@ -435,7 +435,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 
   SF.forAllVisibleModules([&](swift::Module::ImportedModule import) {
     swift::Module *next = import.second;
-    if (Opts.HasUnderlyingModule && next->Name == SF.getParentModule()->Name)
+    if (Opts.HasUnderlyingModule &&
+        next->getName() == SF.getParentModule()->getName())
       return;
 
     next->collectLinkLibraries([this](LinkLibrary linkLib) {
@@ -1237,7 +1238,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Protocol:
     return emitProtocolDecl(cast<ProtocolDecl>(D));
-      
+
   case DeclKind::PatternBinding:
     // The global initializations are in SIL.
     return;
@@ -1296,6 +1297,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
     return;
+
+  case DeclKind::Module:
+    return;
   }
 
   llvm_unreachable("bad decl kind!");
@@ -1339,6 +1343,9 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::Enum:
   case DeclKind::Class:
   case DeclKind::Protocol:
+    break;
+
+  case DeclKind::Module:
     break;
   }
 }
@@ -1910,6 +1917,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::Param:
+    case DeclKind::Module:
       llvm_unreachable("decl not allowed in type context");
 
     case DeclKind::IfConfig:

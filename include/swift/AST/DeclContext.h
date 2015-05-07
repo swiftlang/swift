@@ -50,7 +50,7 @@ namespace swift {
   class Requirement;
   class SourceFile;
   class Type;
-  class Module;
+  class ModuleDecl;
   class NominalTypeDecl;
   class ProtocolConformance;
   class ValueDecl;
@@ -336,7 +336,7 @@ public:
   }
 
   /// Returns the module context that contains this context.
-  Module *getParentModule() const;
+  ModuleDecl *getParentModule() const;
 
   /// Returns the module scope context that contains this context.
   ///

@@ -877,6 +877,11 @@ namespace {
       printCommon(POD, "postfix_operator_decl ");
       OS << POD->getName() << ')';
     }
+
+    void visitModuleDecl(ModuleDecl *MD) {
+      printCommon(MD, "module");
+      OS << ')';
+    }
   };
 } // end anonymous namespace.
 
@@ -898,7 +903,7 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
 
   switch (dc->getContextKind()) {
   case DeclContextKind::Module:
-    printName(os, cast<Module>(dc)->Name);
+    printName(os, cast<Module>(dc)->getName());
     break;
 
   case DeclContextKind::FileUnit:
@@ -2457,7 +2462,7 @@ namespace {
 
     void visitModuleType(ModuleType *T, StringRef label) {
       printCommon(T, label, "module_type");
-      printField("module", T->getModule()->Name);
+      printField("module", T->getModule()->getName());
       OS << ")";
     }
 

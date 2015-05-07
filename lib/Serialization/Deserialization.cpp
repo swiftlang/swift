@@ -109,7 +109,7 @@ namespace {
           break;
         case Kind::Extension:
           if (getDataAs<Module *>())
-            os << "in an extension in module '" << getDataAs<Module *>()->Name
+            os << "in an extension in module '" << getDataAs<Module *>()->getName()
                << "'";
           else
             os << "in an extension in any module";
@@ -209,7 +209,7 @@ namespace {
     }
 
     virtual void print(raw_ostream &os) const override {
-      os << "Cross-reference to module '" << baseM.Name << "'\n";
+      os << "Cross-reference to module '" << baseM.getName() << "'\n";
       for (auto &piece : path) {
         os << "\t... ";
         piece.print(os);
@@ -1497,7 +1497,7 @@ Module *ModuleFile::getModule(ArrayRef<Identifier> name) {
 
   // FIXME: duplicated from NameBinder::getModule
   if (name.size() == 1 &&
-      name.front() == FileContext->getParentModule()->Name) {
+      name.front() == FileContext->getParentModule()->getName()) {
     if (!ShadowedModule) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");

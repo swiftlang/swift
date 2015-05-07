@@ -21,7 +21,7 @@
 namespace swift {
 
 class CanType;
-class Module;
+class ModuleDecl;
 class SILBuilder;
 class SILLocation;
 class SILValue;
@@ -43,19 +43,19 @@ enum class DynamicCastFeasibility {
 /// Classify the feasibility of a dynamic cast.  The source and target
 /// types should be unlowered formal types.
 DynamicCastFeasibility classifyDynamicCast(
-    Module *context,
+    ModuleDecl *context,
     CanType sourceType, CanType targetType,
     bool isSourceTypeExact = false,
     bool isWholdModuleOpts = false);
 
 SILValue emitSuccessfulScalarUnconditionalCast(
-    SILBuilder &B, Module *M, SILLocation loc, SILValue value,
+    SILBuilder &B, ModuleDecl *M, SILLocation loc, SILValue value,
     SILType loweredTargetType,
     CanType formalSourceType, CanType formalTargetType,
     SILInstruction *existingCast = nullptr);
 
 bool emitSuccessfulIndirectUnconditionalCast(
-    SILBuilder &B, Module *M, SILLocation loc,
+    SILBuilder &B, ModuleDecl *M, SILLocation loc,
     CastConsumptionKind consumption,
     SILValue src, CanType sourceType,
     SILValue dest, CanType targetType,
@@ -68,17 +68,17 @@ bool canUseScalarCheckedCastInstructions(CanType sourceType,CanType targetType);
 /// Carry out the operations required for an indirect conditional cast
 /// using a scalar cast operation.
 void emitIndirectConditionalCastWithScalar(
-    SILBuilder &B, Module *M, SILLocation loc,
+    SILBuilder &B, ModuleDecl *M, SILLocation loc,
     CastConsumptionKind consumption,
     SILValue src, CanType sourceType,
     SILValue dest, CanType targetType,
     SILBasicBlock *trueBB, SILBasicBlock *falseBB);
 
 /// \brief Does the type conform to the _ObjectiveCBridgeable protocol.
-bool isObjectiveCBridgeable(Module *M, CanType Ty);
+bool isObjectiveCBridgeable(ModuleDecl *M, CanType Ty);
 
 /// \brief Does the type conform to the _Error protocol.
-bool isErrorType(Module *M, CanType Ty);
+bool isErrorType(ModuleDecl *M, CanType Ty);
 } // end namespace swift
 
 #endif

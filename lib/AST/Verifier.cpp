@@ -115,7 +115,7 @@ struct ASTNodeBase {};
 
     Verifier(PointerUnion<Module *, SourceFile *> M, DeclContext *DC)
       : M(M),
-        Ctx(M.is<Module *>() ? M.get<Module *>()->Ctx
+        Ctx(M.is<Module *>() ? M.get<Module *>()->getASTContext()
                              : M.get<SourceFile *>()->getASTContext()),
         Out(llvm::errs()),
         HadError(Ctx.hadError())

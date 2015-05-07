@@ -34,7 +34,7 @@ class DiagnosticEngine;
 class GenericParamList;
 class NormalProtocolConformance;
 class ProtocolConformance;
-class Module;
+class ModuleDecl;
 enum class AllocationArena;
   
 /// \brief Type substitution mapping from substitutable types to their
@@ -262,7 +262,7 @@ private:
   friend class Substitution;
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
-  ProtocolConformance *subst(Module *module,
+  ProtocolConformance *subst(ModuleDecl *module,
                              Type substType,
                              ArrayRef<Substitution> subs,
                              TypeSubstitutionMap &subMap,

@@ -734,7 +734,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::DoesNotHaveNonMutatingMember:
     if (auto moduleTy = failure.getFirstType()->getAs<ModuleType>()) {
       tc.diagnose(loc, diag::no_member_of_module,
-                  moduleTy->getModule()->Name,
+                  moduleTy->getModule()->getName(),
                   failure.getName())
         .highlight(range1).highlight(range2);
     } else {

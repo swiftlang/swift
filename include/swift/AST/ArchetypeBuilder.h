@@ -43,7 +43,7 @@ class GenericSignature;
 class GenericTypeParamDecl;
 class GenericTypeParamType;
 class LazyResolver;
-class Module;
+class ModuleDecl;
 class Pattern;
 class ProtocolConformance;
 class ProtocolDecl;
@@ -114,7 +114,7 @@ private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
 
-  Module &Mod;
+  ModuleDecl &Mod;
   ASTContext &Context;
   DiagnosticEngine &Diags;
   LazyResolver *Resolver = nullptr;
@@ -157,7 +157,7 @@ private:
   void visitPotentialArchetypes(F f);
 
 public:
-  ArchetypeBuilder(Module &mod, DiagnosticEngine &diags);
+  ArchetypeBuilder(ModuleDecl &mod, DiagnosticEngine &diags);
 
   /// The type of a callback used to retrieve the superclass and
   /// protocol requirements placed on
@@ -180,11 +180,12 @@ public:
   /// to which the given type parameter conforms. The produces the final
   /// results of AbstractTypeParamDecl::getProtocols() for an associated type.
   ArchetypeBuilder(
-    Module &mod, DiagnosticEngine &diags, LazyResolver *resolver,
+    ModuleDecl &mod, DiagnosticEngine &diags, LazyResolver *resolver,
     std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
       getInheritedProtocols,
     GetConformsToCallback getConformsTo,
-    std::function<ProtocolConformance * (Module &M, Type T, ProtocolDecl* P)>
+    std::function<ProtocolConformance * (ModuleDecl &M, Type T,
+                                         ProtocolDecl* P)>
       conformsToProtocol);
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
@@ -193,7 +194,7 @@ public:
   ASTContext &getASTContext() const { return Context; }
 
   /// Retrieve the module.
-  Module &getModule() const { return Mod; }
+  ModuleDecl &getModule() const { return Mod; }
 
   /// Retrieve the lazy resolver, if there is one.
   LazyResolver *getLazyResolver() const { return Resolver; }
@@ -345,7 +346,7 @@ public:
   void dump(llvm::raw_ostream &out);
 
   /// FIXME: Share the guts of our mapTypeIntoContext implementation with
-  static Type mapTypeIntoContext(Module *M,
+  static Type mapTypeIntoContext(ModuleDecl *M,
                                  GenericParamList *genericParams,
                                  Type type,
                                  LazyResolver *resolver = nullptr);

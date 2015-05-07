@@ -33,15 +33,15 @@ class ModuleLoader;
 class ClangModuleUnit final : public LoadedFile {
   ClangImporter &owner;
   const clang::Module *clangModule;
-  llvm::PointerIntPair<Module *, 1, bool> adapterModule;
+  llvm::PointerIntPair<ModuleDecl *, 1, bool> adapterModule;
 
   ~ClangModuleUnit() = default;
 
 public:
   /// True if the given Module contains an imported Clang module unit.
-  static bool hasClangModule(Module *M);
+  static bool hasClangModule(ModuleDecl *M);
 
-  ClangModuleUnit(Module &M, ClangImporter &owner,
+  ClangModuleUnit(ModuleDecl &M, ClangImporter &owner,
                   const clang::Module *clangModule);
 
   /// \brief Retrieve the underlying Clang module.
@@ -53,23 +53,23 @@ public:
   bool isTopLevel() const;
 
   /// Returns the Swift module that overlays this Clang module.
-  Module *getAdapterModule() const;
+  ModuleDecl *getAdapterModule() const;
 
   virtual bool isSystemModule() const override;
 
-  virtual void lookupValue(Module::AccessPathTy accessPath,
+  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
                            DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
-  virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override;
 
-  virtual void lookupClassMembers(Module::AccessPathTy accessPath,
+  virtual void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer) const override;
 
   virtual void
-  lookupClassMember(Module::AccessPathTy accessPath, DeclName name,
+  lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &decls) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
@@ -77,11 +77,11 @@ public:
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
-  getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
-                     Module::ImportFilter filter) const override;
+  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+                     ModuleDecl::ImportFilter filter) const override;
 
   virtual void
-  collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
+  collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
   Identifier
   getDiscriminatorForPrivateValue(const ValueDecl *D) const override {

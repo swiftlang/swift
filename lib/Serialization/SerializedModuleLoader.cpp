@@ -262,7 +262,7 @@ FileUnit *SerializedModuleLoader::loadAST(
 
   case serialization::Status::MissingShadowedModule: {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
-                       M.Name);
+                       M.getName());
     if (Ctx.SearchPathOpts.SDKPath.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
@@ -277,7 +277,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_name_mismatch_repl;
     Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       loadedModuleFile->getModuleName(), M.Name);
+                       loadedModuleFile->getModuleName(), M.getName());
     break;
   }
 

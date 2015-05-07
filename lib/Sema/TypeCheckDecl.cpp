@@ -1869,6 +1869,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::Module:
     llvm_unreachable("cannot appear in a type context");
 
   case DeclKind::Param:
@@ -2339,11 +2340,12 @@ static void checkObjCBridgingFunctions(TypeChecker &TC,
   Module::AccessPathTy unscopedAccess = {};
   SmallVector<ValueDecl *, 4> results;
   
-  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(bridgedTypeName),
+  auto &Ctx = TC.Context;
+  mod->lookupValue(unscopedAccess, Ctx.getIdentifier(bridgedTypeName),
                    NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(forwardConversion),
+  mod->lookupValue(unscopedAccess, Ctx.getIdentifier(forwardConversion),
                    NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(reverseConversion),
+  mod->lookupValue(unscopedAccess, Ctx.getIdentifier(reverseConversion),
                    NLKind::QualifiedLookup, results);
   
   for (auto D : results)
@@ -4267,6 +4269,8 @@ public:
     }
   }
 
+  void visitModuleDecl(ModuleDecl *) { }
+
   /// Adjust the type of the given declaration to appear as if it were
   /// in the given subclass of its actual declared class.
   static Type adjustSuperclassMemberDeclType(TypeChecker &TC,
@@ -5746,6 +5750,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::IfConfig:
     llvm_unreachable("not a value decl");
 
+  case DeclKind::Module:
+    return;
+
   case DeclKind::TypeAlias: {
     // Type aliases may not have an underlying type yet.
     auto typeAlias = cast<TypeAliasDecl>(D);
@@ -6112,6 +6119,9 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
     llvm_unreachable("not a value decl");
+
+  case DeclKind::Module:
+    break;
 
   case DeclKind::TypeAlias:
     computeAccessibility(D);

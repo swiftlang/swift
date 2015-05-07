@@ -890,7 +890,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
     Module *foundationModule = impl.tryLoadFoundationModule();
     if (!foundationModule ||
-        foundationModule->Name != elementClass->getModuleContext()->Name)
+        foundationModule->getName()
+          != elementClass->getModuleContext()->getName())
       return Type();
 
     return impl.getNamedSwiftType(foundationModule, "NSErrorPointer");

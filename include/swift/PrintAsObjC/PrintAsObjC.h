@@ -17,13 +17,13 @@
 #include "swift/AST/Attr.h"
 
 namespace swift {
-  class Module;
+  class ModuleDecl;
 
   /// Print the Objective-C-compatible declarations in a module as a Clang
   /// header.
   ///
   /// Returns true on error.
-  bool printAsObjC(raw_ostream &out, Module *M, StringRef bridgingHeader,
+  bool printAsObjC(raw_ostream &out, ModuleDecl *M, StringRef bridgingHeader,
                    Accessibility minRequiredAccess);
 }
 

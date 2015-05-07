@@ -220,6 +220,7 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
+  case DeclKind::Module:
     llvm_unreachable("not expecting such a declaration result");
 
   case DeclKind::TypeAlias:
@@ -2898,7 +2899,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       // ModuleFilename can be empty if something strange happened during
       // module loading, for example, the module file is corrupted.
       if (!ModuleFilename.empty()) {
-        CodeCompletionCache::Key K{ModuleFilename, TheModule->Name.str(),
+        CodeCompletionCache::Key K{ModuleFilename, TheModule->getName().str(),
                                    AccessPath, Request.NeedLeadingDot,
                                    SF.hasTestableImport(TheModule)};
         std::pair<decltype(ImportsSeen)::iterator, bool>

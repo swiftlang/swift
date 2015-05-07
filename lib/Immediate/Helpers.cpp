@@ -28,7 +28,7 @@ bool swift::appendToREPLFile(SourceFile &SF,
                              std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
 
-  SourceManager &SrcMgr = SF.getParentModule()->Ctx.SourceMgr;
+  SourceManager &SrcMgr = SF.getParentModule()->getASTContext().SourceMgr;
   RC.CurBufferID = SrcMgr.addNewSourceBuffer(std::move(Buffer));
 
   bool FoundAnySideEffects = false;

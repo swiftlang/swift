@@ -111,7 +111,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     // Add the declared module.
     auto module = me->getType()->getAs<ModuleType>()->getModule();
     components.push_back(
-      new (C) SimpleIdentTypeRepr(me->getLoc(), module->Name));
+      new (C) SimpleIdentTypeRepr(me->getLoc(), module->getName()));
     components.back()->setValue(module);
     return true;
   }

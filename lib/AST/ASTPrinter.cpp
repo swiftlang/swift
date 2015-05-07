@@ -1823,6 +1823,8 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
   Printer << "}";
 }
 
+void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
+
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   Printer << "{";
   printASTNodes(stmt->getElements());
@@ -2082,7 +2084,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
       if (auto Parent = M->getParent())
         printDeclContext(Parent);
-      Printer.printModuleRef(M, M->Name);
+      Printer.printModuleRef(M, M->getName());
       return;
     }
 
@@ -2176,7 +2178,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   template <typename T>
   void printModuleContext(T *Ty) {
     Module *Mod = Ty->getDecl()->getModuleContext();
-    Printer.printModuleRef(Mod, Mod->Name);
+    Printer.printModuleRef(Mod, Mod->getName());
     Printer << ".";
   }
 
@@ -2191,7 +2193,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   bool isLLDBExpressionModule(Module *M) {
     if (!M)
       return false;
-    return M->Name.str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
+    return M->getName().str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
   }
 
   bool shouldPrintFullyQualified(TypeBase *T) {
@@ -2216,7 +2218,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
     // Don't print qualifiers for types from the standard library.
     if (M->isStdlibModule() ||
-        M->Name == T->getASTContext().ObjCModuleName ||
+        M->getName() == T->getASTContext().ObjCModuleName ||
         M->isSystemModule() ||
         isLLDBExpressionModule(M))
       return false;
@@ -2460,7 +2462,7 @@ public:
 
   void visitModuleType(ModuleType *T) {
     Printer << "module<";
-    Printer.printModuleRef(T->getModule(), T->getModule()->Name);
+    Printer.printModuleRef(T->getModule(), T->getModule()->getName());
     Printer << ">";
   }
 
@@ -3060,7 +3062,7 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(this);
     os << normal->getProtocol()->getName()
-       << " module " << normal->getDeclContext()->getParentModule()->Name;
+       << " module " << normal->getDeclContext()->getParentModule()->getName();
     break;
   }
   case ProtocolConformanceKind::Specialized: {

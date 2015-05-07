@@ -83,14 +83,14 @@ public:
   
   /// Substitute the replacement and conformance types with the given
   /// substitution vector.
-  Substitution subst(Module *module,
+  Substitution subst(ModuleDecl *module,
                      GenericParamList *context,
                      ArrayRef<Substitution> subs) const;
   
 private:
   friend class ProtocolConformance;
   
-  Substitution subst(Module *module,
+  Substitution subst(ModuleDecl *module,
                      ArrayRef<Substitution> subs,
                      TypeSubstitutionMap &subMap,
                      ArchetypeConformanceMap &conformanceMap) const;

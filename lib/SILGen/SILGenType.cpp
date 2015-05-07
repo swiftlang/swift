@@ -635,6 +635,7 @@ public:
   //===--------------------------------------------------------------------===//
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
+  void visitModuleDecl(ModuleDecl *md) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -734,6 +735,7 @@ public:
   //===--------------------------------------------------------------------===//
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
+  void visitModuleDecl(ModuleDecl *md) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }

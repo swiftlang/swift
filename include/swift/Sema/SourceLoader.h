@@ -18,7 +18,7 @@
 namespace swift {
 
 class ASTContext;
-class Module;
+class ModuleDecl;
   
 /// \brief Imports serialized Swift modules into an ASTContext.
 class SourceLoader : public ModuleLoader {
@@ -52,7 +52,7 @@ public:
   ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// returns NULL.
-  virtual Module *
+  virtual ModuleDecl *
   loadModule(SourceLoc importLoc,
              ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
 

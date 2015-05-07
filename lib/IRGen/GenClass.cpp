@@ -939,7 +939,7 @@ namespace {
       // Find the module the extension is declared in.
       Module *TheModule = TheExtension->getParentModule();
 
-      os << TheModule->Name;
+      os << TheModule->getName();
       
       unsigned categoryCount = CategoryCounts[{getClass(), TheModule}]++;
       if (categoryCount > 0)

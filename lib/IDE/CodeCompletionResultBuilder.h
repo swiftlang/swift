@@ -24,7 +24,7 @@ class Module;
 
 namespace swift {
 class Decl;
-class Module;
+class ModuleDecl;
 
 namespace ide {
 
@@ -36,7 +36,7 @@ class CodeCompletionResultBuilder {
   const Decl *AssociatedDecl = nullptr;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
-  llvm::PointerUnion<const swift::Module *, const clang::Module *>
+  llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,

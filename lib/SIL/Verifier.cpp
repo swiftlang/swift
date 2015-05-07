@@ -2562,7 +2562,7 @@ public:
     require(classDecl, "objc_protocol must produce a class instance");
     require(classDecl->getName() == F.getASTContext().Id_Protocol,
             "objc_protocol must produce an instance of ObjectiveC.Protocol class");
-    require(classDecl->getModuleContext()->Name == F.getASTContext().Id_ObjectiveC,
+    require(classDecl->getModuleContext()->getName() == F.getASTContext().Id_ObjectiveC,
             "objc_protocol must produce an instance of ObjectiveC.Protocol class");
   }
   

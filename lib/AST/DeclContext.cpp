@@ -41,7 +41,7 @@ void *DeclContext::operator new(size_t Bytes, ASTContext &C,
 }
 
 ASTContext &DeclContext::getASTContext() const {
-  return getParentModule()->Ctx;
+  return getParentModule()->getASTContext();
 }
 
 NominalTypeDecl *
@@ -537,7 +537,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
 
   switch (getContextKind()) {
   case DeclContextKind::Module:
-    OS << " name=" << cast<Module>(this)->Name;
+    OS << " name=" << cast<Module>(this)->getName();
     break;
   case DeclContextKind::FileUnit:
     switch (cast<FileUnit>(this)->getKind()) {

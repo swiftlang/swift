@@ -34,7 +34,7 @@ public:
 
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.
-  virtual Module *getImportedHeaderModule() const = 0;
+  virtual ModuleDecl *getImportedHeaderModule() const = 0;
 
   /// Adds a new search path to the Clang CompilerInstance, as if specified with
   /// -I or -F.

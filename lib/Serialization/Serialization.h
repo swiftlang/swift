@@ -41,7 +41,7 @@ class Serializer {
   SmallVector<uint64_t, 64> ScratchRecord;
 
   /// The module currently being serialized.
-  const Module *M = nullptr;
+  const ModuleDecl *M = nullptr;
 
   /// The SourceFile currently being serialized, if any.
   ///
@@ -378,7 +378,7 @@ public:
   ///
   /// \returns The ID for the identifier for the module's name, or one of the
   /// special module codes defined above.
-  IdentifierID addModuleRef(const Module *M);
+  IdentifierID addModuleRef(const ModuleDecl *M);
 
   /// Writes a list of generic substitutions. abbrCode is needed to support
   /// usage out of decl block.

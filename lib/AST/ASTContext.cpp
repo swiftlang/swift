@@ -1231,7 +1231,7 @@ ClangModuleLoader *ASTContext::getClangModuleLoader() const {
 
 static void recordKnownProtocol(Module *Stdlib, StringRef Name,
                                 KnownProtocolKind Kind) {
-  Identifier ID = Stdlib->Ctx.getIdentifier(Name);
+  Identifier ID = Stdlib->getASTContext().getIdentifier(Name);
   UnqualifiedLookup Lookup(ID, Stdlib, nullptr, /*NonCascading=*/true,
                            SourceLoc(), /*IsType=*/true);
   if (auto Proto
@@ -1564,7 +1564,7 @@ namespace {
       Module *lhsModule = lhs->getDeclContext()->getParentModule();
       Module *rhsModule = rhs->getDeclContext()->getParentModule();
       if (lhsModule != rhsModule) {
-        return lhsModule->Name.str() < rhsModule->Name.str();
+        return lhsModule->getName().str() < rhsModule->getName().str();
       }
 
       // If the two declarations are in the same source file, order based on

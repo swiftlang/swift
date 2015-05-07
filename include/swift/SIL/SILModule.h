@@ -236,7 +236,7 @@ public:
   /// Get the Swift module associated with this SIL module.
   Module *getSwiftModule() const { return TheSwiftModule; }
   /// Get the AST context used for type uniquing etc. by this SIL module.
-  ASTContext &getASTContext() const { return TheSwiftModule->Ctx; }
+  ASTContext &getASTContext() const { return TheSwiftModule->getASTContext(); }
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
 
   /// Get the Swift DeclContext associated with this SIL module.

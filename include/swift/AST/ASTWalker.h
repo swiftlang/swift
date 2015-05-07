@@ -20,7 +20,7 @@ namespace swift {
 
 class Decl;
 class Expr;
-class Module;
+class ModuleDecl;
 class Stmt;
 class Pattern;
 class TypeRepr;
@@ -37,7 +37,7 @@ public:
     void *Ptr = nullptr;
 
   public:
-    ParentTy(Module *Mod) : Kind(ParentKind::Module), Ptr(Mod) {}
+    ParentTy(ModuleDecl *Mod) : Kind(ParentKind::Module), Ptr(Mod) {}
     ParentTy(Decl *D) : Kind(ParentKind::Decl), Ptr(D) {}
     ParentTy(Stmt *S) : Kind(ParentKind::Stmt), Ptr(S) {}
     ParentTy(Expr *E) : Kind(ParentKind::Expr), Ptr(E) {}
@@ -51,8 +51,9 @@ public:
       return Kind;
     }
 
-    Module *getAsModule() const {
-      return Kind == ParentKind::Module ? static_cast<Module*>(Ptr) : nullptr;
+    ModuleDecl *getAsModule() const {
+      return Kind == ParentKind::Module ? static_cast<ModuleDecl*>(Ptr)
+                                        : nullptr;
     }
     Decl *getAsDecl() const {
       return Kind == ParentKind::Decl ? static_cast<Decl*>(Ptr) : nullptr;

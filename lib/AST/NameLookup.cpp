@@ -738,13 +738,13 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     return;
 
   // Look for a module with the given name.
-  if (Name.isSimpleName(M.Name)) {
+  if (Name.isSimpleName(M.getName())) {
     Results.push_back(Result::getModuleName(&M));
     return;
   }
 
   Module *desiredModule = Ctx.getLoadedModule(Name.getBaseName());
-  if (!desiredModule && Name == Ctx.TheBuiltinModule->Name)
+  if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {
     forAllVisibleModules(DC, [&](const Module::ImportedModule &import) -> bool {

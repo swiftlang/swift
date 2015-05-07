@@ -31,7 +31,7 @@ namespace clang {
 }
 
 namespace swift {
-  class Module;
+  class ModuleDecl;
   class ValueDecl;
   class ASTContext;
   class CompilerInvocation;

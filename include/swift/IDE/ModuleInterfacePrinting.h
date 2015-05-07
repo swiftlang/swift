@@ -19,7 +19,7 @@
 namespace swift {
 class ASTContext;
 class ASTPrinter;
-class Module;
+class ModuleDecl;
 struct PrintOptions;
 
 namespace ide {
@@ -37,13 +37,13 @@ enum class ModuleTraversal : unsigned {
 /// Options used to describe the traversal of a module for printing.
 typedef OptionSet<ModuleTraversal> ModuleTraversalOptions;
 
-void printModuleInterface(Module *M,
+void printModuleInterface(ModuleDecl *M,
                           ModuleTraversalOptions TraversalOptions,
                           ASTPrinter &Printer, const PrintOptions &Options);
 
 // FIXME: this API should go away when Swift can represent Clang submodules as
 // 'swift::Module *' objects.
-void printSubmoduleInterface(Module *M, ArrayRef<StringRef> FullModuleName,
+void printSubmoduleInterface(ModuleDecl *M, ArrayRef<StringRef> FullModuleName,
                              ModuleTraversalOptions TraversalOptions,
                              ASTPrinter &Printer, const PrintOptions &Options);
 

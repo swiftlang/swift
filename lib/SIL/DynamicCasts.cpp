@@ -158,7 +158,7 @@ classifyDynamicCastToProtocol(CanType source,
 bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
   // Retrieve the _BridgedToObjectiveC protocol.
   auto bridgedProto =
-      M->Ctx.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+      M->getASTContext().getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
 
   if (bridgedProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.
@@ -174,7 +174,7 @@ bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
 bool swift::isErrorType(Module *M, CanType Ty) {
   // Retrieve the _ErrorType protocol.
   auto errorTypeProto =
-      M->Ctx.getProtocol(KnownProtocolKind::_ErrorType);
+      M->getASTContext().getProtocol(KnownProtocolKind::_ErrorType);
 
   if (errorTypeProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.

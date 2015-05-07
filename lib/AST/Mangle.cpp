@@ -310,7 +310,7 @@ void Mangler::mangleModule(const Module *module) {
   if (tryMangleSubstitution(module)) return;
 
   // context ::= identifier
-  mangleIdentifier(module->Name);
+  mangleIdentifier(module->getName());
 
   addSubstitution(module);
 }

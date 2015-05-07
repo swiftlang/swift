@@ -1682,6 +1682,6 @@ void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, M->Ctx, Out, serializeAllSIL);
+  SILSerializer SILSer(*this, M->getASTContext(), Out, serializeAllSIL);
   SILSer.writeSILModule(SILMod);
 }

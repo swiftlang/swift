@@ -45,7 +45,7 @@ namespace swift {
   class GenericParamList;
   class IRGenOptions;
   class LangOptions;
-  class Module;
+  class ModuleDecl;
   class Parser;
   class PersistentParserState;
   class SerializationOptions;
@@ -198,7 +198,7 @@ namespace swift {
   /// if \p wholeModuleCompilation is true, the optimizer assumes that the SIL
   /// of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(Module *M, SILOptions &options,
+  performSILGeneration(ModuleDecl *M, SILOptions &options,
                        bool makeModuleFragile = false,
                        bool wholeModuleCompilation = false);
 
@@ -213,7 +213,7 @@ namespace swift {
                        Optional<unsigned> StartElem = None,
                        bool makeModuleFragile = false);
 
-  using ModuleOrSourceFile = PointerUnion<Module *, SourceFile *>;
+  using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
   /// Serializes a module or single source file to the given output file.
   void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
@@ -226,7 +226,7 @@ namespace swift {
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                    swift::Module *M,
+                                                    ModuleDecl *M,
                                                     SILModule *SILMod,
                                                     StringRef ModuleName,
                                                 llvm::LLVMContext &LLVMContext);

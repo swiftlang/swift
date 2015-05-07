@@ -355,7 +355,7 @@ public:
 
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");
-    return FileContext->getParentModule()->Ctx;
+    return FileContext->getParentModule()->getASTContext();
   }
 
   Module *getAssociatedModule() const {

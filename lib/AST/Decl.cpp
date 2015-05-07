@@ -107,6 +107,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Destructor);
   TRIVIAL_KIND(EnumElement);
   TRIVIAL_KIND(Param);
+  TRIVIAL_KIND(Module);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -239,6 +240,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Addressor, "address accessor");
   ENTRY(MutableAddressor, "mutableAddress accessor");
   ENTRY(EnumElement, "enum element");
+  ENTRY(Module, "module");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -780,6 +782,9 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
 
   case DeclKind::Var:
     return ImportKind::Var;
+
+  case DeclKind::Module:
+    return ImportKind::Module;
   }
   llvm_unreachable("bad DeclKind");
 }
@@ -1294,6 +1299,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
   case DeclKind::Protocol:
+  case DeclKind::Module:
     return true;
   }
   llvm_unreachable("bad DeclKind");
@@ -1351,6 +1357,10 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Var:
     // Non-static variables are instance members.
     return !cast<VarDecl>(this)->isStatic();
+
+  case DeclKind::Module:
+    // Modules are never instance members.
+    return false;
   }
   llvm_unreachable("bad DeclKind");
 }

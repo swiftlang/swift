@@ -46,7 +46,7 @@ class ClangNode;
 class Decl;
 class IRGenOptions;
 class LazyResolver;
-class Module;
+class ModuleDecl;
 class NominalTypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
@@ -101,9 +101,10 @@ public:
   ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
-  virtual Module *loadModule(SourceLoc importLoc,
-                             ArrayRef<std::pair<Identifier, SourceLoc>> path)
-                                                                      override;
+  virtual ModuleDecl *loadModule(
+                        SourceLoc importLoc,
+                        ArrayRef<std::pair<Identifier, SourceLoc>> path)
+                      override;
 
   /// \brief Look for declarations associated with the given name.
   ///
@@ -154,7 +155,7 @@ public:
   /// \param diagLoc A location to attach any diagnostics to if import fails.
   ///
   /// \sa getImportedHeaderModule
-  void importHeader(StringRef header, Module *adapter, off_t expectedSize,
+  void importHeader(StringRef header, ModuleDecl *adapter, off_t expectedSize,
                     time_t expectedModTime, StringRef cachedContents,
                     SourceLoc diagLoc);
 
@@ -166,14 +167,14 @@ public:
   /// \param diagLoc A location to attach any diagnostics to if import fails.
   ///
   /// \sa getImportedHeaderModule
-  void importBridgingHeader(StringRef header, Module *adapter,
+  void importBridgingHeader(StringRef header, ModuleDecl *adapter,
                             SourceLoc diagLoc = {});
 
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.
   ///
   /// \sa importHeader
-  Module *getImportedHeaderModule() const override;
+  ModuleDecl *getImportedHeaderModule() const override;
 
   std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
                                         time_t &fileModTime);

@@ -26,7 +26,7 @@ namespace swift {
   class DeclContext;
   class Identifier;
   class SourceFile;
-  class Module;
+  class ModuleDecl;
   class ModuleEntity;
   class Decl;
   class ValueDecl;
@@ -46,7 +46,7 @@ public:
   bool walk(SourceFile &SrcFile);
   /// Walks the provided module.
   /// \returns true if traversal was aborted, false otherwise.
-  bool walk(Module &Mod);
+  bool walk(ModuleDecl &Mod);
   /// Walks the provided Decl.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(Decl *D);

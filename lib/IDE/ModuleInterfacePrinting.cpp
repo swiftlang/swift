@@ -114,7 +114,8 @@ void swift::ide::printModuleInterface(Module *M,
                                       ModuleTraversalOptions TraversalOptions,
                                       ASTPrinter &Printer,
                                       const PrintOptions &Options) {
-  printSubmoduleInterface(M, M->Name.str(), TraversalOptions, Printer, Options);
+  printSubmoduleInterface(M, M->getName().str(), TraversalOptions, Printer,
+                          Options);
 }
 
 static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
@@ -142,7 +143,7 @@ void swift::ide::printSubmoduleInterface(
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
 
-  auto &SwiftContext = M->Ctx;
+  auto &SwiftContext = M->getASTContext();
   auto &Importer =
       static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
 

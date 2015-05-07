@@ -154,7 +154,7 @@ static Module *getModule(ModuleOrSourceFile DC) {
 }
 
 static ASTContext &getContext(ModuleOrSourceFile DC) {
-  return getModule(DC)->Ctx;
+  return getModule(DC)->getASTContext();
 }
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
@@ -342,16 +342,17 @@ IdentifierID Serializer::addIdentifierRef(Identifier ident) {
 IdentifierID Serializer::addModuleRef(const Module *M) {
   if (M == this->M)
     return CURRENT_MODULE_ID;
-  if (M == this->M->Ctx.TheBuiltinModule)
+  if (M == this->M->getASTContext().TheBuiltinModule)
     return BUILTIN_MODULE_ID;
 
   auto clangImporter =
-    static_cast<ClangImporter *>(this->M->Ctx.getClangModuleLoader());
+    static_cast<ClangImporter *>(
+      this->M->getASTContext().getClangModuleLoader());
   if (M == clangImporter->getImportedHeaderModule())
     return OBJC_HEADER_MODULE_ID;
 
-  assert(!M->Name.empty());
-  return addIdentifierRef(M->Name);
+  assert(!M->getName().empty());
+  return addIdentifierRef(M->getName());
 }
 
 NormalConformanceID Serializer::addConformanceRef(
@@ -542,7 +543,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     control_block::MetadataLayout Metadata(Out);
     control_block::TargetLayout Target(Out);
 
-    ModuleName.emit(ScratchRecord, M->Name.str());
+    ModuleName.emit(ScratchRecord, M->getName().str());
 
     // FIXME: put a real version in here.
 #ifdef LLVM_VERSION_INFO
@@ -554,7 +555,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
                   VERSION_MAJOR, VERSION_MINOR, EXTRA_VERSION_STRING);
 #undef EXTRA_VERSION_STRING
 
-    Target.emit(ScratchRecord, M->Ctx.LangOpts.Target.str());
+    Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 3);
@@ -571,7 +572,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);
 
-        SDKPath.emit(ScratchRecord, M->Ctx.SearchPathOpts.SDKPath);
+        SDKPath.emit(ScratchRecord, M->getASTContext().SearchPathOpts.SDKPath);
         for (const std::string &arg : options.ExtraClangOptions) {
           XCC.emit(ScratchRecord, arg);
         }
@@ -597,7 +598,7 @@ void Serializer::writeDocHeader() {
                   VERSION_MAJOR, VERSION_MINOR, EXTRA_VERSION_STRING);
 #undef EXTRA_VERSION_STRING
 
-    Target.emit(ScratchRecord, M->Ctx.LangOpts.Target.str());
+    Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
   }
 }
 
@@ -609,7 +610,7 @@ removeDuplicateImports(SmallVectorImpl<Module::ImportedModule> &imports) {
     // Arbitrarily sort by name to get a deterministic order.
     // FIXME: Submodules don't get sorted properly here.
     if (lhs.second != rhs.second)
-      return lhs.second->Name.str() < rhs.second->Name.str();
+      return lhs.second->getName().str() < rhs.second->getName().str();
     using AccessPathElem = std::pair<Identifier, SourceLoc>;
     return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
                                         rhs.first.begin(), rhs.first.end(),
@@ -645,7 +646,7 @@ static void flattenImportPath(const Module::ImportedModule &import,
                [&out](StringRef next) { out.append(next); },
                [&out] { out.push_back('\0'); });
   } else {
-    out.append(import.second->Name.str());
+    out.append(import.second->getName().str());
   }
 
   if (import.first.empty())
@@ -667,7 +668,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::SearchPathLayout SearchPath(Out);
 
   if (options.SerializeOptionsForDebugging) {
-    const SearchPathOptions &searchPathOpts = M->Ctx.SearchPathOpts;
+    const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     for (auto &path : searchPathOpts.ImportSearchPaths)
       SearchPath.emit(ScratchRecord, /*framework=*/false, path);
     for (auto &path : searchPathOpts.FrameworkSearchPaths)
@@ -689,9 +690,9 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
 
   removeDuplicateImports(allImports);
   auto clangImporter =
-    static_cast<ClangImporter *>(M->Ctx.getClangModuleLoader());
+    static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
   Module *importedHeaderModule = clangImporter->getImportedHeaderModule();
-  Module *theBuiltinModule = M->Ctx.TheBuiltinModule;
+  Module *theBuiltinModule = M->getASTContext().TheBuiltinModule;
   for (auto import : allImports) {
     if (import.second == theBuiltinModule)
       continue;
@@ -1171,6 +1172,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::TopLevelCode:
   case DeclKind::Extension:
+  case DeclKind::Module:
     llvm_unreachable("decl should never be a member");
 
   case DeclKind::IfConfig:
@@ -1377,7 +1379,7 @@ void Serializer::writeCrossReference(const Decl *D) {
   unsigned abbrCode;
 
   if (auto op = dyn_cast<OperatorDecl>(D)) {
-    writeCrossReference(op->getModuleContext());
+    writeCrossReference(op->getModuleContext(), 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
     auto nameID = addIdentifierRef(op->getName());
@@ -2477,6 +2479,10 @@ void Serializer::writeDecl(const Decl *D) {
       writePattern(pattern);
     break;
   }
+
+  case DeclKind::Module: {
+    llvm_unreachable("FIXME: serialize these");
+  }
   }
 }
 
@@ -2598,7 +2604,7 @@ void Serializer::writeType(Type ty) {
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector: {
     TypeAliasDecl *typeAlias =
-      findTypeAliasForBuiltin(M->Ctx, ty->castTo<BuiltinType>());
+      findTypeAliasForBuiltin(M->getASTContext(), ty->castTo<BuiltinType>());
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,

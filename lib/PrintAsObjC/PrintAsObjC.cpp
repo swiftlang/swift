@@ -39,8 +39,8 @@ static bool isNSObject(Type type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     return !classDecl->getName().empty() &&
            classDecl->getName().str() == "NSObject" &&
-           !classDecl->getModuleContext()->Name.empty() &&
-           classDecl->getModuleContext()->Name.str() == "ObjectiveC";
+           !classDecl->getModuleContext()->getName().empty() &&
+           classDecl->getModuleContext()->getName().str() == "ObjectiveC";
   }
 
   return false;
@@ -197,7 +197,7 @@ private:
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
     os << "@interface " << baseClass->getName()
-       << " (SWIFT_EXTENSION(" << ED->getModuleContext()->Name << "))";
+       << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(ED->getMembers());
@@ -759,7 +759,7 @@ private:
   void visitNameAliasType(NameAliasType *aliasTy,
                           Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
-    if (printIfKnownTypeName(alias->getModuleContext()->Name,
+    if (printIfKnownTypeName(alias->getModuleContext()->getName(),
                              Identifier(),
                              alias->getName(),
                              optionalKind))
@@ -820,7 +820,7 @@ private:
     Identifier parentName{};
     if (auto parentType = SD->getParent()->getDeclaredTypeOfContext())
       parentName = parentType->getAnyNominal()->getName();
-    if (printIfKnownTypeName(SD->getModuleContext()->Name,
+    if (printIfKnownTypeName(SD->getModuleContext()->getName(),
                              parentName,
                              SD->getName(),
                              optionalKind))
@@ -1265,7 +1265,7 @@ class ModuleWriter {
   ObjCPrinter printer;
 public:
   ModuleWriter(Module &mod, StringRef header, Accessibility access)
-    : M(mod), bridgingHeader(header), printer(M.Ctx, os, access) {}
+    : M(mod), bridgingHeader(header), printer(M.getASTContext(), os, access) {}
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -1280,14 +1280,14 @@ public:
     if (otherModule->isStdlibModule())
       return true;
     // Don't need a module for SIMD types in C.
-    if (otherModule->getName() == M.Ctx.Id_simd)
+    if (otherModule->getName() == M.getASTContext().Id_simd)
       return true;
 
     // If there's a Clang node, see if it comes from an explicit submodule.
     // Import that instead, looking through any implicit submodules.
     if (auto clangNode = D->getClangNode()) {
       auto importer =
-        static_cast<ClangImporter *>(M.Ctx.getClangModuleLoader());
+        static_cast<ClangImporter *>(M.getASTContext().getClangModuleLoader());
       if (const auto *clangModule = importer->getClangOwningModule(clangNode)) {
         while (clangModule && !clangModule->IsExplicit)
           clangModule = clangModule->Parent;
@@ -1598,10 +1598,11 @@ public:
 
   bool isUnderlyingModule(Module *import) {
     if (bridgingHeader.empty())
-      return import != &M && import->Name == M.Name;
+      return import != &M && import->getName() == M.getName();
 
     auto importer =
-      static_cast<ClangImporter *>(import->Ctx.getClangModuleLoader());
+      static_cast<ClangImporter *>(import->getASTContext()
+                                     .getClangModuleLoader());
     return import == importer->getImportedHeaderModule();
   }
 
@@ -1613,7 +1614,7 @@ public:
     bool includeUnderlying = false;
     for (auto import : imports) {
       if (auto *swiftModule = import.dyn_cast<Module *>()) {
-        auto Name = swiftModule->Name;
+        auto Name = swiftModule->getName();
         if (isUnderlyingModule(swiftModule)) {
           includeUnderlying = true;
           continue;
@@ -1640,7 +1641,8 @@ public:
 
     if (includeUnderlying) {
       if (bridgingHeader.empty())
-        out << "#import <" << M.Name.str() << '/' << M.Name.str() << ".h>\n\n";
+        out << "#import <" << M.getName().str() << '/' << M.getName().str()
+            << ".h>\n\n";
       else
         out << "#import \"" << bridgingHeader << "\"\n\n";
     }

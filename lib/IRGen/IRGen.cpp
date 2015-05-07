@@ -402,9 +402,10 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                                  llvm::LLVMContext &LLVMContext,
                                                        SourceFile *SF = nullptr,
                                                        unsigned StartElem = 0) {
-  assert(!M->Ctx.hadError());
+  auto &Ctx = M->getASTContext();
+  assert(!Ctx.hadError());
 
-  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, M->Ctx);
+  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
   if (!TargetMachine)
     return nullptr;
 
@@ -413,8 +414,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Create the IR emitter.
   IRGenModuleDispatcher dispatcher;
-  const llvm::Triple &Triple = M->Ctx.LangOpts.Target;
-  IRGenModule IGM(dispatcher, nullptr, M->Ctx, LLVMContext, Opts, ModuleName,
+  const llvm::Triple &Triple = Ctx.LangOpts.Target;
+  IRGenModule IGM(dispatcher, nullptr, Ctx, LLVMContext, Opts, ModuleName,
                   *DataLayout, Triple,
                   TargetMachine, SILMod, Opts.getSingleOutputFilename());
 
@@ -460,13 +461,13 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Hack to handle thunks eagerly synthesized by the Clang importer.
   swift::Module *prev = nullptr;
-  for (auto external : M->Ctx.ExternalDefinitions) {
+  for (auto external : Ctx.ExternalDefinitions) {
     swift::Module *next = external->getModuleContext();
     if (next == prev)
       continue;
     prev = next;
 
-    if (Opts.HasUnderlyingModule && next->Name == M->Name)
+    if (Opts.HasUnderlyingModule && next->getName() == M->getName())
       continue;
 
     next->collectLinkLibraries([&](LinkLibrary linkLib) {
@@ -479,7 +480,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   setModuleFlags(IGM);
 
   // Bail out if there are any errors.
-  if (M->Ctx.hadError()) return nullptr;
+  if (Ctx.hadError()) return nullptr;
 
   embedBitcode(IGM.getModule(), Opts);
   if (performLLVM(IGM.Opts, IGM.Context.Diags, nullptr, IGM.getModule(),
@@ -522,6 +523,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   auto OutputIter = Opts.OutputFilenames.begin();
   bool IGMcreated = false;
   
+  auto &Ctx = M->getASTContext();
   // Create an IRGenModule for each source file.
   for (auto *File : M->getFiles()) {
     auto nextSF = dyn_cast<SourceFile>(File);
@@ -529,24 +531,24 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       continue;
     
     // Create a target machine.
-    llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, M->Ctx);
+    llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
     
     const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
     assert(DataLayout && "target machine didn't set DataLayout?");
     
     LLVMContext *Context = new LLVMContext();
-    const llvm::Triple &Triple = M->Ctx.LangOpts.Target;
+    const llvm::Triple &Triple = Ctx.LangOpts.Target;
 
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
     if (OutputIter == Opts.OutputFilenames.end()) {
       // TODO: Check this already at argument parsing.
-      M->Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
+      Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;
     }
   
     // Create the IR emitter.
-    IRGenModule *IGM = new IRGenModule(dispatcher, nextSF, M->Ctx, *Context,
+    IRGenModule *IGM = new IRGenModule(dispatcher, nextSF, Ctx, *Context,
                                        Opts, ModuleName, *DataLayout, Triple,
                                        TargetMachine, SILMod, *OutputIter++);
     IGMcreated = true;
@@ -556,7 +558,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   
   if (!IGMcreated) {
     // TODO: Check this already at argument parsing.
-    M->Ctx.Diags.diagnose(SourceLoc(), diag::no_input_files_for_mt);
+    Ctx.Diags.diagnose(SourceLoc(), diag::no_input_files_for_mt);
     return;
   }
 
@@ -593,13 +595,13 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   
   // Hack to handle thunks eagerly synthesized by the Clang importer.
   swift::Module *prev = nullptr;
-  for (auto external : M->Ctx.ExternalDefinitions) {
+  for (auto external : Ctx.ExternalDefinitions) {
     swift::Module *next = external->getModuleContext();
     if (next == prev)
       continue;
     prev = next;
     
-    if (Opts.HasUnderlyingModule && next->Name == M->Name)
+    if (Opts.HasUnderlyingModule && next->getName() == M->getName())
       continue;
     
     next->collectLinkLibraries([&](LinkLibrary linkLib) {
@@ -654,7 +656,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   }
 
   // Bail out if there are any errors.
-  if (M->Ctx.hadError()) return;
+  if (Ctx.hadError()) return;
 
   std::vector<std::thread> Threads;
   llvm::sys::Mutex DiagMutex;

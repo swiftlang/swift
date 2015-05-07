@@ -22,7 +22,7 @@
 namespace swift {
 class ASTContext;
 class FileUnit;
-class Module;
+class ModuleDecl;
 class SILDeserializer;
 class SILFunction;
 class SILGlobalVariable;
@@ -38,23 +38,23 @@ public:
   class Callback {
   public:
     /// Observe that we deserialized a function declaration.
-    virtual void didDeserialize(Module *M, SILFunction *fn) {}
+    virtual void didDeserialize(ModuleDecl *M, SILFunction *fn) {}
 
     /// Observe that we successfully deserialized a function body.
-    virtual void didDeserializeFunctionBody(Module *M, SILFunction *fn) {}
+    virtual void didDeserializeFunctionBody(ModuleDecl *M, SILFunction *fn) {}
 
     /// Oberve that we successfully deserialized a witness table's entries.
-    virtual void didDeserializeWitnessTableEntries(Module *M,
+    virtual void didDeserializeWitnessTableEntries(ModuleDecl *M,
                                                    SILWitnessTable *wt) {}
 
     /// Observe that we deserialized a global variable declaration.
-    virtual void didDeserialize(Module *M, SILGlobalVariable *var) {}
+    virtual void didDeserialize(ModuleDecl *M, SILGlobalVariable *var) {}
 
     /// Observe that we deserialized a v-table declaration.
-    virtual void didDeserialize(Module *M, SILVTable *vtable) {}
+    virtual void didDeserialize(ModuleDecl *M, SILVTable *vtable) {}
 
     /// Observe that we deserialized a witness-table declaration.
-    virtual void didDeserialize(Module *M, SILWitnessTable *wtable) {}
+    virtual void didDeserialize(ModuleDecl *M, SILWitnessTable *wtable) {}
 
     virtual ~Callback() = default;
   private:

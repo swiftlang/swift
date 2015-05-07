@@ -30,7 +30,7 @@ namespace swift {
 class CodeCompletionCallbacksFactory;
 class Decl;
 class DeclContext;
-class Module;
+class ModuleDecl;
 
 namespace ide {
 
@@ -505,7 +505,7 @@ struct CodeCompletionResultSink {
   std::vector<CodeCompletionResult *> Results;
 
   /// A single-element cache for module names stored in Allocator, keyed by a
-  /// clang::Module * or swift::Module *.
+  /// clang::Module * or swift::ModuleDecl *.
   std::pair<void *, StringRef> LastModule;
 
   CodeCompletionResultSink()
@@ -550,9 +550,9 @@ public:
 
   void
   getResults(const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
-             const Module *TheModule,
+             const ModuleDecl *TheModule,
              std::function<ValueRefCntPtr(CodeCompletionCache &, Key,
-                                          const Module *)> FillCacheCallback);
+                                          const ModuleDecl *)> FillCacheCallback);
 
   ValueRefCntPtr createValue();
   Optional<ValueRefCntPtr> get(const Key &K);
@@ -622,7 +622,7 @@ makeCodeCompletionCallbacksFactory(CodeCompletionContext &CompletionContext,
 ///
 /// Results are looked up as if in \p currDeclContext, which may be null.
 void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
-                                           const Module *module,
+                                           const ModuleDecl *module,
                                            ArrayRef<std::string> accessPath,
                                            bool needLeadingDot,
                                            const DeclContext *currDeclContext);

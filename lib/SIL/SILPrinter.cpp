@@ -139,8 +139,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     return;
   switch (Context->getContextKind()) {
   case DeclContextKind::Module:
-    if (Context == cast<Module>(Context)->Ctx.TheBuiltinModule)
-      Buffer << cast<Module>(Context)->Name << ".";
+    if (Context == cast<Module>(Context)->getASTContext().TheBuiltinModule)
+      Buffer << cast<Module>(Context)->getName() << ".";
     return;
 
   case DeclContextKind::FileUnit:

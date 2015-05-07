@@ -574,7 +574,7 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   auto module = parentComponents.back()->getBoundModule();
   assert(module && "Unresolved parent component?");
   tc.diagnose(comp->getIdLoc(), diag::no_module_type,
-              comp->getIdentifier(), module->Name);
+              comp->getIdentifier(), module->getName());
   return true;
 }
 
@@ -885,7 +885,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       if (foundModuleTypes.isAmbiguous()) {
         if (diagnoseErrors) {
           TC.diagnose(comp->getIdLoc(), diag::ambiguous_module_type,
-                      comp->getIdentifier(), module->Name);
+                      comp->getIdentifier(), module->getName());
           for (auto foundType : foundModuleTypes) {
             // Only consider type declarations.
             auto typeDecl = foundType.first;
@@ -1064,9 +1064,9 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
   if (auto mod = result.dyn_cast<Module*>()) {
     if (diagnoseErrors) {
       diagnose(Components.back()->getIdLoc(),
-               diag::use_undeclared_type, mod->Name);
+               diag::use_undeclared_type, mod->getName());
       diagnose(Components.back()->getIdLoc(),
-               diag::note_module_as_type, mod->Name);
+               diag::note_module_as_type, mod->getName());
     }
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);

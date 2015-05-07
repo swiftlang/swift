@@ -845,7 +845,7 @@ int ProtocolType::compareProtocols(ProtocolDecl * const* PP1,
   Module *M2 = P2->getParentModule();
 
   // Try ordering based on module name, first.
-  if (int result = M1->Name.str().compare(M2->Name.str()))
+  if (int result = M1->getName().str().compare(M2->getName().str()))
     return result;
 
   // Order based on protocol name.

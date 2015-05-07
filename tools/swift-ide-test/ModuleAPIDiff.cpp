@@ -888,7 +888,7 @@ std::shared_ptr<sma::Module> createSMAModel(Module *M) {
   }
 
   auto ResultM = std::make_shared<sma::Module>();
-  ResultM->Name = Generator.convertToIdentifier(M->Name);
+  ResultM->Name = Generator.convertToIdentifier(M->getName());
 
   // FIXME:
   // ResultM->ExportedModules = ?;

@@ -1018,6 +1018,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     // Imported static vars are handled solely in IRGen.
     break;
 
+  case DeclKind::Module:
+    break;
+
   case DeclKind::IfConfig:
   case DeclKind::Extension:
   case DeclKind::PatternBinding:

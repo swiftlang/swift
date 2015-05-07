@@ -17,6 +17,7 @@
 #ifndef SWIFT_MODULE_H
 #define SWIFT_MODULE_H
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/RawComment.h"
@@ -188,10 +189,10 @@ enum class SourceFileKind {
 /// output binary and logical module (such as a single library or executable).
 ///
 /// \sa FileUnit
-class Module : public DeclContext {
+class ModuleDecl : public TypeDecl, public DeclContext {
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
-  typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
+  typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
   
   static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name) {
     assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
@@ -206,17 +207,13 @@ public:
     bool operator()(const ImportedModule &lhs,
                     const ImportedModule &rhs) const {
       if (lhs.second != rhs.second)
-        return std::less<const Module *>()(lhs.second, rhs.second);
+        return std::less<const ModuleDecl *>()(lhs.second, rhs.second);
       if (lhs.first.data() != rhs.first.data())
         return std::less<AccessPathTy::iterator>()(lhs.first.begin(),
                                                    rhs.first.begin());
       return lhs.first.size() < rhs.first.size();
     }
   };
-
-public:
-  ASTContext &Ctx;
-  Identifier Name;
 
 private:
   /// If non-NULL, an plug-in that should be used when performing external
@@ -277,13 +274,14 @@ private:
   /// The magic __dso_handle variable.
   llvm::PointerIntPair<VarDecl *, 2, OptionSet<Flags>> DSOHandleAndFlags;
 
-  Module(Identifier name, ASTContext &ctx);
-public:
-  Identifier getName() const { return Name; }
+  ModuleDecl(Identifier name, ASTContext &ctx);
 
-  static Module *create(Identifier name, ASTContext &ctx) {
-    return new (ctx) Module(name, ctx);
+public:
+  static ModuleDecl *create(Identifier name, ASTContext &ctx) {
+    return new (ctx) ModuleDecl(name, ctx);
   }
+
+  using Decl::getASTContext;
 
   ArrayRef<FileUnit *> getFiles() {
     return Files;
@@ -541,8 +539,14 @@ public:
   /// Returns the associated clang module if one exists.
   const clang::Module *findUnderlyingClangModule();
 
+  SourceRange getSourceRange() const { return SourceRange(); }
+
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::Module;
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Module;
   }
 
 private:
@@ -554,8 +558,11 @@ public:
   // Only allow allocation of Modules using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(Module));
+                     unsigned Alignment = alignof(ModuleDecl));
 };
+
+/// FIXME: Helper for the Module -> ModuleDecl migration.
+typedef ModuleDecl Module;
 
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
@@ -570,7 +577,7 @@ class FileUnit : public DeclContext {
   const FileUnitKind Kind;
 
 protected:
-  FileUnit(FileUnitKind kind, Module &M)
+  FileUnit(FileUnitKind kind, ModuleDecl &M)
     : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
   }
 
@@ -586,7 +593,7 @@ public:
   /// within this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupValue(Module::AccessPathTy accessPath, DeclName name,
+  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const = 0;
 
@@ -600,20 +607,20 @@ public:
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const {}
 
   /// Finds all class members defined in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupClassMembers(Module::AccessPathTy accessPath,
+  virtual void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer) const {}
 
   /// Finds class members defined in this file with the given name.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupClassMember(Module::AccessPathTy accessPath,
+  virtual void lookupClassMember(ModuleDecl::AccessPathTy accessPath,
                                  DeclName name,
                                  SmallVectorImpl<ValueDecl*> &results) const {}
 
@@ -665,13 +672,13 @@ public:
   /// \p filter controls whether public, private, or any imports are included
   /// in this list.
   virtual void
-  getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
-                     Module::ImportFilter filter) const {}
+  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+                     ModuleDecl::ImportFilter filter) const {}
 
   /// Generates the list of libraries needed to link this file, based on its
   /// imports.
   virtual void
-  collectLinkLibraries(Module::LinkLibraryCallback callback) const {}
+  collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {}
 
   /// @{
 
@@ -683,10 +690,10 @@ public:
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
   bool
-  forAllVisibleModules(llvm::function_ref<bool(Module::ImportedModule)> fn);
+  forAllVisibleModules(llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn);
 
   bool
-  forAllVisibleModules(llvm::function_ref<void(Module::ImportedModule)> fn) {
+  forAllVisibleModules(llvm::function_ref<void(ModuleDecl::ImportedModule)> fn) {
     return forAllVisibleModules([=](Module::ImportedModule import) -> bool {
       fn(import);
       return true;
@@ -695,8 +702,8 @@ public:
   
   template <typename Fn>
   bool forAllVisibleModules(Fn &&fn) {
-    using RetTy = typename std::result_of<Fn(Module::ImportedModule)>::type;
-    llvm::function_ref<RetTy(Module::ImportedModule)> wrapped{
+    using RetTy = typename std::result_of<Fn(ModuleDecl::ImportedModule)>::type;
+    llvm::function_ref<RetTy(ModuleDecl::ImportedModule)> wrapped{
       std::forward<Fn>(fn)
     };
     return forAllVisibleModules(wrapped);
@@ -726,13 +733,8 @@ public:
   virtual bool walk(ASTWalker &walker);
 
   // Efficiency override for DeclContext::getParentModule().
-  Module *getParentModule() const {
-    return const_cast<Module *>(cast<Module>(getParent()));
-  }
-
-  // Efficiency override for DeclContext::getASTContext().
-  ASTContext &getASTContext() const {
-    return getParentModule()->Ctx;
+  ModuleDecl *getParentModule() const {
+    return const_cast<ModuleDecl *>(cast<ModuleDecl>(getParent()));
   }
 
   static bool classof(const DeclContext *DC) {
@@ -764,18 +766,18 @@ class DerivedFileUnit final : public FileUnit {
   TinyPtrVector<FuncDecl *> DerivedDecls;
 
 public:
-  DerivedFileUnit(Module &M);
+  DerivedFileUnit(ModuleDecl &M);
   ~DerivedFileUnit() = default;
 
   void addDerivedDecl(FuncDecl *FD) {
     DerivedDecls.push_back(FD);
   }
 
-  void lookupValue(Module::AccessPathTy accessPath, DeclName name,
+  void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
                    NLKind lookupKind,
                    SmallVectorImpl<ValueDecl*> &result) const override;
   
-  void lookupVisibleDecls(Module::AccessPathTy accessPath,
+  void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                           VisibleDeclConsumer &consumer,
                           NLKind lookupKind) const override;
   
@@ -833,7 +835,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<Module::ImportedModule, ImportOptions>> Imports;
+  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -902,31 +904,31 @@ public:
   /// forwarded on to IRGen.
   ASTStage_t ASTStage = Parsing;
 
-  SourceFile(Module &M, SourceFileKind K, Optional<unsigned> bufferID,
+  SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind);
 
   void
-  addImports(ArrayRef<std::pair<Module::ImportedModule, ImportOptions>> IM);
+  addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
 
-  bool hasTestableImport(const Module *module) const;
+  bool hasTestableImport(const ModuleDecl *module) const;
 
   void clearLookupCache();
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
-  virtual void lookupValue(Module::AccessPathTy accessPath, DeclName name,
+  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
-  virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override;
 
-  virtual void lookupClassMembers(Module::AccessPathTy accessPath,
+  virtual void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer) const override;
   virtual void
-  lookupClassMember(Module::AccessPathTy accessPath, DeclName name,
+  lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
@@ -935,11 +937,11 @@ public:
   getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;
 
   virtual void
-  getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
-                     Module::ImportFilter filter) const override;
+  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+                     ModuleDecl::ImportFilter filter) const override;
 
   virtual void
-  collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
+  collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
@@ -1061,9 +1063,9 @@ private:
   ~BuiltinUnit() = default;
 
 public:
-  explicit BuiltinUnit(Module &M);
+  explicit BuiltinUnit(ModuleDecl &M);
 
-  virtual void lookupValue(Module::AccessPathTy accessPath, DeclName name,
+  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
@@ -1085,7 +1087,7 @@ public:
 class LoadedFile : public FileUnit {
 protected:
   ~LoadedFile() = default;
-  LoadedFile(FileUnitKind Kind, Module &M) noexcept
+  LoadedFile(FileUnitKind Kind, ModuleDecl &M) noexcept
     : FileUnit(Kind, M) {
     assert(classof(this) && "invalid kind");
   }
@@ -1117,13 +1119,13 @@ public:
 };
 
 
-inline SourceFile &Module::getMainSourceFile(SourceFileKind expectedKind) const{
+inline SourceFile &ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const{
   assert(!Files.empty() && "No files added yet");
   assert(cast<SourceFile>(Files.front())->Kind == expectedKind);
   return *cast<SourceFile>(Files.front());
 }
 
-inline FileUnit &Module::getMainFile(FileUnitKind expectedKind) const {
+inline FileUnit &ModuleDecl::getMainFile(FileUnitKind expectedKind) const {
   assert(expectedKind != FileUnitKind::Source &&
          "must use specific source kind; see getMainSourceFile");
   assert(!Files.empty() && "No files added yet");
@@ -1134,11 +1136,11 @@ inline FileUnit &Module::getMainFile(FileUnitKind expectedKind) const {
 /// Wraps either a swift module or a clang one.
 /// FIXME: Should go away once swift modules can support submodules natively.
 class ModuleEntity {
-  llvm::PointerUnion<const Module *, const clang::Module *> Mod;
+  llvm::PointerUnion<const ModuleDecl *, const clang::Module *> Mod;
 
 public:
   ModuleEntity() = default;
-  ModuleEntity(const Module *Mod) : Mod(Mod) {}
+  ModuleEntity(const ModuleDecl *Mod) : Mod(Mod) {}
   ModuleEntity(const clang::Module *Mod) : Mod(Mod) {}
 
   StringRef getName() const;
@@ -1154,25 +1156,25 @@ public:
 
 namespace llvm {
   template <>
-  class DenseMapInfo<swift::Module::ImportedModule> {
-    using Module = swift::Module;
+  class DenseMapInfo<swift::ModuleDecl::ImportedModule> {
+    using ModuleDecl = swift::ModuleDecl;
   public:
-    static Module::ImportedModule getEmptyKey() {
-      return {{}, llvm::DenseMapInfo<Module *>::getEmptyKey()};
+    static ModuleDecl::ImportedModule getEmptyKey() {
+      return {{}, llvm::DenseMapInfo<ModuleDecl *>::getEmptyKey()};
     }
-    static Module::ImportedModule getTombstoneKey() {
-      return {{}, llvm::DenseMapInfo<Module *>::getTombstoneKey()};
+    static ModuleDecl::ImportedModule getTombstoneKey() {
+      return {{}, llvm::DenseMapInfo<ModuleDecl *>::getTombstoneKey()};
     }
 
-    static unsigned getHashValue(const Module::ImportedModule &val) {
+    static unsigned getHashValue(const ModuleDecl::ImportedModule &val) {
       auto pair = std::make_pair(val.first.size(), val.second);
       return llvm::DenseMapInfo<decltype(pair)>::getHashValue(pair);
     }
 
-    static bool isEqual(const Module::ImportedModule &lhs,
-                        const Module::ImportedModule &rhs) {
+    static bool isEqual(const ModuleDecl::ImportedModule &lhs,
+                        const ModuleDecl::ImportedModule &rhs) {
       return lhs.second == rhs.second &&
-             Module::isSameAccessPath(lhs.first, rhs.first);
+             ModuleDecl::isSameAccessPath(lhs.first, rhs.first);
     }
   };
 }

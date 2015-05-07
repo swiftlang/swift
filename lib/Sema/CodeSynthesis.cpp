@@ -2090,7 +2090,8 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
 
   llvm::SmallString<64> buffer;
   StringRef fullClassName = tc.Context.AllocateCopy(
-                              (classDecl->getModuleContext()->Name.str() + "." +
+                              (classDecl->getModuleContext()->getName().str() +
+                               "." +
                                classDecl->getName().str()).toStringRef(buffer));
 
   Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc);

@@ -58,7 +58,7 @@ namespace swift {
   class ProtocolDecl;
   class TypeVariableType;
   class ValueDecl;
-  class Module;
+  class ModuleDecl;
   class ProtocolConformance;
   class Substitution;
   enum OptionalTypeKind : unsigned;
@@ -393,7 +393,7 @@ public:
 
   /// Erase the given opened existential type by replacing it with its
   /// existential type throughout the given type.
-  Type eraseOpenedExistential(Module *module, ArchetypeType *opened);
+  Type eraseOpenedExistential(ModuleDecl *module, ArchetypeType *opened);
 
   /// \brief Compute and return the set of type variables that occur within this
   /// type.
@@ -481,7 +481,7 @@ public:
   /// \param scratchSpace The substitutions will be written into this scratch
   /// space if a single substitutions array cannot be returned.
   ArrayRef<Substitution> gatherAllSubstitutions(
-                           Module *module,
+                           ModuleDecl *module,
                            SmallVectorImpl<Substitution> &scratchSpace,
                            LazyResolver *resolver,
                            DeclContext *gpContext = nullptr);
@@ -491,7 +491,7 @@ public:
   ///
   /// \returns ASTContext-allocated substitutions.
   ArrayRef<Substitution> gatherAllSubstitutions(
-                           Module *module,
+                           ModuleDecl *module,
                            LazyResolver *resolver,
                            DeclContext *gpContext = nullptr);
 
@@ -695,13 +695,14 @@ public:
   /// the member's type will be used.
   ///
   /// \returns the resulting member type.
-  Type getTypeOfMember(Module *module, const ValueDecl *member,
+  Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
                        LazyResolver *resolver, Type memberType = Type());
 
   /// Given the type of a member from a particular declaration context,
   /// substitute in the types from the given base type (this) to produce
   /// the resulting member type.
-  Type getTypeOfMember(Module *module, Type memberType, DeclContext *memberDC);
+  Type getTypeOfMember(ModuleDecl *module, Type memberType,
+                       DeclContext *memberDC);
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
@@ -1367,7 +1368,7 @@ public:
   /// \param gpContext The context from which the generic parameters will be
   /// extracted, which will be either the nominal type declaration or an
   /// extension thereof. If null, will be set to the nominal type declaration.
-  ArrayRef<Substitution> getSubstitutions(Module *module,
+  ArrayRef<Substitution> getSubstitutions(ModuleDecl *module,
                                           LazyResolver *resolver,
                                           DeclContext *gpContext = nullptr);
 
@@ -1800,13 +1801,13 @@ END_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
 /// "Builtin.int".  This is typically given to a ModuleExpr, but can also exist
 /// on ParenExpr, for example.
 class ModuleType : public TypeBase {
-  Module *const TheModule;
+  ModuleDecl *const TheModule;
   
 public:
   /// get - Return the ModuleType for the specified module.
-  static ModuleType *get(Module *M);
+  static ModuleType *get(ModuleDecl *M);
 
-  Module *getModule() const { return TheModule; }
+  ModuleDecl *getModule() const { return TheModule; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1814,7 +1815,7 @@ public:
   }
   
 private:
-  ModuleType(Module *M, const ASTContext &Ctx)
+  ModuleType(ModuleDecl *M, const ASTContext &Ctx)
     : TypeBase(TypeKind::Module, &Ctx, // Always canonical
                RecursiveTypeProperties()),
       TheModule(M) {
@@ -2238,13 +2239,13 @@ public:
 
   /// Substitute the given generic arguments into this polymorphic
   /// function type and return the resulting non-polymorphic type.
-  FunctionType *substGenericArgs(Module *M, ArrayRef<Type> args);
+  FunctionType *substGenericArgs(ModuleDecl *M, ArrayRef<Type> args);
 
   /// Substitute the given generic arguments into this polymorphic
   /// function type and return the resulting non-polymorphic type.
   ///
   /// The order of Substitutions must match the order of generic archetypes.
-  FunctionType *substGenericArgs(Module *M, ArrayRef<Substitution> subs);
+  FunctionType *substGenericArgs(ModuleDecl *M, ArrayRef<Substitution> subs);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2309,18 +2310,18 @@ public:
                               
   /// Substitute all of the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
-  FunctionType *substGenericArgs(Module *M, ArrayRef<Type> args) const;
+  FunctionType *substGenericArgs(ModuleDecl *M, ArrayRef<Type> args) const;
 
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
   ///
   /// The order of Substitutions must match the order of generic parameters.
-  FunctionType *substGenericArgs(Module *M, ArrayRef<Substitution> subs);
+  FunctionType *substGenericArgs(ModuleDecl *M, ArrayRef<Substitution> subs);
 
   /// Substitute the given generic arguments into this generic
   /// function type, possibly leaving some of the generic parameters
   /// unsubstituted, and return the resulting function type.
-  AnyFunctionType *partialSubstGenericArgs(Module *M, ArrayRef<Type> args) const;
+  AnyFunctionType *partialSubstGenericArgs(ModuleDecl *M, ArrayRef<Type> args) const;
                               
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getInput(), getResult(),
@@ -2539,7 +2540,7 @@ public:
   /// return the substituted result.
   ///
   /// The API is comparable to Type::subst.
-  SILParameterInfo subst(Module *module, TypeSubstitutionMap &substitutions,
+  SILParameterInfo subst(ModuleDecl *module, TypeSubstitutionMap &substitutions,
                          SubstOptions options) const {
     Type type = getType().subst(module, substitutions, options);
     return getWithType(type->getCanonicalType());
@@ -2634,7 +2635,7 @@ public:
   /// return the substituted result.
   ///
   /// The API is comparable to Type::subst.
-  SILResultInfo subst(Module *module, TypeSubstitutionMap &substitutions,
+  SILResultInfo subst(ModuleDecl *module, TypeSubstitutionMap &substitutions,
                       SubstOptions options) const {
     Type type = getType().subst(module, substitutions, options);
     return getWithType(type->getCanonicalType());
@@ -2931,7 +2932,7 @@ public:
   }
   
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                               Module *astModule,
+                                               ModuleDecl *astModule,
                                                ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -3755,7 +3756,7 @@ public:
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
-  Type substBaseType(Module *M,
+  Type substBaseType(ModuleDecl *M,
                      Type base,
                      LazyResolver *resolver = nullptr);
 

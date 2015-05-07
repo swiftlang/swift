@@ -437,6 +437,7 @@ public:
     OnGenericTypeParam = 1 << 28,
     OnAssociatedType   = 1 << 29,
     OnParam            = 1 << 30,
+    OnModule           = 1 << 31,
 
     // More coarse-grained aggregations for use in Attr.def.
     OnOperator = OnInfixOperator|OnPrefixOperator|OnPostfixOperator,

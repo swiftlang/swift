@@ -798,7 +798,7 @@ public:
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc,*toplevel));
 
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel);
-      sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->Name;
+      sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getName();
       sgm.TopLevelSGF->prepareEpilog(Type(), false,
                                  CleanupLocation::getModuleCleanupLocation());
 
@@ -962,8 +962,9 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *sf,
   }
 
   // Emit external definitions used by this module.
-  for (size_t i = 0, e = mod->Ctx.LastCheckedExternalDefinition; i != e; ++i) {
-    auto def = mod->Ctx.ExternalDefinitions[i];
+  for (size_t i = 0, e = mod->getASTContext().LastCheckedExternalDefinition;
+       i != e; ++i) {
+    auto def = mod->getASTContext().ExternalDefinitions[i];
     sgm.emitExternalDefinition(def);
   }
 

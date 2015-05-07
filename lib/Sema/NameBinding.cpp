@@ -70,13 +70,13 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   // The Builtin module cannot be explicitly imported unless we're a .sil file
   // or in the REPL.
   if ((SF.Kind == SourceFileKind::SIL || SF.Kind == SourceFileKind::REPL) &&
-      moduleID.first == Context.TheBuiltinModule->Name)
+      moduleID.first == Context.TheBuiltinModule->getName())
     return Context.TheBuiltinModule;
 
   // If the imported module name is the same as the current module,
   // skip the Swift module loader and use the Clang module loader instead.
   // This allows a Swift module to extend a Clang module of the same name.
-  if (moduleID.first == SF.getParentModule()->Name && modulePath.size() == 1) {
+  if (moduleID.first == SF.getParentModule()->getName() && modulePath.size() == 1) {
     if (auto importer = Context.getClangModuleLoader())
       return importer->loadModule(moduleID.second, modulePath);
     return nullptr;
@@ -170,7 +170,7 @@ void NameBinder::addImport(
   if (testableAttr && !topLevelModule->isTestingEnabled() &&
       Context.LangOpts.EnableTestableAttrRequiresTestableModule) {
     diagnose(ID->getModulePath().front().second, diag::module_not_testable,
-             topLevelModule->Name);
+             topLevelModule->getName());
     testableAttr->setInvalid();
   }
 
@@ -209,7 +209,7 @@ void NameBinder::addImport(
     if (!actualKind.hasValue()) {
       // FIXME: print entire module name?
       diagnose(ID, diag::ambiguous_decl_in_module,
-               declPath.front().first, M->Name);
+               declPath.front().first, M->getName());
       for (auto next : decls)
         diagnose(next, diag::found_candidate);
 

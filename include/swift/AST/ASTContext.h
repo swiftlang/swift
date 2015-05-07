@@ -63,7 +63,7 @@ namespace swift {
   class FunctionType;
   class ArchetypeType;
   class Identifier;
-  class Module;
+  class ModuleDecl;
   class ModuleLoader;
   class NominalTypeDecl;
   class TupleTypeElt;
@@ -174,13 +174,13 @@ public:
   DiagnosticEngine &Diags;
 
   /// The set of top-level modules we have loaded.
-  llvm::DenseMap<Identifier, Module*> LoadedModules;
+  llvm::DenseMap<Identifier, ModuleDecl*> LoadedModules;
 
   /// The builtin module.
-  Module * const TheBuiltinModule;
+  ModuleDecl * const TheBuiltinModule;
 
   /// The standard library module.
-  mutable Module *TheStdlibModule = nullptr;
+  mutable ModuleDecl *TheStdlibModule = nullptr;
 
   /// The name of the standard library module "Swift".
   Identifier StdlibModuleName;
@@ -220,7 +220,7 @@ public:
   llvm::StringMap<Type> RemappedTypes;
   
   /// Cache for generic mangling signatures.
-  llvm::DenseMap<std::pair<GenericSignature*, Module*>,
+  llvm::DenseMap<std::pair<GenericSignature*, ModuleDecl*>,
                  CanGenericSignature> ManglingSignatures;
 
 private:
@@ -599,10 +599,10 @@ public:
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
-  Module *getLoadedModule(
+  ModuleDecl *getLoadedModule(
       ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const;
 
-  Module *getLoadedModule(Identifier ModuleName) const;
+  ModuleDecl *getLoadedModule(Identifier ModuleName) const;
 
   /// \brief Attempts to load a module into this ASTContext.
   ///
@@ -610,17 +610,17 @@ public:
   /// be returned.
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
+  ModuleDecl *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
 
-  Module *getModuleByName(StringRef ModuleName);
+  ModuleDecl *getModuleByName(StringRef ModuleName);
 
   /// Returns the standard library module, or null if the library isn't present.
   ///
   /// If \p loadIfAbsent is true, the ASTContext will attempt to load the module
   /// if it hasn't been set yet.
-  Module *getStdlibModule(bool loadIfAbsent = false);
+  ModuleDecl *getStdlibModule(bool loadIfAbsent = false);
 
-  Module *getStdlibModule() const {
+  ModuleDecl *getStdlibModule() const {
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
 
@@ -697,7 +697,7 @@ public:
                              DeclContext *gpContext) const;
 
   /// Record compiler-known protocol information in the AST.
-  void recordKnownProtocols(Module *Stdlib);
+  void recordKnownProtocols(ModuleDecl *Stdlib);
   
   /// \brief Retrieve the substitutions for a bound generic type, if known.
   Optional<ArrayRef<Substitution>>

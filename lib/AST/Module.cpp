@@ -67,14 +67,14 @@ BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
   return *Cache;
 }
 
-void BuiltinUnit::LookupCache::lookupValue(Identifier Name, NLKind LookupKind,
-                                           const BuiltinUnit &M,
-                                           SmallVectorImpl<ValueDecl*> &Result) {
+void BuiltinUnit::LookupCache::lookupValue(
+       Identifier Name, NLKind LookupKind, const BuiltinUnit &M,
+       SmallVectorImpl<ValueDecl*> &Result) {
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return;
   
   ValueDecl *&Entry = Cache[Name];
-  ASTContext &Ctx = M.getParentModule()->Ctx;
+  ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (Entry == 0) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
       Entry = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
@@ -92,9 +92,9 @@ void BuiltinUnit::LookupCache::lookupValue(Identifier Name, NLKind LookupKind,
 }
 
 // Out-of-line because std::unique_ptr wants LookupCache to be complete.
-BuiltinUnit::BuiltinUnit(Module &M)
+BuiltinUnit::BuiltinUnit(ModuleDecl &M)
    : FileUnit(FileUnitKind::Builtin, M) {
-  M.Ctx.addDestructorCleanup(*this);
+  M.getASTContext().addDestructorCleanup(*this);
 }
 
 //===----------------------------------------------------------------------===//
@@ -133,7 +133,7 @@ class SourceFile::LookupCache {
   void addToMemberCache(DeclRange decls);
   void populateMemberCache(const SourceFile &SF);
 public:
-  typedef Module::AccessPathTy AccessPathTy;
+  typedef ModuleDecl::AccessPathTy AccessPathTy;
   
   LookupCache(const SourceFile &SF);
 
@@ -222,7 +222,7 @@ void SourceLookupCache::lookupValue(AccessPathTy AccessPath, DeclName Name,
                                     SmallVectorImpl<ValueDecl*> &Result) {
   // If this import is specific to some named type or decl ("import Swift.int")
   // then filter out any lookups that don't match.
-  if (!Module::matchesAccessPath(AccessPath, Name))
+  if (!ModuleDecl::matchesAccessPath(AccessPath, Name))
     return;
   
   auto I = TopLevelValues.find(Name);
@@ -334,12 +334,14 @@ void SourceLookupCache::invalidate() {
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-Module::Module(Identifier name, ASTContext &ctx)
-    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name)
-{
+ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
+  : TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
+    DeclContext(DeclContextKind::Module, nullptr) {
   ctx.addDestructorCleanup(*this);
+  setImplicit();
+  setType(MetatypeType::get(ModuleType::get(this)));
+  setAccessibility(Accessibility::Public);
 }
-
 
 void Module::addFile(FileUnit &newFile) {
   assert(!isa<DerivedFileUnit>(newFile) &&
@@ -359,7 +361,7 @@ void Module::addFile(FileUnit &newFile) {
       if (isa<DerivedFileUnit>(File))
         return;
     }
-    auto DFU = new (Ctx) DerivedFileUnit(*this);
+    auto DFU = new (getASTContext()) DerivedFileUnit(*this);
     Files.push_back(DFU);
     break;
   }
@@ -398,25 +400,26 @@ VarDecl *Module::getDSOHandle() {
   if (DSOHandleAndFlags.getPointer())
     return DSOHandleAndFlags.getPointer();
 
-  auto unsafeMutablePtr = Ctx.getUnsafeMutablePointerDecl();
+  auto unsafeMutablePtr = getASTContext().getUnsafeMutablePointerDecl();
   if (!unsafeMutablePtr)
     return nullptr;
 
   Type arg;
-  if (auto voidDecl = Ctx.getVoidDecl()) {
+  auto &ctx = getASTContext();
+  if (auto voidDecl = ctx.getVoidDecl()) {
     arg = voidDecl->getDeclaredInterfaceType();
   } else {
-    arg = TupleType::getEmpty(Ctx);
+    arg = TupleType::getEmpty(ctx);
   }
   
   Type type = BoundGenericType::get(unsafeMutablePtr, Type(), { arg });
-  auto handleVar = new (Ctx) VarDecl(/*IsStatic=*/false, /*IsLet=*/false,
+  auto handleVar = new (ctx) VarDecl(/*IsStatic=*/false, /*IsLet=*/false,
                                      SourceLoc(),
-                                     Ctx.getIdentifier("__dso_handle"),
+                                     ctx.getIdentifier("__dso_handle"),
                                      type, Files[0]);
   handleVar->setImplicit(true);
   handleVar->getAttrs().add(
-    new (Ctx) AsmnameAttr("__dso_handle", /*Implicit=*/true));
+    new (ctx) AsmnameAttr("__dso_handle", /*Implicit=*/true));
   handleVar->setAccessibility(Accessibility::Internal);
   DSOHandleAndFlags.setPointer(handleVar);
   return handleVar;
@@ -521,7 +524,7 @@ void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, DeclName name,
 
 DerivedFileUnit::DerivedFileUnit(Module &M)
     : FileUnit(FileUnitKind::Derived, M) {
-  M.Ctx.addDestructorCleanup(*this);
+  M.getASTContext().addDestructorCleanup(*this);
 }
 
 void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
@@ -1136,11 +1139,11 @@ StringRef Module::getModuleFilename() const {
 }
 
 bool Module::isStdlibModule() const {
-  return !getParent() && Name == Ctx.StdlibModuleName;
+  return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
 
 bool Module::isBuiltinModule() const {
-  return this == Ctx.TheBuiltinModule;
+  return this == getASTContext().TheBuiltinModule;
 }
 
 bool SourceFile::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
@@ -1192,7 +1195,7 @@ bool Module::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
       existingDiagLoc = sourceFile->getMainClassDiagLoc();
     } else {
       if (auto bufID = sourceFile->getBufferID())
-        existingDiagLoc = Ctx.SourceMgr.getLocForBufferStart(*bufID);
+        existingDiagLoc = getASTContext().SourceMgr.getLocForBufferStart(*bufID);
     }
   }
 
@@ -1201,27 +1204,27 @@ bool Module::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
       // If we already have a main class, and we haven't diagnosed it,
       // do so now.
       if (existingDiagLoc.isValid()) {
-        Ctx.Diags.diagnose(existingDiagLoc, diag::attr_ApplicationMain_multiple,
+        getASTContext().Diags.diagnose(existingDiagLoc, diag::attr_ApplicationMain_multiple,
                            mainClassDiagKind);
       } else {
-        Ctx.Diags.diagnose(existingClass, diag::attr_ApplicationMain_multiple,
+        getASTContext().Diags.diagnose(existingClass, diag::attr_ApplicationMain_multiple,
                            mainClassDiagKind);
       }
     }
 
     // Always diagnose the new class.
-    Ctx.Diags.diagnose(diagLoc, diag::attr_ApplicationMain_multiple,
+    getASTContext().Diags.diagnose(diagLoc, diag::attr_ApplicationMain_multiple,
                        mainClassDiagKind);
 
   } else {
     // We don't have an existing class, but we /do/ have a file in script mode.
     // Diagnose that.
     if (EntryPointInfo.markDiagnosedMainClassWithScript()) {
-      Ctx.Diags.diagnose(diagLoc, diag::attr_ApplicationMain_with_script,
+      getASTContext().Diags.diagnose(diagLoc, diag::attr_ApplicationMain_with_script,
                          mainClassDiagKind);
 
       if (existingDiagLoc.isValid()) {
-        Ctx.Diags.diagnose(existingDiagLoc,
+        getASTContext().Diags.diagnose(existingDiagLoc,
                            diag::attr_ApplicationMain_script_here);
       }
     }
@@ -1441,7 +1444,7 @@ SourceFile::SourceFile(Module &M, SourceFileKind K,
                        ImplicitModuleImportKind ModImpKind)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1), Kind(K) {
-  M.Ctx.addDestructorCleanup(*this);
+  M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
   if (isScriptMode()) {
@@ -1514,7 +1517,7 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   // discriminator invariant across source checkout locations.
   // FIXME: Use a faster hash here? We don't need security, just uniqueness.
   llvm::MD5 hash;
-  hash.update(getParentModule()->Name.str());
+  hash.update(getParentModule()->getName().str());
   hash.update(llvm::sys::path::filename(name));
   llvm::MD5::MD5Result result;
   hash.final(result);

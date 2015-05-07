@@ -159,6 +159,9 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   out << "provides:\n";
   for (const Decl *D : SF->Decls) {
     switch (D->getKind()) {
+    case DeclKind::Module:
+      break;
+
     case DeclKind::Import:
       // FIXME: Handle re-exported decls.
       break;
@@ -312,8 +315,8 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
   if (EC) {
-    M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                          OutputFilename, EC.message());
+    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                      OutputFilename, EC.message());
     return true;
   }
   SM.print(OS, EmitVerboseSIL, M, SortSIL);
@@ -338,8 +341,8 @@ static bool printAsObjC(const std::string &outputPath, Module *M,
                                               &tmpFilePath)
   };
   if (!out) {
-    M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                          tmpFilePath, EC.message());
+    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                      tmpFilePath, EC.message());
     return true;
   }
 
@@ -350,8 +353,8 @@ static bool printAsObjC(const std::string &outputPath, Module *M,
 
   EC = swift::moveFileIfDifferent(tmpFilePath, outputPath);
   if (EC) {
-    M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                          outputPath, EC.message());
+    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                      outputPath, EC.message());
     return true;
   }
 

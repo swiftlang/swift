@@ -27,7 +27,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class ClassDecl;
-class Module;
+class ModuleDecl;
 class NominalTypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
@@ -82,8 +82,8 @@ public:
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual
-  Module *loadModule(SourceLoc importLoc,
-                     ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
+  ModuleDecl *loadModule(SourceLoc importLoc,
+                         ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
 
   /// \brief Load extensions to the given nominal type.
   ///
