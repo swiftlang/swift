@@ -235,9 +235,6 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 
       return passReference(TyD, IdT->getIdLoc());
     }
-    if (auto Mod = IdT->getBoundModule())
-      return passReference(Mod, std::make_pair(IdT->getIdentifier(),
-                                               IdT->getIdLoc()));
   }
   return true;
 }

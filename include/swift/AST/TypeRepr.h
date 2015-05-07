@@ -29,7 +29,6 @@ namespace swift {
   class ASTWalker;
   class DeclContext;
   class ValueDecl;
-  class ModuleDecl;
   class ExprHandle;
   class NamedTypeRepr;
 
@@ -175,12 +174,13 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
   SourceLoc Loc;
   Identifier Id;
 
-  /// Value is the decl, type, or module that this refers to.
+  /// Value is the decl or type that this refers to.
   ///
-  /// After name binding, the value is set to the decl being referenced.
+  /// After name binding, the value is set to the decl being
+  /// referenced. After type checking, it is set to the type.
   ///
   /// FIXME: Can we sneak the Id into this union?
-  llvm::PointerUnion3<ValueDecl*, Type, ModuleDecl*> Value;
+  llvm::PointerUnion<ValueDecl*, Type> Value;
 
 protected:
   ComponentIdentTypeRepr(TypeReprKind K, SourceLoc Loc, Identifier Id)
@@ -198,7 +198,6 @@ public:
   bool isBound() const { return !Value.isNull(); }
   bool isBoundDecl() const { return Value.is<ValueDecl*>() && isBound(); }
   bool isBoundType() const { return Value.is<Type>() && isBound(); }
-  bool isBoundModule() const { return Value.is<ModuleDecl*>() && isBound(); }
 
   ValueDecl *getBoundDecl() const {
     return Value.dyn_cast<ValueDecl*>();
@@ -206,13 +205,9 @@ public:
   Type getBoundType() const {
     return Value.dyn_cast<Type>();
   }
-  ModuleDecl *getBoundModule() const {
-    return Value.dyn_cast<ModuleDecl*>();
-  }
 
   void setValue(ValueDecl *VD) { Value = VD; }
   void setValue(Type T) { Value = T; }
-  void setValue(ModuleDecl *M) { Value = M; }
 
   void revert() { Value = (ValueDecl*)nullptr; }
 

@@ -2062,7 +2062,6 @@ public:
       OS << " id='" << comp->getIdentifier() << '\'';
       OS << " bind=";
       if (comp->isBoundDecl()) OS << "decl";
-      else if (comp->isBoundModule()) OS << "module";
       else if (comp->isBoundType()) OS << "type";
       else OS << "none";
       OS << ')';

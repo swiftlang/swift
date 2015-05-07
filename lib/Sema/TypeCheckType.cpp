@@ -562,24 +562,16 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                  parentComponents.back()->getEndLoc());
 
   // Lookup into a type.
-  if (auto parentType = parentComponents.back()->getBoundType()) {
-    if (auto moduleType = parentType->getAs<ModuleType>()) {
-      tc.diagnose(comp->getIdLoc(), diag::no_module_type,
-                  comp->getIdentifier(), moduleType->getModule()->getName());
-    } else {
-      tc.diagnose(comp->getIdLoc(), diag::invalid_member_type,
-                  comp->getIdentifier(), parentType)
-        .highlight(parentRange);
-    }
-
-    return true;
+  auto parentType = parentComponents.back()->getBoundType();
+  if (auto moduleType = parentType->getAs<ModuleType>()) {
+    tc.diagnose(comp->getIdLoc(), diag::no_module_type,
+                comp->getIdentifier(), moduleType->getModule()->getName());
+  } else {
+    tc.diagnose(comp->getIdLoc(), diag::invalid_member_type,
+                comp->getIdentifier(), parentType)
+      .highlight(parentRange);
   }
 
-  /// Lookup into a module.
-  auto module = parentComponents.back()->getBoundModule();
-  assert(module && "Unresolved parent component?");
-  tc.diagnose(comp->getIdLoc(), diag::no_module_type,
-              comp->getIdentifier(), module->getName());
   return true;
 }
 
@@ -866,8 +858,6 @@ static Type resolveIdentTypeComponent(
   assert(comp->isBound());
   if (Type ty = comp->getBoundType())
     return ty;
-  if (ModuleDecl *mod = comp->getBoundModule())
-    return mod->getDeclaredType();
 
   ValueDecl *VD = comp->getBoundDecl();
   auto typeDecl = dyn_cast<TypeDecl>(VD);

@@ -262,9 +262,7 @@ static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
 
 void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                        const PrintOptions &Opts) const {
-  if (Module *Mod = getBoundModule()) {
-    Printer.printModuleRef(Mod, getIdentifier());
-  } else if (Type Ty = getBoundType()) {
+  if (Type Ty = getBoundType()) {
     if (auto ModuleTy = dyn_cast<ModuleType>(Ty.getPointer()))
       Printer.printModuleRef(ModuleTy->getModule(), getIdentifier());
     else if (auto NTD = Ty->getAnyNominal())
