@@ -493,16 +493,6 @@ extension ${Self} : _ArrayType {
     return _getCapacity()
   }
 
-  /// The last element, or `nil` if the array is empty
-  public var last: Element? {
-    // FIXME(prext): remove this function when protocol extensions land.
-
-    // FIXME: we can't use the commented-out code because the optimizer
-    // crashes.  <rdar://problem/20514925> Optimizer crashes [...]
-    // return self._prext_last
-    return Swift.last(self)
-  }
-
   /// An object that guarantees the lifetime of this array's elements
   public
   var _owner: AnyObject? {

@@ -195,7 +195,7 @@ func testIsEmptyFirstLast() {
   // CHECK-NEXT: 10
   println((10..<100).first)
   // CHECK-NEXT: 99
-  println(last(10..<100))
+  println((10..<100).last)
 }
 testIsEmptyFirstLast()
 

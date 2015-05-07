@@ -47,13 +47,6 @@ public struct ${Self}<S : CollectionType ${whereClause}> : CollectionType {
     return _base.endIndex
   }
 
-%  if traversal != 'Forward':
-  /// The last element, or `nil` if `self` is empty
-  public var last: S.Generator.Element? {
-    return Swift.last(self)
-  }
-%  end
-
   /// Access the element at `position`.
   ///
   /// Requires: `position` is a valid position in `self` and

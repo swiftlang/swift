@@ -34,7 +34,7 @@ extension CollectionType {
 //===----------------------------------------------------------------------===//
 
 extension CollectionType where Index : BidirectionalIndexType {
-  final public var _prext_last: Generator.Element? {
+  final public var last: Generator.Element? {
     return isEmpty ? nil : self[endIndex.predecessor()]
   }
 }

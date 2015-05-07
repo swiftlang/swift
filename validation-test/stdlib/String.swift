@@ -1125,7 +1125,7 @@ StringTests.test("String.append(_: Character)") {
     for prefix in ["", " "] {
       let base = baseStrings[baseIdx]
       for inputIdx in indices(baseCharacters) {
-        let input = last(prefix + String(baseCharacters[inputIdx]))!
+        let input = (prefix + String(baseCharacters[inputIdx])).last!
         var s = base
         s.append(input)
         expectEqual(Array(base) + [ input ], Array(s)) {

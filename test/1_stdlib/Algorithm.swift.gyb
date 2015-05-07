@@ -2485,14 +2485,14 @@ SequenceTypeAlgorithms.test("first") {
 SequenceTypeAlgorithms.test("last") {
   if true {
     let s = MinimalBidirectionalCollection<OpaqueValue<Int>>([])
-    expectEmpty(s._prext_last)
+    expectEmpty(s.last)
   }
   if true {
     let s = MinimalBidirectionalCollection<OpaqueValue<Int>>([
       OpaqueValue<Int>(1, identity: 10),
       OpaqueValue<Int>(2, identity: 20)
     ])
-    if let result = s._prext_last {
+    if let result = s.last {
       expectEqual(2, result.value)
       expectEqual(20, result.identity)
     } else {
@@ -3051,7 +3051,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         // Check that we didn't lose any values.
 %       if slice:
         expectEqual(0xfffe, s.first!.identity)
-        expectEqual(0xffff, s._prext_last!.identity)
+        expectEqual(0xffff, s.last!.identity)
         var identities = s._prext_map { $0.identity }
         identities.removeLast()
         identities.removeAtIndex(0)

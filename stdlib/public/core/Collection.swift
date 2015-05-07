@@ -210,11 +210,11 @@ public func first<C: CollectionType>(x: C) -> C.Generator.Element? {
 }
 
 /// Returns the last element of `x`, or `nil` if `x` is empty.
+@availability(*, unavailable, message="access the 'last' property on the collection")
 public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
   x: C
 ) -> C.Generator.Element? {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return x._prext_last
+  return x.last
 }
 
 /// A *collection* that supports subscript assignment.
