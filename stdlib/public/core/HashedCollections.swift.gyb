@@ -1896,7 +1896,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   ) -> _Native${Self}Storage<${TypeParameters}> {
     let requiredCapacity =
       _Native${Self}Storage<${TypeParameters}>.getMinCapacity(
-        elements.count, _hashContainerDefaultMaxLoadFactorInverse)
+        elements.count(), _hashContainerDefaultMaxLoadFactorInverse)
     var nativeStorage = _Native${Self}Storage<${TypeParameters}>(
       minimumCapacity: requiredCapacity)
 
@@ -1920,7 +1920,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       _precondition(!found, "${Self} literal contains duplicate keys")
       nativeStorage[i.offset] = Element(key: key, value: value)
     }
-    nativeStorage.count = elements.count
+    nativeStorage.count = elements.count()
 
 %end
 

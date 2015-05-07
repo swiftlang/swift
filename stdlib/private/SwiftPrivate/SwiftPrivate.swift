@@ -43,7 +43,7 @@ public func scan<
 
 public func randomShuffle<T>(a: _UnitTestArray<T>) -> _UnitTestArray<T> {
   var result = a
-  for var i = a.count - 1; i != 0; --i {
+  for var i = a.count() - 1; i != 0; --i {
     // FIXME: 32 bits are not enough in general case!
     let j = Int(rand32(exclusiveUpperBound: UInt32(i + 1)))
     swap(&result[i], &result[j])
@@ -64,7 +64,7 @@ public func gather<
 
 public func scatter<T>(a: _UnitTestArray<T>, _ idx: _UnitTestArray<Int>) -> _UnitTestArray<T> {
   var result = a
-  for i in 0..<a.count {
+  for i in 0..<a.count() {
     result[idx[i]] = a[i]
   }
   return result
@@ -89,7 +89,7 @@ public func withArrayOfCStrings<R>(
     (argsBuffer) in
     let ptr = UnsafeMutablePointer<CChar>(argsBuffer.baseAddress)
     var cStrings = map(argsOffsets) { ptr + $0 }
-    cStrings[cStrings.count - 1] = nil
+    cStrings[cStrings.count() - 1] = nil
     return body(cStrings)
   }
 }

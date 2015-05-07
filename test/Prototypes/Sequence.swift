@@ -164,7 +164,7 @@ public struct MyArray<Element> : Q_CollectionType {
   }
 
   public var endIndex: Int {
-    return _data.count
+    return _data.count()
   }
 
   public subscript(index: Int) -> Element {

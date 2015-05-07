@@ -21,7 +21,7 @@
 //
 
 func _toNSArray<T, U : AnyObject>(a: [T], @noescape f: (T) -> U) -> NSArray {
-  var result = NSMutableArray(capacity: a.count)
+  var result = NSMutableArray(capacity: a.count())
   for s in a {
     result.addObject(f(s))
   }
@@ -629,7 +629,7 @@ extension String {
     return _withOptionalOutParameter(remainingRange) {
       self._ns.getBytes(
         &buffer,
-        maxLength: min(buffer.count, maxLength),
+        maxLength: min(buffer.count(), maxLength),
         usedLength: usedLength,
         encoding: encoding,
         options: options,
@@ -649,7 +649,7 @@ extension String {
   public func getCString(
     inout buffer: [CChar], maxLength: Int, encoding: NSStringEncoding
   ) -> Bool {
-    return _ns.getCString(&buffer, maxLength: min(buffer.count, maxLength),
+    return _ns.getCString(&buffer, maxLength: min(buffer.count(), maxLength),
                           encoding: encoding)
   }
 
@@ -664,7 +664,7 @@ extension String {
   public func getFileSystemRepresentation(
     inout buffer: [CChar], maxLength: Int) -> Bool {
     return _ns.getFileSystemRepresentation(
-      &buffer, maxLength: min(buffer.count, maxLength))
+      &buffer, maxLength: min(buffer.count(), maxLength))
   }
 
   // - (void)
@@ -744,7 +744,7 @@ extension String {
   ) {
     let byteArray = Array(bytes)
     if let ns = NSString(
-      bytes: byteArray, length: byteArray.count, encoding: encoding) {
+      bytes: byteArray, length: byteArray.count(), encoding: encoding) {
 
       self = ns as String
     } else {
@@ -881,7 +881,7 @@ extension String {
   /// values are substituted according to given locale information.
   public init(format: String, locale: NSLocale?, arguments: [CVarArgType]) {
     _precondition(
-      _countFormatSpecifiers(format) <= arguments.count,
+      _countFormatSpecifiers(format) <= arguments.count(),
       "Too many format specifiers (%<letter>) provided for the argument list"
     )
     self = withVaList(arguments) {

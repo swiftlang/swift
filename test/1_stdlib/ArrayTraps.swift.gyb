@@ -186,7 +186,7 @@ class ViolateInoutSafeySwitchToObjcBuffer {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeNoTypeCheck = A._getArrayPropertyIsNativeNoTypeCheck()
-    for i in 0..<A.count {
+    for i in 0..<A.count() {
       A._checkSubscript(i, hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
       A._getElement(i, hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
       accessArrayViaInoutVolation()
@@ -224,7 +224,7 @@ class ViolateInoutSafeyNeedElementTypeCheck {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeNoTypeCheck = A._getArrayPropertyIsNativeNoTypeCheck()
-    for i in 0..<A.count {
+    for i in 0..<A.count() {
       A._checkSubscript(i, hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
       A._getElement(i, hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
       accessArrayViaInoutVolation()

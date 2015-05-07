@@ -120,7 +120,7 @@ func testConvertToArrayOfImplicitUnwrappedClass() {
   // CHECK: Class array count = 2
   // CHECK: Element 0 has value X(1)
   // CHECK: Element 1 has value X(2)
-  println("Class array count = \(arr.count)")
+  println("Class array count = \(arr.count())")
   for (index, opt) in arr.enumerate() {
     if let x = opt {
       println("Element \(index) has value X(\(x.value))")
@@ -144,7 +144,7 @@ func testConvertToArrayOfImplicitUnwrappedString() {
   // CHECK: String array count = 2
   // CHECK: Element 0 has value Hello
   // CHECK: Element 1 has value World
-  println("String array count = \(arr.count)")
+  println("String array count = \(arr.count())")
   for (index, opt) in arr.enumerate() {
     if let str = opt {
       println("Element \(index) has value \(str)")

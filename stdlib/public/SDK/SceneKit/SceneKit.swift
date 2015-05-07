@@ -18,7 +18,7 @@ extension SCNGeometryElement {
   public convenience init<IndexType : IntegerType>(
     indices: [IndexType], primitiveType: SCNGeometryPrimitiveType
   ) {
-    let indexCount = indices.count
+    let indexCount = indices.count()
     let primitiveCount: Int
     switch primitiveType {
     case .Triangles:

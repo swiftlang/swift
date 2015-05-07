@@ -342,7 +342,7 @@ extension SequenceType {
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
     // though.
     var result = Array(self)
-    let count = result.count
+    let count = result.count()
     for i in 0..<count/2 {
       swap(&result[i], &result[count - i - 1])
     }

@@ -4,9 +4,9 @@
 func fn() {
   println("two")
 // CHECK-DAG: ![[LOC:.*]] = !DILocation(line: [[@LINE+1]], column: 13,
-  println(0 - UInt(Process.arguments.count))
+  println(0 - UInt(Process.arguments.count()))
 // CHECK-DAG: ![[LOC2:.*]] = !DILocation(line: [[@LINE+1]], column: 13,
-  println(1 - UInt(Process.arguments.count))
+  println(1 - UInt(Process.arguments.count()))
   println("three")
 }
 

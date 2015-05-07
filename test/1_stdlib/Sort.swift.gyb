@@ -13,7 +13,7 @@ var Algorithm = TestSuite("Algorithm")
 // We can't simply sort both arrays and compare them, because it is needed to
 // check correctness of sorting itself.
 func expectSortedCollection(sortedAry: [Int], _ originalAry: [Int]) {
-  expectEqual(sortedAry.count, originalAry.count)
+  expectEqual(sortedAry.count(), originalAry.count())
   var sortedVals = [Int:Int]()
   var originalVals = [Int:Int]()
   // Keep track of what values we have in sortedAry.
@@ -39,7 +39,7 @@ func expectSortedCollection(sortedAry: [Int], _ originalAry: [Int]) {
   }
 
   // Check if values in sortedAry are actually sorted.
-  for i in 1..<sortedAry.count {
+  for i in 1..<sortedAry.count() {
     expectTrue(sortedAry[i - 1] <= sortedAry[i])
   }
 }
@@ -59,8 +59,8 @@ class OffsetCollection : MutableCollectionType {
   let offset: Int
   var data: [Int] = []
   let forward: Bool
-  var startIndex: Int { return forward ? offset : offset - data.count }
-  var endIndex: Int { return forward ? offset + data.count : offset }
+  var startIndex: Int { return forward ? offset : offset - data.count() }
+  var endIndex: Int { return forward ? offset + data.count() : offset }
   subscript (i: Int) -> Int {
     get { return data[i - startIndex] }
     set { data[i - startIndex] = newValue }
@@ -71,7 +71,7 @@ class OffsetCollection : MutableCollectionType {
   func toArray() -> [Int] {
     return data
   }
-  var count: Int { return data.count }
+  var count: Int { return data.count() }
   init(_ ary: [Int], offset: Int, forward: Bool) {
     data = ary
     self.offset = offset

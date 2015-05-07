@@ -77,8 +77,8 @@ public struct SourceLocStack {
 func _printStackTrace(stackTrace: SourceLocStack?) {
   guard let s = stackTrace else { return }
   println("stacktrace:")
-  for i in 0..<s.locs.count {
-    let loc = s.locs[s.locs.count - i - 1]
+  for i in 0..<s.locs.count() {
+    let loc = s.locs[s.locs.count() - i - 1]
     let comment = (loc.comment != nil) ? " ; \(loc.comment!)" : ""
     println("  #\(i): \(loc.file):\(loc.line)\(comment)")
   }
@@ -746,7 +746,7 @@ struct _ParentProcess {
         case (_, .Some(let status), true):
           testPassed = !_anyExpectFailed
         }
-        if testPassed && t.crashOutputMatches.count > 0 {
+        if testPassed && t.crashOutputMatches.count() > 0 {
           // If we still think that the test passed, check if the crash
           // output matches our expectations.
           let crashOutput = crashStdout + crashStderr
@@ -828,7 +828,7 @@ public func runAllTests() {
   } else {
     var runTestsInProcess: Bool = false
     var filter: String? = nil
-    for var i = 0; i < Process.arguments.count; {
+    for var i = 0; i < Process.arguments.count(); {
       let arg = Process.arguments[i]
       if arg == "--stdlib-unittest-in-process" {
         runTestsInProcess = true
@@ -869,7 +869,7 @@ public class TestSuite {
       _testNameToIndex[name] == nil,
       "test suite with the same name already exists")
     _allTestSuites.append(self)
-    _testSuiteNameToIndex[name] = _allTestSuites.count - 1
+    _testSuiteNameToIndex[name] = _allTestSuites.count() - 1
   }
 
   public func test(name: String, _ testFunction: () -> ()) {
@@ -973,7 +973,7 @@ public class TestSuite {
         stdinText: _data._stdinText,
         stdinEndsWithEOF: _data._stdinEndsWithEOF,
         crashOutputMatches: _data._crashOutputMatches, code: testFunction))
-      _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
+      _testSuite._testNameToIndex[_name] = _testSuite._tests.count() - 1
     }
   }
 
@@ -1027,13 +1027,13 @@ func _parseDottedVersion(s: String) -> _UnitTestArray<Int> {
 
 public func _parseDottedVersionTriple(s: String) -> (Int, Int, Int) {
   var array = _parseDottedVersion(s)
-  if array.count >= 4 {
+  if array.count() >= 4 {
     fatalError("unexpected version")
   }
   return (
-    array.count >= 1 ? array[0] : 0,
-    array.count >= 2 ? array[1] : 0,
-    array.count >= 3 ? array[2] : 0)
+    array.count() >= 1 ? array[0] : 0,
+    array.count() >= 2 ? array[1] : 0,
+    array.count() >= 3 ? array[2] : 0)
 }
 
 func _getOSVersion() -> OSVersion {
@@ -1588,7 +1588,7 @@ public func check${traversal}Collection<
     }
 
     if expectedArray.count() >= 2 {
-      for i in 0..<allIndices.count-1 {
+      for i in 0..<allIndices.count()-1 {
         var successor1 = allIndices[i].successor()
         var successor2 = allIndices[i]
         successor2++
@@ -1606,7 +1606,7 @@ public func check${traversal}Collection<
         }
       }
 %   if traversal == "Bidirectional":
-      for i in 1..<allIndices.count {
+      for i in 1..<allIndices.count() {
         var predecessor1 = allIndices[i].predecessor()
         var predecessor2 = allIndices[i]
         predecessor2--
@@ -1622,7 +1622,7 @@ public func check${traversal}Collection<
             stackTrace: stackTrace.withCurrentLoc())
         }
       }
-      for i in 1..<allIndices.count {
+      for i in 1..<allIndices.count() {
         var index = allIndices[i]
         --index
         ++index
@@ -1745,7 +1745,7 @@ public func checkSliceableWithBidirectionalIndex<
   let expectedArray = _UnitTestArray(expected)
   
   var start = sliceable.startIndex
-  for startNumericIndex in 0...expectedArray.count {
+  for startNumericIndex in 0...expectedArray.count() {
     if start != sliceable.endIndex {
       ++start
       --start
@@ -1753,7 +1753,7 @@ public func checkSliceableWithBidirectionalIndex<
       --start
     }
     var end = start
-    for endNumericIndex in startNumericIndex...expectedArray.count {
+    for endNumericIndex in startNumericIndex...expectedArray.count() {
       if end != sliceable.endIndex {
         ++end
         --end
@@ -1821,7 +1821,7 @@ where
         a.replaceRange(nthIndex(a, ix)..<nthIndex(a, jx), with: newValues)
         let growth = newCount - oldCount
         
-        let expectedCount = source.count + growth
+        let expectedCount = source.count() + growth
         let actualCount = numericCast(a.count()) as Int
         if actualCount != expectedCount {
           reportFailure(
@@ -2179,7 +2179,7 @@ public struct MinimalGenerator<T> : GeneratorType {
   }
 
   public func next() -> T? {
-    if _sharedState.i == _sharedState.data.count {
+    if _sharedState.i == _sharedState.data.count() {
       if isConsumed {
         expectUnreachable() { "next() was called on a consumed generator" }
       }
@@ -2235,13 +2235,13 @@ public struct MinimalSequence<T> : SequenceType {
 
     switch underestimatedCount {
     case .Precise:
-      self._sharedState.underestimatedCount = data.count
+      self._sharedState.underestimatedCount = data.count()
 
     case .Half:
-      self._sharedState.underestimatedCount = data.count / 2
+      self._sharedState.underestimatedCount = data.count() / 2
 
     case .Overestimate:
-      self._sharedState.underestimatedCount = data.count * 3 + 5
+      self._sharedState.underestimatedCount = data.count() * 3 + 5
 
     case .Value(let count):
       self._sharedState.underestimatedCount = count
@@ -2403,13 +2403,13 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 
     switch underestimatedCount {
     case .Precise:
-      self.underestimatedCount = _elements.count
+      self.underestimatedCount = _elements.count()
 
     case .Half:
-      self.underestimatedCount = _elements.count / 2
+      self.underestimatedCount = _elements.count() / 2
 
     case .Overestimate:
-      self.underestimatedCount = _elements.count * 3 + 5
+      self.underestimatedCount = _elements.count() * 3 + 5
 
     case .Value(let count):
       self.underestimatedCount = count
@@ -2477,13 +2477,13 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
 
     switch underestimatedCount {
     case .Precise:
-      self.underestimatedCount = elements.count
+      self.underestimatedCount = elements.count()
 
     case .Half:
-      self.underestimatedCount = elements.count / 2
+      self.underestimatedCount = elements.count() / 2
 
     case .Overestimate:
-      self.underestimatedCount = elements.count * 3 + 5
+      self.underestimatedCount = elements.count() * 3 + 5
 
     case .Value(let count):
       self.underestimatedCount = count

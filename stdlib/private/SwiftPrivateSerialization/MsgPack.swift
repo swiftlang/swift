@@ -57,11 +57,11 @@ public struct MsgPackEncoder {
   }
 
   internal mutating func _addedElement() {
-    _actualElementCount[_actualElementCount.count - 1]++
+    _actualElementCount[_actualElementCount.count() - 1]++
   }
 
   public mutating func append(i: Int64) {
-    bytes.reserveCapacity(bytes.count + 9)
+    bytes.reserveCapacity(bytes.count() + 9)
     bytes.append(0xd3)
     _appendBigEndian(i)
 
@@ -69,7 +69,7 @@ public struct MsgPackEncoder {
   }
 
   public mutating func append(i: UInt64) {
-    bytes.reserveCapacity(bytes.count + 9)
+    bytes.reserveCapacity(bytes.count() + 9)
     bytes.append(0xcf)
     _appendBigEndian(i)
 
@@ -89,7 +89,7 @@ public struct MsgPackEncoder {
   }
 
   public mutating func append(f: Float32) {
-    bytes.reserveCapacity(bytes.count + 5)
+    bytes.reserveCapacity(bytes.count() + 5)
     bytes.append(0xca)
     _appendBigEndian(f._toBitPattern())
 
@@ -97,7 +97,7 @@ public struct MsgPackEncoder {
   }
 
   public mutating func append(f: Float64) {
-    bytes.reserveCapacity(bytes.count + 9)
+    bytes.reserveCapacity(bytes.count() + 9)
     bytes.append(0xcb)
     _appendBigEndian(f._toBitPattern())
 
@@ -106,22 +106,22 @@ public struct MsgPackEncoder {
 
   public mutating func append(s: String) {
     let utf8Bytes = Array(s.utf8)
-    switch Int64(utf8Bytes.count) {
+    switch Int64(utf8Bytes.count()) {
     case 0...31:
       // fixstr
-      bytes.append(0b1010_0000 | UInt8(utf8Bytes.count))
+      bytes.append(0b1010_0000 | UInt8(utf8Bytes.count()))
     case 32...0xff:
       // str8
       bytes.append(0xd9)
-      bytes.append(UInt8(utf8Bytes.count))
+      bytes.append(UInt8(utf8Bytes.count()))
     case 0x100...0xffff:
       // str16
       bytes.append(0xda)
-      _appendBigEndian(UInt16(utf8Bytes.count))
+      _appendBigEndian(UInt16(utf8Bytes.count()))
     case 0x1_0000...0xffff_ffff:
       // str32
       bytes.append(0xdb)
-      _appendBigEndian(UInt32(utf8Bytes.count))
+      _appendBigEndian(UInt32(utf8Bytes.count()))
     default:
       // FIXME: better error handling.  Trapping is at least secure.
       fatalError("string is too long")
@@ -132,19 +132,19 @@ public struct MsgPackEncoder {
   }
 
   public mutating func append(dataBytes: [UInt8]) {
-    switch Int64(dataBytes.count) {
+    switch Int64(dataBytes.count()) {
     case 0...0xff:
       // bin8
       bytes.append(0xc4)
-      bytes.append(UInt8(dataBytes.count))
+      bytes.append(UInt8(dataBytes.count()))
     case 0x100...0xffff:
       // bin16
       bytes.append(0xc5)
-      _appendBigEndian(UInt16(dataBytes.count))
+      _appendBigEndian(UInt16(dataBytes.count()))
     case 0x1_0000...0xffff_ffff:
       // bin32
       bytes.append(0xc6)
-      _appendBigEndian(UInt32(dataBytes.count))
+      _appendBigEndian(UInt32(dataBytes.count()))
     default:
       // FIXME: better error handling.  Trapping is at least secure.
       fatalError("binary data is too long")
@@ -216,7 +216,7 @@ public struct MsgPackEncoder {
   }
 
   public mutating func appendExtended(type type: Int8, data: [UInt8]) {
-    switch Int64(data.count) {
+    switch Int64(data.count()) {
     case 1:
       // fixext1
       bytes.append(0xd4)
@@ -235,15 +235,15 @@ public struct MsgPackEncoder {
     case 0...0xff:
       // ext8
       bytes.append(0xc7)
-      bytes.append(UInt8(data.count))
+      bytes.append(UInt8(data.count()))
     case 0x100...0xffff:
       // ext16
       bytes.append(0xc8)
-      _appendBigEndian(UInt16(data.count))
+      _appendBigEndian(UInt16(data.count()))
     case 0x1_0000...0xffff_ffff:
       // ext32
       bytes.append(0xc9)
-      _appendBigEndian(UInt32(data.count))
+      _appendBigEndian(UInt32(data.count()))
     default:
       fatalError("extended data is too long")
     }
@@ -289,7 +289,7 @@ public struct MsgPackDecoder {
   }
 
   internal func _haveNBytes(count: Int) -> Bool {
-    return _bytes.count >= _consumedCount + count
+    return _bytes.count() >= _consumedCount + count
   }
 
   internal func _lookByte() -> UInt8? {
@@ -640,10 +640,6 @@ public struct MsgPackVariantArray : CollectionType {
   public subscript(i: Int) -> MsgPackVariant {
     return _data[i]
   }
-
-  public var count: Int {
-    return _data.count
-  }
 }
 
 public struct MsgPackVariantMap : CollectionType {
@@ -676,10 +672,6 @@ public struct MsgPackVariantMap : CollectionType {
 
   public subscript(i: Int) -> (MsgPackVariant, MsgPackVariant) {
     return _data[i]
-  }
-
-  public var count: Int {
-    return _data.count
   }
 
   internal mutating func _append(
@@ -731,18 +723,18 @@ public enum MsgPackVariant {
       encoder.append(dataBytes)
 
     case Array(let a):
-      encoder.beginArray(a.count)
+      encoder.beginArray(a.count())
 
       // Reserve space assuming homogenous arrays.
-      if a.count != 0 {
+      if !a.isEmpty {
         switch a[0] {
         case .Float32:
           encoder.bytes.reserveCapacity(
-            encoder.bytes.count + a.count * 5)
+            encoder.bytes.count() + a.count() * 5)
 
         case .Int64, .UInt64, .Float64:
           encoder.bytes.reserveCapacity(
-            encoder.bytes.count + a.count * 9)
+            encoder.bytes.count() + a.count() * 9)
 
         default:
           ()
@@ -754,7 +746,7 @@ public enum MsgPackVariant {
       encoder.endArray()
 
     case Map(let m):
-      encoder.beginMap(m.count)
+      encoder.beginMap(m.count())
       for (key, value) in m {
         key._serializeToImpl(&encoder)
         value._serializeToImpl(&encoder)

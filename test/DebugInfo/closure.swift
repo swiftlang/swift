@@ -3,9 +3,9 @@
 func markUsed<T>(t: T) {}
 
 func foldl1<T>(list: [T], _ function: (a: T, b: T) -> T) -> T {
-     assert(list.count > 1)
+     assert(list.count() > 1)
      var accumulator = list[0]
-     for var i = 1; i < list.count; ++i {
+     for var i = 1; i < list.count(); ++i {
          accumulator = function(a: accumulator, b: list[i])
      }
      return accumulator

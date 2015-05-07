@@ -175,7 +175,7 @@ extension ${vectype}: SIMDVectorType {
   /// - precondition: the array must have the correct number of elements for
   /// the vector type.
   public init(_ array: [Scalar]) {
-    _precondition(array.count == ${size},
+    _precondition(array.count() == ${size},
                   "${vectype} requires a ${cardinals[size]}-element array")
     self.init(${', '.join(map(lambda i:
               components[i] + ':array[' + str(i) + ']',
@@ -843,7 +843,7 @@ extension ${mattype} : SIMDMatrixType {
 
   /// Initialize matrix to have specified `columns`.
   public init(_ columns: [Column]) {
-    _precondition(columns.count == ${cols}, "Requires array of ${cols} vectors")
+    _precondition(columns.count() == ${cols}, "Requires array of ${cols} vectors")
 %   for i in range(cols):
     self._columns.${i} = columns[${i}]
 %   end
@@ -851,7 +851,7 @@ extension ${mattype} : SIMDMatrixType {
 
   /// Initialize matrix to have specified `rows`.
   public init(rows: [Row]) {
-    _precondition(rows.count == ${rows}, "Requires array of ${rows} vectors")
+    _precondition(rows.count() == ${rows}, "Requires array of ${rows} vectors")
 %   for i in range(cols):
       self._columns.${i} = [${', '.join(map(lambda j:
                             'rows[' + str(j) + '].' + components[i],

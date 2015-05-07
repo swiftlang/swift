@@ -134,7 +134,7 @@ Algorithm.test("filter/SequenceType") {
     let result = filter(s) { (x: Int) -> Bool in true }
     expectEqual([ 0, 30, 10, 90 ], result)
     expectEqual([], Array(s)) { "sequence should be consumed" }
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.count(), result.capacity)
   }
   if true {
     let s = MinimalSequence(
@@ -142,7 +142,7 @@ Algorithm.test("filter/SequenceType") {
     let result = filter(s) { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
     expectEqual([], Array(s)) { "sequence should be consumed" }
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.count(), result.capacity)
   }
   if true {
     let s = MinimalSequence(
@@ -150,7 +150,7 @@ Algorithm.test("filter/SequenceType") {
     let result = filter(s) { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
     expectEqual([], Array(s)) { "sequence should be consumed" }
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.count(), result.capacity)
   }
 }
 
@@ -178,13 +178,13 @@ Algorithm.test("filter/CollectionType") {
     let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
     let result = filter(c) { (x: Int) -> Bool in true }
     expectEqual([ 0, 30, 10, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.count(), result.capacity)
   }
   if true {
     let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
     let result = filter(c) { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.count(), result.capacity)
   }
 }
 
@@ -282,7 +282,7 @@ struct A<T> : MutableSliceable {
   }
 
   var endIndex: Int {
-    return impl.count
+    return impl.count()
   }
 
   func generate() -> Array<T>.Generator {
@@ -291,24 +291,24 @@ struct A<T> : MutableSliceable {
 
   subscript(i: Int) -> T {
     get {
-      expectTrue(i >= 0 && i < impl.count)
+      expectTrue(i >= 0 && i < impl.count())
       return impl[i]
     }
     set (x) {
-      expectTrue(i >= 0 && i < impl.count)
+      expectTrue(i >= 0 && i < impl.count())
       impl[i] = x
     }
   }
 
   subscript(r: Range<Int>) -> Array<T>.SubSlice {
     get {
-      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
-      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
+      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count())
+      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count())
       return impl[r]
     }
     set (x) {
-      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
-      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
+      expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count())
+      expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count())
       impl[r] = x
     }
   }
@@ -583,7 +583,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
         stackTrace: test.loc.withCurrentLoc())
     }
     expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
-    expectEqual(max(0, test.sequence.count - 1), timesClosureWasCalled) {
+    expectEqual(max(0, test.sequence.count() - 1), timesClosureWasCalled) {
       "maxElement() should be eager and should only call its predicate once per element"
     }
   }
@@ -1176,7 +1176,7 @@ SequenceTypeAlgorithms.test("reduce") {
     }
     expectEqual(test.sequence, result.value)
     expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
-    expectEqual(test.sequence.count, timesClosureWasCalled) {
+    expectEqual(test.sequence.count(), timesClosureWasCalled) {
       "reduce() should be eager and should only call its predicate once per element"
     }
   }
@@ -1347,10 +1347,10 @@ SequenceTypeAlgorithms.test("filter/SequenceType/${dispatch}") {
       expectType([OpaqueValue<Int>].self, &result)
       expectEqual(test.expected, map(result) { $0.value })
       expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
+      expectEqual(test.sequence.count(), timesClosureWasCalled) {
         "filter() should be eager and should only call its predicate once per element"
       }
-      expectGE(2 * result.count, result.capacity) {
+      expectGE(2 * result.count(), result.capacity) {
         "filter() should not reserve capacity (it does not know how much the predicate will filter out)"
       }
     }
@@ -1537,7 +1537,7 @@ SequenceTypeAlgorithms.test("filter/RangeReplaceableCollectionType/${CollectionT
       expectEqual(test.sequence, s._prext_map { $0.value }) {
         "collection should not be consumed"
       }
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
+      expectEqual(test.sequence.count(), timesClosureWasCalled) {
         "filter() should be eager and should only call its predicate once per element"
       }
       expectGE(2 * result.count(), result.${'capacity' if CollectionKind == 'StdlibArray' else 'reservedCapacity'}) {
@@ -1609,7 +1609,7 @@ SequenceTypeAlgorithms.test("map/SequenceType") {
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(test.expected, result._prext_map { $0.value })
       expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
+      expectEqual(test.sequence.count(), timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
     }
@@ -1642,7 +1642,7 @@ SequenceTypeAlgorithms.test("map/CollectionType") {
       expectEqual(test.sequence, s._prext_map { $0.value }) {
         "collection should not be consumed"
       }
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
+      expectEqual(test.sequence.count(), timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
     }
@@ -1735,7 +1735,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
         test.expected, result._prext_map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
+      expectEqual(test.sequence.count(), timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
       expectGE(2 * result.count(), result.capacity) {
@@ -1812,7 +1812,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
         test.expected, result._prext_map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
+      expectEqual(test.sequence.count(), timesClosureWasCalled) {
         "flatMap() should be eager and should only call its predicate once per element"
       }
       expectGE(2 * result.count(), result.capacity) {
@@ -2834,7 +2834,7 @@ func forAllPermutations<S : SequenceType>(
   sequence: S, body: ([S.Generator.Element]) -> ()
 ) {
   let data = Array(sequence)
-  forAllPermutations(data.count) {
+  forAllPermutations(data.count()) {
     (indices: [Int]) in
     body(indices._prext_map { data[$0] })
     return ()
@@ -2998,7 +2998,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
       if true {
 %     if predicate:
         var sequenceAsArray: [OpaqueValue<Int>] =
-          zip(sequence, 0..<sequence.count)._prext_map {
+          zip(sequence, 0..<sequence.count())._prext_map {
             OpaqueValue($0, identity: $1)
           }
 
@@ -3026,7 +3026,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         }
 %     else:
         var sequenceAsArray: [CustomComparableValue] =
-          zip(sequence, 0..<sequence.count)._prext_map {
+          zip(sequence, 0..<sequence.count())._prext_map {
             CustomComparableValue($0, identity: $1)
           }
 
@@ -3055,9 +3055,9 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         var identities = s._prext_map { $0.identity }
         identities.removeLast()
         identities.removeAtIndex(0)
-        expectEqualsUnordered(0..<sequence.count, identities)
+        expectEqualsUnordered(0..<sequence.count(), identities)
 %       else:
-        expectEqualsUnordered(0..<sequence.count, s._prext_map { $0.identity })
+        expectEqualsUnordered(0..<sequence.count(), s._prext_map { $0.identity })
 %     end
 
         // All the elements in the first partition are less than the pivot

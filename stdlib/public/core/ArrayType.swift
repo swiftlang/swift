@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 public protocol __ArrayType : CollectionType {
-  var count: Int {get}
+  func count() -> Int
 
   typealias _Buffer : _ArrayBufferType
   var _buffer: _Buffer {get}
@@ -40,9 +40,6 @@ protocol _ArrayType
 
   /// Construct an array of count elements, each initialized to repeatedValue
   init(count: Int, repeatedValue: Self.Generator.Element)
-
-  /// How many elements the Array stores
-  var count: Int {get}
 
   /// How many elements the Array can store without reallocation
   var capacity: Int {get}
@@ -136,7 +133,7 @@ internal struct _ArrayTypeMirror<T : _ArrayType> : MirrorType {
 
   var objectIdentifier: ObjectIdentifier? { return nil }
 
-  var count: Int { return _value.count }
+  var count: Int { return _value.count() }
 
   subscript(i: Int) -> (String, MirrorType) {
     _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
