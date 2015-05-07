@@ -3694,15 +3694,14 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // If we're default-initializing this member, there's nothing to do.
     if (sources[i] == TupleShuffleExpr::DefaultInitialize) {
       // Dig out the owner of the default arguments.
+      ConcreteDeclRef argOwner;
       if (!defaultArgsOwner) {
-        defaultArgsOwner 
+        argOwner
           = findDefaultArgsOwner(cs, solution,
                                  cs.getConstraintLocator(locator));
-        assert(defaultArgsOwner && "Missing default arguments owner?");
+        assert(argOwner && "Missing default arguments owner?");
       } else {
-        assert(findDefaultArgsOwner(cs, solution,
-                                    cs.getConstraintLocator(locator))
-                 == defaultArgsOwner);
+        argOwner = defaultArgsOwner;
       }
 
       anythingShuffled = true;
@@ -3711,9 +3710,15 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
       // Create a caller-side default argument, if we need one.
       if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                            defaultArgsOwner, i).first) {
+                                            argOwner, i).first) {
         callerDefaultArgs.push_back(defArg);
         sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
+      }
+      if (!defaultArgsOwner) {
+        defaultArgsOwner = argOwner;
+      } else {
+        assert(defaultArgsOwner == argOwner &&
+               "default args on same func have different owners");
       }
       continue;
     }
@@ -3956,21 +3961,20 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
     assert(field.hasInit() && "Expected a default argument");
 
+    ConcreteDeclRef argOwner;
     // Dig out the owner of the default arguments.
     if (!defaultArgsOwner) {
-      defaultArgsOwner
+      argOwner
       = findDefaultArgsOwner(cs, solution,
                              cs.getConstraintLocator(locator));
-      assert(defaultArgsOwner && "Missing default arguments owner?");
+      assert(argOwner && "Missing default arguments owner?");
     } else {
-      assert(findDefaultArgsOwner(cs, solution,
-                                  cs.getConstraintLocator(locator))
-             == defaultArgsOwner);
+      argOwner = defaultArgsOwner;
     }
 
     // Create a caller-side default argument, if we need one.
     if (auto defArg = getCallerDefaultArg(tc, dc, expr->getLoc(),
-                                          defaultArgsOwner, i).first) {
+                                          argOwner, i).first) {
       // Record the caller-side default argument expression.
       // FIXME: Do we need to record what this was synthesized from?
       elements.push_back(TupleShuffleExpr::CallerDefaultInitialize);
@@ -3978,6 +3982,12 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
     } else {
       // Record the owner of the default argument.
       elements.push_back(TupleShuffleExpr::DefaultInitialize);
+    }
+    if (!defaultArgsOwner) {
+      defaultArgsOwner = argOwner;
+    } else {
+      assert(defaultArgsOwner == argOwner &&
+             "default args on same func have different owners");
     }
 
     ++i;
@@ -4309,23 +4319,21 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     // If we are using a default argument, handle it now.
     if (parameterBindings[paramIdx].empty()) {
       // Dig out the owner of the default arguments.
+      ConcreteDeclRef argOwner;
       if (!defaultArgsOwner) {
-        defaultArgsOwner
+        argOwner
         = findDefaultArgsOwner(cs, solution,
                                cs.getConstraintLocator(locator));
-        assert(defaultArgsOwner && "Missing default arguments owner?");
+        assert(argOwner && "Missing default arguments owner?");
       } else {
-        assert(findDefaultArgsOwner(cs, solution,
-                                    cs.getConstraintLocator(locator))
-               == defaultArgsOwner);
+        argOwner = defaultArgsOwner;
       }
 
       // Create a caller-side default argument, if we need one.
       Expr *defArg;
       DefaultArgumentKind defArgKind;
       std::tie(defArg, defArgKind) = getCallerDefaultArg(tc, dc, arg->getLoc(),
-                                                         defaultArgsOwner,
-                                                         paramIdx);
+                                                         argOwner, paramIdx);
 
       // Note that we'll be doing a shuffle involving default arguments.
       anythingShuffled = true;
@@ -4343,6 +4351,12 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
         sources.push_back(TupleShuffleExpr::CallerDefaultInitialize);
       } else {
         sources.push_back(TupleShuffleExpr::DefaultInitialize);
+      }
+      if (!defaultArgsOwner) {
+        defaultArgsOwner = argOwner;
+      } else {
+        assert(defaultArgsOwner == argOwner &&
+               "default args on same func have different owners");
       }
       continue;
     }

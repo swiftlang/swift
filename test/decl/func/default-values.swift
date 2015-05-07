@@ -82,3 +82,10 @@ class SomeDerivedClass2 : SomeClass2 {
 func shouldNotCrash(a : UndefinedType, bar b : Bool = true) { // expected-error {{use of undeclared type 'UndefinedType'}}
 }
 
+// <rdar://problem/20749423> Compiler crashed while building simple subclass
+// code
+class SomeClass3 {
+  init(x: Int = 5, y: Int = 5) {}
+}
+class SomeDerivedClass3 : SomeClass3 {}
+let _ = SomeDerivedClass3()
