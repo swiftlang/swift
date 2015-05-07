@@ -2089,7 +2089,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
 
     // TODO: figure out right value for isKnownPrivate
     if (!instanceType->getAs<TupleType>()) {
-      auto ctors = CS->TC.lookupConstructors(instanceType, CS->DC, false);
+      auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType);
       for (auto ctor : ctors) {
         if (auto fnType = ctor->getType()->getAs<AnyFunctionType>()) {
           // skip type argument

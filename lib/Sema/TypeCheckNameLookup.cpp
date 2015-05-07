@@ -218,10 +218,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
   return result;
 }
 
-LookupResult TypeChecker::lookupConstructors(Type type, DeclContext *dc,
-                                             bool isKnownPrivate) {
-  NameLookupOptions options = NameLookupFlags::ProtocolMembers;
-  if (isKnownPrivate)
-    options |= NameLookupFlags::KnownPrivate;
+LookupResult TypeChecker::lookupConstructors(DeclContext *dc, Type type,
+                                             NameLookupOptions options) {
   return lookupMember(dc, type, Context.Id_init, options);
 }

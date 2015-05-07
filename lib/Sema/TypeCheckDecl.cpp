@@ -6755,7 +6755,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     auto superclassTy = classDecl->getSuperclass();
-    for (auto member : lookupConstructors(superclassTy, classDecl)) {
+    for (auto member : lookupConstructors(classDecl, superclassTy)) {
       // Skip unavailable superclass initializers.
       if (AvailabilityAttr::isUnavailable(member))
         continue;
@@ -6868,7 +6868,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
     // We need to look for a default constructor.
     if (auto superTy = getSuperClassOf(decl->getDeclaredTypeInContext())) {
       // If there are no default ctors for our supertype, we can't do anything.
-      auto ctors = lookupConstructors(superTy, decl);
+      auto ctors = lookupConstructors(decl, superTy);
       if (!ctors)
         return;
 

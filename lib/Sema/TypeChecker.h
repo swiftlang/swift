@@ -138,6 +138,10 @@ inline NameLookupOptions operator|(NameLookupFlags flag1,
 const NameLookupOptions defaultMemberLookupOptions
   = NameLookupFlags::DynamicLookup | NameLookupFlags::ProtocolMembers;
 
+/// Default options for constructor lookup.
+const NameLookupOptions defaultConstructorLookupOptions
+  = NameLookupFlags::ProtocolMembers;
+
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
 enum class Comparison {
@@ -1178,12 +1182,10 @@ public:
 
   /// \brief Lookup a member in the given type.
   ///
+  /// \param dc The context that needs the member.
   /// \param type The type in which we will look for a member.
   /// \param name The name of the member to look for.
-  /// \param dc The context that needs the member.
-  /// \param isKnownPrivate If true, this lookup is counted as a private
-  /// dependency.
-  /// \param allowDynamicLookup Whether to allow dynamic lookup.
+  /// \param options Options that control name lookup.
   ///
   /// \returns The result of name lookup.
   LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
@@ -1211,14 +1213,14 @@ public:
 
   /// \brief Look up the constructors of the given type.
   ///
-  /// \param type The type for which we will look for constructors.
   /// \param dc The context that needs the constructor.
-  /// \param isKnownPrivate If true, this lookup is counted as a private
-  /// dependency.
+  /// \param type The type for which we will look for constructors.
+  /// \param options Options that control name lookup.
   ///
   /// \returns the constructors found for this type.
-  LookupResult lookupConstructors(Type type, DeclContext *dc,
-                                  bool isKnownPrivate = false);
+  LookupResult lookupConstructors(DeclContext *dc, Type type,
+                                  NameLookupOptions options
+                                    = defaultConstructorLookupOptions);
 
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType(const DeclContext *dc);
