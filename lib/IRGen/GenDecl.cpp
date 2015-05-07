@@ -1220,7 +1220,7 @@ llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
     IGM.addUsedGlobal(var);
   }
 
-  if (IGM.DebugInfo)
+  if (IGM.DebugInfo && ForDefinition)
     IGM.DebugInfo->
       emitGlobalVariableDeclaration(var,
                                     DebugName.empty() ? getName() : DebugName,
