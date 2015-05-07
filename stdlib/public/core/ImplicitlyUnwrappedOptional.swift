@@ -14,7 +14,7 @@
 /// magic).
 ///
 /// The compiler has special knowledge of the existence of
-/// ImplicitlyUnwrappedOptional<T>, but always interacts with it using the
+/// `ImplicitlyUnwrappedOptional<T>`, but always interacts with it using the
 /// library intrinsics below.
 public enum ImplicitlyUnwrappedOptional<T>
   : Reflectable, NilLiteralConvertible {
