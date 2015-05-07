@@ -46,7 +46,7 @@ BRIDGING_KNOWN_TYPE(Foundation, NSError)
 BRIDGING_KNOWN_TYPE(Swift, String)
 BRIDGING_KNOWN_TYPE(ObjectiveC, ObjCBool)
 BRIDGING_KNOWN_TYPE(Swift, Bool)
-BRIDGING_KNOWN_TYPE(Swift, _ErrorType)
+BRIDGING_KNOWN_TYPE(Swift, ErrorType)
 
 BRIDGE_TYPE(Foundation, NSString, Swift, String, true)
 BRIDGE_TYPE(ObjectiveC, ObjCBool, Swift, Bool, false)

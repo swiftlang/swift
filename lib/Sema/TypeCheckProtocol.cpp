@@ -3845,7 +3845,7 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
   case KnownProtocolKind::Hashable:
     return DerivedConformance::deriveHashable(*this, TypeDecl, Requirement);
     
-  case KnownProtocolKind::_ErrorType:
+  case KnownProtocolKind::ErrorType:
     return DerivedConformance::deriveErrorType(*this, TypeDecl, Requirement);
     
   default:

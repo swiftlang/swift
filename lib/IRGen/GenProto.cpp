@@ -3313,7 +3313,7 @@ static const TypeInfo *createErrorExistentialTypeInfo(IRGenModule &IGM,
   // The ErrorType existential has a special boxed representation. It has space
   // only for witnesses to the ErrorType protocol.
   assert(protocols.size() == 1
-     && *protocols[0]->getKnownProtocolKind() == KnownProtocolKind::_ErrorType);
+     && *protocols[0]->getKnownProtocolKind() == KnownProtocolKind::ErrorType);
   
   const ProtocolInfo &impl = IGM.getProtocolInfo(protocols[0]);
   
@@ -4836,7 +4836,7 @@ static bool _isErrorType(SILType baseTy) {
   return baseTy.getSwiftRValueType()->isExistentialType(protos)
     && protos.size() == 1
     && protos[0]->getKnownProtocolKind()
-    && *protos[0]->getKnownProtocolKind() == KnownProtocolKind::_ErrorType;
+    && *protos[0]->getKnownProtocolKind() == KnownProtocolKind::ErrorType;
 }
 #endif
 
@@ -4895,7 +4895,7 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto &srcTI = IGF.getTypeInfo(loweredSrcType);
   
   auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
-  // Should only be one conformance, for the _ErrorType protocol.
+  // Should only be one conformance, for the ErrorType protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
   const ProtocolEntry &entry = destTI.getStoredProtocols()[0];
   auto witness = getProtocolWitnessTable(IGF, formalSrcType, srcTI,

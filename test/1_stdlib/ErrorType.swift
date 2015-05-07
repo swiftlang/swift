@@ -15,7 +15,7 @@ protocol OtherClassProtocol : class {
   var otherClassProperty: String { get }
 }
 
-class NoisyError : _ErrorType, OtherProtocol, OtherClassProtocol {
+class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
   init() { ++NoisyErrorLifeCount }
   deinit { ++NoisyErrorDeathCount }
 
@@ -30,7 +30,7 @@ ErrorTypeTests.test("erasure") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   do {
-    let e: _ErrorType = NoisyError()
+    let e: ErrorType = NoisyError()
 
     expectEqual(e.domain, "NoisyError")
     expectEqual(e.code, 123)
@@ -43,7 +43,7 @@ ErrorTypeTests.test("reflection") {
   NoisyErrorDeathCount = 0
   do {
     let ne = NoisyError()
-    let e: _ErrorType = ne
+    let e: ErrorType = ne
 
     var neDump = "", eDump = ""
     dump(ne, &neDump)
@@ -59,32 +59,32 @@ ErrorTypeTests.test("dynamic casts") {
   NoisyErrorDeathCount = 0
   do {
     let ne = NoisyError()
-    let e: _ErrorType = ne
+    let e: ErrorType = ne
 
     expectTrue(e as! NoisyError === ne)
     expectEqual((e as! OtherClassProtocol).otherClassProperty, "otherClassProperty")
     expectEqual((e as! OtherProtocol).otherProperty, "otherProperty")
 
     let op: OtherProtocol = ne
-    expectEqual((op as! _ErrorType).domain, "NoisyError")
-    expectEqual((op as! _ErrorType).code, 123)
+    expectEqual((op as! ErrorType).domain, "NoisyError")
+    expectEqual((op as! ErrorType).code, 123)
 
     let ocp: OtherClassProtocol = ne
-    expectEqual((ocp as! _ErrorType).domain, "NoisyError")
-    expectEqual((ocp as! _ErrorType).code, 123)
+    expectEqual((ocp as! ErrorType).domain, "NoisyError")
+    expectEqual((ocp as! ErrorType).code, 123)
 
     // Do the same with rvalues, so we exercise the
     // take-on-success/destroy-on-failure paths.
 
-    expectEqual(((NoisyError() as _ErrorType) as! NoisyError).domain, "NoisyError")
-    expectEqual(((NoisyError() as _ErrorType) as! OtherClassProtocol).otherClassProperty, "otherClassProperty")
-    expectEqual(((NoisyError() as _ErrorType) as! OtherProtocol).otherProperty, "otherProperty")
+    expectEqual(((NoisyError() as ErrorType) as! NoisyError).domain, "NoisyError")
+    expectEqual(((NoisyError() as ErrorType) as! OtherClassProtocol).otherClassProperty, "otherClassProperty")
+    expectEqual(((NoisyError() as ErrorType) as! OtherProtocol).otherProperty, "otherProperty")
 
-    expectEqual(((NoisyError() as OtherProtocol) as! _ErrorType).domain, "NoisyError")
-    expectEqual(((NoisyError() as OtherProtocol) as! _ErrorType).code, 123)
+    expectEqual(((NoisyError() as OtherProtocol) as! ErrorType).domain, "NoisyError")
+    expectEqual(((NoisyError() as OtherProtocol) as! ErrorType).code, 123)
 
-    expectEqual(((NoisyError() as OtherClassProtocol) as! _ErrorType).domain, "NoisyError")
-    expectEqual(((NoisyError() as OtherClassProtocol) as! _ErrorType).code, 123)
+    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorType).domain, "NoisyError")
+    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorType).code, 123)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }

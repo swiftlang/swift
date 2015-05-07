@@ -163,10 +163,10 @@ extension CGFloat : _ObjectiveCBridgeable {
   }
 }
 
-extension NSError: _ErrorType {}
+extension NSError: ErrorType {}
 
 @asmname("swift_convertNSErrorToErrorType")
-func _convertNSErrorToErrorType(string: NSError?) -> _ErrorType
+func _convertNSErrorToErrorType(string: NSError?) -> ErrorType
 
 @asmname("swift_convertErrorTypeToNSError")
-func _convertErrorTypeToNSError(string: _ErrorType) -> NSError
+func _convertErrorTypeToNSError(string: ErrorType) -> NSError

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_catch %s | FileCheck %s
 
-enum SomeErr : _ErrorType {
+enum SomeErr : ErrorType {
   case Err1
   case Err2
 }

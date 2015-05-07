@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-enum MSV : _ErrorType {
+enum MSV : ErrorType {
   case Foo, Bar, Baz
   case CarriesInt(Int)
 
@@ -8,7 +8,7 @@ enum MSV : _ErrorType {
   var code: Int { return 0 }
 }
 
-func opaque_error() -> _ErrorType { return MSV.Foo }
+func opaque_error() -> ErrorType { return MSV.Foo }
 
 func one() {
   do {

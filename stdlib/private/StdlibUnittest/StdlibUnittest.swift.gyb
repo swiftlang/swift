@@ -352,7 +352,7 @@ public func expectUnreachable(
 }
 
 public func expectUnreachableCatch(
-  error: _ErrorType,
+  error: ErrorType,
   stackTrace: SourceLocStack? = nil,
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil

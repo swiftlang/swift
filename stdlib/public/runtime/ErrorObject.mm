@@ -169,7 +169,7 @@ static const WitnessTable *getNSErrorConformanceToErrorType() {
   // Swift source.
   
   static auto TheWitnessTable = dlsym(RTLD_DEFAULT,
-                                   "_TWPCSo7CFErrorSs10_ErrorType10Foundation");
+                                   "_TWPCSo7CFErrorSs9ErrorType10Foundation");
   assert(TheWitnessTable &&
          "Foundation overlay not loaded, or CFError: ErrorType conformance "
          "not available");
@@ -242,14 +242,14 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
 }
 
 // @asmname("swift_stdlib_getErrorDomainNSString")
-// public func _stdlib_getErrorDomainNSString<T : _ErrorType>
+// public func _stdlib_getErrorDomainNSString<T : ErrorType>
 //   (x: UnsafePointer<T>) -> AnyObject
 extern "C" NSString *swift_stdlib_getErrorDomainNSString(
                                                  const OpaqueValue *error,
                                                  const Metadata *T,
                                                  const WitnessTable *ErrorType);
 // @asmname("swift_stdlib_getErrorCode")
-// public func _stdlib_getErrorCode<T : _ErrorType>(x: UnsafePointer<T>) -> Int
+// public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int
 extern "C" NSInteger swift_stdlib_getErrorCode(const OpaqueValue *error,
                                                const Metadata *T,
                                                const WitnessTable *ErrorType);

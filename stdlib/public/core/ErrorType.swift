@@ -12,7 +12,7 @@
 
 // The protocol for error values that can be thrown.
 // TODO: API review
-public protocol _ErrorType {
+public protocol ErrorType {
   var domain: String { get }
   var code: Int { get }
 }
@@ -21,18 +21,18 @@ public protocol _ErrorType {
 // Helper functions for the C++ runtime to have easy access to domain and
 // code as Objective-C values.
 @asmname("swift_stdlib_getErrorDomainNSString")
-public func _stdlib_getErrorDomainNSString<T : _ErrorType>(x: UnsafePointer<T>)
+public func _stdlib_getErrorDomainNSString<T : ErrorType>(x: UnsafePointer<T>)
 -> AnyObject {
   return x.memory.domain._bridgeToObjectiveCImpl()
 }
 
 @asmname("swift_stdlib_getErrorCode")
-public func _stdlib_getErrorCode<T : _ErrorType>(x: UnsafePointer<T>) -> Int {
+public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int {
   return x.memory.code
 }
 
 // Known function for the compiler to use to coerce ErrorType instances to
 // NSError.
 @asmname("swift_bridgeErrorTypeToNSError")
-public func _bridgeErrorTypeToNSError(e: _ErrorType) -> AnyObject
+public func _bridgeErrorTypeToNSError(e: ErrorType) -> AnyObject
 #endif

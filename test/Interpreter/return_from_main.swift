@@ -3,5 +3,5 @@
 // REQUIRES: swift_interpreter
 
 // rdar://20809122
-enum Error : _ErrorType { case Foo }
+enum Error : ErrorType { case Foo }
 throw Error.Foo

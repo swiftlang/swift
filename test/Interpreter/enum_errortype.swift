@@ -2,12 +2,12 @@
 
 import StdlibUnittest
 
-enum ClericalErrorDomain: _ErrorType {
+enum ClericalErrorDomain: ErrorType {
   case MisplacedDocument(name: String)
   case AccidentallyErasedTape(fromMinute: Double, toMinute: Double)
 }
 
-enum EmptyErrorDomain: _ErrorType {}
+enum EmptyErrorDomain: ErrorType {}
 
 var EnumErrorType = TestSuite("Enum ErrorType derivation")
 

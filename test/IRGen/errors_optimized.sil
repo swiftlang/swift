@@ -5,16 +5,16 @@ sil_stage canonical
 import Builtin
 import Swift
 
-enum ColorError : _ErrorType {
+enum ColorError : ErrorType {
   case Red, Green, Blue
 }
 
 // CHECK-LABEL: TestCallToWillThrowCallBack
 // CHECK-NOT: call void @swift_willThrow(%swift.error* %0)
 // CHECK: ret i64 undef
-sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned _ErrorType) -> (Int64, @error _ErrorType) {
-bb0(%0 : $_ErrorType):
-  builtin "willThrow"(%0 : $_ErrorType) : $()
-  throw %0 : $_ErrorType                        // id: %3
+sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned ErrorType) -> (Int64, @error ErrorType) {
+bb0(%0 : $ErrorType):
+  builtin "willThrow"(%0 : $ErrorType) : $()
+  throw %0 : $ErrorType                        // id: %3
 }
 

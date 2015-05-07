@@ -6,15 +6,15 @@ import SwiftPrivate
 import StdlibUnittest
 import Foundation
 
-enum SomeError : _ErrorType {
+enum SomeError : ErrorType {
   case GoneToFail
 }
 
 struct ErrorTypeAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
   class RaceData {
-    let error: _ErrorType
+    let error: ErrorType
 
-    init(error: _ErrorType) {
+    init(error: ErrorType) {
       self.error = error
     }
   }

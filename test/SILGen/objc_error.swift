@@ -4,9 +4,9 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_TF10objc_error25NSError_ErrorType_erasureFCSo7NSErrorPSs10_ErrorType_
-// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $_ErrorType
+// CHECK-LABEL: sil hidden @_TF10objc_error24NSErrorErrorType_erasureFCSo7NSErrorPSs9ErrorType_
+// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $ErrorType
 // CHECK:         return [[ERROR_TYPE]]
-func NSError_ErrorType_erasure(x: NSError) -> _ErrorType {
+func NSErrorErrorType_erasure(x: NSError) -> ErrorType {
   return x
 }

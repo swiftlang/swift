@@ -5,26 +5,26 @@ sil_stage canonical
 import Builtin
 import Swift
 
-sil @create_error : $@convention(thin) () -> @owned _ErrorType {
+sil @create_error : $@convention(thin) () -> @owned ErrorType {
 entry:
   unreachable
 }
 
 // CHECK: define void @throws(%swift.refcounted*, %swift.error**) {{.*}} {
-sil @throws : $@convention(thin) () -> @error _ErrorType {
+sil @throws : $@convention(thin) () -> @error ErrorType {
   // CHECK: [[T0:%.*]] = call %swift.error* @create_error()
-  %0 = function_ref @create_error : $@convention(thin) () -> @owned _ErrorType
-  %1 = apply %0() : $@convention(thin) () -> @owned _ErrorType
+  %0 = function_ref @create_error : $@convention(thin) () -> @owned ErrorType
+  %1 = apply %0() : $@convention(thin) () -> @owned ErrorType
 
   // CHECK-NEXT: call void @swift_willThrow
   // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
   // CHECK-NEXT: ret void
-  builtin "willThrow"(%1 : $_ErrorType) : $()
-  throw %1 : $_ErrorType
+  builtin "willThrow"(%1 : $ErrorType) : $()
+  throw %1 : $ErrorType
 }
 
 // CHECK: define void @doesnt_throw(%swift.refcounted*, %swift.error**) {{.*}} {
-sil @doesnt_throw : $@convention(thin) () -> @error _ErrorType {
+sil @doesnt_throw : $@convention(thin) () -> @error ErrorType {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
   // CHECK-NEXT: entry:
@@ -33,7 +33,7 @@ sil @doesnt_throw : $@convention(thin) () -> @error _ErrorType {
   return %0 : $()
 }
 
-sil @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType)
+sil @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorType)
 
 // CHECK: define void @try_apply(%objc_object*)
 sil @try_apply : $@convention(thin) (@owned AnyObject) -> () {
@@ -46,8 +46,8 @@ entry(%0 : $AnyObject):
   // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
   // CHECK-NEXT: [[T0:%.*]] = icmp ne %swift.error* [[ERR]], null
   // CHECK-NEXT: br i1 [[T0]],
-  %1 = function_ref @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType)
-  try_apply %1(%0) : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error _ErrorType),
+  %1 = function_ref @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorType)
+  try_apply %1(%0) : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorType),
     normal bb1, error bb2
 
 // CHECK:             [[T0:%.*]] = phi %objc_object* [ [[RESULT]],
@@ -61,15 +61,15 @@ bb1(%2 : $AnyObject):
 // CHECK:      [[T0:%.*]] = phi %swift.error* [ [[ERR]],
 // CHECK-NEXT: call void @swift_errorRelease(%swift.error* [[T0]])
 // CHECK-NEXT: br label [[CONT]]
-bb2(%3 : $_ErrorType):
-  release_value %3 : $_ErrorType
+bb2(%3 : $ErrorType):
+  release_value %3 : $ErrorType
   br bb3
 bb3:
   %4 = tuple ()
   return %4 : $()
 }
 
-enum ColorError : _ErrorType {
+enum ColorError : ErrorType {
   case Red, Green, Blue
 }
 
@@ -77,9 +77,9 @@ enum ColorError : _ErrorType {
 // CHECK: call void @swift_willThrow(%swift.error* %0)
 // CHECK: store %swift.error* %0
 // CHECK: ret i64 undef
-sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned _ErrorType) -> (Int64, @error _ErrorType) {
-bb0(%0 : $_ErrorType):
-  builtin "willThrow"(%0 : $_ErrorType) : $()
-  throw %0 : $_ErrorType                        // id: %3
+sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned ErrorType) -> (Int64, @error ErrorType) {
+bb0(%0 : $ErrorType):
+  builtin "willThrow"(%0 : $ErrorType) : $()
+  throw %0 : $ErrorType                        // id: %3
 }
 

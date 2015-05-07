@@ -45,7 +45,7 @@ PROTOCOL(RawOptionSetType)
 PROTOCOL(Equatable)
 PROTOCOL(Hashable)
 PROTOCOL(Comparable)
-PROTOCOL(_ErrorType)
+PROTOCOL(ErrorType)
 PROTOCOL(_OptionSetType)
 
 PROTOCOL(_ObjectiveCBridgeable)

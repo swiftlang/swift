@@ -1,11 +1,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CATCH1 | FileCheck %s -check-prefix=CATCH1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=THROW1 | FileCheck %s -check-prefix=THROW1
 
-protocol ErrorPro1 : _ErrorType {}
-class Error1 : _ErrorType {}
-class Error2 : _ErrorType {}
+protocol ErrorPro1 : ErrorType {}
+class Error1 : ErrorType {}
+class Error2 : ErrorType {}
 class Error3 {}
-extension Error3 : _ErrorType{}
+extension Error3 : ErrorType{}
 class NoneError1 {}
 
 

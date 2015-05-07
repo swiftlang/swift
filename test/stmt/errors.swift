@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -parse -verify %s
 
-enum MSV : _ErrorType {
+enum MSV : ErrorType {
   case Foo, Bar, Baz
 
   var domain: String { return "" }
@@ -13,7 +13,7 @@ func c() {}
 func d() {}
 func e() {}
 
-func opaque_error() -> _ErrorType { return MSV.Foo }
+func opaque_error() -> ErrorType { return MSV.Foo }
 
 func one() {
   throw MSV.Foo // expected-error {{error is not handled because the enclosing function is not declared 'throws'}}

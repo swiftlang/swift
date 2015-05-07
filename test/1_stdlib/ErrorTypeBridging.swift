@@ -18,7 +18,7 @@ protocol OtherClassProtocol : class {
   var otherClassProperty: String { get }
 }
 
-class NoisyError : _ErrorType, OtherProtocol, OtherClassProtocol {
+class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
   init() { ++NoisyErrorLifeCount }
   deinit { ++NoisyErrorDeathCount }
 
@@ -38,7 +38,7 @@ ErrorTypeBridgingTests.test("NSError") {
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
-    let e: _ErrorType = ns
+    let e: ErrorType = ns
     expectEqual(e.domain, "SomeDomain")
     expectEqual(e.code, 321)
 
@@ -61,7 +61,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
   
-    let e: _ErrorType = ns
+    let e: ErrorType = ns
 
     let cocoaCode: Int?
     switch e {
@@ -94,7 +94,7 @@ func opaqueUpcastToAny<T>(x: T) -> Any {
   return x
 }
 
-struct StructError: _ErrorType {
+struct StructError: ErrorType {
   var domain: String { return "StructError" }
   var code: Int { return 4812 }
 }
@@ -103,14 +103,14 @@ ErrorTypeBridgingTests.test("ErrorType-to-NSError bridging") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
   autoreleasepool {
-    let e: _ErrorType = NoisyError()
+    let e: ErrorType = NoisyError()
     let ns = e as NSError
     let ns2 = e as NSError
     expectTrue(ns === ns2)
     expectEqual(ns.domain, "NoisyError")
     expectEqual(ns.code, 123)
 
-    let e3: _ErrorType = ns
+    let e3: ErrorType = ns
     expectEqual(e3.domain, "NoisyError")
     expectEqual(e3.code, 123)
     let ns3 = e3 as NSError
@@ -123,7 +123,7 @@ ErrorTypeBridgingTests.test("ErrorType-to-NSError bridging") {
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
-    let nativeE: _ErrorType = nativeNS
+    let nativeE: ErrorType = nativeNS
     let nativeNS2 = nativeE as NSError
     expectTrue(nativeNS === nativeNS2)
     expectEqual(nativeNS2.domain, NSCocoaErrorDomain)

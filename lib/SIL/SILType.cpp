@@ -268,7 +268,7 @@ static bool isBridgedErrorClass(SILModule &M,
 
 static bool isErrorTypeExistential(ArrayRef<ProtocolDecl*> protocols) {
   return protocols.size() == 1
-    && protocols[0]->isSpecificProtocol(KnownProtocolKind::_ErrorType);
+    && protocols[0]->isSpecificProtocol(KnownProtocolKind::ErrorType);
 }
 
 ExistentialRepresentation

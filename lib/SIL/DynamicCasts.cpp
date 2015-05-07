@@ -172,9 +172,9 @@ bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
 
 /// Check if a given type conforms to _Error protocol.
 bool swift::isErrorType(Module *M, CanType Ty) {
-  // Retrieve the _ErrorType protocol.
+  // Retrieve the ErrorType protocol.
   auto errorTypeProto =
-      M->getASTContext().getProtocol(KnownProtocolKind::_ErrorType);
+      M->getASTContext().getProtocol(KnownProtocolKind::ErrorType);
 
   if (errorTypeProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.

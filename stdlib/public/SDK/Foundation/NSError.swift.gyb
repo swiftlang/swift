@@ -5,9 +5,9 @@ import CoreFoundation
 // magic allows this to be done as a "toll-free" conversion when an NSError
 // or CFError is used as an ErrorType existential.
 
-extension NSError : _ErrorType {}
+extension NSError : ErrorType {}
 
-extension CFError : _ErrorType {
+extension CFError : ErrorType {
   public var domain: String {
     return CFErrorGetDomain(self) as String
   }
@@ -19,20 +19,20 @@ extension CFError : _ErrorType {
 
 // An error value to use when an Objective-C API indicates error
 // but produces a nil error object.
-public enum _GenericObjCError : _ErrorType {
+public enum _GenericObjCError : ErrorType {
   case NilError
 }
 
 /// An intrinsic used by the runtime to create an error when an
 /// Objective-C API indicates failure but produces a nil error.
 @asmname("_swift_allocNilObjCError")
-func _allocNilObjCError() -> _ErrorType {
+func _allocNilObjCError() -> ErrorType {
   return _GenericObjCError.NilError
 }
 
 /// An internal protocol to represent Swift error enums that map to standard
 /// Cocoa NSError domains.
-public protocol _ObjectiveCBridgeableErrorType : _ErrorType {
+public protocol _ObjectiveCBridgeableErrorType : ErrorType {
   /// Produce a value of the error type corresponding to the given NSError,
   /// or return nil if it cannot be bridged.
   init?(_bridgedNSError: NSError)

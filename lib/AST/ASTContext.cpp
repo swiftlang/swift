@@ -512,7 +512,7 @@ CanType ASTContext::getExceptionType() const {
 }
 
 NominalTypeDecl *ASTContext::getExceptionTypeDecl() const {
-  return getProtocol(KnownProtocolKind::_ErrorType);
+  return getProtocol(KnownProtocolKind::ErrorType);
 }
 
 NominalTypeDecl *ASTContext::getArrayDecl() const {

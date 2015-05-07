@@ -2,7 +2,7 @@
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -parse -verify -primary-file %t/main.swift %S/Inputs/enum_errortype_other.swift
 
-enum ClericalErrorDomain: _ErrorType {
+enum ClericalErrorDomain: ErrorType {
   case MisplacedDocument(name: String)
   case AccidentallyErasedTape(fromMinute: Double, toMinute: Double)
 }
@@ -17,7 +17,7 @@ struct UseEnumBeforeDeclaration {
   let errorDomain: String = EnumToUseBeforeDeclaration.A.domain
   let errorCode: Int = EnumToUseBeforeDeclaration.A.code
 }
-enum EnumToUseBeforeDeclaration: _ErrorType {
+enum EnumToUseBeforeDeclaration: ErrorType {
   case A
 }
 
@@ -29,4 +29,4 @@ enum NotAnError { case A }
 let notAnErrorDomain: String = NotAnError.A.domain // expected-error{{'NotAnError' does not have a member named 'domain'}}
 let notAnErrorCode: Int = NotAnError.A.code // expected-error{{'NotAnError' does not have a member named 'code'}}
 
-enum EmptyErrorDomain: _ErrorType {}
+enum EmptyErrorDomain: ErrorType {}

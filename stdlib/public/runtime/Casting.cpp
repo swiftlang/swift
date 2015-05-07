@@ -1743,10 +1743,10 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
 }
 
 #if SWIFT_OBJC_INTEROP
-extern "C" const ProtocolDescriptor _TMpSs10_ErrorType;
+extern "C" const ProtocolDescriptor _TMpSs9ErrorType;
 
 static const WitnessTable *findErrorTypeWitness(const Metadata *srcType) {
-  return swift_conformsToProtocol(srcType, &_TMpSs10_ErrorType);
+  return swift_conformsToProtocol(srcType, &_TMpSs9ErrorType);
 }
 
 static const Metadata *getNSErrorTypeMetadata() {

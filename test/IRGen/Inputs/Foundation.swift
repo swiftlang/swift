@@ -19,4 +19,4 @@ func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
-extension NSError: _ErrorType {}
+extension NSError: ErrorType {}

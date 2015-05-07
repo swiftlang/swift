@@ -4430,7 +4430,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   switch (*known) {
   case KnownProtocolKind::AnyObject:
     return SpecialProtocol::AnyObject;
-  case KnownProtocolKind::_ErrorType:
+  case KnownProtocolKind::ErrorType:
     return SpecialProtocol::ErrorType;
     
   // The other known protocols aren't special at runtime.

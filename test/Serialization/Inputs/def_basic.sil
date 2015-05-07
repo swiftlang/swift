@@ -1051,7 +1051,7 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
-struct SomeError: _ErrorType {
+struct SomeError: ErrorType {
   var domain: String { get }
   var code: Int { get }
 }
@@ -1059,16 +1059,16 @@ struct SomeError: _ErrorType {
 // CHECK-LABEL: sil public_external [fragile] @existential_box : $@convention(thin) (SomeError) -> () {
 sil [fragile] @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
-  // CHECK: %1 = alloc_existential_box $_ErrorType, $SomeError
-  %1 = alloc_existential_box $_ErrorType, $SomeError
+  // CHECK: %1 = alloc_existential_box $ErrorType, $SomeError
+  %1 = alloc_existential_box $ErrorType, $SomeError
   // CHECK: store %0 to %1#1 : $*SomeError
   store %0 to %1#1 : $*SomeError
-  // CHECK: %3 = open_existential_box %1#0 : $_ErrorType to $*[[OPENED:@opened\(".*"\)]] _ErrorType
-  %3 = open_existential_box %1#0 : $_ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
-  // CHECK: destroy_addr %3 : $*[[OPENED]] _ErrorType
-  destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
-  // CHECK: dealloc_existential_box %1#0 : $_ErrorType, $SomeError
-  dealloc_existential_box %1#0 : $_ErrorType, $SomeError
+  // CHECK: %3 = open_existential_box %1#0 : $ErrorType to $*[[OPENED:@opened\(".*"\)]] ErrorType
+  %3 = open_existential_box %1#0 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  // CHECK: destroy_addr %3 : $*[[OPENED]] ErrorType
+  destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  // CHECK: dealloc_existential_box %1#0 : $ErrorType, $SomeError
+  dealloc_existential_box %1#0 : $ErrorType, $SomeError
   return undef : $()
 }
 

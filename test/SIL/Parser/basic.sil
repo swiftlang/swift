@@ -1211,7 +1211,7 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
-struct SomeError: _ErrorType {
+struct SomeError: ErrorType {
   var domain: String { get }
   var code: Int { get }
 }
@@ -1219,16 +1219,16 @@ struct SomeError: _ErrorType {
 // CHECK-LABEL: sil @existential_box : $@convention(thin) (SomeError) -> () {
 sil @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
-  // CHECK: %1 = alloc_existential_box $_ErrorType, $SomeError
-  %1 = alloc_existential_box $_ErrorType, $SomeError
+  // CHECK: %1 = alloc_existential_box $ErrorType, $SomeError
+  %1 = alloc_existential_box $ErrorType, $SomeError
   // CHECK: store %0 to %1#1 : $*SomeError
   store %0 to %1#1 : $*SomeError
-  // CHECK: %3 = open_existential_box %1#0 : $_ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
-  %3 = open_existential_box %1#0 : $_ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
-  // CHECK: destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
-  destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") _ErrorType
-  // CHECK: dealloc_existential_box %1#0 : $_ErrorType, $SomeError
-  dealloc_existential_box %1#0 : $_ErrorType, $SomeError
+  // CHECK: %3 = open_existential_box %1#0 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  %3 = open_existential_box %1#0 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  // CHECK: destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
+  // CHECK: dealloc_existential_box %1#0 : $ErrorType, $SomeError
+  dealloc_existential_box %1#0 : $ErrorType, $SomeError
   return undef : $()
 }
 
@@ -1264,26 +1264,26 @@ entry:
 }
 
 
-// CHECK-LABEL: sil @error_result : $@convention(thin) () -> @error _ErrorType
-sil @error_result : $@convention(thin) () -> @error _ErrorType {
+// CHECK-LABEL: sil @error_result : $@convention(thin) () -> @error ErrorType
+sil @error_result : $@convention(thin) () -> @error ErrorType {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result2 : $@convention(thin) () -> (Int, @error _ErrorType)
-sil @error_result2 : $@convention(thin) () -> (Int, @error _ErrorType) {
+// CHECK-LABEL: sil @error_result2 : $@convention(thin) () -> (Int, @error ErrorType)
+sil @error_result2 : $@convention(thin) () -> (Int, @error ErrorType) {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error _ErrorType)
-sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error _ErrorType) {
+// CHECK-LABEL: sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error ErrorType)
+sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error ErrorType) {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType)
-sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType) {
+// CHECK-LABEL: sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
+sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType) {
 entry(%0 : $Class1):
   return %0 : $Class1
 }
@@ -1291,15 +1291,15 @@ entry(%0 : $Class1):
 // CHECK-LABEL: sil @try_apply : $@convention(thin) (@owned Class1) -> ()
 sil @try_apply : $@convention(thin) (@owned Class1) -> () {
 entry(%0 : $Class1):
-  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType)
-  // CHECK: try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType), normal bb1, error bb2
-  try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error _ErrorType),
+  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
+  // CHECK: try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType), normal bb1, error bb2
+  try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType),
     normal bb1, error bb2
 bb1(%2 : $Class1):
   strong_release %2 : $Class1
   br bb3
-bb2(%3 : $_ErrorType):
-  release_value %3 : $_ErrorType
+bb2(%3 : $ErrorType):
+  release_value %3 : $ErrorType
   br bb3
 bb3:
   %4 = tuple ()

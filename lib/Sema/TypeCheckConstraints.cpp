@@ -2234,7 +2234,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   // We can conditionally cast from NSError to an ErrorType-conforming type.
   // This is handled in the runtime, so it doesn't need a special cast kind.
-  auto errorTypeProto = Context.getProtocol(KnownProtocolKind::_ErrorType);
+  auto errorTypeProto = Context.getProtocol(KnownProtocolKind::ErrorType);
   if (conformsToProtocol(toType, errorTypeProto, dc,
                          (ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::Used)))

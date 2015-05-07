@@ -1780,7 +1780,7 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
       return enumDecl->hasOnlyCasesWithoutAssociatedValues();
     
     // Enums can explicitly derive their ErrorType conformance.
-    case KnownProtocolKind::_ErrorType:
+    case KnownProtocolKind::ErrorType:
       return true;
     
     default:

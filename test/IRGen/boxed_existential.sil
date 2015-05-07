@@ -3,57 +3,57 @@
 import Swift
 
 // CHECK-LABEL: define void @retain_release_boxed_existential(%swift.error*)
-sil @retain_release_boxed_existential : $@convention(thin) (_ErrorType) -> () {
-entry(%e : $_ErrorType):
+sil @retain_release_boxed_existential : $@convention(thin) (ErrorType) -> () {
+entry(%e : $ErrorType):
   // CHECK: @swift_errorRetain
-  strong_retain %e : $_ErrorType
+  strong_retain %e : $ErrorType
   // CHECK: @swift_errorRelease
-  strong_release %e : $_ErrorType
+  strong_release %e : $ErrorType
   return undef : $()
 }
 
-// CHECK-LABEL: define %swift.error* @alloc_boxed_existential(%swift.opaque*, %swift.type* %T, i8** %T._ErrorType)
-sil @alloc_boxed_existential : $@convention(thin) <T: _ErrorType> (@in T) -> @owned _ErrorType {
+// CHECK-LABEL: define %swift.error* @alloc_boxed_existential(%swift.opaque*, %swift.type* %T, i8** %T.ErrorType)
+sil @alloc_boxed_existential : $@convention(thin) <T: ErrorType> (@in T) -> @owned ErrorType {
 entry(%x : $*T):
-  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* %T, i8** %T._ErrorType)
+  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* %T, i8** %T.ErrorType)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
-  %b = alloc_existential_box $_ErrorType, $T
+  %b = alloc_existential_box $ErrorType, $T
   // CHECK: call %swift.opaque* %initializeWithTake(%swift.opaque* [[ADDR]], %swift.opaque* %0, %swift.type* %T)
   copy_addr [take] %x to [initialization] %b#1 : $*T
   // CHECK: ret %swift.error* [[BOX]]
-  return %b#0 : $_ErrorType
+  return %b#0 : $ErrorType
 }
 
-struct SomeError: _ErrorType {
+struct SomeError: ErrorType {
   let domain: String
   let code: Int
 }
 
 // CHECK-LABEL: define %swift.error* @alloc_boxed_existential_concrete
-sil @alloc_boxed_existential_concrete : $@convention(thin) (@owned SomeError) -> @owned _ErrorType {
+sil @alloc_boxed_existential_concrete : $@convention(thin) (@owned SomeError) -> @owned ErrorType {
 entry(%x : $SomeError):
-  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @_TMdV17boxed_existential9SomeError {{.*}}, i8** @_TWPV17boxed_existential9SomeErrorSs10_ErrorTypeS_)
+  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @_TMdV17boxed_existential9SomeError {{.*}}, i8** @_TWPV17boxed_existential9SomeErrorSs9ErrorTypeS_)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
   // CHECK: [[OPAQUE_ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   // CHECK: [[ADDR:%.*]] = bitcast %swift.opaque* [[OPAQUE_ADDR]] to %V17boxed_existential9SomeError*
-  %b = alloc_existential_box $_ErrorType, $SomeError
+  %b = alloc_existential_box $ErrorType, $SomeError
   store %x to %b#1 : $*SomeError
   // CHECK: ret %swift.error* [[BOX]]
-  return %b#0 : $_ErrorType
+  return %b#0 : $ErrorType
 }
 
-// CHECK-LABEL: define void @dealloc_boxed_existential(%swift.error*, %swift.type* %T, i8** %T._ErrorType)
-sil @dealloc_boxed_existential : $@convention(thin) <T: _ErrorType> (@owned _ErrorType) -> () {
-entry(%b : $_ErrorType):
+// CHECK-LABEL: define void @dealloc_boxed_existential(%swift.error*, %swift.type* %T, i8** %T.ErrorType)
+sil @dealloc_boxed_existential : $@convention(thin) <T: ErrorType> (@owned ErrorType) -> () {
+entry(%b : $ErrorType):
   // CHECK: call void @swift_deallocError(%swift.error* %0, %swift.type* %T)
-  dealloc_existential_box %b : $_ErrorType, $T
+  dealloc_existential_box %b : $ErrorType, $T
   return undef : $()
 }
 
 // CHECK-LABEL: define {{i[0-9]+}} @open_boxed_existential(%swift.error*)
-sil @open_boxed_existential : $@convention(thin) (@owned _ErrorType) -> Int {
-entry(%b : $_ErrorType):
+sil @open_boxed_existential : $@convention(thin) (@owned ErrorType) -> Int {
+entry(%b : $ErrorType):
   // CHECK: call void @swift_getErrorValue(%swift.error* %0, i8** {{%.*}}, [[TRIPLE:{ %swift.opaque\*, %swift.type\*, i8\*\* }]]* [[OUT:%.*]])
   // CHECK: [[OUT_ADDR:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 0
   // CHECK: [[ADDR:%.*]] = load {{.*}} [[OUT_ADDR]]
@@ -61,13 +61,13 @@ entry(%b : $_ErrorType):
   // CHECK: [[TYPE:%.*]] = load {{.*}} [[OUT_TYPE]]
   // CHECK: [[OUT_WITNESS:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 2
   // CHECK: [[WITNESS:%.*]] = load {{.*}} [[OUT_WITNESS]]
-  %o = open_existential_box %b : $_ErrorType to $*@opened("01234567-89AB-CDEF-0123-000000000000") _ErrorType
+  %o = open_existential_box %b : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType
   // CHECK: [[CODE_ADDR:%.*]] = getelementptr {{.*}} [[WITNESS]], i32 1
   // CHECK: [[CODE:%.*]] = load {{.*}} [[CODE_ADDR]]
-  %m = witness_method $@opened("01234567-89AB-CDEF-0123-000000000000") _ErrorType, #_ErrorType.code!getter.1, %o : $*@opened("01234567-89AB-CDEF-0123-000000000000") _ErrorType : $@convention(witness_method) <Self: _ErrorType> (@in_guaranteed Self) -> Int
+  %m = witness_method $@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType, #ErrorType.code!getter.1, %o : $*@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType : $@convention(witness_method) <Self: ErrorType> (@in_guaranteed Self) -> Int
   // CHECK: [[CODE_FN:%.*]] = bitcast i8* [[CODE]] to [[INT:i[0-9]+]] (%swift.opaque*, %swift.type*)*
   // CHECK: [[RESULT:%.*]] = call [[INT]] [[CODE_FN]](%swift.opaque* [[ADDR]], %swift.type* [[TYPE]])
-  %c = apply %m<@opened("01234567-89AB-CDEF-0123-000000000000") _ErrorType>(%o) : $@convention(witness_method) <Self: _ErrorType> (@in_guaranteed Self) -> Int
+  %c = apply %m<@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType>(%o) : $@convention(witness_method) <Self: ErrorType> (@in_guaranteed Self) -> Int
   // CHECK: ret [[INT]] [[RESULT]]
   return %c : $Int
 }

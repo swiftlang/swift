@@ -2,13 +2,13 @@
 
 class Cat {}
 
-enum HomeworkError : _ErrorType {
+enum HomeworkError : ErrorType {
   case TooHard
   case TooMuch
   case CatAteIt(Cat)
 }
 
-// CHECK: sil hidden @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error _ErrorType) {
+// CHECK: sil hidden @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error ErrorType) {
 // CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatCfMS0_FT_S0_ : $@convention(thin) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type 
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
@@ -17,8 +17,8 @@ func make_a_cat() throws -> Cat {
   return Cat()
 }
 
-// CHECK: sil hidden @_TF6errors15dont_make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error _ErrorType) {
-// CHECK:      [[BOX:%.*]] = alloc_existential_box $_ErrorType, $HomeworkError
+// CHECK: sil hidden @_TF6errors15dont_make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error ErrorType) {
+// CHECK:      [[BOX:%.*]] = alloc_existential_box $ErrorType, $HomeworkError
 // CHECK:      [[T0:%.*]] = function_ref @_TFO6errors13HomeworkError7TooHardFMS0_S0_ : $@convention(thin) (@thin HomeworkError.Type) -> @owned HomeworkError
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
@@ -29,8 +29,8 @@ func dont_make_a_cat() throws -> Cat {
   throw HomeworkError.TooHard
 }
 
-// CHECK: sil hidden @_TF6errors11dont_returnU__FzQ_Q_ : $@convention(thin) <T> (@out T, @in T) -> @error _ErrorType {
-// CHECK:      [[BOX:%.*]] = alloc_existential_box $_ErrorType, $HomeworkError
+// CHECK: sil hidden @_TF6errors11dont_returnU__FzQ_Q_ : $@convention(thin) <T> (@out T, @in T) -> @error ErrorType {
+// CHECK:      [[BOX:%.*]] = alloc_existential_box $ErrorType, $HomeworkError
 // CHECK:      [[T0:%.*]] = function_ref @_TFO6errors13HomeworkError7TooMuchFMS0_S0_ : $@convention(thin) (@thin HomeworkError.Type) -> @owned HomeworkError
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
@@ -51,15 +51,15 @@ func dont_return<T>(argument: T) throws -> T {
 
 //   In the true case, call make_a_cat().
 // CHECK:    [[FLAG_TRUE]]:
-// CHECK:      [[MAC_FN:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error _ErrorType)
-// CHECK-NEXT: try_apply [[MAC_FN]]() : $@convention(thin) () -> (@owned Cat, @error _ErrorType), normal [[MAC_NORMAL:bb[0-9]+]], error [[MAC_ERROR:bb[0-9]+]]
+// CHECK:      [[MAC_FN:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error ErrorType)
+// CHECK-NEXT: try_apply [[MAC_FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[MAC_NORMAL:bb[0-9]+]], error [[MAC_ERROR:bb[0-9]+]]
 // CHECK:    [[MAC_NORMAL]]([[T0:%.*]] : $Cat):
 // CHECK-NEXT: br [[TERNARY_CONT:bb[0-9]+]]([[T0]] : $Cat)
 
 //   In the false case, call dont_make_a_cat().
 // CHECK:    [[FLAG_FALSE]]:
-// CHECK:      [[DMAC_FN:%.*]] = function_ref @_TF6errors15dont_make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error _ErrorType)
-// CHECK-NEXT: try_apply [[DMAC_FN]]() : $@convention(thin) () -> (@owned Cat, @error _ErrorType), normal [[DMAC_NORMAL:bb[0-9]+]], error [[DMAC_ERROR:bb[0-9]+]]
+// CHECK:      [[DMAC_FN:%.*]] = function_ref @_TF6errors15dont_make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error ErrorType)
+// CHECK-NEXT: try_apply [[DMAC_FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[DMAC_NORMAL:bb[0-9]+]], error [[DMAC_ERROR:bb[0-9]+]]
 // CHECK:    [[DMAC_NORMAL]]([[T0:%.*]] : $Cat):
 // CHECK-NEXT: br [[TERNARY_CONT]]([[T0]] : $Cat)
 
@@ -68,7 +68,7 @@ func dont_return<T>(argument: T) throws -> T {
 // CHECK-NEXT: [[ARG_TEMP:%.*]] = alloc_stack $Cat
 // CHECK-NEXT: store [[T0]] to [[ARG_TEMP]]#1
 // CHECK-NEXT: [[RET_TEMP:%.*]] = alloc_stack $Cat
-// CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]]#1, [[ARG_TEMP]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error _ErrorType, normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
+// CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]]#1, [[ARG_TEMP]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorType, normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
 // CHECK:    [[DR_NORMAL]]({{%.*}} : $()):
 // CHECK-NEXT: [[T0:%.*]] = load [[RET_TEMP]]#1 : $*Cat
 // CHECK-NEXT: dealloc_stack [[RET_TEMP]]#0
@@ -80,11 +80,11 @@ func dont_return<T>(argument: T) throws -> T {
 // CHECK-NEXT: return [[T0]] : $Cat
 
 //   Catch dispatch block.
-// CHECK:    [[CATCH:bb[0-9]+]]([[ERROR:%.*]] : $_ErrorType):
-// CHECK-NEXT: [[SRC_TEMP:%.*]] = alloc_stack $_ErrorType
+// CHECK:    [[CATCH:bb[0-9]+]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT: [[SRC_TEMP:%.*]] = alloc_stack $ErrorType
 // CHECK-NEXT: store [[ERROR]] to [[SRC_TEMP]]#1
 // CHECK-NEXT: [[DEST_TEMP:%.*]] = alloc_stack $HomeworkError
-// CHECK-NEXT: checked_cast_addr_br copy_on_success _ErrorType in [[SRC_TEMP]]#1 : $*_ErrorType to HomeworkError in [[DEST_TEMP]]#1 : $*HomeworkError, [[IS_HWE:bb[0-9]+]], [[NOT_HWE:bb[0-9]+]]
+// CHECK-NEXT: checked_cast_addr_br copy_on_success ErrorType in [[SRC_TEMP]]#1 : $*ErrorType to HomeworkError in [[DEST_TEMP]]#1 : $*HomeworkError, [[IS_HWE:bb[0-9]+]], [[NOT_HWE:bb[0-9]+]]
 
 //   Catch HomeworkError.
 // CHECK:    [[IS_HWE]]:
@@ -117,18 +117,18 @@ func dont_return<T>(argument: T) throws -> T {
 // CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatCfMS0_FT_S0_ : $@convention(thin) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
-// CHECK-NEXT: strong_release [[ERROR]] : $_ErrorType
+// CHECK-NEXT: strong_release [[ERROR]] : $ErrorType
 // CHECK-NEXT: br [[RETURN]]([[T2]] : $Cat)
 
 //   Landing pad.
-// CHECK:    [[MAC_ERROR]]([[T0:%.*]] : $_ErrorType):
-// CHECK-NEXT: br [[CATCH]]([[T0]] : $_ErrorType)
-// CHECK:    [[DMAC_ERROR]]([[T0:%.*]] : $_ErrorType):
-// CHECK-NEXT: br [[CATCH]]([[T0]] : $_ErrorType)
-// CHECK:    [[DR_ERROR]]([[T0:%.*]] : $_ErrorType):
+// CHECK:    [[MAC_ERROR]]([[T0:%.*]] : $ErrorType):
+// CHECK-NEXT: br [[CATCH]]([[T0]] : $ErrorType)
+// CHECK:    [[DMAC_ERROR]]([[T0:%.*]] : $ErrorType):
+// CHECK-NEXT: br [[CATCH]]([[T0]] : $ErrorType)
+// CHECK:    [[DR_ERROR]]([[T0:%.*]] : $ErrorType):
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: br [[CATCH]]([[T0]] : $_ErrorType)
+// CHECK-NEXT: br [[CATCH]]([[T0]] : $ErrorType)
 func all_together_now(flag: Bool) -> Cat {
   do {
     return try dont_return(flag ? make_a_cat() : dont_make_a_cat())
@@ -146,24 +146,24 @@ class HasThrowingInit {
     field = value
   }
 }
-// CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitcfMS0_FzT5valueSi_S0_ : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error _ErrorType) {
+// CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitcfMS0_FzT5valueSi_S0_ : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error ErrorType) {
 // CHECK:      [[T0:%.*]] = mark_uninitialized [rootself] %1 : $HasThrowingInit
 // CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $HasThrowingInit
 // CHECK-NEXT: assign %0 to [[T1]] : $*Int
 // CHECK-NEXT: return [[T0]] : $HasThrowingInit
 
-// CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitCfMS0_FzT5valueSi_S0_ : $@convention(thin) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error _ErrorType)
+// CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitCfMS0_FzT5valueSi_S0_ : $@convention(thin) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error ErrorType)
 // CHECK:      [[SELF:%.*]] = alloc_ref $HasThrowingInit
-// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors15HasThrowingInitcfMS0_FzT5valueSi_S0_ : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error _ErrorType)
-// CHECK-NEXT: try_apply [[T0]](%0, [[SELF]]) : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error _ErrorType), normal bb1, error bb2
+// CHECK:      [[T0:%.*]] = function_ref @_TFC6errors15HasThrowingInitcfMS0_FzT5valueSi_S0_ : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error ErrorType)
+// CHECK-NEXT: try_apply [[T0]](%0, [[SELF]]) : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error ErrorType), normal bb1, error bb2
 // CHECK:    bb1([[SELF:%.*]] : $HasThrowingInit):
 // CHECK-NEXT: return [[SELF]]
-// CHECK:    bb2([[ERROR:%.*]] : $_ErrorType):
+// CHECK:    bb2([[ERROR:%.*]] : $ErrorType):
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[ERROR]]
 
 
-enum ColorError : _ErrorType {
+enum ColorError : ErrorType {
   case Red, Green, Blue
 }
 
@@ -190,43 +190,43 @@ protocol Doomed {
   func check() throws
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors12DoomedStructS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error _ErrorType
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors12DoomedStructS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error ErrorType
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*DoomedStruct
-// CHECK:      [[T0:%.*]] = function_ref @_TFV6errors12DoomedStruct5checkfS0_FzT_T_ : $@convention(method) (DoomedStruct) -> @error _ErrorType
+// CHECK:      [[T0:%.*]] = function_ref @_TFV6errors12DoomedStruct5checkfS0_FzT_T_ : $@convention(method) (DoomedStruct) -> @error ErrorType
 // CHECK-NEXT: try_apply [[T0]]([[SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
 // CHECK:      dealloc_stack [[TEMP]]#0
 // CHECK:      return [[T0]] : $()
-// CHECK:    bb2([[T0:%.*]] : $_ErrorType):
-// CHECK:      builtin "willThrow"([[T0]] : $_ErrorType)
+// CHECK:    bb2([[T0:%.*]] : $ErrorType):
+// CHECK:      builtin "willThrow"([[T0]] : $ErrorType)
 // CHECK:      dealloc_stack [[TEMP]]#0
-// CHECK:      throw [[T0]] : $_ErrorType
+// CHECK:      throw [[T0]] : $ErrorType
 struct DoomedStruct : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors11DoomedClassS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error _ErrorType {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors11DoomedClassS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error ErrorType {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*DoomedClass
-// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : DoomedClass -> () throws -> () , $@convention(method) (@guaranteed DoomedClass) -> @error _ErrorType
+// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : DoomedClass -> () throws -> () , $@convention(method) (@guaranteed DoomedClass) -> @error ErrorType
 // CHECK-NEXT: try_apply [[T0]]([[SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
 // CHECK:      strong_release [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]#0
 // CHECK:      return [[T0]] : $()
-// CHECK:    bb2([[T0:%.*]] : $_ErrorType):
-// CHECK:      builtin "willThrow"([[T0]] : $_ErrorType)
+// CHECK:    bb2([[T0:%.*]] : $ErrorType):
+// CHECK:      builtin "willThrow"([[T0]] : $ErrorType)
 // CHECK:      strong_release [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]#0
-// CHECK:      throw [[T0]] : $_ErrorType
+// CHECK:      throw [[T0]] : $ErrorType
 class DoomedClass : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors11HappyStructS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error _ErrorType
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors11HappyStructS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error ErrorType
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*HappyStruct
@@ -238,7 +238,7 @@ struct HappyStruct : Doomed {
   func check() {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors10HappyClassS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error _ErrorType
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors10HappyClassS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error ErrorType
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*HappyClass
@@ -257,23 +257,23 @@ func create<T>(fn: () throws -> T) throws -> T {
 func testThunk(fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@out Int, @owned @callee_owned () -> (Int, @error _ErrorType)) -> @error _ErrorType
-// CHECK: bb0(%0 : $*Int, %1 : $@callee_owned () -> (Int, @error _ErrorType)):
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@out Int, @owned @callee_owned () -> (Int, @error ErrorType)) -> @error ErrorType
+// CHECK: bb0(%0 : $*Int, %1 : $@callee_owned () -> (Int, @error ErrorType)):
 // CHECK:   try_apply %1()
 // CHECK: bb1([[T0:%.*]] : $Int):
 // CHECK:   store [[T0]] to %0 : $*Int
 // CHECK:   [[T0:%.*]] = tuple ()
 // CHECK:   return [[T0]]
-// CHECK: bb2([[T0:%.*]] : $_ErrorType):
-// CHECK:   builtin "willThrow"([[T0]] : $_ErrorType)
-// CHECK:   throw [[T0]] : $_ErrorType
+// CHECK: bb2([[T0:%.*]] : $ErrorType):
+// CHECK:   builtin "willThrow"([[T0]] : $ErrorType)
+// CHECK:   throw [[T0]] : $ErrorType
 
 func createInt(fn: () -> Int) throws {}
 func testForceTry(fn: () -> Int) {
   try! createInt(fn)
 }
 // CHECK-LABEL: sil hidden @_TF6errors12testForceTryFFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> ()
-// CHECK: [[T0:%.*]] = function_ref @_TF6errors9createIntFzFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @error _ErrorType
+// CHECK: [[T0:%.*]] = function_ref @_TF6errors9createIntFzFT_SiT_ : $@convention(thin) (@owned @callee_owned () -> Int) -> @error ErrorType
 // CHECK: try_apply [[T0]](%0)
 // CHECK: strong_release
 // CHECK: return

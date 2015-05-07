@@ -1826,7 +1826,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
       
       // Bridging from an ErrorType to an Objective-C NSError.
-      auto errorType = TC.Context.getProtocol(KnownProtocolKind::_ErrorType);
+      auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorType);
       if (TC.conformsToProtocol(type1, errorType, DC,
                                 ConformanceCheckFlags::InExpression))
         if (auto NSErrorTy = TC.getNSErrorType(DC))
@@ -4222,7 +4222,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
     
     // The input type must be an ErrorType subtype.
-    auto errorType = TC.Context.getProtocol(KnownProtocolKind::_ErrorType)
+    auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorType)
       ->getDeclaredType();
     return matchTypes(type1, errorType, TypeMatchKind::Subtype, subFlags,
                       locator);
