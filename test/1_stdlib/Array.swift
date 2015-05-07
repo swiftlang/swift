@@ -54,13 +54,6 @@ func testFilter() {
 }
 testFilter()
 
-func testReverse() {
-  let a = Array(7..<12)
-  println(a.reverse())
-  // CHECK-NEXT: [11, 10, 9, 8, 7]
-}
-testReverse()
-
 func testSort() {
   var a = [3, 1, 9, 7]
   println(a.sorted { $0 < $1 })

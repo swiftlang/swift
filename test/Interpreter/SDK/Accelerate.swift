@@ -26,7 +26,7 @@ extension vU1024: IntegerLiteralConvertible, CustomStringConvertible, Equatable 
       (intermediate, digit) = quorem(intermediate, 10)
       digits.append(Character(UnicodeScalar(Int(digit) + 48)))
     } while intermediate != 0
-    return String(reverse(digits))
+    return String(digits.reverse())
   }
 }
 

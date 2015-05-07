@@ -337,7 +337,7 @@ extension SequenceType {
 extension SequenceType {
   /// Return an `Array` containing the elements of `self` in reverse
   /// order.
-  final public func _prext_reverse() -> [${GElement}] {
+  final public func reverse() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
     // though.
@@ -353,7 +353,7 @@ extension SequenceType {
 extension CollectionType where Index : BidirectionalIndexType {
   /// Return a lazy `CollectionType` containing the elements of `self`
   /// in reverse order.
-  final public func _prext_reverse() -> BidirectionalReverseView<Self> {
+  final public func reverse() -> BidirectionalReverseView<Self> {
     return BidirectionalReverseView(self)
   }
 }
@@ -361,7 +361,7 @@ extension CollectionType where Index : BidirectionalIndexType {
 extension CollectionType where Index : RandomAccessIndexType {
   /// Return a lazy `CollectionType` containing the elements of `self`
   /// in reverse order.
-  final public func _prext_reverse() -> RandomAccessReverseView<Self> {
+  final public func reverse() -> RandomAccessReverseView<Self> {
     return RandomAccessReverseView(self)
   }
 }

@@ -696,12 +696,6 @@ extension ${Self} : _ArrayType {
     return ${Self}<U>(self._prext_flatMap(transform))
   }
 
-  /// A ${Self} containing the elements of `self` in reverse order
-  public func reverse() -> ${Self} {
-    // FIXME(prext): remove this function when protocol extensions land.
-    return ${Self}(self._prext_reverse())
-  }
-
   /// Return ${a_Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
   public func filter(@noescape includeElement: (T) -> Bool) -> ${Self} {
