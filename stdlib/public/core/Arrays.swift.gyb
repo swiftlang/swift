@@ -662,16 +662,6 @@ extension ${Self} : _ArrayType {
     return Swift.join(self, elements)
   }
 
-  /// Return the result of repeatedly calling `combine` with an
-  /// accumulated value initialized to `initial` and each element of
-  /// `self`, in turn, i.e. return
-  /// `combine(combine(...combine(combine(initial, self[0]),
-  /// self[1]),...self[count-2]), self[count-1])`.
-  public func reduce<U>(initial: U, @noescape combine: (U, T) -> U) -> U {
-    // FIXME(prext): remove this function when protocol extensions land.
-    return self._prext_reduce(initial, combine: combine)
-  }
-
   /// Sort `self` in-place according to `isOrderedBefore`.  Requires:
   /// `isOrderedBefore` induces a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements.

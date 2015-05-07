@@ -345,9 +345,9 @@ public func contains<
 /// Return the result of repeatedly calling `combine` with an
 /// accumulated value initialized to `initial` and each element of
 /// `sequence`, in turn.
+@availability(*, unavailable, message="call the 'reduce()' method on the sequence")
 public func reduce<S : SequenceType, U>(
   sequence: S, _ initial: U, @noescape _ combine: (U, S.Generator.Element) -> U
 ) -> U {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return sequence._prext_reduce(initial, combine: combine)
+  return sequence.reduce(initial, combine: combine)
 }

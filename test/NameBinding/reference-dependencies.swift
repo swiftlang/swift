@@ -104,9 +104,8 @@ func lookUpManyTopLevelNames() {
   let _: Dictionary = [1:1]
 
   // CHECK-DAG: !private "UInt"
-  // CHECK-DAG: !private "reduce"
   // CHECK-DAG: !private "+"
-  let _: UInt = reduce([1,2], 0, +)
+  let _: UInt = [1, 2].reduce(0, combine: +)
   
   // CHECK-DAG: !private "-"
   let _: UInt = 3 - 2 - 1

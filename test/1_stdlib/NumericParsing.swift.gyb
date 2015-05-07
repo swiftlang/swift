@@ -135,7 +135,8 @@ tests.test("${Self}/Basics") {
 
   // Check that we can round-trip the string representation of 2^100,
   // which requires an exponent to express...
-  let large = reduce(Repeat(count: 10, repeatedValue: 1024 as ${Self}), 1, *)
+  let large =
+    Repeat(count: 10, repeatedValue: 1024 as ${Self}).reduce(1, combine: *)
   let largeText = String(large)
   expectEqual(largeText, String(${Self}(largeText)!))
   

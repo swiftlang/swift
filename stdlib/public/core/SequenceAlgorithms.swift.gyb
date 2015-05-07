@@ -319,7 +319,7 @@ extension SequenceType {
   /// `self`, in turn, i.e. return
   /// `combine(combine(...combine(combine(initial, self[0]),
   /// self[1]),...self[count-2]), self[count-1])`.
-  final public func _prext_reduce<T>(
+  final public func reduce<T>(
     initial: T, @noescape combine: (T, ${GElement}) -> T
   ) -> T {
     var result = initial

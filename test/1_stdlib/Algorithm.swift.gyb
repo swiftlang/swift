@@ -1212,7 +1212,7 @@ SequenceTypeAlgorithms.test("reduce") {
     let s = MinimalSequence<OpaqueValue<Int>>(
       test.sequence.map { OpaqueValue($0) })
     var timesClosureWasCalled = 0
-    let result = s._prext_reduce(OpaqueValue<[Int]>([])) {
+    let result = s.reduce(OpaqueValue<[Int]>([])) {
       (partialResult: OpaqueValue<[Int]>, element: OpaqueValue<Int>)
         -> OpaqueValue<[Int]> in
       ++timesClosureWasCalled

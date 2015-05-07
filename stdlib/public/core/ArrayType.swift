@@ -110,9 +110,6 @@ protocol _ArrayType
       S : SequenceType where S.Generator.Element == Self
   >(elements: S) -> Self
 
-  func reduce<U>(initial: U,
-    @noescape combine: (U, Self.Generator.Element) -> U) -> U
-
   /// Sort `self` in-place according to `isOrderedBefore`.  Requires:
   /// `isOrderedBefore` induces a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements.
