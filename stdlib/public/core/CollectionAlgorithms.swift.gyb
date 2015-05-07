@@ -53,7 +53,7 @@ extension CollectionType where ${GElement} : Equatable {
       return result
     }
 
-    for i in self._prext_indices {
+    for i in self.indices {
       if self[i] == element {
         return i
       }
@@ -70,7 +70,7 @@ extension CollectionType {
   final public func indexOf(
     @noescape predicate: (${GElement}) -> Bool
   ) -> Index? {
-    for i in indices(self) {
+    for i in self.indices {
       if predicate(self[i]) {
         return i
       }
@@ -80,7 +80,7 @@ extension CollectionType {
 }
 
 //===----------------------------------------------------------------------===//
-// indices()
+// indices
 //===----------------------------------------------------------------------===//
 
 extension CollectionType {
@@ -89,7 +89,7 @@ extension CollectionType {
   /// The result's `endIndex` is the same as that of `self`.  Because
   /// `Range` is half-open, iterating the values of the result produces
   /// all valid subscript arguments for `self`, omitting its `endIndex`.
-  final public var _prext_indices: Range<Index> {
+  final public var indices: Range<Index> {
     return Range(start: startIndex, end: endIndex)
   }
 }

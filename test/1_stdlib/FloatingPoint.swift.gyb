@@ -228,8 +228,8 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
     ${FloatSelf}.quietNaN,
   ]
 
-  for lhsIdx in indices(interestingValues) {
-    for rhsIdx in indices(interestingValues) {
+  for lhsIdx in interestingValues.indices {
+    for rhsIdx in interestingValues.indices {
       let lhs = interestingValues[lhsIdx]
       let rhs = interestingValues[rhsIdx]
       if lhs.isZero && rhs.isZero {

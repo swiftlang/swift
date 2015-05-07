@@ -26,7 +26,7 @@ func printlnByGenerating<S: SequenceType>(s: S) {
 
 func printlnByIndexing<C: CollectionType>(c: C) {
   printlnByGenerating(
-    PermutationGenerator(elements: c, indices: indices(c))
+    PermutationGenerator(elements: c, indices: c.indices)
   )
 }
 

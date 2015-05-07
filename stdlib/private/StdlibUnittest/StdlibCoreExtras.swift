@@ -42,7 +42,7 @@ func findSubstring(string: String, _ substring: String) -> String.Index? {
   let haystack = string.unicodeScalars
   let needle = substring.unicodeScalars
 
-  for matchStartIndex in indices(haystack) {
+  for matchStartIndex in haystack.indices {
     var matchIndex = matchStartIndex
     var needleIndex = needle.startIndex
     while true {

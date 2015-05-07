@@ -238,7 +238,7 @@ extension String.UTF16View.Index {
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
   /// Requires: `utf8Index` is an element of
-  /// `indices(String(utf16)!.utf8)`.
+  /// `String(utf16)!.utf8.indices`.
   public init?(
     _ utf8Index: String.UTF8Index, within utf16: String.UTF16View
   ) {
@@ -259,7 +259,7 @@ extension String.UTF16View.Index {
   /// `unicodeScalarIndex`.
   ///
   /// Requires: `unicodeScalarIndex` is an element of
-  /// `indices(String(utf16)!.unicodeScalars)`.
+  /// `String(utf16)!.unicodeScalars.indices`.
   public init(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
     within utf16: String.UTF16View) {
@@ -270,7 +270,7 @@ extension String.UTF16View.Index {
   /// `characterIndex`.
   ///
   /// Requires: `characterIndex` is an element of
-  /// `indices(String(utf16)!)`.
+  /// `String(utf16)!.indices`.
   public init(_ characterIndex: String.Index, within utf16: String.UTF16View) {
     _offset = characterIndex._utf16Index
   }
@@ -279,7 +279,7 @@ extension String.UTF16View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// Requires: `self` is an element of
-  /// `indices(String(utf8)!.utf16)`.
+  /// `String(utf8)!.utf16.indices`.
   public func samePositionIn(
     utf8: String.UTF8View
   ) -> String.UTF8View.Index? {
@@ -290,7 +290,7 @@ extension String.UTF16View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// Requires: `self` is an element of
-  /// `indices(String(unicodeScalars).utf16)`.
+  /// `String(unicodeScalars).utf16.indices`.
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
@@ -300,7 +300,7 @@ extension String.UTF16View.Index {
   /// Return the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// Requires: `self` is an element of `indices(characters.utf16)`.
+  /// Requires: `self` is an element of `characters.utf16.indices`.
   public func samePositionIn(
     characters: String
   ) -> String.Index? {

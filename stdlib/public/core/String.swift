@@ -854,7 +854,7 @@ extension String.Index {
   /// `unicodeScalarIndex`. If no such position exists, the result is `nil`.
   ///
   /// Requires: `unicodeScalarIndex` is an element of
-  /// `indices(characters.unicodeScalars)`.
+  /// `characters.unicodeScalars.indices`.
   public init?(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
     within characters: String
@@ -869,7 +869,7 @@ extension String.Index {
   /// `utf16Index`. If no such position exists, the result is `nil`.
   ///
   /// Requires: `utf16Index` is an element of
-  /// `indices(characters.utf16)`.
+  /// `characters.utf16.indices`.
   public init?(
     _ utf16Index: String.UTF16Index,
     within characters: String
@@ -888,7 +888,7 @@ extension String.Index {
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
   /// Requires: `utf8Index` is an element of
-  /// `indices(characters.utf8)`.
+  /// `characters.utf8.indices`.
   public init?(
     _ utf8Index: String.UTF8Index,
     within characters: String
@@ -906,7 +906,7 @@ extension String.Index {
   /// Return the position in `utf8` that corresponds exactly
   /// to `self`.
   ///
-  /// Requires: `self` is an element of `indices(String(utf8))`.
+  /// Requires: `self` is an element of `String(utf8).indices`.
   public func samePositionIn(
     utf8: String.UTF8View
   ) -> String.UTF8View.Index {
@@ -916,7 +916,7 @@ extension String.Index {
   /// Return the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
-  /// Requires: `self` is an element of `indices(String(utf16))`.
+  /// Requires: `self` is an element of `String(utf16).indices`.
   public func samePositionIn(
     utf16: String.UTF16View
   ) -> String.UTF16View.Index {
@@ -926,7 +926,7 @@ extension String.Index {
   /// Return the position in `unicodeScalars` that corresponds exactly
   /// to `self`.
   ///
-  /// Requires: `self` is an element of `indices(String(unicodeScalars))`.
+  /// Requires: `self` is an element of `String(unicodeScalars).indices`.
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarView.Index {

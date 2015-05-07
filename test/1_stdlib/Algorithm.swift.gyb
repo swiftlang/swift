@@ -339,7 +339,7 @@ Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a: A<Int>
     a = randomArray()
-    partition(&a, indices(a), $0)
+    partition(&a, a.indices, $0)
   }
   /*
   // FIXME: Disabled due to <rdar://problem/17734737> Unimplemented:
@@ -347,7 +347,7 @@ Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a = randomArray()
     var pred = $0
-    _insertionSort(&a, indices(a), &pred)
+    _insertionSort(&a, a.indices, &pred)
   }
   */
 }
@@ -2661,7 +2661,7 @@ struct CollectionWithCustomFindMethod : CollectionType {
     element: MinimalEquatableValue
   ) -> MinimalForwardIndex?? {
     ++CollectionWithCustomFindMethod.timesFindWasCalled
-    for i in _elements._prext_indices {
+    for i in _elements.indices {
       if _elements[i] == element.value {
         return MinimalForwardIndex(
           position: i,
@@ -2772,13 +2772,13 @@ SequenceTypeAlgorithms.test("find/Predicate") {
 }
 
 //===----------------------------------------------------------------------===//
-// indices()
+// indices
 //===----------------------------------------------------------------------===//
 
 SequenceTypeAlgorithms.test("indices") {
   if true {
     let s = MinimalForwardCollection<OpaqueValue<Int>>([])
-    let indices = s._prext_indices
+    let indices = s.indices
     expectEqual(s.startIndex, indices.startIndex)
     expectEqual(s.endIndex, indices.endIndex)
   }
@@ -2787,7 +2787,7 @@ SequenceTypeAlgorithms.test("indices") {
       OpaqueValue<Int>(1, identity: 10),
       OpaqueValue<Int>(2, identity: 20)
     ])
-    let indices = s._prext_indices
+    let indices = s.indices
     expectEqual(s.startIndex, indices.startIndex)
     expectEqual(s.endIndex, indices.endIndex)
   }
@@ -3014,7 +3014,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 %       if slice:
         let indices = s.startIndex.successor()..<s.endIndex.predecessor()
 %       else:
-        let indices = s._prext_indices
+        let indices = s.indices
 %       end
 
         let closureLifetimeTracker = LifetimeTracked(0)
@@ -3042,7 +3042,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 %       if slice:
         let indices = s.startIndex.successor()..<s.endIndex.predecessor()
 %       else:
-        let indices = s._prext_indices
+        let indices = s.indices
 %       end
 
         let pivot = s._prext_partition(indices)
@@ -3091,7 +3091,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
           sequence._prext_map { OpaqueValue($0) })
         let closureLifetimeTracker = LifetimeTracked(0)
         expectEqual(1, LifetimeTracked.instances)
-        let pivot = s._prext_partition(s._prext_indices) {
+        let pivot = s._prext_partition(s.indices) {
           (lhs, rhs) in
           _blackHole(closureLifetimeTracker)
           return comparisonPredicate(lhs.value, rhs.value)
@@ -3106,7 +3106,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         CustomComparableValue.lessImpl = {
           comparisonPredicate($0, $1)
         }
-        let pivot = s._prext_partition(s._prext_indices)
+        let pivot = s._prext_partition(s.indices)
 %    end
 
         // Weak postcondition: we didn't lose any values.

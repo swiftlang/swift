@@ -624,7 +624,7 @@ extension ${Self} : _ArrayType {
       _buffer = _Buffer()
     }
     else {
-      self.replaceRange(indices(self), with: EmptyCollection())
+      self.replaceRange(self.indices, with: EmptyCollection())
     }
   }
 

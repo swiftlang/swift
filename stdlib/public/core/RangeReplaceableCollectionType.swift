@@ -208,7 +208,7 @@ public func removeAll<
     x = C()
   }
   else {
-    _replaceRange(&x, indices(x), with: EmptyCollection())
+    _replaceRange(&x, x.indices, with: EmptyCollection())
   }
 }
 

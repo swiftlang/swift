@@ -287,10 +287,10 @@ public struct IndexingGenerator<
 /// The result's `endIndex` is the same as that of `x`.  Because
 /// `Range` is half-open, iterating the values of the result produces
 /// all valid subscript arguments for `x`, omitting its `endIndex`.
+@availability(*, unavailable, message="access the 'indices' property on the collection")
 public func indices<
     C : CollectionType>(x: C) -> Range<C.Index> {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return x._prext_indices
+  return x.indices
 }
 
 /// A *generator* that adapts a *collection* `C` and any *sequence* of

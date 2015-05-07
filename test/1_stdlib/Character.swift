@@ -154,8 +154,8 @@ CharacterTests.test("Hashable") {
     continuingScalars,
     testCharacters
   ] {
-    for i in indices(characters) {
-      for j in indices(characters) {
+    for i in characters.indices {
+      for j in characters.indices {
         var ci = Character(characters[i])
         var cj = Character(characters[j])
         checkHashable(i == j, ci, cj, SourceLocStack().withCurrentLoc()) {

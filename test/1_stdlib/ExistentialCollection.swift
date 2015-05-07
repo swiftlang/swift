@@ -132,9 +132,9 @@ tests.test("ForwardCollection") {
     expectNotEmpty(i)
     expectEqual(e, fc0[i!])
   }
-  for i in indices(fc0) {
+  for i in fc0.indices {
     expectNotEqual(fc0.endIndex, i)
-    expectEqual(1, count(filter(indices(fc0)) {$0 == i}))
+    expectEqual(1, count(filter(fc0.indices) {$0 == i}))
   }
 }
 
@@ -160,9 +160,9 @@ tests.test("BidirectionalCollection") {
     expectNotEmpty(i)
     expectEqual(e, bc0[i!])
   }
-  for i in indices(bc0) {
+  for i in bc0.indices {
     expectNotEqual(bc0.endIndex, i)
-    expectEqual(1, count(filter(indices(bc0)) {$0 == i}))
+    expectEqual(1, count(filter(bc0.indices) {$0 == i}))
   }
   
   // Can't upgrade a non-random-access collection to random access
@@ -195,9 +195,9 @@ tests.test("RandomAccessCollection") {
     expectNotEmpty(i)
     expectEqual(e, rc0[i!])
   }
-  for i in indices(rc0) {
+  for i in rc0.indices {
     expectNotEqual(rc0.endIndex, i)
-    expectEqual(1, count(filter(indices(rc0)) {$0 == i}))
+    expectEqual(1, count(filter(rc0.indices) {$0 == i}))
   }
 }
 

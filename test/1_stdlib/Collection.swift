@@ -30,7 +30,7 @@ println("")
 // FIXME: separate r from the expression below pending
 // <rdar://problem/15772601> Type checking failure
 // CHECK: raboof
-let i = indices(foobar)
+let i = foobar.indices
 let r = lazy(i).reverse()
 for a in PermutationGenerator(elements: foobar, indices: r) {
   
@@ -44,8 +44,8 @@ func isPalindrome0<
 >(seq: S) -> Bool {
   typealias Index = S.Index
 
-  var a = indices(seq)
-  var i = indices(seq)
+  var a = seq.indices
+  var i = seq.indices
   var ir = lazy(i).reverse()
   var b = ir.generate()
   for i in a {
@@ -66,7 +66,7 @@ func isPalindrome1<
   where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
 >(seq: S) -> Bool {
 
-  var a = PermutationGenerator(elements: seq, indices: indices(seq))
+  var a = PermutationGenerator(elements: seq, indices: seq.indices)
   var b = lazy(seq).reverse().generate()
   for nextChar in a {
     if nextChar != b.next()! {
@@ -138,10 +138,10 @@ func isPalindrome4<
 >(seq: S) -> Bool {
   typealias Index = S.Index
 
-  var a = PermutationGenerator(elements: seq, indices: indices(seq))
+  var a = PermutationGenerator(elements: seq, indices: seq.indices)
   // FIXME: separate ri from the expression below pending
   // <rdar://problem/15772601> Type checking failure
-  var i = indices(seq)
+  var i = seq.indices
   let ri = lazy(i).reverse()
   var b = PermutationGenerator(elements: seq, indices: ri)
   for nextChar in a {

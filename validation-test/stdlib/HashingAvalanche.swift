@@ -17,7 +17,7 @@ func avalancheTest(bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: Dou
     for i in 0..<bits {
       bitFlips[i] = 0
     }
-    for i in indices(testData) {
+    for i in testData.indices {
       let inputA = testData[i]
       let outputA = testDataHashed[i]
       let inputB = inputA ^ (1 << UInt64(inputBit))

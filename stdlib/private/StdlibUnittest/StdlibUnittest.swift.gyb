@@ -1570,7 +1570,7 @@ public func check${traversal}Collection<
       let startIndex = collection.startIndex
       let endIndex = collection.endIndex
 
-      for i in indices(collection) {
+      for i in collection.indices {
         expectEqual(startIndex, collection.startIndex,
           stackTrace: stackTrace.withCurrentLoc()) {
           "Iteration should not change startIndex"
@@ -1583,7 +1583,7 @@ public func check${traversal}Collection<
     }
 
     var allIndices: [C.Index] = []
-    for i in indices(collection) {
+    for i in collection.indices {
       allIndices.append(i)
     }
 
@@ -1639,7 +1639,7 @@ public func check${traversal}Collection<
 
     if true {
       var allIndices2: [C.Index] = []
-      for i in indices(collection) {
+      for i in collection.indices {
         allIndices2.append(i)
       }
 
@@ -1800,7 +1800,7 @@ where
   // comparison later.
   let source = _UnitTestArray<A.Generator.Element>(makeCollection())
 
-  for (ix, i) in source._prext_indices.enumerate() {
+  for (ix, i) in source.indices.enumerate() {
     for (jx_, j) in (i..<source.endIndex).enumerate() {
       let jx = jx_ + ix
       
@@ -1828,7 +1828,7 @@ where
             &a, "\(actualCount) != expected count \(expectedCount)")
         }
         
-        for (kx, k) in a._prext_indices.enumerate() {
+        for (kx, k) in a.indices.enumerate() {
           let expectedValue = kx < ix ? nth(source, kx)
           : kx < jx + growth ? nth(newValues, kx - ix)
           : nth(source, kx - growth)

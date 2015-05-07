@@ -163,7 +163,7 @@ extension String {
     -> (before: String, after: String, wasFound : Bool)
   {
     var rng = unicodeScalars
-    for i in indices(rng) {
+    for i in rng.indices {
       if rng[i] == delim {
         return (String(rng[rng.startIndex..<i]), 
                 String(rng[i.successor()..<rng.endIndex]), 
@@ -181,7 +181,7 @@ extension String {
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     var rng = unicodeScalars
-    for i in indices(rng) {
+    for i in rng.indices {
       if predicate(rng[i]) {
         return (String(rng[rng.startIndex..<i]),
                 rng[i], 

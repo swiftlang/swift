@@ -416,7 +416,7 @@ extension Mirror {
       let children = Mirror(reflecting: result).children
       let position: Children.Index
       if case let label as String = e {
-        position = _find(children) { $0.label == label } ?? children.endIndex
+        position = children.indexOf { $0.label == label } ?? children.endIndex
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
         position = advance(children.startIndex, offset, children.endIndex)
@@ -566,22 +566,6 @@ internal extension Mirror {
     self.displayStyle = DisplayStyle(legacy: legacyMirror.disposition)
     self._defaultDescendantRepresentation = .Generated
   }
-}
-
-/// Returns the first index `i` in `indices(domain)` such that
-/// `predicate(domain[i])` is `true``, or `nil` if
-/// `predicate(domain[i])` is `false` for all `i`.
-///
-/// - complexity: O(`count(domain)`)
-internal func _find<
-  C: CollectionType
->(domain: C, predicate: (C.Generator.Element)->Bool) -> C.Index? {
-  for i in indices(domain) {
-    if predicate(domain[i]) {
-      return i
-    }
-  }
-  return nil
 }
 
 //===--- QuickLooks -------------------------------------------------------===//

@@ -1121,10 +1121,10 @@ StringTests.test("String.append(_: Character)") {
   ]
   let baseStrings = [ "" ] + map(baseCharacters) { String($0) }
 
-  for baseIdx in indices(baseStrings) {
+  for baseIdx in baseStrings.indices {
     for prefix in ["", " "] {
       let base = baseStrings[baseIdx]
-      for inputIdx in indices(baseCharacters) {
+      for inputIdx in baseCharacters.indices {
         let input = (prefix + String(baseCharacters[inputIdx])).last!
         var s = base
         s.append(input)

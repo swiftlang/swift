@@ -299,7 +299,7 @@ public func sort<
   inout collection: C ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
-  _introSort(&collection, indices(collection) ${", isOrderedBefore" if p else ""})
+  _introSort(&collection, collection.indices ${", isOrderedBefore" if p else ""})
 }
 
 /// Sort `array` in-place${according}.

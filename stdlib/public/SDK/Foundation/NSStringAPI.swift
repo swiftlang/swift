@@ -370,10 +370,10 @@ extension String {
     // So let's do that; the switch should compile away anyhow.
     return locale != nil ? _ns.compare(
       aString, options: mask,
-      range: _toNSRange(range != nil ? range! : indices(self)), locale: locale)
+      range: _toNSRange(range != nil ? range! : self.indices), locale: locale)
 
     : range != nil ? _ns.compare(
-      aString, options: mask, range: _toNSRange(range != nil ? range! : indices(self)))
+      aString, options: mask, range: _toNSRange(range != nil ? range! : self.indices))
 
     : mask != nil ? _ns.compare(aString, options: mask)
 
@@ -1095,7 +1095,7 @@ extension String {
     return _optionalRange(
       _ns.rangeOfCharacterFromSet(
         aSet, options: mask,
-        range: _toNSRange(aRange != nil ? aRange! : indices(self))))
+        range: _toNSRange(aRange != nil ? aRange! : self.indices)))
   }
 
   // - (NSRange)rangeOfComposedCharacterSequenceAtIndex:(NSUInteger)anIndex
@@ -1150,7 +1150,7 @@ extension String {
     return _optionalRange(
       locale != nil ? _ns.rangeOfString(
         aString, options: mask,
-        range: _toNSRange(searchRange != nil ? searchRange! : indices(self)),
+        range: _toNSRange(searchRange != nil ? searchRange! : self.indices),
         locale: locale
       )
       : searchRange != nil ? _ns.rangeOfString(
@@ -1351,7 +1351,7 @@ extension String {
     ? _ns.stringByReplacingOccurrencesOfString(
       target,
       withString: replacement, options: options,
-      range: _toNSRange(searchRange != nil ? searchRange! : indices(self))
+      range: _toNSRange(searchRange != nil ? searchRange! : self.indices)
     )
     : _ns.stringByReplacingOccurrencesOfString(target, withString: replacement)
   }

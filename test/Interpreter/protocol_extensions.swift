@@ -37,7 +37,7 @@ println(["a", "b", "c", "d"].indexMatching({$0 == "c"})!)
 // element types) with another algorithm.
 extension CollectionType where Self.Generator.Element : Equatable {
   final func myIndexOf(element: Generator.Element) -> Index? {
-    for i in indices(self) {
+    for i in self.indices {
       if self[i] == element { return i }
     }
 

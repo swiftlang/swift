@@ -118,7 +118,7 @@ public func split<S: Sliceable, R:BooleanType>(
      = allowEmptySlices ? .Some(elements.startIndex) : .None
   var splits = 0
 
-  for j in indices(elements) {
+  for j in elements.indices {
     if isSeparator(elements[j]) {
       if startIndex != nil {
         var i = startIndex!

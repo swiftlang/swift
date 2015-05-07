@@ -24,7 +24,7 @@ println(".")
 let twentyOne = CollectionOfOne(21)
 
 print("index loop: ")
-for x in indices(twentyOne) {
+for x in twentyOne.indices {
   print(twentyOne[x] * 2)
 }
 println(".")

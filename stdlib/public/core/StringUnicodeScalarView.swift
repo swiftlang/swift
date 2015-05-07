@@ -350,7 +350,7 @@ extension String.UnicodeScalarIndex {
   /// `utf16Index`. If no such position exists, the result is `nil`.
   ///
   /// Requires: `utf16Index` is an element of
-  /// `indices(String(unicodeScalars).utf16)`.
+  /// `String(unicodeScalars).utf16.indices`.
   public init?(
     _ utf16Index: String.UTF16Index,
     within unicodeScalars: String.UnicodeScalarView
@@ -380,7 +380,7 @@ extension String.UnicodeScalarIndex {
   /// `utf8Index`. If no such position exists, the result is `nil`.
   ///
   /// Requires: `utf8Index` is an element of
-  /// `indices(String(unicodeScalars).utf8)`.
+  /// `String(unicodeScalars).utf8.indices`.
   public init?(
     _ utf8Index: String.UTF8Index,
     within unicodeScalars: String.UnicodeScalarView
@@ -402,7 +402,7 @@ extension String.UnicodeScalarIndex {
   /// exactly to `characterIndex`.
   ///
   /// Requires: `characterIndex` is an element of
-  /// `indices(String(unicodeScalars))`.
+  /// `String(unicodeScalars).indices`.
   public init(
     _ characterIndex: String.Index,
     within unicodeScalars: String.UnicodeScalarView
@@ -413,7 +413,7 @@ extension String.UnicodeScalarIndex {
   /// Return the position in `utf8` that corresponds exactly
   /// to `self`.
   ///
-  /// Requires: `self` is an element of `indices(String(utf8)!)`.
+  /// Requires: `self` is an element of `String(utf8)!.indices`.
   public func samePositionIn(utf8: String.UTF8View) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
@@ -421,7 +421,7 @@ extension String.UnicodeScalarIndex {
   /// Return the position in `utf16` that corresponds exactly
   /// to `self`.
   ///
-  /// Requires: `self` is an element of `indices(String(utf16)!)`.
+  /// Requires: `self` is an element of `String(utf16)!.indices`.
   public func samePositionIn(
     utf16: String.UTF16View
   ) -> String.UTF16View.Index {
@@ -431,7 +431,7 @@ extension String.UnicodeScalarIndex {
   /// Return the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// Requires: `self` is an element of `indices(characters.unicodeScalars)`.
+  /// Requires: `self` is an element of `characters.unicodeScalars.indices`.
   public func samePositionIn(characters: String) -> String.Index? {
     return String.Index(self, within: characters)
   }

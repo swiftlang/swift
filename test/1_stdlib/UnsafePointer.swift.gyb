@@ -60,8 +60,8 @@ ${SelfName}TestSuite.test("Hashable") {
     ${SelfType}(bitPattern: 0x12345678),
     ${SelfType}(bitPattern: 0x87654321 as UInt),
   ]
-  for i in indices(ptrs) {
-    for j in indices(ptrs) {
+  for i in ptrs.indices {
+    for j in ptrs.indices {
       var pi = ptrs[i]
       var pj = ptrs[j]
       checkHashable(i == j, pi, pj, SourceLocStack().withCurrentLoc()) {
