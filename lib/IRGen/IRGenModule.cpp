@@ -306,6 +306,7 @@ IRGenModule::~IRGenModule() {
     delete DebugInfo;
   delete ABITypes;
 }
+static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 
 // Explicitly listing these constants is an unfortunate compromise for
 // making the database file much more compact.
@@ -315,8 +316,17 @@ IRGenModule::~IRGenModule() {
 namespace RuntimeConstants {
   const auto ReadNone = llvm::Attribute::ReadNone;
   const auto ReadOnly = llvm::Attribute::ReadOnly;
+  const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
+  const auto ZExt = llvm::Attribute::ZExt;
   const auto C_CC = llvm::CallingConv::C;
+}
+
+// We don't use enough attributes to justify generalizing the
+// RuntimeFunctions.def FUNCTION macro. Instead, special case the one attribute
+// associated with the return type not the function type.
+static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
+  return Attr == llvm::Attribute::ZExt;
 }
 
 static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
@@ -347,17 +357,29 @@ static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
     fn->setCallingConv(cc);
 
-    llvm::AttrBuilder b;
+    llvm::AttrBuilder buildFnAttr;
+    llvm::AttrBuilder buildRetAttr;
 
-    for (auto Attr : attrs)
-      b.addAttribute(Attr);
-
+    for (auto Attr : attrs) {
+      if (isReturnAttribute(Attr))
+        buildRetAttr.addAttribute(Attr);
+      else
+        buildFnAttr.addAttribute(Attr);
+    }
+    // FIXME: getting attributes here without setting them does
+    // nothing. This cannot be fixed until the attributes are correctly specified.
     fn->getAttributes().
       addAttributes(IGM.LLVMContext,
                     llvm::AttributeSet::FunctionIndex,
                     llvm::AttributeSet::get(IGM.LLVMContext,
                                             llvm::AttributeSet::FunctionIndex,
-                                            b));
+                                            buildFnAttr));
+    fn->getAttributes().
+      addAttributes(IGM.LLVMContext,
+                    llvm::AttributeSet::ReturnIndex,
+                    llvm::AttributeSet::get(IGM.LLVMContext,
+                                            llvm::AttributeSet::ReturnIndex,
+                                            buildRetAttr));
   }
 
   return cache;
