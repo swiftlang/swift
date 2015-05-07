@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s | FileCheck %s
+
+import Foundation
 
 func foo(var f f: (()->())!) {
   f?()
@@ -52,4 +54,18 @@ func tuple_bind_implicitly_unwrapped(x x: (Int, String)!) -> String {
 func return_any() -> AnyObject! { return nil }
 func bind_any() {
   let object : AnyObject? = return_any()
+}
+
+class C : Hive {}
+
+// CHECK: sil private @_TTVFC29implicitly_unwrapped_optional1DcfMS0_FT5coderCSo7NSCoder_S0_
+// CHECK: bb0(%0 : $ImplicitlyUnwrappedOptional<NSCoder>, %1 : $D):
+// CHECK:   [[THUNK:%.*]] = function_ref @_TFC29implicitly_unwrapped_optional1DcfMS0_FT5coderCSo7NSCoder_S0_
+// CHECK:   [[REF:%.*]] = apply [[THUNK]]
+// CHECK:   [[RESULT:%.*]] = enum $ImplicitlyUnwrappedOptional<D>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[REF]] : $D
+// CHECK:   return [[RESULT]] : $ImplicitlyUnwrappedOptional<D>
+class D : C {
+  override init(coder aCoder: NSCoder) {
+    super.init(coder: aCoder)
+  }
 }

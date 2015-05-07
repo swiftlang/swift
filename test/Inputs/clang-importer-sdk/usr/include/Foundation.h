@@ -165,6 +165,7 @@ NSString *NSStringToNSString(NSString *str);
   B *queen;
 }
 - init;
+- (instancetype)initWithCoder:(NSCoder *)aDecoder;
 
 @property __attribute__((iboutletcollection(B))) NSArray *bees;
 

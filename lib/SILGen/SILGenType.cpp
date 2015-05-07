@@ -98,14 +98,21 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
 
     switch (OTKPair(baseOTK, derivedOTK)) {
     case OTKPair(OTK_ImplicitlyUnwrappedOptional, OTK_None):
-    case OTKPair(OTK_Optional, OTK_None):
+    case OTKPair(OTK_Optional, OTK_None): {
       // Optionalize the return value.
       // This only requires a thunk if the underlying type isn't an object
       // reference.
-      vtableResultTy = baseTy->getSemanticResultSILType();
+      auto baseResTy = baseTy->getSemanticResultSILType().getSwiftRValueType();
+      auto origDerivedResTy = origDerivedTy
+        ->getSemanticResultSILType().getSwiftRValueType();
+      auto covariantTy = baseResTy->replaceCovariantResultType(origDerivedResTy,
+                                                               0);
+      auto canTy = covariantTy->getCanonicalType();
+      vtableResultTy = SILType::getPrimitiveObjectType(canTy);
       resultAction = VTableResultThunk::MakeOptional;
       needsThunk |= !baseObj->isBridgeableObjectType();
       break;
+    }
 
     case OTKPair(OTK_None, OTK_None):
     case OTKPair(OTK_Optional, OTK_Optional):
@@ -211,10 +218,12 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
                                           vtableParams, vtableResult,
                                           vtableErrorResult,
                                           getASTContext());
-  SILLocation loc(derived.getDecl());
-  auto thunk = SILFunction::create(M, SILLinkage::Private, name, vtableDerivedTy,
-                         cast<FuncDecl>(derived.getDecl())->getGenericParams(),
-                         loc, IsBare, IsNotTransparent, IsNotFragile);
+  auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
+  SILLocation loc(derivedDecl);
+  auto thunk = SILFunction::create(M, SILLinkage::Private, name,
+                                   vtableDerivedTy,
+                                   derivedDecl->getGenericParams(),
+                                   loc, IsBare, IsNotTransparent, IsNotFragile);
   thunk->setDebugScope(new (M) SILDebugScope(loc, *thunk));
 
   SILGenFunction(*this, *thunk)
