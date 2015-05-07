@@ -298,7 +298,7 @@ final public class VaListBuilder {
       }
       ++sseRegistersUsed
     }
-    else if encoded.count() == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
+    else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
       storage[gpRegistersUsed++] = encoded[0]
     }
     else {

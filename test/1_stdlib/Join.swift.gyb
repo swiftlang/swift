@@ -229,7 +229,7 @@ struct MockExtensibleCollection : ExtensibleCollectionType {
   init() {}
   init(_ a: Array<Int>) {
     _storage = a
-    _reservedCapacity = a.count()
+    _reservedCapacity = a.count
   }
 
   func generate() -> Array<Int>.Generator {

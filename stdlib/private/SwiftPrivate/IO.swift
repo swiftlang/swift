@@ -44,7 +44,7 @@ public struct _FDInputStream {
 
   public mutating func read() {
     let minFree = 128
-    var bufferFree = _buffer.count() - _bufferUsed
+    var bufferFree = _buffer.count - _bufferUsed
     if bufferFree < minFree {
       _buffer.reserveCapacity(minFree - bufferFree)
       while bufferFree < minFree {

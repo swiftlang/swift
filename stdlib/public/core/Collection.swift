@@ -179,7 +179,7 @@ public func ~> <T : protocol<_Sequence_Type, _ArrayType>>(
   let s = source._baseAddressIfContiguous
   if s != nil {
     let p = UnsafeMutablePointer<T.Element>(ptr.1)
-    p.initializeFrom(s, count: source.count())
+    p.initializeFrom(s, count: source.count)
     _fixLifetime(source._owner)
   } else {
     var p = UnsafeMutablePointer<T.Generator.Element>(ptr.1)

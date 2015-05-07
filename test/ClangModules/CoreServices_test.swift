@@ -17,7 +17,7 @@ func test(url: CFURL, ident: CSIdentity) {
 
   let unicharArray: [UniChar] = [ 0x61, 0x62, 0x63, 0x2E, 0x64 ]
   var extIndex: Int = 0
-  LSGetExtensionInfo(unicharArray.count(), unicharArray, &extIndex) // okay
+  LSGetExtensionInfo(unicharArray.count, unicharArray, &extIndex) // okay
 
   _ = CSIdentityCreateCopy(nil, ident) // okay
 

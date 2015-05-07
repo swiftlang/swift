@@ -18,7 +18,7 @@ infix operator != {
 }
 
 func testslice(s: Array<Int>) {
-  for i in 0..<s.count() { print(s[i]+1) }
+  for i in 0..<s.count { print(s[i]+1) }
   for i in s { print(i+1) }
   var s2 = s[0..<2]
   var s3 = s[0...1]
@@ -87,8 +87,8 @@ protocol Comparable {
 }
 
 func sort<T : Comparable>(inout array: [T]) {
-  for i in 0..<array.count() {
-    for j in i+1..<array.count() {
+  for i in 0..<array.count {
+    for j in i+1..<array.count {
       if array[j] < array[i] {
         var temp = array[i]
         array[i] = array[j]

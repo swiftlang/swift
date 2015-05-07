@@ -251,7 +251,7 @@ internal func _fromMsgPackVariant<
 %   end
   case .Array(let a):
     var elements: [Value.Generator.Element] = []
-    elements.reserveCapacity(a.count())
+    elements.reserveCapacity(a.count)
     for e in a {
       var element = Value.Generator.Element(forDeserialization: ())
       var deserializerImpl = _MsgPackDeserializerImpl(e)

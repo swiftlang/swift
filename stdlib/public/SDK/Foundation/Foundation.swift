@@ -533,7 +533,7 @@ extension NSDictionary : DictionaryLiteralConvertible {
     self.init(
       objects: elements.map { (AnyObject?)($0.1) },
       forKeys: elements.map { (NSCopying?)($0.0) },
-      count: elements.count())
+      count: elements.count)
   }
 }
 
@@ -1148,7 +1148,7 @@ extension NSDictionary {
     // - (instancetype)initWithObjects:(NSArray *)objects forKeys:(NSArray *)keys;
     var values: [AnyObject] = []
     var keys:   [AnyObject] = []
-    for var i = 0; i < objects.count(); i += 2 {
+    for var i = 0; i < objects.count; i += 2 {
       values.append(objects[i])
       keys.append(objects[i+1])
     }

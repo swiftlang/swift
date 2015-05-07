@@ -66,7 +66,7 @@ public struct _stdlib_fd_set {
   }
 
   public mutating func zero() {
-    let count = _data.count()
+    let count = _data.count
     return _data.withUnsafeMutableBufferPointer {
       (_data) in
       for i in 0..<count {
