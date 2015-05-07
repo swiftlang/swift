@@ -97,9 +97,9 @@ func _assertionFailed(
       file.withUTF8Buffer {
         (file) -> () in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UWord(prefix.count),
-          message.baseAddress, UWord(message.count),
-          file.baseAddress, UWord(file.count), line)
+          prefix.baseAddress, UWord(prefix.count()),
+          message.baseAddress, UWord(message.count()),
+          file.baseAddress, UWord(file.count()), line)
         Builtin.int_trap()
       }
     }
@@ -125,9 +125,9 @@ func _assertionFailed(
       file.withUTF8Buffer {
         (file) -> () in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UWord(prefix.count),
-          messageUTF8.baseAddress, UWord(messageUTF8.count),
-          file.baseAddress, UWord(file.count), line)
+          prefix.baseAddress, UWord(prefix.count()),
+          messageUTF8.baseAddress, UWord(messageUTF8.count()),
+          file.baseAddress, UWord(file.count()), line)
       }
     }
   }
@@ -152,9 +152,9 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
       file.withUTF8Buffer {
         (file) in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UWord(prefix.count),
-          message.baseAddress, UWord(message.count),
-          file.baseAddress, UWord(file.count), line)
+          prefix.baseAddress, UWord(prefix.count()),
+          message.baseAddress, UWord(message.count()),
+          file.baseAddress, UWord(file.count()), line)
       }
     }
   }
@@ -195,9 +195,9 @@ func _unimplemented_initializer(className: StaticString,
         file.withUTF8Buffer {
           (file) in
           _reportUnimplementedInitializerInFile(
-            className.baseAddress, UWord(className.count),
-            initName.baseAddress, UWord(initName.count),
-            file.baseAddress, UWord(file.count), line, column)
+            className.baseAddress, UWord(className.count()),
+            initName.baseAddress, UWord(initName.count()),
+            file.baseAddress, UWord(file.count()), line, column)
         }
       }
     }
@@ -207,8 +207,8 @@ func _unimplemented_initializer(className: StaticString,
       initName.withUTF8Buffer {
         (initName) in
         _reportUnimplementedInitializer(
-          className.baseAddress, UWord(className.count),
-          initName.baseAddress, UWord(initName.count))
+          className.baseAddress, UWord(className.count()),
+          initName.baseAddress, UWord(initName.count()))
       }
     }
   }

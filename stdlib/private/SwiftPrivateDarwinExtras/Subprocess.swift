@@ -117,7 +117,7 @@ internal func _readAll(fd: CInt) -> String {
     let readResult: ssize_t = buffer.withUnsafeMutableBufferPointer {
       (buffer) in
       let ptr = UnsafeMutablePointer<Void>(buffer.baseAddress + usedBytes)
-      return read(fd, ptr, size_t(buffer.count - usedBytes))
+      return read(fd, ptr, size_t(buffer.count() - usedBytes))
     }
     if readResult > 0 {
       usedBytes += readResult

@@ -66,12 +66,12 @@ ArrayTestSuite.test("valueDestruction") {
 
 ArrayTestSuite.test("Native/count/empty") {
   let a = [TestValueTy]()
-  expectEqual(0, a.count)
+  expectEqual(0, a.count())
 }
 
 ArrayTestSuite.test("Native/count") {
   let a = [ TestValueTy(10), TestValueTy(20), TestValueTy(30) ]
-  expectEqual(3, a.count)
+  expectEqual(3, a.count())
 }
 
 ArrayTestSuite.test("Native/isEmpty/empty") {
@@ -152,19 +152,19 @@ ArrayTestSuite.test("${array_type}/filter") {
     let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.filter() { (x: Int) -> Bool in true }
     expectEqual([ 0, 30, 10, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.count(), result.capacity)
   }
   if true {
     let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.filter() { (x: Int) -> Bool in false }
     expectEqual([], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.count(), result.capacity)
   }
   if true {
     let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.filter() { $0 % 3 == 0 }
     expectEqual([ 0, 30, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.count(), result.capacity)
   }
 }
 
@@ -184,7 +184,7 @@ ArrayTestSuite.test("${array_type}/map") {
     let arr: ${array_type}<Int> = [ 0, 30, 10, 90 ]
     let result = arr.map() { $0 + 1 }
     expectEqual([ 1, 31, 11, 91 ], result)
-    expectGE(2 * result.count, result.capacity)
+    expectGE(2 * result.count(), result.capacity)
   }
 }
 

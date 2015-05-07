@@ -87,7 +87,7 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
   }
 
   /// The number of elements in the buffer
-  public var count: Int {
+  public func count() -> Int {
     return _end - _position
   }
 

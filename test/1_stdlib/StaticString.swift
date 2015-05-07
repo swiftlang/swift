@@ -11,7 +11,7 @@ StaticStringTestSuite.test("PointerRepresentation/ASCII/Empty") {
   expectTrue(str.isASCII)
   str.withUTF8Buffer {
     utf8 in
-    expectEqual(0, utf8.count)
+    expectEqual(0, utf8.count())
   }
   expectEqual("", str.stringValue)
 
@@ -29,7 +29,7 @@ StaticStringTestSuite.test("PointerRepresentation/ASCII") {
   expectTrue(str.isASCII)
   str.withUTF8Buffer {
     utf8 -> () in
-    expectEqual(3, utf8.count)
+    expectEqual(3, utf8.count())
     expectEqual(0x61, utf8[0])
     expectEqual(0x62, utf8[1])
     expectEqual(0x63, utf8[2])
@@ -53,7 +53,7 @@ StaticStringTestSuite.test("PointerRepresentation/NonASCII") {
   expectFalse(str.isASCII)
   str.withUTF8Buffer {
     utf8 -> () in
-    expectEqual(6, utf8.count)
+    expectEqual(6, utf8.count())
     expectEqual(0xd0, utf8[0])
     expectEqual(0xb0, utf8[1])
     expectEqual(0xd0, utf8[2])
@@ -87,7 +87,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/ASCII") {
   expectTrue(str.isASCII)
   str.withUTF8Buffer {
     utf8 -> () in
-    expectEqual(1, utf8.count)
+    expectEqual(1, utf8.count())
     expectEqual(0x5a, utf8[0])
   }
   expectEqual("Z", str.stringValue)

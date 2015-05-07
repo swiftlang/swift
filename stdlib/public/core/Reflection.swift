@@ -276,7 +276,7 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
       println(" #\(previous)", &targetStream)
       return
     }
-    let identifier = visitedItems.count
+    let identifier = visitedItems.count()
     visitedItems[id] = identifier
     print(" #\(identifier)", &targetStream)
   }
