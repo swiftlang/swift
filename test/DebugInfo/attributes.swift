@@ -15,7 +15,7 @@ class SwiftClass {
       func f(someBlock: @convention(block) (Int) -> Int) {
       }
 }
-x
+
 // FIXME: This is currently elided, but should reappear eventually as
 // an artificial variable.
 // DISABLED: [ DW_TAG_variable ] [OBJC_METACLASS_$__TtC10attributes9ObjCClass]
