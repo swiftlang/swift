@@ -257,50 +257,6 @@ Algorithm.test("map/CollectionType") {
   }
 }
 
-Algorithm.test("flatMap/SequenceType") {
-  // FIXME(prext): remove these tests together with the flatMap() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-
-  if true {
-    let s = MinimalSequence<Int>([])
-    var result = flatMap(s) {
-      (x: Int) -> [Int16] in
-      expectUnreachable()
-      return [42]
-    }
-    expectType([Int16].self, &result)
-    expectEqual([], result)
-    expectEqual([], Array(s))
-  }
-  if true {
-    let s = MinimalSequence([ 0, 30, 10, 90 ])
-    let result = flatMap(s) { [$0 + 1] }
-    expectEqual([ 1, 31, 11, 91 ], result)
-    expectEqual([], Array(s))
-  }
-}
-
-Algorithm.test("flatMap/CollectionType") {
-  // FIXME(prext): remove these tests together with the flatMap() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-
-  if true {
-    let c = MinimalForwardCollection<Int>([])
-    var result = flatMap(c) {
-      (x: Int) -> [Int16] in
-      expectUnreachable()
-      return [42]
-    }
-    expectType([Int16].self, &result)
-    expectEqual([], result)
-  }
-  if true {
-    let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
-    let result = flatMap(c) { [$0 + 1] }
-    expectEqual([ 1, 31, 11, 91 ], result)
-  }
-}
-
 Algorithm.test("sorted/strings")
   .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
   .code {
@@ -1767,7 +1723,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-      var result = s._prext_flatMap {
+      var result = s.flatMap {
         (element: OpaqueValue<Int>) -> MinimalSequence<OpaqueValue<Int32>> in
         _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled
@@ -1845,7 +1801,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-      var result = s._prext_flatMap {
+      var result = s.flatMap {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32>? in
         _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled

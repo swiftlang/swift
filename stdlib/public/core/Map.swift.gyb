@@ -74,11 +74,11 @@ public func map<S : SequenceType, T>(
 
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source` and flattening the result.
+@availability(*, unavailable, message="call the 'flatMap()' method on the sequence")
 public func flatMap<S : SequenceType, T>(
   source: S, @noescape _ transform: (S.Generator.Element) -> [T]
 ) -> [T] {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return source._prext_flatMap(transform)
+  return source.flatMap(transform)
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -138,11 +138,11 @@ public func map<C : CollectionType, T>(
 
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source` and flattening the result.
+@availability(*, unavailable, message="call the 'flatMap()' method on the sequence")
 public func flatMap<C : CollectionType, T>(
   source: C, _ transform: (C.Generator.Element) -> [T]
 ) -> [T] {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return source._prext_flatMap(transform)
+  return source.flatMap(transform)
 }
 
 //===--- Support for lazy(s) ----------------------------------------------===//
