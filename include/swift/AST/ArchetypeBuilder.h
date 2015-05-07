@@ -549,6 +549,14 @@ public:
 
     return ArchetypeOrConcreteType.isConcreteType();
   }
+  
+  /// Get the concrete type this potential archetype is constrained to.
+  Type getConcreteType() const {
+    assert(isConcreteType());
+    if (Representative != this)
+      return Representative->getConcreteType();
+    return ArchetypeOrConcreteType.getAsConcreteType();
+  }
 
   /// Determine whether this potential archetype will map to a primary
   /// archetype.

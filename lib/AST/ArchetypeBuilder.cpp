@@ -1425,7 +1425,7 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
 
     // If we have a concrete type, produce a same-type requirement.
     if (archetype->isConcreteType()) {
-      Type concreteType = archetype->getType(*this).castToConcreteType();
+      Type concreteType = archetype->getConcreteType();
       f(RequirementKind::SameType, archetype, concreteType,
         archetype->getSameTypeSource());
       return;

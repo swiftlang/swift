@@ -1069,11 +1069,21 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
     case RequirementKind::SameType:
       // Collect the same-type constraints by their representative.
       CanType repTy;
-      if (auto concreteTy = type.dyn_cast<Type>())
+      if (auto concreteTy = type.dyn_cast<Type>()) {
+        // Maybe we were equated to a concrete type...
         repTy = concreteTy->getCanonicalType();
-      else
-        repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()
-          ->getDependentType(builder, false)->getCanonicalType();
+      } else {
+        // ...or to a representative dependent type that was in turn equated
+        // to a concrete type.
+        auto representative
+          = type.get<ArchetypeBuilder::PotentialArchetype *>();
+        
+        if (representative->isConcreteType())
+          repTy = representative->getConcreteType()->getCanonicalType();
+        else
+          repTy = representative->getDependentType(builder, false)
+            ->getCanonicalType();
+      }
       
       sameTypes[repTy].push_back(depTy);
       return;
