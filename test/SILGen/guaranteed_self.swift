@@ -463,7 +463,9 @@ extension FakeArray : SequenceType {
 // functions.
 // -----------------------------------------------------------------------------
 
-class Kraken {}
+class Kraken {
+  func enrage() {}
+}
 
 class CurriedTestBar {
   func bar(x: Kraken)(_ y: Kraken)(_ z: Kraken) -> Kraken {
@@ -553,4 +555,104 @@ func curried_test3() {
   let k = Kraken()
   let b = CurriedTestBar()
   let bar4 = b.bar(k)(k)(k)
+}
+
+// -----------------------------------------------------------------------------
+// Make sure that we do not emit extra retains when accessing let fields of
+// guaranteed parameters.
+// -----------------------------------------------------------------------------
+
+func destroyShip(k: Kraken) {}
+
+class LetFieldClass {
+  let letk = Kraken()
+  var vark = Kraken()
+
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self13LetFieldClass10letkMethodfS0_FT_T_ : $@convention(method) (@guaranteed LetFieldClass) -> () {
+  // CHECK: bb0([[CLS:%.*]] : $LetFieldClass):
+  // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [[KRAKEN_ADDR]]
+  // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
+  // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
+  // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [[KRAKEN_ADDR]]
+  // CHECK-NEXT: strong_retain [[KRAKEN]]
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
+  // CHECK-NEXT: strong_retain [[KRAKEN]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN]])
+  // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box $Kraken
+  // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
+  // CHECK-NEXT: [[KRAKEN2:%.*]] = load [[KRAKEN_ADDR]]
+  // CHECK-NEXT: strong_retain [[KRAKEN2]]
+  // CHECK-NEXT: store [[KRAKEN2]] to [[KRAKEN_BOX]]#1
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
+  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [[KRAKEN_BOX]]#1
+  // CHECK-NEXT: strong_retain [[KRAKEN_COPY]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
+  // CHECK-NEXT: strong_release [[KRAKEN_BOX]]#0
+  // CHECK-NEXT: strong_release [[KRAKEN]]
+  // CHECK-NEXT: tuple
+  // CHECK-NEXT: return
+  func letkMethod() {
+    letk.enrage()
+    let ll = letk
+    destroyShip(ll)
+    var lv = letk
+    destroyShip(lv)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self13LetFieldClass10varkMethodfS0_FT_T_ : $@convention(method) (@guaranteed LetFieldClass) -> () {
+  // CHECK: bb0([[CLS:%.*]] : $LetFieldClass):
+  // CHECK: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : LetFieldClass -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
+  // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
+  // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
+  // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
+  // CHECK-NEXT: strong_release [[KRAKEN]]
+  // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : LetFieldClass -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
+  // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
+  // CHECK-NEXT: strong_retain [[KRAKEN]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN]])
+  // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box $Kraken
+  // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : LetFieldClass -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
+  // CHECK-NEXT: [[KRAKEN2:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
+  // CHECK-NEXT: store [[KRAKEN2]] to [[KRAKEN_BOX]]#1
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_TF15guaranteed_self11destroyShipFCS_6KrakenT_ : $@convention(thin) (@owned Kraken) -> ()
+  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [[KRAKEN_BOX]]#1
+  // CHECK-NEXT: strong_retain [[KRAKEN_COPY]]
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
+  // CHECK-NEXT: strong_release [[KRAKEN_BOX]]#0
+  // CHECK-NEXT: strong_release [[KRAKEN]]
+  // CHECK-NEXT: tuple
+  // CHECK-NEXT: return
+  func varkMethod() {
+    vark.enrage()
+    let vl = vark
+    destroyShip(vl)
+    var vv = vark
+    destroyShip(vv)
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Make sure that in all of the following cases find has only one retain in it.
+// -----------------------------------------------------------------------------
+
+class ClassIntTreeNode {
+  let value : Int
+  let left, right : ClassIntTreeNode
+
+  init() {}
+
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self16ClassIntTreeNode4findfS0_FSiS0_ : $@convention(method) (Int, @guaranteed ClassIntTreeNode) -> @owned ClassIntTreeNode {
+  // CHECK-NOT: strong_release
+  // CHECK: strong_retain
+  // CHECK-NOT: strong_retain
+  // CHECK-NOT: strong_release
+  // CHECK: return
+  func find(v : Int) -> ClassIntTreeNode {
+    if v == value { return self }
+    if v < value { return left.find(v) }
+    return right.find(v)
+  }
 }

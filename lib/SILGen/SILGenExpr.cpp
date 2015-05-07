@@ -583,12 +583,10 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
 
 /// Produce a singular RValue for a load from the specified property.  This
 /// is designed to work with RValue ManagedValue bases that are either +0 or +1.
-ManagedValue SILGenFunction::
-emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
-                          bool isSuper, VarDecl *field,
-                          ArrayRef<Substitution> substitutions,
-                          AccessSemantics semantics,
-                          Type propTy, SGFContext C) {
+ManagedValue SILGenFunction::emitRValueForPropertyLoad(
+    SILLocation loc, ManagedValue base, bool isSuper, VarDecl *field,
+    ArrayRef<Substitution> substitutions, AccessSemantics semantics,
+    Type propTy, SGFContext C, bool isGuaranteedValid) {
   AccessStrategy strategy =
     field->getAccessStrategy(semantics, AccessKind::Read);
 
@@ -627,12 +625,6 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     return emitRValueForDecl(loc, field, propTy, semantics, C);
   }
 
-  // If the base is a reference type, just handle this as loading the lvalue.
-  if (base.getType().getSwiftRValueType()->hasReferenceSemantics()) {
-    LValue LV = emitPropertyLValue(loc, base, field, AccessKind::Read,
-                                   AccessSemantics::DirectToStorage);
-    return emitLoadOfLValue(loc, std::move(LV), C);
-  }
 
   // rvalue MemberRefExprs are produced in two cases: when accessing a 'let'
   // decl member, and when the base is a (non-lvalue) struct.
@@ -645,13 +637,23 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   auto &lowering = getTypeLowering(substFormalType);
 
   // Check for an abstraction difference.
-  AbstractionPattern origFormalType =
-    getOrigFormalRValueType(*this, field);
+  AbstractionPattern origFormalType = getOrigFormalRValueType(*this, field);
   bool hasAbstractionChange = false;
   if (!origFormalType.isExactType(substFormalType)) {
     auto &abstractedTL = getTypeLowering(origFormalType, substFormalType);
     hasAbstractionChange =
-      (abstractedTL.getLoweredType() != lowering.getLoweredType());
+        (abstractedTL.getLoweredType() != lowering.getLoweredType());
+  }
+
+  // If the base is a reference type, just handle this as loading the lvalue.
+  if (base.getType().getSwiftRValueType()->hasReferenceSemantics()) {
+    LValue LV = emitPropertyLValue(loc, base, field, AccessKind::Read,
+                                   AccessSemantics::DirectToStorage);
+    auto Result = emitLoadOfLValue(loc, std::move(LV), C, isGuaranteedValid);
+    if (hasAbstractionChange)
+      Result =
+          emitOrigToSubstValue(loc, Result, origFormalType, substFormalType, C);
+    return Result;
   }
 
   ManagedValue Result;
@@ -666,11 +668,13 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
       Scalar = emitConversionToSemanticRValue(loc, Scalar, lowering);
       Result = emitManagedRValueWithCleanup(Scalar, lowering);
 
-    } else if (hasAbstractionChange || !C.isImmediatePlusZeroOk()) {
+    } else if (hasAbstractionChange ||
+               (!C.isImmediatePlusZeroOk() &&
+                !(C.isGuaranteedPlusZeroOk() && isGuaranteedValid))) {
       // If we have an abstraction change or if we have to produce a result at
-      // +1, then emit a RetainValue.  Without further analysis, we
-      // can't prove that the base will stay alive, so we can only
-      // return +0 to an immediate consumer.
+      // +1, then emit a RetainValue. If we know that our base will stay alive,
+      // we can emit at +0 for a guaranteed consumer. Otherwise, since we do not
+      // hav eenough information, we can only emit at +0 for immediate clients.
       Result = Result.copyUnmanaged(*this, loc);
     }
   } else {
@@ -1674,6 +1678,119 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   return result;
 }
 
+namespace {
+
+/// A helper function with context that tries to emit member refs of nominal
+/// types avoiding the conservative lvalue logic.
+class NominalTypeMemberRefRValueEmitter {
+  using SelfTy = NominalTypeMemberRefRValueEmitter;
+
+  /// The member ref expression we are emitting.
+  MemberRefExpr *Expr;
+
+  /// The passed in SGFContext.
+  SGFContext Context;
+
+  /// The typedecl of the base expression of the member ref expression.
+  NominalTypeDecl *Base;
+
+  /// The field of the member.
+  VarDecl *Field;
+
+public:
+
+  NominalTypeMemberRefRValueEmitter(MemberRefExpr *Expr, SGFContext Context,
+                                    NominalTypeDecl *Base)
+    : Expr(Expr), Context(Context), Base(Base),
+      Field(cast<VarDecl>(Expr->getMember().getDecl())) {}
+
+  /// Emit the RValue.
+  Optional<RValue> emit(SILGenFunction &SGF) {
+    // If we don't have a class or a struct, bail.
+    if (!isa<ClassDecl>(Base) && !isa<StructDecl>(Base))
+      return None;
+
+    // Check that we have a stored access strategy. If we don't bail.
+    AccessStrategy strategy =
+      Field->getAccessStrategy(Expr->getAccessSemantics(), AccessKind::Read);
+    if (strategy != AccessStrategy::Storage)
+      return None;
+
+    if (isa<StructDecl>(Base))
+      return emitStructDecl(SGF);
+    assert(isa<ClassDecl>(Base) && "Expected class");
+    return emitClassDecl(SGF);
+  }
+
+  NominalTypeMemberRefRValueEmitter(const SelfTy &) = delete;
+  NominalTypeMemberRefRValueEmitter(SelfTy &&) = delete;
+  ~NominalTypeMemberRefRValueEmitter() = default;
+
+private:
+  bool hasStructWithAtMostOneNonTrivialField(SILGenFunction &SGF) const {
+    auto *S = dyn_cast<StructDecl>(Base);
+    if (!S)
+      return false;
+
+    bool FoundNonTrivialField = false;
+
+    for (auto Field : S->getStoredProperties()) {
+      SILType Ty = SGF.getLoweredType(Field->getType()->getCanonicalType());
+      if (Ty.isTrivial(SGF.F.getModule()))
+        continue;
+
+      // We already found a non-trivial field, so we have two. Return false.
+      if (FoundNonTrivialField)
+        return false;
+
+      // We found one non-trivial field.
+      FoundNonTrivialField = true;
+    }
+
+    // We found at most one non-trivial field.
+    return true;
+  }
+
+  RValue emitStructDecl(SILGenFunction &SGF) {
+    ManagedValue base =
+      SGF.emitRValueAsSingleValue(Expr->getBase(),
+                                  SGFContext::AllowImmediatePlusZero);
+    ManagedValue result =
+      SGF.emitRValueForPropertyLoad(Expr, base, Expr->isSuper(), Field,
+                                    Expr->getMember().getSubstitutions(),
+                                    Expr->getAccessSemantics(),
+                                    Expr->getType(), Context);
+    return RValue(SGF, Expr, result);
+  }
+
+  Optional<RValue> emitClassDecl(SILGenFunction &SGF) {
+    // If guaranteed plus zero is not ok, we bail.
+    if (!Context.isGuaranteedPlusZeroOk())
+      return None;
+
+    // If the field is not a let, bail. We need to use the lvalue logic.
+    if (!Field->isLet())
+      return None;
+
+    // Ok, now we know that we are able to emit our base at guaranteed plus zero
+    // emit base.
+    ManagedValue base =
+      SGF.emitRValueAsSingleValue(Expr->getBase(), Context);
+
+    // And then emit our property using whether or not base is at +0 to
+    // discriminate whether or not the base was guaranteed.
+    ManagedValue result =
+        SGF.emitRValueForPropertyLoad(Expr, base, Expr->isSuper(), Field,
+                                      Expr->getMember().getSubstitutions(),
+                                      Expr->getAccessSemantics(),
+                                      Expr->getType(), Context,
+                                      base.isPlusZeroRValueOrTrivial());
+    return RValue(SGF, Expr, result);
+  }
+};
+
+} // end anonymous namespace
+
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
@@ -1693,22 +1810,12 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
     return SGF.emitApplyExpr(E, C);
   }
 
-  // Check to see if we should do this with a simple struct_extract.
-  auto field = cast<VarDecl>(E->getMember().getDecl());
-  if (E->getBase()->getType()->getStructOrBoundGenericStruct()) {
-    AccessStrategy strategy =
-      field->getAccessStrategy(E->getAccessSemantics(), AccessKind::Read);
-    if (strategy == AccessStrategy::Storage) {
-      ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase(),
-                                          SGFContext::AllowImmediatePlusZero);
-      ManagedValue result =
-        SGF.emitRValueForPropertyLoad(E, base, E->isSuper(), field,
-                                      E->getMember().getSubstitutions(),
-                                      E->getAccessSemantics(),
-                                      E->getType(), C);
-      return RValue(SGF, E, result);
-    }
-  }
+  // If we have a nominal type decl as our base, try to use special logic to
+  // emit the base rvalue's member using special logic that will let us avoid
+  // extra retains and releases.
+  if (auto *N = E->getBase()->getType()->getNominalOrBoundGenericNominal())
+    if (auto RV = NominalTypeMemberRefRValueEmitter(E, C, N).emit(SGF))
+      return RValue(std::move(RV).getValue());
 
   // Everything else should use the l-value logic.
 

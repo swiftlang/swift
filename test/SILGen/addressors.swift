@@ -351,7 +351,6 @@ class G {
 // CHECK:   [[T0:%.*]] = alloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
 // CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
-// CHECK:   retain_value [[TUPLE]]
 // CHECK:   [[T3:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
 // CHECK:   store [[T3]] to [[T2]] : $*Builtin.NativeObject
 //   Pull out the address.
@@ -363,8 +362,6 @@ class G {
 // CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[T1]]
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>)
-// CHECK:   strong_release [[ADDR_OWNER]]
-// CHECK:   release_value [[TUPLE]]
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for G.value
@@ -477,7 +474,6 @@ class I {
 // CHECK:   [[T0:%.*]] = alloc_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
 // CHECK:   [[T2:%.*]] = pointer_to_address [[T1]]
-// CHECK:   retain_value [[TUPLE]]
 // CHECK:   [[T3:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
 // CHECK:   store [[T3]] to [[T2]] : $*Optional<Builtin.NativeObject>
 //   Pull out the address.
@@ -488,7 +484,6 @@ class I {
 // CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[T1]] 
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>)
-// CHECK:   release_value [[TUPLE]]
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for I.value
