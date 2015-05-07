@@ -44,8 +44,8 @@ struct IsTriviallyConstructible {
 #if _LIBCPP_VERSION
   // libc++ implements it.
   static const bool value = std::is_trivially_constructible<T>::value;
-#elif __has_feature(is_trivially_constructible)
-  static const bool value = __is_trivially_constructible(T);
+#elif __has_feature(has_trivial_constructor)
+  static const bool value = __has_trivial_constructor(T);
 #else
 #  error "Not implemented"
 #endif
@@ -56,8 +56,8 @@ struct IsTriviallyDestructible {
 #if _LIBCPP_VERSION
   // libc++ implements it.
   static const bool value = std::is_trivially_destructible<T>::value;
-#elif __has_feature(is_trivially_destructible)
-  static const bool value = __is_trivially_destructible(T);
+#elif __has_feature(has_trivial_destructor)
+  static const bool value = __has_trivial_destructor(T);
 #else
 #  error "Not implemented"
 #endif
