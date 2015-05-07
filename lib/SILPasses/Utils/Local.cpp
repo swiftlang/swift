@@ -860,6 +860,25 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
+  // The conformance to _BridgedToObjectiveC is statically known.
+  // Retrieve the  bridging operation to be used if a static conformance
+  // to _BridgedToObjectiveC can be proven.
+  FuncDecl *BridgeFuncDecl =
+      isConditional
+          ? M.getASTContext().getConditionallyBridgeFromObjectiveCBridgeable(nullptr)
+          : M.getASTContext().getForceBridgeFromObjectiveCBridgeable(nullptr);
+
+  assert(BridgeFuncDecl && "_forceBridgeFromObjectiveC should exist");
+
+  SILDeclRef FuncDeclRef(BridgeFuncDecl, SILDeclRef::Kind::Func);
+
+  // Lookup a function from the stdlib.
+  SILFunction *BridgedFunc = M.getOrCreateFunction(
+      Loc, FuncDeclRef, ForDefinition_t::NotForDefinition);
+
+  if (!BridgedFunc)
+    return nullptr;
+
   CanType CanBridgedTy(BridgedTargetTy);
   SILType SILBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
 
@@ -925,24 +944,6 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
          "_ObjectiveCBridgeable conformance should exist");
 
   auto *Conformance = Conf.getPointer();
-
-  // The conformance to _BridgedToObjectiveC is statically known.
-  // Retrieve the  bridging operation to be used if a static conformance
-  // to _BridgedToObjectiveC can be proven.
-  FuncDecl *BridgeFuncDecl =
-      isConditional
-          ? M.getASTContext().getConditionallyBridgeFromObjectiveCBridgeable(nullptr)
-          : M.getASTContext().getForceBridgeFromObjectiveCBridgeable(nullptr);
-
-  assert(BridgeFuncDecl && "_forceBridgeFromObjectiveC should exist");
-
-  SILDeclRef FuncDeclRef(BridgeFuncDecl, SILDeclRef::Kind::Func);
-
-  // Lookup a function from the stdlib.
-  SILFunction *BridgedFunc = M.getOrCreateFunction(
-      Loc, FuncDeclRef, ForDefinition_t::NotForDefinition);
-
-  assert(BridgedFunc && "Bridging function was not found");
 
   auto ParamTypes = BridgedFunc->getLoweredFunctionType()
                                ->getParametersWithoutIndirectResult();
@@ -1052,6 +1053,28 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   return (NewI) ? NewI : AI;
 }
 
+static bool isValidLinkageForFragileRef(SILLinkage linkage) {
+  switch (linkage) {
+  case SILLinkage::Private:
+  case SILLinkage::PrivateExternal:
+  case SILLinkage::Hidden:
+  case SILLinkage::HiddenExternal:
+    return false;
+
+  case SILLinkage::Shared:
+  case SILLinkage::SharedExternal:
+      // This handles some kind of generated functions, like constructors
+      // of clang imported types.
+      // TODO: check why those functions are not fragile anyway and make
+      // a less conservative check here.
+      return true;
+
+  case SILLinkage::Public:
+  case SILLinkage::PublicExternal:
+    return true;
+  }
+}
+
 /// Create a call of _bridgeToObjectiveC which converts an _ObjectiveCBridgeable
 /// instance into a bridged ObjC type.
 SILInstruction *
@@ -1080,6 +1103,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   assert(Conf.getInt() == ConformanceKind::Conforms &&
          "_ObjectiveCBridgeable conformance should exist");
 
+  bool isCurrentModuleBridgeToObjectiveC = false;
+
   // Generate code to invoke _bridgeToObjectiveC
   SILBuilderWithScope<1> Builder(Inst);
 
@@ -1091,18 +1116,34 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto BridgeFuncDeclRef = SILDeclRef(BridgeFuncDecl);
   Module *Mod = M.getASTContext().getLoadedModule(
       M.getASTContext().getIdentifier(FOUNDATION_MODULE_NAME));
-  assert(Mod && "Foundation module should be present");
+  if (!Mod)
+    return nullptr;
   SmallVector<ValueDecl *, 2> Results;
   Mod->lookupMember(Results, Source.getNominalOrBoundGenericNominal(),
                     M.getASTContext().Id_bridgeToObjectiveC, Identifier());
   ArrayRef<ValueDecl *> ResultsRef(Results);
-  assert(ResultsRef.size() == 1 && "There should be only one declaration of _bridgeToObjectiveC");
+  if (ResultsRef.empty()) {
+    M.getSwiftModule()->lookupMember(Results, Source.getNominalOrBoundGenericNominal(),
+                      M.getASTContext().Id_bridgeToObjectiveC, Identifier());
+    ResultsRef = Results;
+    isCurrentModuleBridgeToObjectiveC = true;
+  }
+  if (ResultsRef.size() != 1)
+    return nullptr;
 
   auto MemberDeclRef = SILDeclRef(Results.front());
-  auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef,
-                                            ForDefinition_t::NotForDefinition);
+  auto Linkage = (isCurrentModuleBridgeToObjectiveC)
+                     ? ForDefinition_t::ForDefinition
+                     : ForDefinition_t::NotForDefinition;
+  auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef, Linkage);
   assert(BridgedFunc &&
          "Implementation of _bridgeToObjectiveC could not be found");
+
+  if (Inst->getFunction()->isFragile() &&
+      !(BridgedFunc->isFragile() ||
+        isValidLinkageForFragileRef(BridgedFunc->getLinkage()) ||
+        BridgedFunc->isExternalDeclaration()))
+    return nullptr;
 
   auto ParamTypes = BridgedFunc->getLoweredFunctionType()
                                ->getParametersWithoutIndirectResult();
