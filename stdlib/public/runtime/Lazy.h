@@ -56,10 +56,8 @@ private:
 
 template<typename T>
 inline T& Lazy<T>::get() {
-  static_assert(IsTriviallyConstructible<Lazy<T>>::value,
-                "Lazy must be trivially default constructible");
-  static_assert(IsTriviallyDestructible<Lazy<T>>::value,
-                "Lazy must be trivially destructible");
+  static_assert(std::is_literal_type<Lazy<T>>::value,
+                "Lazy<T> must be a literal type");
 
 #ifdef __APPLE__
   dispatch_once_f(&OnceToken, this, lazyInitCallback);
