@@ -42,7 +42,7 @@ public:
     return *reinterpret_cast<T*>(&Value);
   }
   
-  Lazy() = default;
+  constexpr Lazy() = default;
 
 private:
   static void lazyInitCallback(void *Argument) {
