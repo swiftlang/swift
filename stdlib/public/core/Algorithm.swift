@@ -12,22 +12,22 @@
 
 /// Returns the minimum element in `elements`.  Requires:
 /// `elements` is non-empty. O(count(elements))
+@availability(*, unavailable, message="call the 'minElement()' method on the sequence")
 public func minElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
   -> R.Generator.Element {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return elements._prext_minElement()!
+  return elements.minElement()!
 }
 
 /// Returns the maximum element in `elements`.  Requires:
 /// `elements` is non-empty. O(count(elements))
+@availability(*, unavailable, message="call the 'maxElement()' method on the sequence")
 public func maxElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
   -> R.Generator.Element {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return elements._prext_maxElement()!
+  return elements.maxElement()!
 }
 
 /// Returns the first index where `value` appears in `domain` or `nil` if

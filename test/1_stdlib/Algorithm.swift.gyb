@@ -171,29 +171,6 @@ Algorithm.test("min,max") {
   // condition.
 }
 
-Algorithm.test("minElement,maxElement") {
-  // FIXME(prext): remove these tests together with the minElement() function
-  // when protocol extensions land.  These tests have been migrated to the new
-  // API.
-
-  var arr = [Int](count: 10, repeatedValue: 0)
-  for i in 0..<10 {
-    arr[i] = i % 7 + 2
-  }
-  expectEqual([2, 3, 4, 5, 6, 7, 8, 2, 3, 4], arr)
-
-  expectEqual(2, minElement(arr))
-  expectEqual(8, maxElement(arr))
-
-  // min and max element of a slice
-  expectEqual(3, minElement(arr[1..<5]))
-  expectEqual(6, maxElement(arr[1..<5]))
-
-  // FIXME: add tests that check that minElement/maxElement return the
-  // first element of the sequence (by reference equailty) that satisfy the
-  // condition.
-}
-
 Algorithm.test("filter/SequenceType") {
   // FIXME(prext): remove these tests together with the filter() function when
   // protocol extensions land.  These tests have been migrated to the new API.
@@ -670,7 +647,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") 
       test.sequence.enumerate()._prext_map {
         MinimalComparableValue($1, identity: $0)
       })
-    var maybeResult = s._prext_${algorithmKind}Element()
+    var maybeResult = s.${algorithmKind}Element()
     expectType(Optional<MinimalComparableValue>.self, &maybeResult)
     if let result = maybeResult {
       expectEqual(
@@ -698,7 +675,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
         OpaqueValue($1, identity: $0)
       })
     var timesClosureWasCalled = 0
-    var maybeResult = s._prext_${algorithmKind}Element {
+    var maybeResult = s.${algorithmKind}Element {
       (lhs, rhs) -> Bool in
       ++timesClosureWasCalled
       return lhs.value < rhs.value

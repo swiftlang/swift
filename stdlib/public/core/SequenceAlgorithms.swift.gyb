@@ -63,7 +63,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   ///
   /// - complexity: O(count(elements))
   /// ${orderingRequirement}
-  final public func _prext_minElement(
+  final public func minElement(
 %   if preds:
     @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
 %   end
@@ -84,7 +84,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   ///
   /// - complexity: O(count(elements))
   /// ${orderingRequirement}
-  final public func _prext_maxElement(
+  final public func maxElement(
 %   if preds:
     @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
 %   end
