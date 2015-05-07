@@ -1164,7 +1164,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
   // then the parser is hopelessly lost - just give up instead of spewing.
   if (parseToken(tok::kw_else, diag::expected_else_after_guard) &&
       Tok.isNot(tok::l_brace))
-    return makeParserResult<Stmt>(Status, nullptr);
+    return makeParserError();
 
   // Before parsing the body, disable all of the bound variables so that they
   // cannot be used unbound.
