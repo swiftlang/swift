@@ -176,6 +176,9 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     switch (Base->getKind()) {
       default:
         llvm_unreachable("unhandled context kind in SILPrint!");
+      case TypeKind::Protocol:
+        ExtNominal = cast<ProtocolType>(Base)->getDecl();
+        break;
       case TypeKind::Enum:
         ExtNominal = cast<EnumType>(Base)->getDecl();
         break;
