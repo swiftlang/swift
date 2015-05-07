@@ -266,6 +266,12 @@ extension InitRequirement {
   // CHECK:         apply [[DELEGATEE]]<Self>({{%.*}}, [[ARG_UP]], [[SELF_TYPE]])
     self.init(c: d)
   }
+
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions15InitRequirementCUS0___fMQPS0_FT2d2CS_1D_S1_
+  // CHECK:         function_ref @_TFP19protocol_extensions15InitRequirementCUS0___fMQPS0_FT1dCS_1D_S1_
+  init(d2: D) {
+    self.init(d: d2)
+  }
 }
 
 protocol ClassInitRequirement: class {

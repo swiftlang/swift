@@ -1425,12 +1425,13 @@ public:
 
     // Determine the callee. For structs and enums, this is the allocating
     // constructor (because there is no initializing constructor). For protocol
-    // default implementations, we also use the allocation constructor, because
+    // default implementations, we also use the allocating constructor, because
     // that's the only thing that's witnessed. For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
     if (isa<ArchetypeType>(
-                 SelfParam.getSubstRValueType().getLValueOrInOutObjectType())) {
+                 SelfParam.getSubstRValueType().getLValueOrInOutObjectType())
+        && isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
       // Look up the witness for the constructor.
       auto constant = SILDeclRef(ctorRef->getDecl(),
                              useAllocatingCtor
