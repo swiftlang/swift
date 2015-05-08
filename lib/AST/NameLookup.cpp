@@ -459,7 +459,8 @@ static void recordLookupOfTopLevelName(DeclContext *topLevelContext,
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
                                      bool IsKnownNonCascading,
-                                     SourceLoc Loc, bool IsTypeLookup) {
+                                     SourceLoc Loc, bool IsTypeLookup,
+                                     bool AllowProtocolMembers) {
   Module &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
   const SourceManager &SM = Ctx.SourceMgr;
@@ -596,6 +597,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           options |= NL_KnownCascadingDependency;
         else
           options |= NL_KnownNonCascadingDependency;
+
+        if (AllowProtocolMembers)
+          options |= NL_ProtocolMembers;
 
         SmallVector<ValueDecl *, 4> Lookup;
         DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);

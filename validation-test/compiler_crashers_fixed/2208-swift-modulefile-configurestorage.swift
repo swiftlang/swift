@@ -1,14 +1,15 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
 protocol P {
-class B<H : A.h = 0
+enum B : d = 0)
 }
-class A {
-return [unowned self.init(self)
-typealias e = A"""A.init<T] in
+extension String {
+case C> {
+}
+protocol c : () -> : e() -> T, a<f : A, T)
 protocol A : P {
-let t: B<c>
+func j<S : B, U.e

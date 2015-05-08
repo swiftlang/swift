@@ -32,13 +32,94 @@ void LookupResult::filter(const std::function<bool(Result)> &pred) {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
+  // Determine whether we're searching from a protocol extension.
+  bool searchingFromProtoExt = false;
+  for (auto outerDC = dc; outerDC; outerDC = outerDC->getParent()) {
+    if (auto ext = dyn_cast<ExtensionDecl>(outerDC)) {
+      if (ext->getExtendedType()->is<ProtocolType>()) {
+        searchingFromProtoExt = true;
+        break;
+      }
+    }
+  }
+
   UnqualifiedLookup lookup(name, dc, this,
                            options.contains(NameLookupFlags::KnownPrivate),
                            loc,
-                           options.contains(NameLookupFlags::OnlyTypes));
+                           options.contains(NameLookupFlags::OnlyTypes),
+                           options.contains(NameLookupFlags::ProtocolMembers));
+
   LookupResult result;
+  llvm::SmallDenseMap<std::pair<ValueDecl *, ValueDecl *>, bool, 8> known;
   for (const auto &found : lookup.Results) {
-    result.add({found.getValueDecl(), found.getBaseDecl()});
+    // Members of protocols or protocol extensions need special
+    // treatment.
+    ValueDecl *foundDecl = found.getValueDecl();
+    DeclContext *foundDC = foundDecl->getDeclContext();
+    auto foundProto = foundDC->isProtocolOrProtocolExtensionContext();
+    if (foundProto &&
+        !(isa<GenericTypeParamDecl>(foundDecl)) &&
+        !(isa<FuncDecl>(foundDecl) && cast<FuncDecl>(foundDecl)->isOperator())){
+      // Was the declaration we found declared within the protocol itself?
+      // (Otherwise, it was is an extension of the protocol).
+      bool foundInProto = isa<ProtocolDecl>(foundDC);
+      bool foundInProtoExt = !foundInProto;
+
+      // Determine the nominal type through which we found the
+      // declaration.
+      NominalTypeDecl *baseNominal;
+      if (auto baseParam = dyn_cast<ParamDecl>(found.getBaseDecl())) {
+        auto baseDC = baseParam->getDeclContext();
+        if (isa<AbstractFunctionDecl>(baseDC))
+          baseDC = baseDC->getParent();
+
+        baseNominal = baseDC->isNominalTypeOrNominalTypeExtensionContext();
+        assert(baseNominal && "Did not find nominal type");
+      } else {
+        baseNominal = cast<NominalTypeDecl>(found.getBaseDecl());
+      }
+
+      // If we found something within the protocol itself, and our
+      // search began somewhere that is not in a protocol or extension
+      // thereof, remap this declaration to the witness.
+      if (foundInProto && !isa<ProtocolDecl>(baseNominal)) {
+        ConformanceCheckOptions conformanceOptions;
+        if (options.contains(NameLookupFlags::KnownPrivate))
+          conformanceOptions |= ConformanceCheckFlags::InExpression;
+        ProtocolConformance *conformance = nullptr;
+        ValueDecl *witness = nullptr;
+        if (conformsToProtocol(baseNominal->getDeclaredType(),
+                               foundProto, dc, conformanceOptions,
+                               &conformance)) {
+          if (auto assocType = dyn_cast<AssociatedTypeDecl>(foundDecl)) {
+            witness = conformance->getTypeWitnessSubstAndDecl(assocType, this)
+                        .second;
+          } else {
+            witness = conformance->getWitness(foundDecl, this).getDecl();
+          }
+
+          if (witness &&
+              known.insert({{witness, found.getBaseDecl()}, false}).second)
+            result.add({witness, found.getBaseDecl()});
+        }
+
+        continue;
+      }
+
+      // If we found something in a protocol extension, and our
+      // search began in the same protocol, ignore it.
+      if (foundInProtoExt && baseNominal == foundProto &&
+          !searchingFromProtoExt)
+        continue;
+
+      // Otherwise, we either found something in a protocol
+      // extension that can be used directly, or we found a protocol
+      // requirement where we can use it directly.
+    }
+
+    if (known.insert({{found.getValueDecl(), found.getBaseDecl()}, false})
+          .second)
+      result.add({found.getValueDecl(), found.getBaseDecl()});
   }
   return result;
 }

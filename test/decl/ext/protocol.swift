@@ -153,11 +153,21 @@ func testSubscriptP1(var ss1: SubscriptS1, var sc1: SubscriptC1,
 // ----------------------------------------------------------------------------
 struct S1 : P1 {
   func reqP1a() -> Bool { return true }
+
+  func once() -> Bool {
+    return extP1a() && extP1b
+  }
 }
 
 func useS1(s1: S1) -> Bool {
   s1.reqP1a()
   return s1.extP1a() && s1.extP1b
+}
+
+extension S1 {
+  func twice() -> Bool {
+    return extP1a() && extP1b
+  }
 }
 
 // ----------------------------------------------------------------------------

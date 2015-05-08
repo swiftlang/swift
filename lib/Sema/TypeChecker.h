@@ -169,7 +169,8 @@ const NameLookupOptions defaultMemberTypeLookupOptions
   = NameLookupFlags::ProtocolMembers;
 
 /// Default options for unqualified name lookup.
-const NameLookupOptions defaultUnqualifiedLookupOptions = None;
+const NameLookupOptions defaultUnqualifiedLookupOptions
+  = NameLookupFlags::ProtocolMembers;
 
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.

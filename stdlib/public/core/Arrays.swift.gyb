@@ -736,7 +736,7 @@ extension ${Self} {
   @transparent
   func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
     let p = _baseAddressIfContiguous
-    if _fastPath(p != nil || self.isEmpty) {
+    if _fastPath(p != nil || isEmpty) {
       return (_owner, p._rawValue)
     }
     let n = _extractOrCopyToNativeArrayBuffer(self._buffer)

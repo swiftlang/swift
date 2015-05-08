@@ -1,15 +1,15 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
 protocol P {
-class b[T> {
-var e, a"])
+class a(A> {
 }
-protocol A : P {
-struct Q<Y> : b: d {
-init(array: b> ()] = "a<T, b {
+enum S) { }
 }
-A
+protocol b : P {
+typealias e = {
+protocol b : a: A<3))"\(a()
+func a((a(

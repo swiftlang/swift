@@ -67,7 +67,8 @@ public:
                     LazyResolver *TypeResolver,
                     bool IsKnownPrivate = false,
                     SourceLoc Loc = SourceLoc(),
-                    bool IsTypeLookup = false);
+                    bool IsTypeLookup = false,
+                    bool AllowProtocolMembers = false);
 
   SmallVector<UnqualifiedLookupResult, 4> Results;
 

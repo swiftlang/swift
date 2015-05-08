@@ -211,7 +211,7 @@ extension String {
     }
 
     public var description: String {
-      return String(_core[self.startIndex._position..<self.endIndex._position])
+      return String(_core[startIndex._position..<endIndex._position])
     }
 
     public var debugDescription: String {

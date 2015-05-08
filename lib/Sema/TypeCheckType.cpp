@@ -281,13 +281,14 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
   Type ownerType = resolver->resolveTypeOfContext(ownerDC);
   auto ownerNominal = ownerType->getAnyNominal();
   assert(ownerNominal && "Owner must be a nominal type");
-  for (; !fromDC->isModuleContext(); fromDC = fromDC->getParent()) {
+  for (auto parentDC = fromDC; !parentDC->isModuleContext();
+       parentDC = parentDC->getParent()) {
     // Skip non-type contexts.
-    if (!fromDC->isTypeContext())
+    if (!parentDC->isTypeContext())
       continue;
 
     // Search the type of this context and its supertypes.
-    for (auto fromType = resolver->resolveTypeOfContext(fromDC);
+    for (auto fromType = resolver->resolveTypeOfContext(parentDC);
          fromType;
          fromType = getSuperClassOf(fromType)) {
       // If the nominal type declaration of the context type we're looking at
@@ -304,11 +305,26 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
         }
 
         // Perform the substitution.
-        return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
+        return substMemberTypeWithBase(parentDC->getParentModule(), typeDecl,
                                        fromType, /*isTypeReference=*/true);
       }
     }
   }
+
+  // If we found something in a protocol or extension thereof, substitute in
+  // the appropriate type for 'Self'.
+  // FIXME: We shouldn't have to guess here; the caller should tell us.
+  if (isa<ProtocolDecl>(ownerNominal)) {
+    Type fromType;
+    if (fromDC->isProtocolOrProtocolExtensionContext())
+      fromType = fromDC->getProtocolSelf()->getArchetype();
+    else
+      fromType = resolver->resolveTypeOfContext(fromDC);
+
+    // Perform the substitution.
+    return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
+                                   fromType, /*isTypeReference=*/true);
+   }
 
   llvm_unreachable("Shouldn't have found this type");
 }
@@ -591,6 +607,9 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   lookupOptions |= NameLookupFlags::OnlyTypes;
   if (options.contains(TR_KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
+  // FIXME: Eliminate this once we can handle finding protocol members
+  // in resolveTypeInContext.
+  lookupOptions -= NameLookupFlags::ProtocolMembers;
   LookupResult globals = TC.lookupUnqualified(lookupDC, comp->getIdentifier(),
                                               comp->getIdLoc(), lookupOptions);
 

@@ -288,7 +288,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
-  NameLookupOptions LookupOptions = defaultMemberTypeLookupOptions;
+  NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(Context))
     LookupOptions |= NameLookupFlags::KnownPrivate;
   auto Lookup = TC.lookupUnqualified(Context, Name, Loc, LookupOptions);
