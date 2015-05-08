@@ -29,6 +29,20 @@ void LookupResult::filter(const std::function<bool(Result)> &pred) {
                 Results.end());
 }
 
+LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
+                                            SourceLoc loc,
+                                            NameLookupOptions options) {
+  UnqualifiedLookup lookup(name, dc, this,
+                           options.contains(NameLookupFlags::KnownPrivate),
+                           loc,
+                           options.contains(NameLookupFlags::OnlyTypes));
+  LookupResult result;
+  for (const auto &found : lookup.Results) {
+    result.add({found.getValueDecl(), found.getBaseDecl()});
+  }
+  return result;
+}
+
 LookupResult TypeChecker::lookupMember(DeclContext *dc,
                                        Type type, DeclName name,
                                        NameLookupOptions options) {

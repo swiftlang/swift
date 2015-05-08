@@ -1916,15 +1916,15 @@ ConformanceChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   SmallVector<ValueDecl *, 4> witnesses;
   if (req->getName().isOperator()) {
     // Operator lookup is always global.
-    UnqualifiedLookup lookup(req->getName(),
-                             DC->getModuleScopeContext(),
-                             &TC,
-                             !DC->isCascadingContextForLookup(false));
-
-    if (lookup.isSuccess()) {
-      for (auto candidate : lookup.Results) {
-        witnesses.push_back(candidate.getValueDecl());
-      }
+    auto lookupOptions = defaultUnqualifiedLookupOptions;
+    if (!DC->isCascadingContextForLookup(false))
+      lookupOptions |= NameLookupFlags::KnownPrivate;
+    auto lookup = TC.lookupUnqualified(DC->getModuleScopeContext(),
+                                       req->getName(),
+                                       SourceLoc(),
+                                       lookupOptions);
+    for (auto candidate : lookup) {
+      witnesses.push_back(candidate.Decl);
     }
   } else {
     // Variable/function/subscript requirements.

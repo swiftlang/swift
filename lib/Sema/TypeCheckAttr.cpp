@@ -1041,9 +1041,13 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   auto KitModule = C.getLoadedModule(Id_Kit);
   ProtocolDecl *ApplicationDelegateProto = nullptr;
   if (KitModule) {
-    UnqualifiedLookup lookup(Id_ApplicationDelegate, KitModule, nullptr,
-                             /*NonCascading=*/true, SourceLoc(),
-                             /*IsType=*/true);
+    auto lookupOptions = defaultUnqualifiedLookupOptions;
+    lookupOptions |= NameLookupFlags::OnlyTypes;
+    lookupOptions |= NameLookupFlags::KnownPrivate;
+
+    auto lookup = TC.lookupUnqualified(KitModule, Id_ApplicationDelegate,
+                                       SourceLoc(),
+                                       lookupOptions);
     ApplicationDelegateProto = dyn_cast_or_null<ProtocolDecl>(
                                    lookup.getSingleTypeResult());
   }
@@ -1067,19 +1071,23 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     attr->setInvalid();
   
   // Check that we have the needed symbols in the frameworks.
-  UnqualifiedLookup lookupMain(Id_ApplicationMain, KitModule, nullptr,
-                               /*NonCascading=*/true, SourceLoc(),
-                               /*IsType=*/false);
-  for (const auto &result : lookupMain.Results) {
-    TC.validateDecl(result.getValueDecl());
+  auto lookupOptions = defaultUnqualifiedLookupOptions;
+  lookupOptions |= NameLookupFlags::KnownPrivate;
+  auto lookupMain = TC.lookupUnqualified(KitModule, Id_ApplicationMain,
+                                         SourceLoc(), lookupOptions);
+
+  for (const auto &result : lookupMain) {
+    TC.validateDecl(result.Decl);
   }
   auto Foundation = TC.Context.getLoadedModule(C.getIdentifier("Foundation"));
   if (Foundation) {
-    UnqualifiedLookup lookupString(C.getIdentifier("NSStringFromClass"),
-                                   Foundation, nullptr, /*NonCascading=*/true,
-                                   SourceLoc(), /*IsType=*/false);
-    for (const auto &result : lookupString.Results) {
-      TC.validateDecl(result.getValueDecl());
+    auto lookupString = TC.lookupUnqualified(
+                          Foundation,
+                          C.getIdentifier("NSStringFromClass"),
+                          SourceLoc(),
+                          lookupOptions);
+    for (const auto &result : lookupString) {
+      TC.validateDecl(result.Decl);
     }
   }
 }

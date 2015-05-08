@@ -530,10 +530,13 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
 
 static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
                                      StringRef name) {
-  UnqualifiedLookup lookup(TC.Context.getIdentifier(name),
-                           dc->getModuleScopeContext(),
-                           nullptr,
-                           /*non-cascading=*/isa<AbstractFunctionDecl>(dc));
+  auto lookupOptions = defaultUnqualifiedLookupOptions;
+  if (isa<AbstractFunctionDecl>(dc))
+    lookupOptions |= NameLookupFlags::KnownPrivate;
+  auto lookup = TC.lookupUnqualified(dc->getModuleScopeContext(),
+                                     TC.Context.getIdentifier(name),
+                                     SourceLoc(),
+                                     lookupOptions);
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();

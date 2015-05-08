@@ -1612,17 +1612,18 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   matchVar->setHasNonPatternBindingInit();
   
   // Find '~=' operators for the match.
-  UnqualifiedLookup matchLookup(Context.Id_MatchOperator, DC, this,
-                                /*NonCascading=*/true);
-
-  if (!matchLookup.isSuccess()) {
+  auto lookupOptions = defaultUnqualifiedLookupOptions;
+  lookupOptions |= NameLookupFlags::KnownPrivate;
+  auto matchLookup = lookupUnqualified(DC, Context.Id_MatchOperator,
+                                       SourceLoc(), lookupOptions);
+  if (!matchLookup) {
     diagnose(EP->getLoc(), diag::no_match_operator);
     return true;
   }
   
   SmallVector<ValueDecl*, 4> choices;
-  for (auto &result : matchLookup.Results) {
-    choices.push_back(result.getValueDecl());
+  for (auto &result : matchLookup) {
+    choices.push_back(result.Decl);
   }
   
   if (choices.empty()) {

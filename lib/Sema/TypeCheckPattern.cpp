@@ -29,16 +29,16 @@ using namespace swift;
 static EnumElementDecl *
 lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
                                    Identifier name) {
-  UnqualifiedLookup lookup(name, DC, &TC, /*non-cascading=*/true,
-                           SourceLoc(), /*typeLookup*/false);
-  
-  if (!lookup.isSuccess())
+  auto lookupOptions = defaultUnqualifiedLookupOptions;
+  lookupOptions |= NameLookupFlags::KnownPrivate;
+  auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
+  if (!lookup)
     return nullptr;
 
   // See if there is any enum element in there.
   EnumElementDecl *foundElement = nullptr;
-  for (auto result : lookup.Results) {
-    auto *oe = dyn_cast<EnumElementDecl>(result.getValueDecl());
+  for (auto result : lookup) {
+    auto *oe = dyn_cast<EnumElementDecl>(result.Decl);
     if (!oe)
       continue;
     // Ambiguities should be ruled out by parsing.

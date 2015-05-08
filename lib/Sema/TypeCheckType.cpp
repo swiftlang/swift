@@ -586,16 +586,20 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   DeclContext *lookupDC = DC;
   if (options.contains(TR_GenericSignature))
     lookupDC = DC->getParent();
-  UnqualifiedLookup Globals(comp->getIdentifier(), lookupDC, &TC,
-                            options.contains(TR_KnownNonCascadingDependency),
-                            comp->getIdLoc(), /*TypeLookup*/true);
+
+  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  lookupOptions |= NameLookupFlags::OnlyTypes;
+  if (options.contains(TR_KnownNonCascadingDependency))
+    lookupOptions |= NameLookupFlags::KnownPrivate;
+  LookupResult globals = TC.lookupUnqualified(lookupDC, comp->getIdentifier(),
+                                              comp->getIdLoc(), lookupOptions);
 
   // Process the names we found.
   Type current;
   bool isAmbiguous = false;
-  for (const auto &result : Globals.Results) {
+  for (const auto &result : globals) {
     // Ignore non-type declarations.
-    auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl());
+    auto typeDecl = dyn_cast<TypeDecl>(result.Decl);
     if (!typeDecl)
       continue;
     
@@ -641,8 +645,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       TC.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
                   comp->getIdentifier())
         .highlight(comp->getIdLoc());
-      for (auto Result : Globals.Results) {
-        TC.diagnose(Result.getValueDecl(), diag::found_candidate);
+      for (auto result : globals) {
+        TC.diagnose(result.Decl, diag::found_candidate);
       }
     }
     Type ty = ErrorType::get(TC.Context);

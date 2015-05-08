@@ -47,19 +47,20 @@ struct REPLContext {
       return false;
 
     {
-      UnqualifiedLookup Lookup(Id_print, TC.getStdlibModule(&SF), &TC);
-      if (!Lookup.isSuccess())
+      auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
+                                         Id_print, SourceLoc());
+      if (!lookup)
         return true;
-      for (auto Result : Lookup.Results)
-        PrintDecls.push_back(Result.getValueDecl());
+      for (auto result : lookup)
+        PrintDecls.push_back(result.Decl);
     }
     {
-      UnqualifiedLookup Lookup(Id_debugDebugPrintln, TC.getStdlibModule(&SF),
-                               &TC);
-      if (!Lookup.isSuccess())
+      auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
+                                         Id_debugDebugPrintln, SourceLoc());
+      if (!lookup)
         return true;
-      for (auto Result : Lookup.Results)
-        DebugPrintlnDecls.push_back(Result.getValueDecl());
+      for (auto result : lookup)
+        DebugPrintlnDecls.push_back(result.Decl);
     }
 
     return false;
@@ -129,8 +130,7 @@ Identifier TypeChecker::getNextResponseVariableName(DeclContext *DC) {
     names << "r" << NextResponseVariableIndex++;
 
     ident = Context.getIdentifier(names.str());
-    UnqualifiedLookup lookup(ident, DC, this);
-    nameUsed = lookup.isSuccess();
+    nameUsed = static_cast<bool>(lookupUnqualified(DC, ident, SourceLoc()));
   } while (nameUsed);
 
   return ident;

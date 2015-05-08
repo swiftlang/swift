@@ -73,7 +73,7 @@ public:
   unsigned size() const { return Results.size(); }
   bool empty() const { return Results.empty(); }
 
-  Result operator[](unsigned index) const { return Results[index]; }
+  const Result& operator[](unsigned index) const { return Results[index]; }
 
   Result front() const { return Results.front(); }
   Result back() const { return Results.back(); }
@@ -86,6 +86,13 @@ public:
   /// Determine whether the result set is nonempty.
   explicit operator bool() const {
     return !Results.empty();
+  }
+
+  TypeDecl *getSingleTypeResult() const {
+    if (size() != 1)
+      return nullptr;
+
+    return dyn_cast<TypeDecl>(front().Decl);
   }
 
   /// Filter out any results that aren't accepted by the given predicate.
@@ -137,6 +144,8 @@ enum class NameLookupFlags {
   /// Whether to perform 'dynamic' name lookup that finds @objc
   /// members of any class or protocol.
   DynamicLookup = 0x04,
+  /// Whether we're only looking for types.
+  OnlyTypes = 0x08,
 };
 
 /// A set of options that control name lookup.
@@ -158,6 +167,9 @@ const NameLookupOptions defaultConstructorLookupOptions
 /// Default options for member type lookup.
 const NameLookupOptions defaultMemberTypeLookupOptions
   = NameLookupFlags::ProtocolMembers;
+
+/// Default options for unqualified name lookup.
+const NameLookupOptions defaultUnqualifiedLookupOptions = None;
 
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
@@ -1196,6 +1208,17 @@ public:
                           DeclContext *DC,
                           SourceLoc ComplainLoc,
                           TypeSubstitutionMap *RecordSubstitutions = nullptr);
+
+  /// Perform unqualified name lookup at the given source location
+  /// within a particular declaration context.
+  ///
+  /// \param dc The declaration context in which to perform name lookup.
+  /// \param name The name of the entity to look for.
+  /// \param loc The source location at which name lookup occurs.
+  /// \param options Options that control name lookup.
+  LookupResult lookupUnqualified(DeclContext *dc, DeclName name, SourceLoc loc,
+                                 NameLookupOptions options
+                                   = defaultUnqualifiedLookupOptions);
 
   /// \brief Lookup a member in the given type.
   ///
