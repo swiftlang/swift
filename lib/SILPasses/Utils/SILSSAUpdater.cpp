@@ -456,19 +456,6 @@ UseWrapper::operator Operand *() {
   llvm_unreachable("uninitialize use type");
 }
 
-/// Find the specified value in the BB arguments for the edge from PredBB to
-/// PhiBB.
-static Optional<unsigned> findEdgeValueIdx(SILValue V, SILBasicBlock *PredBB,
-                                           SILBasicBlock *PhiBB) {
-  OperandValueArrayRef EdgeValues =
-    getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
-  for (unsigned ArgIdx : indices(EdgeValues)) {
-    if (EdgeValues[ArgIdx] == V)
-      return ArgIdx;
-  }
-  return None;
-}
-
 /// At least one value feeding the specified SILArgument is a Struct. Attempt to
 /// replace the Argument with a new Struct in the same block.
 ///
