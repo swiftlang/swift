@@ -717,6 +717,16 @@ function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_SUBDIR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
 
+  # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
+  if(SWIFT_ALLOW_BITCODE_SECTION)
+    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
+      set(SWIFTLIB_SINGLE_C_COMPILE_FLAGS "${SWIFTLIB_SINGLE_C_COMPILE_FLAGS}" "-fembed-bitcode")
+      set(SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}" "-embed-bitcode")
+      set(SWIFTLIB_SINGLE_LINK_FLAGS "${SWIFTLIB_SINGLE_LINK_FLAGS}" "-Xlinker -bitcode_bundle -Xlinker -bitcode_hide_symbols")
+    endif()
+  endif()
+
+
   if(MSVC_IDE OR XCODE)
     string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
     list(GET split_path -1 dir)

@@ -91,6 +91,9 @@ set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
 set(SWIFT_SDKS "" CACHE STRING
     "If non-empty, limits building target binaries only to specified SDKs (despite other SDKs being available)")
 
+set(SWIFT_ALLOW_BITCODE_SECTION "" CACHE STRING
+    "If non-empty, allows LLVM bitcode binary sections in standard library and overlay binaries for supported platforms.")
+
 set(SWIFT_PRIMARY_VARIANT_SDK "" CACHE STRING
     "Primary SDK for target binaries")
 set(SWIFT_PRIMARY_VARIANT_ARCH "" CACHE STRING
