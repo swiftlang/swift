@@ -331,11 +331,7 @@ func testSlice() {
 
   // Appending to aSlice works...
   aSlice.append("fodder")
-<<<<<<< HEAD
-  println("<\(aSlice.count)>")    // CHECK-NEXT: <3>
-=======
-  print("<\(aSlice.count())>")    // CHECK-NEXT: <3>
->>>>>>> stdlib: implement new print() API
+  print("<\(aSlice.count)>")      // CHECK-NEXT: <3>
   printSequence(aSlice)           // CHECK-NEXT: [buzz, baz, fodder]
 
   // And doesn't change a
