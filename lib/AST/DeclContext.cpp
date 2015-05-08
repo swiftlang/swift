@@ -504,6 +504,27 @@ static unsigned getLineNumber(DCType *DC) {
   return ctx.SourceMgr.getLineAndColumn(loc).first;
 }
 
+bool DeclContext::classof(const ValueDecl *D) {
+  switch (D->getKind()) { //
+#define DECL(ID, PARENT)               case DeclKind::ID: return false;
+#define CONTEXT_DECL(ID, PARENT)       case DeclKind::ID: return true;
+#define CONTEXT_VALUE_DECL(ID, PARENT) case DeclKind::ID: return true;
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
+const DeclContext *DeclContext::castDeclToDeclContext(const ValueDecl *D) {
+  switch (D->getKind()) {
+#define DECL(ID, PARENT) \
+  case DeclKind::ID: llvm_unreachable("not a decl context");
+#define CONTEXT_DECL(ID, PARENT) \
+  case DeclKind::ID: \
+    return static_cast<const DeclContext*>(cast<ID##Decl>(D));
+#define CONTEXT_VALUE_DECL(ID, PARENT) CONTEXT_DECL(ID, PARENT)
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
 unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   unsigned Depth = 0;
   if (auto *P = getParent())

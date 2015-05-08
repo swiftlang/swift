@@ -31,11 +31,32 @@
 #define ABSTRACT_DECL(Id, Parent)
 #endif
 
+/// CONTEXT_DECL(Id, Parent)
+///   Used for Decls that are also DeclContexts. The default behavior is to do
+///   the same as for Decl.
+#ifndef CONTEXT_DECL
+#define CONTEXT_DECL(Id, Parent) DECL(Id, Parent)
+#endif
+
 /// VALUE_DECL(Id, Parent)
 ///   Used for subclasses of ValueDecl.  The default behavior is to do
 ///   the same as for Decl.
 #ifndef VALUE_DECL
 #define VALUE_DECL(Id, Parent) DECL(Id, Parent)
+#endif
+
+/// CONTEXT_VALUE_DECL(Id, Parent)
+///   Used for subclasses of ValueDecl that are also DeclContexts. The default
+///   behavior is to do the same as for ValueDecl.
+#ifndef CONTEXT_VALUE_DECL
+#define CONTEXT_VALUE_DECL(Id, Parent) VALUE_DECL(Id, Parent)
+#endif
+
+/// FUNCTION_DECL(Id, Parent)
+///   Used for subclasses of AbstractFunctionDecl. The default behavior is to do
+///   the same as for CONTEXT_VALUE_DECL.
+#ifndef FUNCTION_DECL
+#define FUNCTION_DECL(Id, Parent) CONTEXT_VALUE_DECL(Id, Parent)
 #endif
 
 /// OPERATOR_DECL(Id, Parent)
@@ -47,9 +68,9 @@
 
 /// NOMINAL_TYPE_DECL(Id, Parent)
 ///   Used for subclasses of NominalTypeDecl.  The default behavior is
-///   to do the same as for ValueDecl.
+///   to do the same as for CONTEXT_VALUE_DECL.
 #ifndef NOMINAL_TYPE_DECL
-#define NOMINAL_TYPE_DECL(Id, Parent) VALUE_DECL(Id, Parent)
+#define NOMINAL_TYPE_DECL(Id, Parent) CONTEXT_VALUE_DECL(Id, Parent)
 #endif
 
 /// A convenience for determining the range of declarations.  These will always
@@ -59,10 +80,10 @@
 #endif
 
 DECL(Import, Decl)
-DECL(Extension, Decl)
+CONTEXT_DECL(Extension, Decl)
 DECL(PatternBinding, Decl)
 DECL(EnumCase, Decl)
-DECL(TopLevelCode, Decl)
+CONTEXT_DECL(TopLevelCode, Decl)
 DECL(IfConfig, Decl)
 
 ABSTRACT_DECL(Operator, Decl)
@@ -84,7 +105,7 @@ ABSTRACT_DECL(Value, Decl)
       NOMINAL_TYPE_DECL(Class, NominalTypeDecl)
       NOMINAL_TYPE_DECL(Protocol, NominalTypeDecl)
       DECL_RANGE(NominalType, Enum, Protocol)
-    VALUE_DECL(Module, TypeDecl)
+    CONTEXT_VALUE_DECL(Module, TypeDecl)
     DECL_RANGE(Type, TypeAlias, Module)
   ABSTRACT_DECL(AbstractStorage, ValueDecl)
     VALUE_DECL(Var, AbstractStorageDecl)
@@ -92,9 +113,9 @@ ABSTRACT_DECL(Value, Decl)
     VALUE_DECL(Subscript, AbstractStorageDecl)
     DECL_RANGE(AbstractStorage, Var, Subscript)
   ABSTRACT_DECL(AbstractFunction, ValueDecl)
-    VALUE_DECL(Constructor, AbstractFunctionDecl)
-    VALUE_DECL(Destructor, AbstractFunctionDecl)
-    VALUE_DECL(Func, AbstractFunctionDecl)
+    FUNCTION_DECL(Constructor, AbstractFunctionDecl)
+    FUNCTION_DECL(Destructor, AbstractFunctionDecl)
+    FUNCTION_DECL(Func, AbstractFunctionDecl)
     DECL_RANGE(AbstractFunction, Constructor, Func)
   VALUE_DECL(EnumElement, ValueDecl)
   DECL_RANGE(Value, TypeAlias, EnumElement)
@@ -103,4 +124,7 @@ ABSTRACT_DECL(Value, Decl)
 #undef VALUE_DECL
 #undef DECL_RANGE
 #undef ABSTRACT_DECL
+#undef FUNCTION_DECL
+#undef CONTEXT_DECL
+#undef CONTEXT_VALUE_DECL
 #undef DECL

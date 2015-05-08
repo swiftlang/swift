@@ -188,6 +188,11 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   friend class AutoClosureExpr; // uses setParent
   friend class AbstractClosureExpr; // uses setParent
   
+  template<class A, class B, class C>
+  friend struct ::llvm::cast_convert_val;
+  
+  static const DeclContext *castDeclToDeclContext(const ValueDecl *D);
+  
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, Kind) {
@@ -439,6 +444,9 @@ public:
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));
+  
+  // Some Decls are DeclContexts, but not all.
+  static bool classof(const ValueDecl *D);
 };
 
 /// SerializedLocalDeclContext - the base class for DeclContexts that were
@@ -578,5 +586,14 @@ private:
 };
   
 } // end namespace swift
+
+namespace llvm {
+  template<class FromTy>
+  struct cast_convert_val< ::swift::DeclContext, FromTy, FromTy> {
+    static const ::swift::DeclContext *doit(const FromTy &Val) {
+      return ::swift::DeclContext::castDeclToDeclContext(Val);
+    }
+  };
+}
 
 #endif
