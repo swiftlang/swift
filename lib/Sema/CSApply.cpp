@@ -2480,9 +2480,9 @@ namespace {
         ApplyExpr *apply = new (tc.Context) CallExpr(result, arg, 
                                                      /*Implicit=*/false);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
-        result = coerceToType(result, resultTy, cs.getConstraintLocator(expr));
       }
 
+      result = coerceToType(result, resultTy, cs.getConstraintLocator(expr));
       return result;
     }
     
