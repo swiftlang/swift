@@ -950,6 +950,8 @@ private:
       case SyntaxStructureKind::CallExpression: return "call";
       case SyntaxStructureKind::ArrayExpression: return "array";
       case SyntaxStructureKind::DictionaryExpression: return "dictionary";
+      case SyntaxStructureKind::ObjectLiteralExpression:
+        return "object-literal-expression";
     }
     llvm_unreachable("unhandled tag?");
   }

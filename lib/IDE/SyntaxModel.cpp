@@ -353,6 +353,15 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
                                                 CE->getArg()->getSourceRange());
     pushStructureNode(SN, CE);
 
+  } else if (auto *ObjectE = dyn_cast<ObjectLiteralExpr>(E)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::ObjectLiteralExpression;
+    SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+    SourceLoc NRStart = ObjectE->getNameLoc();
+    SourceLoc NREnd = NRStart.getAdvancedLoc(ObjectE->getName().getLength());
+    SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
+    pushStructureNode(SN, E);
+
   } else if (auto *ArrayE = dyn_cast<ArrayExpr>(E)) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::ArrayExpression;
@@ -1005,7 +1014,10 @@ bool ModelASTWalker::isCurrentCallArgExpr(const Expr *E) {
     return false;
   auto Current = SubStructureStack.back();
   return (Current.StructureNode.Kind == SyntaxStructureKind::CallExpression &&
-          cast<CallExpr>(Current.ASTNode.getAsExpr())->getArg() == E);
+          cast<CallExpr>(Current.ASTNode.getAsExpr())->getArg() == E) ||
+         (Current.StructureNode.Kind
+            == SyntaxStructureKind::ObjectLiteralExpression &&
+          cast<ObjectLiteralExpr>(Current.ASTNode.getAsExpr())->getArg() == E);
 }
 
 bool ModelASTWalker::processComment(CharSourceRange Range) {

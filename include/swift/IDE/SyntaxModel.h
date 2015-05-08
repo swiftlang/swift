@@ -99,6 +99,7 @@ enum class SyntaxStructureKind : uint8_t {
   CallExpression,
   ArrayExpression,
   DictionaryExpression,
+  ObjectLiteralExpression,
 };
 
 enum class SyntaxStructureElementKind : uint8_t {

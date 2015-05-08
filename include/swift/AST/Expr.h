@@ -792,6 +792,8 @@ public:
       LLitLoc(LLitLoc), NameLoc(NameLoc), RLitLoc(RLitLoc) {}
 
   Identifier getName() const { return Name; }
+  SourceLoc getNameLoc() const { return NameLoc; }
+
   Expr *getArg() const { return Arg; }
   void setArg(Expr *arg) { Arg = arg; }
 
