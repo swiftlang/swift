@@ -130,7 +130,7 @@ static Type getObjectiveCClassType(TypeChecker &TC,
   if (auto result = TC.lookupMember(dc, ModuleType::get(module), TypeName,
                                     lookupOptions)) {
     for (auto decl : result) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(decl.Decl)) {
         cache = nominal->getDeclaredType();
         return cache;
       }

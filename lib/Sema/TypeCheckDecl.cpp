@@ -4568,7 +4568,9 @@ public:
     SmallVector<MatchType, 2> matches;
     bool hadExactMatch = false;
 
-    for (auto member : members) {
+    for (auto memberResult : members) {
+      auto member = memberResult.Decl;
+
       if (member->isInvalid())
         continue;
 
@@ -6764,7 +6766,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     auto superclassTy = classDecl->getSuperclass();
-    for (auto member : lookupConstructors(classDecl, superclassTy)) {
+    for (auto memberResult : lookupConstructors(classDecl, superclassTy)) {
+      auto member = memberResult.Decl;
+
       // Skip unavailable superclass initializers.
       if (AvailabilityAttr::isUnavailable(member))
         continue;
@@ -6884,7 +6888,9 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
       // Check whether we have a constructor that can be called with an empty
       // tuple.
       bool foundDefaultConstructor = false;
-      for (auto member : ctors) {
+      for (auto memberResult : ctors) {
+        auto member = memberResult.Decl;
+
         // Dig out the parameter tuple for this constructor.
         auto ctor = dyn_cast<ConstructorDecl>(member);
         if (!ctor || ctor->isInvalid())

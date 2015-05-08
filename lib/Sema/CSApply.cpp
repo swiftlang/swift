@@ -6577,7 +6577,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
     return nullptr;
   }
-  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(witnesses[0]);
+  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(witnesses[0].Decl);
   if (!builtinMethod) {
     tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
     return nullptr;

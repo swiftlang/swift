@@ -1193,7 +1193,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
       = defaultConstructorLookupOptions | NameLookupFlags::KnownPrivate;
     for (auto member : tc.lookupConstructors(fromCtor, superclassTy,
                                              lookupOptions)) {
-      auto superclassCtor = dyn_cast<ConstructorDecl>(member);
+      auto superclassCtor = dyn_cast<ConstructorDecl>(member.Decl);
       if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
         continue;

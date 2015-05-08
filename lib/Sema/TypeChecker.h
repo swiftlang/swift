@@ -50,25 +50,38 @@ typedef llvm::DenseMap<SubstitutableType *,
 
 /// The result of name lookup.
 class LookupResult {
-  /// The set of results found.
-  SmallVector<ValueDecl *, 4> Results;
-
-  friend class TypeChecker;
-  
 public:
-  typedef SmallVectorImpl<ValueDecl *>::iterator iterator;
+  struct Result {
+    /// The declaration we found.
+    ValueDecl *Decl;
+
+    /// The base declaration through which we found the declaration.
+    ValueDecl *Base;
+
+    operator ValueDecl*() const { return Decl; }
+    ValueDecl *operator->() const { return Decl; }
+  };
+
+private:
+  /// The set of results found.
+  SmallVector<Result, 4> Results;
+
+public:
+  typedef SmallVectorImpl<Result>::iterator iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
   unsigned size() const { return Results.size(); }
   bool empty() const { return Results.empty(); }
 
-  ValueDecl *operator[](unsigned index) const { return Results[index]; }
+  Result operator[](unsigned index) const { return Results[index]; }
 
-  ValueDecl *front() const { return Results.front(); }
-  ValueDecl *back() const { return Results.back(); }
+  Result front() const { return Results.front(); }
+  Result back() const { return Results.back(); }
 
   /// Add a result to the set of results.
-  void addResult(ValueDecl *result) { Results.push_back(result); }
+  void add(Result result) { Results.push_back(result); }
+
+  void clear() { Results.clear(); }
 
   /// Determine whether the result set is nonempty.
   explicit operator bool() const {
@@ -76,7 +89,7 @@ public:
   }
 
   /// Filter out any results that aren't accepted by the given predicate.
-  void filter(const std::function<bool(ValueDecl *)> &pred);
+  void filter(const std::function<bool(Result)> &pred);
 };
 
 /// The result of name lookup for types.

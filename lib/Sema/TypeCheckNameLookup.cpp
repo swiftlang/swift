@@ -21,10 +21,10 @@
 
 using namespace swift;
 
-void LookupResult::filter(const std::function<bool(ValueDecl *)> &pred) {
+void LookupResult::filter(const std::function<bool(Result)> &pred) {
   Results.erase(std::remove_if(Results.begin(), Results.end(),
-                               [&](ValueDecl *decl) -> bool {
-                                 return !pred(decl);
+                               [&](Result result) -> bool {
+                                 return !pred(result);
                                }),
                 Results.end());
 }
@@ -61,29 +61,28 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
 
-  // Local function that handles protocol members found via name lookup.
+  // Local function that performs lookup.
   SmallVector<ValueDecl *, 4> protocolMembers;
-  auto handleProtocolMembers = [&]() {
-    if (!considerProtocolMembers)
-      return;
+  auto doLookup = [&]() {
+    result.clear();
 
-    // If we considered protocol members, drop them.
-    // FIXME: This will eventually be the correct place to apply derived
-    // conformances.
-    result.filter([&](ValueDecl *value) -> bool {
-      // Filter out and record all members of protocols.
-      if (isa<ProtocolDecl>(value->getDeclContext())) {
+    SmallVector<ValueDecl *, 4> lookupResults;
+    dc->lookupQualified(type, name, subOptions, this, lookupResults);
+    for (auto value : lookupResults) {
+      // If requested, separate out the protocol members.
+      if (considerProtocolMembers &&
+          isa<ProtocolDecl>(value->getDeclContext())) {
         protocolMembers.push_back(value);
-        return false;
+        continue;
       }
 
-      return true;
-    });
+      NominalTypeDecl *owner
+        = value->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+      result.add({value, owner});
+    }
   };
 
-  // Look for the member.
-  dc->lookupQualified(type, name, subOptions, this, result.Results);
-  handleProtocolMembers();
+  doLookup();
 
   if (result.empty()) {
     // If we didn't find anything, /and/ this is a nominal type, check to see
@@ -116,8 +115,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     // Perform the lookup again.
     // FIXME: This is only because forceExternalDeclMembers() might do something
     // interesting.
-    dc->lookupQualified(type, name, subOptions, this, result.Results);
-    handleProtocolMembers();
+    doLookup();
   }
 
   return result;
