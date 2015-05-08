@@ -574,9 +574,13 @@ func F() { init<( } )}
 
 // rdar://20337695
 func f1() {
- 
-  // expected-error@+1 {{getter/setter can only be defined for a single variable}}
-  let n == C { get {}  // expected-error {{invalid pattern}}
+
+  // expected-error @+5 {{use of unresolved identifier 'C'}}
+  // expected-error @+4 {{unary operator cannot be separated from its operand}}
+  // expected-error @+3 {{'==' is not a prefix unary operator}}
+  // expected-error @+2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@+1 {{type annotation missing in pattern}}
+  let n == C { get {}  // expected-error {{use of unresolved identifier 'get'}}
   }
 }
 
@@ -590,5 +594,13 @@ func testMultiPatternConditionRecovery(x: Int?) {
   // expected-error@+1 {{binding ended by previous 'where' clause; use 'var' to introduce a new one}} {{30-30=var }}
   if var y = x where y == 0, z = x {
   }
+}
+
+// rdar://20866942
+func testRefutableLet() {
+  var e : Int?
+  let x? = e  // expected-error {{consecutive statements on a line must be separated by ';'}}
+  // expected-error @-1 {{expected expression}}
+  // expected-error @-2 {{type annotation missing in pattern}}
 }
 

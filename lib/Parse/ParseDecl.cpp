@@ -3611,26 +3611,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     Decls.insert(Decls.begin()+NumDeclsInResult, PBD);
   });
 
-  // Push a local scope to parse the bound VarDecl's into.  We need this scope
-  // because we need to pop it before parsing any 'else' clause on the pattern
-  // binding declaration.  Further wrap this up in an Optional because we want
-  // to pop it early, and this is a convenient way to avoid RAII issues.
-  //
-  // After all of the pattern bindings are parsed, and the else is parsed, the
-  // vardecls are reinjected into the previously active scope so that they can
-  // be found by name lookup.
-  defer(([&] {
-    SmallVector<VarDecl *, 4> Vars;
-    for (auto &elt : PBDEntries)
-      elt.ThePattern->collectVariables(Vars);
-
-    for (auto v : Vars)
-      if (v->hasName())
-        getScopeInfo().addToScope(v, *this);
-  }));
-  Optional<Scope> tempScope;
-  tempScope.emplace(this, getScopeInfo().getCurrentScope()->getKind());
-  
   do {
     Pattern *pattern;
     {
@@ -3638,13 +3618,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
       T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
-      
-#if 1 // FIXME: rdar://20794825 - Remove this migration logic for let/else.
-      auto patternRes = parseMatchingPattern(/*isExprBasic*/true);
-      patternRes = parseOptionalPatternTypeAnnotation(patternRes);
-#else
       auto patternRes = parseTypedPattern();
-#endif
       if (patternRes.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (patternRes.isNull())
@@ -3782,38 +3756,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     Status.setIsParseError();
   }
   
-  // FIXME: rdar://20794825 - Remove this migration logic for let/else.
-  
-  // Check for a 'where' condition.
-  SourceLoc WhereLoc;
-  if (consumeIf(tok::kw_where, WhereLoc)) {
-    ParserResult<Expr> whereCond = parseExpr(diag::expected_condition_where);
 
-    // If we are doing second pass of code completion, we don't want to
-    // suddenly cut off parsing and throw away the declaration.
-    if (whereCond.hasCodeCompletion() && isCodeCompletionFirstPass())
-      return makeParserCodeCompletionStatus();
-  }
-
-
-  // Now that all of the pattern bindings and where have been parsed, pop the
-  // temporary scope we pushed to handle local name lookup.
-  tempScope.reset();
-
-  // Check for an 'else' condition.
-  SourceLoc ElseLoc;
-  if (consumeIf(tok::kw_else, ElseLoc)) {
-    ParserResult<BraceStmt> Body =
-       parseBraceItemList(diag::expected_lbrace_after_if);
-    if (Body.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-  }
-
-  if (WhereLoc.isValid() || ElseLoc.isValid()) {
-    diagnose(VarLoc, diag::let_else_rename)
-      .fixItInsert(VarLoc, "guard case ");
-  }
-  
   // NOTE: At this point, the DoAtScopeExit object is destroyed and the PBD
   // is added to the program.
   

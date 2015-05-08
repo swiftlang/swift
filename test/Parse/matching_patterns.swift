@@ -354,5 +354,7 @@ case (_?)?: break
 // expected-note @+2 {{remove the parentheses to make this a type annotation}} {{5-6=}} {{26-27=}}
 // expected-note @+1 {{remove the label to make this a tuple pattern}} {{6-21=}}
 let (responseObject: Int?) = op1
+// expected-error @-1 2 {{expected ',' separator}}
+// expected-error @-2 {{expected pattern}}
 
 

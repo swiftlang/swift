@@ -134,7 +134,10 @@ x☃⃠y
 // rdar://14705150 - crash on invalid
 func test_14705150() {
   var a = 4
-  var b! = a  // expected-error {{invalid pattern}}
+  var b! = a  // expected-error {{type annotation missing in pattern}}
+  // expected-error @-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error @-2 {{expected expression}}
+
 }
 
 prefix postfix func ++(x: Int) {} // expected-error {{attribute 'prefix' cannot be combined with this attribute}}
