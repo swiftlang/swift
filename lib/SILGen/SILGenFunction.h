@@ -1244,7 +1244,7 @@ public:
   ManagedValue emitUncheckedGetOptionalValueFrom(SILLocation loc,
                                                  ManagedValue addrOrValue,
                                                  const TypeLowering &optTL,
-                                                 SGFContext C);
+                                                 SGFContext C = SGFContext());
 
   typedef std::function<ManagedValue(SILGenFunction &gen,
                                      SILLocation loc,
