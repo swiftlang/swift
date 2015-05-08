@@ -305,13 +305,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
 
-    let totalSize = _My._elementOffset
-      +  minimumCapacity * strideof(Element.self)
-
-    let newBuffer: AnyObject = _swift_bufferAllocate(
-      bufferClass, totalSize, _My._alignmentMask)
-
-    self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
+    self.init(
+      _uncheckedBufferClass: bufferClass, minimumCapacity: minimumCapacity)
   }
 
   /// Internal version for use by _ContiguousArrayBuffer.init where we know that
