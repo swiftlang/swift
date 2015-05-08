@@ -559,13 +559,24 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
   Type type;
   
   // TODO: Use the interface type if enabled.
-  if (decl->getASTContext().LangOpts.EnableInterfaceTypeMangling)
+  if (decl->getASTContext().LangOpts.EnableInterfaceTypeMangling) {
     type = decl->hasType() ? decl->getInterfaceType()
                            : ErrorType::get(decl->getASTContext());
-  else
+    
+  } else {
     type = decl->hasType() ? decl->getType()
                            : ErrorType::get(decl->getASTContext());
+  }
   mangleType(type->getCanonicalType(), explosion, uncurryLevel);
+
+  if (decl->getASTContext().LangOpts.EnableInterfaceTypeMangling) {
+    // Bind the declaration's generic context for nested decls.
+    if (auto context = dyn_cast<DeclContext>(decl)) {
+      if (auto params = context->getGenericParamsOfContext()) {
+        bindAllGenericParameters(*this, params);
+      }
+    }
+  }
 }
 
 void Mangler::mangleGenericSignature(const GenericSignature *sig,
@@ -676,7 +687,7 @@ static void mangleMetatypeRepresentation(raw_ostream &Buffer,
 
 /// Mangle a type into the buffer.
 ///
-/// Type manglings should never start with [0-9d_] or end with [0-9].
+/// Type manglings should never start with [0-9dz_] or end with [0-9].
 ///
 /// <type> ::= A <natural> <type>    # fixed-sized arrays
 /// <type> ::= Bb                    # Builtin.UnsafeValueBuffer

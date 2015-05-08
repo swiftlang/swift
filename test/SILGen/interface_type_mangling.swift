@@ -174,3 +174,13 @@ func L16<T where T: P, T.Assoc2 == T.Assoc1, T.Assoc1 == G<T>>(x: T) {}
 func L17<T where T: P, T.Assoc2 == T.Assoc1, T.Assoc2 == G<T>>(x: T) {}
 // CHECK:       interface_type_mangling.L18 : [[L_SIGNATURE]]
 func L18<T where T: P, G<T> == T.Assoc1, T.Assoc2 == G<T>>(x: T) {}
+
+// CHECK-LABEL: sil shared @_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContextu__rFGS0_q__Fqd__T_L_3fooFTQd__Q__T_
+struct GenericTypeContext<T> {
+  var a: T
+  func closureInGenericContext<U>(b: U) {
+    func foo(x: T, _ y: U) { }
+
+    foo(a, b)
+  }
+}
