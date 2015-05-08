@@ -2183,21 +2183,6 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
                               formalPayloadTy, C);
 }
 
-SILValue SILGenFunction::
-emitUncheckedGetOptionalValueFromSILValue(SILLocation loc, SILValue optValue,
-                                          const TypeLowering &optTL) {
-  assert(!optValue.getType().isAddress() &&
-       "This only works with loadable optionals, not with optional addresses");
-
-  auto optMV = ManagedValue(optValue, CleanupHandle::invalid());
-
-  auto res = emitUncheckedGetOptionalValueFrom(loc, optMV, optTL);
-  assert(!res.hasCleanup());
-  return res.getValue();
-}
-
-
-
 SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
                                                         SILValue src,
                                                   const TypeLowering &valueTL) {

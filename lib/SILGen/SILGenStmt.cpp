@@ -634,7 +634,7 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
       // Ignore the result of the increment expression.
       SGF.emitIgnoredExpr(S->getIncrement().get());
     }
-
+    
     if (SGF.B.hasValidInsertionPoint()) {
       // Associate the loop body's closing brace with this branch.
       RegularLocation L(S->getBody());
@@ -659,16 +659,14 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // This will need revision if we ever add goto.
   if (!SGF.B.hasValidInsertionPoint()) return;
   
-  // If generator's optional result is address-only, create a stack allocation
-  // to hold the results.  This will be initialized on every entry into the loop
-  // header and consumed by the loop body. On loop exit, the terminating value
-  // will be in the buffer.
+  // Create a stack allocation to hold values out of the generator.
+  // This will be initialized on every entry into the loop header and consumed
+  // by the loop body. On loop exit, the terminating value will be in the
+  // buffer.
   auto optTy = S->getGeneratorNext()->getType()->getCanonicalType();
+  auto valTy = optTy.getAnyOptionalObjectType();
   auto &optTL = SGF.getTypeLowering(optTy);
-  SILValue nextBufOrValue;
-
-  if (optTL.isAddressOnly())
-    nextBufOrValue = SGF.emitTemporaryAllocation(S, optTL.getLoweredType());
+  SILValue nextBuf = SGF.emitTemporaryAllocation(S, optTL.getLoweredType());
   
   // Create a new basic block and jump into it.
   JumpDest loopDest = createJumpDest(S->getBody());
@@ -680,20 +678,16 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
-  if (optTL.isAddressOnly()) {
+  {
     Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getGeneratorNext()));
-    InitializationPtr nextInit(new KnownAddressInitialization(nextBufOrValue));
+    InitializationPtr nextInit(new KnownAddressInitialization(nextBuf));
     SGF.emitExprInto(S->getGeneratorNext(), nextInit.get());
     nextInit->finishInitialization(SGF);
-  } else {
-    Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getGeneratorNext()));
-    nextBufOrValue =
-      SGF.emitRValueAsSingleValue(S->getGeneratorNext()).forward(SGF);
   }
   
   // Continue if the value is present.
   Condition Cond = SGF.emitCondition(
-         SGF.emitDoesOptionalHaveValue(S, nextBufOrValue), S,
+         SGF.emitDoesOptionalHaveValue(S, nextBuf), S,
          /*hasFalseCode=*/false, /*invertValue=*/false);
 
   if (Cond.hasTrue()) {
@@ -707,23 +701,13 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
       InitializationPtr initLoopVars
         = SGF.emitPatternBindingInitialization(S->getPattern());
-      ManagedValue val;
-
-      // If we had a loadable "next" generator value, we know it is present.
-      // Get the value out of the optional, and wrap it up with a cleanup so
-      // that any exits out of this scope properly clean it up.
-      if (optTL.isLoadable()) {
-        nextBufOrValue =
-          SGF.emitUncheckedGetOptionalValueFromSILValue(S,nextBufOrValue,optTL);
-        val = SGF.emitManagedRValueWithCleanup(nextBufOrValue);
-      } else {
-        auto managedNext = SGF.emitManagedBufferWithCleanup(nextBufOrValue);
-        val = SGF.emitUncheckedGetOptionalValueFrom(S, managedNext, optTL,
-                                              SGFContext(initLoopVars.get()));
-      }
+      auto managedNext = SGF.emitManagedBufferWithCleanup(nextBuf);
+      ManagedValue val = SGF.emitUncheckedGetOptionalValueFrom(S,
+                               managedNext,
+                               optTL,
+                               SGFContext(initLoopVars.get()));
       if (!val.isInContext())
-        RValue(SGF, S, optTy.getAnyOptionalObjectType(), val)
-          .forwardInto(SGF, initLoopVars.get(), S);
+        RValue(SGF, S, valTy, val).forwardInto(SGF, initLoopVars.get(), S);
       visit(S->getBody());
     }
     
