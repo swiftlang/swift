@@ -186,7 +186,7 @@ public func startsWith<
 ///     g.next() // (1, "bar")
 ///     g.next() // nil
 ///
-/// - note: idiomatic usage is to call `enumerate` instead of
+/// - note: Idiomatic usage is to call `enumerate` instead of
 /// constructing an `EnumerateGenerator` directly.
 public struct EnumerateGenerator<
   Base: GeneratorType
@@ -231,7 +231,7 @@ public struct EnumerateGenerator<
 ///     var s = EnumerateSequence(["foo", "bar"])
 ///     Array(s) // [(0, "foo"), (1, "bar")]
 ///
-/// - note: idiomatic usage is to call `enumerate` instead of
+/// - note: Idiomatic usage is to call `enumerate` instead of
 /// constructing an `EnumerateSequence` directly.
 public struct EnumerateSequence<Base : SequenceType> : SequenceType {
   var base: Base

@@ -342,7 +342,7 @@ public struct Set<T : Hashable> :
   ///
   /// This is identical to `endIndex` in an empty set.
   ///
-  /// - complexity: amortized O(1) if `self` does not wrap a bridged
+  /// - complexity: Amortized O(1) if `self` does not wrap a bridged
   /// `NSSet`, O(N) otherwise.
   public var startIndex: Index {
     return _variantStorage.startIndex
@@ -354,7 +354,7 @@ public struct Set<T : Hashable> :
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   ///
-  /// - complexity: amortized O(1) if `self` does not wrap a bridged
+  /// - complexity: Amortized O(1) if `self` does not wrap a bridged
   /// `NSSet`, O(N) otherwise.
   public var endIndex: Index {
     return _variantStorage.endIndex
@@ -875,7 +875,7 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
 
 /// Implements an unconditional downcast that involves bridging.
 ///
-/// - precondition: at least one of `SwiftValue` is a bridged value
+/// - precondition: At least one of `SwiftValue` is a bridged value
 /// type, and the corresponding `ObjCValue` is a reference type.
 public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
   source: Set<ObjCValue>
@@ -890,7 +890,7 @@ public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
 /// If the cast fails, the function returns `.None`.  All checks should be
 /// performed eagerly.
 ///
-/// - precondition: at least one of `SwiftValue` is a bridged value
+/// - precondition: At least one of `SwiftValue` is a bridged value
 /// type, and the corresponding `ObjCValue` is a reference type.
 public func _setBridgeFromObjectiveCConditional<
   ObjCValue, SwiftValue
@@ -1014,7 +1014,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///
   /// Identical to `endIndex` in an empty dictionary
   ///
-  /// - complexity: amortized O(1) if `self` does not wrap a bridged
+  /// - complexity: Amortized O(1) if `self` does not wrap a bridged
   /// `NSDictionary`, O(N) otherwise.
   public var startIndex: Index {
     return _variantStorage.startIndex
@@ -1026,7 +1026,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   ///
-  /// - complexity: amortized O(1) if `self` does not wrap a bridged
+  /// - complexity: Amortized O(1) if `self` does not wrap a bridged
   /// `NSDictionary`, O(N) otherwise.
   public var endIndex: Index {
     return _variantStorage.endIndex
@@ -1472,7 +1472,7 @@ public func _dictionaryDownCastConditional<
 
 /// Implements an unconditional downcast that involves bridging.
 ///
-/// - precondition: at least one of `SwiftKey` or `SwiftValue` is a bridged value
+/// - precondition: At least one of `SwiftKey` or `SwiftValue` is a bridged value
 /// type, and the corresponding `ObjCKey` or `ObjCValue` is a reference type.
 public func _dictionaryBridgeFromObjectiveC<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue
@@ -1490,7 +1490,7 @@ public func _dictionaryBridgeFromObjectiveC<
 /// If the cast fails, the function returns `.None`.  All checks should be
 /// performed eagerly.
 ///
-/// - precondition: at least one of `SwiftKey` or `SwiftValue` is a bridged value
+/// - precondition: At least one of `SwiftKey` or `SwiftValue` is a bridged value
 /// type, and the corresponding `ObjCKey` or `ObjCValue` is a reference type.
 public func _dictionaryBridgeFromObjectiveCConditional<
   ObjCKey, ObjCValue, SwiftKey, SwiftValue

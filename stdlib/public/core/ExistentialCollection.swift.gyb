@@ -49,7 +49,7 @@ public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// - note: subclasses must override this method.
+  /// - note: Subclasses must override this method.
   public func next() -> T? {_abstract()}
 }
 
@@ -544,7 +544,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   /// Create an `Any${Traversal}Collection` having the same underlying
   /// collection as `other`.
   ///
-  /// - postcondition: the result is `===` to `other`.
+  /// - postcondition: The result is `===` to `other`.
   ///
   /// - complexity: O(1)
   public init(_ other: Any${SubTraversal}Collection<Element>) {

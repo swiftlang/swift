@@ -342,7 +342,7 @@ extension String {
   /// 0025  ; [*038C.0020.0002] # PERCENT SIGN
   /// 0026  ; [*0389.0020.0002] # AMPERSAND
   /// 0027  ; [*02F8.0020.0002] # APOSTROPHE
-  /// - precondition: both self and rhs are ASCII strings
+  /// - precondition: Both self and rhs are ASCII strings.
   public // @testable
   func _compareASCII(rhs: String) -> Int {
     var compare = Int(memcmp(
@@ -422,7 +422,7 @@ extension String {
 
   /// Append `x` to `self`.
   ///
-  /// - complexity: amortized O(1).
+  /// - complexity: Amortized O(1).
   public mutating func append(x: UnicodeScalar) {
     _core.append(x)
   }
@@ -450,7 +450,7 @@ extension String : Hashable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// - note: the hash value is not guaranteed to be stable across
+  /// - note: The hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {

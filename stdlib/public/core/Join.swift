@@ -44,7 +44,7 @@ public protocol _ExtensibleCollectionType : CollectionType {
   /// Applying `successor()` to the index of the new element yields
   /// `self.endIndex`.
   ///
-  /// - complexity: amortized O(1).
+  /// - complexity: Amortized O(1).
   mutating func append(x: Generator.Element)
 
   /// Append the elements of `newElements` to `self`.

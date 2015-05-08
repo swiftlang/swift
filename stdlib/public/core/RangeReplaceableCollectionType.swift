@@ -22,7 +22,7 @@ public protocol _RangeReplaceableCollectionDefaultsType
   /// Applying `successor()` to the index of the new element yields
   /// `self.endIndex`.
   ///
-  /// - complexity: amortized O(1).
+  /// - complexity: Amortized O(1).
   mutating func append(x: Generator.Element)
 }
 
@@ -212,8 +212,9 @@ public func removeAll<
   }
 }
 
-/// Append elements from `newElements` to `x`.  - complexity:
-/// O(N)
+/// Append elements from `newElements` to `x`.
+///
+/// - complexity: O(N)
 public func extend<
   C: RangeReplaceableCollectionType,
   S : CollectionType where S.Generator.Element == C.Generator.Element

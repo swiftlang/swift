@@ -41,7 +41,7 @@ public struct ObjectIdentifier : Hashable, Comparable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// - note: the hash value is not guaranteed to be stable across
+  /// - note: The hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {

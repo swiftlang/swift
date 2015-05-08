@@ -102,7 +102,7 @@ public struct ${Self}<T>
 %  if mutable:
   /// Allocate memory for `num` objects of type `T`.
   ///
-  /// - postcondition: the memory is allocated, but not initialized.
+  /// - postcondition: The memory is allocated, but not initialized.
   public static func alloc(num: Int) -> ${Self} {
     var size = strideof(T.self) * num
     return ${Self}(
@@ -115,9 +115,9 @@ public struct ${Self}<T>
   /// the value that was passed to `alloc()` (partial deallocations are not
   /// possible).
   ///
-  /// - precondition: the memory is not initialized.
+  /// - precondition: The memory is not initialized.
   ///
-  /// - postcondition: the memory has been deallocated.
+  /// - postcondition: The memory has been deallocated.
   public func dealloc(num: Int) {
     var size = strideof(T.self) * num
     Builtin.deallocRaw(
@@ -146,9 +146,9 @@ public struct ${Self}<T>
   /// Initialize the value the pointer points to, to construct
   /// an object where there was no object previously stored.
   ///
-  /// - precondition: the memory is not initialized.
+  /// - precondition: The memory is not initialized.
   ///
-  /// - postcondition: the memory is initalized; the value should eventually
+  /// - postcondition: The memory is initalized; the value should eventually
   /// be destroyed or moved from to avoid leaks.
   public func initialize(newvalue: T) {
     Builtin.initialize(newvalue, _rawValue)
@@ -160,9 +160,9 @@ public struct ${Self}<T>
   /// Equivalent to reading `memory` property and calling `destroy()`,
   /// but more efficient.
   ///
-  /// - precondition: the memory is initialized.
+  /// - precondition: The memory is initialized.
   ///
-  /// - postcondition: the value has been destroyed and the memory must
+  /// - postcondition: The value has been destroyed and the memory must
   /// be initialized before being used again.
   public func move() -> T {
     return Builtin.take(_rawValue)
@@ -238,7 +238,7 @@ public struct ${Self}<T>
 
   /// Copy count values beginning at source into raw memory.
   ///
-  /// - precondition: the memory is not initialized.
+  /// - precondition: The memory is not initialized.
   ///
   /// Requires: `self` and `source` may not overlap.
   public func initializeFrom(source: ${Self}, count: Int) {
@@ -257,7 +257,7 @@ public struct ${Self}<T>
 
   /// Copy the elements of `C` into raw memory.
   ///
-  /// - precondition: the memory is not initialized.
+  /// - precondition: The memory is not initialized.
   public func initializeFrom<C: CollectionType where C.Generator.Element == T>(
     source: C) {
     source~>_initializeTo(self)
@@ -284,18 +284,18 @@ public struct ${Self}<T>
 
   /// Destroy the object the pointer points to.
   ///
-  /// - precondition: the memory is initialized.
+  /// - precondition: The memory is initialized.
   ///
-  /// - postcondition: the value has been destroyed and the memory must
+  /// - postcondition: The value has been destroyed and the memory must
   /// be initialized before being used again.
   public func destroy() {
     Builtin.destroy(T.self, _rawValue)
   }
 
   /// Destroy the `count` objects the pointer points to.
-  /// - precondition: the memory is initialized.
+  /// - precondition: The memory is initialized.
   ///
-  /// - postcondition: the value has been destroyed and the memory must
+  /// - postcondition: The value has been destroyed and the memory must
   /// be initialized before being used again.
   public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
@@ -368,7 +368,7 @@ public struct ${Self}<T>
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// - note: the hash value is not guaranteed to be stable across
+  /// - note: The hash value is not guaranteed to be stable across
   /// different invocations of the same program.  Do not persist the
   /// hash value across program runs.
   public var hashValue: Int {

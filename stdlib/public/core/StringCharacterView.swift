@@ -271,7 +271,7 @@ extension String.CharacterView : ExtensibleCollectionType {
 
   /// Append `c` to `self`.
   ///
-  /// - complexity: amortized O(1).
+  /// - complexity: Amortized O(1).
   public mutating func append(c: Character) {
     switch c._representation {
     case .Small(let _63bits):

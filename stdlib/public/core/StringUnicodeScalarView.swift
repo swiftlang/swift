@@ -257,7 +257,7 @@ extension String.UnicodeScalarView : ExtensibleCollectionType {
   }
   /// Append `x` to `self`.
   ///
-  /// - complexity: amortized O(1).
+  /// - complexity: Amortized O(1).
   public mutating func append(x: UnicodeScalar) {
     _core.append(x)
   }

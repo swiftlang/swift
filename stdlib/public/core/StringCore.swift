@@ -14,7 +14,7 @@
 /// can store both ASCII and UTF-16, and can wrap native Swift
 /// _StringBuffer or NSString instances.
 ///
-/// Usage - note: when elements are 8 bits wide, this code may
+/// Usage note: when elements are 8 bits wide, this code may
 /// dereference one past the end of the byte array that it owns, so
 /// make sure that storage is allocated!  You want a null terminator
 /// anyway, so it shouldn't be a burden.
@@ -364,7 +364,7 @@ public struct _StringCore {
   /// until it has newSize UTF-16 code units; you must immediately copy
   /// valid UTF-16 into that storage.
   ///
-  /// - note: if unsuccessful because of insufficient space in an
+  /// - note: If unsuccessful because of insufficient space in an
   /// existing buffer, the suggested new capacity will at least double
   /// the existing buffer's storage
   mutating func _claimCapacity(
@@ -475,7 +475,7 @@ public struct _StringCore {
 
   /// Append `u` to `self`.
   ///
-  /// - complexity: amortized O(1).
+  /// - complexity: Amortized O(1).
   public mutating func append(u: UTF16.CodeUnit) {
     append(u, nil)
   }

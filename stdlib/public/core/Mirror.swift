@@ -54,7 +54,7 @@ public struct Mirror {
   /// Generate a default mirror for all ancestor classes.  This is the
   /// default behavior.
   ///
-  /// - note: this option bypasses any implementation of `customMirror`
+  /// - note: This option bypasses any implementation of `customMirror`
   /// that may be supplied by a `CustomReflectable` ancestor, so this
   /// is typically not the right option for a `customMirror`implementation 
     
@@ -62,7 +62,7 @@ public struct Mirror {
   ///
   /// This case is the default.
   ///
-  /// - note: this option generates default mirrors even for
+  /// - note: This option generates default mirrors even for
   /// ancestor classes that may implement `CustomReflectable`'s
   /// `customMirror` requirement.  To avoid dropping an ancestor class
   /// customization, an override of `customMirror()` should pass
@@ -202,7 +202,7 @@ public struct Mirror {
   ///
   ///     ancestorRepresentation: .Customized(super.customMirror)
   ///
-  /// - note: the traversal protocol modeled by `children`'s indices
+  /// - note: The traversal protocol modeled by `children`'s indices
   /// (`ForwardIndexType`, `BidirectionalIndexType`, or
   /// `RandomAccessIndexType`) is captured so that the resulting
   /// `Mirror`'s `children` may be upgraded later.  See the failable
@@ -250,7 +250,7 @@ public struct Mirror {
   ///
   ///     ancestorRepresentation: .Customized(super.customMirror)
   ///
-  /// - note: the traversal protocol modeled by `children`'s indices
+  /// - note: The traversal protocol modeled by `children`'s indices
   /// (`ForwardIndexType`, `BidirectionalIndexType`, or
   /// `RandomAccessIndexType`) is captured so that the resulting
   /// `Mirror`'s `children` may be upgraded later.  See the failable
@@ -347,7 +347,7 @@ public struct Mirror {
 public protocol CustomReflectable {
   /// Return the `Mirror` for `self`.
   ///
-  /// - note: if `Self` has value semantics, the `Mirror` should be
+  /// - note: If `Self` has value semantics, the `Mirror` should be
   /// unaffected by subsequent mutations of `self`.
   func customMirror() -> Mirror
 }
@@ -582,7 +582,7 @@ extension PlaygroundQuickLook {
   /// `CustomPlaygroundQuickLookable`, returns the result of calling
   /// its `customPlaygroundQuickLook` method.  Otherwise, returns
   /// a `PlaygroundQuickLook` synthesized for `subject` by the
-  /// language.  - note: in some cases the result may be
+  /// language.  Note that in some cases the result may be
   /// `.Text(String(reflecting: subject))`.
   ///
   /// - note: If the dynamic type of `subject` has value semantics,
@@ -613,7 +613,7 @@ extension PlaygroundQuickLook {
 public protocol CustomPlaygroundQuickLookable {
   /// Return the `Mirror` for `self`.
   ///
-  /// - note: if `Self` has value semantics, the `Mirror` should be
+  /// - note: If `Self` has value semantics, the `Mirror` should be
   /// unaffected by subsequent mutations of `self`.
   func customPlaygroundQuickLook() -> PlaygroundQuickLook
 }
