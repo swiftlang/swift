@@ -2563,6 +2563,10 @@ public:
     printGenericParams(&T->getGenericParams());
     Printer << " ";
     printWithParensIfNotSimple(T->getInput());
+
+    if (T->throws())
+      Printer << " throws";
+
     Printer << " -> ";
     T->getResult().print(Printer, Options);
   }
@@ -2693,6 +2697,9 @@ public:
     printGenericSignature(T->getGenericParams(), T->getRequirements());
     Printer << " ";
     printWithParensIfNotSimple(T->getInput());
+
+    if (T->throws())
+      Printer << " throws";
 
     Printer << " -> ";
     T->getResult().print(Printer, Options);
