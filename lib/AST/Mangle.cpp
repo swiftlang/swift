@@ -571,7 +571,7 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
 void Mangler::mangleGenericSignature(const GenericSignature *sig,
                                      ResilienceExpansion expansion) {
   // TODO: For staging purposes, only canonicalize the signature when interface
-  // type mangling is enabled. We ought to do this all the type.
+  // type mangling is enabled. We ought to do this all the time.
   if (sig->getASTContext().LangOpts.EnableInterfaceTypeMangling)
     // FIXME: Is module important?
     sig = sig->getCanonicalManglingSignature(
