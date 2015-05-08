@@ -2,6 +2,9 @@
 
 // REQUIRES: CPU=x86_64
 
+//
+// Type parameters
+//
 infix operator ~> { precedence 255 }
 
 func ~> <Target, Args, Result> (
@@ -27,6 +30,10 @@ func split<Seq: Runcible>(seq: Seq)(isSeparator: Seq.Element -> Bool) { }
 var seq = Spoon()
 var x = seq ~> split
 
+//
+// Indirect return
+//
+
 // CHECK-LABEL: define internal { i8*, %swift.refcounted* } @_TPA__TF21partial_apply_generic5split{{.*}}(%V21partial_apply_generic5Spoon*, %swift.refcounted*)
 // CHECK:         [[REABSTRACT:%.*]] = bitcast %V21partial_apply_generic5Spoon* %0 to %swift.opaque*
 // CHECK:         tail call { i8*, %swift.refcounted* } @_TF21partial_apply_generic5split{{.*}}(%swift.opaque* [[REABSTRACT]],
@@ -38,3 +45,41 @@ var y = hugeStructReturn()
 // CHECK:   tail call void @_TF21partial_apply_generic16hugeStructReturn{{.*}}(%V21partial_apply_generic10HugeStruct* noalias sret %0, i64 %1, i64 %2, i64 %3, i64 %4)
 // CHECK:   ret void
 // CHECK: }
+
+//
+// Witness method
+//
+protocol Protein {
+  static func veganOrNothing() -> Protein?
+  static func paleoDiet() throws -> Protein
+}
+
+enum CarbOverdose : _ErrorType {
+  case Mild
+  case Severe
+}
+
+class Chicken : Protein {
+  static func veganOrNothing() -> Protein? {
+    return nil
+  }
+
+  static func paleoDiet() throws -> Protein {
+    throw CarbOverdose.Severe
+  }
+}
+
+func healthyLunch<T: Protein>(t: T) -> () -> Protein? {
+  return T.veganOrNothing
+}
+
+let f = healthyLunch(Chicken())
+
+func dietaryFad<T: Protein>(t: T) -> () throws -> Protein {
+  return T.paleoDiet
+}
+
+let g = dietaryFad(Chicken())
+do {
+  try g()
+} catch {}

@@ -3403,8 +3403,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Emit the polymorphic arguments.
   assert(subs.empty() != hasPolymorphicParameters(origType)
          && "should have substitutions iff original function is generic");
+  WitnessMetadata witnessMetadata;
   if (hasPolymorphicParameters(origType)) {
-    emitPolymorphicArguments(subIGF, origType, substType, subs, nullptr, args);
+    emitPolymorphicArguments(subIGF, origType, substType, subs,
+                             &witnessMetadata, args);
   }
 
   // Okay, this is where the callee context goes.
@@ -3425,6 +3427,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   }
 
   assert(origParams.empty());
+
+  if (origType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod) {
+    args.add(witnessMetadata.SelfMetadata);
+  }
 
   llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, args.claimAll());
   
