@@ -81,6 +81,9 @@ protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error{{
 protocol CircleStart : CircleEnd { func circle_start() } // expected-note{{protocol 'CircleStart' declared here}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
 
+protocol CircleEntry : CircleTrivial { }
+protocol CircleTrivial : CircleTrivial { } // expected-error{{circular protocol inheritance CircleTrivial}}
+
 struct Circle {
   func circle_start() {}
   func circle_middle() {}

@@ -616,24 +616,25 @@ static void checkCircularity(TypeChecker &tc, T *decl,
 
   case CircularityCheck::Checking: {
     // We're already checking this protocol, which means we have a cycle.
-    
-    // The type directly references itself.
-    if (path.size() == 1) {
-      tc.diagnose((*path.begin())->getLoc(),
+
+    // The beginning of the path might not be part of the cycle, so find
+    // where the cycle starts.
+    auto cycleStart = path.end() - 1;
+    while (*cycleStart != decl) {
+      assert(cycleStart != path.begin() && "Missing cycle start?");
+      --cycleStart;
+    }
+
+    // If the path length is 1 the type directly references itself.
+    if (path.end() - cycleStart == 1) {
+      tc.diagnose(path.back()->getLoc(),
                   circularDiag,
-                  (*path.begin())->getName().str());
-      
+                  path.back()->getName().str());
+
       decl->setInvalid();
       decl->overwriteType(ErrorType::get(tc.Context));
       breakInheritanceCycle(decl);
       break;
-    }
-
-    // Find the beginning of the cycle within the full path.
-    auto cycleStart = path.end()-2;
-    while (*cycleStart != decl) {
-      assert(cycleStart != path.begin() && "Missing cycle start?");
-      --cycleStart;
     }
 
     // Form the textual path illustrating the cycle.
