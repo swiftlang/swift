@@ -907,7 +907,7 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
         return subAI;
 
     // The call to super.init has to either be an apply or a try_apply.
-    if (!isa<ApplyInst>(inst) && !isa<TryApplyInst>(inst))
+    if (!isa<FullApplySite>(inst))
       continue;
 
     auto *LocExpr = inst->getLoc().getAsASTNode<ApplyExpr>();
@@ -1073,8 +1073,7 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // If this is an ApplyInst, check to see if this is part of a self.init
     // call in a delegating initializer.
     DIUseKind Kind = DIUseKind::Load;
-    if ((isa<ApplyInst>(User) || isa<TryApplyInst>(User)) &&
-        isSelfInitUse(User))
+    if (isa<FullApplySite>(User) && isSelfInitUse(User))
       Kind = DIUseKind::SelfInit;
 
     // If this is a ValueMetatypeInst, check to see if it's part of a
@@ -1156,8 +1155,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         
         // If this is an ApplyInst, check to see if this is part of a self.init
         // call in a delegating initializer.
-        if ((isa<ApplyInst>(User) || isa<TryApplyInst>(User)) &&
-            isSelfInitUse(User))
+        if (isa<FullApplySite>(User) && isSelfInitUse(User))
           Kind = DIUseKind::SelfInit;
 
         // If this is a ValueMetatypeInst, check to see if it's part of a
