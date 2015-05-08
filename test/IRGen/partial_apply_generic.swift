@@ -54,7 +54,7 @@ protocol Protein {
   static func paleoDiet() throws -> Protein
 }
 
-enum CarbOverdose : _ErrorType {
+enum CarbOverdose : ErrorType {
   case Mild
   case Severe
 }
