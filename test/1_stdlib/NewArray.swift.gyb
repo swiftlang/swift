@@ -370,13 +370,8 @@ func testReplace${A}(
   testReplace({ r })
   
   // This test should ensure r's retain isn't dropped before we start testing.
-<<<<<<< HEAD
   if (r.count != testWidth) {
-    println("something bad happened!")
-=======
-  if (r.count() != testWidth) {
     print("something bad happened!")
->>>>>>> stdlib: implement new print() API
   }
 }
 
