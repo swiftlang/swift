@@ -23,7 +23,7 @@ public protocol _RangeReplaceableCollectionDefaultsType
   /// `self.endIndex`.
   ///
   /// - complexity: amortized O(1).
-  mutating func append(x: Self.Generator.Element)
+  mutating func append(x: Generator.Element)
 }
 
 extension _RangeReplaceableCollectionDefaultsType {
@@ -58,7 +58,7 @@ public protocol RangeReplaceableCollectionType
   /// `subRange.endIndex == self.endIndex` and `isEmpty(newElements)`,
   /// O(`self.count()` + `newElements.count()`) otherwise.
   mutating func replaceRange<
-    C : CollectionType where C.Generator.Element == Self.Generator.Element
+    C : CollectionType where C.Generator.Element == Generator.Element
   >(
     subRange: Range<Index>, with newElements: C
   )

@@ -120,10 +120,10 @@ public protocol SequenceType : _Sequence_Type {
   /// in the same order.
   func ~>(
     _:Self, _: (_CopyToNativeArrayBuffer, ())
-  ) -> _ContiguousArrayBuffer<Self.Generator.Element>
+  ) -> _ContiguousArrayBuffer<Generator.Element>
 
   /// Copy a Sequence into an array.
-  func ~> (source:Self, ptr:(_InitializeTo, UnsafeMutablePointer<Self.Generator.Element>))
+  func ~> (source:Self, ptr:(_InitializeTo, UnsafeMutablePointer<Generator.Element>))
 }
 
 public struct _CopyToNativeArrayBuffer {}

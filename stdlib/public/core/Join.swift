@@ -35,7 +35,7 @@ public protocol _ExtensibleCollectionType : CollectionType {
 
   func +=<
     S : SequenceType
-    where S.Generator.Element == Self.Generator.Element
+    where S.Generator.Element == Generator.Element
   >(inout _: Self, _: S)
   */
 
@@ -45,7 +45,7 @@ public protocol _ExtensibleCollectionType : CollectionType {
   /// `self.endIndex`.
   ///
   /// - complexity: amortized O(1).
-  mutating func append(x: Self.Generator.Element)
+  mutating func append(x: Generator.Element)
 
   /// Append the elements of `newElements` to `self`.
   ///
@@ -59,7 +59,7 @@ public protocol _ExtensibleCollectionType : CollectionType {
   ///     }
   mutating func extend<
       S : SequenceType
-      where S.Generator.Element == Self.Generator.Element
+      where S.Generator.Element == Generator.Element
   >(newElements: S)
 }
 
@@ -74,22 +74,22 @@ public protocol ExtensibleCollectionType : _ExtensibleCollectionType {
 
   func +<
     S : SequenceType
-    where S.Generator.Element == Self.Generator.Element
+    where S.Generator.Element == Generator.Element
   >(_: Self, _: S) -> Self
 
   func +<
     S : SequenceType
-    where S.Generator.Element == Self.Generator.Element
+    where S.Generator.Element == Generator.Element
   >(_: S, _: Self) -> Self
 
   func +<
     S : CollectionType
-    where S.Generator.Element == Self.Generator.Element
+    where S.Generator.Element == Generator.Element
   >(_: Self, _: S) -> Self
 
   func +<
     EC : ExtensibleCollectionType
-    where EC.Generator.Element == Self.Generator.Element
+    where EC.Generator.Element == Generator.Element
   >(_: Self, _: S) -> Self
 */
 }
