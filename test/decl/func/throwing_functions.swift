@@ -37,6 +37,26 @@ var b : () throws -> () -> () = curry2Throws
 var c : () -> () throws -> () = curry3
 var d : () throws -> () throws -> () = curry3Throws
 
+// Partial application ////////////////////////////////////////////////////////
+
+func partialApply1(a: Int)(b: Int)(c: Int) throws { }
+
+func partialApply2<T>(a: T)(b: Int)(c: Int) throws { }
+
+protocol Parallelogram {
+  static func partialApply3(a: Int) throws
+}
+
+let f11 = partialApply1
+let f12 = partialApply1(1)
+let f13 = partialApply1(1)(b: 2)
+
+let f22 = partialApply2(1)
+let f23 = partialApply2(1)(b: 2)
+
+func partialApply4<T: Parallelogram>(t: T) {
+  let f = T.partialApply3
+}
 
 // Overload resolution/////////////////////////////////////////////////////////
 func barG<T>(t : T) throws -> T { return t } // expected-note{{}}

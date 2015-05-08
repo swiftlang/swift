@@ -3642,20 +3642,6 @@ public:
     return badType;
   }
 
-  /// \brief Validate and apply the attributes that are applicable to the
-  /// AnyFunctionType.
-  ///
-  /// Currently, we only allow 'noreturn' to be applied on a FuncDecl.
-  AnyFunctionType::ExtInfo
-  validateAndApplyFunctionTypeAttributes(FuncDecl *FD) {
-    auto Info = AnyFunctionType::ExtInfo();
-
-    // 'noreturn' is allowed on a function declaration.
-    Info = Info.withIsNoReturn(FD->getAttrs().hasAttribute<NoReturnAttr>());
-
-    return Info;
-  }
-
   void semaFuncDecl(FuncDecl *FD, GenericTypeResolver *resolver) {
     if (FD->hasType())
       return;
@@ -3765,23 +3751,13 @@ public:
         params = outerGenericParams;
       }
       
-      // Validate and consume the function type attributes.
-      auto Info = validateAndApplyFunctionTypeAttributes(FD);
+      auto Info = TC.applyFunctionTypeAttributes(FD, i);
       
-      // For curried functions, 'throws' only applies to the innnermost
-      // function.
-      auto doesThrow = i ? false : FD->getThrowsLoc().isValid();
       if (params) {
-        funcTy = PolymorphicFunctionType::get(argTy,
-                                              funcTy,
-                                              params,
-                                              Info.withThrows(doesThrow));
+        funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
       } else {
-        funcTy = FunctionType::get(argTy,
-                                   funcTy,
-                                   Info.withThrows(doesThrow));
+        funcTy = FunctionType::get(argTy, funcTy, Info);
       }
-
     }
     FD->setType(funcTy);
     FD->setBodyResultType(bodyResultType);

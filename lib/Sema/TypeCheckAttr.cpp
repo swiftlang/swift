@@ -1471,3 +1471,22 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   // Change the type to the appropriate reference storage type.
   var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
 }
+
+AnyFunctionType::ExtInfo
+TypeChecker::applyFunctionTypeAttributes(AbstractFunctionDecl *func,
+                                         unsigned i) {
+  auto info = AnyFunctionType::ExtInfo();
+
+  // For curried functions, 'throws' and 'noreturn' only applies to the
+  // innermost function.
+  if (i == 0) {
+    info = info.withIsNoReturn(func->getAttrs().hasAttribute<NoReturnAttr>());
+
+    if (auto FD = dyn_cast<FuncDecl>(func))
+      info = info.withThrows(FD->getThrowsLoc().isValid());
+    else if (auto CD = dyn_cast<ConstructorDecl>(func))
+      info = info.withThrows(CD->getThrowsLoc().isValid());
+  }
+
+  return info;
+}

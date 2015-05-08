@@ -111,7 +111,7 @@ var maybeReturns: (Int) -> () = exit // no-error
 var neverReturns1 = exit
 neverReturns1 = print // expected-error {{cannot assign a value of type '(Int) -> ()' to a value of type '@noreturn (Int) -> ()'}}
 
-var neverReturns2: @noreturn MethodWithNoreturn -> @noreturn () -> () = MethodWithNoreturn.neverReturns
+var neverReturns2: MethodWithNoreturn -> @noreturn () -> () = MethodWithNoreturn.neverReturns
 
 exit(5) // no-error
 
@@ -131,3 +131,6 @@ var fnr: @noreturn (_: Int) -> () = exit
 @noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-10=}}
 var fpr: (_: Int) -> () = exit
 
+func testWitnessMethod<T: TestProtocol>(t: T) {
+  let f = T.neverReturnsStatic
+}

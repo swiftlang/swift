@@ -740,6 +740,11 @@ public:
     handleExternalDecl(nominal);
   }
 
+  /// Determine attributes for the given function and curry level, with a level
+  /// of 0 indicating the innermost function.
+  AnyFunctionType::ExtInfo
+  applyFunctionTypeAttributes(AbstractFunctionDecl *func, unsigned i);
+
   /// Determine whether the given (potentially constrained) protocol extension
   /// is usable for the given type.
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
