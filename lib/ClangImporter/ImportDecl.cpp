@@ -1675,8 +1675,12 @@ namespace {
       
       // Did we already import an enum constant for this enum with the
       // same value? If so, import it as a standalone constant.
-      if (!Impl.EnumConstantValues.insert({clangEnum, rawValue}).second)
-        return importOptionConstant(decl, clangEnum, theEnum);
+
+      auto insertResult =
+          Impl.EnumConstantValues.insert({{clangEnum, rawValue}, nullptr});
+      if (!insertResult.second)
+        return importEnumCaseAlias(decl, insertResult.first->second,
+                                   clangEnum, theEnum);
 
       if (clangEnum->getIntegerType()->isSignedIntegerOrEnumerationType()
           && rawValue.slt(0)) {
@@ -1698,6 +1702,7 @@ namespace {
                                         name, TypeLoc(),
                                         SourceLoc(), rawValueExpr,
                                         theEnum);
+      insertResult.first->second = element;
 
       // Give the enum element the appropriate type.
       auto argTy = MetatypeType::get(theEnum->getDeclaredType());
@@ -1728,6 +1733,39 @@ namespace {
                                      clang::APValue(decl->getInitVal()),
                                      convertKind, /*isStatic*/ true, decl);
       Impl.importAttributes(decl, CD);
+      return CD;
+    }
+
+    /// Import \p alias as an alias for the imported constant \p original.
+    ///
+    /// This builds the getter in a way that's compatible with switch
+    /// statements. Changing the body here may require changing
+    /// TypeCheckPattern.cpp as well.
+    Decl *importEnumCaseAlias(const clang::EnumConstantDecl *alias,
+                              EnumElementDecl *original,
+                              const clang::EnumDecl *clangEnum,
+                              NominalTypeDecl *importedEnum) {
+      auto name = getEnumConstantName(alias, clangEnum);
+      if (name.empty())
+        return nullptr;
+      
+      // Construct the original constant. Enum constants witbout payloads look
+      // like simple values, but actually have type 'MyEnum.Type -> MyEnum'.
+      auto constantRef = new (Impl.SwiftContext) DeclRefExpr(original,
+                                                             SourceLoc(),
+                                                             /*implicit*/true);
+      Type importedEnumTy = importedEnum->getDeclaredTypeInContext();
+      auto typeRef = TypeExpr::createImplicit(importedEnumTy,
+                                              Impl.SwiftContext);
+      auto instantiate = new (Impl.SwiftContext) DotSyntaxCallExpr(constantRef,
+                                                                   SourceLoc(),
+                                                                   typeRef);
+      instantiate->setType(importedEnumTy);
+
+      Decl *CD = Impl.createConstant(name, importedEnum, importedEnumTy,
+                                     instantiate, ConstantConvertKind::None,
+                                     /*isStatic*/ true, alias);
+      Impl.importAttributes(alias, CD);
       return CD;
     }
 

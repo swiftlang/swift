@@ -25,6 +25,68 @@
 #include <utility>
 using namespace swift;
 
+/// If the given VarDecl is a computed property whose getter always returns a
+/// particular enum element, return that element.
+///
+/// This requires the getter's body to have a certain syntactic form. It should
+/// be kept in sync with importEnumCaseAlias in the ClangImporter library.
+static EnumElementDecl *
+extractEnumElement(const VarDecl *constant) {
+  const FuncDecl *getter = constant->getGetter();
+  if (!getter)
+    return nullptr;
+
+  const BraceStmt *body = getter->getBody();
+  if (!body || body->getNumElements() != 1)
+    return nullptr;
+
+  auto *retStmtRaw = body->getElement(0).dyn_cast<Stmt *>();
+  auto *retStmt = dyn_cast_or_null<ReturnStmt>(retStmtRaw);
+  if (!retStmt)
+    return nullptr;
+
+  auto *resultExpr = dyn_cast_or_null<ApplyExpr>(retStmt->getResult());
+  if (!resultExpr)
+    return nullptr;
+
+  auto *ctorExpr = dyn_cast<DeclRefExpr>(resultExpr->getFn());
+  if (!ctorExpr)
+    return nullptr;
+
+  return dyn_cast<EnumElementDecl>(ctorExpr->getDecl());
+}
+
+/// Find the first enum element in \p foundElements.
+///
+/// If there are no enum elements but there are properties, attepmts to map
+/// an arbitrary property to an enum element using extractEnumElement.
+static EnumElementDecl *
+filterForEnumElement(LookupResult foundElements) {
+  EnumElementDecl *foundElement = nullptr;
+  VarDecl *foundConstant = nullptr;
+
+  for (ValueDecl *e : foundElements) {
+    assert(e);
+
+    if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
+      // Ambiguities should be ruled out by parsing.
+      assert(!foundElement && "ambiguity in enum case name lookup?!");
+      foundElement = oe;
+      continue;
+    }
+
+    if (auto *var = dyn_cast<VarDecl>(e)) {
+      foundConstant = var;
+      continue;
+    }
+  }
+
+  if (!foundElement && foundConstant && foundConstant->hasClangNode())
+    foundElement = extractEnumElement(foundConstant);
+
+  return foundElement;
+}
+
 /// Find an unqualified enum element.
 static EnumElementDecl *
 lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
@@ -32,20 +94,7 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup = TC.lookupUnqualified(DC, name, SourceLoc(), lookupOptions);
-  if (!lookup)
-    return nullptr;
-
-  // See if there is any enum element in there.
-  EnumElementDecl *foundElement = nullptr;
-  for (auto result : lookup) {
-    auto *oe = dyn_cast<EnumElementDecl>(result.Decl);
-    if (!oe)
-      continue;
-    // Ambiguities should be ruled out by parsing.
-    assert(!foundElement && "ambiguity in enum case name lookup?!");
-    foundElement = oe;
-  }
-  return foundElement;
+  return filterForEnumElement(lookup);
 }
 
 /// Find an enum element in an enum type.
@@ -57,21 +106,7 @@ lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
   NameLookupOptions lookupOptions
     = defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
   LookupResult foundElements = TC.lookupMember(DC, ty, name, lookupOptions);
-  if (!foundElements)
-    return nullptr;
-  
-  // See if there is any enum element in there.
-  EnumElementDecl *foundElement = nullptr;
-  for (ValueDecl *e : foundElements) {
-    auto *oe = dyn_cast<EnumElementDecl>(e);
-    if (!oe)
-      continue;
-    // Ambiguities should be ruled out by parsing.
-    assert(!foundElement && "ambiguity in enum case name lookup?!");
-    foundElement = oe;
-  }
-  
-  return foundElement;
+  return filterForEnumElement(foundElements);
 }
 
 namespace {

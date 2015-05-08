@@ -475,7 +475,7 @@ public:
   llvm::DenseMap<const clang::EnumDecl *, StringRef> EnumConstantNamePrefixes;
 
 private:
-  class EnumConstantDenseSetInfo {
+  class EnumConstantDenseMapInfo {
   public:
     using PairTy = std::pair<const clang::EnumDecl *, llvm::APSInt>;
     using PointerInfo = llvm::DenseMapInfo<const clang::EnumDecl *>;
@@ -496,8 +496,9 @@ private:
 
 public:
   /// \brief Keep track of enum constant values that have been imported.
-  llvm::DenseSet<std::pair<const clang::EnumDecl *, llvm::APSInt>,
-                 EnumConstantDenseSetInfo>
+  llvm::DenseMap<std::pair<const clang::EnumDecl *, llvm::APSInt>,
+                 EnumElementDecl *,
+                 EnumConstantDenseMapInfo>
     EnumConstantValues;
 
   /// \brief Keep track of initializer declarations that correspond to

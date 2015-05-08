@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %s -verify
 // -- Check that we can successfully round-trip.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -D IRGEN -emit-ir %s >/dev/null
 
@@ -61,6 +61,51 @@ var alias1 = NSAliasesEnum.BySameValue
 var alias2 = NSAliasesEnum.ByEquivalentValue
 var alias3 = NSAliasesEnum.ByName
 var aliasOriginal = NSAliasesEnum.Original
+
+switch aliasOriginal {
+case .Original:
+  break
+case .DifferentValue:
+  break
+}
+switch aliasOriginal {
+case .Original:
+  break
+default:
+  break
+}
+
+switch aliasOriginal {
+case .BySameValue:
+  break
+case .DifferentValue:
+  break
+}
+switch aliasOriginal {
+case .BySameValue:
+  break
+default:
+  break
+}
+
+switch aliasOriginal {
+case NSAliasesEnum.BySameValue:
+  break
+case NSAliasesEnum.DifferentValue:
+  break
+}
+
+extension NSAliasesEnum {
+  func test() {
+    switch aliasOriginal {
+    case BySameValue:
+      break
+    case DifferentValue:
+      break
+    }
+  }
+}
+
 
 #if !IRGEN
 var qualifiedName = NSRuncingMode.Mince

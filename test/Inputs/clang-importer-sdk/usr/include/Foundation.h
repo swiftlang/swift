@@ -258,6 +258,7 @@ typedef NS_ENUM(unsigned char, NSAliasesEnum) {
   NSAliasesBySameValue = 129,
   NSAliasesByEquivalentValue = -127,
   NSAliasesByName = NSAliasesOriginal,
+  NSAliasesDifferentValue = 2
 };
 
 NS_ENUM(NSInteger, NSMalformedEnumMissingTypedef) {
