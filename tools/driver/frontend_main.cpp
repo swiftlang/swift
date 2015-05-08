@@ -410,6 +410,8 @@ private:
   bool shouldFix(DiagnosticKind Kind, const DiagnosticInfo &Info) {
     if (Kind == DiagnosticKind::Error)
       return true;
+    if (Info.ID == diag::parameter_pound_double_up.ID)
+      return true;
     return false;
   }
 
