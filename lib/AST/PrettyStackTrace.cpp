@@ -35,14 +35,50 @@ void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
 
 void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
                                  ASTContext &Context) {
+  bool hasPrintedName = false;
   if (auto *named = dyn_cast<ValueDecl>(D)) {
-    if (named->getName().get())
+    if (named->hasName()) {
       out << '\'' << named->getName() << '\'';
-    else
-      out << "'anonname=" << (const void*)named << '\'';
-  } else {
-    out << "declaration";
+      hasPrintedName = true;
+    } else if (auto *fn = dyn_cast<FuncDecl>(named)) {
+      if (auto *ASD = fn->getAccessorStorageDecl()) {
+        if (ASD->hasName()) {
+          switch (fn->getAccessorKind()) {
+          case AccessorKind::NotAccessor:
+            llvm_unreachable("Isn't an accessor?");
+          case AccessorKind::IsGetter:
+            out << "getter";
+            break;
+          case AccessorKind::IsSetter:
+            out << "setter";
+            break;
+          case AccessorKind::IsWillSet:
+            out << "willset";
+            break;
+          case AccessorKind::IsDidSet:
+            out << "didset";
+            break;
+          case AccessorKind::IsMaterializeForSet:
+            out << "materializeForSet";
+            break;
+          case AccessorKind::IsAddressor:
+            out << "addressor";
+            break;
+          case AccessorKind::IsMutableAddressor:
+            out << "mutableAddressor";
+            break;
+          }
+          
+          out << " for " << ASD->getFullName();
+          hasPrintedName = true;
+        }
+      }
+    }
   }
+
+  if (!hasPrintedName)
+    out << "declaration " << (const void *)D;
+
   out << " at ";
   D->getStartLoc().print(out, Context.SourceMgr);
   out << '\n';
