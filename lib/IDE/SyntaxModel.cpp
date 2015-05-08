@@ -368,6 +368,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
     for (auto *Elem : ArrayE->getElements())
       addExprElem(Elem, SN);
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
 
   } else if (auto *DictE = dyn_cast<DictionaryExpr>(E)) {
