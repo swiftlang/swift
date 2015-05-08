@@ -757,17 +757,6 @@ namespace {
         return { false, DRE };
       }
 
-      if (auto FD = dyn_cast<FuncDecl>(D)) {
-        // TODO: Local function references aren't implemented in
-        // SILGen yet. However, if there are no local captures, it will work.
-        // Keep track of these local function captures so we can check them
-        // later.
-        // Observing accessors appear to harmlessly capture each
-        // other, however, so give them an exception.
-        if (!FD->getAccessorStorageDecl())
-          TC.LocalFunctionCaptures.push_back({FD, DRE->getLoc()});
-      }
-
       // We're going to capture this, compute flags for the capture.
       unsigned Flags = 0;
 
