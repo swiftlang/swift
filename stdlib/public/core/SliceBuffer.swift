@@ -240,7 +240,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
       return count
     }
     let n = nativeBuffer
-    if (count + start) == (n.count + n.baseAddress) {
+    let nativeEnd = n.baseAddress + n.count
+    if (start + count) == nativeEnd {
       return count + (n.capacity - n.count)
     }
     return count

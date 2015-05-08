@@ -286,12 +286,10 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   >(
     subRange: Range<Index>, with newElements: C
   ) {
-    _core.replaceRange(
-      subRange.startIndex._position
-      ..< subRange.endIndex._position,
-      with:
-        _lazyConcatenate(lazy(newElements).map { $0.utf16 })
-    )
+    let rawSubRange = subRange.startIndex._position
+      ..< subRange.endIndex._position
+    let lazyUTF16 = _lazyConcatenate(lazy(newElements).map { $0.utf16 })
+    _core.replaceRange(rawSubRange, with: lazyUTF16)
   }
 
   /// Insert `newElement` at index `i`.

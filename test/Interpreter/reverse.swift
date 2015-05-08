@@ -3,7 +3,8 @@
 func test()
 {
     print("[", appendNewline: false)
-  for i in lazy(0..<10).reverse() {
+    let reversed = lazy(0..<10).reverse()
+    for i in reversed {
         print(i, appendNewline: false)
         print(" ", appendNewline: false)
     }
@@ -13,7 +14,9 @@ func test()
 func testr()
 {
     print("[", appendNewline: false)
-    for i in lazy(0..<10).reverse().reverse() {
+    let reversed = lazy(0..<10).reverse()
+    let doublyReversed = reversed.reverse()
+    for i in doublyReversed {
         print(i, appendNewline: false)
         print(" ", appendNewline: false)
     }

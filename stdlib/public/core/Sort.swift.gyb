@@ -219,7 +219,7 @@ func _siftDown<
   if countToIndex + 1 >= countFromIndex {
     return
   }
-  let left = index + (index - range.startIndex) + 1
+  let left = advance(index, countToIndex + 1)
   var largest = index
   if ${cmp("elements[largest]", "elements[left]", p)} {
     largest = left

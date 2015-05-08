@@ -328,12 +328,10 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   >(
     subRange: Range<Index>, with newElements: C
   ) {
-    _core.replaceRange(
-      subRange.startIndex._base._position
-      ..< subRange.endIndex._base._position,
-      with:
-        _lazyConcatenate(lazy(newElements).map { $0.utf16 })
-    )
+    let rawSubRange = subRange.startIndex._base._position
+      ..< subRange.endIndex._base._position
+    let lazyUTF16 = _lazyConcatenate(lazy(newElements).map { $0.utf16 })
+    _core.replaceRange(rawSubRange, with: lazyUTF16)
   }
 
   /// Insert `newElement` at index `i`.
